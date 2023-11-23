@@ -13,10 +13,16 @@
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  */
 
+namespace PayPalRestful\Api;
+
+use PayPalRestful\Common\ErrorInfo;
+use PayPalRestful\Common\Logger;
+use PayPalRestful\Token\TokenCache;
+
 /**
  * PayPal REST API (see https://developer.paypal.com/api/rest/)
  */
-class PayPalRestfulApi extends base
+class PayPalRestfulApi extends ErrorInfo
 {
     // -----
     // Constants used to set the class variable errorInfo['errNum'].
@@ -33,12 +39,6 @@ class PayPalRestfulApi extends base
     //
     protected const ENDPOINT_SANDBOX = 'https://api-m.sandbox.paypal.com/';
     protected const ENDPOINT_PRODUCTION = 'https://api-m.paypal.com/';
-
-    // -----
-    // Constants used to encrypt the session-based copy of the access-token.  Used by
-    // the getSavedToken/saveToken methods.
-    //
-    private const ENCRYPT_ALGO = 'AES-256-CBC';
 
     // -----
     // PayPal constants associated with an order's current 'status'.
@@ -60,22 +60,19 @@ class PayPalRestfulApi extends base
     public const STATUS_SAVED = 'SAVED';
     public const STATUS_VOIDED = 'VOIDED';
 
-
-    // -----
-    // Variable that holds the selected cryptographic algorithm and its IV length.
-    // Set during construction.
-    //
-    private $encryptionAlgorithm;
-    private $encryptionAlgoIvLen;
+    /**
+     * Variables associated with interface logging;
+     *
+     * @log Logger object, logs debug tracing information.
+     */
+    protected $log;
 
     /**
      * Variables associated with interface logging;
      *
-     * @logFile string
-     * @debug bool
+     * @token TokenCache object, caches any access-token retrieved from PayPal.
      */
-    protected $debug = false;
-    protected $debugLogFile;
+    protected $tokenCache;
 
     /**
      * Sandbox or production? Set during class construction.
@@ -108,17 +105,6 @@ class PayPalRestfulApi extends base
     ];
 
     /**
-     * Error information, when a CURL or RESTful error occurs.
-     */
-    protected $errorInfo = [
-        'errMsg' => '',
-        'errNum' => 0,
-        'curlErrno' => 0,
-        'httpCode' => 200,
-        'details' => [],
-    ];
-
-    /**
      * Array, used by the getOrderDifference method, that identifies what operations
      * can be performed on various fields of the order's requested data.  All
      * 'keys' are part of the 'purchase_units' array of that request-data!
@@ -140,15 +126,13 @@ class PayPalRestfulApi extends base
     ];
 
     // -----
-    // Class constructor, saves endpoint (production vs. sandbox), clientId and clientSecret
+    // Class constructor, saves endpoint (live vs. sandbox), clientId and clientSecret
     //
-    public function __construct(string $endpoint_type, string $client_id, string $client_secret, bool $enable_debug)
+    public function __construct(string $endpoint_type, string $client_id, string $client_secret)
     {
-        $this->endpoint = ($endpoint_type === 'Production') ? self::ENDPOINT_PRODUCTION : self::ENDPOINT_SANDBOX;
+        $this->endpoint = ($endpoint_type === 'live') ? self::ENDPOINT_PRODUCTION : self::ENDPOINT_SANDBOX;
         $this->clientId = $client_id;
         $this->clientSecret = $client_secret;
-        $this->encryptionAlgorithm = $this->setEncryptionAlgorithm();
-        $this->encryptionAlgoIvLen = openssl_cipher_iv_length($this->encryptionAlgorithm);
 
         $this->ch = curl_init();
         if ($this->ch === false) {
@@ -156,14 +140,8 @@ class PayPalRestfulApi extends base
             trigger_error($this->errMsg, E_USER_WARNING);
         }
 
-        $this->debug = $enable_debug;
-        $this->debugLogFile = DIR_FS_LOGS . '/PayPalRestfulApi-' . ($_SESSION['customer_id'] ?? 'guest') . '-' . date('Ymd') . '.log';
-
-        $this->notify('NOTIFY_PAYPALRESTFULAPI_CONSTRUCT', $endpoint_type);
-    }
-    protected function setEncryptionAlgorithm(): string
-    {
-        return self::ENCRYPT_ALGO;
+        $this->log = new Logger();
+        $this->tokenCache = new TokenCache($client_secret);
     }
 
     // ----
@@ -186,66 +164,66 @@ class PayPalRestfulApi extends base
 
     public function createOrder(array $order_request)
     {
-        $this->debugLog('==> Start createOrder', true);
+        $this->log->write('==> Start createOrder', true);
         $response = $this->curlPost('v2/checkout/orders', $order_request);
-        $this->debugLog("==> End createOrder\n", true);
+        $this->log->write("==> End createOrder\n", true);
         return $response;
     }
 
     public function getOrderStatus(string $paypal_order_id)
     {
-        $this->debugLog('==> Start getOrderStatus', true);
+        $this->log->write('==> Start getOrderStatus', true);
         $response = $this->curlGet("v2/checkout/orders/$paypal_order_id");
-        $this->debugLog("==> End getOrderStatus\n", true);
+        $this->log->write("==> End getOrderStatus\n", true);
         return $response;
     }
 
     public function confirmPaymentSource(string $paypal_order_id, array $payment_source)
     {
-        $this->debugLog('==> Start confirmPaymentSource', true);
+        $this->log->write('==> Start confirmPaymentSource', true);
         $paypal_options = [
             'payment_source' => $payment_source,
         ];
         $response = $this->curlPost("v2/checkout/orders/$paypal_order_id/confirm-payment-source", $paypal_options);
-        $this->debugLog("==> End confirmPaymentSource\n", true);
+        $this->log->write("==> End confirmPaymentSource\n", true);
         return $response;
     }
 
     public function captureOrder(string $paypal_order_id)
     {
-        $this->debugLog('==> Start captureOrder', true);
+        $this->log->write('==> Start captureOrder', true);
         $response = $this->curlPost("v2/checkout/orders/$paypal_order_id/capture");
-        $this->debugLog("==> End captureOrder\n", true);
+        $this->log->write("==> End captureOrder\n", true);
         return $response;
     }
 
     public function authorizeOrder(string $paypal_order_id)
     {
-        $this->debugLog('==> Start authorizeOrder', true);
+        $this->log->write('==> Start authorizeOrder', true);
         $response = $this->curlPost("v2/checkout/orders/$paypal_order_id/authorize");
-        $this->debugLog("==> End authorizeOrder\n", true);
+        $this->log->write("==> End authorizeOrder\n", true);
         return $response;
     }
 
     public function getAuthorizationDetails(string $paypal_auth_id)
     { 
-        $this->debugLog('==> Start getAuthorizationDetails', true);
+        $this->log->write('==> Start getAuthorizationDetails', true);
         $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id");
-        $this->debugLog("==> End getAuthorizationDetails\n", true);
+        $this->log->write("==> End getAuthorizationDetails\n", true);
         return $response;
     }
 
     public function capturePayment(string $paypal_auth_id, string $invoice_id, string $payer_note, )
     { 
-        $this->debugLog('==> Start capturePayment', true);
+        $this->log->write('==> Start capturePayment', true);
         $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/capture");
-        $this->debugLog("==> End capturePayment\n", true);
+        $this->log->write("==> End capturePayment\n", true);
         return $response;
     }
 
     public function reAuthorizePayment(string $paypal_auth_id, string $currency_code, string $value)
     { 
-        $this->debugLog('==> Start reAuthorizePayment', true);
+        $this->log->write('==> Start reAuthorizePayment', true);
         $amount = [
             'amount' => [
                 'currency_code' => $currency_code,
@@ -253,23 +231,23 @@ class PayPalRestfulApi extends base
             ],
         ];
         $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/reauthorize", $amount);
-        $this->debugLog("==> End reAuthorizePayment\n", true);
+        $this->log->write("==> End reAuthorizePayment\n", true);
         return $response;
     }
 
     public function voidPayment(string $paypal_auth_id)
     { 
-        $this->debugLog('==> Start voidPayment', true);
+        $this->log->write('==> Start voidPayment', true);
         $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/void");
-        $this->debugLog("==> End voidPayment\n", true);
+        $this->log->write("==> End voidPayment\n", true);
         return $response;
     }
 
     public function getCapturedDetails(string $paypal_capture_id)
     { 
-        $this->debugLog('==> Start getCapturedDetails', true);
+        $this->log->write('==> Start getCapturedDetails', true);
         $response = $this->curlPost("v2/payments/captures/$paypal_capture_id");
-        $this->debugLog("==> End getCapturedDetails\n", true);
+        $this->log->write("==> End getCapturedDetails\n", true);
         return $response;
     }
     
@@ -302,7 +280,7 @@ class PayPalRestfulApi extends base
     //
     public function updateOrder(string $paypal_order_id, array $order_request_current, array $order_request_update)
     {
-        $this->debugLog("==> Start updateOrder ($paypal_order_id).  Current:\n" . $this->logJSON($order_request_current) . "\nUpdate:\n" . $this->logJSON($order_request_update), true);
+        $this->log->write("==> Start updateOrder ($paypal_order_id).  Current:\n" . $this->log->logJSON($order_request_current) . "\nUpdate:\n" . $this->log->logJSON($order_request_update), true);
 
         // -----
         // Check to see that the order is valid and that its status is also valid to perform an update operation.
@@ -313,20 +291,20 @@ class PayPalRestfulApi extends base
         }
         if ($status['status'] !== self::STATUS_CREATED && $status['status'] !== self::STATUS_APPROVED) {
             $this->setErrorInfo(422, '', 0, ['name' => 'ORDER_ALREADY_COMPLETED', 'message' => 'The order cannot be patched after it is completed.']);
-            $this->debugLog("  --> Can't update, due to order status restriction: '{$status['status']}'.");
+            $this->log->write("  --> Can't update, due to order status restriction: '{$status['status']}'.");
             return false;
         }
 
         $updates = $this->getOrderDifference($order_request_current, $order_request_update);
         if (count($updates) === 0) {
-            $this->debugLog('  --> Nothing to update, returning getOrderStatus.');
+            $this->log->write('  --> Nothing to update, returning getOrderStatus.');
             return $status;
         }
         if ($updates[0] === 'error') {
             return false;
         }
 
-        $this->debugLog("Updates to order:\n" . $this->logJSON($updates));
+        $this->log->write("Updates to order:\n" . $this->log->logJSON($updates));
         $order_updates = [];
         foreach ($updates as $next_update) {
             $order_updates[] = [
@@ -337,7 +315,7 @@ class PayPalRestfulApi extends base
         }
         $response = $this->curlPatch("v2/checkout/orders/$paypal_order_id", $order_updates);
 
-        $this->debugLog('==> End updateOrder', true);
+        $this->log->write('==> End updateOrder', true);
         return $response;
     }
     protected function getOrderDifference(array $current, array $update): array
@@ -448,7 +426,7 @@ class PayPalRestfulApi extends base
             if (strpos($update_options, $op) === false) {
                 $error_message = "$key/$subkey operation '$op' is not supported";
                 $this->setErrorInfo(self::ERR_CANT_UPDATE, $error_message);
-                $this->debugLog('--> Update disallowed: ' . $error_message);
+                $this->log->write('--> Update disallowed: ' . $error_message);
                 return ['error'];
             }
 
@@ -471,7 +449,7 @@ class PayPalRestfulApi extends base
         //
         if (count($order_difference) !== 0) {
             $this->setErrorInfo(self::ERR_CANT_UPDATE, 'Parameter error, order cannot be updated using current parameters');
-            $this->debugLog("--> Update disallowed, changed parameters cannot be updated:\n" . $this->logJSON($order_difference));
+            $this->log->write("--> Update disallowed, changed parameters cannot be updated:\n" . $this->log->logJSON($order_difference));
             return ['error'];
         }
 
@@ -509,9 +487,9 @@ class PayPalRestfulApi extends base
     // Validates the supplied client-id/secret; used during admin initialization to
     // auto-disable the associated payment method if the credentials aren't valid.
     //
-    public function validatePayPalCredentials(string $client_id, string $client_secret): bool
+    public function validatePayPalCredentials(): bool
     {
-        return ($this->getOAuth2Token($client_id, $client_secret, false) !== '');
+        return ($this->getOAuth2Token($this->clientId, $this->clientSecret, false) !== '');
     }
 
     // -----
@@ -534,7 +512,7 @@ class PayPalRestfulApi extends base
         }
 
         if ($use_saved_token === true) {
-            $token = $this->getSavedToken();
+            $token = $this->tokenCache->get();
             if ($token !== '') {
                 return $token;
             }
@@ -552,40 +530,11 @@ class PayPalRestfulApi extends base
         if ($response !== false) {
             $token = $response['access_token'];
             if ($use_saved_token === true) {
-                $this->saveToken($token, $response['expires_in']);
+                $this->tokenCache->save($token, $response['expires_in']);
             }
          }
 
         return $token;
-    }
-    protected function getSavedToken(): string
-    {
-        if (!isset($_SESSION['PayPalRestful']['token_expires_ts'], $_SESSION['PayPalRestful']['saved_token']) || time() > $_SESSION['PayPalRestful']['token_expires_ts']) {
-            $this->clearToken();
-            return '';
-        }
-
-        $this->debugLog('getSavedToken: Using saved access-token.');
-
-        $encrypted_token = $_SESSION['PayPalRestful']['saved_token'];
-        $iv = substr($encrypted_token, 0, $this->encryptionAlgoIvLen);
-        $saved_token = openssl_decrypt(substr($encrypted_token, $this->encryptionAlgoIvLen), $this->encryptionAlgorithm, $this->clientSecret, 0, $iv);
-        if ($saved_token === false) {
-            $saved_token = '';
-            $this->debugLog('getSavedToken: Failed decryption.');
-            $this->clearToken();
-        }
-        return $saved_token;
-    }
-    protected function saveToken(string $access_token, int $seconds_to_expiration)
-    {
-        $iv = openssl_random_pseudo_bytes($this->encryptionAlgoIvLen);
-        $_SESSION['PayPalRestful']['saved_token'] = $iv . openssl_encrypt($access_token, $this->encryptionAlgorithm, $this->clientSecret, 0, $iv);
-        $_SESSION['PayPalRestful']['token_expires_ts'] = time() + $seconds_to_expiration;
-    }
-    protected function clearToken()
-    {
-        unset($_SESSION['PayPalRestful']['token_expires_ts'], $_SESSION['PayPalRestful']['saved_token']);
     }
 
     // -----
@@ -669,6 +618,7 @@ class PayPalRestfulApi extends base
             }
         }
 
+        curl_reset($this->ch);
         curl_setopt_array($this->ch, $curl_options);
         if ($token_required === false) {
             unset($curl_options[CURLOPT_POSTFIELDS]);
@@ -748,6 +698,7 @@ class PayPalRestfulApi extends base
         if (count($options_array) !== 0) {
             $curl_options[CURLOPT_POSTFIELDS] = json_encode($options_array);
         }
+        curl_reset($this->ch);
         curl_setopt_array($this->ch, $curl_options);
         return $this->issueRequest('curlPatch', $option, $curl_options);
     }
@@ -784,7 +735,7 @@ class PayPalRestfulApi extends base
     {
         $this->setErrorInfo(self::ERR_CURL_ERROR, curl_error($this->ch), curl_errno($this->ch));
         curl_reset($this->ch);
-        $this->debugLog("handleCurlError for $method ($option) : CURL error (" . $this->logJSON($this->errorInfo) . "\nCURL Options:\n" . $this->logJSON($curl_options));
+        $this->log->write("handleCurlError for $method ($option) : CURL error (" . $this->log->logJSON($this->errorInfo) . "\nCURL Options:\n" . $this->log->logJSON($curl_options));
     }
 
     // -----
@@ -814,7 +765,7 @@ class PayPalRestfulApi extends base
         // 204: No content returned; implies successful completion of an updateOrder request.
         //
         if ($httpCode === 200 || $httpCode === 201 || $httpCode === 204) {
-            $this->debugLog("The $method ($option) request was successful ($httpCode).\n" . $this->logJSON($response));
+            $this->log->write("The $method ($option) request was successful ($httpCode).\n" . $this->log->logJSON($response));
             return $response;
         }
 
@@ -824,7 +775,7 @@ class PayPalRestfulApi extends base
             // 401: The access token has expired, noting that this "shouldn't" happen.
             //
             case 401:
-                $this->clearToken();
+                $this->tokenCache->clear();
                 $errMsg = 'An expired-token error was received.';
                 trigger_error($errMsg, E_USER_WARNING);
                 break;
@@ -863,56 +814,9 @@ class PayPalRestfulApi extends base
         // let the caller know that the request was unsuccessful.
         //
         $this->setErrorInfo($httpCode, $errMsg, 0, $response);
-        $this->debugLog("The $method ($option) request was unsuccessful.\n" . $this->logJSON($this->errorInfo) . "\nCURL Options: " . $this->logJSON($curl_options));
+        $this->log->write("The $method ($option) request was unsuccessful.\n" . $this->log->logJSON($this->errorInfo) . "\nCURL Options: " . $this->log->logJSON($curl_options));
 
         return false;
     }
-
-    protected function setErrorInfo(int $errNum, string $errMsg, int $curlErrno = 0, $response = [])
-    {
-        $name = $response['name'] ?? 'n/a';
-        $message = $response['message'] ?? 'n/a';
-        $details = $response['details'] ?? 'n/a';
-        $this->errorInfo = compact('errNum', 'errMsg', 'curlErrno', 'name', 'message', 'details');
-    }
-
-    public function getErrorInfo(): array
-    {
-        return $this->errorInfo;
-    }
-
     // ===== End CURL Interface Methods =====
-
-    // ===== Start Logging Methods =====
-
-    public function getLogFileName(): string
-    {
-        return $this->debugLogFile;
-    }
-
-    // -----
-    // Format pretty-printed JSON for the debug-log, removing any HTTP Header
-    // information (present in the CURL options) and/or the actual access-token.
-    //
-    // Also remove unneeded return values that will just 'clutter up' the logged information.
-    //
-    protected function logJSON($data)
-    {
-        if (is_array($data)) {
-            unset(/*$data[CURLOPT_HTTPHEADER], $data['access_token'],*/ $data['scope'], $data['links']);
-        }
-        return json_encode($data, JSON_PRETTY_PRINT);
-    }
-
-    protected function debugLog($message, $include_timestamp = false)
-    {
-        global $current_page_base;
-
-        if ($this->debug === true) {
-            $timestamp = ($include_timestamp === false) ? '' : ("\n" . date('Y-m-d H:i:s: ') . "($current_page_base) ");
-            error_log($timestamp . $message . PHP_EOL, 3, $this->debugLogFile);
-        }
-    }
-
-    // ===== END Logging Methods =====
 }
