@@ -484,12 +484,16 @@ class PayPalRestfulApi extends ErrorInfo
     // ===== Start Token Handling Methods =====
 
     // -----
-    // Validates the supplied client-id/secret; used during admin initialization to
+    // Validates the supplied client-id/secret; used during admin/store initialization to
     // auto-disable the associated payment method if the credentials aren't valid.
     //
-    public function validatePayPalCredentials(): bool
+    // Normally, this method is called requesting that any saved token be used, to cut
+    // down on API requests.  The one exception is during the payment-module's configuration
+    // in the admin, where the currently-configured credentials need to be specifically validated!
+    //
+    public function validatePayPalCredentials(bool $use_saved_token = true): bool
     {
-        return ($this->getOAuth2Token($this->clientId, $this->clientSecret, false) !== '');
+        return ($this->getOAuth2Token($this->clientId, $this->clientSecret, $use_saved_token) !== '');
     }
 
     // -----

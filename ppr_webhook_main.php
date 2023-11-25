@@ -1,7 +1,7 @@
 <?php
 require 'includes/application_top.php';
 
-//trigger_error(json_encode($_GET, JSON_PRETTY_PRINT) . PHP_EOL . json_encode($_POST, JSON_PRETTY_PRINT), E_USER_NOTICE);
+require DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
 $op = $_GET['op'] ?? '';
 if ($op === 'return') {

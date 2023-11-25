@@ -13,8 +13,9 @@
 require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
 use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Api\Data\Amount;
 use PayPalRestful\Common\Logger;
+use PayPalRestful\Token\TokenCache;
+use PayPalRestful\Zc2Pp\Amount;
 use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
 
 /**
@@ -110,7 +111,7 @@ class paypalr extends base
     /**
      * An instance of the PayPalRestfulApi class.
      *
-     * @var object PayPalRestfuleApi
+     * @var object PayPalRestfulApi
      */
     protected $ppr;
 
@@ -172,11 +173,29 @@ class paypalr extends base
     {
         return '<b class="text-danger">' . $msg . '</b>';
     }
+
+    // -----
+    // Validate the configuration settings to ensure that the payment module
+    // can be enabled for use.
+    //
+    // Side effect: The payment module is auto-disabled if any configuration
+    // issues are found.
+    //
     protected function validateConfiguration(bool $curl_installed)
     {
+        // -----
+        // No CURL, no payment module!  The PayPalRestApi class requires
+        // CURL to 'do its business'.
+        //
         if ($curl_installed === false) {
             $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL);
+        // -----
+        // CURL installed, make sure that the configured credentials are valid ...
+        //
         } else {
+            // -----
+            // Determine which (live vs. sandbox) credentials are in use.
+            //
             if (MODULE_PAYMENT_PAYPALR_SERVER === 'live') {
                 $client_id = MODULE_PAYMENT_PAYPALR_CLIENTID_L;
                 $secret = MODULE_PAYMENT_PAYPALR_SECRET_L;
@@ -184,15 +203,29 @@ class paypalr extends base
                 $client_id = MODULE_PAYMENT_PAYPALR_CLIENTID_S;
                 $secret = MODULE_PAYMENT_PAYPALR_SECRET_S;
             }
+
+            // -----
+            // Ensure that the current environment's credentials are set and, if so,
+            // that they're valid PayPal credentials.
+            //
             $error_message = '';
             if ($client_id === '' || $secret === '') {
                 $error_message = sprintf(MODULE_PAYMENT_PAYPALR_ERROR_CREDS_NEEDED, MODULE_PAYMENT_PAYPALR_SERVER);
             } else {
                 $this->ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret);
-                if ($this->ppr->validatePayPalCredentials() === false) {
+
+                global $current_page;
+                $use_saved_credentials = (IS_ADMIN_FLAG === false || $current_page === FILENAME_MODULES);
+                $this->log->write("validateCredentials: Checking ($use_saved_credentials).", true, 'before');
+                if ($this->ppr->validatePayPalCredentials($use_saved_credentials) === false) {
                     $error_message = sprintf(MODULE_PAYMENT_PAYPALR_ERROR_INVALID_CREDS, MODULE_PAYMENT_PAYPALR_SERVER);
                 }
+                $this->log->write('', false, 'after');
             }
+
+            // -----
+            // Any credential errors detected, the payment module's auto-disabled.
+            //
             if ($error_message !== '') {
                 $this->setConfigurationDisabled($error_message);
             }
@@ -231,16 +264,17 @@ class paypalr extends base
             return;
         }
 
-        if ($order->info['total'] == 0) {
+        $order_total = $order->info['total'];
+        if ($order_total == 0) {
             $this->enabled = false;
-            $this->log->write("update_status: Module disabled because purchase amount is set to 0.00.\n" . $this->log->logJSON($order));
+            $this->log->write("update_status: Module disabled because purchase amount is set to 0.00." . $this->log->logJSON($order->info));
             return;
         }
 
         // module cannot be used for purchase > 1000000 JPY
-        if ($order->info['total'] > 1000000 && $order->info['currency'] === 'JPY') {
+        if ($order->info['currency'] === 'JPY' && (($order_total * $order->info['currency_value']) > 1000000)) {
             $this->enabled = false;
-            $this->log->write('update_status: Module disabled because purchase price (' . $order->info['total'] . ') exceeds PayPal-imposed maximum limit of 1000000 JPY.');
+            $this->log->write("update_status: Module disabled because purchase price ($order_total) exceeds PayPal-imposed maximum limit of 1000000 JPY.");
             return;
         }
 
@@ -271,6 +305,29 @@ class paypalr extends base
             }
         }
 
+        // -----
+        // Determine the currency to be used to send the order to PayPal and whether it's usable.
+        //
+        $order_currency = $order->info['currency'];
+        $paypal_default_currency = (MODULE_PAYMENT_PAYPALR_CURRENCY === 'Selected Currency') ? $order_currency : str_replace('Only ', '', MODULE_PAYMENT_PAYPALR_CURRENCY);
+        $amount = new Amount($paypal_default_currency);
+
+        $paypal_currency = $amount->getDefaultCurrencyCode();
+        if ($paypal_currency !== $order_currency) {
+            $this->log->write("==> order_status: Paypal currency ($paypal_currency) different from order's ($order_currency); checking validity.");
+
+            global $currencies;
+            if (!isset($currencies)) {
+                $currencies = new currencies();
+            }
+            if ($currencies->is_set($paypal_currency) === false) {
+                $this->log->write('  --> Payment method disabled; Paypal currency is not configured.');
+                $this->enabled = false;
+                return;
+            }
+        }
+
+/* Not seeing this limitation during initial testing
         // module cannot be used for purchase > $10,000 USD equiv
         if (!function_exists('paypalUSDCheck')) {
             require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_currency_check.php';
@@ -279,6 +336,7 @@ class paypalr extends base
             $this->enabled = false;
             $this->log->write('update_status: Module disabled because purchase price (' . $order->info['total']. ') exceeds PayPal-imposed maximum limit of 10,000 USD or equivalent.');
         }
+*/
     }
 
     /**
@@ -290,13 +348,35 @@ class paypalr extends base
     }
 
     /**
-     * Display Credit Card Information Submission Fields on the Checkout Payment Page
+     * At this point (checkout_payment in the 3-page version), we've got all the information
+     * required to "Create" the order at PayPal.  If the order can't be created, no selection.
      */
     public function selection()
     {
+        $this->log->write("paypalr:: selection starts:\n", $this->log->logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'before');
+
+        global $order;
+
+        // -----
+        // Set up the currency to be used to create the PayPal order.
+        //
+        $paypal_currency = (MODULE_PAYMENT_PAYPALR_CURRENCY === 'Selected Currency') ? $order->info['currency'] : str_replace('Only ', '', MODULE_PAYMENT_PAYPALR_CURRENCY);
+        $amount = new Amount($paypal_currency);
+        
+        // -----
+        // Build the request for the PayPal order's "Create" and send to off to PayPal. Any issues result
+        // in the associated selection not being displayed.
+        //
+        $create_order_request = new CreatePayPalOrderRequest($order);
+        $create_order = $this->ppr->createOrder($create_order_request->get());
+        if ($create_order === false) {
+            return false;
+        }
+
         // -----
         // Return the PayPal selection as a button, modelled after https://developer.paypal.com/demo/checkout/#/pattern/responsive
         //
+        $this->log->write("paypalr:: selection complete, showing button:\n", $this->log->logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'after');
         return [
             'id' => $this->code,
             'module' =>
@@ -307,16 +387,18 @@ class paypalr extends base
     }
 
     // -----
-    // Issued (in 3-page checkout) curing the 'checkout_confirmation' page's
+    // Issued (in 3-page checkout) during the 'checkout_confirmation' page's
     // header.
-    //
-    // "Create" the order at PayPal.
     //
     public function pre_confirmation_check()
     {
         global $order;
 
-        
+        // -----
+        // Set up the currency to be used to create the PayPal order.
+        //
+        $paypal_currency = (MODULE_PAYMENT_PAYPALR_CURRENCY === 'Selected Currency') ? $order->info['currency'] : str_replace('Only ', '', MODULE_PAYMENT_PAYPALR_CURRENCY);
+        $amount = new Amount($paypal_currency);
 
     }
 

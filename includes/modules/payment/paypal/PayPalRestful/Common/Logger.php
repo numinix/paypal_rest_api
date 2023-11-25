@@ -68,13 +68,16 @@ class Logger
         return json_encode($data, JSON_PRETTY_PRINT);
     }
 
-    public function write(string $message, bool $include_timestamp = false)
+    public function write(string $message, bool $include_timestamp = false, string $include_separator = '')
     {
         global $current_page_base;
 
         if (self::$debug === true) {
             $timestamp = ($include_timestamp === false) ? '' : ("\n" . date('Y-m-d H:i:s: ') . "($current_page_base) ");
-            error_log($timestamp . $message . PHP_EOL, 3, self::$debugLogFile);
+            $separator = ($include_separator === '') ? '' : "**********************";
+            $separator_before = ($include_separator === 'before') ? "\n$separator" : '';
+            $separator_after = ($include_separator === 'after') ? "$separator\n" : '';
+            error_log($separator_before . $timestamp . $message . $separator_after, PHP_EOL, 3, self::$debugLogFile);
         }
     }
 }
