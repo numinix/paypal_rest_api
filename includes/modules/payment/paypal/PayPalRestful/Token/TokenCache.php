@@ -71,7 +71,7 @@ class TokenCache
         $iv = openssl_random_pseudo_bytes($this->encryptionAlgoIvLen);
         $_SESSION['PayPalRestful']['TokenCache'] = [
             'saved_token' => $iv . openssl_encrypt($access_token, $this->encryptionAlgorithm, $this->clientSecret, 0, $iv),
-            'token_expires_ts' => = time() + $seconds_to_expiration,
+            'token_expires_ts' => time() + $seconds_to_expiration,
         ];
     }
 

@@ -31,8 +31,6 @@ class PayPalRestfulApi extends ErrorInfo
 
     public const ERR_NO_CHANNEL    = -1;   //-Set if the curl_init fails; no other requests are honored
     public const ERR_CURL_ERROR    = -2;   //-Set if the curl_exec fails.  The curlErrno variable contains the curl_errno and errMsg contains curl_error
-    
-    public const ERR_CANT_UPDATE   = -100; //-Set by updateOrder if updated parameters aren't valid.
 
     // -----
     // Constants that define the test and production endpoints for the API requests.
@@ -102,27 +100,6 @@ class PayPalRestfulApi extends ErrorInfo
         CURLOPT_HEADER => 0,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 45,
-    ];
-
-    /**
-     * Array, used by the getOrderDifference method, that identifies what operations
-     * can be performed on various fields of the order's requested data.  All
-     * 'keys' are part of the 'purchase_units' array of that request-data!
-     *
-     * The 'key' values can be a pseudo-encoding of the an array structure
-     * present in the 'purchase_units' array.  For example, the 'shipping.name'
-     * key represents the shipping array's sub-element 'name'.
-     */
-    protected $orderUpdateOperations = [
-        'custom_id' => 'replace, add, remove',
-        'description' => 'replace, add, remove',
-        'shipping.name' => 'replace, add',
-        'shipping.address' => 'replace, add',
-        'shipping.type' => 'replace, add',
-        'soft_descriptor' => 'replace, remove',
-        'amount' => 'replace',
-        'items' => 'replace, add, remove',
-        'invoice_id' => 'replace, add, remove',
     ];
 
     // -----
@@ -267,10 +244,8 @@ class PayPalRestfulApi extends ErrorInfo
     // Parameters:
     // - paypal_order_id
     //      The 'id' value returned by PayPal when the order was created or approved.
-    // - order_request_current
-    //      The order-request's current contents, presumed to be those recorded at PayPal.
-    // - order_request_update
-    //      The to-be-updated contents for the order.
+    // - update_order_request
+    //      The to-be-updated contents for the order, presumed to have been created by \Zc2Pp\UpdatePayPalOrderRequest.php
     //
     // Return Values:
     // - response
@@ -278,205 +253,12 @@ class PayPalRestfulApi extends ErrorInfo
     //          getErrorInfo method.
     //      On success, returns an associative array containing the PayPal response.
     //
-    public function updateOrder(string $paypal_order_id, array $order_request_current, array $order_request_update)
+    public function updateOrder(string $paypal_order_id, array $update_order_request)
     {
-        $this->log->write("==> Start updateOrder ($paypal_order_id).  Current:\n" . $this->log->logJSON($order_request_current) . "\nUpdate:\n" . $this->log->logJSON($order_request_update), true);
-
-        // -----
-        // Check to see that the order is valid and that its status is also valid to perform an update operation.
-        //
-        $status = $this->getOrderStatus($paypal_order_id);
-        if ($status === false) {
-            return false;
-        }
-        if ($status['status'] !== self::STATUS_CREATED && $status['status'] !== self::STATUS_APPROVED) {
-            $this->setErrorInfo(422, '', 0, ['name' => 'ORDER_ALREADY_COMPLETED', 'message' => 'The order cannot be patched after it is completed.']);
-            $this->log->write("  --> Can't update, due to order status restriction: '{$status['status']}'.");
-            return false;
-        }
-
-        $updates = $this->getOrderDifference($order_request_current, $order_request_update);
-        if (count($updates) === 0) {
-            $this->log->write('  --> Nothing to update, returning getOrderStatus.');
-            return $status;
-        }
-        if ($updates[0] === 'error') {
-            return false;
-        }
-
-        $this->log->write("Updates to order:\n" . $this->log->logJSON($updates));
-        $order_updates = [];
-        foreach ($updates as $next_update) {
-            $order_updates[] = [
-                'op' => $next_update['op'],
-                'path' => "/purchase_units/@reference_id=='default'/{$next_update['path']}",
-                'value' => $next_update['value'],
-            ];
-        }
-        $response = $this->curlPatch("v2/checkout/orders/$paypal_order_id", $order_updates);
-
+        $this->log->write("==> Start updateOrder ($paypal_order_id).  Current:\n" . $this->log->logJSON($order_request_current) . "\nUpdate:\n" . $this->log->logJSON($update_order_request), true);
+        $response = $this->curlPatch("v2/checkout/orders/$paypal_order_id", $update_order_request);
         $this->log->write('==> End updateOrder', true);
         return $response;
-    }
-    protected function getOrderDifference(array $current, array $update): array
-    {
-        // -----
-        // Determine *all* differences between a current PayPal order and the
-        // current update.  If no differences, return an empty array.
-        //
-        $purchase_unit_current = $current['purchase_units'][0];
-        $purchase_unit_update = $update['purchase_units'][0];
-        $order_difference = $this->orderDiffRecursive($purchase_unit_current, $purchase_unit_update);
-        if (count($order_difference) === 0) {
-            return [];
-        }
-
-        $difference = [];
-        foreach ($this->orderUpdateOperations as $key => $update_options) {
-            $subkey = '';
-            if (strpos($key, '.') !== false) {
-                [$key, $subkey] = explode('.', $key);
-            }
-
-            // -----
-            // Remove this valid-to-update key{/subkey} element from the overall orders'
-            // differences.  If any differences remain after this loop's processing, then
-            // there are updates to the order that are disallowed by PayPal.
-            //
-            if ($subkey !== '') {
-                unset($order_difference[$key][$subkey]);
-            } else {
-                unset($order_difference[$key]);
-            }
-
-            // -----
-            // Remove the current [$key] or [$key][$subkey] from the overall differences
-            // between the two order-information arrays submitted.  If
-            $key_subkey_current = $this->issetKeySubkey($key, $subkey, $purchase_unit_current);
-            $key_subkey_update = $this->issetKeySubkey($key, $subkey, $purchase_unit_update);
-
-            // -----
-            // Is the field *not* present in either the currently-recorded order
-            // at PayPal or in the update, nothing further to do for this key/subkey.
-            //
-            if ($key_subkey_current === false && $key_subkey_update === false) {
-                continue;
-            }
-
-            // -----
-            // Initially, nothing to do for this key/subkey element.
-            //
-            $op = '';
-
-            // -----
-            // If the field is present in both the current and to-be-updated order, check
-            // to see if the field's changed.
-            //
-            if ($key_subkey_current === true && $key_subkey_update === true) {
-                if ($subkey !== '') {
-                    if ($purchase_unit_current[$key][$subkey] !== $purchase_unit_update[$key][$subkey]) {
-                        $op = 'replace';
-                        $path = "$key/$subkey";
-                        $value = $purchase_unit_update[$key][$subkey];
-                    }
-                } elseif ($purchase_unit_current[$key] !== $purchase_unit_update[$key]) {
-                        $op = 'replace';
-                        $path = $key;
-                        $value = $purchase_unit_update[$key];
-                    }
-            // -----
-            // Is the field added to the order for an update?
-            //
-            } elseif ($key_subkey_update === true) {
-                $op = 'add';
-                if ($subkey !== '') {
-                    $path = "$key/$subkey";
-                    $value = $purchase_unit_update[$key][$subkey];
-                } else {
-                    $path = $key;
-                    $value = $purchase_unit_update[$key];
-                }
-            // -----
-            // Otherwise, the field was removed from the to-be-updated order.
-            //
-            } else {
-                $op = 'remove';
-                if ($subkey !== '') {
-                    $path = "$key/$subkey";
-                    $value = $purchase_unit_current[$key][$subkey];
-                } else {
-                    $path = $key;
-                    $value = $purchase_unit_current[$key];
-                }
-            }
-
-            // -----
-            // If no change to the current key/subkey was found, continue on
-            // to the next key/subkey check.
-            //
-            if ($op === '') {
-                continue;
-            }
-
-            // -----
-            // The current key/subkey was changed in some manner, make sure that
-            // the operation is allowed by PayPal.  If not, return a 'difference'
-            // that indicates that the update cannot be applied.
-            //
-            if (strpos($update_options, $op) === false) {
-                $error_message = "$key/$subkey operation '$op' is not supported";
-                $this->setErrorInfo(self::ERR_CANT_UPDATE, $error_message);
-                $this->log->write('--> Update disallowed: ' . $error_message);
-                return ['error'];
-            }
-
-            // -----
-            // The current key/subkey was changed and it's allowed, note the difference
-            // in the to-be-returned difference array.
-            //
-            $difference[] = [
-                'op' => $op,
-                'path' => $path,
-                'value' => $value,
-            ];
-        }
-
-        // -----
-        // If any elements remain in the orders' overall difference array, then those
-        // elements aren't valid-to-update by PayPal.  Note the condition in the PayPal
-        // log and the errorInfo; return a 'difference' that indicates that the update
-        // cannot be applied.
-        //
-        if (count($order_difference) !== 0) {
-            $this->setErrorInfo(self::ERR_CANT_UPDATE, 'Parameter error, order cannot be updated using current parameters');
-            $this->log->write("--> Update disallowed, changed parameters cannot be updated:\n" . $this->log->logJSON($order_difference));
-            return ['error'];
-        }
-
-        return $difference;
-    }
-    protected function issetKeySubkey(string $key, string $subkey, array $array1): bool
-    {
-        return ($subkey !== '') ? isset($array1[$key][$subkey]) : isset($array1[$key]);
-    }
-    public function orderDiffRecursive(array $current, array $update): array
-    {
-        $difference = [];
-        foreach ($current as $key => $value) {
-            if (is_array($value)) {
-                if (!isset($update[$key]) || !is_array($update[$key])) {
-                    $difference[$key] = $value;
-                } else {
-                    $new_diff = $this->orderDiffRecursive($value, $update[$key]);
-                    if (!empty($new_diff)) {
-                        $difference[$key] = $new_diff;
-                    }
-                }
-            } elseif (!array_key_exists($key, $update) || $update[$key] !== $value) {
-                $difference[$key] = $value;
-            }
-        }
-        return $difference;
     }
 
     // ===== End Non-token Methods =====

@@ -1,6 +1,7 @@
 <?php
 /**
- * Debug logging class for the PayPalRestful (paypalr) Payment Module
+ * A class to 'convert' a Zen Cart order to a PayPal order-creation request payload
+ * for the PayPalRestful (paypalr) Payment Module
  *
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -36,7 +37,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
      * The request to be submitted to a v2/orders/create PayPal endpoint.
      */
     protected $request;
-    
+
     /**
      * The items' pricing 'breakdown' elements, gathered by getItems and
      * and subsequently ussed by getOrderTotals.
@@ -59,7 +60,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $this->amount = new Amount();   //- Uses no input parameter so it uses the currently calculated currency-code
         $this->paypalCurrencyCode = $this->amount->getDefaultCurrencyCode();
 
-        $this->log->write('CreatePayPalOrderRequest::__construct starts ...', true, 'before');
+        $this->log->write('CreatePayPalOrderRequest::__construct starts ...');
 
         $this->request = [
             'intent' => (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') ? 'CAPTURE' : 'AUTHORIZE',
@@ -76,7 +77,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             unset($this->request['purchase_units'][0]['items']);
         }
 
-        $this->log->write("CreatePayPalOrderRequest::__construct finished, request:\n" . $this->log->logJSON($this->request), true, 'after');
+        $this->log->write("CreatePayPalOrderRequest::__construct finished, request:\n" . $this->log->logJSON($this->request));
     }
 
     public function get()

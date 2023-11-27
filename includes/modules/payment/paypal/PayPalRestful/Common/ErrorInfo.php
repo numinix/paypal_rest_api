@@ -26,6 +26,11 @@ class ErrorInfo
         return $this->errorInfo;
     }
 
+    public function copyErrorInfo(array $error_info)
+    {
+        $this->errorInfo = $error_info;
+    }
+
     protected function setErrorInfo(int $errNum, string $errMsg, int $curlErrno = 0, $response = [])
     {
         $name = $response['name'] ?? 'n/a';

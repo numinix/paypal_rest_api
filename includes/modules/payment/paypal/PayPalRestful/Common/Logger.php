@@ -63,7 +63,7 @@ class Logger
     public function logJSON($data)
     {
         if (is_array($data)) {
-            unset(/*$data[CURLOPT_HTTPHEADER], $data['access_token'],*/ $data['scope'], $data['links']);
+            unset($data[CURLOPT_HTTPHEADER], $data['access_token'], $data['scope']/*, $data['links']*/);
         }
         return json_encode($data, JSON_PRETTY_PRINT);
     }
@@ -74,10 +74,10 @@ class Logger
 
         if (self::$debug === true) {
             $timestamp = ($include_timestamp === false) ? '' : ("\n" . date('Y-m-d H:i:s: ') . "($current_page_base) ");
-            $separator = ($include_separator === '') ? '' : "**********************";
-            $separator_before = ($include_separator === 'before') ? "\n$separator" : '';
-            $separator_after = ($include_separator === 'after') ? "$separator\n" : '';
-            error_log($separator_before . $timestamp . $message . $separator_after, PHP_EOL, 3, self::$debugLogFile);
+            $separator = ($include_separator === '') ? '' : "\n**********************\n";
+            $separator_before = ($include_separator === 'before') ? $separator : '';
+            $separator_after = ($include_separator === 'after') ? $separator : PHP_EOL;
+            error_log($separator_before . $timestamp . $message . $separator_after, 3, self::$debugLogFile);
         }
     }
 }

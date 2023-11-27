@@ -1,6 +1,6 @@
 <?php
 /**
- * paypalt.php payment module class for PayPal RESTful API payment method
+ * paypalr.php payment module class for PayPal RESTful API payment method
  *
  * @copyright Copyright 2023 Zen Cart Development Team
  * @copyright Portions Copyright 2003 osCommerce
@@ -13,10 +13,13 @@
 require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
 use PayPalRestful\Api\PayPalRestfulApi;
+use PayPalRestful\Common\ErrorInfo;
 use PayPalRestful\Common\Logger;
 use PayPalRestful\Token\TokenCache;
 use PayPalRestful\Zc2Pp\Amount;
+use PayPalRestful\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
 use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
+use PayPalRestful\Zc2Pp\UpdatePayPalOrderRequest;
 
 /**
  * The PayPal payment module using PayPal's RESTful API (v2)
@@ -24,6 +27,8 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
 class paypalr extends base
 {
     protected const CURRENT_VERSION = '1.0.0-beta1';
+
+    protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
     /**
      * name of this module
@@ -104,9 +109,20 @@ class paypalr extends base
     public $ec_redirect_url;
 
     /**
+     * The orders::orders_id for a just-created order, supplied during
+     * the 'checkout_process' step.
+     */
+    protected $orders_id;
+
+    /**
      * Debug interface, shared with the PayPalRestfulApi class.
      */
     protected $log; //- An instance of the Logger class, logs debug tracing information.
+
+    /**
+     * An array to maintain error information returned by various PayPalRestfulApi methods.
+     */
+    protected $errorInfo; //- An instance of the ErrorInfo class, logs debug tracing information.
 
     /**
      * An instance of the PayPalRestfulApi class.
@@ -114,6 +130,13 @@ class paypalr extends base
      * @var object PayPalRestfulApi
      */
     protected $ppr;
+    
+    /**
+     * An array (set by before_process) containing the captured/authorized order's
+     * PayPal response information, for use by after_order_create to populate the
+     * paypal table's record once the associated order's ID is known.
+     */
+    protected $orderInfo = [];
 
     /**
      * class constructor
@@ -137,6 +160,8 @@ class paypalr extends base
         if (null === $this->sort_order) {
             return false;
         }
+
+        $this->errorInfo = new errorInfo();
 
         $this->log = new Logger();
         $debug = (strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false);
@@ -174,6 +199,25 @@ class paypalr extends base
         return '<b class="text-danger">' . $msg . '</b>';
     }
 
+    public static function getEnvironmentInfo(): array
+    {
+        // -----
+        // Determine and return which (live vs. sandbox) credentials are in use.
+        //
+        if (MODULE_PAYMENT_PAYPALR_SERVER === 'live') {
+            $client_id = MODULE_PAYMENT_PAYPALR_CLIENTID_L;
+            $secret = MODULE_PAYMENT_PAYPALR_SECRET_L;
+        } else {
+            $client_id = MODULE_PAYMENT_PAYPALR_CLIENTID_S;
+            $secret = MODULE_PAYMENT_PAYPALR_SECRET_S;
+        }
+        
+        return [
+            $client_id,
+            $secret,
+        ];
+    }
+
     // -----
     // Validate the configuration settings to ensure that the payment module
     // can be enabled for use.
@@ -196,13 +240,7 @@ class paypalr extends base
             // -----
             // Determine which (live vs. sandbox) credentials are in use.
             //
-            if (MODULE_PAYMENT_PAYPALR_SERVER === 'live') {
-                $client_id = MODULE_PAYMENT_PAYPALR_CLIENTID_L;
-                $secret = MODULE_PAYMENT_PAYPALR_SECRET_L;
-            } else {
-                $client_id = MODULE_PAYMENT_PAYPALR_CLIENTID_S;
-                $secret = MODULE_PAYMENT_PAYPALR_SECRET_S;
-            }
+            [$client_id, $secret] = self::getEnvironmentInfo();
 
             // -----
             // Ensure that the current environment's credentials are set and, if so,
@@ -349,57 +387,197 @@ class paypalr extends base
 
     /**
      * At this point (checkout_payment in the 3-page version), we've got all the information
-     * required to "Create" the order at PayPal.  If the order can't be created, no selection.
+     * required to "Create" the order at PayPal.  If the order can't be created, no selection
+     * is rendered.
      */
     public function selection()
     {
-        $this->log->write("paypalr:: selection starts:\n", $this->log->logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'before');
+        $this->log->write("paypalr:: selection starts:\n" . $this->log->logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'before');
 
-        global $order;
-
-        // -----
-        // Set up the currency to be used to create the PayPal order.
-        //
-        $paypal_currency = (MODULE_PAYMENT_PAYPALR_CURRENCY === 'Selected Currency') ? $order->info['currency'] : str_replace('Only ', '', MODULE_PAYMENT_PAYPALR_CURRENCY);
-        $amount = new Amount($paypal_currency);
-        
         // -----
         // Build the request for the PayPal order's "Create" and send to off to PayPal. Any issues result
         // in the associated selection not being displayed.
         //
-        $create_order_request = new CreatePayPalOrderRequest($order);
-        $create_order = $this->ppr->createOrder($create_order_request->get());
-        if ($create_order === false) {
+        $paypal_order_created = $this->createOrUpdateOrder();
+        if ($paypal_order_created === false) {
+            $this->log->write('', false, 'after');
             return false;
         }
 
         // -----
         // Return the PayPal selection as a button, modelled after https://developer.paypal.com/demo/checkout/#/pattern/responsive
         //
-        $this->log->write("paypalr:: selection complete, showing button:\n", $this->log->logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'after');
+        $this->log->write("paypalr:: selection successful:\n" . $this->log->logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'after');
         return [
             'id' => $this->code,
             'module' =>
                 '<button id="paypalr-paypal" style="background: #ffc439; border-radius: 4px; border: none;">' .
                 '  <img style="margin: 0.25vw 2vw;" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAxcHgiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMDEgMzIiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaW5ZTWluIG1lZXQiIHhtbG5zPSJodHRwOiYjeDJGOyYjeDJGO3d3dy53My5vcmcmI3gyRjsyMDAwJiN4MkY7c3ZnIj48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDEyLjIzNyAyLjggTCA0LjQzNyAyLjggQyAzLjkzNyAyLjggMy40MzcgMy4yIDMuMzM3IDMuNyBMIDAuMjM3IDIzLjcgQyAwLjEzNyAyNC4xIDAuNDM3IDI0LjQgMC44MzcgMjQuNCBMIDQuNTM3IDI0LjQgQyA1LjAzNyAyNC40IDUuNTM3IDI0IDUuNjM3IDIzLjUgTCA2LjQzNyAxOC4xIEMgNi41MzcgMTcuNiA2LjkzNyAxNy4yIDcuNTM3IDE3LjIgTCAxMC4wMzcgMTcuMiBDIDE1LjEzNyAxNy4yIDE4LjEzNyAxNC43IDE4LjkzNyA5LjggQyAxOS4yMzcgNy43IDE4LjkzNyA2IDE3LjkzNyA0LjggQyAxNi44MzcgMy41IDE0LjgzNyAyLjggMTIuMjM3IDIuOCBaIE0gMTMuMTM3IDEwLjEgQyAxMi43MzcgMTIuOSAxMC41MzcgMTIuOSA4LjUzNyAxMi45IEwgNy4zMzcgMTIuOSBMIDguMTM3IDcuNyBDIDguMTM3IDcuNCA4LjQzNyA3LjIgOC43MzcgNy4yIEwgOS4yMzcgNy4yIEMgMTAuNjM3IDcuMiAxMS45MzcgNy4yIDEyLjYzNyA4IEMgMTMuMTM3IDguNCAxMy4zMzcgOS4xIDEzLjEzNyAxMC4xIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDM1LjQzNyAxMCBMIDMxLjczNyAxMCBDIDMxLjQzNyAxMCAzMS4xMzcgMTAuMiAzMS4xMzcgMTAuNSBMIDMwLjkzNyAxMS41IEwgMzAuNjM3IDExLjEgQyAyOS44MzcgOS45IDI4LjAzNyA5LjUgMjYuMjM3IDkuNSBDIDIyLjEzNyA5LjUgMTguNjM3IDEyLjYgMTcuOTM3IDE3IEMgMTcuNTM3IDE5LjIgMTguMDM3IDIxLjMgMTkuMzM3IDIyLjcgQyAyMC40MzcgMjQgMjIuMTM3IDI0LjYgMjQuMDM3IDI0LjYgQyAyNy4zMzcgMjQuNiAyOS4yMzcgMjIuNSAyOS4yMzcgMjIuNSBMIDI5LjAzNyAyMy41IEMgMjguOTM3IDIzLjkgMjkuMjM3IDI0LjMgMjkuNjM3IDI0LjMgTCAzMy4wMzcgMjQuMyBDIDMzLjUzNyAyNC4zIDM0LjAzNyAyMy45IDM0LjEzNyAyMy40IEwgMzYuMTM3IDEwLjYgQyAzNi4yMzcgMTAuNCAzNS44MzcgMTAgMzUuNDM3IDEwIFogTSAzMC4zMzcgMTcuMiBDIDI5LjkzNyAxOS4zIDI4LjMzNyAyMC44IDI2LjEzNyAyMC44IEMgMjUuMDM3IDIwLjggMjQuMjM3IDIwLjUgMjMuNjM3IDE5LjggQyAyMy4wMzcgMTkuMSAyMi44MzcgMTguMiAyMy4wMzcgMTcuMiBDIDIzLjMzNyAxNS4xIDI1LjEzNyAxMy42IDI3LjIzNyAxMy42IEMgMjguMzM3IDEzLjYgMjkuMTM3IDE0IDI5LjczNyAxNC42IEMgMzAuMjM3IDE1LjMgMzAuNDM3IDE2LjIgMzAuMzM3IDE3LjIgWiI+PC9wYXRoPjxwYXRoIGZpbGw9IiMwMDMwODciIGQ9Ik0gNTUuMzM3IDEwIEwgNTEuNjM3IDEwIEMgNTEuMjM3IDEwIDUwLjkzNyAxMC4yIDUwLjczNyAxMC41IEwgNDUuNTM3IDE4LjEgTCA0My4zMzcgMTAuOCBDIDQzLjIzNyAxMC4zIDQyLjczNyAxMCA0Mi4zMzcgMTAgTCAzOC42MzcgMTAgQyAzOC4yMzcgMTAgMzcuODM3IDEwLjQgMzguMDM3IDEwLjkgTCA0Mi4xMzcgMjMgTCAzOC4yMzcgMjguNCBDIDM3LjkzNyAyOC44IDM4LjIzNyAyOS40IDM4LjczNyAyOS40IEwgNDIuNDM3IDI5LjQgQyA0Mi44MzcgMjkuNCA0My4xMzcgMjkuMiA0My4zMzcgMjguOSBMIDU1LjgzNyAxMC45IEMgNTYuMTM3IDEwLjYgNTUuODM3IDEwIDU1LjMzNyAxMCBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA2Ny43MzcgMi44IEwgNTkuOTM3IDIuOCBDIDU5LjQzNyAyLjggNTguOTM3IDMuMiA1OC44MzcgMy43IEwgNTUuNzM3IDIzLjYgQyA1NS42MzcgMjQgNTUuOTM3IDI0LjMgNTYuMzM3IDI0LjMgTCA2MC4zMzcgMjQuMyBDIDYwLjczNyAyNC4zIDYxLjAzNyAyNCA2MS4wMzcgMjMuNyBMIDYxLjkzNyAxOCBDIDYyLjAzNyAxNy41IDYyLjQzNyAxNy4xIDYzLjAzNyAxNy4xIEwgNjUuNTM3IDE3LjEgQyA3MC42MzcgMTcuMSA3My42MzcgMTQuNiA3NC40MzcgOS43IEMgNzQuNzM3IDcuNiA3NC40MzcgNS45IDczLjQzNyA0LjcgQyA3Mi4yMzcgMy41IDcwLjMzNyAyLjggNjcuNzM3IDIuOCBaIE0gNjguNjM3IDEwLjEgQyA2OC4yMzcgMTIuOSA2Ni4wMzcgMTIuOSA2NC4wMzcgMTIuOSBMIDYyLjgzNyAxMi45IEwgNjMuNjM3IDcuNyBDIDYzLjYzNyA3LjQgNjMuOTM3IDcuMiA2NC4yMzcgNy4yIEwgNjQuNzM3IDcuMiBDIDY2LjEzNyA3LjIgNjcuNDM3IDcuMiA2OC4xMzcgOCBDIDY4LjYzNyA4LjQgNjguNzM3IDkuMSA2OC42MzcgMTAuMSBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA5MC45MzcgMTAgTCA4Ny4yMzcgMTAgQyA4Ni45MzcgMTAgODYuNjM3IDEwLjIgODYuNjM3IDEwLjUgTCA4Ni40MzcgMTEuNSBMIDg2LjEzNyAxMS4xIEMgODUuMzM3IDkuOSA4My41MzcgOS41IDgxLjczNyA5LjUgQyA3Ny42MzcgOS41IDc0LjEzNyAxMi42IDczLjQzNyAxNyBDIDczLjAzNyAxOS4yIDczLjUzNyAyMS4zIDc0LjgzNyAyMi43IEMgNzUuOTM3IDI0IDc3LjYzNyAyNC42IDc5LjUzNyAyNC42IEMgODIuODM3IDI0LjYgODQuNzM3IDIyLjUgODQuNzM3IDIyLjUgTCA4NC41MzcgMjMuNSBDIDg0LjQzNyAyMy45IDg0LjczNyAyNC4zIDg1LjEzNyAyNC4zIEwgODguNTM3IDI0LjMgQyA4OS4wMzcgMjQuMyA4OS41MzcgMjMuOSA4OS42MzcgMjMuNCBMIDkxLjYzNyAxMC42IEMgOTEuNjM3IDEwLjQgOTEuMzM3IDEwIDkwLjkzNyAxMCBaIE0gODUuNzM3IDE3LjIgQyA4NS4zMzcgMTkuMyA4My43MzcgMjAuOCA4MS41MzcgMjAuOCBDIDgwLjQzNyAyMC44IDc5LjYzNyAyMC41IDc5LjAzNyAxOS44IEMgNzguNDM3IDE5LjEgNzguMjM3IDE4LjIgNzguNDM3IDE3LjIgQyA3OC43MzcgMTUuMSA4MC41MzcgMTMuNiA4Mi42MzcgMTMuNiBDIDgzLjczNyAxMy42IDg0LjUzNyAxNCA4NS4xMzcgMTQuNiBDIDg1LjczNyAxNS4zIDg1LjkzNyAxNi4yIDg1LjczNyAxNy4yIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDA5Y2RlIiBkPSJNIDk1LjMzNyAzLjMgTCA5Mi4xMzcgMjMuNiBDIDkyLjAzNyAyNCA5Mi4zMzcgMjQuMyA5Mi43MzcgMjQuMyBMIDk1LjkzNyAyNC4zIEMgOTYuNDM3IDI0LjMgOTYuOTM3IDIzLjkgOTcuMDM3IDIzLjQgTCAxMDAuMjM3IDMuNSBDIDEwMC4zMzcgMy4xIDEwMC4wMzcgMi44IDk5LjYzNyAyLjggTCA5Ni4wMzcgMi44IEMgOTUuNjM3IDIuOCA5NS40MzcgMyA5NS4zMzcgMy4zIFoiPjwvcGF0aD48L3N2Zz4" data-v-b01da731="" alt="" role="presentation">' .
-                '</button>',
+                '</button>' .
+                ' ' .
+                '<span class="paypal-powered-by">' .
+                    '<style nonce="">
+                        .paypal-powered-by {
+                            margin: 10px auto;
+                            height: 14px;
+                            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+                            font-size: 11px;
+                            font-weight: normal;
+                            font-style: italic;
+                            font-stretch: normal;
+                            color: #7b8388;
+                            position: relative;
+                            margin-right: 3px;
+                            bottom: 3px;
+                            display: inline-block;
+                        }
+
+                        .paypal-powered-by > .paypal-button-text,
+                        .paypal-powered-by > .paypal-logo {
+                            display: inline-block;
+                            height: 16px;
+                            line-height: 16px;
+                            font-size: 11px;
+                            float: none;
+                        }
+                    </style>' .
+                    '<span class="paypal-button-text immediate" data-v-44bf4aee="">Powered by </span>' .
+                    '<img  alt="" role="presentation" class="paypal-logo paypal-logo-paypal paypal-logo-color-blue" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAxcHgiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMDEgMzIiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaW5ZTWluIG1lZXQiIHhtbG5zPSJodHRwOiYjeDJGOyYjeDJGO3d3dy53My5vcmcmI3gyRjsyMDAwJiN4MkY7c3ZnIj48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDEyLjIzNyAyLjggTCA0LjQzNyAyLjggQyAzLjkzNyAyLjggMy40MzcgMy4yIDMuMzM3IDMuNyBMIDAuMjM3IDIzLjcgQyAwLjEzNyAyNC4xIDAuNDM3IDI0LjQgMC44MzcgMjQuNCBMIDQuNTM3IDI0LjQgQyA1LjAzNyAyNC40IDUuNTM3IDI0IDUuNjM3IDIzLjUgTCA2LjQzNyAxOC4xIEMgNi41MzcgMTcuNiA2LjkzNyAxNy4yIDcuNTM3IDE3LjIgTCAxMC4wMzcgMTcuMiBDIDE1LjEzNyAxNy4yIDE4LjEzNyAxNC43IDE4LjkzNyA5LjggQyAxOS4yMzcgNy43IDE4LjkzNyA2IDE3LjkzNyA0LjggQyAxNi44MzcgMy41IDE0LjgzNyAyLjggMTIuMjM3IDIuOCBaIE0gMTMuMTM3IDEwLjEgQyAxMi43MzcgMTIuOSAxMC41MzcgMTIuOSA4LjUzNyAxMi45IEwgNy4zMzcgMTIuOSBMIDguMTM3IDcuNyBDIDguMTM3IDcuNCA4LjQzNyA3LjIgOC43MzcgNy4yIEwgOS4yMzcgNy4yIEMgMTAuNjM3IDcuMiAxMS45MzcgNy4yIDEyLjYzNyA4IEMgMTMuMTM3IDguNCAxMy4zMzcgOS4xIDEzLjEzNyAxMC4xIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDM1LjQzNyAxMCBMIDMxLjczNyAxMCBDIDMxLjQzNyAxMCAzMS4xMzcgMTAuMiAzMS4xMzcgMTAuNSBMIDMwLjkzNyAxMS41IEwgMzAuNjM3IDExLjEgQyAyOS44MzcgOS45IDI4LjAzNyA5LjUgMjYuMjM3IDkuNSBDIDIyLjEzNyA5LjUgMTguNjM3IDEyLjYgMTcuOTM3IDE3IEMgMTcuNTM3IDE5LjIgMTguMDM3IDIxLjMgMTkuMzM3IDIyLjcgQyAyMC40MzcgMjQgMjIuMTM3IDI0LjYgMjQuMDM3IDI0LjYgQyAyNy4zMzcgMjQuNiAyOS4yMzcgMjIuNSAyOS4yMzcgMjIuNSBMIDI5LjAzNyAyMy41IEMgMjguOTM3IDIzLjkgMjkuMjM3IDI0LjMgMjkuNjM3IDI0LjMgTCAzMy4wMzcgMjQuMyBDIDMzLjUzNyAyNC4zIDM0LjAzNyAyMy45IDM0LjEzNyAyMy40IEwgMzYuMTM3IDEwLjYgQyAzNi4yMzcgMTAuNCAzNS44MzcgMTAgMzUuNDM3IDEwIFogTSAzMC4zMzcgMTcuMiBDIDI5LjkzNyAxOS4zIDI4LjMzNyAyMC44IDI2LjEzNyAyMC44IEMgMjUuMDM3IDIwLjggMjQuMjM3IDIwLjUgMjMuNjM3IDE5LjggQyAyMy4wMzcgMTkuMSAyMi44MzcgMTguMiAyMy4wMzcgMTcuMiBDIDIzLjMzNyAxNS4xIDI1LjEzNyAxMy42IDI3LjIzNyAxMy42IEMgMjguMzM3IDEzLjYgMjkuMTM3IDE0IDI5LjczNyAxNC42IEMgMzAuMjM3IDE1LjMgMzAuNDM3IDE2LjIgMzAuMzM3IDE3LjIgWiI+PC9wYXRoPjxwYXRoIGZpbGw9IiMwMDMwODciIGQ9Ik0gNTUuMzM3IDEwIEwgNTEuNjM3IDEwIEMgNTEuMjM3IDEwIDUwLjkzNyAxMC4yIDUwLjczNyAxMC41IEwgNDUuNTM3IDE4LjEgTCA0My4zMzcgMTAuOCBDIDQzLjIzNyAxMC4zIDQyLjczNyAxMCA0Mi4zMzcgMTAgTCAzOC42MzcgMTAgQyAzOC4yMzcgMTAgMzcuODM3IDEwLjQgMzguMDM3IDEwLjkgTCA0Mi4xMzcgMjMgTCAzOC4yMzcgMjguNCBDIDM3LjkzNyAyOC44IDM4LjIzNyAyOS40IDM4LjczNyAyOS40IEwgNDIuNDM3IDI5LjQgQyA0Mi44MzcgMjkuNCA0My4xMzcgMjkuMiA0My4zMzcgMjguOSBMIDU1LjgzNyAxMC45IEMgNTYuMTM3IDEwLjYgNTUuODM3IDEwIDU1LjMzNyAxMCBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA2Ny43MzcgMi44IEwgNTkuOTM3IDIuOCBDIDU5LjQzNyAyLjggNTguOTM3IDMuMiA1OC44MzcgMy43IEwgNTUuNzM3IDIzLjYgQyA1NS42MzcgMjQgNTUuOTM3IDI0LjMgNTYuMzM3IDI0LjMgTCA2MC4zMzcgMjQuMyBDIDYwLjczNyAyNC4zIDYxLjAzNyAyNCA2MS4wMzcgMjMuNyBMIDYxLjkzNyAxOCBDIDYyLjAzNyAxNy41IDYyLjQzNyAxNy4xIDYzLjAzNyAxNy4xIEwgNjUuNTM3IDE3LjEgQyA3MC42MzcgMTcuMSA3My42MzcgMTQuNiA3NC40MzcgOS43IEMgNzQuNzM3IDcuNiA3NC40MzcgNS45IDczLjQzNyA0LjcgQyA3Mi4yMzcgMy41IDcwLjMzNyAyLjggNjcuNzM3IDIuOCBaIE0gNjguNjM3IDEwLjEgQyA2OC4yMzcgMTIuOSA2Ni4wMzcgMTIuOSA2NC4wMzcgMTIuOSBMIDYyLjgzNyAxMi45IEwgNjMuNjM3IDcuNyBDIDYzLjYzNyA3LjQgNjMuOTM3IDcuMiA2NC4yMzcgNy4yIEwgNjQuNzM3IDcuMiBDIDY2LjEzNyA3LjIgNjcuNDM3IDcuMiA2OC4xMzcgOCBDIDY4LjYzNyA4LjQgNjguNzM3IDkuMSA2OC42MzcgMTAuMSBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA5MC45MzcgMTAgTCA4Ny4yMzcgMTAgQyA4Ni45MzcgMTAgODYuNjM3IDEwLjIgODYuNjM3IDEwLjUgTCA4Ni40MzcgMTEuNSBMIDg2LjEzNyAxMS4xIEMgODUuMzM3IDkuOSA4My41MzcgOS41IDgxLjczNyA5LjUgQyA3Ny42MzcgOS41IDc0LjEzNyAxMi42IDczLjQzNyAxNyBDIDczLjAzNyAxOS4yIDczLjUzNyAyMS4zIDc0LjgzNyAyMi43IEMgNzUuOTM3IDI0IDc3LjYzNyAyNC42IDc5LjUzNyAyNC42IEMgODIuODM3IDI0LjYgODQuNzM3IDIyLjUgODQuNzM3IDIyLjUgTCA4NC41MzcgMjMuNSBDIDg0LjQzNyAyMy45IDg0LjczNyAyNC4zIDg1LjEzNyAyNC4zIEwgODguNTM3IDI0LjMgQyA4OS4wMzcgMjQuMyA4OS41MzcgMjMuOSA4OS42MzcgMjMuNCBMIDkxLjYzNyAxMC42IEMgOTEuNjM3IDEwLjQgOTEuMzM3IDEwIDkwLjkzNyAxMCBaIE0gODUuNzM3IDE3LjIgQyA4NS4zMzcgMTkuMyA4My43MzcgMjAuOCA4MS41MzcgMjAuOCBDIDgwLjQzNyAyMC44IDc5LjYzNyAyMC41IDc5LjAzNyAxOS44IEMgNzguNDM3IDE5LjEgNzguMjM3IDE4LjIgNzguNDM3IDE3LjIgQyA3OC43MzcgMTUuMSA4MC41MzcgMTMuNiA4Mi42MzcgMTMuNiBDIDgzLjczNyAxMy42IDg0LjUzNyAxNCA4NS4xMzcgMTQuNiBDIDg1LjczNyAxNS4zIDg1LjkzNyAxNi4yIDg1LjczNyAxNy4yIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDA5Y2RlIiBkPSJNIDk1LjMzNyAzLjMgTCA5Mi4xMzcgMjMuNiBDIDkyLjAzNyAyNCA5Mi4zMzcgMjQuMyA5Mi43MzcgMjQuMyBMIDk1LjkzNyAyNC4zIEMgOTYuNDM3IDI0LjMgOTYuOTM3IDIzLjkgOTcuMDM3IDIzLjQgTCAxMDAuMjM3IDMuNSBDIDEwMC4zMzcgMy4xIDEwMC4wMzcgMi44IDk5LjYzNyAyLjggTCA5Ni4wMzcgMi44IEMgOTUuNjM3IDIuOCA5NS40MzcgMyA5NS4zMzcgMy4zIFoiPjwvcGF0aD48L3N2Zz4">' .
+               '</span>',
         ];
     }
 
-    // -----
-    // Issued (in 3-page checkout) during the 'checkout_confirmation' page's
-    // header.
-    //
-    public function pre_confirmation_check()
+    protected function resetOrder()
+    {
+        unset($_SESSION['PayPalRestful']['Order']);
+    }
+
+    protected function createOrUpdateOrder(): bool
     {
         global $order;
 
         // -----
-        // Set up the currency to be used to create the PayPal order.
+        // Build the request for the PayPal order's "Create" or "Update".
         //
-        $paypal_currency = (MODULE_PAYMENT_PAYPALR_CURRENCY === 'Selected Currency') ? $order->info['currency'] : str_replace('Only ', '', MODULE_PAYMENT_PAYPALR_CURRENCY);
-        $amount = new Amount($paypal_currency);
+        $create_order_request = new CreatePayPalOrderRequest($order);
 
+        // -----
+        // If no order has yet been requested from Paypal, send the request off
+        // to register the order at PayPal.
+        //
+        if (!isset($_SESSION['PayPalRestful']['Order'])) {
+            $order_response = $this->ppr->createOrder($create_order_request->get());
+            if ($order_response === false) {
+                $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
+                return false;
+            }
+        // -----
+        // Otherwise, the order has been registered at PayPal; let's see if it's changed/can-be-updated.
+        //
+        } else {
+            $update_order = new UpdatePayPalOrderRequest($create_order_request->get());
+            $update_order_request = $update_order->get();
+
+            // -----
+            // Order hasn't changed, no update needed.
+            //
+            if (count($update_order_request) === 0) {
+                return true;
+            }
+
+            // -----
+            // If no error was identified, update the order as requested.
+            //
+            if (!isset($update_order_request['error'])) {
+                $order_response = $this->ppr->updateOrder($_SESSION['PayPalRestful']['Order']['id'], $update_order_request);
+            } elseif ($update_order_request['error'] === 'recreate') {
+                $order_response = $this->ppr->createOrder($create_order_request->get());
+            } else {
+                $this->errorInfo->copyErrorInfo($update_order->getErrorInfo());
+                return false;
+            }
+        }
+
+        if ($order_response === false) {
+            $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
+            return false;
+        }
+
+        // -----
+        // Save the created/updated PayPal order in the session and indicate that the
+        // operation was successful.
+        //
+        $paypal_id = $order_response['id'];
+        $status = $order_response['status'];
+        $create_time = $order_response['create_time'];
+        unset(
+            $order_response['id'],
+            $order_response['status'],
+            $order_response['create_time'],
+            $order_response['links'],
+            $order_response['purchase_units'][0]['reference_id'],
+            $order_response['purchase_units'][0]['payee']
+        );
+        $_SESSION['PayPalRestful']['Order'] = [
+            'current' => $order_response,
+            'id' => $paypal_id,
+            'status' => $status,
+            'create_time' => $create_time,
+        ];
+        return true;
+    }
+
+    // -----
+    // Issued (in 3-page checkout) during the 'checkout_confirmation' page's
+    // header.  At this point, send the request off to PayPal for the customer
+    // to confirm their payment choice.
+    //
+    // Note: Doesn't return, comes back to the site via the WEBHOOK_NAME identified
+    // at the top of this file!
+    //
+    public function pre_confirmation_check()
+    {
+        global $order, $messageStack;
+
+        $current_status = $_SESSION['PayPalRestful']['Order']['status'];
+        if (!in_array($current_status, [PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED, PayPalRestfulApi::STATUS_APPROVED])) {
+            $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::WEBHOOK_NAME, $order);
+            $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
+            if ($payment_choice_response === false) {
+                $messageStack->add_session('checkout_payment', "confirmPaymentSource failed, see log.", 'error');  //- FIXME
+                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
+            }
+
+            $current_status = $payment_choice_response['status'];
+            $_SESSION['PayPalRestful']['Order']['status'] = $current_status;
+            if ($current_status !== PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
+                $messageStack->add_session('checkout_payment', "confirmPaymentSource invalid return status '$current_status', see log.", 'error');  //- FIXME
+                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
+            }
+
+            // -----
+            // Locate (and save) the URL to which the customer is redirected at PayPal
+            // to confirm their payment choice.
+            //
+            $action_link = '';
+            foreach ($payment_choice_response['links'] as $next_link) {
+                if ($next_link['rel'] === 'payer-action') {
+                    $action_link = $next_link['href'];
+                    $approve_method = $next_link['method'];
+                    break;
+                }
+            }
+            if ($action_link === '') {
+                trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", $this->log->logJSON($payment_choice_response), E_USER_WARNING);
+                $messageStack->add_session('checkout_payment', "confirmPaymentSource, no payer-action link found.", 'error');  //- FIXME
+                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
+            }
+            $_SESSION['PayPalRestful']['Order']['action_link'] = $action_link;
+        }
+
+        if ($current_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
+            zen_redirect($_SESSION['PayPalRestful']['Order']['action_link']);
+        }
     }
 
     /**
@@ -408,9 +586,19 @@ class paypalr extends base
     public function confirmation()
     {
         // -----
-        // Nothing additional to display.
+        // Nothing additional to display for the 'paypal' payment method.
         //
         return false;
+    }
+
+    /**
+     * Issued by the checkout_process page's header_php.php when a change
+     * in the cart's contents are detected, given a payment module the
+     * opportunity to reset any related variables.
+     */
+    public function clear_payments()
+    {
+        $this->resetOrder();
     }
 
     /**
@@ -418,47 +606,138 @@ class paypalr extends base
      */
     public function process_button()
     {
-        // When hitting the checkout-confirm button, we are going into markflow mode
-        $_SESSION['paypal_ec_markflow'] = 1;
-
-        // if we have a token, we want to avoid incontext checkout, so we return no special markup
-        if (isset($_SESSION['paypal_ec_token']) && !empty($_SESSION['paypal_ec_token'])) {
-            return '';
-        }
-
-    // send the PayPal-provided javascript to trigger the incontext checkout experience
-    return "      <script>
-        window.paypalCheckoutReady = function () {
-        paypal.checkout.setup('" . MODULE_PAYMENT_PAYPALR_MERCHANTID . "', {
-          //locale: '" . $this->getLanguageCode('incontext') . "',"
-          . (MODULE_PAYMENT_PAYPALR_SERVER == 'live' ? '' : "\n          environment: 'sandbox',") . "
-          container: 'checkout_confirmation',
-          button: 'btn_submit'
-        });
-      };
-      </script>
-      <script src=\"https://www.paypalobjects.com/api/checkout.js\" async></script>";
+        // -----
+        // Nothing additional to display for the 'paypal' payment method.
+        //
+        return false;
     }
 
     /**
-     * Prepare and submit the final authorization to PayPal via the appropriate means as configured
+     * Prepare and submit the final authorization to PayPal via the appropriate means as configured.
+     * Issued close to the start of the 'checkout_process' phase.
      */
     public function before_process()
     {
-        global $order, $doPayPal, $messageStack;
+        global $messageStack;
 
+        if (!isset($_SESSION['PayPalRestful']['Order']['status']) || $_SESSION['PayPalRestful']['Order']['status'] !== PayPalRestfulApi::STATUS_APPROVED) {
+            $messageStack->add_session('checkout', "paypalr::before_process, can't capture/authorize order; wrong status ({$_SESSION['PayPalRestful']['Order']['status']}).", 'error');  //- FIXME
+            zen_redirect(zen_href_link(FILENAME_CHECKOUT_SHIPPING));
+        }
+
+        $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
+        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') {
+            $response = $this->ppr->captureOrder($paypal_id);
+        } else {
+            $response = $this->ppr->authorizeOrder($paypal_id);
+        }
+
+        if ($response === false) {
+            $messageSTack->add_session('checkout', 'paypalr::before_process, can\'t capture/authorize order; error in attempt, see log.', 'error');
+            zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
+        }
+
+        $_SESSION['PayPalRestful']['Order']['status'] = $response['status'];
+        unset($response['purchase_units'][0]['links']);
+        $this->orderInfo = $response;
 
         $this->notify('NOTIFY_PAYPALR_BEFORE_PROCESS_FINISHED', $response);
     }
 
     /**
-     * When the order returns from the processor, this stores the results in order-status-history and logs data for subsequent use
+     * Issued by /modules/checkout_process.php after the main order-record has
+     * been provided in the database, supplying the just-created order's 'id'.
+     *
+     * Unlike other payment modules, paypalr stores its database information during
+     * the after_order_create method's processing, just in case some email issue arises
+     * so that the information's not written.
+     */
+    public function after_order_create($orders_id)
+    {
+        $this->orderInfo['orders_id'] = $orders_id;
+
+        $purchase_unit = $this->orderInfo['purchase_units'][0];
+        $address_info = [];
+        if (isset($purchase_unit['shipping']['address'])) {
+            $shipping_address = $purchase_unit['shipping']['address'];
+            $address_street = $shipping_address['address_line_1'];
+            if (isset($shipping_address['address_line_2'])) {
+                $address_street .= ', ' . $shipping_address['address_line_2'];
+            }
+            $address_street = substr($address_street, 0, 254);
+            $address_info = [
+                'address_name' => substr($purchase_unit['shipping']['name']['full_name'], 0, 64),
+                'address_street' => $address_street,
+                'address_city' => substr($shipping_address['admin_area_2'] ?? '', 0, 120),
+                'address_state' => substr($shipping_address['admin_area_1'] ?? '', 0, 120),
+                'address_zip' => substr($shipping_address['postal_code'] ?? '', 0, 10),
+                'address_country' => substr($shipping_address['country_code'] ?? '', 0, 64),
+            ];
+        }
+
+        $payment = $purchase_unit['payments']['captures'][0] ?? $purchase_unit['payments']['authorizations'][0];
+        $payment_info = [];
+        if (isset($purchase_unit['payments']['captures'])) {
+            $seller_receivable = $payment['seller_receivable_breakdown'];
+            $payment_info = [
+                'payment_date' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $payment['create_time']))),
+                'payment_gross' => $seller_receivable['gross_amount']['value'],
+                'payment_fee' => $seller_receivable['paypal_fee']['value'],
+                'settle_amount' => $seller_receivable['net_amount']['value'],
+                'settle_currency' => $seller_receivable['net_amount']['currency_code'],
+            ];
+        }
+
+        $payment_type = array_key_first($this->orderInfo['payment_source']);
+        $sql_data_array = [
+            'order_id' => $orders_id,
+            'txn_type' => '',
+            'module_name' => $this->code,
+            'module_mode' => '',
+            'payment_type' => $payment_type,
+            'payment_status' => $this->orderInfo['status'],
+            'invoice' => $this->orderInfo['invoice_id'] ?? $this->order_info['custom_id'] ?? '',
+            'mc_currency' => $payment['amount']['currency_code'],
+            'first_name' => substr($this->orderInfo['payer']['name']['given_name'], 0, 32),
+            'last_name' => substr($this->orderInfo['payer']['name']['surname'], 0, 32),
+            'payer_email' => $this->orderInfo['payer']['email_address'],
+            'payer_id' => $this->orderInfo['payer']['payer_id'],
+            'payer_status' => $this->orderInfo['payment_source'][$payment_type]['account_status'] ?? '???',
+            'receiver_email' => $purchase_unit['payee']['email_address'],
+            'receiver_id' => $purchase_unit['payee']['merchant_id'],
+            'txn_id' => $this->orderInfo['id'],
+            'num_cart_items' => $_SESSION['cart']->count_contents(),
+            'mc_gross' => $payment['amount']['value'],
+            'date_added' => 'now()',
+        ];
+        $sql_data_array = array_merge($sql_data_array, $address_info, $payment_info);
+        zen_db_perform(TABLE_PAYPAL, $sql_data_array);
+    }
+
+    /**
+     * Issued at the tail-end of the checkout_process' header_php.php, indicating that the
+     * order's been recorded in the database and any required emails sent.
+     *
+     * Add a customer-visible order-status-history record identifying the
+     * associated transaction ID, payment method, timestamp, status and amount.
      */
     public function after_process()
     {
-        global $insert_id, $order;
+        $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
+        $timestamp = '';
+        if (isset($payment['created_date'])) {
+            $timestamp = 'Timestamp: ' . $payment['created_date'] . "\n";
+        }
 
-        $this->notify('NOTIFY_PAYPALR_AFTER_PROCESS_FINISHED', $paypal_order);
+        $message =
+            'Transaction ID: ' . $this->orderInfo['id'] . "\n" .
+            'Payment Type: PayPal Checkout (' . array_key_first($this->orderInfo['payment_source']) . ")\n" .
+            $timestamp .
+            'Payment Status: ' . $this->orderInfo['status'] . "\n" .
+            'Amount: ' . $payment['amount']['value'] . ' ' . $payment['amount']['currency_code'];
+        zen_update_orders_history($this->orderInfo['orders_id'], $message, -1, 0);
+
+        $this->resetOrder();
     }
 
     /**
