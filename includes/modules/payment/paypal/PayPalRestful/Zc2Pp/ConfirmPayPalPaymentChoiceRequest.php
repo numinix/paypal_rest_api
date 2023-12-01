@@ -22,16 +22,6 @@ class ConfirmPayPalPaymentChoiceRequest
     public function __construct(string $webhook_name, \order $order)
     {
         // -----
-        // Determine the site's payment-preferrence, one of:
-        //
-        // - UNRESTRICTED ................. Any type of payment (including eChecks).
-        // - IMMEDIATE_PAYMENT_REQUIRED ... Accepts only immediate payment from the customer.
-        //     For example, credit card, PayPal balance, or instant ACH. Ensures that at the time of capture,
-        //     the payment does not have the PENDING status.
-        //
-        $payment_preference = (MODULE_PAYMENT_PAYPALR_ALLOWEDPAYMENT === 'Any') ? 'UNRESTRICTED' : 'IMMEDIATE_PAYMENT_REQUIRED';
-
-        // -----
         // Determine the shipping-preference, one of:
         //
         // - GET_FROM_FILE .......... The customer can choose one of their PayPal-registered addresses for the shipping.
@@ -54,7 +44,7 @@ class ConfirmPayPalPaymentChoiceRequest
                 ],
                 'email_address' => $order->customer['email_address'],
                 'experience_context' => [
-                    'payment_method_preference' => $payment_preference,
+                    'payment_method_preference' => 'IMMEDIATE_PAYMENT_REQUIRED',    //- No eChecks, no means to test in the sandbox environment
                     'brand_name' => $brand_name,
 //                    'locale' => 'en-US',
                     'landing_page' => 'NO_PREFERENCE',  //- LOGIN, GUEST_CHECKOUT or NO_PREFERENCE

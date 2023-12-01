@@ -73,7 +73,7 @@ class UpdatePayPalOrderRequest extends ErrorInfo
         if (count($updates) === 0) {
             $this->log->write('  --> Nothing to update.');
         } elseif ($updates[0] !== 'error') {
-            $this->log->write("  --> Updates to order:\n" . $this->log->logJSON($updates));
+            $this->log->write("  --> Updates to order:\n" . Logger::logJSON($updates));
             foreach ($updates as $next_update) {
                 $this->request[] = [
                     'op' => $next_update['op'],
@@ -82,7 +82,7 @@ class UpdatePayPalOrderRequest extends ErrorInfo
                 ];
             }
         }
-        $this->log->write("UpdatePayPalOrderRequest::__construct finished, request:\n" . $this->log->logJSON($this->request));
+        $this->log->write("UpdatePayPalOrderRequest::__construct finished, request:\n" . Logger::logJSON($this->request));
     }
 
     public function get()
@@ -224,7 +224,7 @@ class UpdatePayPalOrderRequest extends ErrorInfo
         // cannot be applied.
         //
         if (count($order_difference) !== 0) {
-            $this->setError("--> Update disallowed, changed parameters cannot be updated:\n" . $this->log->logJSON($order_difference), 'recreate');
+            $this->setError("--> Update disallowed, changed parameters cannot be updated:\n" . Logger::logJSON($order_difference), 'recreate');
             return ['error'];
         }
 

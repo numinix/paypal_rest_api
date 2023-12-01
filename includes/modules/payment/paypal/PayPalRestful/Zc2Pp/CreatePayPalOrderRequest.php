@@ -77,7 +77,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             unset($this->request['purchase_units'][0]['items']);
         }
 
-        $this->log->write("CreatePayPalOrderRequest::__construct finished, request:\n" . $this->log->logJSON($this->request));
+        $this->log->write("CreatePayPalOrderRequest::__construct finished, request:\n" . Logger::logJSON($this->request));
     }
 
     public function get()
@@ -146,7 +146,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             // Unfortunately, PayPal has no concept of one-time charges for a product.  They'll be
             // summed up and will be noted in the PayPal order as a 'handling fee'.
             //
-            $this->itemBreakdown['handling'] += $this->getRateConvertedValue($next_product['onetime_charges']) * $tax_rate;
+            $this->itemBreakdown['handling'] += $next_product['onetime_charges'] * $tax_rate;
 
             // -----
             // Add the current item to the items' array.
@@ -159,7 +159,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
     protected function getOrderAmountAndBreakdown($order): array
     {
-        $amount = $this->amount->setValue($this->getRateConvertedValue($order->info['total']));
+        $amount = $this->setRateConvertedValue($order->info['total']);
         if ($this->countItems() === 0) {
             return $amount;
         }
@@ -176,24 +176,29 @@ class CreatePayPalOrderRequest extends ErrorInfo
         }
         $breakdown = [
             'item_total' => $this->amount->setValue($item_total),
-            'shipping' => $this->amount->setValue($order->info['shipping_cost'] + $order->info['shipping_tax']),
+            'shipping' => $this->setRateConvertedValue($order->info['shipping_cost'] + $order->info['shipping_tax']),
             'tax_total' => $this->amount->setValue($item_tax_total),
         ];
 
         if ($handling_total > 0) {
-            $breakdown['handling'] = $this->amount->setValue($handling_total);
+            $breakdown['handling'] = $this->setRateConvertedValue($handling_total);
         }
         if ($insurance_total > 0) {
-            $breakdown['insurance'] = $this->amount->setValue($insurance_total);
+            $breakdown['insurance'] = $this->setRateConvertedValue($insurance_total);
         }
         if ($shipping_discount_total > 0) {
-            $breakdown['shipping_discount'] = $this->amount->setValue($shipping_discount_total);
+            $breakdown['shipping_discount'] = $setRateConvertedValue($shipping_discount_total);
         }
         if ($discount_total > 0) {
-            $breakdown['discount'] = $this->amount->setValue($discount_total);
+            $breakdown['discount'] = $this->setRateConvertedValue($discount_total);
         }
         $amount['breakdown'] = $breakdown;
         return $amount;
+    }
+
+    protected function setRateConvertedValue($value)
+    {
+        return $this->amount->setValue($this->getRateConvertedValue($value));
     }
 
     protected function getShipping($order)

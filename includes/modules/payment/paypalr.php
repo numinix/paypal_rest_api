@@ -12,6 +12,7 @@
  */
 require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
+use PayPalRestful\Admin\AdminMain;
 use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Common\ErrorInfo;
 use PayPalRestful\Common\Logger;
@@ -85,13 +86,6 @@ class paypalr extends base
      * @var int
      */
     public $sort_order = 0;
-
-    /**
-     * order status setting for pending orders
-     *
-     * @var int
-     */
-    protected $order_pending_status = 1;
 
     /**
      * order status setting for completed orders
@@ -170,8 +164,12 @@ class paypalr extends base
         }
         $this->emailAlerts = ($debug === true || MODULE_PAYMENT_PAYPALR_DEBUGGING === 'Alerts Only');
 
-        $this->order_pending_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
-        $this->order_status = (int)((int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID > 0) ? MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID : DEFAULT_ORDERS_STATUS_ID;
+        // -----
+        // An order's *initial* order-status depending on the mode in which the PayPal transaction
+        // is to be performed.
+        //
+        $order_status = (int)(MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') ? MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID : MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+        $this->order_status = ($order_status > 1) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
 
         $this->zone = (int)MODULE_PAYMENT_PAYPALR_ZONE;
 
@@ -287,7 +285,7 @@ class paypalr extends base
             $messageStack->add_session($error_message, 'error');
             $this->description = $this->alertMsg($error_message) . '<br><br>' . $this->description;
         } else {
-            $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_MSG_CONFIGURATION, $error_message);
+            $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, $error_message);
         }
     }
 
@@ -305,7 +303,7 @@ class paypalr extends base
         $order_total = $order->info['total'];
         if ($order_total == 0) {
             $this->enabled = false;
-            $this->log->write("update_status: Module disabled because purchase amount is set to 0.00." . $this->log->logJSON($order->info));
+            $this->log->write("update_status: Module disabled because purchase amount is set to 0.00." . Logger::logJSON($order->info));
             return;
         }
 
@@ -392,7 +390,7 @@ class paypalr extends base
      */
     public function selection()
     {
-        $this->log->write("paypalr:: selection starts:\n" . $this->log->logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'before');
+        $this->log->write("paypalr:: selection starts:\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'before');
 
         // -----
         // Build the request for the PayPal order's "Create" and send to off to PayPal. Any issues result
@@ -407,13 +405,13 @@ class paypalr extends base
         // -----
         // Return the PayPal selection as a button, modelled after https://developer.paypal.com/demo/checkout/#/pattern/responsive
         //
-        $this->log->write("paypalr:: selection successful:\n" . $this->log->logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'after');
+        $this->log->write("paypalr:: selection successful:\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'after');
         return [
             'id' => $this->code,
             'module' =>
-                '<button id="paypalr-paypal" style="background: #ffc439; border-radius: 4px; border: none;">' .
-                '  <img style="margin: 0.25vw 2vw;" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAxcHgiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMDEgMzIiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaW5ZTWluIG1lZXQiIHhtbG5zPSJodHRwOiYjeDJGOyYjeDJGO3d3dy53My5vcmcmI3gyRjsyMDAwJiN4MkY7c3ZnIj48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDEyLjIzNyAyLjggTCA0LjQzNyAyLjggQyAzLjkzNyAyLjggMy40MzcgMy4yIDMuMzM3IDMuNyBMIDAuMjM3IDIzLjcgQyAwLjEzNyAyNC4xIDAuNDM3IDI0LjQgMC44MzcgMjQuNCBMIDQuNTM3IDI0LjQgQyA1LjAzNyAyNC40IDUuNTM3IDI0IDUuNjM3IDIzLjUgTCA2LjQzNyAxOC4xIEMgNi41MzcgMTcuNiA2LjkzNyAxNy4yIDcuNTM3IDE3LjIgTCAxMC4wMzcgMTcuMiBDIDE1LjEzNyAxNy4yIDE4LjEzNyAxNC43IDE4LjkzNyA5LjggQyAxOS4yMzcgNy43IDE4LjkzNyA2IDE3LjkzNyA0LjggQyAxNi44MzcgMy41IDE0LjgzNyAyLjggMTIuMjM3IDIuOCBaIE0gMTMuMTM3IDEwLjEgQyAxMi43MzcgMTIuOSAxMC41MzcgMTIuOSA4LjUzNyAxMi45IEwgNy4zMzcgMTIuOSBMIDguMTM3IDcuNyBDIDguMTM3IDcuNCA4LjQzNyA3LjIgOC43MzcgNy4yIEwgOS4yMzcgNy4yIEMgMTAuNjM3IDcuMiAxMS45MzcgNy4yIDEyLjYzNyA4IEMgMTMuMTM3IDguNCAxMy4zMzcgOS4xIDEzLjEzNyAxMC4xIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDM1LjQzNyAxMCBMIDMxLjczNyAxMCBDIDMxLjQzNyAxMCAzMS4xMzcgMTAuMiAzMS4xMzcgMTAuNSBMIDMwLjkzNyAxMS41IEwgMzAuNjM3IDExLjEgQyAyOS44MzcgOS45IDI4LjAzNyA5LjUgMjYuMjM3IDkuNSBDIDIyLjEzNyA5LjUgMTguNjM3IDEyLjYgMTcuOTM3IDE3IEMgMTcuNTM3IDE5LjIgMTguMDM3IDIxLjMgMTkuMzM3IDIyLjcgQyAyMC40MzcgMjQgMjIuMTM3IDI0LjYgMjQuMDM3IDI0LjYgQyAyNy4zMzcgMjQuNiAyOS4yMzcgMjIuNSAyOS4yMzcgMjIuNSBMIDI5LjAzNyAyMy41IEMgMjguOTM3IDIzLjkgMjkuMjM3IDI0LjMgMjkuNjM3IDI0LjMgTCAzMy4wMzcgMjQuMyBDIDMzLjUzNyAyNC4zIDM0LjAzNyAyMy45IDM0LjEzNyAyMy40IEwgMzYuMTM3IDEwLjYgQyAzNi4yMzcgMTAuNCAzNS44MzcgMTAgMzUuNDM3IDEwIFogTSAzMC4zMzcgMTcuMiBDIDI5LjkzNyAxOS4zIDI4LjMzNyAyMC44IDI2LjEzNyAyMC44IEMgMjUuMDM3IDIwLjggMjQuMjM3IDIwLjUgMjMuNjM3IDE5LjggQyAyMy4wMzcgMTkuMSAyMi44MzcgMTguMiAyMy4wMzcgMTcuMiBDIDIzLjMzNyAxNS4xIDI1LjEzNyAxMy42IDI3LjIzNyAxMy42IEMgMjguMzM3IDEzLjYgMjkuMTM3IDE0IDI5LjczNyAxNC42IEMgMzAuMjM3IDE1LjMgMzAuNDM3IDE2LjIgMzAuMzM3IDE3LjIgWiI+PC9wYXRoPjxwYXRoIGZpbGw9IiMwMDMwODciIGQ9Ik0gNTUuMzM3IDEwIEwgNTEuNjM3IDEwIEMgNTEuMjM3IDEwIDUwLjkzNyAxMC4yIDUwLjczNyAxMC41IEwgNDUuNTM3IDE4LjEgTCA0My4zMzcgMTAuOCBDIDQzLjIzNyAxMC4zIDQyLjczNyAxMCA0Mi4zMzcgMTAgTCAzOC42MzcgMTAgQyAzOC4yMzcgMTAgMzcuODM3IDEwLjQgMzguMDM3IDEwLjkgTCA0Mi4xMzcgMjMgTCAzOC4yMzcgMjguNCBDIDM3LjkzNyAyOC44IDM4LjIzNyAyOS40IDM4LjczNyAyOS40IEwgNDIuNDM3IDI5LjQgQyA0Mi44MzcgMjkuNCA0My4xMzcgMjkuMiA0My4zMzcgMjguOSBMIDU1LjgzNyAxMC45IEMgNTYuMTM3IDEwLjYgNTUuODM3IDEwIDU1LjMzNyAxMCBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA2Ny43MzcgMi44IEwgNTkuOTM3IDIuOCBDIDU5LjQzNyAyLjggNTguOTM3IDMuMiA1OC44MzcgMy43IEwgNTUuNzM3IDIzLjYgQyA1NS42MzcgMjQgNTUuOTM3IDI0LjMgNTYuMzM3IDI0LjMgTCA2MC4zMzcgMjQuMyBDIDYwLjczNyAyNC4zIDYxLjAzNyAyNCA2MS4wMzcgMjMuNyBMIDYxLjkzNyAxOCBDIDYyLjAzNyAxNy41IDYyLjQzNyAxNy4xIDYzLjAzNyAxNy4xIEwgNjUuNTM3IDE3LjEgQyA3MC42MzcgMTcuMSA3My42MzcgMTQuNiA3NC40MzcgOS43IEMgNzQuNzM3IDcuNiA3NC40MzcgNS45IDczLjQzNyA0LjcgQyA3Mi4yMzcgMy41IDcwLjMzNyAyLjggNjcuNzM3IDIuOCBaIE0gNjguNjM3IDEwLjEgQyA2OC4yMzcgMTIuOSA2Ni4wMzcgMTIuOSA2NC4wMzcgMTIuOSBMIDYyLjgzNyAxMi45IEwgNjMuNjM3IDcuNyBDIDYzLjYzNyA3LjQgNjMuOTM3IDcuMiA2NC4yMzcgNy4yIEwgNjQuNzM3IDcuMiBDIDY2LjEzNyA3LjIgNjcuNDM3IDcuMiA2OC4xMzcgOCBDIDY4LjYzNyA4LjQgNjguNzM3IDkuMSA2OC42MzcgMTAuMSBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA5MC45MzcgMTAgTCA4Ny4yMzcgMTAgQyA4Ni45MzcgMTAgODYuNjM3IDEwLjIgODYuNjM3IDEwLjUgTCA4Ni40MzcgMTEuNSBMIDg2LjEzNyAxMS4xIEMgODUuMzM3IDkuOSA4My41MzcgOS41IDgxLjczNyA5LjUgQyA3Ny42MzcgOS41IDc0LjEzNyAxMi42IDczLjQzNyAxNyBDIDczLjAzNyAxOS4yIDczLjUzNyAyMS4zIDc0LjgzNyAyMi43IEMgNzUuOTM3IDI0IDc3LjYzNyAyNC42IDc5LjUzNyAyNC42IEMgODIuODM3IDI0LjYgODQuNzM3IDIyLjUgODQuNzM3IDIyLjUgTCA4NC41MzcgMjMuNSBDIDg0LjQzNyAyMy45IDg0LjczNyAyNC4zIDg1LjEzNyAyNC4zIEwgODguNTM3IDI0LjMgQyA4OS4wMzcgMjQuMyA4OS41MzcgMjMuOSA4OS42MzcgMjMuNCBMIDkxLjYzNyAxMC42IEMgOTEuNjM3IDEwLjQgOTEuMzM3IDEwIDkwLjkzNyAxMCBaIE0gODUuNzM3IDE3LjIgQyA4NS4zMzcgMTkuMyA4My43MzcgMjAuOCA4MS41MzcgMjAuOCBDIDgwLjQzNyAyMC44IDc5LjYzNyAyMC41IDc5LjAzNyAxOS44IEMgNzguNDM3IDE5LjEgNzguMjM3IDE4LjIgNzguNDM3IDE3LjIgQyA3OC43MzcgMTUuMSA4MC41MzcgMTMuNiA4Mi42MzcgMTMuNiBDIDgzLjczNyAxMy42IDg0LjUzNyAxNCA4NS4xMzcgMTQuNiBDIDg1LjczNyAxNS4zIDg1LjkzNyAxNi4yIDg1LjczNyAxNy4yIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDA5Y2RlIiBkPSJNIDk1LjMzNyAzLjMgTCA5Mi4xMzcgMjMuNiBDIDkyLjAzNyAyNCA5Mi4zMzcgMjQuMyA5Mi43MzcgMjQuMyBMIDk1LjkzNyAyNC4zIEMgOTYuNDM3IDI0LjMgOTYuOTM3IDIzLjkgOTcuMDM3IDIzLjQgTCAxMDAuMjM3IDMuNSBDIDEwMC4zMzcgMy4xIDEwMC4wMzcgMi44IDk5LjYzNyAyLjggTCA5Ni4wMzcgMi44IEMgOTUuNjM3IDIuOCA5NS40MzcgMyA5NS4zMzcgMy4zIFoiPjwvcGF0aD48L3N2Zz4" data-v-b01da731="" alt="" role="presentation">' .
-                '</button>' .
+                '<span id="paypalr-paypal" style="background: #ffc439; border-radius: 4px; border: none; display: inline-block">' .
+                '  <img style="margin: 0.25vw 2vw;" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAxcHgiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMDEgMzIiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaW5ZTWluIG1lZXQiIHhtbG5zPSJodHRwOiYjeDJGOyYjeDJGO3d3dy53My5vcmcmI3gyRjsyMDAwJiN4MkY7c3ZnIj48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDEyLjIzNyAyLjggTCA0LjQzNyAyLjggQyAzLjkzNyAyLjggMy40MzcgMy4yIDMuMzM3IDMuNyBMIDAuMjM3IDIzLjcgQyAwLjEzNyAyNC4xIDAuNDM3IDI0LjQgMC44MzcgMjQuNCBMIDQuNTM3IDI0LjQgQyA1LjAzNyAyNC40IDUuNTM3IDI0IDUuNjM3IDIzLjUgTCA2LjQzNyAxOC4xIEMgNi41MzcgMTcuNiA2LjkzNyAxNy4yIDcuNTM3IDE3LjIgTCAxMC4wMzcgMTcuMiBDIDE1LjEzNyAxNy4yIDE4LjEzNyAxNC43IDE4LjkzNyA5LjggQyAxOS4yMzcgNy43IDE4LjkzNyA2IDE3LjkzNyA0LjggQyAxNi44MzcgMy41IDE0LjgzNyAyLjggMTIuMjM3IDIuOCBaIE0gMTMuMTM3IDEwLjEgQyAxMi43MzcgMTIuOSAxMC41MzcgMTIuOSA4LjUzNyAxMi45IEwgNy4zMzcgMTIuOSBMIDguMTM3IDcuNyBDIDguMTM3IDcuNCA4LjQzNyA3LjIgOC43MzcgNy4yIEwgOS4yMzcgNy4yIEMgMTAuNjM3IDcuMiAxMS45MzcgNy4yIDEyLjYzNyA4IEMgMTMuMTM3IDguNCAxMy4zMzcgOS4xIDEzLjEzNyAxMC4xIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDM1LjQzNyAxMCBMIDMxLjczNyAxMCBDIDMxLjQzNyAxMCAzMS4xMzcgMTAuMiAzMS4xMzcgMTAuNSBMIDMwLjkzNyAxMS41IEwgMzAuNjM3IDExLjEgQyAyOS44MzcgOS45IDI4LjAzNyA5LjUgMjYuMjM3IDkuNSBDIDIyLjEzNyA5LjUgMTguNjM3IDEyLjYgMTcuOTM3IDE3IEMgMTcuNTM3IDE5LjIgMTguMDM3IDIxLjMgMTkuMzM3IDIyLjcgQyAyMC40MzcgMjQgMjIuMTM3IDI0LjYgMjQuMDM3IDI0LjYgQyAyNy4zMzcgMjQuNiAyOS4yMzcgMjIuNSAyOS4yMzcgMjIuNSBMIDI5LjAzNyAyMy41IEMgMjguOTM3IDIzLjkgMjkuMjM3IDI0LjMgMjkuNjM3IDI0LjMgTCAzMy4wMzcgMjQuMyBDIDMzLjUzNyAyNC4zIDM0LjAzNyAyMy45IDM0LjEzNyAyMy40IEwgMzYuMTM3IDEwLjYgQyAzNi4yMzcgMTAuNCAzNS44MzcgMTAgMzUuNDM3IDEwIFogTSAzMC4zMzcgMTcuMiBDIDI5LjkzNyAxOS4zIDI4LjMzNyAyMC44IDI2LjEzNyAyMC44IEMgMjUuMDM3IDIwLjggMjQuMjM3IDIwLjUgMjMuNjM3IDE5LjggQyAyMy4wMzcgMTkuMSAyMi44MzcgMTguMiAyMy4wMzcgMTcuMiBDIDIzLjMzNyAxNS4xIDI1LjEzNyAxMy42IDI3LjIzNyAxMy42IEMgMjguMzM3IDEzLjYgMjkuMTM3IDE0IDI5LjczNyAxNC42IEMgMzAuMjM3IDE1LjMgMzAuNDM3IDE2LjIgMzAuMzM3IDE3LjIgWiI+PC9wYXRoPjxwYXRoIGZpbGw9IiMwMDMwODciIGQ9Ik0gNTUuMzM3IDEwIEwgNTEuNjM3IDEwIEMgNTEuMjM3IDEwIDUwLjkzNyAxMC4yIDUwLjczNyAxMC41IEwgNDUuNTM3IDE4LjEgTCA0My4zMzcgMTAuOCBDIDQzLjIzNyAxMC4zIDQyLjczNyAxMCA0Mi4zMzcgMTAgTCAzOC42MzcgMTAgQyAzOC4yMzcgMTAgMzcuODM3IDEwLjQgMzguMDM3IDEwLjkgTCA0Mi4xMzcgMjMgTCAzOC4yMzcgMjguNCBDIDM3LjkzNyAyOC44IDM4LjIzNyAyOS40IDM4LjczNyAyOS40IEwgNDIuNDM3IDI5LjQgQyA0Mi44MzcgMjkuNCA0My4xMzcgMjkuMiA0My4zMzcgMjguOSBMIDU1LjgzNyAxMC45IEMgNTYuMTM3IDEwLjYgNTUuODM3IDEwIDU1LjMzNyAxMCBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA2Ny43MzcgMi44IEwgNTkuOTM3IDIuOCBDIDU5LjQzNyAyLjggNTguOTM3IDMuMiA1OC44MzcgMy43IEwgNTUuNzM3IDIzLjYgQyA1NS42MzcgMjQgNTUuOTM3IDI0LjMgNTYuMzM3IDI0LjMgTCA2MC4zMzcgMjQuMyBDIDYwLjczNyAyNC4zIDYxLjAzNyAyNCA2MS4wMzcgMjMuNyBMIDYxLjkzNyAxOCBDIDYyLjAzNyAxNy41IDYyLjQzNyAxNy4xIDYzLjAzNyAxNy4xIEwgNjUuNTM3IDE3LjEgQyA3MC42MzcgMTcuMSA3My42MzcgMTQuNiA3NC40MzcgOS43IEMgNzQuNzM3IDcuNiA3NC40MzcgNS45IDczLjQzNyA0LjcgQyA3Mi4yMzcgMy41IDcwLjMzNyAyLjggNjcuNzM3IDIuOCBaIE0gNjguNjM3IDEwLjEgQyA2OC4yMzcgMTIuOSA2Ni4wMzcgMTIuOSA2NC4wMzcgMTIuOSBMIDYyLjgzNyAxMi45IEwgNjMuNjM3IDcuNyBDIDYzLjYzNyA3LjQgNjMuOTM3IDcuMiA2NC4yMzcgNy4yIEwgNjQuNzM3IDcuMiBDIDY2LjEzNyA3LjIgNjcuNDM3IDcuMiA2OC4xMzcgOCBDIDY4LjYzNyA4LjQgNjguNzM3IDkuMSA2OC42MzcgMTAuMSBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA5MC45MzcgMTAgTCA4Ny4yMzcgMTAgQyA4Ni45MzcgMTAgODYuNjM3IDEwLjIgODYuNjM3IDEwLjUgTCA4Ni40MzcgMTEuNSBMIDg2LjEzNyAxMS4xIEMgODUuMzM3IDkuOSA4My41MzcgOS41IDgxLjczNyA5LjUgQyA3Ny42MzcgOS41IDc0LjEzNyAxMi42IDczLjQzNyAxNyBDIDczLjAzNyAxOS4yIDczLjUzNyAyMS4zIDc0LjgzNyAyMi43IEMgNzUuOTM3IDI0IDc3LjYzNyAyNC42IDc5LjUzNyAyNC42IEMgODIuODM3IDI0LjYgODQuNzM3IDIyLjUgODQuNzM3IDIyLjUgTCA4NC41MzcgMjMuNSBDIDg0LjQzNyAyMy45IDg0LjczNyAyNC4zIDg1LjEzNyAyNC4zIEwgODguNTM3IDI0LjMgQyA4OS4wMzcgMjQuMyA4OS41MzcgMjMuOSA4OS42MzcgMjMuNCBMIDkxLjYzNyAxMC42IEMgOTEuNjM3IDEwLjQgOTEuMzM3IDEwIDkwLjkzNyAxMCBaIE0gODUuNzM3IDE3LjIgQyA4NS4zMzcgMTkuMyA4My43MzcgMjAuOCA4MS41MzcgMjAuOCBDIDgwLjQzNyAyMC44IDc5LjYzNyAyMC41IDc5LjAzNyAxOS44IEMgNzguNDM3IDE5LjEgNzguMjM3IDE4LjIgNzguNDM3IDE3LjIgQyA3OC43MzcgMTUuMSA4MC41MzcgMTMuNiA4Mi42MzcgMTMuNiBDIDgzLjczNyAxMy42IDg0LjUzNyAxNCA4NS4xMzcgMTQuNiBDIDg1LjczNyAxNS4zIDg1LjkzNyAxNi4yIDg1LjczNyAxNy4yIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDA5Y2RlIiBkPSJNIDk1LjMzNyAzLjMgTCA5Mi4xMzcgMjMuNiBDIDkyLjAzNyAyNCA5Mi4zMzcgMjQuMyA5Mi43MzcgMjQuMyBMIDk1LjkzNyAyNC4zIEMgOTYuNDM3IDI0LjMgOTYuOTM3IDIzLjkgOTcuMDM3IDIzLjQgTCAxMDAuMjM3IDMuNSBDIDEwMC4zMzcgMy4xIDEwMC4wMzcgMi44IDk5LjYzNyAyLjggTCA5Ni4wMzcgMi44IEMgOTUuNjM3IDIuOCA5NS40MzcgMyA5NS4zMzcgMy4zIFoiPjwvcGF0aD48L3N2Zz4" alt="" role="presentation">' .
+                '</span>' .
                 ' ' .
                 '<span class="paypal-powered-by">' .
                     '<style nonce="">
@@ -441,7 +439,7 @@ class paypalr extends base
                             float: none;
                         }
                     </style>' .
-                    '<span class="paypal-button-text immediate" data-v-44bf4aee="">Powered by </span>' .
+                    '<span class="paypal-button-text">Powered by </span>' .
                     '<img  alt="" role="presentation" class="paypal-logo paypal-logo-paypal paypal-logo-color-blue" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAxcHgiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMDEgMzIiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaW5ZTWluIG1lZXQiIHhtbG5zPSJodHRwOiYjeDJGOyYjeDJGO3d3dy53My5vcmcmI3gyRjsyMDAwJiN4MkY7c3ZnIj48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDEyLjIzNyAyLjggTCA0LjQzNyAyLjggQyAzLjkzNyAyLjggMy40MzcgMy4yIDMuMzM3IDMuNyBMIDAuMjM3IDIzLjcgQyAwLjEzNyAyNC4xIDAuNDM3IDI0LjQgMC44MzcgMjQuNCBMIDQuNTM3IDI0LjQgQyA1LjAzNyAyNC40IDUuNTM3IDI0IDUuNjM3IDIzLjUgTCA2LjQzNyAxOC4xIEMgNi41MzcgMTcuNiA2LjkzNyAxNy4yIDcuNTM3IDE3LjIgTCAxMC4wMzcgMTcuMiBDIDE1LjEzNyAxNy4yIDE4LjEzNyAxNC43IDE4LjkzNyA5LjggQyAxOS4yMzcgNy43IDE4LjkzNyA2IDE3LjkzNyA0LjggQyAxNi44MzcgMy41IDE0LjgzNyAyLjggMTIuMjM3IDIuOCBaIE0gMTMuMTM3IDEwLjEgQyAxMi43MzcgMTIuOSAxMC41MzcgMTIuOSA4LjUzNyAxMi45IEwgNy4zMzcgMTIuOSBMIDguMTM3IDcuNyBDIDguMTM3IDcuNCA4LjQzNyA3LjIgOC43MzcgNy4yIEwgOS4yMzcgNy4yIEMgMTAuNjM3IDcuMiAxMS45MzcgNy4yIDEyLjYzNyA4IEMgMTMuMTM3IDguNCAxMy4zMzcgOS4xIDEzLjEzNyAxMC4xIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDM1LjQzNyAxMCBMIDMxLjczNyAxMCBDIDMxLjQzNyAxMCAzMS4xMzcgMTAuMiAzMS4xMzcgMTAuNSBMIDMwLjkzNyAxMS41IEwgMzAuNjM3IDExLjEgQyAyOS44MzcgOS45IDI4LjAzNyA5LjUgMjYuMjM3IDkuNSBDIDIyLjEzNyA5LjUgMTguNjM3IDEyLjYgMTcuOTM3IDE3IEMgMTcuNTM3IDE5LjIgMTguMDM3IDIxLjMgMTkuMzM3IDIyLjcgQyAyMC40MzcgMjQgMjIuMTM3IDI0LjYgMjQuMDM3IDI0LjYgQyAyNy4zMzcgMjQuNiAyOS4yMzcgMjIuNSAyOS4yMzcgMjIuNSBMIDI5LjAzNyAyMy41IEMgMjguOTM3IDIzLjkgMjkuMjM3IDI0LjMgMjkuNjM3IDI0LjMgTCAzMy4wMzcgMjQuMyBDIDMzLjUzNyAyNC4zIDM0LjAzNyAyMy45IDM0LjEzNyAyMy40IEwgMzYuMTM3IDEwLjYgQyAzNi4yMzcgMTAuNCAzNS44MzcgMTAgMzUuNDM3IDEwIFogTSAzMC4zMzcgMTcuMiBDIDI5LjkzNyAxOS4zIDI4LjMzNyAyMC44IDI2LjEzNyAyMC44IEMgMjUuMDM3IDIwLjggMjQuMjM3IDIwLjUgMjMuNjM3IDE5LjggQyAyMy4wMzcgMTkuMSAyMi44MzcgMTguMiAyMy4wMzcgMTcuMiBDIDIzLjMzNyAxNS4xIDI1LjEzNyAxMy42IDI3LjIzNyAxMy42IEMgMjguMzM3IDEzLjYgMjkuMTM3IDE0IDI5LjczNyAxNC42IEMgMzAuMjM3IDE1LjMgMzAuNDM3IDE2LjIgMzAuMzM3IDE3LjIgWiI+PC9wYXRoPjxwYXRoIGZpbGw9IiMwMDMwODciIGQ9Ik0gNTUuMzM3IDEwIEwgNTEuNjM3IDEwIEMgNTEuMjM3IDEwIDUwLjkzNyAxMC4yIDUwLjczNyAxMC41IEwgNDUuNTM3IDE4LjEgTCA0My4zMzcgMTAuOCBDIDQzLjIzNyAxMC4zIDQyLjczNyAxMCA0Mi4zMzcgMTAgTCAzOC42MzcgMTAgQyAzOC4yMzcgMTAgMzcuODM3IDEwLjQgMzguMDM3IDEwLjkgTCA0Mi4xMzcgMjMgTCAzOC4yMzcgMjguNCBDIDM3LjkzNyAyOC44IDM4LjIzNyAyOS40IDM4LjczNyAyOS40IEwgNDIuNDM3IDI5LjQgQyA0Mi44MzcgMjkuNCA0My4xMzcgMjkuMiA0My4zMzcgMjguOSBMIDU1LjgzNyAxMC45IEMgNTYuMTM3IDEwLjYgNTUuODM3IDEwIDU1LjMzNyAxMCBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA2Ny43MzcgMi44IEwgNTkuOTM3IDIuOCBDIDU5LjQzNyAyLjggNTguOTM3IDMuMiA1OC44MzcgMy43IEwgNTUuNzM3IDIzLjYgQyA1NS42MzcgMjQgNTUuOTM3IDI0LjMgNTYuMzM3IDI0LjMgTCA2MC4zMzcgMjQuMyBDIDYwLjczNyAyNC4zIDYxLjAzNyAyNCA2MS4wMzcgMjMuNyBMIDYxLjkzNyAxOCBDIDYyLjAzNyAxNy41IDYyLjQzNyAxNy4xIDYzLjAzNyAxNy4xIEwgNjUuNTM3IDE3LjEgQyA3MC42MzcgMTcuMSA3My42MzcgMTQuNiA3NC40MzcgOS43IEMgNzQuNzM3IDcuNiA3NC40MzcgNS45IDczLjQzNyA0LjcgQyA3Mi4yMzcgMy41IDcwLjMzNyAyLjggNjcuNzM3IDIuOCBaIE0gNjguNjM3IDEwLjEgQyA2OC4yMzcgMTIuOSA2Ni4wMzcgMTIuOSA2NC4wMzcgMTIuOSBMIDYyLjgzNyAxMi45IEwgNjMuNjM3IDcuNyBDIDYzLjYzNyA3LjQgNjMuOTM3IDcuMiA2NC4yMzcgNy4yIEwgNjQuNzM3IDcuMiBDIDY2LjEzNyA3LjIgNjcuNDM3IDcuMiA2OC4xMzcgOCBDIDY4LjYzNyA4LjQgNjguNzM3IDkuMSA2OC42MzcgMTAuMSBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA5MC45MzcgMTAgTCA4Ny4yMzcgMTAgQyA4Ni45MzcgMTAgODYuNjM3IDEwLjIgODYuNjM3IDEwLjUgTCA4Ni40MzcgMTEuNSBMIDg2LjEzNyAxMS4xIEMgODUuMzM3IDkuOSA4My41MzcgOS41IDgxLjczNyA5LjUgQyA3Ny42MzcgOS41IDc0LjEzNyAxMi42IDczLjQzNyAxNyBDIDczLjAzNyAxOS4yIDczLjUzNyAyMS4zIDc0LjgzNyAyMi43IEMgNzUuOTM3IDI0IDc3LjYzNyAyNC42IDc5LjUzNyAyNC42IEMgODIuODM3IDI0LjYgODQuNzM3IDIyLjUgODQuNzM3IDIyLjUgTCA4NC41MzcgMjMuNSBDIDg0LjQzNyAyMy45IDg0LjczNyAyNC4zIDg1LjEzNyAyNC4zIEwgODguNTM3IDI0LjMgQyA4OS4wMzcgMjQuMyA4OS41MzcgMjMuOSA4OS42MzcgMjMuNCBMIDkxLjYzNyAxMC42IEMgOTEuNjM3IDEwLjQgOTEuMzM3IDEwIDkwLjkzNyAxMCBaIE0gODUuNzM3IDE3LjIgQyA4NS4zMzcgMTkuMyA4My43MzcgMjAuOCA4MS41MzcgMjAuOCBDIDgwLjQzNyAyMC44IDc5LjYzNyAyMC41IDc5LjAzNyAxOS44IEMgNzguNDM3IDE5LjEgNzguMjM3IDE4LjIgNzguNDM3IDE3LjIgQyA3OC43MzcgMTUuMSA4MC41MzcgMTMuNiA4Mi42MzcgMTMuNiBDIDgzLjczNyAxMy42IDg0LjUzNyAxNCA4NS4xMzcgMTQuNiBDIDg1LjczNyAxNS4zIDg1LjkzNyAxNi4yIDg1LjczNyAxNy4yIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDA5Y2RlIiBkPSJNIDk1LjMzNyAzLjMgTCA5Mi4xMzcgMjMuNiBDIDkyLjAzNyAyNCA5Mi4zMzcgMjQuMyA5Mi43MzcgMjQuMyBMIDk1LjkzNyAyNC4zIEMgOTYuNDM3IDI0LjMgOTYuOTM3IDIzLjkgOTcuMDM3IDIzLjQgTCAxMDAuMjM3IDMuNSBDIDEwMC4zMzcgMy4xIDEwMC4wMzcgMi44IDk5LjYzNyAyLjggTCA5Ni4wMzcgMi44IEMgOTUuNjM3IDIuOCA5NS40MzcgMyA5NS4zMzcgMy4zIFoiPjwvcGF0aD48L3N2Zz4">' .
                '</span>',
         ];
@@ -568,7 +566,7 @@ class paypalr extends base
                 }
             }
             if ($action_link === '') {
-                trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", $this->log->logJSON($payment_choice_response), E_USER_WARNING);
+                trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", Logger::logJSON($payment_choice_response), E_USER_WARNING);
                 $messageStack->add_session('checkout_payment', "confirmPaymentSource, no payer-action link found.", 'error');  //- FIXME
                 zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
             }
@@ -633,7 +631,7 @@ class paypalr extends base
         }
 
         if ($response === false) {
-            $messageSTack->add_session('checkout', 'paypalr::before_process, can\'t capture/authorize order; error in attempt, see log.', 'error');
+            $messageSTack->add_session('checkout', 'paypalr::before_process, can\'t capture/authorize order; error in attempt, see log.', 'error');  //- FIXME
             zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
         }
 
@@ -641,12 +639,46 @@ class paypalr extends base
         unset($response['purchase_units'][0]['links']);
         $this->orderInfo = $response;
 
-        $this->notify('NOTIFY_PAYPALR_BEFORE_PROCESS_FINISHED', $response);
+        // -----
+        // Determine the payment's status to be recorded in the paypal table and to accompany the
+        // additional order-status-history record to be created by the after_process method.
+        //
+        $txn_type = $this->orderInfo['intent'];
+        $payment = $purchase_unit['payments']['captures'][0] ?? $purchase_unit['payments']['authorizations'][0];
+        $payment_status = ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalRestfulApi::STATUS_CAPTURED : PayPalRestfulApi::STATUS_APPROVED);
+        $this->orderInfo['payment_status'] = $payment_status;
+        $this->orderInfo['paypal_payment_status'] = $payment['status'];
+
+        // -----
+        // If the order's PayPal status doesn't indicate successful completion, ensure that
+        // the overall order's status is set to this payment-module's PENDING status and set
+        // a processing flag so that the after_process method will alert the store admin if
+        // configured.
+        //
+        // Setting the order's overall status here, since zc158a and earlier don't acknowlege
+        // a payment-module's change in status during the payment processing!
+        //
+        $this->orderInfo['admin_alert_needed'] = false;
+        if ($payment_status !== PayPalRestfulApi::STATUS_CAPTURED && $payment_status !== PayPalRestfulApi::STATUS_CREATED) {
+            global $order;
+
+            $this->order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+            $order->info['order_status'] = $this->order_status;
+            $this->orderInfo['admin_alert_needed'] = true;
+
+            $this->log->write("==> paypalr::before_process: Payment status {$payment['status']} received from PayPal; order's status forced to pending.");
+        }
+
+        $this->notify('NOTIFY_PAYPALR_BEFORE_PROCESS_FINISHED', $this->orderInfo);
     }
 
     /**
      * Issued by /modules/checkout_process.php after the main order-record has
      * been provided in the database, supplying the just-created order's 'id'.
+     *
+     * The before_process method has stored the successful PayPal response from the
+     * payment's capture (or authorization), based on the site's configuration, in
+     * the class' orderInfo property.
      *
      * Unlike other payment modules, paypalr stores its database information during
      * the after_order_create method's processing, just in case some email issue arises
@@ -676,41 +708,73 @@ class paypalr extends base
         }
 
         $payment = $purchase_unit['payments']['captures'][0] ?? $purchase_unit['payments']['authorizations'][0];
+
         $payment_info = [];
-        if (isset($purchase_unit['payments']['captures'])) {
+        if (isset($payment['seller_receivable_breakdown'])) {
             $seller_receivable = $payment['seller_receivable_breakdown'];
             $payment_info = [
                 'payment_date' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $payment['create_time']))),
                 'payment_gross' => $seller_receivable['gross_amount']['value'],
                 'payment_fee' => $seller_receivable['paypal_fee']['value'],
-                'settle_amount' => $seller_receivable['net_amount']['value'],
-                'settle_currency' => $seller_receivable['net_amount']['currency_code'],
+                'settle_amount' => $seller_receivable['receivable_amount']['value'] ?? $seller_receivable['net_amount']['value'],
+                'settle_currency' => $seller_receivable['receivable_amount']['currency_code'] ?? $seller_receivable['net_amount']['currency_code'],
+                'exchange_rate' => $seller_receivable['exchange_rate']['value'] ?? 'null',
             ];
         }
 
+        // -----
+        // Set information used by the after_process method's status-history record creation.
+        //
         $payment_type = array_key_first($this->orderInfo['payment_source']);
+        $this->orderInfo['payment_info'] = [
+            'payment_type' => $payment_type,
+            'amount' => $payment['amount']['value'] . ' ' . $payment['amount']['currency_code'],
+            'created_date' => $payment['created_date'] ?? '',
+        ];
+
         $sql_data_array = [
             'order_id' => $orders_id,
-            'txn_type' => '',
+            'txn_type' => 'CREATE',
             'module_name' => $this->code,
             'module_mode' => '',
+            'reason_code' => $payment['status_details']['reason'] ?? '',
             'payment_type' => $payment_type,
-            'payment_status' => $this->orderInfo['status'],
+            'payment_status' => $this->orderInfo['payment_status'],
             'invoice' => $this->orderInfo['invoice_id'] ?? $this->order_info['custom_id'] ?? '',
             'mc_currency' => $payment['amount']['currency_code'],
             'first_name' => substr($this->orderInfo['payer']['name']['given_name'], 0, 32),
             'last_name' => substr($this->orderInfo['payer']['name']['surname'], 0, 32),
             'payer_email' => $this->orderInfo['payer']['email_address'],
             'payer_id' => $this->orderInfo['payer']['payer_id'],
-            'payer_status' => $this->orderInfo['payment_source'][$payment_type]['account_status'] ?? '???',
+            'payer_status' => $this->orderInfo['payment_source'][$payment_type]['account_status'] ?? 'UNKNOWN',
             'receiver_email' => $purchase_unit['payee']['email_address'],
             'receiver_id' => $purchase_unit['payee']['merchant_id'],
             'txn_id' => $this->orderInfo['id'],
             'num_cart_items' => $_SESSION['cart']->count_contents(),
             'mc_gross' => $payment['amount']['value'],
-            'date_added' => 'now()',
+            'date_added' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $this->orderInfo['create_time']))),
+            'last_modified' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $this->orderInfo['update_time']))),
         ];
         $sql_data_array = array_merge($sql_data_array, $address_info, $payment_info);
+        zen_db_perform(TABLE_PAYPAL, $sql_data_array);
+
+        $sql_data_array = [
+            'order_id' => $orders_id,
+            'txn_type' => $txn_type,
+            'module_name' => $this->code,
+            'module_mode' => '',
+            'reason_code' => $payment['status_details']['reason'] ?? '',
+            'payment_type' => $payment_type,
+            'payment_status' => $payment['status'],
+            'invoice' => $this->orderInfo['invoice_id'] ?? $this->order_info['custom_id'] ?? '',
+            'mc_currency' => $payment['amount']['currency_code'],
+            'txn_id' => $payment['id'],
+            'parent_txn_id' => $this->orderInfo['id'],
+            'mc_gross' => $payment['amount']['value'],
+            'date_added' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $payment['create_time']))),
+            'last_modified' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $payment['update_time']))),
+        ];
+        $sql_data_array = array_merge($sql_data_array, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);
     }
 
@@ -723,19 +787,29 @@ class paypalr extends base
      */
     public function after_process()
     {
-        $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
+        $payment_info = $this->orderInfo['payment_info'];
         $timestamp = '';
-        if (isset($payment['created_date'])) {
-            $timestamp = 'Timestamp: ' . $payment['created_date'] . "\n";
+        if ($payment_info['created_date'] !== '') {
+            $timestamp = 'Timestamp: ' . $payment_info['created_date'] . "\n";
         }
 
         $message =
             'Transaction ID: ' . $this->orderInfo['id'] . "\n" .
-            'Payment Type: PayPal Checkout (' . array_key_first($this->orderInfo['payment_source']) . ")\n" .
+            'Payment Type: PayPal Checkout (' . $payment_info['payment_type'] . ")\n" .
             $timestamp .
-            'Payment Status: ' . $this->orderInfo['status'] . "\n" .
-            'Amount: ' . $payment['amount']['value'] . ' ' . $payment['amount']['currency_code'];
-        zen_update_orders_history($this->orderInfo['orders_id'], $message, -1, 0);
+            'Payment Status: ' . $this->orderInfo['payment_status'] . "\n" .
+            'Amount: ' . $payment_info['amount'];
+        zen_update_orders_history($this->orderInfo['orders_id'], $message, null, -1, 0);
+
+        // -----
+        // If the order's processing requires an admin-alert, send one if so configured.
+        //
+        if ($this->orderInfo['admin_alert_needed'] === true) {
+            $this->sendAlertEmail(
+                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
+                sprintf(MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION, $this->orderInfo['orders_id'], $this->orderInfo['paypal_payment_status'])
+            );
+        }
 
         $this->resetOrder();
     }
@@ -748,25 +822,25 @@ class paypalr extends base
       */
     public function admin_notification($zf_order_id)
     {
-        return '';
+        $admin_main = new AdminMain($this->code, (int)$zf_order_id, $this->ppr);
+
+        return $admin_main->get();
     }
 
     public function help()
     {
         return [
-            'link' => 'https://docs.zen-cart.com/user/payment/paypal_express_checkout/'
+            'link' => 'https://github.com/lat9/paypalr/wiki'
         ];
     }
 
-  /**
-   * Determine whether the shipping-edit button should be displayed or not
-   */
-  function alterShippingEditButton() {
-    return false;
-    if ($this->in_special_checkout() && empty($_SESSION['paypal_ec_markflow'])) {
-      return zen_href_link('ipn_main_handler.php', 'type=ec&clearSess=1', 'SSL', true,true, true);
+    /**
+     * Determine whether the shipping-edit button should be displayed or not
+     */
+    public function alterShippingEditButton()
+    {
+        return false;
     }
-  }
 
   /**
    * Used to submit a refund for a given transaction.  FOR FUTURE USE.
@@ -1092,18 +1166,6 @@ class paypalr extends base
     }
 
   /**
-   * Calculate the amount based on acceptable currencies
-   */
-  function calc_order_amount($amount, $paypalCurrency, $applyFormatting = false) {
-    global $currencies;
-    $amount = ($amount * $currencies->get_value($paypalCurrency));
-    if (in_array($paypalCurrency, array('JPY', 'HUF', 'TWD')) || (int)$currencies->get_decimal_places($paypalCurrency) == 0) {
-      $amount = (int)$amount;
-      $applyFormatting = FALSE;
-    }
-    return ($applyFormatting ? round($amount, $currencies->get_decimal_places($paypalCurrency)) : $amount);
-  }
-  /**
    * Set the state field depending on what PayPal requires for that country.
    * The shipping address state or province is required if the address is in one of the following countries: Argentina, Brazil, Canada, China, Indonesia, India, Japan, Mexico, Thailand, USA
    * https://developer.paypal.com/docs/classic/api/state_codes/
@@ -1191,11 +1253,11 @@ class paypalr extends base
 
                 ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now()),
 
-                ('Completed Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID', '2', 'Set the status of orders successfully paid with this payment module to this value.<br><b>Recommended: Processing[2]</b>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+                ('Completed Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID', '2', 'Set the status of orders whose payment has been successfully <em>captured</em> to this value.<br><b>Recommended: Processing[2]</b>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
-                ('Set Unpaid Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID', '1', 'Set the status of unpaid orders made with this payment module to this value.<br><b>Recommended: Pending[1]</b>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+                ('Set Unpaid Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID', '1', 'Set the status of orders whose payment has been successfully <em>authorized</em> to this value.<br><b>Recommended: Pending[1]</b>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
-                ('Set Refund Order Status', 'MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID', '1', 'Set the status of refunded orders to this value.<br><b>Recommended: Pending[1]</b>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+                ('Set Refund Order Status', 'MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID', '1', 'Set the status of <em><b>fully</b>-refunded<em> or <em>voided</em> orders to this value.<br><b>Recommended: Pending[1]</b>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
                 ('PayPal Page Style', 'MODULE_PAYMENT_PAYPALR_PAGE_STYLE', 'Primary', 'The page-layout style you want customers to see when they visit the PayPal site. You can configure your <b>Custom Page Styles</b> in your PayPal Profile settings. This value is case-sensitive.', 6, 0, NULL, NULL, now()),
 
@@ -1206,8 +1268,6 @@ class paypalr extends base
                 ('Transaction Currency', 'MODULE_PAYMENT_PAYPALR_CURRENCY', 'Selected Currency', 'In which currency should the order be sent to PayPal?<br>NOTE: If an unsupported currency is sent to PayPal, it will be auto-converted to the <em>Fall-back Currency</em>.<br><b>Default: Selected Currency</b>', 6, 0, 'zen_cfg_select_option([\'Selected Currency\', $currencies_list], ', NULL, now()),
 
                 ('Fall-back Currency', 'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK', 'USD', 'If the <b>Transaction Currency</b> is set to <em>Selected Currency</em>, what currency should be used as a fall-back when the customer\'s selected currency is not supported by PayPal?<br><b>Default: USD</b>', 6, 0, 'zen_cfg_select_option([\'USD\', \'GBP\'], ', NULL, now()),
-
-                ('Allowed Payment Types', 'MODULE_PAYMENT_PAYPALR_ALLOWEDPAYMENT', 'Any', 'Do you want to allow non-instant payments like eCheck/EFT/ELV?', 6, 0, 'zen_cfg_select_option([\'Any\', \'Instant Only\'], ', NULL, now()),
 
                 ('Debug Mode', 'MODULE_PAYMENT_PAYPALR_DEBUGGING', 'Off', 'Would you like to enable debug mode?  A complete detailed log of failed transactions will be emailed to the store owner.', 6, 0, 'zen_cfg_select_option([\'Off\', \'Alerts Only\', \'Log File\', \'Log and Email\'], ', NULL, now())"
         );
@@ -1232,11 +1292,12 @@ class paypalr extends base
             'MODULE_PAYMENT_PAYPALR_CURRENCY',
             'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK',
             'MODULE_PAYMENT_PAYPALR_BRANDNAME',
-            'MODULE_PAYMENT_PAYPALEC_ALLOWEDPAYMENT',
             'MODULE_PAYMENT_PAYPALR_PAGE_STYLE',
             'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE',
             'MODULE_PAYMENT_PAYPALR_DEBUGGING',
         ];
+
+        $this->notify('NOTIFY_PAYMENT_PAYPALR_UNINSTALLED');
     }
 
     /**
@@ -1250,22 +1311,22 @@ class paypalr extends base
 
         $this->notify('NOTIFY_PAYMENT_PAYPALR_UNINSTALLED');
     }
-    
+
     /**
      * Send email to store-owner, if configured.
      *
      */
-    public function sendAlertEmail(string $errorNum, string $message)
+    public function sendAlertEmail(string $subject_detail, string $message)
     {
         if ($this->emailAlerts === true) {
             zen_mail(
                 STORE_NAME,
                 STORE_OWNER_EMAIL_ADDRESS,
-                MODULE_PAYMENT_PAYPALR_TEXT_EMAIL_ERROR_SUBJECT . " ($errorNum)",
+                sprintf(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT, $subject_detail),
                 $message,
                 STORE_OWNER,
                 STORE_OWNER_EMAIL_ADDRESS,
-                ['EMAIL_MESSAGE_HTML' => nl2br($message)],
+                ['EMAIL_MESSAGE_HTML' => nl2br($message, false)],   //- Replace new-lines with HTML5 <br>
                 'paymentalert'
             );
         }

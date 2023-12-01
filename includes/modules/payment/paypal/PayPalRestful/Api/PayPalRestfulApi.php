@@ -39,7 +39,8 @@ class PayPalRestfulApi extends ErrorInfo
     protected const ENDPOINT_PRODUCTION = 'https://api-m.paypal.com/';
 
     // -----
-    // PayPal constants associated with an order's current 'status'.
+    // PayPal constants associated with an order/payment's current 'status'. Also
+    // used for the paypal::txn_type field.
     //
     public const STATUS_APPROVED = 'APPROVED';
     public const STATUS_CAPTURED = 'CAPTURED';
@@ -147,46 +148,46 @@ class PayPalRestfulApi extends ErrorInfo
         return $response;
     }
 
-    public function getOrderStatus(string $paypal_order_id)
+    public function getOrderStatus(string $paypal_id)
     {
         $this->log->write('==> Start getOrderStatus', true);
-        $response = $this->curlGet("v2/checkout/orders/$paypal_order_id");
+        $response = $this->curlGet("v2/checkout/orders/$paypal_id");
         $this->log->write("==> End getOrderStatus\n", true);
         return $response;
     }
 
-    public function confirmPaymentSource(string $paypal_order_id, array $payment_source)
+    public function confirmPaymentSource(string $paypal_id, array $payment_source)
     {
         $this->log->write('==> Start confirmPaymentSource', true);
         $paypal_options = [
             'payment_source' => $payment_source,
         ];
-        $response = $this->curlPost("v2/checkout/orders/$paypal_order_id/confirm-payment-source", $paypal_options);
+        $response = $this->curlPost("v2/checkout/orders/$paypal_id/confirm-payment-source", $paypal_options);
         $this->log->write("==> End confirmPaymentSource\n", true);
         return $response;
     }
 
-    public function captureOrder(string $paypal_order_id)
+    public function captureOrder(string $paypal_id)
     {
         $this->log->write('==> Start captureOrder', true);
-        $response = $this->curlPost("v2/checkout/orders/$paypal_order_id/capture");
+        $response = $this->curlPost("v2/checkout/orders/$paypal_id/capture");
         $this->log->write("==> End captureOrder\n", true);
         return $response;
     }
 
-    public function authorizeOrder(string $paypal_order_id)
+    public function authorizeOrder(string $paypal_id)
     {
         $this->log->write('==> Start authorizeOrder', true);
-        $response = $this->curlPost("v2/checkout/orders/$paypal_order_id/authorize");
+        $response = $this->curlPost("v2/checkout/orders/$paypal_id/authorize");
         $this->log->write("==> End authorizeOrder\n", true);
         return $response;
     }
 
-    public function getAuthorizationDetails(string $paypal_auth_id)
+    public function getAuthorizationStatus(string $paypal_auth_id)
     { 
-        $this->log->write('==> Start getAuthorizationDetails', true);
+        $this->log->write('==> Start getAuthorizationStatus', true);
         $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id");
-        $this->log->write("==> End getAuthorizationDetails\n", true);
+        $this->log->write("==> End getAuthorizationStatus\n", true);
         return $response;
     }
 
@@ -220,11 +221,11 @@ class PayPalRestfulApi extends ErrorInfo
         return $response;
     }
 
-    public function getCapturedDetails(string $paypal_capture_id)
+    public function getCaptureStatus(string $paypal_capture_id)
     { 
-        $this->log->write('==> Start getCapturedDetails', true);
+        $this->log->write('==> Start getCaptureStatus', true);
         $response = $this->curlPost("v2/payments/captures/$paypal_capture_id");
-        $this->log->write("==> End getCapturedDetails\n", true);
+        $this->log->write("==> End getCaptureStatus\n", true);
         return $response;
     }
     
@@ -242,7 +243,7 @@ class PayPalRestfulApi extends ErrorInfo
     // Update a PayPal order with CREATED or APPROVED status **only**.
     //
     // Parameters:
-    // - paypal_order_id
+    // - paypal_id
     //      The 'id' value returned by PayPal when the order was created or approved.
     // - update_order_request
     //      The to-be-updated contents for the order, presumed to have been created by \Zc2Pp\UpdatePayPalOrderRequest.php
@@ -253,10 +254,10 @@ class PayPalRestfulApi extends ErrorInfo
     //          getErrorInfo method.
     //      On success, returns an associative array containing the PayPal response.
     //
-    public function updateOrder(string $paypal_order_id, array $update_order_request)
+    public function updateOrder(string $paypal_id, array $update_order_request)
     {
-        $this->log->write("==> Start updateOrder ($paypal_order_id).  Current:\n" . $this->log->logJSON($order_request_current) . "\nUpdate:\n" . $this->log->logJSON($update_order_request), true);
-        $response = $this->curlPatch("v2/checkout/orders/$paypal_order_id", $update_order_request);
+        $this->log->write("==> Start updateOrder ($paypal_id).  Current:\n" . Logger::logJSON($order_request_current) . "\nUpdate:\n" . Logger::logJSON($update_order_request), true);
+        $response = $this->curlPatch("v2/checkout/orders/$paypal_id", $update_order_request);
         $this->log->write('==> End updateOrder', true);
         return $response;
     }
@@ -521,7 +522,7 @@ class PayPalRestfulApi extends ErrorInfo
     {
         $this->setErrorInfo(self::ERR_CURL_ERROR, curl_error($this->ch), curl_errno($this->ch));
         curl_reset($this->ch);
-        $this->log->write("handleCurlError for $method ($option) : CURL error (" . $this->log->logJSON($this->errorInfo) . "\nCURL Options:\n" . $this->log->logJSON($curl_options));
+        $this->log->write("handleCurlError for $method ($option) : CURL error (" . Logger::logJSON($this->errorInfo) . "\nCURL Options:\n" . Logger::logJSON($curl_options));
     }
 
     // -----
@@ -551,7 +552,7 @@ class PayPalRestfulApi extends ErrorInfo
         // 204: No content returned; implies successful completion of an updateOrder request.
         //
         if ($httpCode === 200 || $httpCode === 201 || $httpCode === 204) {
-            $this->log->write("The $method ($option) request was successful ($httpCode).\n" . $this->log->logJSON($response));
+            $this->log->write("The $method ($option) request was successful ($httpCode).\n" . Logger::logJSON($response));
             return $response;
         }
 
@@ -600,7 +601,7 @@ class PayPalRestfulApi extends ErrorInfo
         // let the caller know that the request was unsuccessful.
         //
         $this->setErrorInfo($httpCode, $errMsg, 0, $response);
-        $this->log->write("The $method ($option) request was unsuccessful.\n" . $this->log->logJSON($this->errorInfo) . "\nCURL Options: " . $this->log->logJSON($curl_options));
+        $this->log->write("The $method ($option) request was unsuccessful.\n" . Logger::logJSON($this->errorInfo) . "\nCURL Options: " . Logger::logJSON($curl_options));
 
         return false;
     }

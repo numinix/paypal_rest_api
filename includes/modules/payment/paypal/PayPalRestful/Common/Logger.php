@@ -60,7 +60,7 @@ class Logger
     //
     // Also remove unneeded return values that will just 'clutter up' the logged information.
     //
-    public function logJSON($data)
+    public static function logJSON($data)
     {
         if (is_array($data)) {
             unset($data[CURLOPT_HTTPHEADER], $data['access_token'], $data['scope']/*, $data['links']*/);
