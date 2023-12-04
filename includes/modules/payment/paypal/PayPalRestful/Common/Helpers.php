@@ -30,4 +30,14 @@ class Helpers
         }
         return $difference;
     }
+
+    public static function convertPayPalDatePay2Db(string $paypal_date): string
+    {
+        return convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $paypal_date)));
+    }
+
+    public static function getDaysToSettle(string $expiration_date): string
+    {
+        return (string)ceil((strtotime($expiration_date) - time()) / 86400);
+    }
 }

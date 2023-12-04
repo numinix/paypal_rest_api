@@ -138,7 +138,7 @@ class PayPalRestfulApi extends ErrorInfo
         }
     }
 
-    // ===== Start Non-token Methods =====
+    // ===== Start Token-required Methods =====
 
     public function createOrder(array $order_request)
     {
@@ -228,7 +228,19 @@ class PayPalRestfulApi extends ErrorInfo
         $this->log->write("==> End getCaptureStatus\n", true);
         return $response;
     }
-    
+
+    public function getTransactionStatus(string $paypal_id)
+    { 
+        $this->log->write("==> Start getTransactionStatus ($paypal_id)", true);
+        $parameters = [
+            'transaction_id' => $paypal_id,
+            'fields' => 'all',
+        ];
+        $response = $this->curlGet("v1/reporting/transactions", $parameters);
+        $this->log->write("==> End getTransactionStatus\n", true);
+        return $response;
+    }
+
     public function refundCaptureFull(string $paypal_capture_id)
     {
     }
@@ -256,7 +268,7 @@ class PayPalRestfulApi extends ErrorInfo
     //
     public function updateOrder(string $paypal_id, array $update_order_request)
     {
-        $this->log->write("==> Start updateOrder ($paypal_id).  Current:\n" . Logger::logJSON($order_request_current) . "\nUpdate:\n" . Logger::logJSON($update_order_request), true);
+        $this->log->write("==> Start updateOrder ($paypal_id)\n" . Logger::logJSON($update_order_request), true);
         $response = $this->curlPatch("v2/checkout/orders/$paypal_id", $update_order_request);
         $this->log->write('==> End updateOrder', true);
         return $response;

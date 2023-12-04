@@ -13,8 +13,10 @@
 require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
 use PayPalRestful\Admin\AdminMain;
+use PayPalRestful\Admin\GetTransactions;
 use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Common\ErrorInfo;
+use PayPalRestful\Common\Helpers;
 use PayPalRestful\Common\Logger;
 use PayPalRestful\Token\TokenCache;
 use PayPalRestful\Zc2Pp\Amount;
@@ -220,11 +222,43 @@ class paypalr extends base
     // Validate the configuration settings to ensure that the payment module
     // can be enabled for use.
     //
-    // Side effect: The payment module is auto-disabled if any configuration
-    // issues are found.
+    // Side effects:
+    //
+    // - Additional fields are added to the 'paypal' table, if not already present.
+    // - The payment module is auto-disabled if any configuration issues are found.
     //
     protected function validateConfiguration(bool $curl_installed)
     {
+        // -----
+        // Make any modifications to the 'paypal' table, if not already done; admin
+        // processing **only**.
+        //
+        if (IS_ADMIN_FLAG === true) {
+            global $sniffer, $db;
+
+            // -----
+            // Adding an order's re-authorize time limit, so it's always available.
+            //
+            if ($sniffer->field_exists(TABLE_PAYPAL, 'expiration_time') === false) {
+
+                $db->Execute(
+                    "ALTER TABLE " . TABLE_PAYPAL . "
+                       ADD expiration_time datetime default NULL AFTER date_added"
+                );
+            }
+
+            // -----
+            // Increasing the number of characters in 'notify_version' (was varchar(6) NOT NULL default '')
+            // since the payment-module's version will be stored there.
+            //
+            if ($sniffer->field_type(TABLE_PAYPAL, 'notify_version', 'varchar(20)') === false) {
+                $db->Execute(
+                    "ALTER TABLE " . TABLE_PAYPAL . "
+                       MODIFY notify_version varchar(20) NOT NULL default ''"
+                );
+            }
+        }
+
         // -----
         // No CURL, no payment module!  The PayPalRestApi class requires
         // CURL to 'do its business'.
@@ -294,7 +328,7 @@ class paypalr extends base
      */
     public function update_status()
     {
-        global $order;
+        global $order, $current_page_base;
 
         if ($this->enabled === false || !isset($order->billing['country']['id'])) {
             return;
@@ -363,6 +397,15 @@ class paypalr extends base
             }
         }
 
+        // -----
+        // On the storefront, for the checkout_process page's processing, add
+        // the type of PayPal payment to the payment-module's title so that it
+        // shows up as part of the to-be-generated order.
+        //
+        if (isset($current_page_base) && $current_page_base === FILENAME_CHECKOUT_PROCESS) {
+            $this->title .= '(' . $_SESSION['PayPalRestful']['Order']['payment_source'] . ')';
+        }
+
 /* Not seeing this limitation during initial testing
         // module cannot be used for purchase > $10,000 USD equiv
         if (!function_exists('paypalUSDCheck')) {
@@ -405,7 +448,7 @@ class paypalr extends base
         // -----
         // Return the PayPal selection as a button, modelled after https://developer.paypal.com/demo/checkout/#/pattern/responsive
         //
-        $this->log->write("paypalr:: selection successful:\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'after');
+        $this->log->write("paypalr:: selection successful:\n", true, 'after');
         return [
             'id' => $this->code,
             'module' =>
@@ -473,7 +516,13 @@ class paypalr extends base
         // Otherwise, the order has been registered at PayPal; let's see if it's changed/can-be-updated.
         //
         } else {
-            $update_order = new UpdatePayPalOrderRequest($create_order_request->get());
+            // -----
+            // Set the order's 'invoice_id' to the to-be-created PayPal order's 'id'.
+            //
+            $update_request = $create_order_request->get();
+            $update_request['purchase_units'][0]['invoice_id'] = 'PPR-' . $_SESSION['PayPalRestful']['Order']['id'];
+
+            $update_order = new UpdatePayPalOrderRequest($update_request);
             $update_order_request = $update_order->get();
 
             // -----
@@ -488,6 +537,9 @@ class paypalr extends base
             //
             if (!isset($update_order_request['error'])) {
                 $order_response = $this->ppr->updateOrder($_SESSION['PayPalRestful']['Order']['id'], $update_order_request);
+                if ($order_response !== false) {
+                    $order_response = $this->ppr->getOrderStatus($_SESSION['PayPalRestful']['Order']['id']);
+                }
             } elseif ($update_order_request['error'] === 'recreate') {
                 $order_response = $this->ppr->createOrder($create_order_request->get());
             } else {
@@ -554,6 +606,15 @@ class paypalr extends base
             }
 
             // -----
+            // If present (it *should* be), save the payment source (e.g. 'paypal' or 'card') in the order's
+            // session array, for use when the payment is confirmed so that the source
+            // can be included in the 'title' of the PayPal Checkout.
+            //
+            if (isset($payment_choice_response['payment_source'])) {
+                $_SESSION['PayPalRestful']['Order']['payment_source'] = array_key_first($payment_choice_response['payment_source']);
+            }
+
+            // -----
             // Locate (and save) the URL to which the customer is redirected at PayPal
             // to confirm their payment choice.
             //
@@ -579,13 +640,10 @@ class paypalr extends base
     }
 
     /**
-     * Display Payment Information for review on the Checkout Confirmation Page
+     * Display Payment Additional Information for review on the Checkout Confirmation Page
      */
     public function confirmation()
     {
-        // -----
-        // Nothing additional to display for the 'paypal' payment method.
-        //
         return false;
     }
 
@@ -644,10 +702,18 @@ class paypalr extends base
         // additional order-status-history record to be created by the after_process method.
         //
         $txn_type = $this->orderInfo['intent'];
-        $payment = $purchase_unit['payments']['captures'][0] ?? $purchase_unit['payments']['authorizations'][0];
+        $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
         $payment_status = ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalRestfulApi::STATUS_CAPTURED : PayPalRestfulApi::STATUS_APPROVED);
+
         $this->orderInfo['payment_status'] = $payment_status;
         $this->orderInfo['paypal_payment_status'] = $payment['status'];
+        $this->orderInfo['txn_type'] = $txn_type;
+
+        // -----
+        // If an expiration is present (e.g. this is a payment authorization), record the expiration
+        // time for follow-on recording in the database.
+        //
+        $this->orderInfo['expiration_time'] = $payment['expiration_time'] ?? null;
 
         // -----
         // If the order's PayPal status doesn't indicate successful completion, ensure that
@@ -713,7 +779,7 @@ class paypalr extends base
         if (isset($payment['seller_receivable_breakdown'])) {
             $seller_receivable = $payment['seller_receivable_breakdown'];
             $payment_info = [
-                'payment_date' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $payment['create_time']))),
+                'payment_date' => Helpers::convertPayPalDatePay2Db($payment['create_time']),
                 'payment_gross' => $seller_receivable['gross_amount']['value'],
                 'payment_fee' => $seller_receivable['paypal_fee']['value'],
                 'settle_amount' => $seller_receivable['receivable_amount']['value'] ?? $seller_receivable['net_amount']['value'],
@@ -732,6 +798,8 @@ class paypalr extends base
             'created_date' => $payment['created_date'] ?? '',
         ];
 
+        $expiration_time = (isset($this->orderInfo['expiration_time'])) ? Helpers::convertPayPalDatePay2Db($this->orderInfo['expiration_time']) : 'null';
+        $num_cart_items = $_SESSION['cart']->count_contents();
         $sql_data_array = [
             'order_id' => $orders_id,
             'txn_type' => 'CREATE',
@@ -740,7 +808,7 @@ class paypalr extends base
             'reason_code' => $payment['status_details']['reason'] ?? '',
             'payment_type' => $payment_type,
             'payment_status' => $this->orderInfo['payment_status'],
-            'invoice' => $this->orderInfo['invoice_id'] ?? $this->order_info['custom_id'] ?? '',
+            'invoice' => $purchase_unit['invoice_id'] ?? $purchase_unit['custom_id'] ?? '',
             'mc_currency' => $payment['amount']['currency_code'],
             'first_name' => substr($this->orderInfo['payer']['name']['given_name'], 0, 32),
             'last_name' => substr($this->orderInfo['payer']['name']['surname'], 0, 32),
@@ -750,29 +818,31 @@ class paypalr extends base
             'receiver_email' => $purchase_unit['payee']['email_address'],
             'receiver_id' => $purchase_unit['payee']['merchant_id'],
             'txn_id' => $this->orderInfo['id'],
-            'num_cart_items' => $_SESSION['cart']->count_contents(),
+            'num_cart_items' => $num_cart_items,
             'mc_gross' => $payment['amount']['value'],
-            'date_added' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $this->orderInfo['create_time']))),
-            'last_modified' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $this->orderInfo['update_time']))),
+            'date_added' => Helpers::convertPayPalDatePay2Db($this->orderInfo['create_time']),
+            'last_modified' => Helpers::convertPayPalDatePay2Db($this->orderInfo['update_time']),
+            'notify_version' => self::CURRENT_VERSION,
+            'expiration_time' => $expiration_time,
         ];
         $sql_data_array = array_merge($sql_data_array, $address_info, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);
 
         $sql_data_array = [
             'order_id' => $orders_id,
-            'txn_type' => $txn_type,
+            'txn_type' => $this->orderInfo['txn_type'],
             'module_name' => $this->code,
             'module_mode' => '',
             'reason_code' => $payment['status_details']['reason'] ?? '',
             'payment_type' => $payment_type,
             'payment_status' => $payment['status'],
-            'invoice' => $this->orderInfo['invoice_id'] ?? $this->order_info['custom_id'] ?? '',
             'mc_currency' => $payment['amount']['currency_code'],
             'txn_id' => $payment['id'],
-            'parent_txn_id' => $this->orderInfo['id'],
+            'num_cart_items' => $num_cart_items,
             'mc_gross' => $payment['amount']['value'],
-            'date_added' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $payment['create_time']))),
-            'last_modified' => convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $payment['update_time']))),
+            'notify_version' => self::CURRENT_VERSION,
+            'date_added' => Helpers::convertPayPalDatePay2Db($payment['create_time']),
+            'last_modified' => Helpers::convertPayPalDatePay2Db($payment['update_time']),
         ];
         $sql_data_array = array_merge($sql_data_array, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);
@@ -822,7 +892,7 @@ class paypalr extends base
       */
     public function admin_notification($zf_order_id)
     {
-        $admin_main = new AdminMain($this->code, (int)$zf_order_id, $this->ppr);
+        $admin_main = new AdminMain($this->code, self::CURRENT_VERSION, (int)$zf_order_id, $this->ppr);
 
         return $admin_main->get();
     }
@@ -920,54 +990,50 @@ class paypalr extends base
     }
 
     /**
-     * Used to authorize part of a given previously-initiated transaction.  FOR FUTURE USE.
+     * Used to re-authorize a previously-created transaction, possibly changing the
+     * authorized value.
      */
     public function _doAuth($oID, $amt, $currency = 'USD')
     {
-        global $db, $messageStack;
-        $doPayPal = $this->paypal_init();
-        $authAmt = $amt;
-        $new_order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+        global $messageStack;
 
-        if (isset($_POST['orderauth']) && $_POST['orderauth'] == MODULE_PAYMENT_PAYPAL_ENTRY_AUTH_BUTTON_TEXT_PARTIAL) {
-          $authAmt = (float)$_POST['authamt'];
-          $new_order_status = MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
-          if (isset($_POST['authconfirm']) && $_POST['authconfirm'] == 'on') {
-            $proceedToAuth = true;
-          } else {
-            $messageStack->add_session(MODULE_PAYMENT_PAYPALR_TEXT_AUTH_CONFIRM_ERROR, 'error');
-            $proceedToAuth = false;
-          }
-          if ($authAmt == 0) {
-            $messageStack->add_session(MODULE_PAYMENT_PAYPALR_TEXT_INVALID_AUTH_AMOUNT, 'error');
-            $proceedToAuth = false;
-          }
+        $module_name = '<em>' . $this->code . '</em>';
+        $oID = (int)$oID;
+
+        if (!isset($_POST['ppr-amount'], $_POST['doAuthOid']) || $oID !== (int)$_POST['doAuthOid']) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_PARAM_ERROR, $module_name), 'error');
+            return;
         }
-        // look up history on this order from PayPal table
-        $sql = "SELECT * FROM " . TABLE_PAYPAL . " WHERE order_id = :orderID  AND parent_txn_id = '' ";
-        $sql = $db->bindVars($sql, ':orderID', $oID, 'integer');
-        $zc_ppHist = $db->Execute($sql);
-        if ($zc_ppHist->RecordCount() == 0) return false;
-        $txnID = $zc_ppHist->fields['txn_id'];
-        /**
-         * Submit auth request to PayPal
-         */
-        if ($proceedToAuth) {
-          $response = $doPayPal->DoAuthorization($txnID, $authAmt, $currency);
 
-          //$this->zcLog("_doAuth($oID, $amt, $currency):", print_r($response, true));
-
-          $error = $this->_errorHandler($response, 'DoAuthorization');
-          $new_order_status = ($new_order_status > 0 ? $new_order_status : 1);
-          if (!$error) {
-            // Success, so save the results
-            $comments = 'AUTHORIZATION ADDED. Trans ID: ' . urldecode($response['TRANSACTIONID']) . "\n" . ' Amount:' . urldecode($response['AMT']) . ' ' . $currency;
-            zen_update_orders_history($oID, $comments, null, $new_order_status, -1);
-
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_AUTH_INITIATED, urldecode($response['AMT'])), 'success');
-            return true;
-          }
+        $ppr_txns = new GetTransactions($this->code, self::CURRENT_VERSION, $oID, $this->ppr);
+        $ppr_db_txns = $ppr_txns->getDatabaseTxns('AUTHORIZE');
+        if (count($ppr_db_txns) === 0) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_NO_RECORDS, 'AUTHORIZE', $oID), 'error');
+            return;
         }
+
+        $auth_amount = number_format((float)$_POST['ppr-amount'], 2, '.', '');
+        $first_authorization = reset($ppr_db_txns);
+        $auth_currency = $first_authorization['mc_currency'];
+        $auth_txn_id = $first_authorization['txn_id'];
+        $auth_response = $this->ppr->reAuthorizePayment($auth_txn_id, $auth_currency, $auth_amount);
+
+        if ($auth_response === false) {
+             $messageStack->add_session(MODULE_PAYMENT_PAYPALR_REAUTH_ERROR . "\n" . json_encode($this->ppr->getErrorInfo()), 'error');
+             return;
+        }
+
+        $amount = $auth_response['amount']['value'] . ' ' . $auth_response['amount']['currency_code'];
+        $reauth_memo = sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_MEMO, zen_updated_by_admin(), $amount);
+        $ppr_txns->addDbTransaction('AUTHORIZE', $auth_response, $reauth_memo);
+        $ppr_txns->updateMainTransaction($oID, $auth_response, $reauth_memo);
+
+        $comments =
+            'AUTHORIZATION ADDED. Trans ID: ' . $auth_response['id'] . "\n" .
+            'Amount: ' . $amount;
+        zen_update_orders_history($oID, $comments, null, (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID, -1);
+
+        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_COMPLETE, $amount), 'success');
     }
 
     /**
@@ -1051,57 +1117,57 @@ class paypalr extends base
     }
 
     /**
-     * Used to void a given previously-authorized transaction.  FOR FUTURE USE.
+     * Used to void a given previously-authorized transaction.
+     *
+     * NOTE: Once a PayPal transaction is voided, it is REMOVED from PayPal's
+     * history and any request to retrieve the order's PayPal status will result
+     * a RESOURCE_NOT_FOUND (404) error!
      */
     public function _doVoid($oID, $note = '')
     {
         global $db, $messageStack;
 
-        $new_order_status = (int)MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID;
+        $oID = (int)$oID;
+        $module_name = '<em>' . $this->code . '</em>';
 
-        $voidNote = strip_tags(zen_db_input($_POST['voidnote']));
-        $voidAuthID = trim(strip_tags(zen_db_input($_POST['voidauthid'])));
-        $proceedToVoid = false;
-        if (isset($_POST['ordervoid']) && $_POST['ordervoid'] === MODULE_PAYMENT_PAYPALR_ENTRY_VOID_BUTTON_TEXT_FULL) {
-            if (isset($_POST['voidconfirm']) && $_POST['voidconfirm'] === 'on') {
-                $proceedToVoid = true;
-            } else {
-                $messageStack->add_session(MODULE_PAYMENT_PAYPALR_TEXT_VOID_CONFIRM_ERROR, 'error');
-            }
+        if (!isset($_POST['ppr-void-id'], $_POST['doVoidOid'], $_POST['ppr-void-note']) || $oID !== (int)$_POST['doVoidOid']) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_VOID_PARAM_ERROR, $module_name), 'error');
+            return;
         }
 
-        // look up history on this order from PayPal table
-        $sql = "SELECT * FROM " . TABLE_PAYPAL . " WHERE order_id = :orderID  AND parent_txn_id = '' ";
-        $sql = $db->bindVars($sql, ':orderID', $oID, 'integer');
-        $sql = $db->bindVars($sql, ':transID', $voidAuthID, 'string');
-        $zc_ppHist = $db->Execute($sql);
-        if ($zc_ppHist->EOF === true) {
-            return false;
+        $ppr_txns = new GetTransactions($this->code, self::CURRENT_VERSION, $oID, $this->ppr);
+        $ppr_db_txns = $ppr_txns->getDatabaseTxns('AUTHORIZE');
+        if (count($ppr_db_txns) === 0) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_NO_RECORDS, 'AUTHORIZE', $oID), 'error');
+            return;
         }
 
-        $txnID = $zc_ppHist->fields['txn_id'];
-        /**
-         * Submit void request to PayPal
-         */
-        if ($proceedToVoid === true) {
-            $response = $doPayPal->DoVoid($voidAuthID, $voidNote);
-
-            $error = $this->_errorHandler($response, 'DoVoid');
-            $new_order_status = ($new_order_status > 0 ? $new_order_status : 1);
-            if ($error === false) {
-                // Success, so save the results
-                $comments =
-                    'VOIDED. Trans ID: ' . urldecode($response['AUTHORIZATIONID']) .
-                    ($response['PNREF'] ?? '') .
-                    (isset($response['PPREF']) ? "\nPPRef: " . $response['PPREF'] : '') . "\n" .
-                    $voidNote;
-                zen_update_orders_history($oID, $comments, null, $new_order_status, 0);
-
-                $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_VOID_INITIATED, urldecode($response['AUTHORIZATIONID']) . ($response['PNREF'] ?? '')), 'success');
-                return true;
-            }
+        $last_auth_txn = end($ppr_db_txns);
+        if ($last_auth_txn['txn_id'] !== $_POST['ppr-void-id']) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_VOID_INVALID_TXN_ID, zen_output_string_protected($_POST['ppr-void-id'])), 'error');
+            return;
         }
-        return false;
+
+        $void_response = $this->ppr->voidPayment($last_auth_txn['txn_id']);
+        if ($void_response === false) {
+             $messageStack->add_session(MODULE_PAYMENT_PAYPALR_VOID_ERROR . "\n" . json_encode($this->ppr->getErrorInfo()), 'error');
+             return;
+        }
+
+        $void_memo = sprintf(MODULE_PAYMENT_PAYPALR_VOID_MEMO, zen_updated_by_admin()) . "\n\n";
+        $void_note = strip_tags($_POST['ppr-void-note']);
+        $ppr_txns->addDbTransaction('VOID', $void_response, $void_memo . $void_note);
+        $ppr_txns->updateMainTransaction($oID, $void_response, $void_memo . $void_note);
+
+        $comments =
+            'VOIDED. Trans ID: ' . $last_auth_txn['txn_id'] . "\n" .
+            $void_note;
+
+        $voided_status = (int)MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID;
+        $voided_status = ($voided_status > 0) ? $voided_status : 1;
+        zen_update_orders_history($oID, $comments, null, $voided_status, 0);
+
+        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_VOID_COMPLETE, $oID), 'warning');
     }
 
     /**

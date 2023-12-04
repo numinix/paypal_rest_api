@@ -71,9 +71,9 @@ class UpdatePayPalOrderRequest extends ErrorInfo
 
         $updates = $this->getOrderDifference($order_request_update);
         if (count($updates) === 0) {
-            $this->log->write('  --> Nothing to update.');
+            $message = 'Nothing to update:';
         } elseif ($updates[0] !== 'error') {
-            $this->log->write("  --> Updates to order:\n" . Logger::logJSON($updates));
+            $message = 'Updates to order:';
             foreach ($updates as $next_update) {
                 $this->request[] = [
                     'op' => $next_update['op'],
@@ -82,7 +82,7 @@ class UpdatePayPalOrderRequest extends ErrorInfo
                 ];
             }
         }
-        $this->log->write("UpdatePayPalOrderRequest::__construct finished, request:\n" . Logger::logJSON($this->request));
+        $this->log->write("UpdatePayPalOrderRequest::__construct finished, $message\n" . Logger::logJSON($this->request));
     }
 
     public function get()
@@ -99,12 +99,12 @@ class UpdatePayPalOrderRequest extends ErrorInfo
         $current = $_SESSION['PayPalRestful']['Order']['current'];
 
         // -----
-        // Determine *all* differences between a current PayPal order and the
-        // current update.  If no differences, return an empty array.
+        // Determine *all* differences between a current update and the
+        // current PayPal order.  If no differences, return an empty array.
         //
         $purchase_unit_current = $current['purchase_units'][0];
         $purchase_unit_update = $update['purchase_units'][0];
-        $order_difference = Helpers::arrayDiffRecursive($purchase_unit_current, $purchase_unit_update);
+        $order_difference = Helpers::arrayDiffRecursive($purchase_unit_update, $purchase_unit_current);
         if (count($order_difference) === 0) {
             return [];
         }
@@ -128,8 +128,9 @@ class UpdatePayPalOrderRequest extends ErrorInfo
             }
 
             // -----
-            // Remove the current [$key] or [$key][$subkey] from the overall differences
-            // between the two order-information arrays submitted.  If
+            // Determine the presence of the current key{/subkey} in the current/to-be-updated
+            // order elements.
+            //
             $key_subkey_current = $this->issetKeySubkey($key, $subkey, $purchase_unit_current);
             $key_subkey_update = $this->issetKeySubkey($key, $subkey, $purchase_unit_update);
 
@@ -215,6 +216,16 @@ class UpdatePayPalOrderRequest extends ErrorInfo
                 'path' => $path,
                 'value' => $value,
             ];
+        }
+
+        // -----
+        // A special case for the order's 'shipping' component.  Since each of the
+        // individual elements can be separately updated, it's possible that an empty
+        // 'shipping element remains in the differences.  If that's the case, remove
+        // if prior to the order-differences' check below.
+        //
+        if (empty($order_difference['shipping'])) {
+            unset($order_difference['shipping']);
         }
 
         // -----

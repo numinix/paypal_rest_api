@@ -71,7 +71,14 @@ class CreatePayPalOrderRequest extends ErrorInfo
         ];
         $this->request['purchase_units'][0]['items'] = $this->getItems($order->products);
         $this->request['purchase_units'][0]['amount'] = $this->getOrderAmountAndBreakdown($order);
-        $this->request['purchase_units'][0]['shipping'] = $this->getShipping($order);
+
+        // -----
+        // The 'shipping' element is included *only if* the order's got one or more
+        // physical items to be shipped.
+        //
+        if ($this->itemBreakdown['all_products_virtual'] === false) {
+            $this->request['purchase_units'][0]['shipping'] = $this->getShipping($order);
+        }
 
         if ($this->countItems() === 0) {
             unset($this->request['purchase_units'][0]['items']);
@@ -201,17 +208,20 @@ class CreatePayPalOrderRequest extends ErrorInfo
         return $this->amount->setValue($this->getRateConvertedValue($value));
     }
 
-    protected function getShipping($order)
+    // -----
+    // Gets the shipping element of a to-be-created order.  Note that this method
+    // is not called (!) when the order's virtual!
+    //
+    protected function getShipping($order): array
     {
-        $is_virtual_order = $this->itemBreakdown['all_products_virtual'];
+        global $order;
+
         $is_storepickup = (strpos($order->info['shipping_module_code'], 'storepickup') === 0);
 
-        $order_address = ($is_virtual_order === false) ? $order->delivery : $order->billing;
-
         return [
-            'type' => ($is_virtual_order === true || $is_storepickup === true) ? 'PICKUP_IN_PERSON' : 'SHIPPING',
-            'name' => Name::get($order_address),
-            'address' => Address::get($order_address),
+            'type' => ($is_storepickup === true) ? 'PICKUP_IN_PERSON' : 'SHIPPING',
+            'name' => Name::get($order->delivery),
+            'address' => Address::get($order->delivery),
         ];
     }
 

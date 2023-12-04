@@ -1,0 +1,12 @@
+.ppr-modal .form-group {
+    margin-bottom: 0;
+}
+.ppr-modal collapse.in {
+    display: inline-block;
+}
+.ppr-button-row {
+    margin-top: 1vh;
+}
+.ppr-pr-0 {
+    padding-right: 0;
+}

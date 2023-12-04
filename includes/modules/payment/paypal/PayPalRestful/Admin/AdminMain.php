@@ -22,18 +22,16 @@ class AdminMain
 
     protected $adminNotifications = '';
 
-    public function __construct(string $module_name, int $oID, PayPalRestfulApi $ppr)
+    public function __construct(string $module_name, string $module_version, int $oID, PayPalRestfulApi $ppr)
     {
         $this->ppr = $ppr;
         $this->log = new Logger();
 
         // -----
         // Retrieve the PayPal transactions currently registered in the database
-        // for subsequent display.  Note that the class also provides a sync
-        // with PayPal, just in case a transaction was updated in the management
-        // console (not via the Zen Cart admin processing).
+        // for subsequent display.
         //
-        $ppr_txns = new GetTransactions($module_name, $oID, $ppr);
+        $ppr_txns = new GetTransactions($module_name, $module_version, $oID, $ppr);
         $paypal_db_txns = $ppr_txns->getDatabaseTxns();
         if (count($paypal_db_txns) === 0) {
             $this->adminNotifications =
@@ -44,17 +42,26 @@ class AdminMain
         }
 
         // -----
-        // Retrieve the PayPal order-status information as well, used in the formatting
-        // of the admin_notifications displays.
+        // If the transaction has not been voided, retrieve the PayPal order-status
+        // information as well, used in the formatting some of the admin_notifications displays.
         //
-        $paypal_status_response = $ppr_txns->getPaypalTxns();
+        // Note that the class-method also provides a sync with PayPal, just in case a transaction
+        // was updated in the management console (not via the Zen Cart admin processing).
+        //
+        $paypal_status_response = [];
+        if ($paypal_db_txns[0]['payment_status'] !== 'VOIDED') {
+            $paypal_status_response = $ppr_txns->getPaypalTxns();
+//        $txn_paypal_status = $this->ppr->getTransactionStatus($paypal_db_txns[0]['txn_id']);  //-FIXME: Can't get this to work on the sandbox.
+        }
 
         // -----
         // When the database transactions are retrieved, messages are created if
         // the PayPal synchronization resulted in new records being added.
         //
         $this->adminNotifications = $ppr_txns->getMessages();
-        
+
+//-FIXME: What if the transactionStatus fails?
+
         // -----
         // Format the main notification table displayed, showing the basic flow of
         // transactions for this order.

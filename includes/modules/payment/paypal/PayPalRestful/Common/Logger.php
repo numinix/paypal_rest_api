@@ -63,7 +63,23 @@ class Logger
     public static function logJSON($data)
     {
         if (is_array($data)) {
-            unset($data[CURLOPT_HTTPHEADER], $data['access_token'], $data['scope']/*, $data['links']*/);
+            unset(
+                $data[CURLOPT_HTTPHEADER],
+                $data['access_token'],
+                $data['scope'],
+                $data['links'],
+                $data['purchase_units'][0]['payments']['authorizations']['links'],
+                $data['purchase_units'][0]['payments']['captures']['links'],
+                $data['purchase_units'][0]['payments']['refunds']['links']
+            );
+            foreach (['authorizations', 'captures', 'refunds'] as $next_payment_type) {
+                if (!isset($data['purchase_units'][0]['payments'][$next_payment_type])) {
+                    continue;
+                }
+                for ($i = 0, $n = count($data['purchase_units'][0]['payments'][$next_payment_type]); $i < $n; $i++) {
+                    unset($data['purchase_units'][0]['payments'][$next_payment_type][$i]['links']);
+                }
+            }
         }
         return json_encode($data, JSON_PRETTY_PRINT);
     }
