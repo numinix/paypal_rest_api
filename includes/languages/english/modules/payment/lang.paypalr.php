@@ -39,19 +39,24 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_FUNDING_ERROR' => 'Funding source problem; please go to Paypal.com and make payment directly to ' . STORE_OWNER_EMAIL_ADDRESS,
     'MODULE_PAYMENT_PAYPALR_TEXT_INVALID_ZONE_ERROR' => 'We are sorry for the inconvenience; however, at the present time we are unable to use PayPal to process orders from the geographic region you selected as your PayPal address.  Please continue using normal checkout and select from the available payment methods to complete your order.',
     'MODULE_PAYMENT_PAYPALR_TEXT_ORDER_ALREADY_PLACED_ERROR' => 'It appears that your order was submitted twice. Please check the My Account area to see the actual order details.  Please use the Contact Us form if your order does not appear here but is already paid from your PayPal account so that we may check our records and reconcile this with you.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_BUTTON_ALTTEXT' => 'Click here to pay via PayPal Express Checkout',
-    'MODULE_PAYMENT_PAYPALR_EC_BUTTON_IMG' => 'https://www.paypalobjects.com/webstatic/en_US/btn/btn_checkout_pp_142x27.png',
-    'MODULE_PAYMENT_PAYPALR_EC_BUTTON_SM_IMG' => 'https://www.paypalobjects.com/en_US/i/btn/btn_xpressCheckoutsm.gif',
+
+    // -----
+    // Buttons on checkout_payment page; see https://www.paypal.com/c2/webapps/mpp/logos-buttons?locale.x=en_C2 for additional information.
+    //
+    'MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT' => 'Click here to pay via PayPal Checkout',
     'MODULE_PAYMENT_PAYPALR_MARK_BUTTON_TXT' => '',
-    'MODULE_PAYMENT_PAYPALEC_MARK_BUTTON_IMG' => 'https://www.paypalobjects.com/en_US/i/btn/btn1_for_hub.gif',
+    'MODULE_PAYMENT_PAYPALR_BUTTON_COLOR' => 'YELLOW',   //- One of WHITE, YELLOW, GREY or BLUE; defaults to YELLOW.
+        'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_YELLOW' => 'https://www.paypalobjects.com/digitalassets/c/website/marketing/apac/C2/logos-buttons/optimize/44_Yellow_PayPal_Pill_Button.png',
+        'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_GREY' => 'https://www.paypalobjects.com/digitalassets/c/website/marketing/apac/C2/logos-buttons/optimize/44_Grey_PayPal_Pill_Button.png',
+        'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_BLUE' => 'https://www.paypalobjects.com/digitalassets/c/website/marketing/apac/C2/logos-buttons/optimize/44_Blue_PayPal_Pill_Button.png',
+        'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_WHITE' => 'https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-150px.png',
 
     // -----
     // Admin messages, from an order's display, viewing the PayPal transaction history.
     //
     'MODULE_PAYMENT_PAYPALR_TEXT_GETDETAILS_ERROR' => 'There was a problem retrieving PayPal transaction details.',
     'MODULE_PAYMENT_PAYPALR_NO_RECORDS' => 'No \'%1$s\' records were found in the database for order #%2$u.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_TRANSSEARCH_ERROR' => 'There was a problem locating transactions matching the criteria you specified. ',
-    'MODULE_PAYMENT_PAYPALR_TEXT_VOID_ERROR' => 'There was a problem voiding the transaction. ',
+
     'MODULE_PAYMENT_PAYPALR_TEXT_REFUND_ERROR' => 'There was a problem refunding the transaction amount specified. ',
 
     'MODULE_PAYMENT_PAYPALR_TEXT_CAPT_ERROR' => 'There was a problem capturing the transaction. ',
@@ -67,15 +72,17 @@ $define = [
 
     'MODULE_PAYMENT_PAYPALR_TEXT_CAPT_INITIATED' => 'PayPal Capture for %s initiated. Receipt ID: %s. Refresh the screen to see confirmation details updated in the Order Status History/Comments section.',
 
-    'MODULE_PAYMENT_PAYPALR_COMMENTS' => 'System Comments: ',
-    'MODULE_PAYMENT_PAYPALR_PROTECTIONELIG' => 'Protection Eligibility:',
-
     // -----
     // Used during the admin's display of the payment transactions on an
     // order's detailed view.
     //
     'MODULE_PAYMENT_PAYPALR_NO_RECORDS_FOUND' => 'No PayPal transactions are recorded in the database for this order.',
 
+    'MODULE_PAYMENT_PAYPALR_TXN_TABLE_CAPTION' => 'PayPal Transactions',
+    'MODULE_PAYMENT_PAYPALR_PAYMENTS_TABLE_CAPTION' => 'Settled Payments',
+    'MODULE_PAYMENT_PAYPALR_PAYMENTS_NONE' => 'No currently-settled payments.',
+    'MODULE_PAYMENT_PAYPALR_PAYMENTS_TOTAL' => 'Settled Totals:',
+    'MODULE_PAYMENT_PAYPALR_NAME_EMAIL_ID' => 'Payer Name / Email / Payer ID',
     'MODULE_PAYMENT_PAYPALR_NAME_EMAIL' => 'Payer Name/Email:',
     'MODULE_PAYMENT_PAYPALR_PAYER_ID' => 'Payer ID:',
     'MODULE_PAYMENT_PAYPALR_PAYER_STATUS' => 'Payer Status:',
@@ -87,21 +94,27 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_CURRENCY_HDR' => 'Currency:',
     'MODULE_PAYMENT_PAYPALR_GROSS_AMOUNT' => 'Gross Amount:',
     'MODULE_PAYMENT_PAYPALR_PAYMENT_FEE' => 'Payment Fee:',
+    'MODULE_PAYMENT_PAYPALR_SETTLE_AMOUNT' => 'Settled Amount:',
     'MODULE_PAYMENT_PAYPALR_EXCHANGE_RATE' => 'Exchange Rate:',
 
-    'MODULE_PAYMENT_PAYPALR_TXN_TYPE' => 'Trans. Type:',
-    'MODULE_PAYMENT_PAYPALR_TXN_ID' => 'Trans. ID:',
+    'MODULE_PAYMENT_PAYPALR_TXN_TYPE' => 'Txn Type:',
+    'MODULE_PAYMENT_PAYPALR_TXN_ID' => 'Txn ID:',
+    'MODULE_PAYMENT_PAYPALR_TXN_PARENT_TXN_ID' => 'Txn ID / Parent Txn ID:',
     'MODULE_PAYMENT_PAYPALR_ACTION' => 'Action',
         'MODULE_PAYMENT_PAYPALR_ACTION_DETAILS' => 'Details',
         'MODULE_PAYMENT_PAYPALR_ACTION_REAUTH' => 'Re-Authorize',
         'MODULE_PAYMENT_PAYPALR_ACTION_VOID' => 'Void',
         'MODULE_PAYMENT_PAYPALR_ACTION_CAPTURE' => 'Capture',
         'MODULE_PAYMENT_PAYPALR_ACTION_REFUND' => 'Refund',
+    'MODULE_PAYMENT_PAYPALR_TXN_STATUS' => 'Txn Status',
 
     'MODULE_PAYMENT_PAYPALR_CONFIRM' => 'Confirm',
     'MODULE_PAYMENT_PAYPALR_DAYSTOSETTLE' => 'Days to Settle:',
     'MODULE_PAYMENT_PAYPALR_AMOUNT' => 'Amount:',
+    'MODULE_PAYMENT_PAYPALR_CUSTOMER_NOTE' => 'Customer Note:',
     'MODULE_PAYMENT_PAYPALR_DATE_CREATED' => 'Date Created:',
+    'MODULE_PAYMENT_PAYPALR_AMOUNT_RANGE' => 'Enter an amount between %1$s 1.00 and %1$s %2$s.',
+    'MODULE_PAYMENT_PAYPALR_NOTES' => 'Notes:',
 
     // -----
     // Constants used in the "Details" modal.
@@ -125,28 +138,39 @@ $define = [
     // -----
     // Constants used in the "Refunds" modal.
     //
-    'MODULE_PAYMENT_PAYPALR_REFUND_TITLE' => 'Refund Payment',
-    'MODULE_PAYMENT_PAYPALR_REFUND_FULL' => 'If you wish to refund this order in its entirety, click here:',
-    'MODULE_PAYMENT_PAYPALR_REFUND_BUTTON_TEXT_FULL' => 'Do Full Refund',
-    'MODULE_PAYMENT_PAYPALR_REFUND_BUTTON_TEXT_PARTIAL' => 'Do Partial Refund',
-    'MODULE_PAYMENT_PAYPALR_REFUND_TEXT_FULL_OR' => '<br>... or enter the partial ',
-    'MODULE_PAYMENT_PAYPALR_REFUND_PAYFLOW_TEXT' => 'Enter the ',
-    'MODULE_PAYMENT_PAYPALR_REFUND_PARTIAL_TEXT' => 'refund amount here and click on Partial Refund',
-    'MODULE_PAYMENT_PAYPALR_REFUND_SUFFIX' => '*A Full refund may not be issued after a Partial refund has been applied.<br>*Multiple Partial refunds are permitted up to the remaining unrefunded balance.',
-    'MODULE_PAYMENT_PAYPALR_REFUND_TEXT_COMMENTS' => '<strong>Note to display to customer:</strong>',
+    'MODULE_PAYMENT_PAYPALR_REFUND_TITLE' => 'Refund a Payment',
+    'MODULE_PAYMENT_PAYPALR_REFUND_INSTRUCTIONS' => 'You can refund all or part of a captured payment.',
+        'MODULE_PAYMENT_PAYPALR_REFUND_NOTE1' => 'A <em>full</em> refund refunds the remaining unrefunded balance of the captured payment.',
+        'MODULE_PAYMENT_PAYPALR_REFUND_NOTE2' => 'A <em>partial</em> refund refunds a portion of the captured payment.',
+        'MODULE_PAYMENT_PAYPALR_REFUND_NOTE3' => 'You can issue multiple <em>partial</em> refunds, up to the remaining unrefunded balance.',
+    'MODULE_PAYMENT_PAYPALR_REMAINING_TO_REFUND' => 'Remaining to Refund:',
+    'MODULE_PAYMENT_PAYPALR_REFUND_AMOUNT' => 'Amount to Refund:',
+    'MODULE_PAYMENT_PAYPALR_REFUND_FULL' => 'Full Refund?',
     'MODULE_PAYMENT_PAYPALR_REFUND_DEFAULT_MESSAGE' => 'Refunded by store administrator.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_REFUND_FULL_CONFIRM_CHECK' => 'Confirm: ',
+
+    'MODULE_PAYMENT_PAYPALR_REFUND_PARAM_ERROR' => 'Invalid parameters were supplied (CP %u) when attempting to refund a payment for this order; please try again.',
+    'MODULE_PAYMENT_PAYPALR_REFUND_ERROR' => 'There was a problem refunding the transaction.',
+
+    'MODULE_PAYMENT_PAYPALR_REFUND_COMPLETE' => 'A refund in the amount of %s has been completed.',
+    'MODULE_PAYMENT_PAYPALR_REFUND_MEMO' => 'Refunded by %1$s for an amount of %2$s.',
 
     // -----
     // Constants used in the "Re-Authorize" modal.
     //
     'MODULE_PAYMENT_PAYPALR_REAUTH_TITLE' => 'Re-Authorize an Order',
-    'MODULE_PAYMENT_PAYPALR_REAUTH_ORIGINAL' => 'Original Amount:',
-    'MODULE_PAYMENT_PAYPALR_REAUTH_AMOUNT_RANGE' => 'Enter an amount between %1$s 1.00 and %1$s %2$s.',
+    'MODULE_PAYMENT_PAYPALR_REAUTH_INSTRUCTIONS' => 'To ensure that funds are still available, you can re-authorize a payment after its initial three-day honor period expires.',
+        'MODULE_PAYMENT_PAYPALR_REAUTH_NOTE1' => 'Within the 29-day authorization period, you can issue multiple re-authorizations after the 3-day honor period expires for the previously-issued authorization.',
+        'MODULE_PAYMENT_PAYPALR_REAUTH_NOTE2' => 'If 30 days have transpired since the date of the original authorization, you must create an authorized payment instead of re-authorizing the original.',
+        'MODULE_PAYMENT_PAYPALR_REAUTH_NOTE3' => 'A re-authorized payment itself has a new honor period of three days.',
+        'MODULE_PAYMENT_PAYPALR_REAUTH_NOTE4' => 'You can re-authorize an authorized payment <em>once</em> for up to 115%% of the original authorized amount (%s), not to exceed an increase of $75 USD.',
 
-    'MODULE_PAYMENT_PAYPALR_REAUTH_PARAM_ERROR' => 'Invalid parameters were supplied for a %s re-authorization request; please try again.',
-    'MODULE_PAYMENT_PAYPALR_REAUTH_INVALID_AMOUNT' => 'The amount you supplied for a %s re-authorization request was invalid; please try again.',
+    'MODULE_PAYMENT_PAYPALR_REAUTH_ORIGINAL' => 'Original Amount:',
+    'MODULE_PAYMENT_PAYPALR_REAUTH_DAYS_FROM_LAST' => 'Days Since Last Authorization:',
+
+    'MODULE_PAYMENT_PAYPALR_REAUTH_PARAM_ERROR' => 'Invalid parameters were supplied (CP %u) when attempting to re-authorize this order; please try again.',
     'MODULE_PAYMENT_PAYPALR_REAUTH_ERROR' => 'There was a problem authorizing the transaction.',
+    'MODULE_PAYMENT_PAYPALR_REAUTH_TOO_SOON' => 'A reauthorization is only allowed once from Day 4 to Day 29 since the date of the original authorization.',
+
     'MODULE_PAYMENT_PAYPALR_REAUTH_COMPLETE' => 'A re-authorization in the amount of %s has been completed.',
     'MODULE_PAYMENT_PAYPALR_REAUTH_MEMO' => 'Re-authorized by %1$s for an amount of %2$s.',
 
@@ -154,31 +178,32 @@ $define = [
     // Constants used in the "Capture" modal.
     //
     'MODULE_PAYMENT_PAYPALR_CAPTURE_TITLE' => 'Capture an Authorization',
-    'MODULE_PAYMENT_PAYPALR_CAPTURE_FULL' => 'If you wish to capture all or part of the outstanding authorized amounts for this order, enter the Capture Amount and select whether this is the final capture for this order.  Check the confirm box before submitting your Capture request.<br>',
-    'MODULE_PAYMENT_PAYPALR_CAPTURE_BUTTON_TEXT_FULL' => 'Do Capture',
-    'MODULE_PAYMENT_PAYPALR_CAPTURE_AMOUNT_TEXT' => 'Amount to Capture:',
-    'MODULE_PAYMENT_PAYPALR_CAPTURE_FINAL_TEXT' => 'Is this the final capture?',
-    'MODULE_PAYMENT_PAYPALR_CAPTURE_SUFFIX' => '',
-    'MODULE_PAYMENT_PAYPALR_CAPTURE_TEXT_COMMENTS' => '<strong>Note to display to customer:</strong>',
+    'MODULE_PAYMENT_PAYPALR_CAPTURE_INSTRUCTIONS' => 'To capture all or part of the outstanding funds for this order, enter the &quot;Amount&quot; below, indicate whether this is the <b>final</b> capture for the order and click the &quot;Capture&quot; button.',
+    'MODULE_PAYMENT_PAYPALR_CAPTURE_FINAL_TEXT' => 'Final Capture?',
+    'MODULE_PAYMENT_PAYPALR_CAPTURED_SO_FAR' => 'Previously Captured:',
+    'MODULE_PAYMENT_PAYPALR_REMAINING_TO_CAPTURE' => 'Remaining to Capture:',
     'MODULE_PAYMENT_PAYPALR_CAPTURE_DEFAULT_MESSAGE' => 'Thank you for your order.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CAPTURE_FULL_CONFIRM_CHECK' => 'Confirm: ',
+
+    'MODULE_PAYMENT_PAYPALR_CAPTURE_PARAM_ERROR' => 'Invalid parameters were supplied (CP %u) when attempting to capture funds for this order; please try again.',
+    'MODULE_PAYMENT_PAYPALR_CAPTURE_ERROR' => 'There was a problem capturing the transaction.',
+
+    'MODULE_PAYMENT_PAYPALR_CAPTURE_COMPLETE' => 'The payment for order#%u has been captured.',
+    'MODULE_PAYMENT_PAYPALR_PARTIAL_CAPTURE_MEMO' => 'Partially captured by %1$s for an amount of %2$s.',
+    'MODULE_PAYMENT_PAYPALR_FINAL_CAPTURE_MEMO' => 'Final capture by %1$s for an amount of %2$s.',
 
     // -----
     // Constants used in the "Void" modal.
     //
     'MODULE_PAYMENT_PAYPALR_VOID_TITLE' => 'Void an Authorization',
-    'MODULE_PAYMENT_PAYPALR_VOID_INSTRUCTIONS' => 'To void this transaction, enter/copy the &quot;Authorization ID&quot; into the input field below and click the &quot;Do Void&quot; button.',
+    'MODULE_PAYMENT_PAYPALR_VOID_INSTRUCTIONS' => 'To void this transaction, enter/copy the &quot;Authorization ID&quot; into the input field below and click the &quot;Void&quot; button.',
     'MODULE_PAYMENT_PAYPALR_VOID_AUTH_ID' => 'Authorization ID:',
-    'MODULE_PAYMENT_PAYPALR_VOID_AMOUNT' => 'Amount:',
-    'MODULE_PAYMENT_PAYPALR_VOID_CUSTOMOR_NOTE' => 'Customer Note:',
-    'MODULE_PAYMENT_PAYPALR_VOID_DEFAULT_MESSAGE' => 'Thank you for your patronage. Please come again.',
-    'MODULE_PAYMENT_PAYPALR_VOID_BUTTON_TEXT' => 'Do Void',
+    'MODULE_PAYMENT_PAYPALR_VOID_DEFAULT_MESSAGE' => 'Transaction voided.',
 
-    'MODULE_PAYMENT_PAYPALR_VOID_PARAM_ERROR' => 'Invalid parameters were supplied for a % re-authorization request; please try again.',
+    'MODULE_PAYMENT_PAYPALR_VOID_PARAM_ERROR' => 'Invalid parameters were supplied (CP %u) when attempting to void this order; please try again.',
     'MODULE_PAYMENT_PAYPALR_VOID_ERROR' => 'There was a problem voiding the transaction.',
     'MODULE_PAYMENT_PAYPALR_VOID_MEMO' => 'Transaction voided by %1$s.',
     'MODULE_PAYMENT_PAYPALR_VOID_INVALID_TXN_ID' => 'The transaction ID you entered (%1$s) was not found; please try again.',
-    'MODULE_PAYMENT_PAYPALR_VOID_COMPLETE' => 'The authorized payment for order#%u has been voided.',
+    'MODULE_PAYMENT_PAYPALR_VOID_COMPLETE' => 'The payment authorization for order#%u has been voided.',
 
     /* card-related language constants, future.
     'MODULE_PAYMENT_PAYPALR_TRANSSTATE' => 'Trans. State:',

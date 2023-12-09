@@ -49,7 +49,7 @@ class ConfirmPayPalPaymentChoiceRequest
 //                    'locale' => 'en-US',
                     'landing_page' => 'NO_PREFERENCE',  //- LOGIN, GUEST_CHECKOUT or NO_PREFERENCE
                     'shipping_preference' => $shipping_preference,    //- GET_FROM_FILE (allows shipping address change on PayPal), NO_SHIPPING, SET_PROVIDED_ADDRESS (customer can't change)
-                    'user_action' => 'CONTINUE',  //- PAY_NOW or CONTINUE
+                    'user_action' => 'PAY_NOW',  //- PAY_NOW or CONTINUE
                     'return_url' => $webhook_name . '?op=return',
                     'cancel_url' => $webhook_name . '?op=cancel',
                 ],

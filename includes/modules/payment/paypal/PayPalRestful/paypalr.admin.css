@@ -1,3 +1,11 @@
+.ppr-table caption {
+    background-color: #f2f1ee;
+    border: 1px solid #d7d6cc;
+    margin: 0.5vh 0;
+}
+tr.ppr-payments {
+    font-weight: bold;
+}
 .ppr-modal .form-group {
     margin-bottom: 0;
 }
@@ -5,8 +13,11 @@
     display: inline-block;
 }
 .ppr-button-row {
-    margin-top: 1vh;
+    padding-top: 1vh;
 }
 .ppr-pr-0 {
     padding-right: 0;
+}
+.ppr-modal textarea {
+    margin: 0.5vh 0;
 }

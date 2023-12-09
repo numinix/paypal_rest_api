@@ -14,7 +14,7 @@ use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Common\Helpers;
 use PayPalRestful\Common\Logger;
 
-class GetTransactions
+class GetPayPalOrderTransactions
 {
     protected string $moduleName;
 
@@ -43,22 +43,38 @@ class GetTransactions
 
         $this->log = new Logger();
         $this->messages = new Messages();
+
+        $this->getPayPalDatabaseTransactionsForOrder();
     }
 
     public function getDatabaseTxns(string $txn_type = ''): array
     {
-        $this->databaseTxns = $this->getPayPalDatabaseTransactionsForOrder($txn_type);
-        return $this->databaseTxns;
+        if ($txn_type === '') {
+            return $this->databaseTxns;
+        }
+
+        $database_txns = [];
+        foreach ($this->databaseTxns as $next_db_txn) {
+            if ($next_db_txn['txn_type'] === $txn_type) {
+                $database_txns[] = $next_db_txn;
+            }
+        }
+        return $database_txns;
     }
 
-    public function getPaypalTxns(): array
+    public function getInvoiceId(): string
+    {
+        $main_txn = $this->getDatabaseTxns('CREATE');
+        return (string)$main_txn[0]['invoice'];
+    }
+
+    public function syncPaypalTxns()
     {
         $this->getPayPalUpdates($this->oID);
 
         if ($this->messages->size !== 0) {
-            $this->databaseTxns = $this->getPayPalDatabaseTransactionsForOrder($this->moduleName);
+            $this->getPayPalDatabaseTransactionsForOrder();
         }
-        return $this->paypalTransactions;
     }
 
     public function getMessages(): string
@@ -66,7 +82,7 @@ class GetTransactions
         return $this->messages->output();
     }
 
-    protected function getPayPalDatabaseTransactionsForOrder(string $txn_type): array
+    protected function getPayPalDatabaseTransactionsForOrder()
     {
         global $db;
 
@@ -78,24 +94,54 @@ class GetTransactions
         // This funkiness is needed since the date_added for the order-creation
         // is the same as that for its first transaction (AUTHORIZE or CAPTURE).
         //
-        $paypal_txns = [];
-        $and_clause = ($txn_type === '') ? '' : "AND txn_type = '$txn_type'";
         $txns = $db->ExecuteNoCache(
             "SELECT *
                FROM " . TABLE_PAYPAL . "
               WHERE order_id = {$this->oID}
                 AND module_name = '{$this->moduleName}'
-                $and_clause
               ORDER BY
                 CASE txn_type
                     WHEN 'CREATE' THEN -1
-                    ELSE 1
+                    WHEN 'AUTHORIZE' THEN 0
+                    WHEN 'CAPTURE' THEN 1
+                    ELSE 2
                 END ASC, date_added ASC"
         );
+
+        // -----
+        // Now, sort those transactions in parent/child order.
+        //
+        $db_txns = [];
         foreach ($txns as $txn) {
-            $paypal_txns[] = $txn;
+            // -----
+            // From the SQL query, the order's "CREATE" transaction will always be
+            // first, so just add it as the first element of the database transactions'
+            // array.
+            //
+            if ($txn['txn_type'] === 'CREATE') {
+                $db_txns[] = $txn;
+                continue;
+            }
+
+            // -----
+            // Credit: https://stackoverflow.com/questions/3797239/insert-new-item-in-array-on-any-position-in-php
+            //
+            $parent_txn_id = $txn['parent_txn_id'];
+            for ($position = 0, $txn_count = count($db_txns); $position < $txn_count; $position++) {
+                if ($db_txns[$position]['parent_txn_id'] === $parent_txn_id) {
+                    $db_txns = array_merge(
+                        array_slice($db_txns, 0, $position),
+                        [$position => $txn],
+                        array_slice($db_txns, $position)
+                    );
+                    break;
+                }
+            }
+            if ($position === $txn_count) {
+                $db_txns[] = $txn;
+            }
         }
-        return $paypal_txns;
+        $this->databaseTxns = $db_txns;
     }
 
     protected function getPayPalUpdates()
@@ -107,7 +153,7 @@ class GetTransactions
         $primary_txn_id = $this->databaseTxns[0]['txn_id'];
         $txns = $this->ppr->getOrderStatus($primary_txn_id);
         if ($txns === false) {
-            $this->messages->add(MODULE_PAYMENT_PAYPALR_TEXT_GETDETAILS_ERROR, 'error');
+            $this->messages->add(MODULE_PAYMENT_PAYPALR_TEXT_GETDETAILS_ERROR . "\n" . Logger::logJSON($this->ppr->getErrorInfo()), 'error');
             return;
         }
         $this->paypalTransactions = $txns;
@@ -123,19 +169,23 @@ class GetTransactions
         // the database with any that are missing as an order might have been updated in
         // the store's PayPal Management Console.
         //
+        $authorizations = [];
+        $captures = [];
         foreach ($txns['purchase_units'][0]['payments'] as $record_type => $child_txns) {
             switch ($record_type) {
                 case 'authorizations':
-                    $this->updateAuthorizations($child_txns);
+                    $authorizations = $child_txns;
+                    $this->updateAuthorizations($authorizations);
                     break;
                 case 'captures':
-                    $this->updateCaptures($child_txns);
+                    $captures = $child_txns;
+                    $this->updateCaptures($captures, $authorizations);
                     break;
                 case 'refunds':
-                    $this->updateRefunds($child_txns);
+                    $this->updateRefunds($child_txns, $captures);
                     break;
                 default:
-                    $this->messages->add("Unknown payment record ($record_type) provided by PayPal.", 'error');
+                    $this->messages->add("Unknown payment record ($record_type) provided by PayPal.\n" . Logger::logJSON($child_txns, true), 'error');
                     break;
             }
         }
@@ -148,30 +198,41 @@ class GetTransactions
             if ($this->transactionExists($authorization_txn_id) === true) {
                 continue;
             }
-            $this->addDbTransaction('AUTHORIZE', $next_authorization);
+            $this->addDbTransaction('AUTHORIZE', $next_authorization, 'Authorization added during PayPal Management Console action.', true);
+            $this->updateMainTransaction($next_refund);
         }
     }
 
-    protected function updateCaptures(array $captures)
+    protected function updateCaptures(array $captures, array $authorizations)
     {
         foreach ($captures as $next_capture) {
             $capture_txn_id = $next_capture['id'];
             if ($this->transactionExists($capture_txn_id) === true) {
                 continue;
             }
-            $this->addDbTransaction('CAPTURE', $next_capture);
+            $parent_txn_id = $this->addDbTransaction('CAPTURE', $next_capture, 'Capture added during PayPal Management Console action.', true);
+            $parent_txn_response = $this->getParentTxnStatus($parent_txn_id, $authorizations);
+            if (!empty($parent_txn_response)) {
+                $this->updateParentTxnDateAndStatus($parent_txn_id, $parent_txn_response);
+            }
+            $this->updateMainTransaction($next_capture);
         }
     }
 
-    protected function updateRefunds(array $refunds)
+    protected function updateRefunds(array $refunds, array $captures)
     {
         foreach ($refunds as $next_refund) {
             $refund_txn_id = $next_refund['id'];
             if ($this->transactionExists($refund_txn_id) === true) {
                 continue;
             }
+            $parent_txn_id = $this->addDbTransaction('REFUND', $next_refund, 'Refund added during PayPal Management Console action.', true);
+            $parent_txn_response = $this->getParentTxnStatus($parent_txn_id, $captures);
+            if (!empty($parent_txn_response)) {
+                $this->updateParentTxnDateAndStatus($parent_txn_id, $parent_txn_response);
+            }
+            $this->updateMainTransaction($next_refund);
         }
-        $this->addDbTransaction('REFUND', $next_refund);
     }
 
     protected function transactionExists(string $txn_id): bool
@@ -186,9 +247,19 @@ class GetTransactions
         return $txn_exists;
     }
 
-    public function addDbTransaction(string $txn_type, array $paypal_response, string $memo_comment = '')
+    protected function getParentTxnStatus(string $txn_id, array $paypal_response): array
     {
-        $this->log->write("addDbTransaction($txn_type, ..., $memo_comment):\n" . Logger::logJSON($paypal_response));
+        foreach ($paypal_response as $next_response) {
+            if ($next_response['id'] === $txn_id) {
+                return $next_response;
+            }
+        }
+        return [];
+    }
+
+    public function addDbTransaction(string $txn_type, array $paypal_response, string $memo_comment, bool $keep_links_in_log = false): string
+    {
+        $this->log->write("addDbTransaction($txn_type, ..., $memo_comment):\n" . Logger::logJSON($paypal_response, $keep_links_in_log));
 
         $date_added = Helpers::convertPayPalDatePay2Db($paypal_response['create_time']);
 
@@ -202,28 +273,60 @@ class GetTransactions
             $note_to_payer = "\n\nPayment Note: $note_to_payer";
         }
 
-        if ($memo_comment === '') {
-            $memo_comment = 'Added during PayPal Management Console action.';
+        $expiration_time = $paypal_response['expiration_time'] ?? 'null';
+        if ($expiration_time !== 'null') {
+            $expiration_time = Helpers::convertPayPalDatePay2Db($expiration_time);
         }
 
+        $parent_txn_id = $this->getParentTxnFromResponse($paypal_response['links']);
         $sql_data_array = [
             'order_id' => $this->oID,
             'txn_type' => $txn_type,
+            'final_capture' => (int)($paypal_response['final_capture'] ?? 0),
             'module_name' => $this->moduleName,
             'module_mode' => '',
-            'reason_code' => $paypal_response['status_details']['reason'] ?? '',
             'payment_type' => $this->paymentType ?? $this->databaseTxns[0]['payment_type'],
             'payment_status' => $paypal_response['status'],
+            'pending_reason' => $paypal_response['status_details']['reason'] ?? 'null',
             'mc_currency' => $paypal_response['amount']['currency_code'],
             'txn_id' => $paypal_response['id'],
+            'parent_txn_id' => $parent_txn_id,
             'mc_gross' => $paypal_response['amount']['value'],
-            'date_added' => $date_added,
             'notify_version' => $this->moduleVersion,
+            'date_added' => $date_added,
             'last_modified' => Helpers::convertPayPalDatePay2Db($paypal_response['update_time']),
+            'expiration_time' => $expiration_time,
             'memo' => $memo_comment . $note_to_payer,
         ];
         $sql_data_array = array_merge($sql_data_array, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);
+
+        return $parent_txn_id;
+    }
+
+    protected function getParentTxnFromResponse(array $links): string
+    {
+        $parent_txn_id = '';
+        foreach ($links as $next_link) {
+            if ($next_link['rel'] === 'up') {
+                $pieces = explode('/', $next_link['href']);
+                $parent_txn_id = end($pieces);
+                break;
+            }
+        }
+        return $parent_txn_id;
+    }
+
+    public function updateParentTxnDateAndStatus(array $paypal_response)
+    {
+        $parent_txn_id = $paypal_response['id'];
+        $sql_data_array = [
+            'payment_status' => $paypal_response['status'],
+            'pending_status' => $paypal_response['status_details']['reason'] ?? 'null',
+            'notify_version' => $this->moduleVersion,
+            'last_modified' => Helpers::convertPayPalDatePay2Db($paypal_response['update_time']),
+        ];
+        zen_db_perform(TABLE_PAYPAL, $sql_data_array, 'update', "order_id={$this->oID} AND txn_id = '$parent_txn_id' LIMIT 1");
     }
 
     protected function getPaymentInfo(array $paypal_response): array
@@ -243,18 +346,16 @@ class GetTransactions
         ];
     }
 
-    public function updateMainTransaction(int $oID, array $paypal_response, string $memo)
+    public function updateMainTransaction(array $paypal_response)
     {
         global $db;
 
         $modification_date = Helpers::convertPayPalDatePay2Db($paypal_response['update_time']);
-        $memo = "\n$modification_date: $memo";
         $db->Execute(
             "UPDATE " . TABLE_PAYPAL . "
                 SET last_modified = '$modification_date',
-                    notify_version = '" . $this->moduleVersion . "',
-                    memo = CONCAT(IFNULL(memo, ''), '$memo')
-              WHERE order_id = $oID
+                    notify_version = '" . $this->moduleVersion . "'
+              WHERE order_id = {$this->oID}
                 AND txn_type = 'CREATE'
               LIMIT 1"
         );

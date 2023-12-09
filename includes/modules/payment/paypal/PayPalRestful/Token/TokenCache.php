@@ -52,14 +52,14 @@ class TokenCache
             return '';
         }
 
-        $this->log->write('TokenCache::get, using saved access-token.');
+        $this->log->write("\nTokenCache::get, using saved access-token.");
 
         $encrypted_token = $_SESSION['PayPalRestful']['TokenCache']['saved_token'];
         $iv = substr($encrypted_token, 0, $this->encryptionAlgoIvLen);
         $saved_token = openssl_decrypt(substr($encrypted_token, $this->encryptionAlgoIvLen), $this->encryptionAlgorithm, $this->clientSecret, 0, $iv);
         if ($saved_token === false) {
             $saved_token = '';
-            $this->log->write('TokenCache::get, failed decryption.');
+            $this->log->write("\nTokenCache::get, failed decryption.");
             $this->clear();
         }
         return $saved_token;
@@ -67,7 +67,7 @@ class TokenCache
 
     public function save(string $access_token, int $seconds_to_expiration)
     {
-        $this->log->write('TokenCache::save, saving access-token.');
+        $this->log->write("\nTokenCache::save, saving access-token.");
         $iv = openssl_random_pseudo_bytes($this->encryptionAlgoIvLen);
         $_SESSION['PayPalRestful']['TokenCache'] = [
             'saved_token' => $iv . openssl_encrypt($access_token, $this->encryptionAlgorithm, $this->clientSecret, 0, $iv),

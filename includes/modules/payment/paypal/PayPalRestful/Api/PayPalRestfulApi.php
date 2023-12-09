@@ -50,8 +50,9 @@ class PayPalRestfulApi extends ErrorInfo
     public const STATUS_FAILED = 'FAILED';
     public const STATUS_PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED';
 
-    //- The order requires an action from the payer (e.g. 3DS authentication). Redirect the payer to the "rel":"payer-action" HATEOAS
-    //    link returned as part of the response prior to authorizing or capturing the order.
+    //- The order requires an action from the payer (e.g. 3DS authentication or PayPal confirmation).
+    //    Redirect the payer to the "rel":"payer-action" HATEOAS link returned as part of the response
+    //    prior to authorizing or capturing the order.
     public const STATUS_PAYER_ACTION_REQUIRED = 'PAYER_ACTION_REQUIRED';
 
     public const STATUS_PENDING = 'PENDING';
@@ -144,7 +145,7 @@ class PayPalRestfulApi extends ErrorInfo
     {
         $this->log->write('==> Start createOrder', true);
         $response = $this->curlPost('v2/checkout/orders', $order_request);
-        $this->log->write("==> End createOrder\n", true);
+        $this->log->write("==> End createOrder", true);
         return $response;
     }
 
@@ -152,7 +153,7 @@ class PayPalRestfulApi extends ErrorInfo
     {
         $this->log->write('==> Start getOrderStatus', true);
         $response = $this->curlGet("v2/checkout/orders/$paypal_id");
-        $this->log->write("==> End getOrderStatus\n", true);
+        $this->log->write("==> End getOrderStatus", true);
         return $response;
     }
 
@@ -163,7 +164,7 @@ class PayPalRestfulApi extends ErrorInfo
             'payment_source' => $payment_source,
         ];
         $response = $this->curlPost("v2/checkout/orders/$paypal_id/confirm-payment-source", $paypal_options);
-        $this->log->write("==> End confirmPaymentSource\n", true);
+        $this->log->write("==> End confirmPaymentSource", true);
         return $response;
     }
 
@@ -171,7 +172,7 @@ class PayPalRestfulApi extends ErrorInfo
     {
         $this->log->write('==> Start captureOrder', true);
         $response = $this->curlPost("v2/checkout/orders/$paypal_id/capture");
-        $this->log->write("==> End captureOrder\n", true);
+        $this->log->write("==> End captureOrder", true);
         return $response;
     }
 
@@ -179,29 +180,46 @@ class PayPalRestfulApi extends ErrorInfo
     {
         $this->log->write('==> Start authorizeOrder', true);
         $response = $this->curlPost("v2/checkout/orders/$paypal_id/authorize");
-        $this->log->write("==> End authorizeOrder\n", true);
+        $this->log->write("==> End authorizeOrder", true);
         return $response;
     }
 
     public function getAuthorizationStatus(string $paypal_auth_id)
     { 
         $this->log->write('==> Start getAuthorizationStatus', true);
-        $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id");
+        $response = $this->curlGet("v2/payments/authorizations/$paypal_auth_id");
         $this->log->write("==> End getAuthorizationStatus\n", true);
         return $response;
     }
 
-    public function capturePayment(string $paypal_auth_id, string $invoice_id, string $payer_note, )
+    public function capturePayment(string $paypal_auth_id, string $currency_code, string $value, string $invoice_id, string $payer_note, bool $final_capture)
     { 
-        $this->log->write('==> Start capturePayment', true);
-        $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/capture");
-        $this->log->write("==> End capturePayment\n", true);
+        $this->log->write("==> Start capturePayment($paypal_auth_id, $currency_code, $value, $invoice_id, $payer_note, $final_capture)", true);
+        $parameters = [
+            'amount' => [
+                'currency_code' => $currency_code,
+                'value' => $value,
+            ],
+            'invoice_id' => $invoice_id,
+            'note_to_payer' => $payer_note,
+            'final_capture' => $final_capture,
+        ];
+        $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/capture", $parameters);
+        $this->log->write('==> End capturePayment', true);
+        return $response;
+    }
+
+    public function getCaptureStatus(string $paypal_capture_id)
+    { 
+        $this->log->write('==> Start getCaptureStatus', true);
+        $response = $this->curlGet("v2/payments/captures/$paypal_capture_id");
+        $this->log->write("==> End getCaptureStatus\n", true);
         return $response;
     }
 
     public function reAuthorizePayment(string $paypal_auth_id, string $currency_code, string $value)
     { 
-        $this->log->write('==> Start reAuthorizePayment', true);
+        $this->log->write("==> Start reAuthorizePayment($paypal_auth_id, $currency_code, $value)", true);
         $amount = [
             'amount' => [
                 'currency_code' => $currency_code,
@@ -209,23 +227,15 @@ class PayPalRestfulApi extends ErrorInfo
             ],
         ];
         $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/reauthorize", $amount);
-        $this->log->write("==> End reAuthorizePayment\n", true);
+        $this->log->write('==> End reAuthorizePayment', true);
         return $response;
     }
 
     public function voidPayment(string $paypal_auth_id)
     { 
-        $this->log->write('==> Start voidPayment', true);
+        $this->log->write("==> Start voidPayment($paypal_auth_id)", true);
         $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/void");
-        $this->log->write("==> End voidPayment\n", true);
-        return $response;
-    }
-
-    public function getCaptureStatus(string $paypal_capture_id)
-    { 
-        $this->log->write('==> Start getCaptureStatus', true);
-        $response = $this->curlPost("v2/payments/captures/$paypal_capture_id");
-        $this->log->write("==> End getCaptureStatus\n", true);
+        $this->log->write('==> End voidPayment', true);
         return $response;
     }
 
@@ -237,18 +247,31 @@ class PayPalRestfulApi extends ErrorInfo
             'fields' => 'all',
         ];
         $response = $this->curlGet("v1/reporting/transactions", $parameters);
-        $this->log->write("==> End getTransactionStatus\n", true);
+        $this->log->write("==> End getTransactionStatus", true);
         return $response;
     }
 
-    public function refundCaptureFull(string $paypal_capture_id)
+    public function refundCaptureFull(string $paypal_capture_id, string $invoice_id, string $payer_note)
     {
+        return $this->refundCapture($paypal_capture_id, $invoice_id, $payer_note);
     }
-    public function refundCapturePartial(string $paypal_capture_id, string $currency_code, string $value)
+    public function refundCapturePartial(string $paypal_capture_id, string $currency_code, string $value, string $invoice_id, string $payer_note)
     {
+        return $this->refundCapture($paypal_capture_id, $invoice_id, $payer_note, compact('currency_code', 'value'));
     }
-    protected function refundCapture($paypal_capture_id, array $amount)
+    protected function refundCapture(string $paypal_capture_id, string $invoice_id, string $payer_note, array $amount = [])
     {
+        $this->log->write("==> Start refundCapture($paypal_capture_id, $invoice_id, $payer_note, ...)\n" . Logger::logJSON($amount), true);
+        $parameters = [
+            'invoice_id' => $invoice_id,
+            'note_to_payer' => $payer_note,
+        ];
+        if (!empty($amount)) {
+            $parameters['amount'] = $amount;
+        }
+        $response = $this->curlPost("v2/payments/captures/$paypal_capture_id/refund", $parameters);
+        $this->log->write("==> End refundCapture", true);
+        return $response;
     }
 
     // -----
@@ -268,7 +291,7 @@ class PayPalRestfulApi extends ErrorInfo
     //
     public function updateOrder(string $paypal_id, array $update_order_request)
     {
-        $this->log->write("==> Start updateOrder ($paypal_id)\n" . Logger::logJSON($update_order_request), true);
+        $this->log->write("==> Start updateOrder ($paypal_id)" . Logger::logJSON($update_order_request), true);
         $response = $this->curlPatch("v2/checkout/orders/$paypal_id", $update_order_request);
         $this->log->write('==> End updateOrder', true);
         return $response;

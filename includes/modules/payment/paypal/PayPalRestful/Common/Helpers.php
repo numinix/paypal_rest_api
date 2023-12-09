@@ -36,8 +36,13 @@ class Helpers
         return convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $paypal_date)));
     }
 
-    public static function getDaysToSettle(string $expiration_date): string
+    public static function getDaysTo(string $future_date): string
     {
-        return (string)ceil((strtotime($expiration_date) - time()) / 86400);
+        return (string)ceil((strtotime($future_date) - time()) / 86400);
+    }
+
+    public static function getDaysFrom(string $past_date): string
+    {
+        return (string)ceil((time() - strtotime($past_date)) / 86400);
     }
 }

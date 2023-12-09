@@ -58,20 +58,25 @@ class Logger
     // Format pretty-printed JSON for the debug-log, removing any HTTP Header
     // information (present in the CURL options) and/or the actual access-token.
     //
-    // Also remove unneeded return values that will just 'clutter up' the logged information.
+    // Also remove unneeded return values that will just 'clutter up' the logged information,
+    // unless requested to keep them.
     //
-    public static function logJSON($data)
+    public static function logJSON($data, bool $keep_links = false): string
     {
         if (is_array($data)) {
             unset(
                 $data[CURLOPT_HTTPHEADER],
                 $data['access_token'],
-                $data['scope'],
-                $data['links'],
-                $data['purchase_units'][0]['payments']['authorizations']['links'],
-                $data['purchase_units'][0]['payments']['captures']['links'],
-                $data['purchase_units'][0]['payments']['refunds']['links']
+                $data['scope']
             );
+            if ($keep_links === false) {
+                unset(
+                    $data['links'],
+                    $data['purchase_units'][0]['payments']['authorizations']['links'],
+                    $data['purchase_units'][0]['payments']['captures']['links'],
+                    $data['purchase_units'][0]['payments']['refunds']['links']
+                );
+            }
             foreach (['authorizations', 'captures', 'refunds'] as $next_payment_type) {
                 if (!isset($data['purchase_units'][0]['payments'][$next_payment_type])) {
                     continue;
@@ -90,9 +95,17 @@ class Logger
 
         if (self::$debug === true) {
             $timestamp = ($include_timestamp === false) ? '' : ("\n" . date('Y-m-d H:i:s: ') . "($current_page_base) ");
-            $separator = ($include_separator === '') ? '' : "\n**********************\n";
-            $separator_before = ($include_separator === 'before') ? $separator : '';
-            $separator_after = ($include_separator === 'after') ? $separator : PHP_EOL;
+            $separator = '';
+            $separator_before = '';
+            $separator_after = '';
+            if ($include_separator !== '') {
+                $separator = "************************************************";
+                if ($include_separator === 'before') {
+                    $separator_before = (strpos($message, "\n") === 0) ? "\n$separator" : "\n$separator\n";
+                } else {
+                    $separator_after = (substr($message, -1) === "\n") ? "$separator\n" : "\n$separator\n";
+                }
+            }
             error_log($separator_before . $timestamp . $message . $separator_after, 3, self::$debugLogFile);
         }
     }

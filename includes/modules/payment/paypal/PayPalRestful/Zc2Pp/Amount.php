@@ -112,12 +112,22 @@ class Amount
         return self::$defaultCurrencyCode['code'];
     }
 
+    public function getValueFromFloat(float $value): string
+    {
+        $amount = $this->setValue($value);
+        return $amount['value'];
+    }
+    public function getValueFromString(string $value): string
+    {
+        $amount = $this->setValue((float)$value);
+        return $amount['value'];
+    }
     public function setValue(float $value): array
     {
         $amount_value = number_format($value, 2, '.', '');
         if (self::$defaultCurrencyCode['no_decimals'] === true && strpos($value, '.00') === false) {
-            $default_currency_code = self::$defaultCurrencyCode['code'];
-            $this->log->write("Amount::setValue, value ($amount_value) has unsupported decimal digits for currency $default_currency_code; value is converted to integer.");
+//            $default_currency_code = self::$defaultCurrencyCode['code'];
+//            $this->log->write("Amount::setValue, value ($amount_value) has unsupported decimal digits for currency $default_currency_code; value is converted to integer.");
             $amount_value = (string)((int)$value);
         }
         $this->amount['value'] = $amount_value;

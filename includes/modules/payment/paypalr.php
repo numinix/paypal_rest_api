@@ -13,7 +13,7 @@
 require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
 use PayPalRestful\Admin\AdminMain;
-use PayPalRestful\Admin\GetTransactions;
+use PayPalRestful\Admin\GetPayPalOrderTransactions;
 use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Common\ErrorInfo;
 use PayPalRestful\Common\Helpers;
@@ -29,7 +29,7 @@ use PayPalRestful\Zc2Pp\UpdatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.0.0-beta1';
+    protected const CURRENT_VERSION = '1.0.0-beta2';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
@@ -38,28 +38,28 @@ class paypalr extends base
      *
      * @var string
      */
-    public $code;
+    public string $code;
 
     /**
      * displayed module title
      *
      * @var string
      */
-    public $title;
+    public string $title;
 
     /**
      * displayed module description
      *
      * @var string
      */
-    public $description = '';
+    public string $description = '';
 
     /**
      * module status - set based on various config and zone criteria
      *
      * @var boolean
      */
-    public $enabled;
+    public bool $enabled;
 
     /**
      * Installation 'check' flag
@@ -73,19 +73,19 @@ class paypalr extends base
      *
      * @var int
      */
-    public $zone;
+    public int $zone;
 
     /**
      * debugging flags
      *
      * @var boolean
      */
-    public $emailAlerts;
+    public bool $emailAlerts;
 
     /**
      * sort order of display
      *
-     * @var int
+     * @var int/null
      */
     public $sort_order = 0;
 
@@ -94,7 +94,7 @@ class paypalr extends base
      *
     * @var int
      */
-    public $order_status;
+    public int $order_status;
 
     /**
      * URLs used during checkout if this is the selected payment method
@@ -102,7 +102,6 @@ class paypalr extends base
      * @var string
      */
     public $form_action_url;
-    public $ec_redirect_url;
 
     /**
      * The orders::orders_id for a just-created order, supplied during
@@ -113,26 +112,26 @@ class paypalr extends base
     /**
      * Debug interface, shared with the PayPalRestfulApi class.
      */
-    protected $log; //- An instance of the Logger class, logs debug tracing information.
+    protected Logger $log; //- An instance of the Logger class, logs debug tracing information.
 
     /**
      * An array to maintain error information returned by various PayPalRestfulApi methods.
      */
-    protected $errorInfo; //- An instance of the ErrorInfo class, logs debug tracing information.
+    protected ErrorInfo $errorInfo; //- An instance of the ErrorInfo class, logs debug tracing information.
 
     /**
      * An instance of the PayPalRestfulApi class.
      *
      * @var object PayPalRestfulApi
      */
-    protected $ppr;
+    protected PayPalRestfulApi $ppr;
     
     /**
      * An array (set by before_process) containing the captured/authorized order's
      * PayPal response information, for use by after_order_create to populate the
      * paypal table's record once the associated order's ID is known.
      */
-    protected $orderInfo = [];
+    protected array $orderInfo = [];
 
     /**
      * class constructor
@@ -152,12 +151,12 @@ class paypalr extends base
             $this->description = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION, self::CURRENT_VERSION);
         }
 
-        $this->sort_order = defined('MODULE_PAYMENT_PAYPALR_SORT_ORDER') ? MODULE_PAYMENT_PAYPALR_SORT_ORDER : null;
+        $this->sort_order = defined('MODULE_PAYMENT_PAYPALR_SORT_ORDER') ? ((int)MODULE_PAYMENT_PAYPALR_SORT_ORDER) : null;
         if (null === $this->sort_order) {
             return false;
         }
 
-        $this->errorInfo = new errorInfo();
+        $this->errorInfo = new ErrorInfo();
 
         $this->log = new Logger();
         $debug = (strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false);
@@ -229,36 +228,6 @@ class paypalr extends base
     //
     protected function validateConfiguration(bool $curl_installed)
     {
-        // -----
-        // Make any modifications to the 'paypal' table, if not already done; admin
-        // processing **only**.
-        //
-        if (IS_ADMIN_FLAG === true) {
-            global $sniffer, $db;
-
-            // -----
-            // Adding an order's re-authorize time limit, so it's always available.
-            //
-            if ($sniffer->field_exists(TABLE_PAYPAL, 'expiration_time') === false) {
-
-                $db->Execute(
-                    "ALTER TABLE " . TABLE_PAYPAL . "
-                       ADD expiration_time datetime default NULL AFTER date_added"
-                );
-            }
-
-            // -----
-            // Increasing the number of characters in 'notify_version' (was varchar(6) NOT NULL default '')
-            // since the payment-module's version will be stored there.
-            //
-            if ($sniffer->field_type(TABLE_PAYPAL, 'notify_version', 'varchar(20)') === false) {
-                $db->Execute(
-                    "ALTER TABLE " . TABLE_PAYPAL . "
-                       MODIFY notify_version varchar(20) NOT NULL default ''"
-                );
-            }
-        }
-
         // -----
         // No CURL, no payment module!  The PayPalRestApi class requires
         // CURL to 'do its business'.
@@ -397,15 +366,6 @@ class paypalr extends base
             }
         }
 
-        // -----
-        // On the storefront, for the checkout_process page's processing, add
-        // the type of PayPal payment to the payment-module's title so that it
-        // shows up as part of the to-be-generated order.
-        //
-        if (isset($current_page_base) && $current_page_base === FILENAME_CHECKOUT_PROCESS) {
-            $this->title .= '(' . $_SESSION['PayPalRestful']['Order']['payment_source'] . ')';
-        }
-
 /* Not seeing this limitation during initial testing
         // module cannot be used for purchase > $10,000 USD equiv
         if (!function_exists('paypalUSDCheck')) {
@@ -431,60 +391,20 @@ class paypalr extends base
      * required to "Create" the order at PayPal.  If the order can't be created, no selection
      * is rendered.
      */
-    public function selection()
+    public function selection(): array
     {
-        $this->log->write("paypalr:: selection starts:\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []), true, 'before');
+        // -----
+        // Determine which color button to use.
+        //
+        $chosen_button_color = 'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_' . MODULE_PAYMENT_PAYPALR_BUTTON_COLOR;
+        $paypal_button = (defined($chosen_button_color)) ? constant($chosen_button_color) : MODULE_PAYMENT_PAYPALR_BUTTON_IMG_YELLOW;
 
         // -----
-        // Build the request for the PayPal order's "Create" and send to off to PayPal. Any issues result
-        // in the associated selection not being displayed.
+        // Return the PayPal selection as a button
         //
-        $paypal_order_created = $this->createOrUpdateOrder();
-        if ($paypal_order_created === false) {
-            $this->log->write('', false, 'after');
-            return false;
-        }
-
-        // -----
-        // Return the PayPal selection as a button, modelled after https://developer.paypal.com/demo/checkout/#/pattern/responsive
-        //
-        $this->log->write("paypalr:: selection successful:\n", true, 'after');
         return [
             'id' => $this->code,
-            'module' =>
-                '<span id="paypalr-paypal" style="background: #ffc439; border-radius: 4px; border: none; display: inline-block">' .
-                '  <img style="margin: 0.25vw 2vw;" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAxcHgiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMDEgMzIiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaW5ZTWluIG1lZXQiIHhtbG5zPSJodHRwOiYjeDJGOyYjeDJGO3d3dy53My5vcmcmI3gyRjsyMDAwJiN4MkY7c3ZnIj48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDEyLjIzNyAyLjggTCA0LjQzNyAyLjggQyAzLjkzNyAyLjggMy40MzcgMy4yIDMuMzM3IDMuNyBMIDAuMjM3IDIzLjcgQyAwLjEzNyAyNC4xIDAuNDM3IDI0LjQgMC44MzcgMjQuNCBMIDQuNTM3IDI0LjQgQyA1LjAzNyAyNC40IDUuNTM3IDI0IDUuNjM3IDIzLjUgTCA2LjQzNyAxOC4xIEMgNi41MzcgMTcuNiA2LjkzNyAxNy4yIDcuNTM3IDE3LjIgTCAxMC4wMzcgMTcuMiBDIDE1LjEzNyAxNy4yIDE4LjEzNyAxNC43IDE4LjkzNyA5LjggQyAxOS4yMzcgNy43IDE4LjkzNyA2IDE3LjkzNyA0LjggQyAxNi44MzcgMy41IDE0LjgzNyAyLjggMTIuMjM3IDIuOCBaIE0gMTMuMTM3IDEwLjEgQyAxMi43MzcgMTIuOSAxMC41MzcgMTIuOSA4LjUzNyAxMi45IEwgNy4zMzcgMTIuOSBMIDguMTM3IDcuNyBDIDguMTM3IDcuNCA4LjQzNyA3LjIgOC43MzcgNy4yIEwgOS4yMzcgNy4yIEMgMTAuNjM3IDcuMiAxMS45MzcgNy4yIDEyLjYzNyA4IEMgMTMuMTM3IDguNCAxMy4zMzcgOS4xIDEzLjEzNyAxMC4xIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDM1LjQzNyAxMCBMIDMxLjczNyAxMCBDIDMxLjQzNyAxMCAzMS4xMzcgMTAuMiAzMS4xMzcgMTAuNSBMIDMwLjkzNyAxMS41IEwgMzAuNjM3IDExLjEgQyAyOS44MzcgOS45IDI4LjAzNyA5LjUgMjYuMjM3IDkuNSBDIDIyLjEzNyA5LjUgMTguNjM3IDEyLjYgMTcuOTM3IDE3IEMgMTcuNTM3IDE5LjIgMTguMDM3IDIxLjMgMTkuMzM3IDIyLjcgQyAyMC40MzcgMjQgMjIuMTM3IDI0LjYgMjQuMDM3IDI0LjYgQyAyNy4zMzcgMjQuNiAyOS4yMzcgMjIuNSAyOS4yMzcgMjIuNSBMIDI5LjAzNyAyMy41IEMgMjguOTM3IDIzLjkgMjkuMjM3IDI0LjMgMjkuNjM3IDI0LjMgTCAzMy4wMzcgMjQuMyBDIDMzLjUzNyAyNC4zIDM0LjAzNyAyMy45IDM0LjEzNyAyMy40IEwgMzYuMTM3IDEwLjYgQyAzNi4yMzcgMTAuNCAzNS44MzcgMTAgMzUuNDM3IDEwIFogTSAzMC4zMzcgMTcuMiBDIDI5LjkzNyAxOS4zIDI4LjMzNyAyMC44IDI2LjEzNyAyMC44IEMgMjUuMDM3IDIwLjggMjQuMjM3IDIwLjUgMjMuNjM3IDE5LjggQyAyMy4wMzcgMTkuMSAyMi44MzcgMTguMiAyMy4wMzcgMTcuMiBDIDIzLjMzNyAxNS4xIDI1LjEzNyAxMy42IDI3LjIzNyAxMy42IEMgMjguMzM3IDEzLjYgMjkuMTM3IDE0IDI5LjczNyAxNC42IEMgMzAuMjM3IDE1LjMgMzAuNDM3IDE2LjIgMzAuMzM3IDE3LjIgWiI+PC9wYXRoPjxwYXRoIGZpbGw9IiMwMDMwODciIGQ9Ik0gNTUuMzM3IDEwIEwgNTEuNjM3IDEwIEMgNTEuMjM3IDEwIDUwLjkzNyAxMC4yIDUwLjczNyAxMC41IEwgNDUuNTM3IDE4LjEgTCA0My4zMzcgMTAuOCBDIDQzLjIzNyAxMC4zIDQyLjczNyAxMCA0Mi4zMzcgMTAgTCAzOC42MzcgMTAgQyAzOC4yMzcgMTAgMzcuODM3IDEwLjQgMzguMDM3IDEwLjkgTCA0Mi4xMzcgMjMgTCAzOC4yMzcgMjguNCBDIDM3LjkzNyAyOC44IDM4LjIzNyAyOS40IDM4LjczNyAyOS40IEwgNDIuNDM3IDI5LjQgQyA0Mi44MzcgMjkuNCA0My4xMzcgMjkuMiA0My4zMzcgMjguOSBMIDU1LjgzNyAxMC45IEMgNTYuMTM3IDEwLjYgNTUuODM3IDEwIDU1LjMzNyAxMCBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA2Ny43MzcgMi44IEwgNTkuOTM3IDIuOCBDIDU5LjQzNyAyLjggNTguOTM3IDMuMiA1OC44MzcgMy43IEwgNTUuNzM3IDIzLjYgQyA1NS42MzcgMjQgNTUuOTM3IDI0LjMgNTYuMzM3IDI0LjMgTCA2MC4zMzcgMjQuMyBDIDYwLjczNyAyNC4zIDYxLjAzNyAyNCA2MS4wMzcgMjMuNyBMIDYxLjkzNyAxOCBDIDYyLjAzNyAxNy41IDYyLjQzNyAxNy4xIDYzLjAzNyAxNy4xIEwgNjUuNTM3IDE3LjEgQyA3MC42MzcgMTcuMSA3My42MzcgMTQuNiA3NC40MzcgOS43IEMgNzQuNzM3IDcuNiA3NC40MzcgNS45IDczLjQzNyA0LjcgQyA3Mi4yMzcgMy41IDcwLjMzNyAyLjggNjcuNzM3IDIuOCBaIE0gNjguNjM3IDEwLjEgQyA2OC4yMzcgMTIuOSA2Ni4wMzcgMTIuOSA2NC4wMzcgMTIuOSBMIDYyLjgzNyAxMi45IEwgNjMuNjM3IDcuNyBDIDYzLjYzNyA3LjQgNjMuOTM3IDcuMiA2NC4yMzcgNy4yIEwgNjQuNzM3IDcuMiBDIDY2LjEzNyA3LjIgNjcuNDM3IDcuMiA2OC4xMzcgOCBDIDY4LjYzNyA4LjQgNjguNzM3IDkuMSA2OC42MzcgMTAuMSBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA5MC45MzcgMTAgTCA4Ny4yMzcgMTAgQyA4Ni45MzcgMTAgODYuNjM3IDEwLjIgODYuNjM3IDEwLjUgTCA4Ni40MzcgMTEuNSBMIDg2LjEzNyAxMS4xIEMgODUuMzM3IDkuOSA4My41MzcgOS41IDgxLjczNyA5LjUgQyA3Ny42MzcgOS41IDc0LjEzNyAxMi42IDczLjQzNyAxNyBDIDczLjAzNyAxOS4yIDczLjUzNyAyMS4zIDc0LjgzNyAyMi43IEMgNzUuOTM3IDI0IDc3LjYzNyAyNC42IDc5LjUzNyAyNC42IEMgODIuODM3IDI0LjYgODQuNzM3IDIyLjUgODQuNzM3IDIyLjUgTCA4NC41MzcgMjMuNSBDIDg0LjQzNyAyMy45IDg0LjczNyAyNC4zIDg1LjEzNyAyNC4zIEwgODguNTM3IDI0LjMgQyA4OS4wMzcgMjQuMyA4OS41MzcgMjMuOSA4OS42MzcgMjMuNCBMIDkxLjYzNyAxMC42IEMgOTEuNjM3IDEwLjQgOTEuMzM3IDEwIDkwLjkzNyAxMCBaIE0gODUuNzM3IDE3LjIgQyA4NS4zMzcgMTkuMyA4My43MzcgMjAuOCA4MS41MzcgMjAuOCBDIDgwLjQzNyAyMC44IDc5LjYzNyAyMC41IDc5LjAzNyAxOS44IEMgNzguNDM3IDE5LjEgNzguMjM3IDE4LjIgNzguNDM3IDE3LjIgQyA3OC43MzcgMTUuMSA4MC41MzcgMTMuNiA4Mi42MzcgMTMuNiBDIDgzLjczNyAxMy42IDg0LjUzNyAxNCA4NS4xMzcgMTQuNiBDIDg1LjczNyAxNS4zIDg1LjkzNyAxNi4yIDg1LjczNyAxNy4yIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDA5Y2RlIiBkPSJNIDk1LjMzNyAzLjMgTCA5Mi4xMzcgMjMuNiBDIDkyLjAzNyAyNCA5Mi4zMzcgMjQuMyA5Mi43MzcgMjQuMyBMIDk1LjkzNyAyNC4zIEMgOTYuNDM3IDI0LjMgOTYuOTM3IDIzLjkgOTcuMDM3IDIzLjQgTCAxMDAuMjM3IDMuNSBDIDEwMC4zMzcgMy4xIDEwMC4wMzcgMi44IDk5LjYzNyAyLjggTCA5Ni4wMzcgMi44IEMgOTUuNjM3IDIuOCA5NS40MzcgMyA5NS4zMzcgMy4zIFoiPjwvcGF0aD48L3N2Zz4" alt="" role="presentation">' .
-                '</span>' .
-                ' ' .
-                '<span class="paypal-powered-by">' .
-                    '<style nonce="">
-                        .paypal-powered-by {
-                            margin: 10px auto;
-                            height: 14px;
-                            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-                            font-size: 11px;
-                            font-weight: normal;
-                            font-style: italic;
-                            font-stretch: normal;
-                            color: #7b8388;
-                            position: relative;
-                            margin-right: 3px;
-                            bottom: 3px;
-                            display: inline-block;
-                        }
-
-                        .paypal-powered-by > .paypal-button-text,
-                        .paypal-powered-by > .paypal-logo {
-                            display: inline-block;
-                            height: 16px;
-                            line-height: 16px;
-                            font-size: 11px;
-                            float: none;
-                        }
-                    </style>' .
-                    '<span class="paypal-button-text">Powered by </span>' .
-                    '<img  alt="" role="presentation" class="paypal-logo paypal-logo-paypal paypal-logo-color-blue" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAxcHgiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMDEgMzIiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaW5ZTWluIG1lZXQiIHhtbG5zPSJodHRwOiYjeDJGOyYjeDJGO3d3dy53My5vcmcmI3gyRjsyMDAwJiN4MkY7c3ZnIj48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDEyLjIzNyAyLjggTCA0LjQzNyAyLjggQyAzLjkzNyAyLjggMy40MzcgMy4yIDMuMzM3IDMuNyBMIDAuMjM3IDIzLjcgQyAwLjEzNyAyNC4xIDAuNDM3IDI0LjQgMC44MzcgMjQuNCBMIDQuNTM3IDI0LjQgQyA1LjAzNyAyNC40IDUuNTM3IDI0IDUuNjM3IDIzLjUgTCA2LjQzNyAxOC4xIEMgNi41MzcgMTcuNiA2LjkzNyAxNy4yIDcuNTM3IDE3LjIgTCAxMC4wMzcgMTcuMiBDIDE1LjEzNyAxNy4yIDE4LjEzNyAxNC43IDE4LjkzNyA5LjggQyAxOS4yMzcgNy43IDE4LjkzNyA2IDE3LjkzNyA0LjggQyAxNi44MzcgMy41IDE0LjgzNyAyLjggMTIuMjM3IDIuOCBaIE0gMTMuMTM3IDEwLjEgQyAxMi43MzcgMTIuOSAxMC41MzcgMTIuOSA4LjUzNyAxMi45IEwgNy4zMzcgMTIuOSBMIDguMTM3IDcuNyBDIDguMTM3IDcuNCA4LjQzNyA3LjIgOC43MzcgNy4yIEwgOS4yMzcgNy4yIEMgMTAuNjM3IDcuMiAxMS45MzcgNy4yIDEyLjYzNyA4IEMgMTMuMTM3IDguNCAxMy4zMzcgOS4xIDEzLjEzNyAxMC4xIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDM1LjQzNyAxMCBMIDMxLjczNyAxMCBDIDMxLjQzNyAxMCAzMS4xMzcgMTAuMiAzMS4xMzcgMTAuNSBMIDMwLjkzNyAxMS41IEwgMzAuNjM3IDExLjEgQyAyOS44MzcgOS45IDI4LjAzNyA5LjUgMjYuMjM3IDkuNSBDIDIyLjEzNyA5LjUgMTguNjM3IDEyLjYgMTcuOTM3IDE3IEMgMTcuNTM3IDE5LjIgMTguMDM3IDIxLjMgMTkuMzM3IDIyLjcgQyAyMC40MzcgMjQgMjIuMTM3IDI0LjYgMjQuMDM3IDI0LjYgQyAyNy4zMzcgMjQuNiAyOS4yMzcgMjIuNSAyOS4yMzcgMjIuNSBMIDI5LjAzNyAyMy41IEMgMjguOTM3IDIzLjkgMjkuMjM3IDI0LjMgMjkuNjM3IDI0LjMgTCAzMy4wMzcgMjQuMyBDIDMzLjUzNyAyNC4zIDM0LjAzNyAyMy45IDM0LjEzNyAyMy40IEwgMzYuMTM3IDEwLjYgQyAzNi4yMzcgMTAuNCAzNS44MzcgMTAgMzUuNDM3IDEwIFogTSAzMC4zMzcgMTcuMiBDIDI5LjkzNyAxOS4zIDI4LjMzNyAyMC44IDI2LjEzNyAyMC44IEMgMjUuMDM3IDIwLjggMjQuMjM3IDIwLjUgMjMuNjM3IDE5LjggQyAyMy4wMzcgMTkuMSAyMi44MzcgMTguMiAyMy4wMzcgMTcuMiBDIDIzLjMzNyAxNS4xIDI1LjEzNyAxMy42IDI3LjIzNyAxMy42IEMgMjguMzM3IDEzLjYgMjkuMTM3IDE0IDI5LjczNyAxNC42IEMgMzAuMjM3IDE1LjMgMzAuNDM3IDE2LjIgMzAuMzM3IDE3LjIgWiI+PC9wYXRoPjxwYXRoIGZpbGw9IiMwMDMwODciIGQ9Ik0gNTUuMzM3IDEwIEwgNTEuNjM3IDEwIEMgNTEuMjM3IDEwIDUwLjkzNyAxMC4yIDUwLjczNyAxMC41IEwgNDUuNTM3IDE4LjEgTCA0My4zMzcgMTAuOCBDIDQzLjIzNyAxMC4zIDQyLjczNyAxMCA0Mi4zMzcgMTAgTCAzOC42MzcgMTAgQyAzOC4yMzcgMTAgMzcuODM3IDEwLjQgMzguMDM3IDEwLjkgTCA0Mi4xMzcgMjMgTCAzOC4yMzcgMjguNCBDIDM3LjkzNyAyOC44IDM4LjIzNyAyOS40IDM4LjczNyAyOS40IEwgNDIuNDM3IDI5LjQgQyA0Mi44MzcgMjkuNCA0My4xMzcgMjkuMiA0My4zMzcgMjguOSBMIDU1LjgzNyAxMC45IEMgNTYuMTM3IDEwLjYgNTUuODM3IDEwIDU1LjMzNyAxMCBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA2Ny43MzcgMi44IEwgNTkuOTM3IDIuOCBDIDU5LjQzNyAyLjggNTguOTM3IDMuMiA1OC44MzcgMy43IEwgNTUuNzM3IDIzLjYgQyA1NS42MzcgMjQgNTUuOTM3IDI0LjMgNTYuMzM3IDI0LjMgTCA2MC4zMzcgMjQuMyBDIDYwLjczNyAyNC4zIDYxLjAzNyAyNCA2MS4wMzcgMjMuNyBMIDYxLjkzNyAxOCBDIDYyLjAzNyAxNy41IDYyLjQzNyAxNy4xIDYzLjAzNyAxNy4xIEwgNjUuNTM3IDE3LjEgQyA3MC42MzcgMTcuMSA3My42MzcgMTQuNiA3NC40MzcgOS43IEMgNzQuNzM3IDcuNiA3NC40MzcgNS45IDczLjQzNyA0LjcgQyA3Mi4yMzcgMy41IDcwLjMzNyAyLjggNjcuNzM3IDIuOCBaIE0gNjguNjM3IDEwLjEgQyA2OC4yMzcgMTIuOSA2Ni4wMzcgMTIuOSA2NC4wMzcgMTIuOSBMIDYyLjgzNyAxMi45IEwgNjMuNjM3IDcuNyBDIDYzLjYzNyA3LjQgNjMuOTM3IDcuMiA2NC4yMzcgNy4yIEwgNjQuNzM3IDcuMiBDIDY2LjEzNyA3LjIgNjcuNDM3IDcuMiA2OC4xMzcgOCBDIDY4LjYzNyA4LjQgNjguNzM3IDkuMSA2OC42MzcgMTAuMSBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA5MC45MzcgMTAgTCA4Ny4yMzcgMTAgQyA4Ni45MzcgMTAgODYuNjM3IDEwLjIgODYuNjM3IDEwLjUgTCA4Ni40MzcgMTEuNSBMIDg2LjEzNyAxMS4xIEMgODUuMzM3IDkuOSA4My41MzcgOS41IDgxLjczNyA5LjUgQyA3Ny42MzcgOS41IDc0LjEzNyAxMi42IDczLjQzNyAxNyBDIDczLjAzNyAxOS4yIDczLjUzNyAyMS4zIDc0LjgzNyAyMi43IEMgNzUuOTM3IDI0IDc3LjYzNyAyNC42IDc5LjUzNyAyNC42IEMgODIuODM3IDI0LjYgODQuNzM3IDIyLjUgODQuNzM3IDIyLjUgTCA4NC41MzcgMjMuNSBDIDg0LjQzNyAyMy45IDg0LjczNyAyNC4zIDg1LjEzNyAyNC4zIEwgODguNTM3IDI0LjMgQyA4OS4wMzcgMjQuMyA4OS41MzcgMjMuOSA4OS42MzcgMjMuNCBMIDkxLjYzNyAxMC42IEMgOTEuNjM3IDEwLjQgOTEuMzM3IDEwIDkwLjkzNyAxMCBaIE0gODUuNzM3IDE3LjIgQyA4NS4zMzcgMTkuMyA4My43MzcgMjAuOCA4MS41MzcgMjAuOCBDIDgwLjQzNyAyMC44IDc5LjYzNyAyMC41IDc5LjAzNyAxOS44IEMgNzguNDM3IDE5LjEgNzguMjM3IDE4LjIgNzguNDM3IDE3LjIgQyA3OC43MzcgMTUuMSA4MC41MzcgMTMuNiA4Mi42MzcgMTMuNiBDIDgzLjczNyAxMy42IDg0LjUzNyAxNCA4NS4xMzcgMTQuNiBDIDg1LjczNyAxNS4zIDg1LjkzNyAxNi4yIDg1LjczNyAxNy4yIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDA5Y2RlIiBkPSJNIDk1LjMzNyAzLjMgTCA5Mi4xMzcgMjMuNiBDIDkyLjAzNyAyNCA5Mi4zMzcgMjQuMyA5Mi43MzcgMjQuMyBMIDk1LjkzNyAyNC4zIEMgOTYuNDM3IDI0LjMgOTYuOTM3IDIzLjkgOTcuMDM3IDIzLjQgTCAxMDAuMjM3IDMuNSBDIDEwMC4zMzcgMy4xIDEwMC4wMzcgMi44IDk5LjYzNyAyLjggTCA5Ni4wMzcgMi44IEMgOTUuNjM3IDIuOCA5NS40MzcgMyA5NS4zMzcgMy4zIFoiPjwvcGF0aD48L3N2Zz4">' .
-               '</span>',
+            'module' => '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">',
         ];
     }
 
@@ -493,7 +413,7 @@ class paypalr extends base
         unset($_SESSION['PayPalRestful']['Order']);
     }
 
-    protected function createOrUpdateOrder(): bool
+    protected function createPayPalOrder(): bool
     {
         global $order;
 
@@ -503,58 +423,16 @@ class paypalr extends base
         $create_order_request = new CreatePayPalOrderRequest($order);
 
         // -----
-        // If no order has yet been requested from Paypal, send the request off
-        // to register the order at PayPal.
+        // Send the request off to register the order at PayPal.
         //
-        if (!isset($_SESSION['PayPalRestful']['Order'])) {
-            $order_response = $this->ppr->createOrder($create_order_request->get());
-            if ($order_response === false) {
-                $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
-                return false;
-            }
-        // -----
-        // Otherwise, the order has been registered at PayPal; let's see if it's changed/can-be-updated.
-        //
-        } else {
-            // -----
-            // Set the order's 'invoice_id' to the to-be-created PayPal order's 'id'.
-            //
-            $update_request = $create_order_request->get();
-            $update_request['purchase_units'][0]['invoice_id'] = 'PPR-' . $_SESSION['PayPalRestful']['Order']['id'];
-
-            $update_order = new UpdatePayPalOrderRequest($update_request);
-            $update_order_request = $update_order->get();
-
-            // -----
-            // Order hasn't changed, no update needed.
-            //
-            if (count($update_order_request) === 0) {
-                return true;
-            }
-
-            // -----
-            // If no error was identified, update the order as requested.
-            //
-            if (!isset($update_order_request['error'])) {
-                $order_response = $this->ppr->updateOrder($_SESSION['PayPalRestful']['Order']['id'], $update_order_request);
-                if ($order_response !== false) {
-                    $order_response = $this->ppr->getOrderStatus($_SESSION['PayPalRestful']['Order']['id']);
-                }
-            } elseif ($update_order_request['error'] === 'recreate') {
-                $order_response = $this->ppr->createOrder($create_order_request->get());
-            } else {
-                $this->errorInfo->copyErrorInfo($update_order->getErrorInfo());
-                return false;
-            }
-        }
-
+        $order_response = $this->ppr->createOrder($create_order_request->get());
         if ($order_response === false) {
             $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
             return false;
         }
 
         // -----
-        // Save the created/updated PayPal order in the session and indicate that the
+        // Save the created PayPal order in the session and indicate that the
         // operation was successful.
         //
         $paypal_id = $order_response['id'];
@@ -579,64 +457,80 @@ class paypalr extends base
 
     // -----
     // Issued (in 3-page checkout) during the 'checkout_confirmation' page's
-    // header.  At this point, send the request off to PayPal for the customer
-    // to confirm their payment choice.
-    //
-    // Note: Doesn't return, comes back to the site via the WEBHOOK_NAME identified
-    // at the top of this file!
+    // header.
     //
     public function pre_confirmation_check()
     {
-        global $order, $messageStack;
+        global $order;
 
-        $current_status = $_SESSION['PayPalRestful']['Order']['status'];
-        if (!in_array($current_status, [PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED, PayPalRestfulApi::STATUS_APPROVED])) {
-            $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::WEBHOOK_NAME, $order);
-            $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
-            if ($payment_choice_response === false) {
-                $messageStack->add_session('checkout_payment', "confirmPaymentSource failed, see log.", 'error');  //- FIXME
-                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
-            }
+        $this->log->write("pre_confirmation_check starts ...\n", true, 'before');
 
-            $current_status = $payment_choice_response['status'];
-            $_SESSION['PayPalRestful']['Order']['status'] = $current_status;
-            if ($current_status !== PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
-                $messageStack->add_session('checkout_payment', "confirmPaymentSource invalid return status '$current_status', see log.", 'error');  //- FIXME
-                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
-            }
-
-            // -----
-            // If present (it *should* be), save the payment source (e.g. 'paypal' or 'card') in the order's
-            // session array, for use when the payment is confirmed so that the source
-            // can be included in the 'title' of the PayPal Checkout.
-            //
-            if (isset($payment_choice_response['payment_source'])) {
-                $_SESSION['PayPalRestful']['Order']['payment_source'] = array_key_first($payment_choice_response['payment_source']);
-            }
-
-            // -----
-            // Locate (and save) the URL to which the customer is redirected at PayPal
-            // to confirm their payment choice.
-            //
-            $action_link = '';
-            foreach ($payment_choice_response['links'] as $next_link) {
-                if ($next_link['rel'] === 'payer-action') {
-                    $action_link = $next_link['href'];
-                    $approve_method = $next_link['method'];
-                    break;
-                }
-            }
-            if ($action_link === '') {
-                trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", Logger::logJSON($payment_choice_response), E_USER_WARNING);
-                $messageStack->add_session('checkout_payment', "confirmPaymentSource, no payer-action link found.", 'error');  //- FIXME
-                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
-            }
-            $_SESSION['PayPalRestful']['Order']['action_link'] = $action_link;
+        // -----
+        // Build the request for the PayPal order's "Create" and send to off to PayPal.
+        //
+        $paypal_order_created = $this->createPayPalOrder();
+        if ($paypal_order_created === false) {
+            $this->setMessageAndRedirect("createPayPalOrder failed\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);  //- FIXME
         }
 
-        if ($current_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
-            zen_redirect($_SESSION['PayPalRestful']['Order']['action_link']);
+        // -----
+        // Add an invoice number to the PayPal order, it'll be ZC-{paypal-txn-id}.
+        //
+        $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
+        $update_order_invoice = [
+            [
+                'op' => 'add',
+                'path' => "/purchase_units/@reference_id=='default'/invoice_id",
+                'value' => "ZC-$paypal_id",
+            ],
+        ];
+        $order_update_response = $this->ppr->updateOrder($paypal_id, $update_order_invoice);
+        if ($order_update_response === false) {
+            $this->setMessageAndRedirect("updateOrder invoice failed:\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);
         }
+
+        $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::WEBHOOK_NAME, $order);
+        $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
+        if ($payment_choice_response === false) {
+            $this->setMessageAndRedirect("confirmPaymentSource failed\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        }
+
+        $current_status = $payment_choice_response['status'];
+        if ($current_status !== PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
+            $this->setMessageAndRedirect("confirmPaymentSource invalid return status '$current_status', see log.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        }
+
+        // -----
+        // If present (it *should* be), save the payment source (e.g. 'paypal' or 'card') in the order's
+        // session array, for use when the payment is confirmed so that the source
+        // can be included in the 'title' of the PayPal Checkout.
+        //
+/*---- Not sure if this violates PayPal's instructions since it'll show 'paypal' (without caps).
+        if (isset($payment_choice_response['payment_source'])) {
+            $_SESSION['PayPalRestful']['Order']['payment_source'] = array_key_first($payment_choice_response['payment_source']);
+            $this->title .= ' (' . $_SESSION['PayPalRestful']['Order']['payment_source'] . ')';
+        }
+*/
+
+        // -----
+        // Locate (and save) the URL to which the customer is redirected at PayPal
+        // to confirm their payment choice.
+        //
+        $action_link = '';
+        foreach ($payment_choice_response['links'] as $next_link) {
+            if ($next_link['rel'] === 'payer-action') {
+                $action_link = $next_link['href'];
+                $approve_method = $next_link['method'];
+                break;
+            }
+        }
+        if ($action_link === '') {
+            trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", Logger::logJSON($payment_choice_response), E_USER_WARNING);
+            $this->setMessageAndRedirect("confirmPaymentSource, no payer-action link found.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        }
+        $this->form_action_url = $action_link;
+
+        $this->log->write('pre_confirmation_check, completed.', true, 'after');
     }
 
     /**
@@ -662,9 +556,6 @@ class paypalr extends base
      */
     public function process_button()
     {
-        // -----
-        // Nothing additional to display for the 'paypal' payment method.
-        //
         return false;
     }
 
@@ -677,8 +568,7 @@ class paypalr extends base
         global $messageStack;
 
         if (!isset($_SESSION['PayPalRestful']['Order']['status']) || $_SESSION['PayPalRestful']['Order']['status'] !== PayPalRestfulApi::STATUS_APPROVED) {
-            $messageStack->add_session('checkout', "paypalr::before_process, can't capture/authorize order; wrong status ({$_SESSION['PayPalRestful']['Order']['status']}).", 'error');  //- FIXME
-            zen_redirect(zen_href_link(FILENAME_CHECKOUT_SHIPPING));
+            $this->setMessageAndRedirect("paypalr::before_process, can't capture/authorize order; wrong status ({$_SESSION['PayPalRestful']['Order']['status']}).", FILENAME_CHECKOUT_SHIPPING);  //- FIXME
         }
 
         $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
@@ -689,8 +579,7 @@ class paypalr extends base
         }
 
         if ($response === false) {
-            $messageSTack->add_session('checkout', 'paypalr::before_process, can\'t capture/authorize order; error in attempt, see log.', 'error');  //- FIXME
-            zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
+            $this->setMessageAndRedirect('paypalr::before_process, can\'t capture/authorize order; error in attempt, see log.', FILENAME_CHECKOUT_PAYMENT);  //- FIXME
         }
 
         $_SESSION['PayPalRestful']['Order']['status'] = $response['status'];
@@ -736,6 +625,15 @@ class paypalr extends base
         }
 
         $this->notify('NOTIFY_PAYPALR_BEFORE_PROCESS_FINISHED', $this->orderInfo);
+    }
+
+    protected function setMessageAndRedirect(string $error_message, string $redirect_page)
+    {
+        global $messageStack;
+
+        $messageStack->add_session('checkout', $error_message, 'error');  //- FIXME
+        $this->resetOrder();
+        zen_redirect(zen_href_link($redirect_page));
     }
 
     /**
@@ -804,7 +702,7 @@ class paypalr extends base
             'order_id' => $orders_id,
             'txn_type' => 'CREATE',
             'module_name' => $this->code,
-            'module_mode' => '',
+            'module_mode' => $this->orderInfo['txn_type'],
             'reason_code' => $payment['status_details']['reason'] ?? '',
             'payment_type' => $payment_type,
             'payment_status' => $this->orderInfo['payment_status'],
@@ -831,6 +729,7 @@ class paypalr extends base
         $sql_data_array = [
             'order_id' => $orders_id,
             'txn_type' => $this->orderInfo['txn_type'],
+            'final_capture' => (int)($this->orderInfo['txn_type'] === 'CAPTURE'),
             'module_name' => $this->code,
             'module_mode' => '',
             'reason_code' => $payment['status_details']['reason'] ?? '',
@@ -838,11 +737,13 @@ class paypalr extends base
             'payment_status' => $payment['status'],
             'mc_currency' => $payment['amount']['currency_code'],
             'txn_id' => $payment['id'],
+            'parent_txn_id' => $this->orderInfo['id'],
             'num_cart_items' => $num_cart_items,
             'mc_gross' => $payment['amount']['value'],
             'notify_version' => self::CURRENT_VERSION,
             'date_added' => Helpers::convertPayPalDatePay2Db($payment['create_time']),
             'last_modified' => Helpers::convertPayPalDatePay2Db($payment['update_time']),
+            'expiration_time' => $expiration_time,
         ];
         $sql_data_array = array_merge($sql_data_array, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);
@@ -912,208 +813,263 @@ class paypalr extends base
         return false;
     }
 
-  /**
-   * Used to submit a refund for a given transaction.  FOR FUTURE USE.
-   * @TODO: Add option to specify shipping/tax amounts for refund instead of just total. Ref: https://developer.paypal.com/docs/classic/release-notes/merchant/PayPal_Merchant_API_Release_Notes_119/
-   */
-    public function _doRefund($oID, $amount = 'Full', $note = '')
+    /**
+     * Used to submit a refund for a given payment-capture for an order.
+     */
+    public function _doRefund($oID)
     {
-        global $db, $messageStack;
+        global $messageStack;
 
-        $new_order_status = (int)MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID;
-        $orig_order_amount = 0;
+        $oID = (int)$oID;
 
-        $proceedToRefund = false;
-        $refundNote = strip_tags(zen_db_input($_POST['refnote']));
-        if (isset($_POST['fullrefund']) && $_POST['fullrefund'] === MODULE_PAYMENT_PAYPAL_ENTRY_REFUND_BUTTON_TEXT_FULL) {
-            $refundAmt = 'Full';
-            if (isset($_POST['reffullconfirm']) && $_POST['reffullconfirm'] == 'on') {
-                $proceedToRefund = true;
-            } else {
-                $messageStack->add_session(MODULE_PAYMENT_PAYPALR_TEXT_REFUND_FULL_CONFIRM_ERROR, 'error');
+        if (!isset($_POST['ppr-amount'], $_POST['doRefundOid'], $_POST['capture_txn_id'], $_POST['ppr-refund-note']) || $oID !== (int)$_POST['doRefundOid']) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REFUND_PARAM_ERROR, 1), 'error');
+            return;
+        }
+
+        $ppr_txns = new GetPayPalOrderTransactions($this->code, self::CURRENT_VERSION, $oID, $this->ppr);
+        $ppr_capture_db_txns = $ppr_txns->getDatabaseTxns('CAPTURE');
+        if (count($ppr_capture_db_txns) === 0) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_NO_RECORDS, 'CAPTURE', $oID), 'error');
+            return;
+        }
+
+        $capture_id_txn = false;
+        foreach ($ppr_capture_db_txns as $next_txn) {
+            if ($next_txn['txn_id'] === $_POST['capture_txn_id']) {
+                $capture_id_txn = $next_txn;
+                break;
             }
         }
-        if (isset($_POST['partialrefund']) && $_POST['partialrefund'] === MODULE_PAYMENT_PAYPAL_ENTRY_REFUND_BUTTON_TEXT_PARTIAL) {
-            $refundAmt = (float)$_POST['refamt'];
-            $proceedToRefund = true;
-            if ($refundAmt == 0) {
-                $messageStack->add_session(MODULE_PAYMENT_PAYPALR_TEXT_INVALID_REFUND_AMOUNT, 'error');
-                $proceedToRefund = false;
+        if ($capture_id_txn === false) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REFUND_PARAM_ERROR, 2), 'error');
+            return;
+        }
+
+        $capture_currency = $capture_id_txn['mc_currency'];
+
+        $payer_note = $_POST['ppr-refund-note'];
+        $invoice_id = $ppr_txns->getInvoiceId();
+
+        $full_refund = isset($_POST['ppr-refund-full']);
+        if ($full_refund === true) {
+            $refund_response = $this->ppr->refundCaptureFull($_POST['capture_txn_id'], $invoice_id, $payer_note);
+        } else {
+            $amount = new Amount($capture_currency);
+            $refund_amount = $amount->getValueFromString($_POST['ppr-amount']);
+            $refund_response = $this->ppr->refundCapturePartial($_POST['capture_txn_id'], $capture_currency, $refund_amount, $invoice_id, $payer_note);
+        }
+
+        if ($refund_response === false) {
+            $error_info = $this->ppr->getErrorInfo();
+            $issue = $error_info['details'][0]['issue'] ?? '';
+            switch ($issue) {
+                default:
+                    $error_message = MODULE_PAYMENT_PAYPALR_REFUND_ERROR . "\n" . json_encode($error_info);
+                    break;
             }
+            $messageStack->add_session($error_message, 'error');
+            return;
         }
 
-        // look up history on this order from PayPal table
-        $sql = "SELECT * FROM " . TABLE_PAYPAL . " WHERE order_id = :orderID  AND parent_txn_id = '' ";
-        $sql = $db->bindVars($sql, ':orderID', $oID, 'integer');
-        $zc_ppHist = $db->Execute($sql);
-        if ($zc_ppHist->EOF === true) {
-            return false;
+        $amount_refunded = $refund_response['amount']['value'] . ' ' . $refund_response['amount']['currency_code'];
+        $payer_note = "\n$payer_note";
+
+        $refund_memo = sprintf(MODULE_PAYMENT_PAYPALR_REFUND_MEMO, zen_updated_by_admin(), $amount_refunded) . "\n" . $payer_note;
+        $ppr_txns->addDbTransaction('REFUND', $refund_response, $refund_memo);
+
+        $parent_capture_status = $this->ppr->getCaptureStatus($_POST['capture_txn_id']);
+        if ($parent_capture_status === false) {
+            $messageStack->add_session("Error retrieving capture status:\n" . json_encode($this->ppr->getErrorInfo()), 'warning');
+        } else {
+            $ppr_txns->updateParentTxnDateAndStatus($parent_capture_status);
         }
 
-        $txnID = $zc_ppHist->fields['txn_id'];
-        $curCode = $zc_ppHist->fields['mc_currency'];
-        $PFamt = $zc_ppHist->fields['mc_gross'];
-        if ($refundAmt == 'Full') {
-            $refundAmt = $PFamt;
+        $ppr_txns->updateMainTransaction($refund_response);
+
+        $comments =
+            'REFUNDED. Trans ID: ' . $refund_response['id'] . "\n" .
+            'Amount: ' . $amount_refunded . "\n" .
+            $payer_note;
+
+        if (($capture_id_txn['mc_gross'] . ' ' . $capture_currency) !== $refund_amount) {
+            $capture_status = -1;
+        } else {
+            $refund_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;   //-FIXME:  There might be multiple captures to be refunded
+            $refund_status = ($order_status > 0) ? $order_status : 2;
         }
+        zen_update_orders_history($oID, $comments, null, $refund_status, 0);
 
-        /**
-         * Submit refund request to PayPal
-         */
-        if ($proceedToRefund === false) {
-            return false;
-        }
-
-        $response = $doPayPal->RefundTransaction($oID, $txnID, $refundAmt, $refundNote, $curCode);
-
-        $error = $this->_errorHandler($response, 'DoRefund');
-        $new_order_status = ($new_order_status > 0 ? $new_order_status : 1);
-        if ($error === false) {
-            if (!isset($response['GROSSREFUNDAMT'])) {
-                $response['GROSSREFUNDAMT'] = $refundAmt;
-            }
-
-            // Success, so save the results
-            $comments =
-                'REFUND INITIATED. Trans ID:' .
-                $response['REFUNDTRANSACTIONID'] .
-                ($response['PNREF'] ?? '') . "\n" .
-                ' Gross Refund Amt: ' . urldecode($response['GROSSREFUNDAMT']) .
-                (isset($response['PPREF']) ? "\nPPRef: " . $response['PPREF'] : '') . "\n" .
-                $refundNote;
-            zen_update_orders_history($oID, $comments, null, $new_order_status, 0);
-
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_REFUND_INITIATED, urldecode($response['GROSSREFUNDAMT']), urldecode($response['REFUNDTRANSACTIONID']) . $response['PNREF'] ?? ''), 'success');
-            return true;
-        }
-        return false;
+        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REFUND_COMPLETE, $oID), 'success');
     }
 
     /**
      * Used to re-authorize a previously-created transaction, possibly changing the
      * authorized value.
      */
-    public function _doAuth($oID, $amt, $currency = 'USD')
+    public function _doAuth($oID, $order_amt, $currency = 'USD')
     {
-        global $messageStack;
+        global $db, $messageStack;
 
-        $module_name = '<em>' . $this->code . '</em>';
         $oID = (int)$oID;
 
-        if (!isset($_POST['ppr-amount'], $_POST['doAuthOid']) || $oID !== (int)$_POST['doAuthOid']) {
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_PARAM_ERROR, $module_name), 'error');
+        if (!isset($_POST['ppr-amount'], $_POST['doAuthOid'], $_POST['auth_txn_id']) || $oID !== (int)$_POST['doAuthOid']) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_PARAM_ERROR, 1), 'error');
             return;
         }
 
-        $ppr_txns = new GetTransactions($this->code, self::CURRENT_VERSION, $oID, $this->ppr);
+        $ppr_txns = new GetPayPalOrderTransactions($this->code, self::CURRENT_VERSION, $oID, $this->ppr);
         $ppr_db_txns = $ppr_txns->getDatabaseTxns('AUTHORIZE');
         if (count($ppr_db_txns) === 0) {
             $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_NO_RECORDS, 'AUTHORIZE', $oID), 'error');
             return;
         }
 
-        $auth_amount = number_format((float)$_POST['ppr-amount'], 2, '.', '');
-        $first_authorization = reset($ppr_db_txns);
-        $auth_currency = $first_authorization['mc_currency'];
-        $auth_txn_id = $first_authorization['txn_id'];
-        $auth_response = $this->ppr->reAuthorizePayment($auth_txn_id, $auth_currency, $auth_amount);
+        $auth_id_txn = false;
+        foreach ($ppr_txns as $next_txn) {
+            if ($next_txn_id === $_POST['auth_txn_id']) {
+                $auth_id_txn = $next_txn;
+                break;
+            }
+        }
+        if ($auth_id_txn === false) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_PARAM_ERROR, 2), 'error');
+            return;
+        }
 
+        $auth_currency = $auth_id_txn['mc_currency'];
+        $amount = new Amount($auth_currency);
+        $auth_amount = $amount->getAmountFromString($_POST['ppr-amount']);
+
+        $auth_response = $this->ppr->reAuthorizePayment($_POST['auth_txn_id'], $auth_currency, $auth_amount);
         if ($auth_response === false) {
-             $messageStack->add_session(MODULE_PAYMENT_PAYPALR_REAUTH_ERROR . "\n" . json_encode($this->ppr->getErrorInfo()), 'error');
-             return;
+            $error_info = $this->ppr->getErrorInfo();
+            $issue = $error_info['details'][0]['issue'] ?? '';
+            switch ($issue) {
+                case 'REAUTHORIZATION_TOO_SOON':
+                    $error_message = MODULE_PAYMENT_PAYPALR_REAUTH_TOO_SOON;
+                    break;
+                default:
+                    $error_message = MODULE_PAYMENT_PAYPALR_REAUTH_ERROR . "\n" . json_encode($error_info);
+                    break;
+            }
+            $messageStack->add_session($error_message, 'error');
+            return;
         }
 
         $amount = $auth_response['amount']['value'] . ' ' . $auth_response['amount']['currency_code'];
         $reauth_memo = sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_MEMO, zen_updated_by_admin(), $amount);
         $ppr_txns->addDbTransaction('AUTHORIZE', $auth_response, $reauth_memo);
-        $ppr_txns->updateMainTransaction($oID, $auth_response, $reauth_memo);
+        $ppr_txns->updateMainTransaction($auth_response);
 
+        // -----
+        // A re-authorization transaction, for whatever reason, doesn't return its 'parent'
+        // transaction id (the authorization just updated) in its response.  To keep the
+        // parent/child chain valid in the database, update the just-created re-authorization
+        // to reflect its parent authorization.
+        //
+        $db->Execute(
+            "UPDATE " . TABLE_PAYPAL . "
+                SET parent_txn_id = '" . $_POST['auth_txn_id'] . "'
+              WHERE txn_id = '" . $auth_response['id'] . "'
+              LIMIT 1"
+        );
+
+        // -----
+        // A re-authorization doesn't change an order's status.  Write an orders-history
+        // record containing information for the admin's hidden view.
+        //
         $comments =
             'AUTHORIZATION ADDED. Trans ID: ' . $auth_response['id'] . "\n" .
             'Amount: ' . $amount;
-        zen_update_orders_history($oID, $comments, null, (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID, -1);
+        zen_update_orders_history($oID, $comments);
 
         $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_COMPLETE, $amount), 'success');
     }
 
     /**
-     * Used to capture part or all of a given previously-authorized transaction.  FOR FUTURE USE.
-     * (alt value for $captureType = 'NotComplete')
+     * Used to capture part or all of a given previously-authorized transaction.  A capture is
+     * performed against the most recent authorization (or re-authorization).
      */
-    public function _doCapt($oID, $captureType = 'Complete', $amt = 0, $currency = 'USD', $note = '')
+    public function _doCapt($oID, $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
     {
         global $db, $messageStack;
 
-        //@TODO: Read current order status and determine best status to set this to
-        $new_order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+        $oID = (int)$oID;
 
-        $orig_order_amount = 0;
-        $proceedToCapture = false;
-        $captureNote = strip_tags(zen_db_input($_POST['captnote']));
-        if (isset($_POST['captfullconfirm']) && $_POST['captfullconfirm'] == 'on') {
-            $proceedToCapture = true;
-        } else {
-            $messageStack->add_session(MODULE_PAYMENT_PAYPALR_TEXT_CAPTURE_FULL_CONFIRM_ERROR, 'error');
+        if (!isset($_POST['ppr-amount'], $_POST['doCaptOid'], $_POST['auth_txn_id'], $_POST['ppr-capt-note']) || $oID !== (int)$_POST['doCaptOid']) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_CAPTURE_PARAM_ERROR, 1), 'error');
+            return;
         }
-        if (isset($_POST['captfinal']) && $_POST['captfinal'] === 'on') {
-            $captureType = 'Complete';
-        } else {
-            $captureType = 'NotComplete';
+
+        $ppr_txns = new GetPayPalOrderTransactions($this->code, self::CURRENT_VERSION, $oID, $this->ppr);
+        $ppr_auth_db_txns = $ppr_txns->getDatabaseTxns('AUTHORIZE');
+        if (count($ppr_auth_db_txns) === 0) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_NO_RECORDS, 'AUTHORIZE', $oID), 'error');
+            return;
         }
-        if (isset($_POST['btndocapture']) && $_POST['btndocapture'] === MODULE_PAYMENT_PAYPALR_ENTRY_CAPTURE_BUTTON_TEXT_FULL) {
-            $captureAmt = (float)$_POST['captamt'];
-            if ($captureAmt == 0) {
-                $messageStack->add_session(MODULE_PAYMENT_PAYPALR_TEXT_INVALID_CAPTURE_AMOUNT, 'error');
-                $proceedToCapture = false;
+
+        $auth_id_txn = false;
+        foreach ($ppr_auth_db_txns as $next_txn) {
+            if ($next_txn['txn_id'] === $_POST['auth_txn_id']) {
+                $auth_id_txn = $next_txn;
+                break;
             }
         }
-
-        // look up history on this order from PayPal table
-        $sql = "SELECT * FROM " . TABLE_PAYPAL . " WHERE order_id = :orderID  AND parent_txn_id = '' ";
-        $sql = $db->bindVars($sql, ':orderID', $oID, 'integer');
-        $zc_ppHist = $db->Execute($sql);
-        if ($zc_ppHist->EOF === true) {
-            return false;
+        if ($auth_id_txn === false) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_PARAM_ERROR, 2), 'error');
+            return;
         }
-        $txnID = $zc_ppHist->fields['txn_id'];
 
-        /**
-         * Submit capture request to PayPal
-         */
-        if ($proceedToCapture === true) {
-            $response = $doPayPal->DoCapture($txnID, $captureAmt, $currency, $captureType, '', $captureNote);
+        $capt_currency = $auth_id_txn['mc_currency'];
+        $amount = new Amount($capt_currency);
+        $capt_amount = $amount->getValueFromString($_POST['ppr-amount']);
+        $payer_note = $_POST['ppr-capt-note'];
+        $final_capture = isset($_POST['final_capture']);
 
-            $error = $this->_errorHandler($response, 'DoCapture');
-            $new_order_status = ($new_order_status > 0 ? $new_order_status : 1);
-            if ($error === false) {
-                if (isset($response['PNREF'])) {
-                    if (!isset($response['AMT'])) {
-                        $response['AMT'] = $captureAmt;
-                    }
-                    if (!isset($response['ORDERTIME'])) {
-                        $response['ORDERTIME'] = date("M-d-Y h:i:s");
-                    }
-                }
-                // Success, so save the results
-                $comments =
-                    'FUNDS CAPTURED. Trans ID: ' . urldecode($response['TRANSACTIONID']) .
-                    ($response['PNREF'] ?? '') . "\n" .
-                    ' Amount: ' . urldecode($response['AMT']) . ' ' .
-                    $currency . "\n" .
-                    'Time: ' . urldecode($response['ORDERTIME']) . "\n" .
-                    'Auth Code: ' . (!empty($response['AUTHCODE']) ? $response['AUTHCODE'] : $response['CORRELATIONID']) .
-                    (isset($response['PPREF']) ? "\nPPRef: " . $response['PPREF'] : '') . "\n" .
-                    $captureNote;
-                zen_update_orders_history($oID, $comments, null, $new_order_status, 0);
-
-                $messageStack->add_session(
-                    sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CAPT_INITIATED, urldecode($response['AMT']), urldecode(!empty($response['AUTHCODE']) ? $response['AUTHCODE'] : $response['CORRELATIONID']). $response['PNREF'] ?? ''),
-                    'success'
-                );
-                return true;
+        $capture_response = $this->ppr->capturePayment($_POST['auth_txn_id'], $capt_currency, $capt_amount, $ppr_txns->getInvoiceId(), $payer_note, $final_capture);
+        if ($capture_response === false) {
+            $error_info = $this->ppr->getErrorInfo();
+            $issue = $error_info['details'][0]['issue'] ?? '';
+            switch ($issue) {
+                default:
+                    $error_message = MODULE_PAYMENT_PAYPALR_CAPTURE_ERROR . "\n" . json_encode($error_info);
+                    break;
             }
+            $messageStack->add_session($error_message, 'error');
+            return;
         }
-        return false;
+
+        $amount = $capture_response['amount']['value'] . ' ' . $capture_response['amount']['currency_code'];
+        $payer_note = "\n$payer_note";
+
+        $capture_memo_message = ($final_capture === true) ? MODULE_PAYMENT_PAYPALR_FINAL_CAPTURE_MEMO : MODULE_PAYMENT_PAYPALR_PARTIAL_CAPTURE_MEMO;
+        $capture_memo = sprintf($capture_memo_message, zen_updated_by_admin(), $amount) . "\n" . $payer_note;
+        $ppr_txns->addDbTransaction('CAPTURE', $capture_response, $capture_memo);
+
+        $parent_auth_status = $this->ppr->getAuthorizationStatus($_POST['auth_txn_id']);
+        if ($parent_auth_status === false) {
+            $messageStack->add_session("Error retrieving authorization status:\n" . json_encode($this->ppr->getErrorInfo()), 'warning');
+        } else {
+            $ppr_txns->updateParentTxnDateAndStatus($parent_auth_status);
+        }
+
+        $ppr_txns->updateMainTransaction($capture_response);
+
+        $comments =
+            'FUNDS CAPTURED. Trans ID: ' . $capture_response['id'] . "\n" .
+            "Amount: $amount\n" .
+            $payer_note;
+
+        if ($final_capture === false) {
+            $capture_status = -1;
+        } else {
+            $capture_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+            $capture_status = ($order_status > 0) ? $order_status : 2;
+        }
+        zen_update_orders_history($oID, $comments, null, $capture_status, 0);
+
+        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_CAPTURE_COMPLETE, $oID), 'success');
     }
 
     /**
@@ -1123,7 +1079,7 @@ class paypalr extends base
      * history and any request to retrieve the order's PayPal status will result
      * a RESOURCE_NOT_FOUND (404) error!
      */
-    public function _doVoid($oID, $note = '')
+    public function _doVoid($oID)
     {
         global $db, $messageStack;
 
@@ -1131,33 +1087,53 @@ class paypalr extends base
         $module_name = '<em>' . $this->code . '</em>';
 
         if (!isset($_POST['ppr-void-id'], $_POST['doVoidOid'], $_POST['ppr-void-note']) || $oID !== (int)$_POST['doVoidOid']) {
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_VOID_PARAM_ERROR, $module_name), 'error');
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_VOID_PARAM_ERROR, 1), 'error');
             return;
         }
 
-        $ppr_txns = new GetTransactions($this->code, self::CURRENT_VERSION, $oID, $this->ppr);
+        $ppr_txns = new GetPayPalOrderTransactions($this->code, self::CURRENT_VERSION, $oID, $this->ppr);
         $ppr_db_txns = $ppr_txns->getDatabaseTxns('AUTHORIZE');
         if (count($ppr_db_txns) === 0) {
             $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_NO_RECORDS, 'AUTHORIZE', $oID), 'error');
             return;
         }
 
-        $last_auth_txn = end($ppr_db_txns);
-        if ($last_auth_txn['txn_id'] !== $_POST['ppr-void-id']) {
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_VOID_INVALID_TXN_ID, zen_output_string_protected($_POST['ppr-void-id'])), 'error');
+        $auth_id_txn = false;
+        foreach ($ppr_txns as $next_txn) {
+            if ($next_txn_id === $_POST['ppr-void-id']) {
+                $auth_id_txn = $next_txn;
+                break;
+            }
+        }
+        if ($auth_id_txn === false) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_VOID_PARAM_ERROR, 2), 'error');
             return;
         }
 
-        $void_response = $this->ppr->voidPayment($last_auth_txn['txn_id']);
+        $void_response = $this->ppr->voidPayment($_POST['ppr-void-id']);
         if ($void_response === false) {
              $messageStack->add_session(MODULE_PAYMENT_PAYPALR_VOID_ERROR . "\n" . json_encode($this->ppr->getErrorInfo()), 'error');
              return;
         }
 
+        // -----
+        // Note: An authorization void returns *no additional information*, with a 204 http-code.
+        // Simply update this authorization's status to indicate that it's been voided.
+        //
         $void_memo = sprintf(MODULE_PAYMENT_PAYPALR_VOID_MEMO, zen_updated_by_admin()) . "\n\n";
         $void_note = strip_tags($_POST['ppr-void-note']);
-        $ppr_txns->addDbTransaction('VOID', $void_response, $void_memo . $void_note);
-        $ppr_txns->updateMainTransaction($oID, $void_response, $void_memo . $void_note);
+        $modification_date = Helpers::convertPayPalDatePay2Db($void_response['update_time']);
+        $memo = zen_db_input("\n$modification_date: $void_memo$void_note");
+        $db->Execute(
+            "UPDATE " . TABLE_PAYPAL . "
+                SET last_modified = '$modification_date',
+                    payment_status = 'VOIDED',
+                    notify_version = '" . $this->moduleVersion . "',
+                    memo = CONCAT(IFNULL(memo, ''), '$memo'),
+                    last_updated = now()
+              WHERE paypal_ipn_id = " . $auth_id_txn['paypal_ipn_id'] . "
+              LIMIT 1"
+        );
 
         $comments =
             'VOIDED. Trans ID: ' . $last_auth_txn['txn_id'] . "\n" .
@@ -1171,116 +1147,21 @@ class paypalr extends base
     }
 
     /**
-     * Determine the language to use when redirecting to the PayPal site
-     * Order of selection: locale for current language, current-language-code, delivery-country, billing-country, store-country
-     */
-    public function getLanguageCode($mode = 'ec')
-    {
-        global $order, $locales, $lng;
-
-        if (!isset($lng) || !is_object($lng)) {
-            $lng = new language;
-        }
-        $allowed_country_codes = ['US', 'AU', 'DE', 'FR', 'IT', 'GB', 'ES', 'AT', 'BE', 'CA', 'CH', 'CN', 'NL', 'PL', 'PT', 'BR', 'RU'];
-        $allowed_language_codes = ['da_DK', 'he_IL', 'id_ID', 'ja_JP', 'no_NO', 'pt_BR', 'ru_RU', 'sv_SE', 'th_TH', 'tr_TR', 'zh_CN', 'zh_HK', 'zh_TW'];
-
-        if ($mode === 'incontext') {
-            $additional_language_codes = ['de_DE', 'en_AU', 'en_GB', 'en_US', 'es_ES', 'fr_CA', 'fr_FR', 'it_IT', 'nl_NL', 'pl_PL', 'pt_PT'];
-            $allowed_language_codes = array_merge($allowed_language_codes, $additional_language_codes);
-            $allowed_country_codes = [];
-        }
-
-        $lang_code = '';
-        $user_locale_info = [];
-        if (isset($locales) && is_array($locales)) {
-            $user_locale_info = $locales;
-        }
-
-        $lng->get_browser_language();
-        array_unshift($user_locale_info, $lng->language['code']);
-
-        $user_locale_info[] = strtoupper($_SESSION['languages_code']);
-
-        if (isset($order->delivery['country']['id'])) {
-            $shippingISO = zen_get_countries_with_iso_codes($order->delivery['country']['id']);
-            $user_locale_info[] = strtoupper($shippingISO['countries_iso_code_2']);
-        }
-
-        if (isset($order->billing['country']['id'])) {
-            $billingISO = zen_get_countries_with_iso_codes($order->billing['country']['id']);
-            $user_locale_info[] = strtoupper($billingISO['countries_iso_code_2']);
-        }
-
-        if (isset($order->customer['country']['id'])) {
-            $custISO = zen_get_countries_with_iso_codes($order->customer['country']['id']);
-            $user_locale_info[] = strtoupper($custISO['countries_iso_code_2']);
-        }
-
-        $storeISO = zen_get_countries_with_iso_codes(STORE_COUNTRY);
-        $user_locale_info[] = strtoupper($storeISO['countries_iso_code_2']);
-
-        $to_match = array_map('strtoupper', array_merge($allowed_country_codes, $allowed_language_codes));
-        foreach ($user_locale_info as $val) {
-            if (in_array(strtoupper($val), $to_match)) {
-                if (strtoupper($val) === 'EN') {
-                    $val = (isset($locales) && $locales[0] === 'en_GB') ? 'GB' : 'US';
-                }
-                return $val;
-            }
-        }
-        return '';
-    }
-
-  /**
-   * Set the state field depending on what PayPal requires for that country.
-   * The shipping address state or province is required if the address is in one of the following countries: Argentina, Brazil, Canada, China, Indonesia, India, Japan, Mexico, Thailand, USA
-   * https://developer.paypal.com/docs/classic/api/state_codes/
-   */
-  function setStateAndCountry(&$info) {
-    global $db, $messageStack;
-    switch ($info['country']['iso_code_2']) {
-      case 'AU':
-      case 'US':
-      case 'CA':
-      // Paypal only accepts two character state/province codes for some countries.
-      if (strlen($info['state']) > 2) {
-        $sql = "SELECT zone_code FROM " . TABLE_ZONES . " WHERE zone_name = :zoneName";
-        $sql = $db->bindVars($sql, ':zoneName', $info['state'], 'string');
-        $state = $db->Execute($sql);
-        if (!$state->EOF) {
-          $info['state'] = $state->fields['zone_code'];
-        } else {
-          $messageStack->add_session('header', MODULE_PAYMENT_PAYPALR_TEXT_STATE_ERROR, 'error');
-          $this->terminateEC(MODULE_PAYMENT_PAYPALR_TEXT_STATE_ERROR);
-        }
-      }
-      break;
-      case 'AT':
-      case 'BE':
-      case 'FR':
-      case 'DE':
-      case 'CH':
-      $info['state'] = '';
-      break;
-      case 'GB':
-      break;
-      default:
-      $info['state'] = '';
-    }
-  }
-
-    /**
      * Evaluate installation status of this module. Returns true if the status key is found.
      */
-    public function check()
+    public function check(): bool
     {
         global $db;
 
         if (!isset($this->_check)) {
-          $check_query = $db->Execute("SELECT configuration_value FROM " . TABLE_CONFIGURATION . " WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_STATUS' LIMIT 1");
-          $this->_check = !$check_query->EOF;
+            $check_query = $db->Execute(
+                "SELECT configuration_value
+                   FROM " . TABLE_CONFIGURATION . "
+                  WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_STATUS'
+                  LIMIT 1"
+            );
+            $this->_check = !$check_query->EOF;
         }
-
         return $this->_check;
     }
 
@@ -1289,7 +1170,7 @@ class paypalr extends base
      */
     public function install()
     {
-        global $db;
+        global $db, $sniffer;
 
         $amount = new Amount();
         $supported_currencies = $amount->getSupportedCurrencyCodes();
@@ -1337,6 +1218,52 @@ class paypalr extends base
 
                 ('Debug Mode', 'MODULE_PAYMENT_PAYPALR_DEBUGGING', 'Off', 'Would you like to enable debug mode?  A complete detailed log of failed transactions will be emailed to the store owner.', 6, 0, 'zen_cfg_select_option([\'Off\', \'Alerts Only\', \'Log File\', \'Log and Email\'], ', NULL, now())"
         );
+
+        // -----
+        // Make any modifications to the 'paypal' table, if not already done.
+        //
+        // 1. Adding an order's re-authorize time limit, so it's always available.
+        //
+        if ($sniffer->field_exists(TABLE_PAYPAL, 'expiration_time') === false) {
+            $db->Execute(
+                "ALTER TABLE " . TABLE_PAYPAL . "
+                   ADD expiration_time datetime default NULL AFTER date_added"
+            );
+        }
+
+        // -----
+        // 2. Increasing the number of characters in 'notify_version' (was varchar(6) NOT NULL default '')
+        // since the payment-module's version will be stored there.
+        //
+        if ($sniffer->field_type(TABLE_PAYPAL, 'notify_version', 'varchar(20)') === false) {
+            $db->Execute(
+                "ALTER TABLE " . TABLE_PAYPAL . "
+                   MODIFY notify_version varchar(20) NOT NULL default ''"
+            );
+        }
+
+        // -----
+        // 3. Adding a final_capture flag (0/1) for use in the payment module's admin
+        // notifications handling.
+        //
+        if ($sniffer->field_exists(TABLE_PAYPAL, 'final_capture') === false) {
+            $db->Execute(
+                "ALTER TABLE " . TABLE_PAYPAL . "
+                   ADD final_capture tinyint(1) NOT NULL default 0 AFTER txn_type"
+            );
+        }
+
+        // -----
+        // 4. Increasing the number of characters in 'pending_reason' (was varchar(32) default NULL)
+        // since some of the status_details::reason codes, e.g. RECEIVING_PREFERENCE_MANDATES_MANUAL_ACTION,
+        // won't fit and result in a MySQL error otherwise.
+        //
+        if ($sniffer->field_type(TABLE_PAYPAL, 'pending_reason', 'varchar(64)') === false) {
+            $db->Execute(
+                "ALTER TABLE " . TABLE_PAYPAL . "
+                   MODIFY pending_reason varchar(64) default NULL"
+            );
+        }
 
         $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
     }
