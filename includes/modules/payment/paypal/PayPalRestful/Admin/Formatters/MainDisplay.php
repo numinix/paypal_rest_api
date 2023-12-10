@@ -688,7 +688,7 @@ class MainDisplay
         $column_count = count(self::$paymentTableFields);
         if ($data === '') {
             return
-                "<tr class=\"dataTableRow\ ppr-no-payments\">\n" .
+                "<tr class=\"dataTableRow ppr-no-payments\">\n" .
                     "<td class=\"dataTableContents text-center\" colspan=\"$column_count\">" . MODULE_PAYMENT_PAYPALR_PAYMENTS_NONE . "</td>\n" .
                 "</tr>\n";
         }
