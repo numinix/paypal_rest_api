@@ -1256,12 +1256,23 @@ class paypalr extends base
         // -----
         // 4. Increasing the number of characters in 'pending_reason' (was varchar(32) default NULL)
         // since some of the status_details::reason codes, e.g. RECEIVING_PREFERENCE_MANDATES_MANUAL_ACTION,
-        // won't fit and result in a MySQL error otherwise.
+        // won't fit and will result in a MySQL error otherwise.
         //
         if ($sniffer->field_type(TABLE_PAYPAL, 'pending_reason', 'varchar(64)') === false) {
             $db->Execute(
                 "ALTER TABLE " . TABLE_PAYPAL . "
                    MODIFY pending_reason varchar(64) default NULL"
+            );
+        }
+
+        // -----
+        // 5. Increasing the number of decimal digits in 'exchange_rate' (was decimal(15,4) default NULL)
+        // to increase accuracy of currency conversions.
+        //
+        if ($sniffer->field_type(TABLE_PAYPAL, 'exchange_rate', 'decimal(15,6)') === false) {
+            $db->Execute(
+                "ALTER TABLE " . TABLE_PAYPAL . "
+                   MODIFY exchange_rate decimal(15,6) default NULL"
             );
         }
 

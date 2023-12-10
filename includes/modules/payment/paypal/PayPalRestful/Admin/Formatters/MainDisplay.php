@@ -590,7 +590,7 @@ class MainDisplay
 
         $data = '';
         foreach ($this->paypalDbTxns as $next_txn) {
-            if ($next_txn['settle_amount'] === null) {
+            if ($next_txn['txn_type'] === 'CREATE' || $next_txn['settle_amount'] === null) {
                 continue;
             }
 
@@ -605,6 +605,11 @@ class MainDisplay
                 if (isset($next_field['is_amount']) && $value !== null) {
                     $value = $this->amount->getValueFromString($value);
                 }
+
+                // -----
+                // Determine the currency in which the payment/refund was placed.
+                //
+                $mc_currency = $next_txn['mc_currency'];
 
                 // -----
                 // Calculations for the current PayPal settled amounts.
@@ -625,7 +630,7 @@ class MainDisplay
                     // if present.
                     //
                     case 'mc_gross':
-                        $value .= ' ' . $next_txn['mc_currency'];
+                        $value .= ' ' . $mc_currency;
                         break;
 
                     // -----
@@ -633,7 +638,7 @@ class MainDisplay
                     //
                     case 'payment_fee':
                         $paypal_fees_total += $value;
-                        $value .= ' ' . $next_txn['settle_currency'];
+                        $value .= ' ' . $mc_currency;
                         break;
 
                     // -----
@@ -647,7 +652,7 @@ class MainDisplay
                         } else {
                             $paypal_gross_total += $value;
                         }
-                        $value .= ' ' . $next_txn['settle_currency'];
+                        $value .= ' ' . $mc_currency;
                         break;
 
                     // -----
