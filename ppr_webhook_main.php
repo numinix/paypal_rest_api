@@ -11,19 +11,19 @@ use PayPalRestful\Common\Logger;
 $op = $_GET['op'] ?? '';
 
 if (($op !== 'cancel' && $op !== 'return') || !isset($_GET['token'], $_SESSION['PayPalRestful']['Order']['id']) || $_GET['token'] !== $_SESSION['PayPalRestful']['Order']['id']) {
-        zen_redirect(zen_href_link(FILENAME_DEFAULT));  //- FIXME
+    unset($_SESSION['PayPalRestful']['Order']);
+    zen_redirect(zen_href_link(FILENAME_DEFAULT));  //- FIXME?
 }
 
 if ($op === 'cancel') {
     $messageStack->add_session('checkout', '**FIXME** Cancelled from PayPal payment choice.', 'caution');
-    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
+    zen_redirect(zen_href_link(FILENAME_CHECKOUT_SHIPPING));
 }
 
 $logger = new Logger();
 if (strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false) {
     $logger->enableDebug();
 }
-
 $logger->write('ppr_webhook_main (return) starts.', true, 'before');
 
 require DIR_WS_MODULES . 'payment/paypalr.php';
@@ -32,13 +32,14 @@ require DIR_WS_MODULES . 'payment/paypalr.php';
 $ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret);
 $order_status = $ppr->getOrderStatus($_GET['token']);
 if ($order_status === false) {
+    unset($_SESSION['PayPalRestful']['Order']);
     $logger->write('==> getOrderStatus failed, redirecting to shopping-cart', true, 'after');
     zen_redirect(zen_href_link(FILENAME_SHOPPING_CART));
 }
 
 $_SESSION['PayPalRestful']['Order']['status'] = $order_status['status'];
-$logger->write("Order's status set to {$order_status['status']}; redirecting to checkout_confirmation.", true, 'after');
-zen_redirect(zen_href_link(FILENAME_CHECKOUT_CONFIRMATION));
+$logger->write("Order's status set to {$order_status['status']}; redirecting to checkout_process.", true, 'after');
+zen_redirect(zen_href_link(FILENAME_CHECKOUT_PROCESS));
 
 // -----
 // Note, redundant as execution will never reach here!

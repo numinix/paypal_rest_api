@@ -351,7 +351,9 @@ class MainDisplay
         $days_to_settle = Helpers::getDaysTo($last_authorization['expiration_time']);
 
         $original_auth_value = $this->amount->getValueFromString($first_authorization['mc_gross']);
-        $maximum_auth_value = $this->amount->getValueFromFloat($original_auth_value * 1.15);
+        $currency_decimals = $this->amount->getCurrencyDecimals();
+        $multiplier = ($currency_decimals === 0) ? 1 : 100;
+        $maximum_auth_value = $this->amount->getValueFromFloat(floor($original_auth_value * 1.15 * $multiplier) / $multiplier);
         $amount_input_params = 'type="number" min="1" max="' . $maximum_auth_value . '" step="0.01"';
         $amount_help_text = sprintf(MODULE_PAYMENT_PAYPALR_AMOUNT_RANGE, $this->currencyCode, $maximum_auth_value);
 

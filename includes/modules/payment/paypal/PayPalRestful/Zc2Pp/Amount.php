@@ -78,6 +78,14 @@ class Amount
         return $this->amount;
     }
 
+    public function getCurrencyDecimals(string $currency_code = ''): int
+    {
+        if ($currency_code === '') {
+            $currency_code = $this->amount['currency_code'];
+        }
+        return (isset(self::$supportedCurrencyCodes[$currency_code]['no_decimals'])) ? 0 : 2;
+    }
+
     public function setDefaultCurrency(string $currency_code)
     {
         if (in_array($currency_code, $this->getSupportedCurrencyCodes())) {

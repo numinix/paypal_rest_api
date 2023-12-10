@@ -926,8 +926,8 @@ class paypalr extends base
         }
 
         $auth_id_txn = false;
-        foreach ($ppr_txns as $next_txn) {
-            if ($next_txn_id === $_POST['auth_txn_id']) {
+        foreach ($ppr_db_txns as $next_txn) {
+            if ($next_txn['txn_id'] === $_POST['auth_txn_id']) {
                 $auth_id_txn = $next_txn;
                 break;
             }
@@ -939,7 +939,7 @@ class paypalr extends base
 
         $auth_currency = $auth_id_txn['mc_currency'];
         $amount = new Amount($auth_currency);
-        $auth_amount = $amount->getAmountFromString($_POST['ppr-amount']);
+        $auth_amount = $amount->getValueFromString($_POST['ppr-amount']);
 
         $auth_response = $this->ppr->reAuthorizePayment($_POST['auth_txn_id'], $auth_currency, $auth_amount);
         if ($auth_response === false) {
