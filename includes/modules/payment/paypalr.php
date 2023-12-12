@@ -125,13 +125,19 @@ class paypalr extends base
      * @var object PayPalRestfulApi
      */
     protected PayPalRestfulApi $ppr;
-    
+
     /**
      * An array (set by before_process) containing the captured/authorized order's
      * PayPal response information, for use by after_order_create to populate the
      * paypal table's record once the associated order's ID is known.
      */
     protected array $orderInfo = [];
+
+    /**
+     * An array (set by validateCardInformation) containing the card-related information
+     * to be sent to PayPal for a 'card' transaction.
+     */
+    private array $ccInfo = [];
 
     /**
      * class constructor
@@ -383,7 +389,26 @@ class paypalr extends base
      */
     public function javascript_validation()
     {
-        return false;
+        return
+            'if (payment_value == "' . $this->code . '") {' . "\n" .
+                'if (document.checkout_payment.ppr_type.value === "card") {' . "\n" .
+                    'var cc_owner = document.checkout_payment.ppr_cc_owner.value;' . "\n" .
+                    'var cc_number = document.checkout_payment.ppr_cc_number.value;' . "\n" .
+                    'var cc_cvv = document.checkout_payment.ppr_cc_cvv.value;' . "\n" .
+                    'if (cc_owner == "" || eval(cc_owner.length) < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
+                        'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
+                        'error = 1;' . "\n" .
+                    '}' . "\n" .
+                    'if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
+                        'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
+                        'error = 1;' . "\n" .
+                    '}' . "\n" .
+                    'if (cc_cvv == "" || cc_cvv.length < 3 || cc_cvv.length > 4) {' . "\n".
+                        'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_CVV . '";' . "\n" .
+                        'error = 1;' . "\n" .
+                    '}' . "\n" .
+                '}' . "\n" .
+            '}' . "\n";
     }
 
     /**
@@ -393,6 +418,8 @@ class paypalr extends base
      */
     public function selection(): array
     {
+        global $order, $zcDate;
+
         // -----
         // Determine which color button to use.
         //
@@ -402,57 +429,86 @@ class paypalr extends base
         // -----
         // Return the PayPal selection as a button
         //
+/*
         return [
             'id' => $this->code,
             'module' => '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">',
+        ];
+*/
+        // -----
+        // Create dropdowns for the credit-card's expiry year and month
+        //
+        $expires_month = [];
+        $expires_year = [];
+        for ($month = 1; $month < 13; $month++) {
+            $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => $zcDate->output('%B - (%m)', mktime(0, 0, 0, $month, 1, 2000))];
+        }
+        $this_year = date('Y');
+        for ($year = $this_year; $year < $this_year + 15; $year++) {
+            $expires_year[] = ['id' => $year, 'text' => $year];
+        }
+
+        $ppr_cc_owner_id = $this->code . '-cc-owner';
+        $ppr_cc_number_id = $this->code . '-cc-number';
+        $ppr_cc_expires_year_id = $this->code . '-cc-expires-year';
+        $ppr_cc_expires_month_id = $this->code . '-cc-expires-month';
+        $ppr_cc_cvv_id = $this->code . '-cc-cvv';
+
+        $on_focus = ' onfocus="methodSelect(\'pmt-' . $this->code . '\')"';
+        return [
+            'id' => $this->code,
+            'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE,
+            'fields' => [
+                [
+                    'title' => MODULE_PAYMENT_PALPALR_HOW_TO_PAY,
+                    'field' =>
+                        '<style nonce="">' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css') . '</style>' .
+                        '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>' .
+                        '<ul id="ppr-buttons">' .
+                            '<li>' .
+                                '<input type="radio" class="ppr-choice" id="ppr-paypal" name="ppr_type" value="paypal"' . $on_focus . '>' .
+                                '<label for="ppr-paypal">' .
+                                    '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
+                                '</label>' .
+                            '</li>' .
+                            '<li>' .
+                                '<input type="radio" class="ppr-choice" id="ppr-card" name="ppr_type" value="card"' . $on_focus . '>' .
+                                '<label for="ppr-card">' .
+                                    'Credit Card' .
+                                '</label>' .
+                            '</li>' .
+                        '</ul>',
+                ],
+                [
+                    'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER,
+                    'field' => zen_draw_input_field('ppr_cc_owner', $order->billing['firstname'] . ' ' . $order->billing['lastname'], 'class="ppr-cc" id="' . $ppr_cc_owner_id . '" autocomplete="off"' . $on_focus),
+                    'tag' => $ppr_cc_owner_id,
+                ],
+                [
+                    'title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER,
+                    'field' => zen_draw_input_field('ppr_cc_number', '', 'class="ppr-cc" id="' . $ppr_cc_number_id . '" autocomplete="off"' . $on_focus),
+                    'tag' => $ppr_cc_number_id,
+                ],
+                [
+                    'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
+                    'field' =>
+                        zen_draw_pull_down_menu('ppr_cc_expires_month', $expires_month, $zcDate->output('%m'), 'class="ppr-cc" id="' . $ppr_cc_expires_month_id . '"' . $on_focus) .
+                        '&nbsp;' .
+                        zen_draw_pull_down_menu('ppr_cc_expires_year', $expires_year, '', 'class="ppr-cc" id="' . $ppr_cc_expires_year_id . '"' . $on_focus),
+                    'tag' => $ppr_cc_expires_month_id,
+                ],
+                [
+                    'title' => MODULE_PAYMENT_PAYPALR_CC_CVV,
+                    'field' => zen_draw_input_field('ppr_cc_cvv', '', 'class="ppr-cc" id="' . $ppr_cc_cvv_id . '" autocomplete="off"' . $on_focus),
+                    'tag' => $ppr_cc_cvv_id,
+                ],
+            ],
         ];
     }
 
     protected function resetOrder()
     {
         unset($_SESSION['PayPalRestful']['Order']);
-    }
-
-    protected function createPayPalOrder(): bool
-    {
-        global $order;
-
-        // -----
-        // Build the request for the PayPal order's "Create" or "Update".
-        //
-        $create_order_request = new CreatePayPalOrderRequest($order);
-
-        // -----
-        // Send the request off to register the order at PayPal.
-        //
-        $order_response = $this->ppr->createOrder($create_order_request->get());
-        if ($order_response === false) {
-            $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
-            return false;
-        }
-
-        // -----
-        // Save the created PayPal order in the session and indicate that the
-        // operation was successful.
-        //
-        $paypal_id = $order_response['id'];
-        $status = $order_response['status'];
-        $create_time = $order_response['create_time'];
-        unset(
-            $order_response['id'],
-            $order_response['status'],
-            $order_response['create_time'],
-            $order_response['links'],
-            $order_response['purchase_units'][0]['reference_id'],
-            $order_response['purchase_units'][0]['payee']
-        );
-        $_SESSION['PayPalRestful']['Order'] = [
-            'current' => $order_response,
-            'id' => $paypal_id,
-            'status' => $status,
-            'create_time' => $create_time,
-        ];
-        return true;
     }
 
     // -----
@@ -466,27 +522,24 @@ class paypalr extends base
         $this->log->write("pre_confirmation_check starts ...\n", true, 'before');
 
         // -----
-        // Build the request for the PayPal order's "Create" and send to off to PayPal.
+        // If a card-payment was selected, validate the information entered.  Any
+        // errors detected, the called method will have set the appropriate messages
+        // on the messageStack.
         //
-        $paypal_order_created = $this->createPayPalOrder();
-        if ($paypal_order_created === false) {
-            $this->setMessageAndRedirect("createPayPalOrder failed\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        $ppr_type = 'paypal';
+        if (isset($_POST['ppr_type'])) {
+            $ppr_type = $_POST['ppr_type'];
+            if ($ppr_type === 'card' && $this->validateCardInformation() === false) {
+                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL', true, false));
+            }
         }
 
         // -----
-        // Add an invoice number to the PayPal order, it'll be ZC-{paypal-txn-id}.
+        // Build the request for the PayPal order's "Create" and send to off to PayPal.
         //
-        $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
-        $update_order_invoice = [
-            [
-                'op' => 'add',
-                'path' => "/purchase_units/@reference_id=='default'/invoice_id",
-                'value' => "ZC-$paypal_id",
-            ],
-        ];
-        $order_update_response = $this->ppr->updateOrder($paypal_id, $update_order_invoice);
-        if ($order_update_response === false) {
-            $this->setMessageAndRedirect("updateOrder invoice failed:\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);
+        $paypal_order_created = $this->createPayPalOrder($ppr_type);
+        if ($paypal_order_created === false) {
+            $this->setMessageAndRedirect("createPayPalOrder failed\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);  //- FIXME
         }
 
         $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::WEBHOOK_NAME, $order);
@@ -532,6 +585,134 @@ class paypalr extends base
 
         $this->log->write('pre_confirmation_check, completed.', true, 'after');
     }
+    protected function validateCardInformation(): bool
+    {
+        global $messageStack, $order;
+
+        require DIR_WS_CLASSES . 'cc_validation.php';
+        $cc_validation = new cc_validation();
+        $result = $cc_validation->validate(
+            $_POST['ppr_cc_number'] ?? '',
+            $_POST['ppr_cc_expires_month'] ?? '',
+            $_POST['ppr_cc_expires_year'] ?? ''
+        );
+        switch ((int)$result) {
+            case -1:
+                $error = MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD;
+                if (empty($_POST['ppr_cc_number'])) {
+                    $error = trim(MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER, '* \\n');
+                }
+                break;
+            case -2:
+            case -3:
+            case -4:
+                $error = TEXT_CCVAL_ERROR_INVALID_DATE;
+                break;
+            case 0:
+                $error = TEXT_CCVAL_ERROR_INVALID_NUMBER;
+                break;
+            default:
+                $error = '';
+                break;
+        }
+        if ($error !== '') {
+            $messageStack->add_session('checkout_payment', $error, 'error');
+            return false;
+        }
+
+        $cvv_posted = $_POST['ppr_cc_cvv'] ?? '';
+        $cvv = preg_replace('/[^0-9]/i', '', $cvv_posted);
+        $cvv_length = strlen($cvv);
+        if ($cvv_posted !== $cvv || $cvv_length < 3 || $cvv_length > 4) {
+            $messageStack->add_session('checkout_payment', trim(MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_CVV, '* \\n'), 'error');
+            return false;
+        }
+
+        $cc_owner = $_POST['ppr_cc_owner'] ?? '';
+        if (strlen($cc_owner) < CC_OWNER_MIN_LENGTH) {
+            $messageStack->add_session('checkout_payment', trim(MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER, '* \\n'), 'error');
+            return false;
+        }
+
+        $this->ccInfo = [
+            'type' => $cc_validation->cc_type,
+            'number' => $cc_validation->cc_number,
+            'expiry_month' => $cc_validation->cc_expiry_month,
+            'expiry_year' => $cc_validation->cc_expiry_year,
+            'name' => $cc_owner,
+            'security_code' => $cvv,
+            'webhook' => self::WEBHOOK_NAME,
+        ];
+        return true;
+    }
+    protected function createPayPalOrder(string $ppr_type): bool
+    {
+        global $order;
+
+        // -----
+        // Create a GUID (Globally Unique IDentifier) for the order's
+        // current 'state'.
+        //
+        $order_guid = $this->createOrderGuid($order);
+
+        // -----
+        // If the PayPal order been previously created and the order's GUID
+        // has not changed, the original PayPal order information can
+        // be safely used.
+        //
+        if (isset($_SESSION['PayPalRestful']['Order']['guid']) && $_SESSION['PayPalRestful']['Order']['guid'] === $order_guid) {
+            return true;
+        }
+
+        // -----
+        // Build the request for the PayPal order's "Create" or "Update".
+        //
+        $create_order_request = new CreatePayPalOrderRequest($ppr_type, $order, $this->ccInfo);
+
+        // -----
+        // Send the request off to register the order at PayPal.
+        //
+        $this->ppr->setPayPalRequestId($order_guid);
+        $order_response = $this->ppr->createOrder($create_order_request->get());
+        if ($order_response === false) {
+            $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
+            return false;
+        }
+
+        // -----
+        // Save the created PayPal order in the session and indicate that the
+        // operation was successful.
+        //
+        $paypal_id = $order_response['id'];
+        $status = $order_response['status'];
+        $create_time = $order_response['create_time'];
+        unset(
+            $order_response['id'],
+            $order_response['status'],
+            $order_response['create_time'],
+            $order_response['links'],
+            $order_response['purchase_units'][0]['reference_id'],
+            $order_response['purchase_units'][0]['payee']
+        );
+        $_SESSION['PayPalRestful']['Order'] = [
+            'current' => $order_response,
+            'id' => $paypal_id,
+            'status' => $status,
+            'create_time' => $create_time,
+            'guid' => $order_guid,
+        ];
+        return true;
+    }
+    protected function createOrderGuid(\order $order): string
+    {
+        $hash = hash('sha256', json_encode($order) . json_encode($this->ccInfo));
+        return
+            substr($hash,  0,  8) . '-' .
+            substr($hash,  8,  4) . '-' .
+            substr($hash, 12,  4) . '-' .
+            substr($hash, 16,  4) . '-' .
+            substr($hash, 20, 12);
+    }
 
     /**
      * Display Payment Additional Information for review on the Checkout Confirmation Page
@@ -572,6 +753,7 @@ class paypalr extends base
         }
 
         $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
+        $this->ppr->setPayPalRequestId($_SESSION['PayPalRestful']['Order']['guid']);
         if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') {
             $response = $this->ppr->captureOrder($paypal_id);
         } else {
@@ -1279,7 +1461,7 @@ class paypalr extends base
         $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
     }
 
-    public function keys()
+    public function keys(): array
     {
         return [
             'MODULE_PAYMENT_PAYPALR_STATUS',

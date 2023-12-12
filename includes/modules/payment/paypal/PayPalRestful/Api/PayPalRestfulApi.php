@@ -84,7 +84,7 @@ class PayPalRestfulApi extends ErrorInfo
      */
     private $clientId;
     private $clientSecret;
-    
+
     /**
      * The CURL channel, initialized during construction.
      */
@@ -103,6 +103,21 @@ class PayPalRestfulApi extends ErrorInfo
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 45,
     ];
+
+    /**
+     * Contains the (optional) HTTP Header's PayPal-Request-Id value;
+     * required for payments with a payment_source *other than* paypal
+     * (the default).  See https://developer.paypal.com/api/rest/requests/#http-request-headers
+     * for additional information.
+     */
+    protected string $paypalRequestId = '';
+
+    /**
+     * Contains an (optional) "Mock Response" to be included in the HTTP
+     * header's PayPal-Mock-Response value, enabling testing to be performed
+     * for error responses; see the above link for additional information.
+     */
+    protected string $paypalMockResponse = '';
 
     // -----
     // Class constructor, saves endpoint (live vs. sandbox), clientId and clientSecret
@@ -137,6 +152,16 @@ class PayPalRestfulApi extends ErrorInfo
             curl_close($this->ch);
             $this->ch = false;
         }
+    }
+
+    public function setPayPalRequestId(string $request_id)
+    {
+        $this->paypalRequestId = $request_id;
+    }
+
+    public function setPayPalMockResponse(strong $mock_response)
+    {
+        $this->paypalMockResponse = $mock_response;
     }
 
     // ===== Start Token-required Methods =====
@@ -297,7 +322,7 @@ class PayPalRestfulApi extends ErrorInfo
         return $response;
     }
 
-    // ===== End Non-token Methods =====
+    // ===== End Token-required Methods =====
 
     // ===== Start Token Handling Methods =====
 
@@ -378,6 +403,23 @@ class PayPalRestfulApi extends ErrorInfo
             "Authorization: Bearer $oauth2_token",
             'Prefer: return=representation',
         ];
+
+        // -----
+        // If a PayPal-Request-Id value is set, include that value
+        // in the HTTP header.
+        //
+        if ($this->paypalRequestId !== '') {
+            $curl_options[CURLOPT_HTTPHEADER][] = 'PayPal-Request-Id: ' . $this->paypalRequestId;
+        }
+
+        // -----
+        // If a PayPal-Mock-Response value is set, include that value
+        // in the HTTP header.
+        //
+        if ($this->paypalMockResponse !== '') {
+            $curl_options[CURLOPT_HTTPHEADER][] = 'PayPal-Mock-Response: ' . json_encode(['mock_application_codes' => $this->paypalMockResponse]);
+        }
+
         return $curl_options;
     }
 
