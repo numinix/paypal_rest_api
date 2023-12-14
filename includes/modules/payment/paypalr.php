@@ -29,7 +29,7 @@ use PayPalRestful\Zc2Pp\UpdatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.0.0-beta2';
+    protected const CURRENT_VERSION = '1.0.0-beta3';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
@@ -125,13 +125,30 @@ class paypalr extends base
      * @var object PayPalRestfulApi
      */
     protected PayPalRestfulApi $ppr;
-    
+
     /**
      * An array (set by before_process) containing the captured/authorized order's
      * PayPal response information, for use by after_order_create to populate the
      * paypal table's record once the associated order's ID is known.
      */
     protected array $orderInfo = [];
+
+    /**
+     * An array (set by validateCardInformation) containing the card-related information
+     * to be sent to PayPal for a 'card' transaction.
+     */
+    private array $ccInfo = [];
+    
+    /**
+     * Indicates whether/not credit-card payments are to be accepted during storefront
+     * processing.
+     */
+    protected bool $cardsAccepted = false;
+    
+    /**
+     * Indicates whether/not an otherwise approved payment is pending review.
+     */
+    protected bool $paymentIsPending = false;
 
     /**
      * class constructor
@@ -173,6 +190,15 @@ class paypalr extends base
         $this->order_status = ($order_status > 1) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
 
         $this->zone = (int)MODULE_PAYMENT_PAYPALR_ZONE;
+        
+        // -----
+        // Determine whether credit-card payments are to be accepted on the storefront.
+        //
+        // Note: For this type of payment to be enabled on the storefront:
+        // 1) The payment-method needs to be enabled via configuration.
+        // 2) The site must _either_ be running or the 'sandbox' server or using SSL-encryption.
+        //
+        $this->cardsAccepted = (IS_ADMIN_FLAG === false && MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS === 'true' && (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox' || strpos(HTTP_SERVER, 'https://') === 0));
 
         $this->enabled = (MODULE_PAYMENT_PAYPALR_STATUS === 'True');
         if ($this->enabled === true) {
@@ -185,7 +211,7 @@ class paypalr extends base
                 if ($debug === true) {
                     $this->title .= '<strong> (Debug)</strong>';
                 }
-//                $this->tableCheckup();
+                $this->tableCheckup();
             }
 
             if ($this->enabled === true && is_object($order)) {
@@ -291,6 +317,19 @@ class paypalr extends base
             $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, $error_message);
         }
     }
+    protected function tableCheckup()
+    {
+        global $db;
+
+        $db->Execute(
+            "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+             VALUES
+                ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now()),
+
+                ('Set Held Order Status', 'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID', '1', 'Set the status of orders that are held for review to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now())"
+        );
+    }
 
     /**
      *  Sets payment module status based on zone restrictions etc
@@ -378,12 +417,45 @@ class paypalr extends base
 */
     }
 
+    protected function resetOrder()
+    {
+        unset($_SESSION['PayPalRestful']['Order']);
+    }
+
+    // --------------------------------------------
+    // Issued during the "payment" phase of the checkout process.
+    // --------------------------------------------
+
     /**
-     *  Validate the credit card information via javascript (Number, Owner, and CVV Lengths)
+     * Validate the credit card information via javascript (Number, Owner, and CVV lengths), if
+     * card payments are to be accepted.
      */
     public function javascript_validation()
     {
-        return false;
+        if ($this->cardsAccepted === false) {
+            return '';
+        }
+
+        return
+            'if (payment_value == "' . $this->code . '") {' . "\n" .
+                'if (document.checkout_payment.ppr_type.value === "card") {' . "\n" .
+                    'var cc_owner = document.checkout_payment.ppr_cc_owner.value;' . "\n" .
+                    'var cc_number = document.checkout_payment.ppr_cc_number.value;' . "\n" .
+                    'var cc_cvv = document.checkout_payment.ppr_cc_cvv.value;' . "\n" .
+                    'if (cc_owner == "" || eval(cc_owner.length) < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
+                        'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
+                        'error = 1;' . "\n" .
+                    '}' . "\n" .
+                    'if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
+                        'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
+                        'error = 1;' . "\n" .
+                    '}' . "\n" .
+                    'if (cc_cvv == "" || cc_cvv.length < 3 || cc_cvv.length > 4) {' . "\n".
+                        'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_CVV . '";' . "\n" .
+                        'error = 1;' . "\n" .
+                    '}' . "\n" .
+                '}' . "\n" .
+            '}' . "\n";
     }
 
     /**
@@ -393,6 +465,15 @@ class paypalr extends base
      */
     public function selection(): array
     {
+        global $order, $zcDate;
+
+        // -----
+        // If we're back in the "payment" phase of checkout, make sure that any previous payment confirmation
+        // for the PayPal payment 'source' is cleared so that the customer will need to (possibly again) validate
+        // their payment means.
+        //
+        unset($_SESSION['PayPalRestful']['Order']['payment_confirmed']);
+
         // -----
         // Determine which color button to use.
         //
@@ -400,31 +481,263 @@ class paypalr extends base
         $paypal_button = (defined($chosen_button_color)) ? constant($chosen_button_color) : MODULE_PAYMENT_PAYPALR_BUTTON_IMG_YELLOW;
 
         // -----
-        // Return the PayPal selection as a button
+        // Return **only** the PayPal selection as a button, if cards aren't to be accepted.
         //
+        if ($this->cardsAccepted === false) {
+            return [
+                'id' => $this->code,
+                'module' => '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">',
+            ];
+        }
+
+        // -----
+        // Create dropdowns for the credit-card's expiry year and month
+        //
+        $expires_month = [];
+        $expires_year = [];
+        for ($month = 1; $month < 13; $month++) {
+            $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => $zcDate->output('%B - (%m)', mktime(0, 0, 0, $month, 1, 2000))];
+        }
+        $this_year = date('Y');
+        for ($year = $this_year; $year < $this_year + 15; $year++) {
+            $expires_year[] = ['id' => $year, 'text' => $year];
+        }
+
+        $ppr_cc_owner_id = $this->code . '-cc-owner';
+        $ppr_cc_number_id = $this->code . '-cc-number';
+        $ppr_cc_expires_year_id = $this->code . '-cc-expires-year';
+        $ppr_cc_expires_month_id = $this->code . '-cc-expires-month';
+        $ppr_cc_cvv_id = $this->code . '-cc-cvv';
+
+        $on_focus = ' onfocus="methodSelect(\'pmt-' . $this->code . '\')"';
         return [
             'id' => $this->code,
-            'module' => '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">',
+            'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE,
+            'fields' => [
+                [
+                    'title' => MODULE_PAYMENT_PALPALR_HOW_TO_PAY,
+                    'field' =>
+                        '<style nonce="">' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css') . '</style>' .
+                        '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>' .
+                        '<ul id="ppr-buttons">' .
+                            '<li>' .
+                                '<input type="radio" class="ppr-choice" id="ppr-paypal" name="ppr_type" value="paypal"' . $on_focus . '>' .
+                                '<label for="ppr-paypal">' .
+                                    '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
+                                '</label>' .
+                            '</li>' .
+                            '<li>' .
+                                '<input type="radio" class="ppr-choice" id="ppr-card" name="ppr_type" value="card"' . $on_focus . '>' .
+                                '<label for="ppr-card">' .
+                                    'Credit Card' .
+                                '</label>' .
+                            '</li>' .
+                        '</ul>',
+                ],
+                [
+                    'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER,
+                    'field' => zen_draw_input_field('ppr_cc_owner', $order->billing['firstname'] . ' ' . $order->billing['lastname'], 'class="ppr-cc" id="' . $ppr_cc_owner_id . '" autocomplete="off"' . $on_focus),
+                    'tag' => $ppr_cc_owner_id,
+                ],
+                [
+                    'title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER,
+                    'field' => zen_draw_input_field('ppr_cc_number', '', 'class="ppr-cc" id="' . $ppr_cc_number_id . '" autocomplete="off"' . $on_focus),
+                    'tag' => $ppr_cc_number_id,
+                ],
+                [
+                    'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
+                    'field' =>
+                        zen_draw_pull_down_menu('ppr_cc_expires_month', $expires_month, $zcDate->output('%m'), 'class="ppr-cc" id="' . $ppr_cc_expires_month_id . '"' . $on_focus) .
+                        '&nbsp;' .
+                        zen_draw_pull_down_menu('ppr_cc_expires_year', $expires_year, '', 'class="ppr-cc" id="' . $ppr_cc_expires_year_id . '"' . $on_focus),
+                    'tag' => $ppr_cc_expires_month_id,
+                ],
+                [
+                    'title' => MODULE_PAYMENT_PAYPALR_CC_CVV,
+                    'field' => zen_draw_input_field('ppr_cc_cvv', '', 'class="ppr-cc" id="' . $ppr_cc_cvv_id . '" autocomplete="off"' . $on_focus),
+                    'tag' => $ppr_cc_cvv_id,
+                ],
+            ],
         ];
     }
 
-    protected function resetOrder()
-    {
-        unset($_SESSION['PayPalRestful']['Order']);
-    }
+    // --------------------------------------------
+    // Issued during the "confirmation" phase of the checkout process.
+    // --------------------------------------------
 
-    protected function createPayPalOrder(): bool
+    public function pre_confirmation_check()
+    {
+        global $order;
+
+        $this->log->write("pre_confirmation_check starts ...\n", true, 'before');
+
+        // -----
+        // If a card-payment was selected, validate the information entered.  Any
+        // errors detected, the called method will have set the appropriate messages
+        // on the messageStack.
+        //
+        $ppr_type = 'paypal';
+        if (isset($_POST['ppr_type'])) {
+            $ppr_type = $_POST['ppr_type'];
+            if ($ppr_type === 'card' && $this->validateCardInformation() === false) {
+                $log_only = true;
+                $this->setMessageAndRedirect("pre_confirmation_check, card failed initial validation.", FILENAME_CHECKOUT_PAYMENT, $log_only);
+            }
+        }
+
+        // -----
+        // Build the *inital* request for the PayPal order's "Create" and send to off to PayPal.
+        //
+        // This extra step for credit-card payments ensures that the order's content is acceptable
+        // to PayPal (e.g. the order-totals sum up properly), so that corrective action can be taken
+        // during this checkout phase rather than having a PayPal 'unacceptance' count against the
+        // customer as a slamming count.
+        //
+        $paypal_order_created = $this->createPayPalOrder('paypal');
+        if ($paypal_order_created === false) {
+            $this->setMessageAndRedirect("\ncreatePayPalOrder failed\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        }
+
+        // -----
+        // If the payment is *not* to be processed by PayPal 'proper' (e.g. a 'card' payment) or if
+        // the customer has already confirmed their payment choice at PayPal, nothing further to do
+        // at this time.
+        //
+        // Note: The 'payment_confirmed' element of the payment-module's session-based order is set by the
+        // ppr_webhook_main.php processing when the customer returns from selecting a payment means for
+        // the 'paypal' payment-source.
+        //
+        if ($ppr_type !== 'paypal' || isset($_SESSION['PayPalRestful']['Order']['payment_confirmed'])) {
+            $_SESSION['PayPalRestful']['Order']['payment_source'] = $ppr_type;
+            $this->log->write("pre_confirmation_check, completed for payment-source $ppr_type.", true, 'after');
+            return;
+        }
+
+        // -----
+        // The payment is to be processed by PayPal 'proper', send the customer off to
+        // PayPal to confirm their payment source.  That'll either come back to the checkout_confirmation
+        // page (via the payment module's webhook) if they choose a payment means or back to the
+        // checkout_payment page if they cancelled-out from PayPal.
+        //
+        $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::WEBHOOK_NAME, $order);
+        $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
+        if ($payment_choice_response === false) {
+            $this->setMessageAndRedirect("confirmPaymentSource failed\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        }
+
+        $current_status = $payment_choice_response['status'];
+        if ($current_status !== PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
+            $this->setMessageAndRedirect("confirmPaymentSource invalid return status '$current_status', see log.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        }
+
+        // -----
+        // Locate (and save) the URL to which the customer is redirected at PayPal
+        // to confirm their payment choice.
+        //
+        $action_link = '';
+        foreach ($payment_choice_response['links'] as $next_link) {
+            if ($next_link['rel'] === 'payer-action') {
+                $action_link = $next_link['href'];
+                $approve_method = $next_link['method'];
+                break;
+            }
+        }
+        if ($action_link === '') {
+            trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", Logger::logJSON($payment_choice_response), E_USER_WARNING);
+            $this->setMessageAndRedirect("confirmPaymentSource, no payer-action link found.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        }
+        $this->form_action_url = $action_link;
+
+        $this->log->write('pre_confirmation_check, completed.', true, 'after');
+    }
+    protected function validateCardInformation(): bool
+    {
+        global $messageStack, $order;
+
+        require DIR_WS_CLASSES . 'cc_validation.php';
+        $cc_validation = new cc_validation();
+        $result = $cc_validation->validate(
+            $_POST['ppr_cc_number'] ?? '',
+            $_POST['ppr_cc_expires_month'] ?? '',
+            $_POST['ppr_cc_expires_year'] ?? ''
+        );
+        switch ((int)$result) {
+            case -1:
+                $error = MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD;
+                if (empty($_POST['ppr_cc_number'])) {
+                    $error = trim(MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER, '* \\n');
+                }
+                break;
+            case -2:
+            case -3:
+            case -4:
+                $error = TEXT_CCVAL_ERROR_INVALID_DATE;
+                break;
+            case 0:
+                $error = TEXT_CCVAL_ERROR_INVALID_NUMBER;
+                break;
+            default:
+                $error = '';
+                break;
+        }
+        if ($error !== '') {
+            $messageStack->add_session('checkout_payment', $error, 'error');
+            return false;
+        }
+
+        $cvv_posted = $_POST['ppr_cc_cvv'] ?? '';
+        $cvv_required_length = ($cc_validation->cc_type === 'American Express') ? 4 : 3;
+        if (!ctype_digit($cvv_posted) || strlen($cvv_posted) !== $cvv_required_length) {
+            $messageStack->add_session('checkout_payment', sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH, $cc_validation->cc_type, $cvv_required_length), 'error');
+            return false;
+        }
+
+        $cc_owner = $_POST['ppr_cc_owner'] ?? '';
+        if (strlen($cc_owner) < CC_OWNER_MIN_LENGTH) {
+            $messageStack->add_session('checkout_payment', trim(MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER, '* \\n'), 'error');
+            return false;
+        }
+
+        $this->ccInfo = [
+            'type' => $cc_validation->cc_type,
+            'number' => $cc_validation->cc_number,
+            'expiry_month' => $cc_validation->cc_expiry_month,
+            'expiry_year' => $cc_validation->cc_expiry_year,
+            'name' => $cc_owner,
+            'security_code' => $cvv,
+            'webhook' => self::WEBHOOK_NAME,
+        ];
+        return true;
+    }
+    protected function createPayPalOrder(string $ppr_type): bool
     {
         global $order;
 
         // -----
-        // Build the request for the PayPal order's "Create" or "Update".
+        // Create a GUID (Globally Unique IDentifier) for the order's
+        // current 'state'.
         //
-        $create_order_request = new CreatePayPalOrderRequest($order);
+        $order_guid = $this->createOrderGuid($order, $ppr_type);
+
+        // -----
+        // If the PayPal order been previously created and the order's GUID
+        // has not changed, the original PayPal order information can
+        // be safely used.
+        //
+        if (isset($_SESSION['PayPalRestful']['Order']['guid']) && $_SESSION['PayPalRestful']['Order']['guid'] === $order_guid) {
+            $this->log->write("\ncreatePayPalOrder($ppr_type), no change in order GUID ($order_guid); nothing further to do.\n");
+            return true;
+        }
+
+        // -----
+        // Build the request for the PayPal order's initial creation.
+        //
+        $create_order_request = new CreatePayPalOrderRequest($ppr_type, $order, $this->ccInfo);
 
         // -----
         // Send the request off to register the order at PayPal.
         //
+        $this->ppr->setPayPalRequestId($order_guid);
         $order_response = $this->ppr->createOrder($create_order_request->get());
         if ($order_response === false) {
             $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
@@ -451,95 +764,98 @@ class paypalr extends base
             'id' => $paypal_id,
             'status' => $status,
             'create_time' => $create_time,
+            'guid' => $order_guid,
+            'payment_source' => $ppr_type,
         ];
         return true;
     }
-
-    // -----
-    // Issued (in 3-page checkout) during the 'checkout_confirmation' page's
-    // header.
-    //
-    public function pre_confirmation_check()
+    protected function createOrderGuid(\order $order, string $ppr_type): string
     {
-        global $order;
-
-        $this->log->write("pre_confirmation_check starts ...\n", true, 'before');
-
-        // -----
-        // Build the request for the PayPal order's "Create" and send to off to PayPal.
-        //
-        $paypal_order_created = $this->createPayPalOrder();
-        if ($paypal_order_created === false) {
-            $this->setMessageAndRedirect("createPayPalOrder failed\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        $hash_data = json_encode($order);
+        if ($ppr_type !== 'paypal') {
+            $hash_data .= json_encode($this->ccInfo);
         }
-
-        // -----
-        // Add an invoice number to the PayPal order, it'll be ZC-{paypal-txn-id}.
-        //
-        $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
-        $update_order_invoice = [
-            [
-                'op' => 'add',
-                'path' => "/purchase_units/@reference_id=='default'/invoice_id",
-                'value' => "ZC-$paypal_id",
-            ],
-        ];
-        $order_update_response = $this->ppr->updateOrder($paypal_id, $update_order_invoice);
-        if ($order_update_response === false) {
-            $this->setMessageAndRedirect("updateOrder invoice failed:\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);
-        }
-
-        $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::WEBHOOK_NAME, $order);
-        $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
-        if ($payment_choice_response === false) {
-            $this->setMessageAndRedirect("confirmPaymentSource failed\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);  //- FIXME
-        }
-
-        $current_status = $payment_choice_response['status'];
-        if ($current_status !== PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
-            $this->setMessageAndRedirect("confirmPaymentSource invalid return status '$current_status', see log.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
-        }
-
-        // -----
-        // If present (it *should* be), save the payment source (e.g. 'paypal' or 'card') in the order's
-        // session array, for use when the payment is confirmed so that the source
-        // can be included in the 'title' of the PayPal Checkout.
-        //
-/*---- Not sure if this violates PayPal's instructions since it'll show 'paypal' (without caps).
-        if (isset($payment_choice_response['payment_source'])) {
-            $_SESSION['PayPalRestful']['Order']['payment_source'] = array_key_first($payment_choice_response['payment_source']);
-            $this->title .= ' (' . $_SESSION['PayPalRestful']['Order']['payment_source'] . ')';
-        }
-*/
-
-        // -----
-        // Locate (and save) the URL to which the customer is redirected at PayPal
-        // to confirm their payment choice.
-        //
-        $action_link = '';
-        foreach ($payment_choice_response['links'] as $next_link) {
-            if ($next_link['rel'] === 'payer-action') {
-                $action_link = $next_link['href'];
-                $approve_method = $next_link['method'];
-                break;
-            }
-        }
-        if ($action_link === '') {
-            trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", Logger::logJSON($payment_choice_response), E_USER_WARNING);
-            $this->setMessageAndRedirect("confirmPaymentSource, no payer-action link found.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
-        }
-        $this->form_action_url = $action_link;
-
-        $this->log->write('pre_confirmation_check, completed.', true, 'after');
+        $hash = hash('sha256', $hash_data);
+        return
+            substr($hash,  0,  8) . '-' .
+            substr($hash,  8,  4) . '-' .
+            substr($hash, 12,  4) . '-' .
+            substr($hash, 16,  4) . '-' .
+            substr($hash, 20, 12);
     }
 
     /**
-     * Display Payment Additional Information for review on the Checkout Confirmation Page
+     * Display additional payment information for review on the 'checkout_confirmation' page.
+     *
+     * Issued by the page's template-rendering.
      */
     public function confirmation()
     {
+        if ($_SESSION['PayPalRestful']['Order']['payment_source'] !== 'card') {
+            return false;
+        }
+
+        global $zcDate;
+        return [
+            'title' => '',
+            'fields' => [
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_OWNER, 'field' => $_POST['ppr_cc_owner']],
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_TYPE, 'field' => $this->ccInfo['type']],
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER, 'field' => $this->obfuscateCcNumber($_POST['ppr_cc_number'])],
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES, 'field' => $zcDate->output('%B, %Y', mktime(0, 0, 0, $_POST['ppr_cc_expires_month'], 1, '20')) . $_POST['ppr_cc_expires_year']],
+            ],
+        ];
+    }
+
+    /**
+     * Prepare the hidden fields comprising the parameters for the Submit button on the checkout confirmation page.
+     *
+     * These values, for a credit-card, are subsequently passed to the 'process' phase of the checkout process.
+     */
+    public function process_button()
+    {
+        if ($_SESSION['PayPalRestful']['Order']['payment_source'] !== 'card') {
+            return false;
+        }
+
+        return
+            zen_draw_hidden_field('ppr_cc_owner', $_POST['ppr_cc_owner']) . "\n" .
+            zen_draw_hidden_field('ppr_cc_expires_month', $_POST['ppr_cc_expires_month']) . "\n" .
+            zen_draw_hidden_field('ppr_cc_expires_year', $_POST['ppr_cc_expires_year']) . "\n" .
+            zen_draw_hidden_field('ppr_cc_number', $_POST['ppr_cc_number']) . "\n" .
+            zen_draw_hidden_field('ppr_cc_cvv', $_POST['ppr_cc_cvv']) . "\n";
+    }
+    public function process_button_ajax()
+    {
+        if ($_SESSION['PayPalRestful']['Order']['payment_source'] !== 'card') {
+            return false;
+        }
+        
+        return [
+            'ccFields' => [
+                'ppr_cc_owner' => 'ppr_cc_owner',
+                'ppr_cc_expires_month' => 'ppr_cc_expires_month',
+                'ppr_cc_expires_year' => 'ppr_cc_expires_year',
+                'ppr_cc_number' => 'ppr_cc_number',
+                'ppr_cc_cvv' => 'ppr_cc_cvv',
+            ],
+        ];
+    }
+
+    /**
+     * Determine whether the shipping-edit button should be displayed or not (also used on the
+     * "shipping" phase of the checkout process).
+     *
+     * For now, the shipping address entered during the Zen Cart checkout process can be changed.
+     */
+    public function alterShippingEditButton()
+    {
         return false;
     }
+
+    // --------------------------------------------
+    // Issued during the "process" phase of the checkout process.
+    // --------------------------------------------
 
     /**
      * Issued by the checkout_process page's header_php.php when a change
@@ -552,39 +868,97 @@ class paypalr extends base
     }
 
     /**
-     * Prepare the hidden fields comprising the parameters for the Submit button on the checkout confirmation page
-     */
-    public function process_button()
-    {
-        return false;
-    }
-
-    /**
      * Prepare and submit the final authorization to PayPal via the appropriate means as configured.
      * Issued close to the start of the 'checkout_process' phase.
+     *
+     * Note: Any failure here bumps the checkout_process page's slamming_count.
      */
     public function before_process()
     {
-        global $messageStack;
+        global $order;
 
-        if (!isset($_SESSION['PayPalRestful']['Order']['status']) || $_SESSION['PayPalRestful']['Order']['status'] !== PayPalRestfulApi::STATUS_APPROVED) {
-            $this->setMessageAndRedirect("paypalr::before_process, can't capture/authorize order; wrong status ({$_SESSION['PayPalRestful']['Order']['status']}).", FILENAME_CHECKOUT_SHIPPING);  //- FIXME
-        }
+        // -----
+        // Initially a successful payment is not 'pending'.  This might be changed by
+        // the checkCardPaymentResponse method.
+        //
+        $this->paymentIsPending = false;
 
-        $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
-        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') {
-            $response = $this->ppr->captureOrder($paypal_id);
+        $payment_source = $_SESSION['PayPalRestful']['Order']['payment_source'];
+        if ($payment_source !== 'card') {
+            if (!isset($_SESSION['PayPalRestful']['Order']['status']) || $_SESSION['PayPalRestful']['Order']['status'] !== PayPalRestfulApi::STATUS_APPROVED) {
+                $this->setMessageAndRedirect("paypalr::before_process, can't capture/authorize order; wrong status ({$_SESSION['PayPalRestful']['Order']['status']}).", FILENAME_CHECKOUT_SHIPPING);  //- FIXME
+            }
+
+            $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
+            $this->ppr->setPayPalRequestId($_SESSION['PayPalRestful']['Order']['guid']);
+            if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') {
+                $response = $this->ppr->captureOrder($paypal_id);
+            } else {
+                $response = $this->ppr->authorizeOrder($paypal_id);
+            }
         } else {
-            $response = $this->ppr->authorizeOrder($paypal_id);
+            if ($this->validateCardInformation() === false) {
+                $this->setMessageAndRedirect("before_process, card failed validation.", FILENAME_CHECKOUT_PAYMENT); //-FIXME
+            }
+
+            // -----
+            // Save the pertinent credit-card information into the order so that it'll be
+            // included in the GUID.
+            //
+            $order->info['cc_type'] = $this->ccInfo['type'];
+            $order->info['cc_number'] = $this->obfuscateCcNumber($this->ccInfo['number']);
+            $order->info['cc_owner'] = $this->ccInfo['name'];
+            $order->info['cc_expires'] = ''; //- $this->ccInfo['expiry_month'] . substr($this->ccInfo['expiry_year'], -2);
+
+            // -----
+            // Create a GUID (Globally Unique IDentifier) for the order's
+            // current 'state'.
+            //
+            $order_guid = $this->createOrderGuid($order, 'card');
+
+            // -----
+            // Build the request for the PayPal card-payment order's creation.
+            //
+            $create_order_request = new CreatePayPalOrderRequest('card', $order, $this->ccInfo);
+
+            // -----
+            // Send the request off to register the order at PayPal.
+            //
+            $this->ppr->setPayPalRequestId($order_guid);
+            $response = $this->ppr->createOrder($create_order_request->get());
+            if ($response === false) {
+                $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
+                return false;   //-FIXME(?), log this, set a message and redirect?
+            }
+
+            // -----
+            // Check the response for the payment authorization/capture to see if there was
+            // an issue with the card.
+            //
+            $payment_response_message = $this->checkCardPaymentResponse($response);
+            if ($payment_response_message !== '') {
+                $this->setMessageAndRedirect($payment_response_message, FILENAME_CHECKOUT_PAYMENT);
+            }
         }
 
         if ($response === false) {
-            $this->setMessageAndRedirect('paypalr::before_process, can\'t capture/authorize order; error in attempt, see log.', FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+            $this->setMessageAndRedirect("paypalr::before_process ($payment_source), can't create/capture/authorize order; error in attempt, see log.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
         }
 
         $_SESSION['PayPalRestful']['Order']['status'] = $response['status'];
         unset($response['purchase_units'][0]['links']);
         $this->orderInfo = $response;
+
+        // -----
+        // If the payment is pending (e.g. under-review), set the payment module's order
+        // status to indicate as such.
+        //
+        if ($this->paymentIsPending === true) {
+            $pending_status = (int)MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID;
+            if ($pending_status > 0) {
+                $this->order_status = $pending_status;
+            }
+        }
 
         // -----
         // Determine the payment's status to be recorded in the paypal table and to accompany the
@@ -621,19 +995,126 @@ class paypalr extends base
             $order->info['order_status'] = $this->order_status;
             $this->orderInfo['admin_alert_needed'] = true;
 
-            $this->log->write("==> paypalr::before_process: Payment status {$payment['status']} received from PayPal; order's status forced to pending.");
+            $this->log->write("==> paypalr::before_process ($payment_source): Payment status {$payment['status']} received from PayPal; order's status forced to pending.");
         }
 
         $this->notify('NOTIFY_PAYPALR_BEFORE_PROCESS_FINISHED', $this->orderInfo);
     }
-
-    protected function setMessageAndRedirect(string $error_message, string $redirect_page)
+    protected function checkCardPaymentResponse(array $response): string
     {
-        global $messageStack;
+        // -----
+        // Grab the 'payments' portion of the response; the element depends on whether
+        // the payment-module is configured for 'Final Sale' or 'Auth Only'.
+        //
+        $payment = $response['purchase_units'][0]['payments']['captures'] ?? $response['purchase_units'][0]['payments']['authorizations'];
 
-        $messageStack->add_session('checkout', $error_message, 'error');  //- FIXME
+        // -----
+        // If the capture was completed or the authorization was created, all's good; let
+        // the caller know.
+        //
+        if ($payment['status'] === 'COMPLETED' || $payment['status'] === 'CREATED') {
+            return '';
+        }
+
+        // -----
+        // There was an issue of some sort with the credit-card payment.  Determine whether/not
+        // it's recoverable, e.g. a payment that was placed on PENDING/PENDING_REVIEW.
+        //
+        // See https://developer.paypal.com/api/rest/sandbox/card-testing/ for additional information.
+        //
+        $card_payment_source = $response['purchase_units'][0]['payment_source']['card'];
+        $card_type = $card_payment_source['brand'] ?? '';
+        $last_digits = $card_payment_source['last_digits'];
+        $response_message = '';
+        $response_code = $payment['processor_response']['response_code'] ?? '-- not supplied --';
+        switch ($payment['status']) {
+            case 'PENDING':
+                $this->paymentIsPending = true;
+                break;
+
+            case 'FAILED':
+                $response_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR;
+                break;
+
+            case 'DECLINED':
+                switch ($response_code) {
+                    case '5400':    //- Expired card
+                        $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRED, $card_type, $last_digits);
+                        break;
+
+                    case '5120':    //- Insufficient funds
+                        $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS, $card_type, $last_digits);
+                        break;
+
+                    case '00N7':
+                    case '5110':    //- CVV check failed
+                        $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CVV_FAILED, $card_type, $last_digits);
+                        break;
+
+                    case '5180':    //- Luhn check failed; don't use card
+                    case '0500':    //- Card refused
+                    case '1330':    //- Card not valid
+                    case '5100':    //- Generic decline
+                        $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED, $last_digits);
+                        break;
+
+                    case '9500':    //- Fraudalent card
+                    case '9520':    //- Lost or stolen card
+                        $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED, $last_digits);
+
+                        $this->sendAlertEmail(
+                            MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD,
+                            sprintf(MODULE_PAYMENT_PAYPALR_ALERT_LOST_STOLEN_CARD,
+                                ($response_code === '9500') ? MODULE_PAYMENT_PAYPALR_CARD_FRAUDULENT : MODULE_PAYMENT_PAYPALR_CARD_LOST,
+                                $_SESSION['customer_first_name'],
+                                $_SESSION['customer_last_name'],
+                                $_SESSION['customer_id']
+                            ) . "\n\n" .
+                            json_encode($card_payment_source, JSON_PRETTY_PRINT)
+                        );
+                        break;
+
+                    default:
+                        $response_message =
+                            sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED, $last_digits) .
+                            ' ' .
+                            sprintf(MODULE_PAYMENT_PAYPALR_TEXT_DECLINED_UNKNOWN, $response_code);
+
+                        $this->sendAlertEmail(
+                            MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL,
+                            sprintf(MODULE_PAYMENT_PAYPALR_ALERT_UNKNOWN_DENIAL,
+                                $response_code,
+                                $_SESSION['customer_first_name'],
+                                $_SESSION['customer_last_name'],
+                                $_SESSION['customer_id']
+                            ) . "\n\n" .
+                            json_encode($card_payment_source, JSON_PRETTY_PRINT)
+                        );
+                        break;
+                }
+                break;
+
+            default:
+                break;
+        }
+
+        return $response_message;
+    }
+
+    protected function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
+    {
+        if ($log_only === false) {
+            global $messageStack;
+            $messageStack->add_session('checkout', $error_message, 'error');  //- FIXME
+        }
+        $this->log->write($error_message);
         $this->resetOrder();
         zen_redirect(zen_href_link($redirect_page));
+    }
+
+    protected function obfuscateCcNumber(string $cc_number): string
+    {
+        return substr($cc_number, 0, 4) . str_repeat('X', (strlen($cc_number) - 8)) . substr($cc_number, -4);
     }
 
     /**
@@ -696,6 +1177,29 @@ class paypalr extends base
             'created_date' => $payment['created_date'] ?? '',
         ];
 
+        // -----
+        // Payer information returned is different for 'paypal' and 'card' payments.
+        //
+        $payment_source = $this->orderInfo['payment_source'][$payment_type];
+        if ($payment_type !== 'card') {
+            $first_name = $payment_source['name']['given_name'];
+            $last_name = $payment_source['name']['surname'];
+            $email_address = $payment_source['email_address'];
+            $payer_id = $this->orderInfo['payer']['payer_id'];
+            $memo = '';
+        } else {
+            $name_elements = explode(' ', $payment_source['name']);
+            $first_name = $name_elements[0];
+            unset($name_elements[0]);
+            $last_name = implode(' ', $name_elements);
+            $email_address = '';
+            $payer_id = '';
+            $memo =
+                'Card Information: ' . json_encode($payment_source) . "\n" .
+                'Processor Response: ' . json_encode($payment['processor_response'] ?? 'n/a') . "\n" .
+                'Netword Txn. Reference: ' . json_encode($payment['network_transaction_reference'] ?? 'n/a') . "\n";
+        }
+
         $expiration_time = (isset($this->orderInfo['expiration_time'])) ? Helpers::convertPayPalDatePay2Db($this->orderInfo['expiration_time']) : 'null';
         $num_cart_items = $_SESSION['cart']->count_contents();
         $sql_data_array = [
@@ -708,10 +1212,10 @@ class paypalr extends base
             'payment_status' => $this->orderInfo['payment_status'],
             'invoice' => $purchase_unit['invoice_id'] ?? $purchase_unit['custom_id'] ?? '',
             'mc_currency' => $payment['amount']['currency_code'],
-            'first_name' => substr($this->orderInfo['payer']['name']['given_name'], 0, 32),
-            'last_name' => substr($this->orderInfo['payer']['name']['surname'], 0, 32),
-            'payer_email' => $this->orderInfo['payer']['email_address'],
-            'payer_id' => $this->orderInfo['payer']['payer_id'],
+            'first_name' => substr($first_name, 0, 32),
+            'last_name' => substr($last_name, 0, 32),
+            'payer_email' => $email_address,
+            'payer_id' => $payer_id,
             'payer_status' => $this->orderInfo['payment_source'][$payment_type]['account_status'] ?? 'UNKNOWN',
             'receiver_email' => $purchase_unit['payee']['email_address'],
             'receiver_id' => $purchase_unit['payee']['merchant_id'],
@@ -722,6 +1226,7 @@ class paypalr extends base
             'last_modified' => Helpers::convertPayPalDatePay2Db($this->orderInfo['update_time']),
             'notify_version' => self::CURRENT_VERSION,
             'expiration_time' => $expiration_time,
+            'memo' => $memo,
         ];
         $sql_data_array = array_merge($sql_data_array, $address_info, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);
@@ -785,6 +1290,10 @@ class paypalr extends base
         $this->resetOrder();
     }
 
+    // -----
+    // Issued during admin processing (on the customers::orders/details page).
+    // -----
+
     /**
       * Build admin-page components
       *
@@ -803,14 +1312,6 @@ class paypalr extends base
         return [
             'link' => 'https://github.com/lat9/paypalr/wiki'
         ];
-    }
-
-    /**
-     * Determine whether the shipping-edit button should be displayed or not
-     */
-    public function alterShippingEditButton()
-    {
-        return false;
     }
 
     /**
@@ -1200,11 +1701,13 @@ class paypalr extends base
 
                 ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now()),
 
-                ('Completed Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID', '2', 'Set the status of orders whose payment has been successfully <em>captured</em> to this value.<br><b>Recommended: Processing[2]</b>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+                ('Completed Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID', '2', 'Set the status of orders whose payment has been successfully <em>captured</em> to this value.<br>Recommended: <b>Processing[2]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
-                ('Set Unpaid Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID', '1', 'Set the status of orders whose payment has been successfully <em>authorized</em> to this value.<br><b>Recommended: Pending[1]</b>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+                ('Set Unpaid Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID', '1', 'Set the status of orders whose payment has been successfully <em>authorized</em> to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
-                ('Set Refund Order Status', 'MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID', '1', 'Set the status of <em><b>fully</b>-refunded</em> or <em>voided</em> orders to this value.<br><b>Recommended: Pending[1]</b>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+                ('Set Refund Order Status', 'MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID', '1', 'Set the status of <em><b>fully</b>-refunded</em> or <em>voided</em> orders to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+
+                ('Set Held Order Status', 'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID', '1', 'Set the status of orders that are held for review to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
                 ('PayPal Page Style', 'MODULE_PAYMENT_PAYPALR_PAGE_STYLE', 'Primary', 'The page-layout style you want customers to see when they visit the PayPal site. You can configure your <b>Custom Page Styles</b> in your PayPal Profile settings. This value is case-sensitive.', 6, 0, NULL, NULL, now()),
 
@@ -1215,6 +1718,8 @@ class paypalr extends base
                 ('Transaction Currency', 'MODULE_PAYMENT_PAYPALR_CURRENCY', 'Selected Currency', 'In which currency should the order be sent to PayPal?<br>NOTE: If an unsupported currency is sent to PayPal, it will be auto-converted to the <em>Fall-back Currency</em>.<br><b>Default: Selected Currency</b>', 6, 0, 'zen_cfg_select_option([\'Selected Currency\', $currencies_list], ', NULL, now()),
 
                 ('Fall-back Currency', 'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK', 'USD', 'If the <b>Transaction Currency</b> is set to <em>Selected Currency</em>, what currency should be used as a fall-back when the customer\'s selected currency is not supported by PayPal?<br><b>Default: USD</b>', 6, 0, 'zen_cfg_select_option([\'USD\', \'GBP\'], ', NULL, now()),
+
+                ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now()),
 
                 ('Debug Mode', 'MODULE_PAYMENT_PAYPALR_DEBUGGING', 'Off', 'Would you like to enable debug mode?  A complete detailed log of failed transactions will be emailed to the store owner.', 6, 0, 'zen_cfg_select_option([\'Off\', \'Alerts Only\', \'Log File\', \'Log and Email\'], ', NULL, now())"
         );
@@ -1279,7 +1784,7 @@ class paypalr extends base
         $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
     }
 
-    public function keys()
+    public function keys(): array
     {
         return [
             'MODULE_PAYMENT_PAYPALR_STATUS',
@@ -1293,11 +1798,13 @@ class paypalr extends base
             'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID',
+            'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_CURRENCY',
             'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK',
             'MODULE_PAYMENT_PAYPALR_BRANDNAME',
             'MODULE_PAYMENT_PAYPALR_PAGE_STYLE',
             'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE',
+            'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS',
             'MODULE_PAYMENT_PAYPALR_DEBUGGING',
         ];
 

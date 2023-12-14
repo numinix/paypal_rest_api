@@ -15,15 +15,6 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_AUTO_DISABLED' => ' The payment module has been automatically disabled.',
 
     // -----
-    // Admin alert-email messages.
-    //
-    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPalCheckout Error (%s)',    //- %s is an additional error descriptor, see below
-        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION' => 'Configuration',
-        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
-
-    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
-
-    // -----
     // Storefront messages.
     //
     'MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL' => 'Paying via PayPal',     //- Used by the confirmation method, when paying via PayPal Checkout (paypal)
@@ -41,7 +32,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_ORDER_ALREADY_PLACED_ERROR' => 'It appears that your order was submitted twice. Please check the My Account area to see the actual order details.  Please use the Contact Us form if your order does not appear here but is already paid from your PayPal account so that we may check our records and reconcile this with you.',
 
     // -----
-    // Buttons on checkout_payment page; see https://www.paypal.com/c2/webapps/mpp/logos-buttons?locale.x=en_C2 for additional information.
+    // Buttons on checkout_payment page; see https://www.paypal.com/bm/webapps/mpp/logo-center for additional information.
     //
     'MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT' => 'Click here to pay via PayPal Checkout',
     'MODULE_PAYMENT_PAYPALR_MARK_BUTTON_TXT' => '',
@@ -50,6 +41,10 @@ $define = [
         'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_GREY' => 'https://www.paypalobjects.com/digitalassets/c/website/marketing/apac/C2/logos-buttons/optimize/44_Grey_PayPal_Pill_Button.png',
         'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_BLUE' => 'https://www.paypalobjects.com/digitalassets/c/website/marketing/apac/C2/logos-buttons/optimize/44_Blue_PayPal_Pill_Button.png',
         'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_WHITE' => 'https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-150px.png',
+
+    'MODULE_PAYMENT_PAYPALR_BUTTON_CARDS' => 'https://www.paypalobjects.com/webstatic/mktg/logo/AM_mc_vs_dc_ae.jpg',
+    'MODULE_PAYMENT_PALPALR_HOW_TO_PAY' => 'How do you want to pay?',
+    'MODULE_PAYMENT_PAYPALR_LOGO_SVG' => "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAxcHgiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAxMDEgMzIiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaW5ZTWluIG1lZXQiIHhtbG5zPSJodHRwOiYjeDJGOyYjeDJGO3d3dy53My5vcmcmI3gyRjsyMDAwJiN4MkY7c3ZnIj48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDEyLjIzNyAyLjggTCA0LjQzNyAyLjggQyAzLjkzNyAyLjggMy40MzcgMy4yIDMuMzM3IDMuNyBMIDAuMjM3IDIzLjcgQyAwLjEzNyAyNC4xIDAuNDM3IDI0LjQgMC44MzcgMjQuNCBMIDQuNTM3IDI0LjQgQyA1LjAzNyAyNC40IDUuNTM3IDI0IDUuNjM3IDIzLjUgTCA2LjQzNyAxOC4xIEMgNi41MzcgMTcuNiA2LjkzNyAxNy4yIDcuNTM3IDE3LjIgTCAxMC4wMzcgMTcuMiBDIDE1LjEzNyAxNy4yIDE4LjEzNyAxNC43IDE4LjkzNyA5LjggQyAxOS4yMzcgNy43IDE4LjkzNyA2IDE3LjkzNyA0LjggQyAxNi44MzcgMy41IDE0LjgzNyAyLjggMTIuMjM3IDIuOCBaIE0gMTMuMTM3IDEwLjEgQyAxMi43MzcgMTIuOSAxMC41MzcgMTIuOSA4LjUzNyAxMi45IEwgNy4zMzcgMTIuOSBMIDguMTM3IDcuNyBDIDguMTM3IDcuNCA4LjQzNyA3LjIgOC43MzcgNy4yIEwgOS4yMzcgNy4yIEMgMTAuNjM3IDcuMiAxMS45MzcgNy4yIDEyLjYzNyA4IEMgMTMuMTM3IDguNCAxMy4zMzcgOS4xIDEzLjEzNyAxMC4xIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDAzMDg3IiBkPSJNIDM1LjQzNyAxMCBMIDMxLjczNyAxMCBDIDMxLjQzNyAxMCAzMS4xMzcgMTAuMiAzMS4xMzcgMTAuNSBMIDMwLjkzNyAxMS41IEwgMzAuNjM3IDExLjEgQyAyOS44MzcgOS45IDI4LjAzNyA5LjUgMjYuMjM3IDkuNSBDIDIyLjEzNyA5LjUgMTguNjM3IDEyLjYgMTcuOTM3IDE3IEMgMTcuNTM3IDE5LjIgMTguMDM3IDIxLjMgMTkuMzM3IDIyLjcgQyAyMC40MzcgMjQgMjIuMTM3IDI0LjYgMjQuMDM3IDI0LjYgQyAyNy4zMzcgMjQuNiAyOS4yMzcgMjIuNSAyOS4yMzcgMjIuNSBMIDI5LjAzNyAyMy41IEMgMjguOTM3IDIzLjkgMjkuMjM3IDI0LjMgMjkuNjM3IDI0LjMgTCAzMy4wMzcgMjQuMyBDIDMzLjUzNyAyNC4zIDM0LjAzNyAyMy45IDM0LjEzNyAyMy40IEwgMzYuMTM3IDEwLjYgQyAzNi4yMzcgMTAuNCAzNS44MzcgMTAgMzUuNDM3IDEwIFogTSAzMC4zMzcgMTcuMiBDIDI5LjkzNyAxOS4zIDI4LjMzNyAyMC44IDI2LjEzNyAyMC44IEMgMjUuMDM3IDIwLjggMjQuMjM3IDIwLjUgMjMuNjM3IDE5LjggQyAyMy4wMzcgMTkuMSAyMi44MzcgMTguMiAyMy4wMzcgMTcuMiBDIDIzLjMzNyAxNS4xIDI1LjEzNyAxMy42IDI3LjIzNyAxMy42IEMgMjguMzM3IDEzLjYgMjkuMTM3IDE0IDI5LjczNyAxNC42IEMgMzAuMjM3IDE1LjMgMzAuNDM3IDE2LjIgMzAuMzM3IDE3LjIgWiI+PC9wYXRoPjxwYXRoIGZpbGw9IiMwMDMwODciIGQ9Ik0gNTUuMzM3IDEwIEwgNTEuNjM3IDEwIEMgNTEuMjM3IDEwIDUwLjkzNyAxMC4yIDUwLjczNyAxMC41IEwgNDUuNTM3IDE4LjEgTCA0My4zMzcgMTAuOCBDIDQzLjIzNyAxMC4zIDQyLjczNyAxMCA0Mi4zMzcgMTAgTCAzOC42MzcgMTAgQyAzOC4yMzcgMTAgMzcuODM3IDEwLjQgMzguMDM3IDEwLjkgTCA0Mi4xMzcgMjMgTCAzOC4yMzcgMjguNCBDIDM3LjkzNyAyOC44IDM4LjIzNyAyOS40IDM4LjczNyAyOS40IEwgNDIuNDM3IDI5LjQgQyA0Mi44MzcgMjkuNCA0My4xMzcgMjkuMiA0My4zMzcgMjguOSBMIDU1LjgzNyAxMC45IEMgNTYuMTM3IDEwLjYgNTUuODM3IDEwIDU1LjMzNyAxMCBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA2Ny43MzcgMi44IEwgNTkuOTM3IDIuOCBDIDU5LjQzNyAyLjggNTguOTM3IDMuMiA1OC44MzcgMy43IEwgNTUuNzM3IDIzLjYgQyA1NS42MzcgMjQgNTUuOTM3IDI0LjMgNTYuMzM3IDI0LjMgTCA2MC4zMzcgMjQuMyBDIDYwLjczNyAyNC4zIDYxLjAzNyAyNCA2MS4wMzcgMjMuNyBMIDYxLjkzNyAxOCBDIDYyLjAzNyAxNy41IDYyLjQzNyAxNy4xIDYzLjAzNyAxNy4xIEwgNjUuNTM3IDE3LjEgQyA3MC42MzcgMTcuMSA3My42MzcgMTQuNiA3NC40MzcgOS43IEMgNzQuNzM3IDcuNiA3NC40MzcgNS45IDczLjQzNyA0LjcgQyA3Mi4yMzcgMy41IDcwLjMzNyAyLjggNjcuNzM3IDIuOCBaIE0gNjguNjM3IDEwLjEgQyA2OC4yMzcgMTIuOSA2Ni4wMzcgMTIuOSA2NC4wMzcgMTIuOSBMIDYyLjgzNyAxMi45IEwgNjMuNjM3IDcuNyBDIDYzLjYzNyA3LjQgNjMuOTM3IDcuMiA2NC4yMzcgNy4yIEwgNjQuNzM3IDcuMiBDIDY2LjEzNyA3LjIgNjcuNDM3IDcuMiA2OC4xMzcgOCBDIDY4LjYzNyA4LjQgNjguNzM3IDkuMSA2OC42MzcgMTAuMSBaIj48L3BhdGg+PHBhdGggZmlsbD0iIzAwOWNkZSIgZD0iTSA5MC45MzcgMTAgTCA4Ny4yMzcgMTAgQyA4Ni45MzcgMTAgODYuNjM3IDEwLjIgODYuNjM3IDEwLjUgTCA4Ni40MzcgMTEuNSBMIDg2LjEzNyAxMS4xIEMgODUuMzM3IDkuOSA4My41MzcgOS41IDgxLjczNyA5LjUgQyA3Ny42MzcgOS41IDc0LjEzNyAxMi42IDczLjQzNyAxNyBDIDczLjAzNyAxOS4yIDczLjUzNyAyMS4zIDc0LjgzNyAyMi43IEMgNzUuOTM3IDI0IDc3LjYzNyAyNC42IDc5LjUzNyAyNC42IEMgODIuODM3IDI0LjYgODQuNzM3IDIyLjUgODQuNzM3IDIyLjUgTCA4NC41MzcgMjMuNSBDIDg0LjQzNyAyMy45IDg0LjczNyAyNC4zIDg1LjEzNyAyNC4zIEwgODguNTM3IDI0LjMgQyA4OS4wMzcgMjQuMyA4OS41MzcgMjMuOSA4OS42MzcgMjMuNCBMIDkxLjYzNyAxMC42IEMgOTEuNjM3IDEwLjQgOTEuMzM3IDEwIDkwLjkzNyAxMCBaIE0gODUuNzM3IDE3LjIgQyA4NS4zMzcgMTkuMyA4My43MzcgMjAuOCA4MS41MzcgMjAuOCBDIDgwLjQzNyAyMC44IDc5LjYzNyAyMC41IDc5LjAzNyAxOS44IEMgNzguNDM3IDE5LjEgNzguMjM3IDE4LjIgNzguNDM3IDE3LjIgQyA3OC43MzcgMTUuMSA4MC41MzcgMTMuNiA4Mi42MzcgMTMuNiBDIDgzLjczNyAxMy42IDg0LjUzNyAxNCA4NS4xMzcgMTQuNiBDIDg1LjczNyAxNS4zIDg1LjkzNyAxNi4yIDg1LjczNyAxNy4yIFoiPjwvcGF0aD48cGF0aCBmaWxsPSIjMDA5Y2RlIiBkPSJNIDk1LjMzNyAzLjMgTCA5Mi4xMzcgMjMuNiBDIDkyLjAzNyAyNCA5Mi4zMzcgMjQuMyA5Mi43MzcgMjQuMyBMIDk1LjkzNyAyNC4zIEMgOTYuNDM3IDI0LjMgOTYuOTM3IDIzLjkgOTcuMDM3IDIzLjQgTCAxMDAuMjM3IDMuNSBDIDEwMC4zMzcgMy4xIDEwMC4wMzcgMi44IDk5LjYzNyAyLjggTCA5Ni4wMzcgMi44IEMgOTUuNjM3IDIuOCA5NS40MzcgMyA5NS4zMzcgMy4zIFoiPjwvcGF0aD48L3N2Zz4",
 
     // -----
     // Admin messages, from an order's display, viewing the PayPal transaction history.
@@ -213,23 +208,79 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_CVV2MATCH' => 'CVV2 match:',
 
     'MODULE_PAYMENT_PAYPALR_ERROR_HEADING' => 'We\'re sorry, but we were unable to process your credit card.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CARD_ERROR' => 'The credit card information you entered contains an error.  Please check it and try again.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_FIRSTNAME' => 'Credit Card First Name:',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_LASTNAME' => 'Credit Card Last Name:',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_OWNER' => 'Cardholder Name:',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_TYPE' => 'Credit Card Type:',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_NUMBER' => 'Credit Card Number:',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRES' => 'Credit Card Expiry Date:',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ISSUE' => 'Credit Card Issue Date:',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_CVV' => 'CVV Number:',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_CHECKNUMBER_LOCATION' => '(on back of the credit card)',
 
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_DECLINED' => 'Your credit card was declined. Please try another card or contact your bank for more information.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR' => 'An error occurred when we tried to process your credit card. Please try again, select an alternate payment method or contact the store owner for assistance.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ISSUE' => 'Credit Card Issue Date:',
+*/
+    // -----
+    // Constants used when processing credit-cards
+    //
+    'MODULE_PAYMENT_PAYPALR_CC_OWNER' => 'Cardholder Name:',
+    'MODULE_PAYMENT_PAYPALR_CC_TYPE' => 'Credit Card Type:',
+    'MODULE_PAYMENT_PAYPALR_CC_NUMBER' => 'Credit Card Number:',
+    'MODULE_PAYMENT_PAYPALR_CC_EXPIRES' => 'Credit Card Expiry Date:',
+    'MODULE_PAYMENT_PAYPALR_CC_CVV' => 'CVV Number:',
+
+    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH' => 'The <em>CVV Number</em> for %1$s cards must be %2$u digits in length.',  //- %1$s is the card type, %2$u is the required CVV length
     'MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD' => 'We apologize for the inconvenience, but the credit card you entered is not one that we accept. Please use a different credit card.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_BAD_LOGIN' => 'There was a problem validating your account. Please try again.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR' => 'An error occurred when we tried to process your credit card. Please try again, select an alternate payment method or contact the store owner for assistance.',
+
+    'MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED' => 'The card ending with \'%s\' was declined.',     //- %s is the last-4 of the card-number.
+    'MODULE_PAYMENT_PAYPALR_TEXT_DECLINED_REASON_UNKNOWN' => 'If you continue to receive this message, please contact us and supply reason-code \'%s\'.', //- %s is ['processor_response']['response_code']
+
+    // -----
+    // Admin alert-email messages.
+    //
+    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPalCheckout Error (%s)',    //- %s is an additional error descriptor, see below
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION' => 'Configuration',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL' => 'Unknown Denial Reason',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD' => 'Lost/Stolen/Fraudulent Card',
+
+    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
+
+    // -----
+    // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.
+    //
+
+    // -----
+    // %1$s: ['processor_response']['response_code']
+    // %2$s: $_SESSION['customer_first_name']
+    // %3$s: $_SESSION['customer_last_name']
+    // $4%u: $_SESSION['customer_id']
+    //
+    'MODULE_PAYMENT_PAYPALR_ALERT_UNKNOWN_DENIAL' =>
+        'PayPal returned an unknown response code (%1$s) for a denied credit-card payment.' . "\n\n" .
+        'The payment was attempted by %2$s %3$s (customer id %4$u). Formatted card-details follow:' . "\n\n",
+
+    // -----
+    // %1$s: One of the two language constants that follow.
+    // %2$s: $_SESSION['customer_first_name']
+    // %3$s: $_SESSION['customer_last_name']
+    // $4%u: $_SESSION['customer_id']
+    //
+    'MODULE_PAYMENT_PAYPALR_ALERT_LOST_STOLEN_CARD' =>
+        'A credit-card payment was attempted with a %1$s card.' . "\n\n" .
+        'The payment was attempted by %2$s %3$s (customer id %4$u). Formatted card-details follow:' . "\n\n",
+    'MODULE_PAYMENT_PAYPALR_CARD_LOST' => 'lost or stolen',
+    'MODULE_PAYMENT_PAYPALR_CARD_FRAUDULENT' => 'fraudulent',
+
+    // -----
+    // For these messages, %1$s is the card-type and %2$s is the last-4 of the card-number.
+    //
+    'MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRED' => 'The %1$s card ending with \'%2$s\' has expired.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS' => 'The %1$s card ending with \'%2$s\' has insufficient funds.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_FAILED' => 'The "CVV Number" you entered for the %1$s card ending with \'%2$s\' is not correct.  Please try again.',
+
+    // -----
+    // Used by the payment module's javascript_validation method.
+    //
     'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER' => '* The cardholder\'s name must be at least ' . CC_OWNER_MIN_LENGTH . ' characters.\n',
-    'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER' => '* The credit card number must be at least ' . CC_NUMBER_MIN_LENGTH . ' characters.\n',
+    'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER' => '* The Credit Card Number must be at least ' . CC_NUMBER_MIN_LENGTH . ' characters.\n',
+    'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_CVV' => '* The 3 or 4 digit CVV Number must be entered from the back of the credit card (or front for American Express).\n',
+/*
+    'MODULE_PAYMENT_PAYPALR_TEXT_CC_DECLINED' => 'Your credit card was declined. Please try another card or contact your bank for more information.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_BAD_LOGIN' => 'There was a problem validating your account. Please try again.',
+
     'MODULE_PAYMENT_PAYPALR_ERROR_AVS_FAILURE_TEXT' => 'ALERT: Address Verification Failure. ',
     'MODULE_PAYMENT_PAYPALR_ERROR_CVV_FAILURE_TEXT' => 'ALERT: Card CVV Code Verification Failure. ',
     'MODULE_PAYMENT_PAYPALR_ERROR_AVSCVV_PROBLEM_TEXT' => ' Order is on hold pending review by Store Owner.',

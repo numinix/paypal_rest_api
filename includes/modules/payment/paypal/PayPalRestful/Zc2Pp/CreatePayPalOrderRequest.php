@@ -15,34 +15,37 @@ use PayPalRestful\Zc2Pp\Address;
 use PayPalRestful\Zc2Pp\Amount;
 use PayPalRestful\Zc2Pp\Name;
 
+// -----
+// Create a PayPal order request, as documented here: https://developer.paypal.com/docs/api/orders/v2/#orders_create
+//
 class CreatePayPalOrderRequest extends ErrorInfo
 {
     /**
      * Debug interface, shared with the PayPalRestfulApi class.
      */
-    protected $log; //- An instance of the Logger class, logs debug tracing information.
+    protected Logger $log; //- An instance of the Logger class, logs debug tracing information.
 
     /**
      * Local "Amount" class; it's got the to-be-used currency for the PayPal order
      * stashed in a static variable!
      */
-    protected $amount;
+    protected Amount $amount;
     
     /**
      * The currency-code in which the PayPal order is to be 'built'.
      */
-    protected $paypalCurrencyCode;
+    protected string $paypalCurrencyCode;
 
     /**
      * The request to be submitted to a v2/orders/create PayPal endpoint.
      */
-    protected $request;
+    protected array $request;
 
     /**
      * The items' pricing 'breakdown' elements, gathered by getItems and
      * and subsequently ussed by getOrderTotals.
      */
-    protected $itemBreakdown = [
+    protected array $itemBreakdown = [
         'handling' => 0,        //- aka one-time charges
         'item_total' => 0,
         'item_tax_total' => 0,
@@ -52,20 +55,26 @@ class CreatePayPalOrderRequest extends ErrorInfo
     // -----
     // Constructor.  "Converts" a Zen Cart order into an PayPal /orders/create object.
     //
-    public function __construct($order)
+    public function __construct(string $ppr_type, \order $order, array $cc_info)
     {
         $this->log = new Logger();
 
         global $currencies;
-        $this->amount = new Amount();   //- Uses no input parameter so it uses the currently calculated currency-code
+        $this->amount = new Amount($order->info['currency']);
         $this->paypalCurrencyCode = $this->amount->getDefaultCurrencyCode();
 
-        $this->log->write('CreatePayPalOrderRequest::__construct starts ...');
+        $this->log->write("CreatePayPalOrderRequest::__construct($ppr_type, ...) starts ...");
 
         $this->request = [
             'intent' => (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') ? 'CAPTURE' : 'AUTHORIZE',
             'purchase_units' => [
                 [
+                    'invoice_id' =>
+                        'PPR-' .
+                        date('YmdHis') . '-' .
+                        $_SESSION['customer_id'] . '-' .
+                        substr($_SESSION['customer_first_name'], 0, 3) . substr($_SESSION['customer_last_name'], 0, 3) . '-' .
+                        bin2hex(random_bytes(4)),
                 ],
             ],
         ];
@@ -84,7 +93,16 @@ class CreatePayPalOrderRequest extends ErrorInfo
             unset($this->request['purchase_units'][0]['items']);
         }
 
-        $this->log->write("CreatePayPalOrderRequest::__construct finished, request:\n" . Logger::logJSON($this->request));
+        // -----
+        // If this is a request to pay for the order using a credit card, add
+        // the 'card' payment source to the order-creation request.  Note that
+        // without a 'payment_source', the source defaults to 'paypal'.
+        //
+        if ($ppr_type === 'card') {
+            $this->request['payment_source']['card'] = $this->buildCardPaymentSource($order, $cc_info);
+        }
+
+        $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request));
     }
 
     public function get()
@@ -235,5 +253,20 @@ class CreatePayPalOrderRequest extends ErrorInfo
         global $currencies;
 
         return number_format((float)$currencies->rateAdjusted($value, true, $this->paypalCurrencyCode), 2, '.', '');
+    }
+
+    protected function buildCardPaymentSource(\order $order, array $cc_info): array
+    {
+        return [
+            'name' => $cc_info['name'],
+            'number' => $cc_info['number'],
+            'security_code' => $cc_info['security_code'],
+            'expiry' => $cc_info['expiry_year'] . '-' . $cc_info['expiry_month'],
+            'billing_address' => Address::get($order->billing),
+            'experience_context' => [
+                'return_url' => $cc_info['webhook'] . '?op=3ds_challenge_return',
+                'cancel_url' => $cc_info['webhook'] . '?op=3ds_challenge_cancel',
+            ],
+        ];
     }
 }

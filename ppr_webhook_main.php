@@ -17,7 +17,7 @@ if (($op !== 'cancel' && $op !== 'return') || !isset($_GET['token'], $_SESSION['
 
 if ($op === 'cancel') {
     $messageStack->add_session('checkout', '**FIXME** Cancelled from PayPal payment choice.', 'caution');
-    zen_redirect(zen_href_link(FILENAME_CHECKOUT_SHIPPING));
+    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT));
 }
 
 $logger = new Logger();
@@ -37,9 +37,16 @@ if ($order_status === false) {
     zen_redirect(zen_href_link(FILENAME_SHOPPING_CART));
 }
 
+// -----
+// Save the PayPal status response's (er) status in the session-based PayPal
+// order array and indicate that the payment has been confirmed so that
+// the base payment module "knows" that the payment-confirmation at PayPal
+// has been completed.
+//
 $_SESSION['PayPalRestful']['Order']['status'] = $order_status['status'];
-$logger->write("Order's status set to {$order_status['status']}; redirecting to checkout_process.", true, 'after');
-zen_redirect(zen_href_link(FILENAME_CHECKOUT_PROCESS));
+$_SESSION['PayPalRestful']['Order']['payment_confirmed'] = true;
+$logger->write("Order's status set to {$order_status['status']}; redirecting to checkout_confirmation.", true, 'after');
+zen_redirect(zen_href_link(FILENAME_CHECKOUT_CONFIRMATION));
 
 // -----
 // Note, redundant as execution will never reach here!
