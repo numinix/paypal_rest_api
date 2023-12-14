@@ -15,15 +15,6 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_AUTO_DISABLED' => ' The payment module has been automatically disabled.',
 
     // -----
-    // Admin alert-email messages.
-    //
-    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPalCheckout Error (%s)',    //- %s is an additional error descriptor, see below
-        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION' => 'Configuration',
-        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
-
-    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
-
-    // -----
     // Storefront messages.
     //
     'MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL' => 'Paying via PayPal',     //- Used by the confirmation method, when paying via PayPal Checkout (paypal)
@@ -217,21 +208,68 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_CVV2MATCH' => 'CVV2 match:',
 
     'MODULE_PAYMENT_PAYPALR_ERROR_HEADING' => 'We\'re sorry, but we were unable to process your credit card.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CARD_ERROR' => 'The credit card information you entered contains an error.  Please check it and try again.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_FIRSTNAME' => 'Credit Card First Name:',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_LASTNAME' => 'Credit Card Last Name:',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_TYPE' => 'Credit Card Type:',
+
     'MODULE_PAYMENT_PAYPALR_TEXT_CC_ISSUE' => 'Credit Card Issue Date:',
 */
     // -----
     // Constants used when processing credit-cards
     //
     'MODULE_PAYMENT_PAYPALR_CC_OWNER' => 'Cardholder Name:',
+    'MODULE_PAYMENT_PAYPALR_CC_TYPE' => 'Credit Card Type:',
     'MODULE_PAYMENT_PAYPALR_CC_NUMBER' => 'Credit Card Number:',
     'MODULE_PAYMENT_PAYPALR_CC_EXPIRES' => 'Credit Card Expiry Date:',
     'MODULE_PAYMENT_PAYPALR_CC_CVV' => 'CVV Number:',
 
+    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH' => 'The <em>CVV Number</em> for %1$s cards must be %2$u digits in length.',  //- %1$s is the card type, %2$u is the required CVV length
     'MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD' => 'We apologize for the inconvenience, but the credit card you entered is not one that we accept. Please use a different credit card.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR' => 'An error occurred when we tried to process your credit card. Please try again, select an alternate payment method or contact the store owner for assistance.',
+
+    'MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED' => 'The card ending with \'%s\' was declined.',     //- %s is the last-4 of the card-number.
+    'MODULE_PAYMENT_PAYPALR_TEXT_DECLINED_REASON_UNKNOWN' => 'If you continue to receive this message, please contact us and supply reason-code \'%s\'.', //- %s is ['processor_response']['response_code']
+
+    // -----
+    // Admin alert-email messages.
+    //
+    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPalCheckout Error (%s)',    //- %s is an additional error descriptor, see below
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION' => 'Configuration',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL' => 'Unknown Denial Reason',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD' => 'Lost/Stolen/Fraudulent Card',
+
+    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
+
+    // -----
+    // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.
+    //
+
+    // -----
+    // %1$s: ['processor_response']['response_code']
+    // %2$s: $_SESSION['customer_first_name']
+    // %3$s: $_SESSION['customer_last_name']
+    // $4%u: $_SESSION['customer_id']
+    //
+    'MODULE_PAYMENT_PAYPALR_ALERT_UNKNOWN_DENIAL' =>
+        'PayPal returned an unknown response code (%1$s) for a denied credit-card payment.' . "\n\n" .
+        'The payment was attempted by %2$s %3$s (customer id %4$u). Formatted card-details follow:' . "\n\n",
+
+    // -----
+    // %1$s: One of the two language constants that follow.
+    // %2$s: $_SESSION['customer_first_name']
+    // %3$s: $_SESSION['customer_last_name']
+    // $4%u: $_SESSION['customer_id']
+    //
+    'MODULE_PAYMENT_PAYPALR_ALERT_LOST_STOLEN_CARD' =>
+        'A credit-card payment was attempted with a %1$s card.' . "\n\n" .
+        'The payment was attempted by %2$s %3$s (customer id %4$u). Formatted card-details follow:' . "\n\n",
+    'MODULE_PAYMENT_PAYPALR_CARD_LOST' => 'lost or stolen',
+    'MODULE_PAYMENT_PAYPALR_CARD_FRAUDULENT' => 'fraudulent',
+
+    // -----
+    // For these messages, %1$s is the card-type and %2$s is the last-4 of the card-number.
+    //
+    'MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRED' => 'The %1$s card ending with \'%2$s\' has expired.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS' => 'The %1$s card ending with \'%2$s\' has insufficient funds.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_FAILED' => 'The "CVV Number" you entered for the %1$s card ending with \'%2$s\' is not correct.  Please try again.',
 
     // -----
     // Used by the payment module's javascript_validation method.
@@ -241,7 +279,6 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_CVV' => '* The 3 or 4 digit CVV Number must be entered from the back of the credit card (or front for American Express).\n',
 /*
     'MODULE_PAYMENT_PAYPALR_TEXT_CC_DECLINED' => 'Your credit card was declined. Please try another card or contact your bank for more information.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR' => 'An error occurred when we tried to process your credit card. Please try again, select an alternate payment method or contact the store owner for assistance.',
     'MODULE_PAYMENT_PAYPALR_TEXT_BAD_LOGIN' => 'There was a problem validating your account. Please try again.',
 
     'MODULE_PAYMENT_PAYPALR_ERROR_AVS_FAILURE_TEXT' => 'ALERT: Address Verification Failure. ',

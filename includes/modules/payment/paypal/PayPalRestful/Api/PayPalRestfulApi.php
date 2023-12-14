@@ -40,7 +40,7 @@ class PayPalRestfulApi extends ErrorInfo
 
     // -----
     // PayPal constants associated with an order/payment's current 'status'. Also
-    // used for the paypal::txn_type field.
+    // used for the paypal::payment_status field.
     //
     public const STATUS_APPROVED = 'APPROVED';
     public const STATUS_CAPTURED = 'CAPTURED';

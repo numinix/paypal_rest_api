@@ -23,29 +23,29 @@ class CreatePayPalOrderRequest extends ErrorInfo
     /**
      * Debug interface, shared with the PayPalRestfulApi class.
      */
-    protected $log; //- An instance of the Logger class, logs debug tracing information.
+    protected Logger $log; //- An instance of the Logger class, logs debug tracing information.
 
     /**
      * Local "Amount" class; it's got the to-be-used currency for the PayPal order
      * stashed in a static variable!
      */
-    protected $amount;
+    protected Amount $amount;
     
     /**
      * The currency-code in which the PayPal order is to be 'built'.
      */
-    protected $paypalCurrencyCode;
+    protected string $paypalCurrencyCode;
 
     /**
      * The request to be submitted to a v2/orders/create PayPal endpoint.
      */
-    protected $request;
+    protected array $request;
 
     /**
      * The items' pricing 'breakdown' elements, gathered by getItems and
      * and subsequently ussed by getOrderTotals.
      */
-    protected $itemBreakdown = [
+    protected array $itemBreakdown = [
         'handling' => 0,        //- aka one-time charges
         'item_total' => 0,
         'item_tax_total' => 0,
@@ -60,10 +60,10 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $this->log = new Logger();
 
         global $currencies;
-        $this->amount = new Amount();   //- Uses no input parameter so it uses the currently calculated currency-code
+        $this->amount = new Amount($order->info['currency']);
         $this->paypalCurrencyCode = $this->amount->getDefaultCurrencyCode();
 
-        $this->log->write('CreatePayPalOrderRequest::__construct starts ...');
+        $this->log->write("CreatePayPalOrderRequest::__construct($ppr_type, ...) starts ...");
 
         $this->request = [
             'intent' => (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') ? 'CAPTURE' : 'AUTHORIZE',
@@ -74,7 +74,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
                         date('YmdHis') . '-' .
                         $_SESSION['customer_id'] . '-' .
                         substr($_SESSION['customer_first_name'], 0, 3) . substr($_SESSION['customer_last_name'], 0, 3) . '-' .
-                        random_bytes(4),
+                        bin2hex(random_bytes(4)),
                 ],
             ],
         ];
@@ -102,7 +102,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $this->request['payment_source']['card'] = $this->buildCardPaymentSource($order, $cc_info);
         }
 
-        $this->log->write("CreatePayPalOrderRequest::__construct finished, request:\n" . Logger::logJSON($this->request));
+        $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request));
     }
 
     public function get()

@@ -322,7 +322,7 @@ class GetPayPalOrderTransactions
         $parent_txn_id = $paypal_response['id'];
         $sql_data_array = [
             'payment_status' => $paypal_response['status'],
-            'pending_status' => $paypal_response['status_details']['reason'] ?? 'null',
+            'pending_reason' => $paypal_response['status_details']['reason'] ?? 'null',
             'notify_version' => $this->moduleVersion,
             'last_modified' => Helpers::convertPayPalDatePay2Db($paypal_response['update_time']),
         ];
