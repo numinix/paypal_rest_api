@@ -509,25 +509,40 @@ class paypalr extends base
         $ppr_cc_expires_month_id = $this->code . '-cc-expires-month';
         $ppr_cc_cvv_id = $this->code . '-cc-cvv';
 
+        // -----
+        // Determine which of the payment methods is currently selected, noting
+        // that if this module is not the one currently selected that the
+        // customer needs to choose one to select the payment module!
+        //
+        $selected_payment_module = $_SESSION['payment'] ?? '';
+        if ($selected_payment_module !== $this->code) {
+            $paypal_selected = '';
+            $card_selected = '';
+            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['PayPalRestful']['ppr_type']);
+        } else {
+            $ppr_type = $_SESSION['PayPalRestful']['ppr_type'] ?? 'paypal';
+            $paypal_selected = ($ppr_type === 'paypal') ? ' checked="checked"' : '';
+            $card_selected = ($paypal_selected === '') ? ' checked="checked"' : '';
+        }
         $on_focus = ' onfocus="methodSelect(\'pmt-' . $this->code . '\')"';
         return [
             'id' => $this->code,
             'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE,
             'fields' => [
                 [
-                    'title' => MODULE_PAYMENT_PALPALR_HOW_TO_PAY,
+                    'title' => MODULE_PAYMENT_PALPALR_CHOOSE_METHOD,
                     'field' =>
                         '<style nonce="">' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css') . '</style>' .
                         '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>' .
                         '<ul id="ppr-buttons">' .
                             '<li>' .
-                                '<input type="radio" class="ppr-choice" id="ppr-paypal" name="ppr_type" value="paypal"' . $on_focus . '>' .
+                                '<input type="radio" class="ppr-choice" id="ppr-paypal" name="ppr_type" value="paypal"' . $on_focus . $paypal_selected . '>' .
                                 '<label for="ppr-paypal">' .
                                     '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
                                 '</label>' .
                             '</li>' .
                             '<li>' .
-                                '<input type="radio" class="ppr-choice" id="ppr-card" name="ppr_type" value="card"' . $on_focus . '>' .
+                                '<input type="radio" class="ppr-choice" id="ppr-card" name="ppr_type" value="card"' . $on_focus . $card_selected . '>' .
                                 '<label for="ppr-card">' .
                                     'Credit Card' .
                                 '</label>' .
@@ -562,7 +577,8 @@ class paypalr extends base
     }
 
     // --------------------------------------------
-    // Issued during the "confirmation" phase of the checkout process.
+    // Issued during the "confirmation" phase of the checkout process, called
+    // here IFF this payment module was selected during the "payment" phase!
     // --------------------------------------------
 
     public function pre_confirmation_check()
@@ -579,6 +595,7 @@ class paypalr extends base
         $ppr_type = 'paypal';
         if (isset($_POST['ppr_type'])) {
             $ppr_type = $_POST['ppr_type'];
+            $_SESSION['PayPalRestful']['ppr_type'] = $ppr_type;
             if ($ppr_type === 'card' && $this->validateCardInformation() === false) {
                 $log_only = true;
                 $this->setMessageAndRedirect("pre_confirmation_check, card failed initial validation.", FILENAME_CHECKOUT_PAYMENT, $log_only);
@@ -688,7 +705,7 @@ class paypalr extends base
         $cvv_posted = $_POST['ppr_cc_cvv'] ?? '';
         $cvv_required_length = ($cc_validation->cc_type === 'American Express') ? 4 : 3;
         if (!ctype_digit($cvv_posted) || strlen($cvv_posted) !== $cvv_required_length) {
-            $messageStack->add_session('checkout_payment', sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH, $cc_validation->cc_type, $cvv_required_length), 'error');
+            $messageStack->add_session('checkout_payment', sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH, $cc_validation->cc_type, substr($cc_validation->cc_number, -4), $cvv_required_length), 'error');
             return false;
         }
 
