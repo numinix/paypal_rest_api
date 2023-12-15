@@ -80,7 +80,7 @@ class paypalr extends base
      *
      * @var boolean
      */
-    public bool $emailAlerts;
+    protected bool $emailAlerts;
 
     /**
      * sort order of display
@@ -419,7 +419,7 @@ class paypalr extends base
 
     protected function resetOrder()
     {
-        unset($_SESSION['PayPalRestful']['Order']);
+        unset($_SESSION['PayPalRestful']['Order'], $_SESSION['PayPalRestful']['ppr_type'], $_SESSION['PayPalRestful']['Order']['payment_confirmed']);
     }
 
     // --------------------------------------------
@@ -518,7 +518,7 @@ class paypalr extends base
         if ($selected_payment_module !== $this->code) {
             $paypal_selected = '';
             $card_selected = '';
-            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['PayPalRestful']['ppr_type']);
+            $this->resetOrder();
         } else {
             $ppr_type = $_SESSION['PayPalRestful']['ppr_type'] ?? 'paypal';
             $paypal_selected = ($ppr_type === 'paypal') ? ' checked="checked"' : '';
@@ -663,9 +663,9 @@ class paypalr extends base
             trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", Logger::logJSON($payment_choice_response), E_USER_WARNING);
             $this->setMessageAndRedirect("confirmPaymentSource, no payer-action link found.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
         }
-        $this->form_action_url = $action_link;
 
-        $this->log->write('pre_confirmation_check, completed.', true, 'after');
+        $this->log->write('pre_confirmation_check, sending the payer-action off to PayPal.', true, 'after');
+        zen_redirect($action_link);
     }
     protected function validateCardInformation(): bool
     {
