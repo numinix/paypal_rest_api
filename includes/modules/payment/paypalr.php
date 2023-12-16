@@ -244,7 +244,7 @@ class paypalr extends base
         // -----
         // No cards enabled, no cards can be accepted.
         //
-        if ($cards_accepted->EOF) {
+        if ($cards_accepted_db->EOF) {
             return false;
         }
 
@@ -281,7 +281,7 @@ class paypalr extends base
                     $this->cardImages['SOLO'] = 'solo.png';
                     break;
                 case 'VISA':
-                $cards_accepted = true;
+                    $cards_accepted = true;
                     $this->cardImages['VISA'] = 'visa.png';
                     break;
                 default:
@@ -593,6 +593,16 @@ class paypalr extends base
             $card_selected = !$paypal_selected;
         }
 
+        // -----
+        // If the site's active template has overridden the styling for the button-choices,
+        // load that version instead of the default.
+        //
+        if (file_exists(DIR_FS_CATALOG . DIR_WS_TEMPLATE . 'css/paypalr.css')) {
+            $css_file_name = DIR_WS_TEMPLATE . 'css/paypalr.css';
+        } else {
+            $css_file_name = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css';
+        }
+
         $on_focus = ' onfocus="methodSelect(\'pmt-' . $this->code . '\')"';
         return [
             'id' => $this->code,
@@ -600,24 +610,29 @@ class paypalr extends base
             'fields' => [
                 [
                     'title' =>
-                        '<style nonce="">' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css') . '</style>' .
+                        // -----
+                        // Note: CSS 'inspired' by: https://codepen.io/phusum/pen/VQrQqy
+                        //
+                        '<style nonce="">' . file_get_contents($css_file_name) . '</style>' .
                         '<span class="ppr-choice-label">' . MODULE_PAYMENT_PAYPALR_CHOOSE_PAYPAL . '</span>',
                     'field' =>
-                        zen_draw_radio_field('ppr_type', 'paypal', $paypal_selected, 'id="ppr-paypal" class="ppr-choice"' . $on_focus) .
-                        '<label for="ppr-paypal" class="radioButtonLabel ppr-choice-label"' . $on_focus . '>' .
-                            '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
-                        '</label>' .
-                        '<div class="clearBoth"></div>',
+                        '<div id="ppr-choice-paypal" class="ppr-button-choice">' .
+                            zen_draw_radio_field('ppr_type', 'paypal', $paypal_selected, 'id="ppr-paypal" class="ppr-choice"' . $on_focus) .
+                            '<label for="ppr-paypal" class="ppr-choice-label"' . $on_focus . '>' .
+                                '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
+                            '</label>' .
+                        '</div>',
                 ],
                 [
                     'title' => '<span class="ppr-choice-label">' . MODULE_PAYMENT_PALPALR_CHOOSE_CARD . '</span>' ,
                     'field' =>
                         '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>' .
-                        zen_draw_radio_field('ppr_type', 'card', $card_selected, 'id="ppr-card" class="ppr-choice"' . $on_focus) .
-                        '<label for="ppr-card" class="radioButtonLabel ppr-choice-label"' . $on_focus . '>' .
-                            $this->buildCardsAccepted() .
-                        '</label>' .
-                        '<div class="clearBoth"></div>',
+                        '<div class="ppr-button-choice">' .
+                            zen_draw_radio_field('ppr_type', 'card', $card_selected, 'id="ppr-card" class="ppr-choice"' . $on_focus) .
+                            '<label for="ppr-card" class="ppr-choice-label"' . $on_focus . '>' .
+                                $this->buildCardsAccepted() .
+                            '</label>' .
+                        '</div>',
                 ],
                 [
                     'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER,
