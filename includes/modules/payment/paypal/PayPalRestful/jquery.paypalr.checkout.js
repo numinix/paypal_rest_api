@@ -4,7 +4,7 @@ jQuery(document).ready(function() {
         jQuery('.ppr-cc').each(function() {
             jQuery(this).hide().prop('disabled', true);
             jQuery(this).prev('label').hide();
-            jQuery(this).next('br').hide();
+            jQuery(this).next('br, div.p-2').hide();
         });
     }
     function showPprCcFields()
@@ -12,13 +12,14 @@ jQuery(document).ready(function() {
         jQuery('.ppr-cc').each(function() {
             jQuery(this).show().prop('disabled', false);;
             jQuery(this).prev('label').show();
-            jQuery(this).next('br').show();
+            jQuery(this).next('br, div.p-2').show();
         });
     }
 
     if (jQuery('#ppr-card').is(':not(:checked)')) {
         hidePprCcFields();
     }
+
     jQuery('input[name=payment], .ppr-choice').on('change', function() {
         if (jQuery('#pmt-paypalr').is(':not(:checked)') || jQuery('#ppr-card').is(':not(:checked)')) {
             hidePprCcFields();

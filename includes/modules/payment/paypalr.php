@@ -138,13 +138,15 @@ class paypalr extends base
      * to be sent to PayPal for a 'card' transaction.
      */
     private array $ccInfo = [];
-    
+
     /**
      * Indicates whether/not credit-card payments are to be accepted during storefront
-     * processing.
+     * processing and, if so, an array that maps a credit-card's name to its associated
+     * image.
      */
     protected bool $cardsAccepted = false;
-    
+    protected array $cardImages = [];
+
     /**
      * Indicates whether/not an otherwise approved payment is pending review.
      */
@@ -196,9 +198,15 @@ class paypalr extends base
         //
         // Note: For this type of payment to be enabled on the storefront:
         // 1) The payment-method needs to be enabled via configuration.
-        // 2) The site must _either_ be running or the 'sandbox' server or using SSL-encryption.
+        // 2) The site must _either_ be running on the 'sandbox' server or using SSL-encryption.
+        //
+        // If enabled via configuration, further check to see that at least one of the card types
+        // supported by PayPal is also supported by the site.
         //
         $this->cardsAccepted = (IS_ADMIN_FLAG === false && MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS === 'true' && (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox' || strpos(HTTP_SERVER, 'https://') === 0));
+        if ($this->cardsAccepted === true) {
+            $this->cardsAccepted = $this->checkCardsAcceptedForSite();
+        }
 
         $this->enabled = (MODULE_PAYMENT_PAYPALR_STATUS === 'True');
         if ($this->enabled === true) {
@@ -222,6 +230,66 @@ class paypalr extends base
     protected function alertMsg(string $msg)
     {
         return '<b class="text-danger">' . $msg . '</b>';
+    }
+    protected function checkCardsAcceptedForSite(): bool
+    {
+        global $db;
+
+        // -----
+        // See which cards are enabled via Configuration :: Credit Cards.  The
+        // SQL query is defined in /includes/classes/db/mysql/define_queries.php.
+        //
+        $cards_accepted_db = $db->Execute(SQL_CC_ENABLED);
+
+        // -----
+        // No cards enabled, no cards can be accepted.
+        //
+        if ($cards_accepted->EOF) {
+            return false;
+        }
+
+        // -----
+        // Loop through the cards accepted on the site, ensuring that at
+        // least one supported by PayPal is enabled.
+        //
+        $cards_accepted = false;
+        foreach ($cards_accepted_db as $next_card) {
+            $next_card = str_replace('CC_ENABLED_', '', $next_card['configuration_key']);
+            switch ($next_card) {
+                case 'AMEX':
+                    $cards_accepted = true;
+                    $this->cardImages['American Express'] = 'american_express.png';
+                    break;
+                case 'DISCOVER':
+                    $cards_accepted = true;
+                    $this->cardImages['Discover'] = 'discover.png';
+                    break;
+                case 'JCB':
+                    $cards_accepted = true;
+                    $this->cardImages['JCB'] = 'jcb.png';
+                    break;
+                case 'MAESTRO':
+                    $cards_accepted = true;
+                    $this->cardImages['Maestro'] = 'maestro.png';
+                    break;
+                case 'MC':
+                    $cards_accepted = true;
+                    $this->cardImages['MasterCard'] = 'mastercard.png';
+                    break;
+                case 'SOLO':
+                    $cards_accepted = true;
+                    $this->cardImages['SOLO'] = 'solo.png';
+                    break;
+                case 'VISA':
+                $cards_accepted = true;
+                    $this->cardImages['VISA'] = 'visa.png';
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        return $cards_accepted;
     }
 
     public static function getEnvironmentInfo(): array
@@ -516,38 +584,40 @@ class paypalr extends base
         //
         $selected_payment_module = $_SESSION['payment'] ?? '';
         if ($selected_payment_module !== $this->code) {
-            $paypal_selected = '';
-            $card_selected = '';
+            $paypal_selected = false;
+            $card_selected = false;
             $this->resetOrder();
         } else {
             $ppr_type = $_SESSION['PayPalRestful']['ppr_type'] ?? 'paypal';
-            $paypal_selected = ($ppr_type === 'paypal') ? ' checked="checked"' : '';
-            $card_selected = ($paypal_selected === '') ? ' checked="checked"' : '';
+            $paypal_selected = ($ppr_type === 'paypal');
+            $card_selected = !$paypal_selected;
         }
+
         $on_focus = ' onfocus="methodSelect(\'pmt-' . $this->code . '\')"';
         return [
             'id' => $this->code,
             'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE,
             'fields' => [
                 [
-                    'title' => MODULE_PAYMENT_PALPALR_CHOOSE_METHOD,
-                    'field' =>
+                    'title' =>
                         '<style nonce="">' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css') . '</style>' .
+                        '<span class="ppr-choice-label">' . MODULE_PAYMENT_PAYPALR_CHOOSE_PAYPAL . '</span>',
+                    'field' =>
+                        zen_draw_radio_field('ppr_type', 'paypal', $paypal_selected, 'id="ppr-paypal" class="ppr-choice"' . $on_focus) .
+                        '<label for="ppr-paypal" class="radioButtonLabel ppr-choice-label"' . $on_focus . '>' .
+                            '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
+                        '</label>' .
+                        '<div class="clearBoth"></div>',
+                ],
+                [
+                    'title' => '<span class="ppr-choice-label">' . MODULE_PAYMENT_PALPALR_CHOOSE_CARD . '</span>' ,
+                    'field' =>
                         '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>' .
-                        '<ul id="ppr-buttons">' .
-                            '<li>' .
-                                '<input type="radio" class="ppr-choice" id="ppr-paypal" name="ppr_type" value="paypal"' . $on_focus . $paypal_selected . '>' .
-                                '<label for="ppr-paypal">' .
-                                    '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
-                                '</label>' .
-                            '</li>' .
-                            '<li>' .
-                                '<input type="radio" class="ppr-choice" id="ppr-card" name="ppr_type" value="card"' . $on_focus . $card_selected . '>' .
-                                '<label for="ppr-card">' .
-                                    'Credit Card' .
-                                '</label>' .
-                            '</li>' .
-                        '</ul>',
+                        zen_draw_radio_field('ppr_type', 'card', $card_selected, 'id="ppr-card" class="ppr-choice"' . $on_focus) .
+                        '<label for="ppr-card" class="radioButtonLabel ppr-choice-label"' . $on_focus . '>' .
+                            $this->buildCardsAccepted() .
+                        '</label>' .
+                        '<div class="clearBoth"></div>',
                 ],
                 [
                     'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER,
@@ -574,6 +644,15 @@ class paypalr extends base
                 ],
             ],
         ];
+    }
+    protected function buildCardsAccepted(): string
+    {
+        $cards_accepted = '';
+        $card_image_directory = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/images/';
+        foreach ($this->cardImages as $card_name => $card_image) {
+            $cards_accepted .= '<img src="' . $card_image_directory . $card_image . '" alt="' . $card_name . '" title="' . $card_name . '"> ';
+        }
+        return $cards_accepted;
     }
 
     // --------------------------------------------
@@ -809,7 +888,9 @@ class paypalr extends base
     public function confirmation()
     {
         if ($_SESSION['PayPalRestful']['Order']['payment_source'] !== 'card') {
-            return false;
+            return [
+                'title' => MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL,
+            ];
         }
 
         global $zcDate;
@@ -1702,7 +1783,7 @@ class paypalr extends base
             "INSERT INTO " . TABLE_CONFIGURATION . "
                 (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
              VALUES
-                ('Enable this Payment Module', 'MODULE_PAYMENT_PAYPALR_STATUS', 'False', 'Do you want to enable this payment module?', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now()),
+                ('Enable this Payment Module?', 'MODULE_PAYMENT_PAYPALR_STATUS', 'False', 'Do you want to enable this payment module?', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now()),
 
                 ('Environment', 'MODULE_PAYMENT_PAYPALR_SERVER', 'live', '<b>Live: </b> Used to process Live transactions<br><b>Sandbox: </b>For developers and testing', 6, 0, 'zen_cfg_select_option([\'live\', \'sandbox\'], ', NULL, now()),
 

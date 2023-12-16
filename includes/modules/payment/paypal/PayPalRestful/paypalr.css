@@ -1,37 +1,9 @@
-/* Inspired by https://stackoverflow.com/questions/16242980/making-radio-buttons-look-like-buttons-instead */
-#ppr-buttons {
-    list-style-type: none;
-    padding: 0 0 3vh 0;
-    height: 2vh;
+.ppr-choice-label {
+    font-weight: bold;
+    width: 11rem;
+    display: inline-block;
 }
-#ppr-buttons li {
-    float: left;
-    margin: 0 1vw 0 0;
-    width: 8vw;
-    height: 5vh;
-    position: relative;
-}
-#ppr-buttons label,
-#ppr-buttons input {
-    display: inline;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-}
-#ppr-buttons input[type="radio"] {
-    opacity: 0.01;
-    z-index: 100;
-}
-#ppr-buttons input[type="radio"]:checked+label {
+.ppr-choice:checked+label {
+    padding-bottom: .5rem;
     border-bottom: 2px solid #ccc;
-}
-#ppr-buttons label {
-    text-align: center;
-    cursor: pointer;
-    z-index: 90;
-    height: 6vh;
-}
-#ppr-buttons label:hover {
 }
