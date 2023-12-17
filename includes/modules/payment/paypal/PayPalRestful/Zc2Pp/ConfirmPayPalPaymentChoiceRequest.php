@@ -36,6 +36,21 @@ class ConfirmPayPalPaymentChoiceRequest
         //
         $brand_name = (MODULE_PAYMENT_PAYPALR_BRANDNAME !== '') ? MODULE_PAYMENT_PAYPALR_BRANDNAME : STORE_NAME;
 
+        // -----
+        // Determine the post-choice action for the customer. If we're running the 'standard' 3-page
+        // checkout or OPC where this payment module is in the 'confirmation-required' list, then
+        // the customer can review their order prior to order-confirmation.
+        //
+        // Otherwise, the customer confirms their order on the PayPal payment selection.
+        //
+        $user_action = 'CONTINUE';
+        global $current_page_base;
+        if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
+            if (!in_array('paypalr', explode(',', str_replace(' ', '', CHECKOUT_ONE_CONFIRMATION_REQUIRED)))) {
+                $user_action = 'PAY_NOW';
+            }
+        }
+
         $this->request = [
             'paypal' => [
                 'name' => [
@@ -49,7 +64,7 @@ class ConfirmPayPalPaymentChoiceRequest
 //                    'locale' => 'en-US',
                     'landing_page' => 'NO_PREFERENCE',  //- LOGIN, GUEST_CHECKOUT or NO_PREFERENCE
                     'shipping_preference' => $shipping_preference,    //- GET_FROM_FILE (allows shipping address change on PayPal), NO_SHIPPING, SET_PROVIDED_ADDRESS (customer can't change)
-                    'user_action' => 'CONTINUE',  //- PAY_NOW or CONTINUE
+                    'user_action' => $user_action,  //- PAY_NOW or CONTINUE
                     'return_url' => $webhook_name . '?op=return',
                     'cancel_url' => $webhook_name . '?op=cancel',
                 ],

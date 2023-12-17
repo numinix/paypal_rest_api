@@ -224,10 +224,12 @@ $define = [
 
     'MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH' => 'The <em>CVV Number</em> for your %1$s card ending in <var>%2$s</var> must be %3$u digits in length.',  //- %1$s is the card type, , %2$s is the last-r, %3$u is the CVV length
     'MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD' => 'We apologize for the inconvenience, but the credit card you entered is not one that we accept. Please use a different credit card.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR' => 'An error occurred when we tried to process your credit card. Please try again, select an alternate payment method or contact the store owner for assistance.',
 
+    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR' => 'An error occurred when we tried to process your credit card.',
     'MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED' => 'The card ending with <var>%s</var> was declined.',     //- %s is the last-4 of the card-number.
     'MODULE_PAYMENT_PAYPALR_TEXT_DECLINED_REASON_UNKNOWN' => 'If you continue to receive this message, please contact us and supply reason-code \'%s\'.', //- %s is ['processor_response']['response_code']
+
+    'MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN' => 'Please try again, select an alternate payment method or contact us for assistance.',
 
     // -----
     // Admin alert-email messages.
@@ -256,22 +258,23 @@ $define = [
 
     // -----
     // %1$s: One of the two language constants that follow.
-    // %2$s: $_SESSION['customer_first_name']
-    // %3$s: $_SESSION['customer_last_name']
-    // $4%u: $_SESSION['customer_id']
+    // %2$s: $_SESSION['customers_ip_address']
+    // %3$s: $_SESSION['customer_first_name']
+    // %4$s: $_SESSION['customer_last_name']
+    // $5%u: $_SESSION['customer_id']
     //
     'MODULE_PAYMENT_PAYPALR_ALERT_LOST_STOLEN_CARD' =>
-        'A credit-card payment was attempted with a %1$s card.' . "\n\n" .
-        'The payment was attempted by %2$s %3$s (customer id %4$u). Formatted card-details follow:' . "\n\n",
+        'A credit-card payment was attempted with a %1$s card from IP address %2$s.' . "\n\n" .
+        'The payment was attempted by %3$s %4$s (customer id %5$u). Formatted card-details follow:' . "\n\n",
     'MODULE_PAYMENT_PAYPALR_CARD_LOST' => 'lost or stolen',
     'MODULE_PAYMENT_PAYPALR_CARD_FRAUDULENT' => 'fraudulent',
 
     // -----
     // For these messages, %1$s is the card-type and %2$s is the last-4 of the card-number.
     //
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRED' => 'The %1$s card ending with \'%2$s\' has expired.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS' => 'The %1$s card ending with \'%2$s\' has insufficient funds.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_FAILED' => 'The "CVV Number" you entered for the %1$s card ending with \'%2$s\' is not correct.  Please try again.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRED' => 'The %1$s card ending with <var>%2$s</var> has expired.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS' => 'The %1$s card ending with <var>%2$s</var> has insufficient funds.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_FAILED' => 'The "CVV Number" you entered for the %1$s card ending with <var>%2$s</var> is not correct.',
 
     // -----
     // Used by the payment module's javascript_validation method.

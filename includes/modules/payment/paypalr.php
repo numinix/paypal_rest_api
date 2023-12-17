@@ -153,6 +153,17 @@ class paypalr extends base
     protected bool $paymentIsPending = false;
 
     /**
+     * Indicates whether/not we're on the One-Page-Checkout confirmation page.  Possibly
+     * set true by the update_status method.  Also captured on this page is the original,
+     * pre-confirmation check, value of the $_SESSION['PayPalRestful'] element.
+     *
+     * It'll be needed if this payment method is configured by OPC to 'not need' confirmation
+     * so that we can fake out the before/after session-check.
+     */
+    protected bool $onOpcConfirmationPage = false;
+    protected array $paypalRestfulSessionOnEntry = [];
+
+    /**
      * class constructor
      */
     public function __construct()
@@ -182,7 +193,7 @@ class paypalr extends base
         if ($debug === true) {
             $this->log->enableDebug();
         }
-        $this->emailAlerts = ($debug === true || MODULE_PAYMENT_PAYPALR_DEBUGGING === 'Alerts Only');
+        $this->emailAlerts = (MODULE_PAYMENT_PAYPALR_DEBUGGING === 'Alerts Only' || MODULE_PAYMENT_PAYPALR_DEBUGGING === 'Log and Email');
 
         // -----
         // An order's *initial* order-status depending on the mode in which the PayPal transaction
@@ -192,7 +203,7 @@ class paypalr extends base
         $this->order_status = ($order_status > 1) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
 
         $this->zone = (int)MODULE_PAYMENT_PAYPALR_ZONE;
-        
+
         // -----
         // Determine whether credit-card payments are to be accepted on the storefront.
         //
@@ -292,6 +303,7 @@ class paypalr extends base
         return $cards_accepted;
     }
 
+    // ----- Static function used by the root-directory web-hook
     public static function getEnvironmentInfo(): array
     {
         // -----
@@ -304,7 +316,7 @@ class paypalr extends base
             $client_id = MODULE_PAYMENT_PAYPALR_CLIENTID_S;
             $secret = MODULE_PAYMENT_PAYPALR_SECRET_S;
         }
-        
+
         return [
             $client_id,
             $secret,
@@ -382,7 +394,7 @@ class paypalr extends base
             $messageStack->add_session($error_message, 'error');
             $this->description = $this->alertMsg($error_message) . '<br><br>' . $this->description;
         } else {
-            $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, $error_message);
+            $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, $error_message, true);
         }
     }
     protected function tableCheckup()
@@ -404,7 +416,7 @@ class paypalr extends base
      */
     public function update_status()
     {
-        global $order, $current_page_base;
+        global $order;
 
         if ($this->enabled === false || !isset($order->billing['country']['id'])) {
             return;
@@ -473,6 +485,15 @@ class paypalr extends base
             }
         }
 
+        // -----
+        // Still here?  Check to see if we're on the OPC confirmation page.
+        //
+        global $current_page_base;
+        if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
+            $this->onOpcConfirmationPage = true;
+            $this->paypalRestfulSessionOnEntry = $_SESSION['PayPalRestful'] ?? [];
+            $this->attach($this, ['NOTIFY_OPC_OBSERVER_SESSION_FIXUPS']);
+        }
 /* Not seeing this limitation during initial testing
         // module cannot be used for purchase > $10,000 USD equiv
         if (!function_exists('paypalUSDCheck')) {
@@ -483,6 +504,19 @@ class paypalr extends base
             $this->log->write('update_status: Module disabled because purchase price (' . $order->info['total']. ') exceeds PayPal-imposed maximum limit of 10,000 USD or equivalent.');
         }
 */
+    }
+
+    // -----
+    // One-Page-Checkout's session-hash will have hissy-fits with the $_SESSION['PayPalRestful'] element, since
+    // that's likely to change during the pre-confirmation step for the 'paypal' payment type.
+    //
+    // This method just replaces the 'after-hash' value of $_SESSION['PayPalRestful'] with the 'before-hash'
+    // value; there's nothing in that element that affects the ability for the customer to 'pay now'.
+    //
+    public function updateNotifyOpcObserverSessionFixups(&$class, $eventID, $empty_string, &$session_data)
+    {
+        $session_data['PayPalRestful'] = $this->paypalRestfulSessionOnEntry;
+        $this->paypalRestfulSessionOnEntry = [];
     }
 
     protected function resetOrder()
@@ -564,18 +598,12 @@ class paypalr extends base
         $expires_month = [];
         $expires_year = [];
         for ($month = 1; $month < 13; $month++) {
-            $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => $zcDate->output('%B - (%m)', mktime(0, 0, 0, $month, 1, 2000))];
+            $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => $zcDate->output('%B - (%m)', mktime(0, 0, 0, $month))];
         }
         $this_year = date('Y');
         for ($year = $this_year; $year < $this_year + 15; $year++) {
             $expires_year[] = ['id' => $year, 'text' => $year];
         }
-
-        $ppr_cc_owner_id = $this->code . '-cc-owner';
-        $ppr_cc_number_id = $this->code . '-cc-number';
-        $ppr_cc_expires_year_id = $this->code . '-cc-expires-year';
-        $ppr_cc_expires_month_id = $this->code . '-cc-expires-month';
-        $ppr_cc_cvv_id = $this->code . '-cc-cvv';
 
         // -----
         // Determine which of the payment methods is currently selected, noting
@@ -597,11 +625,23 @@ class paypalr extends base
         // If the site's active template has overridden the styling for the button-choices,
         // load that version instead of the default.
         //
+        // Note: CSS 'inspired' by: https://codepen.io/phusum/pen/VQrQqy
+        //
         if (file_exists(DIR_FS_CATALOG . DIR_WS_TEMPLATE . 'css/paypalr.css')) {
             $css_file_name = DIR_WS_TEMPLATE . 'css/paypalr.css';
         } else {
             $css_file_name = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css';
         }
+
+        // -----
+        // Set 'id' attribute values, shared between input/label for credit-card entry
+        // fields.
+        //
+        $ppr_cc_owner_id = $this->code . '-cc-owner';
+        $ppr_cc_number_id = $this->code . '-cc-number';
+        $ppr_cc_expires_year_id = $this->code . '-cc-expires-year';
+        $ppr_cc_expires_month_id = $this->code . '-cc-expires-month';
+        $ppr_cc_cvv_id = $this->code . '-cc-cvv';
 
         $on_focus = ' onfocus="methodSelect(\'pmt-' . $this->code . '\')"';
         return [
@@ -610,9 +650,6 @@ class paypalr extends base
             'fields' => [
                 [
                     'title' =>
-                        // -----
-                        // Note: CSS 'inspired' by: https://codepen.io/phusum/pen/VQrQqy
-                        //
                         '<style nonce="">' . file_get_contents($css_file_name) . '</style>' .
                         '<span class="ppr-choice-label">' . MODULE_PAYMENT_PAYPALR_CHOOSE_PAYPAL . '</span>',
                     'field' =>
@@ -677,8 +714,6 @@ class paypalr extends base
 
     public function pre_confirmation_check()
     {
-        global $order;
-
         $this->log->write("pre_confirmation_check starts ...\n", true, 'before');
 
         // -----
@@ -730,6 +765,7 @@ class paypalr extends base
         // page (via the payment module's webhook) if they choose a payment means or back to the
         // checkout_payment page if they cancelled-out from PayPal.
         //
+        global $order;
         $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::WEBHOOK_NAME, $order);
         $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
         if ($payment_choice_response === false) {
@@ -754,10 +790,19 @@ class paypalr extends base
             }
         }
         if ($action_link === '') {
-            trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", Logger::logJSON($payment_choice_response), E_USER_WARNING);
+            trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", Logger::logJSON($payment_choice_response['links']), E_USER_WARNING);
             $this->setMessageAndRedirect("confirmPaymentSource, no payer-action link found.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
         }
 
+        // -----
+        // Save the posted variables from the payment phase of checkout; the webhook will use those to restore after
+        // PayPal returns.
+        //
+        global $current_page_base;
+        $_SESSION['PayPalRestful']['Order']['PayerAction'] = [
+            'current_page_base' => $current_page_base,
+            'savedPosts' => $_POST,
+        ];
         $this->log->write('pre_confirmation_check, sending the payer-action off to PayPal.', true, 'after');
         zen_redirect($action_link);
     }
@@ -815,7 +860,7 @@ class paypalr extends base
             'expiry_month' => $cc_validation->cc_expiry_month,
             'expiry_year' => $cc_validation->cc_expiry_year,
             'name' => $cc_owner,
-            'security_code' => $cvv,
+            'security_code' => $cvv_posted,
             'webhook' => self::WEBHOOK_NAME,
         ];
         return true;
@@ -912,10 +957,10 @@ class paypalr extends base
         return [
             'title' => '',
             'fields' => [
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_OWNER, 'field' => $_POST['ppr_cc_owner']],
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_TYPE, 'field' => $this->ccInfo['type']],
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER, 'field' => $this->obfuscateCcNumber($_POST['ppr_cc_number'])],
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES, 'field' => $zcDate->output('%B, %Y', mktime(0, 0, 0, $_POST['ppr_cc_expires_month'], 1, '20')) . $_POST['ppr_cc_expires_year']],
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_OWNER, 'field' => '&nbsp;' . $_POST['ppr_cc_owner']],
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_TYPE, 'field' => '&nbsp;' . $this->ccInfo['type']],
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER, 'field' => '&nbsp;' . $this->obfuscateCcNumber($_POST['ppr_cc_number'])],
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES, 'field' => '&nbsp;' . $zcDate->output('%B, ', mktime(0, 0, 0, (int)$_POST['ppr_cc_expires_month'])) . $_POST['ppr_cc_expires_year']],
             ],
         ];
     }
@@ -1119,7 +1164,7 @@ class paypalr extends base
         // Grab the 'payments' portion of the response; the element depends on whether
         // the payment-module is configured for 'Final Sale' or 'Auth Only'.
         //
-        $payment = $response['purchase_units'][0]['payments']['captures'] ?? $response['purchase_units'][0]['payments']['authorizations'];
+        $payment = $response['purchase_units'][0]['payments']['captures'][0] ?? $response['purchase_units'][0]['payments']['authorizations'][0];
 
         // -----
         // If the capture was completed or the authorization was created, all's good; let
@@ -1135,11 +1180,7 @@ class paypalr extends base
         //
         // See https://developer.paypal.com/api/rest/sandbox/card-testing/ for additional information.
         //
-        $card_payment_source = $response['purchase_units'][0]['payment_source']['card'];
-        $card_type = $card_payment_source['brand'] ?? '';
-        $last_digits = $card_payment_source['last_digits'];
         $response_message = '';
-        $response_code = $payment['processor_response']['response_code'] ?? '-- not supplied --';
         switch ($payment['status']) {
             case 'PENDING':
                 $this->paymentIsPending = true;
@@ -1150,6 +1191,11 @@ class paypalr extends base
                 break;
 
             case 'DECLINED':
+                $card_payment_source = $response['payment_source']['card'];
+                $card_type = $card_payment_source['brand'] ?? '';
+                $last_digits = $card_payment_source['last_digits'];
+
+                $response_code = $payment['processor_response']['response_code'] ?? '-- not supplied --';
                 switch ($response_code) {
                     case '5400':    //- Expired card
                         $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRED, $card_type, $last_digits);
@@ -1175,15 +1221,20 @@ class paypalr extends base
                     case '9520':    //- Lost or stolen card
                         $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED, $last_digits);
 
+                        // -----
+                        // Note: An alert-email is forced for this condition!
+                        //
                         $this->sendAlertEmail(
                             MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD,
                             sprintf(MODULE_PAYMENT_PAYPALR_ALERT_LOST_STOLEN_CARD,
                                 ($response_code === '9500') ? MODULE_PAYMENT_PAYPALR_CARD_FRAUDULENT : MODULE_PAYMENT_PAYPALR_CARD_LOST,
+                                $_SESSION['customers_ip_address'],
                                 $_SESSION['customer_first_name'],
                                 $_SESSION['customer_last_name'],
                                 $_SESSION['customer_id']
-                            ) . "\n\n" .
-                            json_encode($card_payment_source, JSON_PRETTY_PRINT)
+                            ) . "\n" .
+                            json_encode($card_payment_source, JSON_PRETTY_PRINT),
+                            true
                         );
                         break;
 
@@ -1200,7 +1251,7 @@ class paypalr extends base
                                 $_SESSION['customer_first_name'],
                                 $_SESSION['customer_last_name'],
                                 $_SESSION['customer_id']
-                            ) . "\n\n" .
+                            ) . "\n" .
                             json_encode($card_payment_source, JSON_PRETTY_PRINT)
                         );
                         break;
@@ -1211,6 +1262,9 @@ class paypalr extends base
                 break;
         }
 
+        if ($response_message !== '') {
+            $response_message .= ' ' . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN;
+        }
         return $response_message;
     }
 
@@ -1940,9 +1994,9 @@ class paypalr extends base
      * Send email to store-owner, if configured.
      *
      */
-    public function sendAlertEmail(string $subject_detail, string $message)
+    public function sendAlertEmail(string $subject_detail, string $message, bool $force_send = false)
     {
-        if ($this->emailAlerts === true) {
+        if ($this->emailAlerts === true || $force_send === true) {
             zen_mail(
                 STORE_NAME,
                 STORE_OWNER_EMAIL_ADDRESS,
