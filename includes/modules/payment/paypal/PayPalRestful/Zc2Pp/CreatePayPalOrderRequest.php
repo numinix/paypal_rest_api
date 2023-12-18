@@ -43,7 +43,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
     /**
      * The items' pricing 'breakdown' elements, gathered by getItems and
-     * and subsequently ussed by getOrderTotals.
+     * and subsequently used by getOrderTotals.
      */
     protected array $itemBreakdown = [
         'handling' => 0,        //- aka one-time charges
@@ -51,6 +51,13 @@ class CreatePayPalOrderRequest extends ErrorInfo
         'item_tax_total' => 0,
         'all_products_virtual' => true,
     ];
+
+    /**
+     * The overall discount applied to the order (both shipping and items).
+     * Set by getOrderAmountAndBreakdown and used by buildLevel2Level3Data for
+     * the level-3 data.
+     */
+    protected float $overallDiscount = 0.0;
 
     // -----
     // Constructor.  "Converts" a Zen Cart order into an PayPal /orders/create object.
@@ -100,6 +107,15 @@ class CreatePayPalOrderRequest extends ErrorInfo
         //
         if ($ppr_type === 'card') {
             $this->request['payment_source']['card'] = $this->buildCardPaymentSource($order, $cc_info);
+
+            // -----
+            // See if there's information that could be added as level 2/3 data
+            // for the card purchase, adding that information if so.
+            //
+            $supplementary_data = $this->buildLevel2Level3Data($this->request['purchase_units'][0]);
+            if (count($supplementary_data) !== 0) {
+                $this->request['purchase_units'][0]['supplementary_data'] = $supplementary_data;
+            }
         }
 
         $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request));
@@ -182,7 +198,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
         return ($item_errors === true) ? [] : $items;
     }
 
-    protected function getOrderAmountAndBreakdown($order): array
+    protected function getOrderAmountAndBreakdown(\order $order): array
     {
         $amount = $this->setRateConvertedValue($order->info['total']);
         if ($this->countItems() === 0) {
@@ -218,6 +234,9 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $breakdown['discount'] = $this->setRateConvertedValue($discount_total);
         }
         $amount['breakdown'] = $breakdown;
+
+        $this->overallDiscount = (float)($shipping_discount_total + $discount_total);
+
         return $amount;
     }
 
@@ -230,7 +249,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
     // Gets the shipping element of a to-be-created order.  Note that this method
     // is not called (!) when the order's virtual!
     //
-    protected function getShipping($order): array
+    protected function getShipping(\order $order): array
     {
         global $order;
 
@@ -268,5 +287,46 @@ class CreatePayPalOrderRequest extends ErrorInfo
                 'cancel_url' => $cc_info['webhook'] . '?op=3ds_challenge_cancel',
             ],
         ];
+    }
+
+    protected function buildLevel2Level3Data(array $purchase_unit): array
+    {
+        if (isset($purchase_unit['amount']['breakdown']['tax_total'])) {
+            $level_2 = [
+                'tax_total' => $purchase_unit['amount']['breakdown']['tax_total'],
+            ];
+        }
+        $level_3 = [];
+        if (SHIPPING_ORIGIN_ZIP !== '') {
+            $level_3['ships_from_postal_code'] = SHIPPING_ORIGIN_ZIP;
+        }
+        if (!empty($purchase_unit['items'])) {
+            $level_3['line_items'] = $purchase_unit['items'];
+        }
+        if (isset($purchase_unit['amount']['breakdown']['shipping'])) {
+            $level_3['shipping_amount'] = $purchase_unit['amount']['breakdown']['shipping'];
+        }
+        if ($this->overallDiscount != 0) {
+            $level_3['discount_amount'] = $this->setRateConvertedValue($this->overallDiscount);
+        }
+        if (isset($purchase_unit['shipping']['address'])) {
+            $level_3['shipping_address'] = $purchase_unit['shipping']['address'];
+        }
+        
+        if (!isset($level_2) || empty($level_3)) {
+            return [];
+        }
+
+        $supplementary_data = [
+            'card' => [
+            ],
+        ];
+        if (isset($level_2)) {
+            $supplementary_data['card']['level_2'] = $level_2;
+        }
+        if (!empty($level_3)) {
+            $supplementary_data['card']['level_3'] = $level_3;
+        }
+        return $supplementary_data;
     }
 }

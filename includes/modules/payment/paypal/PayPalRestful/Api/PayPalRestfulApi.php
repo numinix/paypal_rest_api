@@ -299,29 +299,6 @@ class PayPalRestfulApi extends ErrorInfo
         return $response;
     }
 
-    // -----
-    // Update a PayPal order with CREATED or APPROVED status **only**.
-    //
-    // Parameters:
-    // - paypal_id
-    //      The 'id' value returned by PayPal when the order was created or approved.
-    // - update_order_request
-    //      The to-be-updated contents for the order, presumed to have been created by \Zc2Pp\UpdatePayPalOrderRequest.php
-    //
-    // Return Values:
-    // - response
-    //      Returns false if an error is detected; the caller retrieves the error details via the
-    //          getErrorInfo method.
-    //      On success, returns an associative array containing the PayPal response.
-    //
-    public function updateOrder(string $paypal_id, array $update_order_request)
-    {
-        $this->log->write("==> Start updateOrder ($paypal_id)" . Logger::logJSON($update_order_request), true);
-        $response = $this->curlPatch("v2/checkout/orders/$paypal_id", $update_order_request);
-        $this->log->write('==> End updateOrder', true);
-        return $response;
-    }
-
     // ===== End Token-required Methods =====
 
     // ===== Start Token Handling Methods =====

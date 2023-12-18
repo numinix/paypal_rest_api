@@ -18,18 +18,16 @@ use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Common\ErrorInfo;
 use PayPalRestful\Common\Helpers;
 use PayPalRestful\Common\Logger;
-use PayPalRestful\Token\TokenCache;
 use PayPalRestful\Zc2Pp\Amount;
 use PayPalRestful\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
 use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
-use PayPalRestful\Zc2Pp\UpdatePayPalOrderRequest;
 
 /**
  * The PayPal payment module using PayPal's RESTful API (v2)
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.0.0-beta3';
+    protected const CURRENT_VERSION = '1.0.0-beta4';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
@@ -186,6 +184,11 @@ class paypalr extends base
             return false;
         }
 
+        $this->enabled = (MODULE_PAYMENT_PAYPALR_STATUS === 'True');
+        if ($this->enabled === false) {
+            return;
+        }
+
         $this->errorInfo = new ErrorInfo();
 
         $this->log = new Logger();
@@ -204,44 +207,125 @@ class paypalr extends base
 
         $this->zone = (int)MODULE_PAYMENT_PAYPALR_ZONE;
 
-        // -----
-        // Determine whether credit-card payments are to be accepted on the storefront.
-        //
-        // Note: For this type of payment to be enabled on the storefront:
-        // 1) The payment-method needs to be enabled via configuration.
-        // 2) The site must _either_ be running on the 'sandbox' server or using SSL-encryption.
-        //
-        // If enabled via configuration, further check to see that at least one of the card types
-        // supported by PayPal is also supported by the site.
-        //
-        $this->cardsAccepted = (IS_ADMIN_FLAG === false && MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS === 'true' && (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox' || strpos(HTTP_SERVER, 'https://') === 0));
-        if ($this->cardsAccepted === true) {
-            $this->cardsAccepted = $this->checkCardsAcceptedForSite();
+        if (IS_ADMIN_FLAG === true) {
+            if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
+                $this->title .= $this->alertMsg(' (sandbox active)');
+            }
+            if ($debug === true) {
+                $this->title .= '<strong> (Debug)</strong>';
+            }
+            $this->tableCheckup();
+        } else {
+            // -----
+            // Determine whether credit-card payments are to be accepted on the storefront.
+            //
+            // Note: For this type of payment to be enabled on the storefront:
+            // 1) The payment-method needs to be enabled via configuration.
+            // 2) The site must _either_ be running on the 'sandbox' server or using SSL-encryption.
+            //
+            // If enabled via configuration, further check to see that at least one of the card types
+            // supported by PayPal is also supported by the site.
+            //
+            $this->cardsAccepted = (MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS === 'true' && (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox' || strpos(HTTP_SERVER, 'https://') === 0));
+            if ($this->cardsAccepted === true) {
+                $this->cardsAccepted = $this->checkCardsAcceptedForSite();
+            }
         }
 
-        $this->enabled = (MODULE_PAYMENT_PAYPALR_STATUS === 'True');
-        if ($this->enabled === true) {
-            $this->validateConfiguration($curl_installed);
+        // -----
+        // Validate the configuration, e.g. that the supplied Client ID/Secret are
+        // valid for the active PayPal server.
+        //
+        $this->enabled = $this->validateConfiguration($curl_installed);
+        if ($this->enabled === false) {
+            return;
+        }
 
-            if (IS_ADMIN_FLAG === true) {
-                if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
-                    $this->title .= $this->alertMsg(' (sandbox active)');
-                }
-                if ($debug === true) {
-                    $this->title .= '<strong> (Debug)</strong>';
-                }
-                $this->tableCheckup();
+        // -----
+        // If loaded in the presence of an order ...
+        //
+        if (is_object($order)) {
+            // -----
+            // Check whether/not this payment module is to be active for the current
+            // payment zone and/or order-total-value limitations.
+            //
+            $this->update_status();
+            if ($this->enabled === false) {
+                return;
             }
 
-            if ($this->enabled === true && is_object($order)) {
-                $this->update_status();
+            // -----
+            // Determine the currency to be used to send the order to PayPal and whether it's usable.
+            //
+            $order_currency = $order->info['currency'];
+            $paypal_default_currency = (MODULE_PAYMENT_PAYPALR_CURRENCY === 'Selected Currency') ? $order_currency : str_replace('Only ', '', MODULE_PAYMENT_PAYPALR_CURRENCY);
+            $amount = new Amount($paypal_default_currency);
+
+            $paypal_currency = $amount->getDefaultCurrencyCode();
+            if ($paypal_currency !== $order_currency) {
+                $this->log->write("==> order_status: Paypal currency ($paypal_currency) different from order's ($order_currency); checking validity.");
+
+                global $currencies;
+                if (!isset($currencies)) {
+                    $currencies = new currencies();
+                }
+                if ($currencies->is_set($paypal_currency) === false) {
+                    $this->log->write('  --> Payment method disabled; Paypal currency is not configured.');
+                    $this->enabled = false;
+                    return;
+                }
             }
+        }
+
+        // -----
+        // Still here?  Check to see if we're on the storefront's OPC confirmation page.
+        //
+        global $current_page_base;
+        if (IS_ADMIN_FLAG === false && defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
+            $this->onOpcConfirmationPage = true;
+            $this->paypalRestfulSessionOnEntry = $_SESSION['PayPalRestful'] ?? [];
+            $this->attach($this, ['NOTIFY_OPC_OBSERVER_SESSION_FIXUPS']);
         }
     }
+
+    // -----
+    // One-Page-Checkout's session-hash will have hissy-fits with the $_SESSION['PayPalRestful'] element, since
+    // that's likely to change during the pre-confirmation step for the 'paypal' payment type.
+    //
+    // This method just replaces the 'after-hash' value of $_SESSION['PayPalRestful'] with the 'before-hash'
+    // value; there's nothing in that element that affects the ability for the customer to 'pay now'.
+    //
+    public function updateNotifyOpcObserverSessionFixups(&$class, $eventID, $empty_string, &$session_data)
+    {
+        $session_data['PayPalRestful'] = $this->paypalRestfulSessionOnEntry;
+        $this->paypalRestfulSessionOnEntry = [];
+    }
+
     protected function alertMsg(string $msg)
     {
         return '<b class="text-danger">' . $msg . '</b>';
     }
+
+    protected function tableCheckup()
+    {
+        global $db;
+
+        $db->Execute(
+            "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+             VALUES
+                ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now()),
+
+                ('Set Held Order Status', 'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID', '1', 'Set the status of orders that are held for review to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+
+                ('List <var>handling-fee</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_HANDLING_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_loworderfee</code> &mdash; that add an <em>handling-fee</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
+
+                ('List <var>insurance</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules that add an <em>insurance</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
+
+                ('List <var>discount</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_coupon</code> and <code>ot_group_pricing</code> &mdash; that add a <em>discount</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now())"
+        );
+    }
+
     protected function checkCardsAcceptedForSite(): bool
     {
         global $db;
@@ -263,47 +347,38 @@ class paypalr extends base
         // Loop through the cards accepted on the site, ensuring that at
         // least one supported by PayPal is enabled.
         //
-        $cards_accepted = false;
         foreach ($cards_accepted_db as $next_card) {
             $next_card = str_replace('CC_ENABLED_', '', $next_card['configuration_key']);
             switch ($next_card) {
                 case 'AMEX':
-                    $cards_accepted = true;
                     $this->cardImages['American Express'] = 'american_express.png';
                     break;
                 case 'DISCOVER':
-                    $cards_accepted = true;
                     $this->cardImages['Discover'] = 'discover.png';
                     break;
                 case 'JCB':
-                    $cards_accepted = true;
                     $this->cardImages['JCB'] = 'jcb.png';
                     break;
                 case 'MAESTRO':
-                    $cards_accepted = true;
                     $this->cardImages['Maestro'] = 'maestro.png';
                     break;
                 case 'MC':
-                    $cards_accepted = true;
                     $this->cardImages['MasterCard'] = 'mastercard.png';
                     break;
                 case 'SOLO':
-                    $cards_accepted = true;
                     $this->cardImages['SOLO'] = 'solo.png';
                     break;
                 case 'VISA':
-                    $cards_accepted = true;
                     $this->cardImages['VISA'] = 'visa.png';
                     break;
                 default:
                     break;
             }
         }
-
-        return $cards_accepted;
+        return (count($this->cardImages) !== 0);
     }
 
-    // ----- Static function used by the root-directory web-hook
+    // ----- Static function since used by the root-directory web-hook, too.
     public static function getEnvironmentInfo(): array
     {
         // -----
@@ -329,10 +404,9 @@ class paypalr extends base
     //
     // Side effects:
     //
-    // - Additional fields are added to the 'paypal' table, if not already present.
     // - The payment module is auto-disabled if any configuration issues are found.
     //
-    protected function validateConfiguration(bool $curl_installed)
+    protected function validateConfiguration(bool $curl_installed): bool
     {
         // -----
         // No CURL, no payment module!  The PayPalRestApi class requires
@@ -340,47 +414,51 @@ class paypalr extends base
         //
         if ($curl_installed === false) {
             $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL);
+            return false;
+        }
+
         // -----
         // CURL installed, make sure that the configured credentials are valid ...
         //
+        // Determine which (live vs. sandbox) credentials are in use.
+        //
+        [$client_id, $secret] = self::getEnvironmentInfo();
+
+        // -----
+        // Ensure that the current environment's credentials are set and, if so,
+        // that they're valid PayPal credentials.
+        //
+        $error_message = '';
+        if ($client_id === '' || $secret === '') {
+            $error_message = sprintf(MODULE_PAYMENT_PAYPALR_ERROR_CREDS_NEEDED, MODULE_PAYMENT_PAYPALR_SERVER);
         } else {
-            // -----
-            // Determine which (live vs. sandbox) credentials are in use.
-            //
-            [$client_id, $secret] = self::getEnvironmentInfo();
+            $this->ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret);
 
-            // -----
-            // Ensure that the current environment's credentials are set and, if so,
-            // that they're valid PayPal credentials.
-            //
-            $error_message = '';
-            if ($client_id === '' || $secret === '') {
-                $error_message = sprintf(MODULE_PAYMENT_PAYPALR_ERROR_CREDS_NEEDED, MODULE_PAYMENT_PAYPALR_SERVER);
-            } else {
-                $this->ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret);
-
-                global $current_page;
-                $use_saved_credentials = (IS_ADMIN_FLAG === false || $current_page === FILENAME_MODULES);
-                $this->log->write("validateCredentials: Checking ($use_saved_credentials).", true, 'before');
-                if ($this->ppr->validatePayPalCredentials($use_saved_credentials) === false) {
-                    $error_message = sprintf(MODULE_PAYMENT_PAYPALR_ERROR_INVALID_CREDS, MODULE_PAYMENT_PAYPALR_SERVER);
-                }
-                $this->log->write('', false, 'after');
+            global $current_page;
+            $use_saved_credentials = (IS_ADMIN_FLAG === false || $current_page === FILENAME_MODULES);
+            $this->log->write("validateCredentials: Checking ($use_saved_credentials).", true, 'before');
+            if ($this->ppr->validatePayPalCredentials($use_saved_credentials) === false) {
+                $error_message = sprintf(MODULE_PAYMENT_PAYPALR_ERROR_INVALID_CREDS, MODULE_PAYMENT_PAYPALR_SERVER);
             }
-
-            // -----
-            // Any credential errors detected, the payment module's auto-disabled.
-            //
-            if ($error_message !== '') {
-                $this->setConfigurationDisabled($error_message);
-            }
+            $this->log->write('', false, 'after');
         }
+
+        // -----
+        // Any credential errors detected, the payment module's auto-disabled.
+        //
+        if ($error_message !== '') {
+            $this->setConfigurationDisabled($error_message);
+            return false;
+        }
+
+        // -----
+        // Got here?  The configuration's valid.
+        //
+        return true;
     }
     protected function setConfigurationDisabled(string $error_message)
     {
         global $db, $messageStack;
-
-        $this->enabled = false;
 
         $db->Execute(
             "UPDATE " . TABLE_CONFIGURATION . "
@@ -396,19 +474,6 @@ class paypalr extends base
         } else {
             $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, $error_message, true);
         }
-    }
-    protected function tableCheckup()
-    {
-        global $db;
-
-        $db->Execute(
-            "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
-                (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
-             VALUES
-                ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now()),
-
-                ('Set Held Order Status', 'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID', '1', 'Set the status of orders that are held for review to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now())"
-        );
     }
 
     /**
@@ -462,61 +527,6 @@ class paypalr extends base
                 return;
             }
         }
-
-        // -----
-        // Determine the currency to be used to send the order to PayPal and whether it's usable.
-        //
-        $order_currency = $order->info['currency'];
-        $paypal_default_currency = (MODULE_PAYMENT_PAYPALR_CURRENCY === 'Selected Currency') ? $order_currency : str_replace('Only ', '', MODULE_PAYMENT_PAYPALR_CURRENCY);
-        $amount = new Amount($paypal_default_currency);
-
-        $paypal_currency = $amount->getDefaultCurrencyCode();
-        if ($paypal_currency !== $order_currency) {
-            $this->log->write("==> order_status: Paypal currency ($paypal_currency) different from order's ($order_currency); checking validity.");
-
-            global $currencies;
-            if (!isset($currencies)) {
-                $currencies = new currencies();
-            }
-            if ($currencies->is_set($paypal_currency) === false) {
-                $this->log->write('  --> Payment method disabled; Paypal currency is not configured.');
-                $this->enabled = false;
-                return;
-            }
-        }
-
-        // -----
-        // Still here?  Check to see if we're on the OPC confirmation page.
-        //
-        global $current_page_base;
-        if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
-            $this->onOpcConfirmationPage = true;
-            $this->paypalRestfulSessionOnEntry = $_SESSION['PayPalRestful'] ?? [];
-            $this->attach($this, ['NOTIFY_OPC_OBSERVER_SESSION_FIXUPS']);
-        }
-/* Not seeing this limitation during initial testing
-        // module cannot be used for purchase > $10,000 USD equiv
-        if (!function_exists('paypalUSDCheck')) {
-            require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_currency_check.php';
-        }
-        if (paypalUSDCheck($order->info['total']) === false) {
-            $this->enabled = false;
-            $this->log->write('update_status: Module disabled because purchase price (' . $order->info['total']. ') exceeds PayPal-imposed maximum limit of 10,000 USD or equivalent.');
-        }
-*/
-    }
-
-    // -----
-    // One-Page-Checkout's session-hash will have hissy-fits with the $_SESSION['PayPalRestful'] element, since
-    // that's likely to change during the pre-confirmation step for the 'paypal' payment type.
-    //
-    // This method just replaces the 'after-hash' value of $_SESSION['PayPalRestful'] with the 'before-hash'
-    // value; there's nothing in that element that affects the ability for the customer to 'pay now'.
-    //
-    public function updateNotifyOpcObserverSessionFixups(&$class, $eventID, $empty_string, &$session_data)
-    {
-        $session_data['PayPalRestful'] = $this->paypalRestfulSessionOnEntry;
-        $this->paypalRestfulSessionOnEntry = [];
     }
 
     protected function resetOrder()
@@ -1080,13 +1090,13 @@ class paypalr extends base
             $create_order_request = new CreatePayPalOrderRequest('card', $order, $this->ccInfo);
 
             // -----
-            // Send the request off to register the order at PayPal.
+            // Send the request off to register the credit-card order at PayPal.
             //
             $this->ppr->setPayPalRequestId($order_guid);
             $response = $this->ppr->createOrder($create_order_request->get());
             if ($response === false) {
                 $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
-                return false;   //-FIXME(?), log this, set a message and redirect?
+                $this->setMessageAndRedirect("before_process, createOrder failed:\n" . json_encode($this->errorInfo), FILENAME_CHECKOUT_PAYMENT); //-FIXME
             }
 
             // -----
@@ -1888,6 +1898,12 @@ class paypalr extends base
 
                 ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now()),
 
+                ('List <var>handling-fee</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_HANDLING_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_loworderfee</code> &mdash; that add an <em>handling-fee</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
+
+                ('List <var>insurance</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules that add an <em>insurance</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
+
+                ('List <var>discount</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_coupon</code> and <code>ot_group_pricing</code> &mdash; that add a <em>discount</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
+
                 ('Debug Mode', 'MODULE_PAYMENT_PAYPALR_DEBUGGING', 'Off', 'Would you like to enable debug mode?  A complete detailed log of failed transactions will be emailed to the store owner.', 6, 0, 'zen_cfg_select_option([\'Off\', \'Alerts Only\', \'Log File\', \'Log and Email\'], ', NULL, now())"
         );
 
@@ -1972,6 +1988,9 @@ class paypalr extends base
             'MODULE_PAYMENT_PAYPALR_PAGE_STYLE',
             'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE',
             'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS',
+            'MODULE_PAYMENT_PAYPALR_HANDLING_OT',
+            'MODULE_PAYMENT_PAYPALR_INSURANCE_OT',
+            'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT',
             'MODULE_PAYMENT_PAYPALR_DEBUGGING',
         ];
 
