@@ -897,19 +897,11 @@ class paypalr extends base
     {
         // -----
         // If the required notifications in the order_total.php class haven't been applied, the
-        // order's amount-breakdown can't be properly formed.
+        // order's amount-breakdown can't be properly formed.  This method checks that and
+        // either kicks the customer back to the payment phase or returns the $order_info
+        // that the observer has collected.
         //
-        // Kick the customer back to the payment phase of the checkout process.
-        //
-        global $zcObserverPaypalrestful;
-        $order_info = $zcObserverPaypalrestful->getLastOrderValues();
-        if (count($order_info) === 0) {
-            if (!isset($_SESSION['PayPalRestful']['Order']['notificationMissing'])) {
-                $_SESSION['PayPalRestful']['Order']['notificationMissing'] = true;
-                $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS, true);
-            }
-            $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_NOTIFICATION_MISSING, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
-        }
+        $order_info = $this->getOrderTotalsInfo();
 
         // -----
         // Create a GUID (Globally Unique IDentifier) for the order's
@@ -931,7 +923,7 @@ class paypalr extends base
         // -----
         // Build the request for the PayPal order's initial creation.
         //
-        $order_info['free_shipping_coupon'] = $zcObserverPaypalrestful->orderHasFreeShippingCoupon();
+        global $zcObserverPaypalrestful;
         $create_order_request = new CreatePayPalOrderRequest($ppr_type, $order, $this->ccInfo, $order_info, $zcObserverPaypalrestful->getOrderTotalChanges());
 
         // -----
@@ -968,6 +960,27 @@ class paypalr extends base
             'payment_source' => $ppr_type,
         ];
         return true;
+    }
+    protected function getOrderTotalsInfo(): array
+    {
+        // -----
+        // If the required notifications in the order_total.php class haven't been applied, the
+        // order's amount-breakdown can't be properly formed.
+        //
+        // Kick the customer back to the payment phase of the checkout process.
+        //
+        global $zcObserverPaypalrestful;
+        $order_info = $zcObserverPaypalrestful->getLastOrderValues();
+        if (count($order_info) === 0) {
+            if (!isset($_SESSION['PayPalRestful']['Order']['notificationMissing'])) {
+                $_SESSION['PayPalRestful']['Order']['notificationMissing'] = true;
+                $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS, true);
+            }
+            $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_NOTIFICATION_MISSING, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
+        }
+        $order_info['free_shipping_coupon'] = $zcObserverPaypalrestful->orderHasFreeShippingCoupon();
+
+        return $order_info;
     }
     protected function createOrderGuid(\order $order, string $ppr_type): string
     {
@@ -1077,7 +1090,13 @@ class paypalr extends base
      */
     public function before_process()
     {
-        global $order;
+        // -----
+        // If the required notifications in the order_total.php class haven't been applied, the
+        // order's amount-breakdown can't be properly formed.  This method checks that and
+        // either kicks the customer back to the payment phase or returns the $order_info
+        // that the observer has collected.
+        //
+        $order_info = $this->getOrderTotalsInfo();
 
         // -----
         // Initially a successful payment is not 'pending'.  This might be changed by
@@ -1107,6 +1126,8 @@ class paypalr extends base
             // Save the pertinent credit-card information into the order so that it'll be
             // included in the GUID.
             //
+            global $order;
+
             $order->info['cc_type'] = $this->ccInfo['type'];
             $order->info['cc_number'] = $this->obfuscateCcNumber($this->ccInfo['number']);
             $order->info['cc_owner'] = $this->ccInfo['name'];
@@ -1121,7 +1142,8 @@ class paypalr extends base
             // -----
             // Build the request for the PayPal card-payment order's creation.
             //
-            $create_order_request = new CreatePayPalOrderRequest('card', $order, $this->ccInfo);
+            global $zcObserverPaypalrestful;
+            $create_order_request = new CreatePayPalOrderRequest('card', $order, $this->ccInfo, $order_info, $zcObserverPaypalrestful->getOrderTotalChanges());
 
             // -----
             // Send the request off to register the credit-card order at PayPal.
