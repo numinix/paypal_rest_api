@@ -217,6 +217,23 @@ class paypalr extends base
             $this->tableCheckup();
         } else {
             // -----
+            // Ensure that the payment-module's observer-class is loaded (auto.paypalrestful.php).  That
+            // observer gathers order-totals' changes to the order's 'info', enabling the order-creation
+            // request to PayPal to be properly formed.
+            //
+            // No observer?  No payment via this module.
+            //
+            global $zcObserverPaypalrestful;
+            if (!isset($zcObserverPaypalrestful)) {
+                if (!isset($_SESSION['PayPalRestful']['Order']['observerMissing'])) {
+                    $_SESSION['PayPalRestful']['Order']['observerMissing'] = true;
+                    $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER, true);
+                }
+                $this->enabled = false;
+                return;
+            }
+
+            // -----
             // Determine whether credit-card payments are to be accepted on the storefront.
             //
             // Note: For this type of payment to be enabled on the storefront:
@@ -322,7 +339,7 @@ class paypalr extends base
 
                 ('List <var>insurance</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules that add an <em>insurance</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
-                ('List <var>discount</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_coupon</code> and <code>ot_group_pricing</code> &mdash; that add a <em>discount</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now())"
+                ('List <var>discount</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_coupon</code>, <code>ot_gv</code> and <code>ot_group_pricing</code> &mdash; that add a <em>discount</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now())"
         );
     }
 
@@ -484,6 +501,7 @@ class paypalr extends base
         global $order;
 
         if ($this->enabled === false || !isset($order->billing['country']['id'])) {
+            $this->enabled = false;
             return;
         }
 
@@ -877,12 +895,27 @@ class paypalr extends base
     }
     protected function createPayPalOrder(string $ppr_type): bool
     {
-        global $order;
+        // -----
+        // If the required notifications in the order_total.php class haven't been applied, the
+        // order's amount-breakdown can't be properly formed.
+        //
+        // Kick the customer back to the payment phase of the checkout process.
+        //
+        global $zcObserverPaypalrestful;
+        $order_info = $zcObserverPaypalrestful->getLastOrderValues();
+        if (count($order_info) === 0) {
+            if (!isset($_SESSION['PayPalRestful']['Order']['notificationMissing'])) {
+                $_SESSION['PayPalRestful']['Order']['notificationMissing'] = true;
+                $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS, true);
+            }
+            $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_NOTIFICATION_MISSING, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
+        }
 
         // -----
         // Create a GUID (Globally Unique IDentifier) for the order's
         // current 'state'.
         //
+        global $order;
         $order_guid = $this->createOrderGuid($order, $ppr_type);
 
         // -----
@@ -898,7 +931,8 @@ class paypalr extends base
         // -----
         // Build the request for the PayPal order's initial creation.
         //
-        $create_order_request = new CreatePayPalOrderRequest($ppr_type, $order, $this->ccInfo);
+        $order_info['free_shipping_coupon'] = $zcObserverPaypalrestful->orderHasFreeShippingCoupon();
+        $create_order_request = new CreatePayPalOrderRequest($ppr_type, $order, $this->ccInfo, $order_info, $zcObserverPaypalrestful->getOrderTotalChanges());
 
         // -----
         // Send the request off to register the order at PayPal.
@@ -1902,7 +1936,7 @@ class paypalr extends base
 
                 ('List <var>insurance</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules that add an <em>insurance</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
-                ('List <var>discount</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_coupon</code> and <code>ot_group_pricing</code> &mdash; that add a <em>discount</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
+                ('List <var>discount</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_coupon</code>, <code>ot_gv</code> and <code>ot_group_pricing</code> &mdash; that add a <em>discount</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
                 ('Debug Mode', 'MODULE_PAYMENT_PAYPALR_DEBUGGING', 'Off', 'Would you like to enable debug mode?  A complete detailed log of failed transactions will be emailed to the store owner.', 6, 0, 'zen_cfg_select_option([\'Off\', \'Alerts Only\', \'Log File\', \'Log and Email\'], ', NULL, now())"
         );

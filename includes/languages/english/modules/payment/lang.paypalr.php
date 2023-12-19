@@ -26,6 +26,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_CONFIRMEDADDR_ERROR' => 'The address you selected at PayPal is not a Confirmed address. Please return to PayPal and select or add a confirmed address and try again.',
     'MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS_ERROR' => 'PayPal was unable to successfully fund this transaction. Please choose another payment option or review funding options in your PayPal account before proceeding.',
     'MODULE_PAYMENT_PAYPALR_TEXT_PAYPALR_DECLINED' => 'Sorry. PayPal has declined the transaction and advised us to tell you to contact PayPal Customer Service for more information. To complete your purchase, please select an alternate payment method.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_NOTIFICATION_MISSING' => 'We are unable to process your %s payment at this time.  Please contact us for assistance.',  //- %s filled in with MODULE_PAYMENT_PAYPALR_TEXT_TITLE
  
     'MODULE_PAYMENT_PAYPALR_FUNDING_ERROR' => 'Funding source problem; please go to Paypal.com and make payment directly to ' . STORE_OWNER_EMAIL_ADDRESS,
     'MODULE_PAYMENT_PAYPALR_TEXT_INVALID_ZONE_ERROR' => 'We are sorry for the inconvenience; however, at the present time we are unable to use PayPal to process orders from the geographic region you selected as your PayPal address.  Please continue using normal checkout and select from the available payment methods to complete your order.',
@@ -234,13 +235,15 @@ $define = [
     // -----
     // Admin alert-email messages.
     //
-    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPalCheckout Error (%s)',    //- %s is an additional error descriptor, see below
+    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPal Checkout Error (%s)',    //- %s is an additional error descriptor, see below
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION' => 'Configuration',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL' => 'Unknown Denial Reason',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD' => 'Lost/Stolen/Fraudulent Card',
 
     'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
+    'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypalrestful.php) was not loaded; the payment module has been disabled.',
+    'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS' => 'The required notifications in the order_total.php class were not applied; the payment module cannot place orders.',
 
     // -----
     // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.

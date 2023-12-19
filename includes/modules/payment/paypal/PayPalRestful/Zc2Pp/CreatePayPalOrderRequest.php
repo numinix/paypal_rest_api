@@ -46,7 +46,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
      * and subsequently used by getOrderTotals.
      */
     protected array $itemBreakdown = [
-        'handling' => 0,        //- aka one-time charges
+        'item_onetime_charges' => 0.0,
         'item_total' => 0,
         'item_tax_total' => 0,
         'all_products_virtual' => true,
@@ -62,7 +62,9 @@ class CreatePayPalOrderRequest extends ErrorInfo
     // -----
     // Constructor.  "Converts" a Zen Cart order into an PayPal /orders/create object.
     //
-    public function __construct(string $ppr_type, \order $order, array $cc_info)
+    // Note: The $order_info and $ot_diffs arrays are created by the payment-module's auto.paypalrestful.php observer.
+    //
+    public function __construct(string $ppr_type, \order $order, array $cc_info, array $order_info, array $ot_diffs)
     {
         $this->log = new Logger();
 
@@ -70,7 +72,12 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $this->amount = new Amount($order->info['currency']);
         $this->paypalCurrencyCode = $this->amount->getDefaultCurrencyCode();
 
-        $this->log->write("CreatePayPalOrderRequest::__construct($ppr_type, ...) starts ...");
+        $this->log->write(
+            "CreatePayPalOrderRequest::__construct($ppr_type, ...) starts ...\n" .
+            "Order's info: " . Logger::logJSON($order->info) . "\n" .
+            'order_info: ' . Logger::logJSON($order_info) . "\n" .
+            'ot_diffs: ' . Logger::logJSON($ot_diffs)
+        );
 
         $this->request = [
             'intent' => (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') ? 'CAPTURE' : 'AUTHORIZE',
@@ -86,14 +93,14 @@ class CreatePayPalOrderRequest extends ErrorInfo
             ],
         ];
         $this->request['purchase_units'][0]['items'] = $this->getItems($order->products);
-        $this->request['purchase_units'][0]['amount'] = $this->getOrderAmountAndBreakdown($order);
+        $this->request['purchase_units'][0]['amount'] = $this->getOrderAmountAndBreakdown($order, $order_info, $ot_diffs);
 
         // -----
         // The 'shipping' element is included *only if* the order's got one or more
         // physical items to be shipped.
         //
         if ($this->itemBreakdown['all_products_virtual'] === false) {
-            $this->request['purchase_units'][0]['shipping'] = $this->getShipping($order);
+            $this->request['purchase_units'][0]['shipping'] = $this->getShippingAddressInfo($order);
         }
 
         if ($this->countItems() === 0) {
@@ -161,11 +168,9 @@ class CreatePayPalOrderRequest extends ErrorInfo
             }
 
             // -----
-            // Rather than dealing with divide-by-zero issues if there's no tax, since the
-            // tax is represented as a percent, e.g. '5.75' for a 5.75% tax, simply multiply
-            // the tax value by 1/100 (0.01) to arrive at the percentage.
+            // Determine the product's tax-rate as a percentage value.
             //
-            $tax_rate = $next_product['tax'] * 0.01;
+            $tax_rate = $next_product['tax'] / 100;
             $products_price = $this->getRateConvertedValue($next_product['final_price']);
             $product_is_physical = ($next_product['products_virtual'] !== 1);
             $item = [
@@ -185,9 +190,9 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
             // -----
             // Unfortunately, PayPal has no concept of one-time charges for a product.  They'll be
-            // summed up and will be noted in the PayPal order as a 'handling fee'.
+            // summed up and will be noted in the PayPal order as part of the 'handling fee'.
             //
-            $this->itemBreakdown['handling'] += $next_product['onetime_charges'] * $tax_rate;
+            $this->itemBreakdown['item_onetime_charges'] += $next_product['onetime_charges'] * $tax_rate;
 
             // -----
             // Add the current item to the items' array.
@@ -198,38 +203,39 @@ class CreatePayPalOrderRequest extends ErrorInfo
         return ($item_errors === true) ? [] : $items;
     }
 
-    protected function getOrderAmountAndBreakdown(\order $order): array
+    protected function getOrderAmountAndBreakdown(\order $order, array $order_info, array $ot_diffs): array
     {
-        $amount = $this->setRateConvertedValue($order->info['total']);
+        $amount = $this->setRateConvertedValue($order_info['total']);
         if ($this->countItems() === 0) {
             return $amount;
         }
 
         $item_total = 0;
         $item_tax_total = 0;
-        $handling_total = $this->itemBreakdown['handling'];
-        $insurance_total = 0;
-        $shipping_discount_total = 0;
-        $discount_total = 0;
         foreach ($this->request['purchase_units'][0]['items'] as $next_item) {
             $item_total += $next_item['quantity'] * $next_item['unit_amount']['value'];
             $item_tax_total += $next_item['quantity'] * $next_item['tax']['value'];
         }
+        $shipping_total = (float)($order->info['shipping_cost'] + $order->info['shipping_tax']);
         $breakdown = [
             'item_total' => $this->amount->setValue($item_total),
-            'shipping' => $this->setRateConvertedValue($order->info['shipping_cost'] + $order->info['shipping_tax']),
+            'shipping' => $this->setRateConvertedValue($shipping_total),
             'tax_total' => $this->amount->setValue($item_tax_total),
         ];
 
+        $handling_total = $this->calculateHandling($ot_diffs);
         if ($handling_total > 0) {
             $breakdown['handling'] = $this->setRateConvertedValue($handling_total);
         }
+        $insurance_total = $this->calculateInsurance($ot_diffs);
         if ($insurance_total > 0) {
             $breakdown['insurance'] = $this->setRateConvertedValue($insurance_total);
         }
+        $shipping_discount_total = ($order_info['free_shipping_coupon'] === false) ? 0.0 : $shipping_total;
         if ($shipping_discount_total > 0) {
-            $breakdown['shipping_discount'] = $setRateConvertedValue($shipping_discount_total);
+            $breakdown['shipping_discount'] = $this->setRateConvertedValue($shipping_discount_total);
         }
+        $discount_total = $this->calculateDiscount($ot_diffs) - $shipping_discount_total;
         if ($discount_total > 0) {
             $breakdown['discount'] = $this->setRateConvertedValue($discount_total);
         }
@@ -238,6 +244,33 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $this->overallDiscount = (float)($shipping_discount_total + $discount_total);
 
         return $amount;
+    }
+    protected function calculateHandling(array $ot_diffs): float
+    {
+        $handling = $this->itemBreakdown['item_onetime_charges'];
+        return $handling + $this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_HANDLING_OT . ', ot_loworderfee', $ot_diffs);
+    }
+    protected function calculateInsurance(array $ot_diffs): float
+    {
+        return $this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_INSURANCE_OT, $ot_diffs);
+    }
+    protected function calculateDiscount(array $ot_diffs): float
+    {
+        return abs($this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT . ', ot_coupon, ot_gv, ot_group_pricing', $ot_diffs));
+    }
+    protected function calculateOrderElementValue(string $ot_class_names, array $ot_diffs): float
+    {
+        $total_classes = explode(',', str_replace(' ', '', $ot_class_names));
+
+        $value = 0.0;
+        foreach (array_keys($ot_diffs) as $next_ot_class) {
+            if (!in_array($next_ot_class, $total_classes)) {
+                continue;
+            }
+            $diff = $ot_diffs[$next_ot_class]['diff'];
+            $value += $diff['total'];
+        }
+        return $value;
     }
 
     protected function setRateConvertedValue($value)
@@ -249,7 +282,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
     // Gets the shipping element of a to-be-created order.  Note that this method
     // is not called (!) when the order's virtual!
     //
-    protected function getShipping(\order $order): array
+    protected function getShippingAddressInfo(\order $order): array
     {
         global $order;
 
