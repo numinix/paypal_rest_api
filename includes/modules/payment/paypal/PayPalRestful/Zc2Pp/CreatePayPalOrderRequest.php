@@ -100,7 +100,10 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // physical items to be shipped.
         //
         if ($this->itemBreakdown['all_products_virtual'] === false) {
-            $this->request['purchase_units'][0]['shipping'] = $this->getShippingAddressInfo($order);
+            $shipping_address_info = $this->getShippingAddressInfo($order);
+            if (count($shipping_address_info) !== 0) {
+                $this->request['purchase_units'][0]['shipping'] = $this->getShippingAddressInfo($order);
+            }
         }
 
         if ($this->countItems() === 0) {
@@ -192,7 +195,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             // Unfortunately, PayPal has no concept of one-time charges for a product.  They'll be
             // summed up and will be noted in the PayPal order as part of the 'handling fee'.
             //
-            $this->itemBreakdown['item_onetime_charges'] += $next_product['onetime_charges'] * $tax_rate;
+            $this->itemBreakdown['item_onetime_charges'] += $next_product['onetime_charges'] * (1.00 + $tax_rate);
 
             // -----
             // Add the current item to the items' array.
@@ -247,8 +250,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
     }
     protected function calculateHandling(array $ot_diffs): float
     {
-        $handling = $this->itemBreakdown['item_onetime_charges'];
-        return $handling + $this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_HANDLING_OT . ', ot_loworderfee', $ot_diffs);
+        return $this->itemBreakdown['item_onetime_charges'] + $this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_HANDLING_OT . ', ot_loworderfee', $ot_diffs);
     }
     protected function calculateInsurance(array $ot_diffs): float
     {
@@ -286,10 +288,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
     {
         global $order;
 
-        $is_storepickup = (strpos($order->info['shipping_module_code'], 'storepickup') === 0);
-
         return [
-            'type' => ($is_storepickup === true) ? 'PICKUP_IN_PERSON' : 'SHIPPING',
+            'type' => 'SHIPPING',
             'name' => Name::get($order->delivery),
             'address' => Address::get($order->delivery),
         ];

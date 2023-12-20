@@ -295,7 +295,8 @@ class paypalr extends base
         }
 
         // -----
-        // Still here?  Check to see if we're on the storefront's OPC confirmation page.
+        // Still here?  Check to see if we're on the storefront's OPC confirmation page and 'watch'
+        // for OPC's session-hash operation.
         //
         global $current_page_base;
         if (IS_ADMIN_FLAG === false && defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
@@ -769,7 +770,10 @@ class paypalr extends base
         //
         $paypal_order_created = $this->createPayPalOrder('paypal');
         if ($paypal_order_created === false) {
-            $this->setMessageAndRedirect("\ncreatePayPalOrder failed\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+            $error_info = $this->ppr->getErrorInfo();
+            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';    //-FIXME: If the error code is AMOUNT_MISMATCH, resubmit without amount breakdown!
+            $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN, MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info));
+            $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALR_TEXT_TITLE, $error_code), FILENAME_CHECKOUT_PAYMENT);
         }
 
         // -----

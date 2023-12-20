@@ -9,6 +9,8 @@
  */
 namespace PayPalRestful\Zc2Pp;
 
+use PayPalRestful\Common\Logger;
+
 class ConfirmPayPalPaymentChoiceRequest
 {
     /**
@@ -26,7 +28,7 @@ class ConfirmPayPalPaymentChoiceRequest
         //
         // - GET_FROM_FILE .......... The customer can choose one of their PayPal-registered addresses for the shipping.
         // - NO_SHIPPING ............ Indicates that the order is 'digital' (aka 'virtual') and no shipping is required.
-        // - SET_PROVIDED_ADDRESS ... PayPal uses the address the customer has chosent, no modification is allowed.
+        // - SET_PROVIDED_ADDRESS ... PayPal uses the address the customer has chosen, no modification is allowed.
         //
         $shipping_preference = ($order->content_type === 'virtual') ? 'NO_SHIPPING' : 'SET_PROVIDED_ADDRESS';
 
@@ -70,6 +72,9 @@ class ConfirmPayPalPaymentChoiceRequest
                 ],
             ],
         ];
+
+        $logger = new Logger();
+        $logger->write("\ConfirmPayPalPaymentChoiceRequest::__construct(...) finished, request:\n" . Logger::logJSON($this->request));
     }
 
     public function get(): array

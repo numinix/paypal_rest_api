@@ -17,16 +17,21 @@ $define = [
     // -----
     // Storefront messages.
     //
-    'MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL' => 'Paying via PayPal',     //- Used by the confirmation method, when paying via PayPal Checkout (paypal)
+    'MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL' => 'Paying via PayPal Wallet',     //- Used by the confirmation method, when paying via PayPal Checkout (paypal)
 
     'MODULE_PAYMENT_PAYPALR_INVALID_RESPONSE' => 'We were not able to process your order. Please try again, select an alternate payment method or contact the store owner for assistance.',
     'MODULE_PAYMENT_PAYPALR_TEXT_GEN_ERROR' => 'An error occurred when we tried to contact the payment processor. Please try again, select an alternate payment method or contact the store owner for assistance.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_EMAIL_ERROR_MESSAGE' => 'Dear store owner,' . "\n" . 'An error occurred when attempting to initiate a PayPal Checkout transaction. As a courtesy, only the error \'number\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
     'MODULE_PAYMENT_PAYPALR_TEXT_ADDR_ERROR' => 'The address information you entered does not appear to be valid or cannot be matched. Please select or add a different address and try again.',
     'MODULE_PAYMENT_PAYPALR_TEXT_CONFIRMEDADDR_ERROR' => 'The address you selected at PayPal is not a Confirmed address. Please return to PayPal and select or add a confirmed address and try again.',
     'MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS_ERROR' => 'PayPal was unable to successfully fund this transaction. Please choose another payment option or review funding options in your PayPal account before proceeding.',
     'MODULE_PAYMENT_PAYPALR_TEXT_PAYPALR_DECLINED' => 'Sorry. PayPal has declined the transaction and advised us to tell you to contact PayPal Customer Service for more information. To complete your purchase, please select an alternate payment method.',
     'MODULE_PAYMENT_PAYPALR_TEXT_NOTIFICATION_MISSING' => 'We are unable to process your %s payment at this time.  Please contact us for assistance.',  //- %s filled in with MODULE_PAYMENT_PAYPALR_TEXT_TITLE
+
+    // -----
+    // $1$s ... MODULE_PAYMENT_PAYPALR_TEXT_TITLE
+    // $2%s ... The error-code returned by PayPal.
+    //
+    'MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE' => 'We are unable to process your %1$s payment at this time. Please contact us for assistance, providing us with this code: <b>%2$s</b>.',
  
     'MODULE_PAYMENT_PAYPALR_FUNDING_ERROR' => 'Funding source problem; please go to Paypal.com and make payment directly to ' . STORE_OWNER_EMAIL_ADDRESS,
     'MODULE_PAYMENT_PAYPALR_TEXT_INVALID_ZONE_ERROR' => 'We are sorry for the inconvenience; however, at the present time we are unable to use PayPal to process orders from the geographic region you selected as your PayPal address.  Please continue using normal checkout and select from the available payment methods to complete your order.',
@@ -35,7 +40,7 @@ $define = [
     // -----
     // Buttons on checkout_payment page; see https://www.paypal.com/bm/webapps/mpp/logo-center for additional information.
     //
-    'MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT' => 'Click here to pay via PayPal Checkout',
+    'MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT' => 'Click here to pay with your PayPal Wallet',
     'MODULE_PAYMENT_PAYPALR_MARK_BUTTON_TXT' => '',
     'MODULE_PAYMENT_PAYPALR_BUTTON_COLOR' => 'YELLOW',   //- One of WHITE, YELLOW, GREY or BLUE; defaults to YELLOW.
         'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_YELLOW' => 'https://www.paypalobjects.com/digitalassets/c/website/marketing/apac/C2/logos-buttons/optimize/44_Yellow_PayPal_Pill_Button.png',
@@ -244,6 +249,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
     'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypalrestful.php) was not loaded; the payment module has been disabled.',
     'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS' => 'The required notifications in the order_total.php class were not applied; the payment module cannot place orders.',
+    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE' => 'An error was returned by PayPal when attempting to initiate an order. As a courtesy, only the error \'number\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
 
     // -----
     // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.
