@@ -131,11 +131,17 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request));
     }
 
+    // -----
+    // Retrieve the generated request.
+    //
     public function get()
     {
         return $this->request;
     }
 
+    // -----
+    // 'Convert' the order's products into the PayPal 'items' array.
+    //
     protected function getItems(array $order_products): array
     {
         $item_errors = false;
@@ -206,6 +212,10 @@ class CreatePayPalOrderRequest extends ErrorInfo
         return ($item_errors === true) ? [] : $items;
     }
 
+    // -----
+    // For seller-protection to be activated, the order's amounts need to be
+    // broken into various elements.
+    //
     protected function getOrderAmountAndBreakdown(\order $order, array $order_info, array $ot_diffs): array
     {
         $amount = $this->setRateConvertedValue($order_info['total']);
@@ -213,6 +223,11 @@ class CreatePayPalOrderRequest extends ErrorInfo
             return $amount;
         }
 
+        // -----
+        // Record the order's product/item overall price and tax as well
+        // as the shipping cost (it'll include any tax associated with the
+        // shipping).
+        //
         $item_total = 0;
         $item_tax_total = 0;
         foreach ($this->request['purchase_units'][0]['items'] as $next_item) {
@@ -226,28 +241,56 @@ class CreatePayPalOrderRequest extends ErrorInfo
             'tax_total' => $this->amount->setValue($item_tax_total),
         ];
 
+        // -----
+        // Calculate any handling fees (including products' onetime-charges) and,
+        // if non-zero, include that value in the breakdown.
+        //
         $handling_total = $this->calculateHandling($ot_diffs);
         if ($handling_total > 0) {
             $breakdown['handling'] = $this->setRateConvertedValue($handling_total);
         }
+
+        // -----
+        // Calculate any insurance associated with the order and, if non-zero, include
+        // that value in the breakdown.
+        //
         $insurance_total = $this->calculateInsurance($ot_diffs);
         if ($insurance_total > 0) {
             $breakdown['insurance'] = $this->setRateConvertedValue($insurance_total);
         }
+
+        // -----
+        // Calculate any shipping-discount associated with the order and, if non-zero, include
+        // that value in the breakdown.
+        //
         $shipping_discount_total = ($order_info['free_shipping_coupon'] === false) ? 0.0 : $shipping_total;
         if ($shipping_discount_total > 0) {
             $breakdown['shipping_discount'] = $this->setRateConvertedValue($shipping_discount_total);
         }
+
+        // -----
+        // Calculate any discounts (e.g. coupons, gift-vouchers or group-pricing) associated
+        // with the order and, if non-zero, include that value in the breakdown.
+        //
         $discount_total = $this->calculateDiscount($ot_diffs) - $shipping_discount_total;
         if ($discount_total > 0) {
             $breakdown['discount'] = $this->setRateConvertedValue($discount_total);
         }
         $amount['breakdown'] = $breakdown;
 
+        // -----
+        // Sum up the overall order-discount for possible use in providing the Level 2/3
+        // information for credit-card payments.
+        //
         $this->overallDiscount = (float)($shipping_discount_total + $discount_total);
 
         return $amount;
     }
+
+    // -----
+    // Separate 'calculators' for the 'handling', 'insurance' and 'discount amounts
+    // for the order.
+    //
     protected function calculateHandling(array $ot_diffs): float
     {
         return $this->itemBreakdown['item_onetime_charges'] + $this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_HANDLING_OT . ', ot_loworderfee', $ot_diffs);
@@ -280,6 +323,13 @@ class CreatePayPalOrderRequest extends ErrorInfo
         return $this->amount->setValue($this->getRateConvertedValue($value));
     }
 
+    protected function getRateConvertedValue($value)
+    {
+        global $currencies;
+
+        return number_format((float)$currencies->rateAdjusted($value, true, $this->paypalCurrencyCode), 2, '.', '');
+    }
+
     // -----
     // Gets the shipping element of a to-be-created order.  Note that this method
     // is not called (!) when the order's virtual!
@@ -298,13 +348,6 @@ class CreatePayPalOrderRequest extends ErrorInfo
     protected function countItems()
     {
         return count($this->request['purchase_units'][0]['items']);
-    }
-
-    protected function getRateConvertedValue($value)
-    {
-        global $currencies;
-
-        return number_format((float)$currencies->rateAdjusted($value, true, $this->paypalCurrencyCode), 2, '.', '');
     }
 
     protected function buildCardPaymentSource(\order $order, array $cc_info): array
