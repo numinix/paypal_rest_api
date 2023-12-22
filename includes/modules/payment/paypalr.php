@@ -19,6 +19,7 @@ use PayPalRestful\Admin\DoRefund;
 use PayPalRestful\Admin\DoVoid;
 use PayPalRestful\Admin\GetPayPalOrderTransactions;
 use PayPalRestful\Api\PayPalRestfulApi;
+use PayPalRestful\Api\Data\CountryCodes;
 use PayPalRestful\Common\ErrorInfo;
 use PayPalRestful\Common\Helpers;
 use PayPalRestful\Common\Logger;
@@ -166,6 +167,14 @@ class paypalr extends base
     protected array $paypalRestfulSessionOnEntry = [];
 
     /**
+     * A couple of flags (used by the 'selection' method) which are set by the
+     * class-constuctor to indicate whether/not the storefront's currently active billing/shipping
+     * addresses are associated with countries not supported by PayPal.
+     */
+    protected bool $billingCountryIsSupported = true;
+    protected bool $shippingCountryIsSupported = true;
+
+    /**
      * class constructor
      */
     public function __construct()
@@ -294,6 +303,20 @@ class paypalr extends base
                     $this->log->write('  --> Payment method disabled; Paypal currency is not configured.');
                     $this->enabled = false;
                     return;
+                }
+            }
+
+            // -----
+            // If on the storefront, check to make sure that the shipping/billing address
+            // countries are supported by PayPal.
+            //
+            // Note: The payment-module will remain enabled, with a customer message indicating
+            // that the payment module cannot be used due to the currently-active address(es).
+            //
+            if (IS_ADMIN_FLAG === false) {
+                $this->billingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->billing['country']['iso_code_2']) !== '');
+                if ($_SESSION['cart']->get_content_type() !== 'virtual') {
+                    $this->shippingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->delivery['country']['iso_code_2'] ?? '??') !== '');
                 }
             }
         }
@@ -565,7 +588,7 @@ class paypalr extends base
      * Validate the credit card information via javascript (Number, Owner, and CVV lengths), if
      * card payments are to be accepted.
      */
-    public function javascript_validation()
+    public function javascript_validation(): string
     {
         if ($this->cardsAccepted === false) {
             return '';
@@ -610,19 +633,56 @@ class paypalr extends base
         unset($_SESSION['PayPalRestful']['Order']['payment_confirmed']);
 
         // -----
-        // Determine which color button to use.
+        // Determine which color button to use.  The color-choice constants are defined in
+        // /includes/languages/modules/payment{/YOUR_TEMPLATE}/lang.paypalr.php
         //
         $chosen_button_color = 'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_' . MODULE_PAYMENT_PAYPALR_BUTTON_COLOR;
         $paypal_button = (defined($chosen_button_color)) ? constant($chosen_button_color) : MODULE_PAYMENT_PAYPALR_BUTTON_IMG_YELLOW;
+        
+        // -----
+        // Create the default (PayPal only) selection.  This might be modified below to add a note
+        // to the customer if either their shipping or billing address' country isn't supported by
+        // PayPal.
+        //
+        $selection = [
+            'id' => $this->code,
+            'module' =>
+                '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
+                zen_draw_hidden_field('ppr_type', 'paypal'),
+        ];
 
         // -----
-        // Return **only** the PayPal selection as a button, if cards aren't to be accepted.
+        // Return **only** the PayPal selection as a button, if cards aren't to be accepted. If the customer's
+        // shipping to a country unsupported by PayPal, add some jQuery to disable the associated payment-module
+        // selection and display a note to the customer.
         //
-        if ($this->cardsAccepted === false) {
-            return [
-                'id' => $this->code,
-                'module' => '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">',
+        if ($this->cardsAccepted === false || $this->shippingCountryIsSupported === false) {
+            if ($this->shippingCountryIsSupported === false) {
+                $selection['fields'] = [
+                    [
+                        'title' => '<b>' . MODULE_PAYMENT_PAYPALR_TEXT_PLEASE_NOTE . '</b>',
+                        'field' =>
+                            '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.disable.js') . '</script>' .
+                            '<small>' . MODULE_PAYMENT_PAYPALR_UNSUPPORTED_SHIPPING_COUNTRY . '</small>',
+                        ],
+                ];
+            }
+            return $selection;
+        }
+
+        // -----
+        // If cards *can* be selected, but the billing country isn't supported by PayPal,
+        // add a 'field' to the PayPal Checkout payment's display, noting the condition.
+        //
+        if ($this->billingCountryIsSupported === false) {
+            $selection['fields'] = [
+                [
+                    'title' => '<b>' . MODULE_PAYMENT_PAYPALR_TEXT_PLEASE_NOTE . '</b>',
+                    'field' =>
+                        '<small>' . MODULE_PAYMENT_PAYPALR_UNSUPPORTED_BILLING_COUNTRY . '</small>',
+                    ],
             ];
+            return $selection;
         }
 
         // -----
@@ -750,18 +810,27 @@ class paypalr extends base
         $this->log->write("pre_confirmation_check starts ...\n", true, 'before');
 
         // -----
+        // If the PayPal Checkout payment-type isn't included in the posted data,
+        // send the customer back to the payment phase of checkout to ensure that
+        // the selection is made.
+        //
+        // Noting that this "shouldn't" happen unless someone's fussing with the form,
+        // so no message!
+        //
+        if (!isset($_POST['ppr_type']) || !in_array($_POST['ppr_type'], ['paypal', 'card'], true)) {
+            zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
+        }
+
+        // -----
         // If a card-payment was selected, validate the information entered.  Any
         // errors detected, the called method will have set the appropriate messages
         // on the messageStack.
         //
-        $ppr_type = 'paypal';
-        if (isset($_POST['ppr_type'])) {
-            $ppr_type = $_POST['ppr_type'];
-            $_SESSION['PayPalRestful']['ppr_type'] = $ppr_type;
-            if ($ppr_type === 'card' && $this->validateCardInformation() === false) {
-                $log_only = true;
-                $this->setMessageAndRedirect("pre_confirmation_check, card failed initial validation.", FILENAME_CHECKOUT_PAYMENT, $log_only);
-            }
+        $ppr_type = $_POST['ppr_type'];
+        $_SESSION['PayPalRestful']['ppr_type'] = $ppr_type;
+        if ($ppr_type === 'card' && $this->validateCardInformation() === false) {
+            $log_only = true;
+            $this->setMessageAndRedirect("pre_confirmation_check, card failed initial validation.", FILENAME_CHECKOUT_PAYMENT, $log_only);
         }
 
         // -----
@@ -1378,7 +1447,7 @@ class paypalr extends base
         }
         $this->log->write($error_message);
         $this->resetOrder();
-        zen_redirect(zen_href_link($redirect_page));
+        zen_redirect(zen_href_link($redirect_page, '', 'SSL'));
     }
 
     protected function obfuscateCcNumber(string $cc_number): string

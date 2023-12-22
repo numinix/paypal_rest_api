@@ -4,7 +4,6 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_TITLE_ADMIN' => 'PayPal Checkout (RESTful)',
     'MODULE_PAYMENT_PAYPALR_TEXT_DESCRIPTION' => '<strong>PayPal</strong>',
     'MODULE_PAYMENT_PAYPALR_TEXT_TYPE' => 'PayPal Checkout',
-    'MODULE_PAYMENT_PAYPALR_TEXT_EC_HEADER' => 'Fast, Secure Checkout with PayPal:',    //- not currently used
 
     // -----
     // Configuration-related errors displayed during the payment module's admin configuration.
@@ -18,24 +17,89 @@ $define = [
     // Storefront messages.
     //
     'MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL' => 'Paying via PayPal Wallet',     //- Used by the confirmation method, when paying via PayPal Checkout (paypal)
-
-    'MODULE_PAYMENT_PAYPALR_INVALID_RESPONSE' => 'We were not able to process your order. Please try again, select an alternate payment method or contact the store owner for assistance.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_GEN_ERROR' => 'An error occurred when we tried to contact the payment processor. Please try again, select an alternate payment method or contact the store owner for assistance.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_ADDR_ERROR' => 'The address information you entered does not appear to be valid or cannot be matched. Please select or add a different address and try again.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CONFIRMEDADDR_ERROR' => 'The address you selected at PayPal is not a Confirmed address. Please return to PayPal and select or add a confirmed address and try again.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS_ERROR' => 'PayPal was unable to successfully fund this transaction. Please choose another payment option or review funding options in your PayPal account before proceeding.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_PAYPALR_DECLINED' => 'Sorry. PayPal has declined the transaction and advised us to tell you to contact PayPal Customer Service for more information. To complete your purchase, please select an alternate payment method.',
     'MODULE_PAYMENT_PAYPALR_TEXT_NOTIFICATION_MISSING' => 'We are unable to process your %s payment at this time.  Please contact us for assistance.',  //- %s filled in with MODULE_PAYMENT_PAYPALR_TEXT_TITLE
+    'MODULE_PAYMENT_PAYPALR_TEXT_PLEASE_NOTE' => 'Please Note:',
+    'MODULE_PAYMENT_PAYPALR_UNSUPPORTED_BILLING_COUNTRY' => 'Your billing address\' country not supported by PayPal; credit-card payments cannot be made.',
+    'MODULE_PAYMENT_PAYPALR_UNSUPPORTED_SHIPPING_COUNTRY' => 'Your shipping address\' country not supported by PayPal; this payment method cannot be used.',
+
+    // -----
+    // Used by the payment module's javascript_validation method.
+    //
+    'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER' => '* The cardholder\'s name must be at least ' . CC_OWNER_MIN_LENGTH . ' characters.\n',
+    'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER' => '* The Credit Card Number must be at least ' . CC_NUMBER_MIN_LENGTH . ' characters.\n',
+    'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_CVV' => '* The 3 or 4 digit CVV Number must be entered from the back of the credit card (or front for American Express).\n',
+
+    // -----
+    // Constants used when processing credit-cards
+    //
+    'MODULE_PAYMENT_PAYPALR_CC_OWNER' => 'Cardholder Name:',
+    'MODULE_PAYMENT_PAYPALR_CC_TYPE' => 'Credit Card Type:',
+    'MODULE_PAYMENT_PAYPALR_CC_NUMBER' => 'Credit Card Number:',
+    'MODULE_PAYMENT_PAYPALR_CC_EXPIRES' => 'Credit Card Expiry Date:',
+    'MODULE_PAYMENT_PAYPALR_CC_CVV' => 'CVV Number:',
+
+    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH' => 'The <em>CVV Number</em> for your %1$s card ending in <var>%2$s</var> must be %3$u digits in length.',  //- %1$s is the card type, , %2$s is the last-r, %3$u is the CVV length
+    'MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD' => 'We apologize for the inconvenience, but the credit card type you entered is not one that we accept. Please use a different credit card.',
+
+    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR' => 'An error occurred when we tried to process your credit card.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED' => 'The card ending with <var>%s</var> was declined.',     //- %s is the last-4 of the card-number.
+    'MODULE_PAYMENT_PAYPALR_TEXT_DECLINED_REASON_UNKNOWN' => 'If you continue to receive this message, please contact us and supply reason-code \'%s\'.', //- %s is ['processor_response']['response_code']
+
+    'MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN' => 'Please try again, select an alternate payment method or contact us for assistance.',
+
+    // -----
+    // Store owner/admin alert-email messages.
+    //
+    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPal Checkout Error (%s)',    //- %s is an additional error descriptor, see below
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION' => 'Configuration',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL' => 'Unknown Denial Reason',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD' => 'Lost/Stolen/Fraudulent Card',
+
+    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
+    'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypalrestful.php) was not loaded; the payment module has been disabled.',
+    'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS' => 'The required notifications in the order_total.php class were not applied; the payment module cannot place orders.',
+    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE' => 'An error was returned by PayPal when attempting to initiate an order. As a courtesy, only the error \'number\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
+
+    // -----
+    // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.
+    //
+
+    // -----
+    // %1$s: ['processor_response']['response_code']
+    // %2$s: $_SESSION['customer_first_name']
+    // %3$s: $_SESSION['customer_last_name']
+    // $4%u: $_SESSION['customer_id']
+    //
+    'MODULE_PAYMENT_PAYPALR_ALERT_UNKNOWN_DENIAL' =>
+        'PayPal returned an unknown response code (%1$s) for a denied credit-card payment.' . "\n\n" .
+        'The payment was attempted by %2$s %3$s (customer id %4$u). Formatted card-details follow:' . "\n\n",
+
+    // -----
+    // %1$s: One of the two language constants that follow.
+    // %2$s: $_SESSION['customers_ip_address']
+    // %3$s: $_SESSION['customer_first_name']
+    // %4$s: $_SESSION['customer_last_name']
+    // $5%u: $_SESSION['customer_id']
+    //
+    'MODULE_PAYMENT_PAYPALR_ALERT_LOST_STOLEN_CARD' =>
+        'A credit-card payment was attempted with a %1$s card from IP address %2$s.' . "\n\n" .
+        'The payment was attempted by %3$s %4$s (customer id %5$u). Formatted card-details follow:' . "\n\n",
+    'MODULE_PAYMENT_PAYPALR_CARD_LOST' => 'lost or stolen',
+    'MODULE_PAYMENT_PAYPALR_CARD_FRAUDULENT' => 'fraudulent',
+
+    // -----
+    // For these messages, %1$s is the card-type and %2$s is the last-4 of the card-number.
+    //
+    'MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRED' => 'The %1$s card ending with <var>%2$s</var> has expired.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS' => 'The %1$s card ending with <var>%2$s</var> has insufficient funds.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_FAILED' => 'The "CVV Number" you entered for the %1$s card ending with <var>%2$s</var> is not correct.',
 
     // -----
     // $1$s ... MODULE_PAYMENT_PAYPALR_TEXT_TITLE
     // $2%s ... The error-code returned by PayPal.
     //
     'MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE' => 'We are unable to process your %1$s payment at this time. Please contact us for assistance, providing us with this code: <b>%2$s</b>.',
- 
-    'MODULE_PAYMENT_PAYPALR_FUNDING_ERROR' => 'Funding source problem; please go to Paypal.com and make payment directly to ' . STORE_OWNER_EMAIL_ADDRESS,
-    'MODULE_PAYMENT_PAYPALR_TEXT_INVALID_ZONE_ERROR' => 'We are sorry for the inconvenience; however, at the present time we are unable to use PayPal to process orders from the geographic region you selected as your PayPal address.  Please continue using normal checkout and select from the available payment methods to complete your order.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_ORDER_ALREADY_PLACED_ERROR' => 'It appears that your order was submitted twice. Please check the My Account area to see the actual order details.  Please use the Contact Us form if your order does not appear here but is already paid from your PayPal account so that we may check our records and reconcile this with you.',
 
     // -----
     // Buttons on checkout_payment page; see https://www.paypal.com/bm/webapps/mpp/logo-center for additional information.
@@ -48,7 +112,6 @@ $define = [
         'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_BLUE' => 'https://www.paypalobjects.com/digitalassets/c/website/marketing/apac/C2/logos-buttons/optimize/44_Blue_PayPal_Pill_Button.png',
         'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_WHITE' => 'https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-150px.png',
 
-    'MODULE_PAYMENT_PAYPALR_BUTTON_CARDS' => 'https://www.paypalobjects.com/webstatic/mktg/logo/AM_mc_vs_dc_ae.jpg',
     'MODULE_PAYMENT_PAYPALR_CHOOSE_PAYPAL' => 'Pay with PayPal:',
     'MODULE_PAYMENT_PAYPALR_OR' => 'OR',
     'MODULE_PAYMENT_PALPALR_CHOOSE_CARD' => 'Pay with Credit Card:',
@@ -59,21 +122,6 @@ $define = [
     //
     'MODULE_PAYMENT_PAYPALR_TEXT_GETDETAILS_ERROR' => 'There was a problem retrieving PayPal transaction details.',
     'MODULE_PAYMENT_PAYPALR_NO_RECORDS' => 'No \'%1$s\' records were found in the database for order #%2$u.',
-
-    'MODULE_PAYMENT_PAYPALR_TEXT_REFUND_ERROR' => 'There was a problem refunding the transaction amount specified. ',
-
-    'MODULE_PAYMENT_PAYPALR_TEXT_CAPT_ERROR' => 'There was a problem capturing the transaction. ',
-    'MODULE_PAYMENT_PAYPALR_TEXT_REFUNDFULL_ERROR' => 'Your Refund Request was rejected by PayPal.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_INVALID_REFUND_AMOUNT' => 'You requested a partial refund but did not specify an amount.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_REFUND_FULL_CONFIRM_ERROR' => 'You requested a full refund but did not check the Confirm box to verify your intent.',
-
-    'MODULE_PAYMENT_PAYPALR_TEXT_INVALID_CAPTURE_AMOUNT' => 'You requested a capture but did not specify an amount.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CAPTURE_FULL_CONFIRM_ERROR' => 'You requested funds-Capture but did not check the Confirm box to verify your intent.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_GEN_API_ERROR' => 'There was an error in the attempted transaction. Please see the API Reference guide or transaction logs for detailed information.',
-
-    'MODULE_PAYMENT_PAYPALR_TEXT_REFUND_INITIATED' => 'PayPal refund for %s initiated. Transaction ID: %s. Refresh the screen to see confirmation details updated in the Order Status History/Comments section.',
-
-    'MODULE_PAYMENT_PAYPALR_TEXT_CAPT_INITIATED' => 'PayPal Capture for %s initiated. Receipt ID: %s. Refresh the screen to see confirmation details updated in the Order Status History/Comments section.',
 
     // -----
     // Used during the admin's display of the payment transactions on an
@@ -94,7 +142,6 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_PENDING_REASON' => 'Pending Reason:',
     'MODULE_PAYMENT_PAYPALR_INVOICE' => 'Invoice:',
     'MODULE_PAYMENT_PAYPALR_PAYMENT_DATE' => 'Payment Date:',
-    'MODULE_PAYMENT_PAYPALR_CURRENCY_HDR' => 'Currency:',
     'MODULE_PAYMENT_PAYPALR_GROSS_AMOUNT' => 'Gross Amount:',
     'MODULE_PAYMENT_PAYPALR_PAYMENT_FEE' => 'Payment Fee:',
     'MODULE_PAYMENT_PAYPALR_SETTLE_AMOUNT' => 'Settled Amount:',
@@ -207,103 +254,6 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_VOID_MEMO' => 'Transaction voided by %1$s.',
     'MODULE_PAYMENT_PAYPALR_VOID_INVALID_TXN_ID' => 'The transaction ID you entered (%1$s) was not found; please try again.',
     'MODULE_PAYMENT_PAYPALR_VOID_COMPLETE' => 'The payment authorization for order#%u has been voided.',
-
-    /* card-related language constants, future.
-    'MODULE_PAYMENT_PAYPALR_TRANSSTATE' => 'Trans. State:',
-    'MODULE_PAYMENT_PAYPALR_AUTHCODE' => 'Auth. Code:',
-    'MODULE_PAYMENT_PAYPALR_AVSADDR' => 'AVS Address match:',
-    'MODULE_PAYMENT_PAYPALR_AVSZIP' => 'AVS ZIP match:',
-    'MODULE_PAYMENT_PAYPALR_CVV2MATCH' => 'CVV2 match:',
-
-    'MODULE_PAYMENT_PAYPALR_ERROR_HEADING' => 'We\'re sorry, but we were unable to process your credit card.',
-
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ISSUE' => 'Credit Card Issue Date:',
-*/
-    // -----
-    // Constants used when processing credit-cards
-    //
-    'MODULE_PAYMENT_PAYPALR_CC_OWNER' => 'Cardholder Name:',
-    'MODULE_PAYMENT_PAYPALR_CC_TYPE' => 'Credit Card Type:',
-    'MODULE_PAYMENT_PAYPALR_CC_NUMBER' => 'Credit Card Number:',
-    'MODULE_PAYMENT_PAYPALR_CC_EXPIRES' => 'Credit Card Expiry Date:',
-    'MODULE_PAYMENT_PAYPALR_CC_CVV' => 'CVV Number:',
-
-    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH' => 'The <em>CVV Number</em> for your %1$s card ending in <var>%2$s</var> must be %3$u digits in length.',  //- %1$s is the card type, , %2$s is the last-r, %3$u is the CVV length
-    'MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD' => 'We apologize for the inconvenience, but the credit card you entered is not one that we accept. Please use a different credit card.',
-
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR' => 'An error occurred when we tried to process your credit card.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED' => 'The card ending with <var>%s</var> was declined.',     //- %s is the last-4 of the card-number.
-    'MODULE_PAYMENT_PAYPALR_TEXT_DECLINED_REASON_UNKNOWN' => 'If you continue to receive this message, please contact us and supply reason-code \'%s\'.', //- %s is ['processor_response']['response_code']
-
-    'MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN' => 'Please try again, select an alternate payment method or contact us for assistance.',
-
-    // -----
-    // Admin alert-email messages.
-    //
-    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPal Checkout Error (%s)',    //- %s is an additional error descriptor, see below
-        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION' => 'Configuration',
-        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
-        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL' => 'Unknown Denial Reason',
-        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD' => 'Lost/Stolen/Fraudulent Card',
-
-    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
-    'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypalrestful.php) was not loaded; the payment module has been disabled.',
-    'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS' => 'The required notifications in the order_total.php class were not applied; the payment module cannot place orders.',
-    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE' => 'An error was returned by PayPal when attempting to initiate an order. As a courtesy, only the error \'number\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
-
-    // -----
-    // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.
-    //
-
-    // -----
-    // %1$s: ['processor_response']['response_code']
-    // %2$s: $_SESSION['customer_first_name']
-    // %3$s: $_SESSION['customer_last_name']
-    // $4%u: $_SESSION['customer_id']
-    //
-    'MODULE_PAYMENT_PAYPALR_ALERT_UNKNOWN_DENIAL' =>
-        'PayPal returned an unknown response code (%1$s) for a denied credit-card payment.' . "\n\n" .
-        'The payment was attempted by %2$s %3$s (customer id %4$u). Formatted card-details follow:' . "\n\n",
-
-    // -----
-    // %1$s: One of the two language constants that follow.
-    // %2$s: $_SESSION['customers_ip_address']
-    // %3$s: $_SESSION['customer_first_name']
-    // %4$s: $_SESSION['customer_last_name']
-    // $5%u: $_SESSION['customer_id']
-    //
-    'MODULE_PAYMENT_PAYPALR_ALERT_LOST_STOLEN_CARD' =>
-        'A credit-card payment was attempted with a %1$s card from IP address %2$s.' . "\n\n" .
-        'The payment was attempted by %3$s %4$s (customer id %5$u). Formatted card-details follow:' . "\n\n",
-    'MODULE_PAYMENT_PAYPALR_CARD_LOST' => 'lost or stolen',
-    'MODULE_PAYMENT_PAYPALR_CARD_FRAUDULENT' => 'fraudulent',
-
-    // -----
-    // For these messages, %1$s is the card-type and %2$s is the last-4 of the card-number.
-    //
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRED' => 'The %1$s card ending with <var>%2$s</var> has expired.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS' => 'The %1$s card ending with <var>%2$s</var> has insufficient funds.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_FAILED' => 'The "CVV Number" you entered for the %1$s card ending with <var>%2$s</var> is not correct.',
-
-    // -----
-    // Used by the payment module's javascript_validation method.
-    //
-    'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER' => '* The cardholder\'s name must be at least ' . CC_OWNER_MIN_LENGTH . ' characters.\n',
-    'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER' => '* The Credit Card Number must be at least ' . CC_NUMBER_MIN_LENGTH . ' characters.\n',
-    'MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_CVV' => '* The 3 or 4 digit CVV Number must be entered from the back of the credit card (or front for American Express).\n',
-/*
-    'MODULE_PAYMENT_PAYPALR_TEXT_CC_DECLINED' => 'Your credit card was declined. Please try another card or contact your bank for more information.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_BAD_LOGIN' => 'There was a problem validating your account. Please try again.',
-
-    'MODULE_PAYMENT_PAYPALR_ERROR_AVS_FAILURE_TEXT' => 'ALERT: Address Verification Failure. ',
-    'MODULE_PAYMENT_PAYPALR_ERROR_CVV_FAILURE_TEXT' => 'ALERT: Card CVV Code Verification Failure. ',
-    'MODULE_PAYMENT_PAYPALR_ERROR_AVSCVV_PROBLEM_TEXT' => ' Order is on hold pending review by Store Owner.',
-
-    'MODULES_PAYMENT_PAYPALDP_TEXT_EMAIL_FMF_SUBJECT' => 'Payment in Fraud Review Status: ',
-    'MODULES_PAYMENT_PAYPALDP_TEXT_EMAIL_FMF_INTRO' => 'This is an automated notification to advise you that PayPal flagged the payment for a new order as Requiring Payment Review by their Fraud team. Normally the review is completed within 36 hours. It is STRONGLY ADVISED that you DO NOT SHIP the order until payment review is completed. You can see the latest review status of the order by logging into your PayPal account and reviewing recent transactions.',
-    'MODULES_PAYMENT_PAYPALR_TEXT_BLANK_ADDRESS' => 'PROBLEM: We are sorry. PayPal has unexpectedly returned a blank address.<br>In order to complete your purchase, please provide your address by clicking the &quot;Sign Up&quot; button below to create an account in our store. Then you can select PayPal again when you continue with checkout. We apologize for the inconvenience. If you have any trouble with checkout, please click the Contact Us link to explain the details to us so we can help you with your purchase and prevent the problem in the future. Thanks.',
-    'MODULES_PAYMENT_PAYPALR_AGGREGATE_CART_CONTENTS' => 'All the items in your shopping basket (see details in the store and on your store receipt).',
-*/
 ];
 
 if (IS_ADMIN_FLAG === true) {

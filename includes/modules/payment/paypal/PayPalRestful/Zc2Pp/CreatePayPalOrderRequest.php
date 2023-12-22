@@ -234,7 +234,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $item_total += $next_item['quantity'] * $next_item['unit_amount']['value'];
             $item_tax_total += $next_item['quantity'] * $next_item['tax']['value'];
         }
-        $shipping_total = (float)($order->info['shipping_cost'] + $order->info['shipping_tax']);
+        $shipping_total = (float)($order->info['shipping_cost'] + $order_info['shipping_tax']);
         $breakdown = [
             'item_total' => $this->amount->setValue($item_total),
             'shipping' => $this->setRateConvertedValue($shipping_total),
