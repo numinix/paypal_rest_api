@@ -55,11 +55,13 @@ $define = [
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL' => 'Unknown Denial Reason',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD' => 'Lost/Stolen/Fraudulent Card',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_TOTAL_MISMATCH' => 'Calculation Mismatch',
 
     'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
     'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypalrestful.php) was not loaded; the payment module has been disabled.',
     'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS' => 'The required notifications in the order_total.php class were not applied; the payment module cannot place orders.',
-    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE' => 'An error was returned by PayPal when attempting to initiate an order. As a courtesy, only the error \'number\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
+    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE' => 'An error was returned by PayPal when attempting to initiate an order. As a courtesy, only the error \'code\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
+    'MODULE_PAYMENT_PAYPALR_ALERT_TOTAL_MISMATCH' => 'A discrepancy was found between an order\'s overall value and its breakdown.  The order is being submitted to PayPal without items and cost breakdown included:',
 
     // -----
     // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.

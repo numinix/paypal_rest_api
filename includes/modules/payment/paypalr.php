@@ -1004,6 +1004,18 @@ class paypalr extends base
         $create_order_request = new CreatePayPalOrderRequest($ppr_type, $order, $this->ccInfo, $order_info, $zcObserverPaypalrestful->getOrderTotalChanges());
 
         // -----
+        // If the order's request-creation resulted in a calculation mismatch, send an alert if
+        // configured.
+        //
+        $order_amount_mismatch = $create_order_request->getBreakdownMismatch();
+        if (count($order_amount_mismatch) !== 0) {
+            $this->sendAlertEmail(
+                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_TOTAL_MISMATCH,
+                MODULE_PAYMENT_PAYPALR_ALERT_TOTAL_MISMATCH . "\n\n" . Logger::logJSON($order_amount_mismatch)
+            );
+        }
+
+        // -----
         // Send the request off to register the order at PayPal.
         //
         $this->ppr->setPayPalRequestId($order_guid);

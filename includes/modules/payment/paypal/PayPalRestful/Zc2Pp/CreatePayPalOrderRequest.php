@@ -50,6 +50,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
         'item_total' => 0,
         'item_tax_total' => 0,
         'all_products_virtual' => true,
+        'breakdown_mismatch' => [],  //- NOTE, only has values if a breakdown-mismatch was found!
     ];
 
     /**
@@ -111,6 +112,14 @@ class CreatePayPalOrderRequest extends ErrorInfo
         }
 
         // -----
+        // Validate that the order's amount-breakdown actually adds up (it might not for
+        // various tax situations and/or if a coupon is present). If the breakdown doesn't
+        // match the order's total, the order will be submitted *without the breakdown* which
+        // (unfortunately) could result in the order not being protected by PayPal.
+        //
+        $this->validateOrderAmounts();
+
+        // -----
         // If this is a request to pay for the order using a credit card, add
         // the 'card' payment source to the order-creation request.  Note that
         // without a 'payment_source', the source defaults to 'paypal'.
@@ -130,6 +139,22 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
         $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request));
     }
+    protected function validateOrderAmounts()
+    {
+        $purchase_amount = $this->request['purchase_units'][0]['amount'];
+        $summed_amount = ($this->amount->getCurrencyDecimals() === 0) ? '0' : '0.00';
+        foreach ($purchase_amount['breakdown'] as $name => $amount) {
+            $summed_amount += $amount['value']
+        }
+        if ((string)$summed_amount !== $purchase_amount) {
+            $this->log->write("\n***--> CreatePayPalOrderRequest, amount mismatch. No items or cost breakdown included in the submission to PayPal. Error amount:\n" . Logger::logJSON($purchase_amount));
+            $this->itemBreakdown['breakdown_mismatch'] = $purchase_amount;
+            unset(
+                $this->request['purchase_units'][0]['amount']['breakdown'],
+                $this->request['purchase_units'][0]['items']
+            );
+        }
+    }
 
     // -----
     // Retrieve the generated request.
@@ -137,6 +162,15 @@ class CreatePayPalOrderRequest extends ErrorInfo
     public function get()
     {
         return $this->request;
+    }
+
+    // -----
+    // Retrieve the breakdown-mismatch array. If not empty, indicates that there
+    // was a mismatch between the calculated order breakdown and the order's total.
+    //
+    public function getBreakdownMismatch(): array
+    {
+        return $this->itemBreakdown['breakdown_mismatch'];
     }
 
     // -----
