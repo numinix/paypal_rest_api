@@ -577,7 +577,7 @@ class paypalr extends base
 
     protected function resetOrder()
     {
-        unset($_SESSION['PayPalRestful']['Order'], $_SESSION['PayPalRestful']['ppr_type'], $_SESSION['PayPalRestful']['Order']['payment_confirmed']);
+        unset($_SESSION['PayPalRestful']['Order'], $_SESSION['PayPalRestful']['ppr_type']);
     }
 
     // --------------------------------------------
@@ -630,7 +630,7 @@ class paypalr extends base
         // for the PayPal payment 'source' is cleared so that the customer will need to (possibly again) validate
         // their payment means.
         //
-        unset($_SESSION['PayPalRestful']['Order']['payment_confirmed']);
+        unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
 
         // -----
         // Determine which color button to use.  The color-choice constants are defined in
@@ -736,7 +736,7 @@ class paypalr extends base
         $ppr_cc_expires_month_id = $this->code . '-cc-expires-month';
         $ppr_cc_cvv_id = $this->code . '-cc-cvv';
 
-        return [
+        $selection = [
             'id' => $this->code,
             'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE,
             'fields' => [
@@ -787,8 +787,29 @@ class paypalr extends base
                     'field' => zen_draw_input_field('ppr_cc_cvv', '', 'class="ppr-cc" id="' . $ppr_cc_cvv_id . '" autocomplete="off"'),
                     'tag' => $ppr_cc_cvv_id,
                 ],
+                [
+                    'title' => '&nbsp;',
+                    'field' =>
+                        '<small class="ppr-cc">' .
+                            sprintf(MODULE_PAYMENT_PAYPALR_CARD_PROCESSING, '<a href="' . MODULE_PAYMENT_PAYPALR_PAYPAL_PRIVACY_LINK . '" target="_blank">' . MODULE_PAYMENT_PAYPALR_PAYPAL_PRIVACY_STMT . '</a>') .
+                        '</small>',
+                ],
             ],
         ];
+
+        // -----
+        // If running in the sandbox environment, add a checkbox input to enable SCA
+        // testing.
+        //
+        if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
+            $selection['fields'][] = [
+                'title' => 'Enable SCA Always?',
+                'field' => zen_draw_checkbox_field('ppr_cc_sca_always', 'on', false, 'class="ppr-cc" id=ppr-cc-sca-always'),
+                'tag' => 'ppr-c-sca-always',
+            ];
+        }
+
+        return $selection;
     }
     protected function buildCardsAccepted(): string
     {
@@ -854,11 +875,11 @@ class paypalr extends base
         // the customer has already confirmed their payment choice at PayPal, nothing further to do
         // at this time.
         //
-        // Note: The 'payment_confirmed' element of the payment-module's session-based order is set by the
+        // Note: The 'wallet_payment_confirmed' element of the payment-module's session-based order is set by the
         // ppr_webhook_main.php processing when the customer returns from selecting a payment means for
         // the 'paypal' payment-source.
         //
-        if ($ppr_type !== 'paypal' || isset($_SESSION['PayPalRestful']['Order']['payment_confirmed'])) {
+        if ($ppr_type !== 'paypal' || isset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'])) {
             $_SESSION['PayPalRestful']['Order']['payment_source'] = $ppr_type;
             $this->log->write("pre_confirmation_check, completed for payment-source $ppr_type.", true, 'after');
             return;
@@ -883,14 +904,13 @@ class paypalr extends base
         }
 
         // -----
-        // Locate (and save) the URL to which the customer is redirected at PayPal
+        // Locate the URL to which the customer is redirected at PayPal
         // to confirm their payment choice.
         //
         $action_link = '';
         foreach ($payment_choice_response['links'] as $next_link) {
             if ($next_link['rel'] === 'payer-action') {
                 $action_link = $next_link['href'];
-                $approve_method = $next_link['method'];
                 break;
             }
         }
@@ -1140,12 +1160,16 @@ class paypalr extends base
             return false;
         }
 
-        return
+        $hidden_fields =
             zen_draw_hidden_field('ppr_cc_owner', $_POST['ppr_cc_owner']) . "\n" .
             zen_draw_hidden_field('ppr_cc_expires_month', $_POST['ppr_cc_expires_month']) . "\n" .
             zen_draw_hidden_field('ppr_cc_expires_year', $_POST['ppr_cc_expires_year']) . "\n" .
             zen_draw_hidden_field('ppr_cc_number', $_POST['ppr_cc_number']) . "\n" .
             zen_draw_hidden_field('ppr_cc_cvv', $_POST['ppr_cc_cvv']) . "\n";
+        if (isset($_POST['ppr_cc_sca_always'])) {
+            $hidden_fields .= zen_draw_hidden_field('ppr_cc_sca_always', $_POST['ppr_cc_sca_always']);
+        }
+        return $hidden_fields;
     }
     public function process_button_ajax()
     {
@@ -1213,67 +1237,26 @@ class paypalr extends base
         //
         $this->paymentIsPending = false;
 
+        // -----
+        // Determine the 'payment_source' for the order (either 'paypal' or 'card'). If
+        // the customer's paying with a card, call an additional method to deal with
+        // those complications.
+        //
+        // Note: That method won't return here if an issue was found with the
+        // credit-card or if a 3DS verification is required.
+        //
         $payment_source = $_SESSION['PayPalRestful']['Order']['payment_source'];
-        if ($payment_source !== 'card') {
+        if ($payment_source === 'card') {
+            $response = $this->createCreditCardOrder($order, $order_info);
+
+        // -----
+        // Otherwise, the customer's paying with their PayPal Wallet.
+        //
+        } else {
             if (!isset($_SESSION['PayPalRestful']['Order']['status']) || $_SESSION['PayPalRestful']['Order']['status'] !== PayPalRestfulApi::STATUS_APPROVED) {
                 $this->setMessageAndRedirect("paypalr::before_process, can't capture/authorize order; wrong status ({$_SESSION['PayPalRestful']['Order']['status']}).", FILENAME_CHECKOUT_SHIPPING);  //- FIXME
             }
-
-            $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
-            $this->ppr->setPayPalRequestId($_SESSION['PayPalRestful']['Order']['guid']);
-            if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') {
-                $response = $this->ppr->captureOrder($paypal_id);
-            } else {
-                $response = $this->ppr->authorizeOrder($paypal_id);
-            }
-
-            if ($response === false) {
-                $this->setMessageAndRedirect("paypalr::before_process ($payment_source), can't create/capture/authorize order; error in attempt, see log.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
-            }
-        } else {
-            if ($this->validateCardInformation() === false) {
-                $this->setMessageAndRedirect("before_process, card failed validation.", FILENAME_CHECKOUT_PAYMENT); //-FIXME
-            }
-
-            // -----
-            // Save the pertinent credit-card information into the order so that it'll be
-            // included in the GUID.
-            //
-            $order->info['cc_type'] = $this->ccInfo['type'];
-            $order->info['cc_number'] = $this->obfuscateCcNumber($this->ccInfo['number']);
-            $order->info['cc_owner'] = $this->ccInfo['name'];
-            $order->info['cc_expires'] = ''; //- $this->ccInfo['expiry_month'] . substr($this->ccInfo['expiry_year'], -2);
-
-            // -----
-            // Create a GUID (Globally Unique IDentifier) for the order's
-            // current 'state'.
-            //
-            $order_guid = $this->createOrderGuid($order, 'card');
-
-            // -----
-            // Build the request for the PayPal card-payment order's creation.
-            //
-            global $zcObserverPaypalrestful;
-            $create_order_request = new CreatePayPalOrderRequest('card', $order, $this->ccInfo, $order_info, $zcObserverPaypalrestful->getOrderTotalChanges());
-
-            // -----
-            // Send the request off to register the credit-card order at PayPal.
-            //
-            $this->ppr->setPayPalRequestId($order_guid);
-            $response = $this->ppr->createOrder($create_order_request->get());
-            if ($response === false) {
-                $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
-                $this->setMessageAndRedirect("before_process, createOrder failed:\n" . json_encode($this->errorInfo), FILENAME_CHECKOUT_PAYMENT); //-FIXME
-            }
-
-            // -----
-            // Check the response for the payment authorization/capture to see if there was
-            // an issue with the card.
-            //
-            $payment_response_message = $this->checkCardPaymentResponse($response);
-            if ($payment_response_message !== '') {
-                $this->setMessageAndRedirect($payment_response_message, FILENAME_CHECKOUT_PAYMENT);
-            }
+            $response = $this->captureOrAuthorizeOrder('paypal');
         }
 
         // -----
@@ -1282,7 +1265,7 @@ class paypalr extends base
         // method, in a class property.
         //
         $_SESSION['PayPalRestful']['Order']['status'] = $response['status'];
-        unset($response['purchase_units'][0]['links']);
+        unset($response['links']);
         $this->orderInfo = $response;
 
         // -----
@@ -1341,21 +1324,147 @@ class paypalr extends base
 
         $this->notify('NOTIFY_PAYPALR_BEFORE_PROCESS_FINISHED', $this->orderInfo);
     }
+    protected function captureOrAuthorizePayment(string $payment_source): array
+    {
+        $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
+        $this->ppr->setPayPalRequestId($_SESSION['PayPalRestful']['Order']['guid']);
+        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') {
+            $response = $this->ppr->captureOrder($paypal_id);
+        } else {
+            $response = $this->ppr->authorizeOrder($paypal_id);
+        }
+
+        if ($response === false) {
+            $this->setMessageAndRedirect("paypalr::before_process ($payment_source), can't create/capture/authorize order; error in attempt, see log.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        }
+        return $response;
+    }
+    protected function createCreditCardOrder(\order $order, array $order_info): array
+    {
+        // -----
+        // If we came back from a 3DS response (as set by ppr_webhook_main.php), check
+        // that response, redirecting back to the payment phase of checkout if an issue
+        // was reported.  Otherwise, the payment is captured or authorized (depending on
+        // the site's configuration) and the response from that action is returned to
+        // the caller.
+        //
+        if (isset($_SESSION['PayPalRestful']['Order']['3DS_response'])) {
+            //-FIXME: Need to check the AVS response codes!
+            return $this->captureOrAuthorizePayment('card');
+        }
+
+        // -----
+        // Otherwise, this is the initial 'create' of the credit-card payment.  Check
+        // that the card-related information submitted is valid, returning the customer
+        // to the payment phase of the checkout process if something's not kosher.
+        //
+        if ($this->validateCardInformation() === false) {
+            $this->setMessageAndRedirect("before_process, card failed validation.", FILENAME_CHECKOUT_PAYMENT); //-FIXME
+        }
+
+        // -----
+        // Save the pertinent credit-card information into the order so that it'll be
+        // included in the GUID.
+        //
+        $order->info['cc_type'] = $this->ccInfo['type'];
+        $order->info['cc_number'] = $this->obfuscateCcNumber($this->ccInfo['number']);
+        $order->info['cc_owner'] = $this->ccInfo['name'];
+        $order->info['cc_expires'] = ''; //- $this->ccInfo['expiry_month'] . substr($this->ccInfo['expiry_year'], -2);
+
+        // -----
+        // Create a GUID (Globally Unique IDentifier) for the order's
+        // current 'state'.
+        //
+        $order_guid = $this->createOrderGuid($order, 'card');
+
+        // -----
+        // Build the request for the PayPal card-payment order's creation.
+        //
+        global $zcObserverPaypalrestful;
+        $create_order_request = new CreatePayPalOrderRequest('card', $order, $this->ccInfo, $order_info, $zcObserverPaypalrestful->getOrderTotalChanges());
+
+        // -----
+        // Send the request off to register the credit-card order at PayPal.
+        //
+        $this->ppr->setPayPalRequestId($order_guid);
+        $this->ppr->setKeepTxnLinks(true);
+
+        $response = $this->ppr->createOrder($create_order_request->get());
+        if ($response === false) {
+            $this->setMessageAndRedirect("before_process, createOrder failed:\n" . json_encode($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT); //-FIXME
+        }
+
+        // -----
+        // Check the response for the card-payment order creation to see if there was
+        // an issue with the card reported by the card processor.
+        //
+        $payment_response_message = $this->checkCardPaymentResponse($response);
+        if ($payment_response_message !== '') {
+            $this->setMessageAndRedirect($payment_response_message, FILENAME_CHECKOUT_PAYMENT);
+        }
+
+        // -----
+        // If we've gotten this far, the order has been created at PayPal.  Save
+        // the pertinent information in the session.
+        //
+        $_SESSION['PayPalRestful']['Order']['status'] = $response['status'];
+        $_SESSION['PayPalRestful']['Order']['id'] = $response['id'];
+
+        // -----
+        // See if a 'payer-action' link is sent back (it will be if the customer needs to
+        // perform an SCA verification).  If such a link is found, send the customer off
+        // to that verification link; they'll come back to the store via a webhook back
+        // to the payment module's /ppr_webhook_main.php.
+        //
+        foreach ($response['links'] as $next_link) {
+            if ($next_link['rel'] === 'payer-action') {
+                // -----
+                // Since the customer will be coming back through the process phase of checkout
+                // in their response to the SCA verification link, don't count this pass through
+                // "against them".
+                //
+                $_SESSION['payment_attempt']--;
+
+                // -----
+                // Save confirmation page to which the customer should be redirected upon
+                // a submittal on the SCA verification link.  That's used by the webhook.
+                //
+                global $current_page_base;
+                $_SESSION['PayPalRestful']['Order']['PayerAction'] = [
+                    'current_page_base' => $current_page_base,
+                    'savedPosts' => [
+                        'securityToken' => $_SESSION['securityToken'],
+                    ],
+                ];
+
+                $sca_link = $next_link['href'];
+                $this->log->write("before_process, sending the customer off to a 3DS link ($sca_link).", true, 'after');
+                zen_redirect($sca_link);
+            }
+        }
+
+        // -----
+        // If we've reached this point, the credit-card order was successfully
+        // created (no SCA verification required); return the response to the caller.
+        //
+        return $response;
+    }
     protected function checkCardPaymentResponse(array $response): string
     {
+        // -----
+        // If the capture was completed, the authorization was created or if a
+        // payer-action is required (i.e. an SCA link); all's good and let the caller
+        // know.
+        //
+        if (in_array($response['status'], ['COMPLETED', 'CREATED', 'PAYER_ACTION_REQUIRED'], true)) {
+            return '';
+        }
+
         // -----
         // Grab the 'payments' portion of the response; the element depends on whether
         // the payment-module is configured for 'Final Sale' or 'Auth Only'.
         //
         $payment = $response['purchase_units'][0]['payments']['captures'][0] ?? $response['purchase_units'][0]['payments']['authorizations'][0];
-
-        // -----
-        // If the capture was completed or the authorization was created, all's good; let
-        // the caller know.
-        //
-        if ($payment['status'] === 'COMPLETED' || $payment['status'] === 'CREATED') {
-            return '';
-        }
 
         // -----
         // There was an issue of some sort with the credit-card payment.  Determine whether/not

@@ -142,12 +142,12 @@ class CreatePayPalOrderRequest extends ErrorInfo
     protected function validateOrderAmounts()
     {
         $purchase_amount = $this->request['purchase_units'][0]['amount'];
-        $summed_amount = ($this->amount->getCurrencyDecimals() === 0) ? '0' : '0.00';
+        $summed_amount = 0;
         foreach ($purchase_amount['breakdown'] as $name => $amount) {
-            $summed_amount += $amount['value']
+            $summed_amount += $amount['value'];
         }
-        if ((string)$summed_amount !== $purchase_amount) {
-            $this->log->write("\n***--> CreatePayPalOrderRequest, amount mismatch. No items or cost breakdown included in the submission to PayPal. Error amount:\n" . Logger::logJSON($purchase_amount));
+        if (number_format((float)$summed_amount, $this->amount->getCurrencyDecimals(), '.', '') !== $purchase_amount['value']) {
+            $this->log->write("\n***--> CreatePayPalOrderRequest, amount mismatch ($summed_amount vs. {$purchase_amount['value']}). No items or cost breakdown included in the submission to PayPal. Error amount:\n" . Logger::logJSON($purchase_amount));
             $this->itemBreakdown['breakdown_mismatch'] = $purchase_amount;
             unset(
                 $this->request['purchase_units'][0]['amount']['breakdown'],
@@ -386,17 +386,21 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
     protected function buildCardPaymentSource(\order $order, array $cc_info): array
     {
-        return [
+        $payment_source = [
             'name' => $cc_info['name'],
             'number' => $cc_info['number'],
             'security_code' => $cc_info['security_code'],
             'expiry' => $cc_info['expiry_year'] . '-' . $cc_info['expiry_month'],
             'billing_address' => Address::get($order->billing),
             'experience_context' => [
-                'return_url' => $cc_info['webhook'] . '?op=3ds_challenge_return',
-                'cancel_url' => $cc_info['webhook'] . '?op=3ds_challenge_cancel',
+                'return_url' => $cc_info['webhook'] . '?op=3ds_return',
+                'cancel_url' => $cc_info['webhook'] . '?op=3ds_cancel',
             ],
         ];
+        if (isset($_POST['ppr_cc_sca_always'])) {
+            $payment_source['attributes']['verification']['method'] = 'SCA_ALWAYS'; //- Defaults to 'SCA_WHEN_REQUIRED' for live environment
+        }
+        return $payment_source;
     }
 
     protected function buildLevel2Level3Data(array $purchase_unit): array

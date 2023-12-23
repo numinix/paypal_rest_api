@@ -47,6 +47,10 @@ $define = [
 
     'MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN' => 'Please try again, select an alternate payment method or contact us for assistance.',
 
+    'MODULE_PAYMENT_PAYPALR_CARD_PROCESSING' => 'By paying with your card, you acknowledge that your data will be processed by PayPal subject to the %s available at PayPal.com.',  //- %s is filled in with a link
+    'MODULE_PAYMENT_PAYPALR_PAYPAL_PRIVACY_STMT' => 'PayPal Privacy Statement',
+    'MODULE_PAYMENT_PAYPALR_PAYPAL_PRIVACY_LINK' => 'https://www.paypal.com/us/legalhub/privacy-full',
+
     // -----
     // Store owner/admin alert-email messages.
     //
@@ -65,7 +69,7 @@ $define = [
 
     // -----
     // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.
-    //
+    // -----
 
     // -----
     // %1$s: ['processor_response']['response_code']

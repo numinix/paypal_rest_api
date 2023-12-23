@@ -34,7 +34,7 @@ class Logger
         }
 
         if (IS_ADMIN_FLAG === false) {
-            $logfile_suffix = 'c-' . ($_SESSION['customer_id'] ?? 'na') . '-' . substr($_SESSION['customer_first_name'] ?? '', 0, 3) . substr($_SESSION['customer_last_name'] ?? '', 0, 3);
+            $logfile_suffix = 'c-' . ($_SESSION['customer_id'] ?? 'na') . '-' . substr($_SESSION['customer_first_name'] ?? 'na', 0, 3) . substr($_SESSION['customer_last_name'] ?? 'na', 0, 3);
         } else {
             $logfile_suffix = 'adm-a' . $_SESSION['admin_id'];
             global $order;

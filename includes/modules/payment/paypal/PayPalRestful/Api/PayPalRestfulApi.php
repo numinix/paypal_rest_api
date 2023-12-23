@@ -119,6 +119,12 @@ class PayPalRestfulApi extends ErrorInfo
      */
     protected string $paypalMockResponse = '';
 
+    /**
+     * A binary flag that indicates whether/not the caller wants to keep the 'links' returned
+     * by the various PayPal responses.
+     */
+    protected bool $keepTxnLinks = false;
+
     // -----
     // Class constructor, saves endpoint (live vs. sandbox), clientId and clientSecret
     //
@@ -162,6 +168,11 @@ class PayPalRestfulApi extends ErrorInfo
     public function setPayPalMockResponse(strong $mock_response)
     {
         $this->paypalMockResponse = $mock_response;
+    }
+
+    public function setKeepTxnLinks(bool $keep_links)
+    {
+        $this->keepTxnLinks = $keep_links;
     }
 
     // ===== Start Token-required Methods =====
@@ -606,7 +617,7 @@ class PayPalRestfulApi extends ErrorInfo
         // 204: No content returned; implies successful completion of an updateOrder request.
         //
         if ($httpCode === 200 || $httpCode === 201 || $httpCode === 204) {
-            $this->log->write("The $method ($option) request was successful ($httpCode).\n" . Logger::logJSON($response));
+            $this->log->write("The $method ($option) request was successful ($httpCode).\n" . Logger::logJSON($response, $this->keepTxnLinks));
             return $response;
         }
 
