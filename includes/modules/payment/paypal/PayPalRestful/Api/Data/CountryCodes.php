@@ -10,7 +10,7 @@ namespace PayPalRestful\Api\Data;
 
 class CountryCodes
 {
-    protected static $countryCodes = [
+    protected static array $countryCodes = [
         'AL',  //- ALBANIA
         'DZ',  //- ALGERIA
         'AD',  //- ANDORRA

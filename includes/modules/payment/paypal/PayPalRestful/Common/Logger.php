@@ -17,8 +17,8 @@ class Logger
      * @debugLogFile string
      * @debug bool
      */
-    protected static $debug = false;
-    protected static $debugLogFile;
+    protected static bool $debug = false;
+    protected static string $debugLogFile;
 
     // -----
     // Class constructor.

@@ -10,7 +10,6 @@
 namespace PayPalRestful\Admin\Formatters;
 
 use PayPalRestful\Common\Helpers;
-use PayPalRestful\Common\Logger;
 use PayPalRestful\Zc2Pp\Amount;
 
 class MainDisplay
@@ -268,7 +267,7 @@ class MainDisplay
         $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_ID, $create_fields['payer_id']);
         $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_STATUS, $create_fields['payer_status']);
 
-        if (!empty($create_fields['address_status'])) {
+        if (!empty($create_fields['address_name'])) {
             $address_elements = [
                 'address_name' => MODULE_PAYMENT_PAYPALR_ADDRESS_NAME,
                 'address_street' => MODULE_PAYMENT_PAYPALR_ADDRESS_STREET,
@@ -279,9 +278,6 @@ class MainDisplay
             ];
             foreach ($address_elements as $field_name => $label) {
                 $value = $create_fields[$field_name];
-                if ($field_name === 'address_name') {
-                    $value .= ' (' . MODULE_PAYMENT_PAYPALR_ADDRESS . ' ' . $create_fields['address_status'] . ')';
-                }
                 $modal_body .= $this->createStaticFormGroup(3, $label, $value);
             }
         }

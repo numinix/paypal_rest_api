@@ -14,7 +14,7 @@ class ErrorInfo
     /**
      * Error information, when a CURL or RESTful error occurs.
      */
-    protected $errorInfo;
+    protected array $errorInfo;
 
     public function __construct()
     {

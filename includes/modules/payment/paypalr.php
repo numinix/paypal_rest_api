@@ -1597,7 +1597,7 @@ class paypalr extends base
         if (isset($purchase_unit['shipping']['address'])) {
             $shipping_address = $purchase_unit['shipping']['address'];
             $address_street = $shipping_address['address_line_1'];
-            if (isset($shipping_address['address_line_2'])) {
+            if (!empty($shipping_address['address_line_2'])) {
                 $address_street .= ', ' . $shipping_address['address_line_2'];
             }
             $address_street = substr($address_street, 0, 254);

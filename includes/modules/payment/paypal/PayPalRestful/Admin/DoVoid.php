@@ -12,7 +12,6 @@ namespace PayPalRestful\Admin;
 use PayPalRestful\Admin\GetPayPalOrderTransactions;
 use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Common\Helpers;
-use PayPalRestful\Zc2Pp\Amount;
 
 class DoVoid
 {

@@ -352,12 +352,12 @@ class CreatePayPalOrderRequest extends ErrorInfo
         return $value;
     }
 
-    protected function setRateConvertedValue($value)
+    protected function setRateConvertedValue($value): array
     {
         return $this->amount->setValue($this->getRateConvertedValue($value));
     }
 
-    protected function getRateConvertedValue($value)
+    protected function getRateConvertedValue($value): string
     {
         global $currencies;
 
@@ -379,7 +379,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
         ];
     }
 
-    protected function countItems()
+    protected function countItems(): int
     {
         return count($this->request['purchase_units'][0]['items']);
     }

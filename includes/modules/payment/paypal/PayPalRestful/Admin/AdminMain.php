@@ -12,20 +12,16 @@ namespace PayPalRestful\Admin;
 use PayPalRestful\Admin\GetPayPalOrderTransactions;
 use PayPalRestful\Admin\Formatters\MainDisplay;
 use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Common\Logger;
 
 class AdminMain
 {
     protected PayPalRestfulApi $ppr;
-
-    protected Logger $log;
 
     protected string $adminNotifications = '';
 
     public function __construct(string $module_name, string $module_version, int $oID, PayPalRestfulApi $ppr)
     {
         $this->ppr = $ppr;
-        $this->log = new Logger();
 
         // -----
         // Retrieve the PayPal transactions currently registered in the database

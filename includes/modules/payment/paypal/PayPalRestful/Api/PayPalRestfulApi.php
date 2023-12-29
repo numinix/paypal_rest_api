@@ -65,25 +65,25 @@ class PayPalRestfulApi extends ErrorInfo
      *
      * @log Logger object, logs debug tracing information.
      */
-    protected $log;
+    protected Logger $log;
 
     /**
      * Variables associated with interface logging;
      *
      * @token TokenCache object, caches any access-token retrieved from PayPal.
      */
-    protected $tokenCache;
+    protected TokenCache $tokenCache;
 
     /**
      * Sandbox or production? Set during class construction.
      */
-    protected $endpoint;
+    protected string $endpoint;
 
     /**
      * OAuth client id and secret, set during class construction.
      */
-    private $clientId;
-    private $clientSecret;
+    private string $clientId;
+    private string $clientSecret;
 
     /**
      * The CURL channel, initialized during construction.
@@ -94,7 +94,7 @@ class PayPalRestfulApi extends ErrorInfo
      * Options for cURL. Defaults to preferred (constant) options.  Used by
      * the curlGet and curlPost methods.
      */
-    protected $curlOptions = [
+    protected array $curlOptions = [
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_FORBID_REUSE => true,

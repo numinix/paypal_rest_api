@@ -16,7 +16,7 @@ class ConfirmPayPalPaymentChoiceRequest
     /**
      * The request to be submitted to a v2/orders/{id}/confirm-payment-choice PayPal endpoint.
      */
-    protected $request;
+    protected array $request;
 
     // -----
     // Constructor.  Creates the payload for a PayPal payment-choice confirmation request.
@@ -47,7 +47,7 @@ class ConfirmPayPalPaymentChoiceRequest
         //
         $user_action = 'CONTINUE';
         global $current_page_base;
-        if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
+        if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && defined('CHECKOUT_ONE_CONFIRMATION_REQUIRED') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
             if (!in_array('paypalr', explode(',', str_replace(' ', '', CHECKOUT_ONE_CONFIRMATION_REQUIRED)))) {
                 $user_action = 'PAY_NOW';
             }
