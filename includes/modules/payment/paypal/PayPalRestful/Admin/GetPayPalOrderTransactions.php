@@ -89,10 +89,7 @@ class GetPayPalOrderTransactions
         // -----
         // Grab the transactions for the current order from the database.  The
         // original order (with a txn_type of "CREATE") is always displayed first;
-        // the remaining ones are included in date_added order.
-        //
-        // This funkiness is needed since the date_added for the order-creation
-        // is the same as that for its first transaction (AUTHORIZE or CAPTURE).
+        // the remaining ones are included in txn_type/parent_txn_id order.
         //
         $txns = $db->ExecuteNoCache(
             "SELECT *
@@ -109,14 +106,13 @@ class GetPayPalOrderTransactions
         );
 
         // -----
-        // Now, sort those transactions in parent/child order.
+        // Now, sort those transactions so that the REFUNDs and VOIDs are
+        // located *after* their parent CAPTURE/AUTHORIZE.
         //
         $db_txns = [];
         foreach ($txns as $txn) {
             // -----
-            // From the SQL query, the order's "CREATE" transaction will always be
-            // first, so just add it as the first element of the database transactions'
-            // array.
+            // 
             //
             if ($txn['txn_type'] === 'CREATE') {
                 $db_txns[] = $txn;
@@ -128,11 +124,12 @@ class GetPayPalOrderTransactions
             //
             $parent_txn_id = $txn['parent_txn_id'];
             for ($position = 0, $txn_count = count($db_txns); $position < $txn_count; $position++) {
-                if ($db_txns[$position]['parent_txn_id'] === $parent_txn_id) {
+                if ($db_txns[$position]['txn_id'] === $parent_txn_id) {
+                    $position_after = $position + 1;
                     $db_txns = array_merge(
-                        array_slice($db_txns, 0, $position),
-                        [$position => $txn],
-                        array_slice($db_txns, $position)
+                        array_slice($db_txns, 0, $position_after),
+                        [$position_after => $txn],
+                        array_slice($db_txns, $position_after)
                     );
                     break;
                 }
@@ -153,7 +150,10 @@ class GetPayPalOrderTransactions
         $primary_txn_id = $this->databaseTxns[0]['txn_id'];
         $txns = $this->ppr->getOrderStatus($primary_txn_id);
         if ($txns === false) {
-            $this->messages->add(MODULE_PAYMENT_PAYPALR_TEXT_GETDETAILS_ERROR . "\n" . Logger::logJSON($this->ppr->getErrorInfo()), 'error');
+            $error_info = $this->ppr->getErrorInfo();
+            if ($error_info['name'] !== 'RESOURCE_NOT_FOUND') {
+                $this->messages->add(MODULE_PAYMENT_PAYPALR_TEXT_GETDETAILS_ERROR . "\n" . Logger::logJSON($error_info), 'error');
+            }
             return;
         }
         $this->paypalTransactions = $txns;
@@ -268,9 +268,12 @@ class GetPayPalOrderTransactions
             $payment_info['payment_date'] = $date_added;
         }
 
-        $note_to_payer = $paypal_response['note_to_payer'] ?? '';
-        if ($note_to_payer !== '') {
-            $note_to_payer = "\n\nPayment Note: $note_to_payer";
+        $memo = [];
+        if (isset($paypal_response['note_to_payer'])) {
+            $memo['note_to_payer'] = $paypal_response['note_to_payer'];
+        }
+        if ($memo_comment !== '') {
+            $memo['comment'] = $memo_comment;
         }
 
         $expiration_time = $paypal_response['expiration_time'] ?? 'null';
@@ -296,7 +299,7 @@ class GetPayPalOrderTransactions
             'date_added' => $date_added,
             'last_modified' => Helpers::convertPayPalDatePay2Db($paypal_response['update_time']),
             'expiration_time' => $expiration_time,
-            'memo' => $memo_comment . $note_to_payer,
+            'memo' => json_encode($memo),
         ];
         $sql_data_array = array_merge($sql_data_array, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);

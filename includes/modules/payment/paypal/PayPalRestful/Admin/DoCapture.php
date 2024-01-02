@@ -25,6 +25,12 @@ class DoCapture
             return;
         }
 
+        $capture_remaining_funds = isset($_POST['ppr-capt-remaining']);
+        if ($capture_remaining_funds === false && (float)$_POST['ppr-amount'] == 0) {
+            $messageStack->add_session(MODULE_PAYMENT_PAYPALR_CAPTURE_AMOUNT, 'error');
+            return;
+        }
+
         $ppr_txns = new GetPayPalOrderTransactions($module_name, $module_version, $oID, $ppr);
         $ppr_auth_db_txns = $ppr_txns->getDatabaseTxns('AUTHORIZE');
         if (count($ppr_auth_db_txns) === 0) {
@@ -44,13 +50,17 @@ class DoCapture
             return;
         }
 
-        $capt_currency = $auth_id_txn['mc_currency'];
-        $amount = new Amount($capt_currency);
-        $capt_amount = $amount->getValueFromString($_POST['ppr-amount']);
         $payer_note = $_POST['ppr-capt-note'];
-        $final_capture = isset($_POST['final_capture']);
+        $final_capture = isset($_POST['ppr-capt-final']);
+        if ($capture_remaining_funds === true) {
+            $capture_response = $ppr->capturePaymentRemaining($_POST['auth_txn_id'], $ppr_txns->getInvoiceId(), $payer_note, $final_capture);
+        } else {
+            $capt_currency = $auth_id_txn['mc_currency'];
+            $amount = new Amount($capt_currency);
+            $capt_amount = $amount->getValueFromString($_POST['ppr-amount']);
+            $capture_response = $ppr->capturePaymentAmount($_POST['auth_txn_id'], $capt_currency, $capt_amount, $ppr_txns->getInvoiceId(), $payer_note, $final_capture);
+        }
 
-        $capture_response = $ppr->capturePayment($_POST['auth_txn_id'], $capt_currency, $capt_amount, $ppr_txns->getInvoiceId(), $payer_note, $final_capture);
         if ($capture_response === false) {
             $error_info = $ppr->getErrorInfo();
             $issue = $error_info['details'][0]['issue'] ?? '';

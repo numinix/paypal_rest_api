@@ -21,3 +21,11 @@ tr.ppr-payments {
 .ppr-modal textarea {
     margin: 0.5vh 0;
 }
+.ppr-modal .control-label {
+    padding-top: 0;
+}
+.ppr-modal p.form-control-static {
+    min-height: auto;
+    padding-top: 0;
+    padding-bottom: 0;
+}

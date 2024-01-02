@@ -90,14 +90,14 @@ class DoRefund
             'Amount: ' . $amount_refunded . "\n" .
             $payer_note;
 
-        if (($capture_id_txn['mc_gross'] . ' ' . $capture_currency) !== $refund_amount) {
-            $capture_status = -1;
+        if (($capture_id_txn['mc_gross'] . ' ' . $capture_currency) !== $amount_refunded) {
+            $refund_status = -1;
         } else {
             $refund_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;   //-FIXME:  There might be multiple captures to be refunded
-            $refund_status = ($order_status > 0) ? $order_status : 2;
+            $refund_status = ($refund_status > 0) ? $refund_status : 2;
         }
         zen_update_orders_history($oID, $comments, null, $refund_status, 0);
 
-        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REFUND_COMPLETE, $oID), 'success');
+        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REFUND_COMPLETE, $amount_refunded), 'success');
     }
 }

@@ -69,7 +69,7 @@ class MainDisplay
 
         // -----
         // Done here instead of in the concatenation above, since the modals element is
-        // created by the table-builders!
+        // created during the buildTxnTable call!
         //
         $this->mainDisplay .=
             $this->modals .
@@ -135,6 +135,7 @@ class MainDisplay
         $found_refunds = false;
         $refund_indices = [];
         $transaction_voided = false;
+        $main_txn_id = '';
 
         $data = '';
         $txn_index = -1;
@@ -160,12 +161,13 @@ class MainDisplay
                 //
                 switch ($next_field['field']) {
                     // -----
-                    // Special case for 'txn_id' field, it's followed by its parent-txn-id.
+                    // Special case for 'txn_id' field, it's preceeded by its parent-txn-id.
                     //
                     case 'txn_id':
-                        if (!empty($next_txn['parent_txn_id'])) {
-                            $value .= '<br>' . $next_txn['parent_txn_id'];
-                        }
+                        $value =
+                            ((empty($next_txn['parent_txn_id'])) ? '&mdash;' : $next_txn['parent_txn_id']) .
+                            '<br>' .
+                            $value;
                         break;
 
                     // -----
@@ -175,10 +177,17 @@ class MainDisplay
                     case 'payer_email':
                         $first_name = $next_txn['first_name'];
                         $last_name = $next_txn['last_name'];
+                        $payment_type = $next_txn['payment_type'];
+                        $payer_email = $value;
                         if (($first_name . $last_name) !== '') {
-                            $value = $first_name . ' ' . $last_name . ' (' . $next_txn['payer_status'] . ')<br>' . $value;
+                            $value = $first_name . ' ' . $last_name;
+                            if ($payment_type === 'paypal') {
+                                $value .= ' (' . $next_txn['payer_status'] . ')<br>' . $payer_email;
+                            }
                         }
-                        $value .= '<br>' . $next_txn['payer_id'];
+                        if ($payment_type === 'paypal') {
+                            $value .= '<br>' . $next_txn['payer_id'];
+                        }
                         break;
 
                     // -----
@@ -223,10 +232,11 @@ class MainDisplay
                         $days_to_settle = Helpers::getDaysTo($next_txn['expiration_time']);
                     }
                     $modals = $this->createDetailsModal($next_txn, $days_to_settle);
+                    $main_txn_id = $next_txn['txn_id'];
                     break;
 
                 case 'AUTHORIZE':
-                    [$action_buttons, $modals] = $this->createAuthButtonsAndModals($txn_index, $days_to_settle);
+                    [$action_buttons, $modals] = $this->createAuthButtonsAndModals($txn_index, $main_txn_id, $days_to_settle);
                     break;
 
                 case 'CAPTURE':
@@ -262,10 +272,13 @@ class MainDisplay
             '<div class="row">
                 <div class="col-md-6 ppr-pr-0">
                     <h5>' . MODULE_PAYMENT_PAYPALR_BUYER_INFO . '</h5>
-                    <div class="form-horizontal">';
-        $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_NAME, $create_fields['first_name'] . ' ' . $create_fields['last_name']);
-        $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_ID, $create_fields['payer_id']);
-        $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_STATUS, $create_fields['payer_status']);
+                    <div class="form-horizontal">' .
+                        $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_NAME, $create_fields['first_name'] . ' ' . $create_fields['last_name']);
+        if ($create_fields['payment_type'] === 'paypal') {
+            $modal_body .=
+                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_ID, $create_fields['payer_id']) .
+                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_STATUS, $create_fields['payer_status']);
+        }
 
         if (!empty($create_fields['address_name'])) {
             $address_elements = [
@@ -290,12 +303,14 @@ class MainDisplay
                     <div class="form-horizontal">';
 
         $seller_elements = [
-            'business' => 'Business:',
-            'receiver_email' => 'Email:',
-            'receiver_id' => 'Merchant ID:',
+            'business' => MODULE_PAYMENT_PAYPALR_MERCHANT_NAME,
+            'receiver_email' => MODULE_PAYMENT_PAYPALR_MERCHANT_EMAIL,
+            'receiver_id' => MODULE_PAYMENT_PAYPALR_MERCHANT_ID,
         ];
         foreach ($seller_elements as $field_name => $label) {
-            $modal_body .= $this->createStaticFormGroup(3, $label, $create_fields[$field_name]);
+            if (!empty($create_fields[$field_name])) {
+                $modal_body .= $this->createStaticFormGroup(3, $label, $create_fields[$field_name]);
+            }
         }
 
         $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_GROSS_AMOUNT, $this->amount->getValueFromString($create_fields['mc_gross']) . ' ' . $create_fields['mc_currency']);
@@ -308,28 +323,38 @@ class MainDisplay
                 </div>
             </div>';
 
-        return $this->createModal('details', MODULE_PAYMENT_PAYPALR_DETAILS_TITLE, $modal_body, 'lg');
+        $modal_title_type = ($create_fields['payment_type'] === 'paypal') ? MODULE_PAYMENT_PAYPALR_DETAILS_TYPE_PAYPAL : MODULE_PAYMENT_PAYPALR_DETAILS_TYPE_CARD;
+        return $this->createModal('details', sprintf(MODULE_PAYMENT_PAYPALR_DETAILS_TITLE, $modal_title_type), $modal_body, 'lg');
     }
 
-    protected function createAuthButtonsAndModals(int $auth_index, string $days_to_settle): array
+    protected function createAuthButtonsAndModals(int $auth_index, string $main_txn_id, string $days_to_settle): array
     {
         $action_buttons = '';
         $modals = '';
 
         // -----
-        // Actions on authorizations are allowed up to and including the 29th day after the
-        // original AUTHORIZE transaction was placed.
+        // Actions on authorizations are allowed:
+        // - ONLY on the original authorization
+        // - If that authorization has not been voided
+        // - Up to and including the 29th day after the original AUTHORIZE transaction was placed.
         //
         if ($days_to_settle <= 29) {
-            $action_buttons =
-                $this->createActionButton("reauth-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_REAUTH, 'primary') . ' ' .
-                $this->createActionButton("capture-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_CAPTURE, 'warning') . ' ' .
-                $this->createActionButton("void-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_VOID, 'danger');
+            $authorization = $this->paypalDbTxns[$auth_index];
+            if ($authorization['parent_txn_id'] === $main_txn_id) {
+                if ($authorization['payment_status'] !== 'VOIDED') {
+                    $action_buttons = $this->createActionButton("reauth-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_REAUTH, 'primary');
+                    $modals = $this->createReauthModal($auth_index);
 
-            $modals =
-                $this->createReauthModal($auth_index) .
-                $this->createCaptureModal($auth_index) .
-                $this->createVoidModal($auth_index);
+                    if ($action_buttons !== '') {
+                        $action_buttons .= ' ';
+                    }
+                    $action_buttons .= $this->createActionButton("void-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_VOID, 'danger');
+                    $modals .= $this->createVoidModal($auth_index);
+
+                    $action_buttons .= $this->createActionButton("capture-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_CAPTURE, 'warning');
+                    $modals .= $this->createCaptureModal($auth_index);
+                }
+            }
         }
 
         return [$action_buttons, $modals];
@@ -350,7 +375,7 @@ class MainDisplay
         $currency_decimals = $this->amount->getCurrencyDecimals();
         $multiplier = ($currency_decimals === 0) ? 1 : 100;
         $maximum_auth_value = $this->amount->getValueFromFloat(floor($original_auth_value * 1.15 * $multiplier) / $multiplier);
-        $amount_input_params = 'type="number" min="1" max="' . $maximum_auth_value . '" step="0.01"';
+        $amount_input_params = 'type="number" min="0.01" max="' . $maximum_auth_value . '" step="0.01"';
         $amount_help_text = sprintf(MODULE_PAYMENT_PAYPALR_AMOUNT_RANGE, $this->currencyCode, $maximum_auth_value);
 
         $days_since_last_auth = Helpers::getDaysFrom($last_authorization['date_added']);
@@ -393,7 +418,7 @@ class MainDisplay
 
         $maximum_capt_value = $this->amount->getValueFromFloat((float)($original_auth_value - $previously_captured_value));
 
-        $amount_input_params = 'type="number" min="1" max="' . $maximum_capt_value . '" step="0.01"';
+        $amount_input_params = 'type="number" min="0" max="' . $maximum_capt_value . '" step="0.01"';
         $amount_help_text = sprintf(MODULE_PAYMENT_PAYPALR_AMOUNT_RANGE, $this->currencyCode, $maximum_capt_value);
 
         $modal_body =
@@ -405,6 +430,7 @@ class MainDisplay
                 $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_CAPTURED_SO_FAR, $this->amount->getValueFromFloat((float)$previously_captured_value) . ' ' . $this->currencyCode) .
                 $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_REMAINING_TO_CAPTURE, $maximum_capt_value . ' ' . $this->currencyCode) .
                 $this->createModalInput(4, MODULE_PAYMENT_PAYPALR_AMOUNT, $maximum_capt_value, "capt-amt-$auth_index", 'ppr-amount', $amount_input_params, $amount_help_text) .
+                $this->createModalCheckbox(4, 'Capture remaining funds?', 'ppr-capt-remaining') .
                 $this->createModalTextArea(4, MODULE_PAYMENT_PAYPALR_CUSTOMER_NOTE, MODULE_PAYMENT_PAYPALR_CAPTURE_DEFAULT_MESSAGE, "capt-note-$auth_index", 'ppr-capt-note') .
                 $this->createModalCheckbox(4, MODULE_PAYMENT_PAYPALR_CAPTURE_FINAL_TEXT, 'ppr-capt-final') .
                 $this->createModalButtons("ppr-capt-submit-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_CAPTURE, MODULE_PAYMENT_PAYPALR_CONFIRM) .
@@ -430,21 +456,30 @@ class MainDisplay
 
     protected function createCaptureButtonsAndModals(int $capture_index): array
     {
-        $action_buttons = '';
-        $modals = '';
+        $capture_db_txn = $this->paypalDbTxns[$capture_index];
+        $original_capture_value = $this->amount->getValueFromString($capture_db_txn['mc_gross']);
+
+        $previously_refunded_value = 0;
+        $capture_txn_id = $capture_db_txn['txn_id'];
+        foreach ($this->paypalDbTxns as $next_txn) {
+            if ($next_txn['txn_type'] === 'REFUND' && $next_txn['parent_txn_id'] === $capture_txn_id) {
+                $previously_refunded_value += $next_txn['payment_gross'];
+            }
+        }
+        $maximum_refund_value = (float)($original_capture_value - $previously_refunded_value);
+        if ($maximum_refund_value <= 0) {
+            return ['', ''];
+        }
 
         // -----
         // Captures can be refunded, so long as they haven't been fully refunded.
         //
-        $action_buttons =
-            $this->createActionButton("refund-$capture_index", MODULE_PAYMENT_PAYPALR_ACTION_REFUND, 'warning');
-
-        $modals =
-            $this->createRefundModal($capture_index);
-
-        return [$action_buttons, $modals];
+        return [
+            $this->createActionButton("refund-$capture_index", MODULE_PAYMENT_PAYPALR_ACTION_REFUND, 'warning'),
+            $this->createRefundModal($capture_index, $this->amount->getValueFromFloat($maximum_refund_value))
+        ];
     }
-    protected function createRefundModal(int $capture_index): string
+    protected function createRefundModal(int $capture_index, string $maximum_refund_value): string
     {
         $capture_db_txn = $this->paypalDbTxns[$capture_index];
         $original_capture_value = $this->amount->getValueFromString($capture_db_txn['mc_gross']);
@@ -459,7 +494,7 @@ class MainDisplay
 
         $maximum_refund_value = $this->amount->getValueFromFloat((float)($original_capture_value - $previously_refunded_value));
 
-        $amount_input_params = 'type="number" min="1" max="' . $maximum_refund_value . '" step="0.01"';
+        $amount_input_params = 'type="number" min="0.01" max="' . $maximum_refund_value . '" step="0.01"';
         $amount_help_text = sprintf(MODULE_PAYMENT_PAYPALR_AMOUNT_RANGE, $this->currencyCode, $maximum_refund_value);
 
         $modal_body =
@@ -580,12 +615,23 @@ class MainDisplay
 
     protected function buildPaymentTableData(): string
     {
+        // -----
+        // Sort this order's PayPal transactions by date.
+        //
+        $sorted_transactions = $this->paypalDbTxns;
+        uasort($sorted_transactions, function($a, $b) {
+            if ($a['date_added'] === $b['date_added']) {
+                return 0;
+            }
+            return ($a['date_added'] < $b['date_added']) ? -1 : 1;
+        });
+
         $paypal_gross_total = 0;
         $paypal_fees_total = 0;
         $settled_total = 0;
 
         $data = '';
-        foreach ($this->paypalDbTxns as $next_txn) {
+        foreach ($sorted_transactions as $next_txn) {
             if ($next_txn['txn_type'] === 'CREATE' || $next_txn['settle_amount'] === null) {
                 continue;
             }

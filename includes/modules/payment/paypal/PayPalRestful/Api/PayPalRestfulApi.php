@@ -228,9 +228,22 @@ class PayPalRestfulApi extends ErrorInfo
         return $response;
     }
 
-    public function capturePayment(string $paypal_auth_id, string $currency_code, string $value, string $invoice_id, string $payer_note, bool $final_capture)
+    public function capturePaymentRemaining(string $paypal_auth_id, string $invoice_id, string $payer_note, bool $final_capture)
     { 
-        $this->log->write("==> Start capturePayment($paypal_auth_id, $currency_code, $value, $invoice_id, $payer_note, $final_capture)", true);
+        $this->log->write("==> Start capturePaymentRemaining($paypal_auth_id, $invoice_id, $payer_note, $final_capture)", true);
+        $parameters = [
+            'invoice_id' => $invoice_id,
+            'note_to_payer' => $payer_note,
+            'final_capture' => $final_capture,
+        ];
+        $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/capture", $parameters);
+        $this->log->write('==> End capturePaymentRemaining', true);
+        return $response;
+    }
+
+    public function capturePaymentAmount(string $paypal_auth_id, string $currency_code, string $value, string $invoice_id, string $payer_note, bool $final_capture)
+    { 
+        $this->log->write("==> Start capturePaymentAmount($paypal_auth_id, $currency_code, $value, $invoice_id, $payer_note, $final_capture)", true);
         $parameters = [
             'amount' => [
                 'currency_code' => $currency_code,
@@ -241,7 +254,7 @@ class PayPalRestfulApi extends ErrorInfo
             'final_capture' => $final_capture,
         ];
         $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/capture", $parameters);
-        $this->log->write('==> End capturePayment', true);
+        $this->log->write('==> End capturePaymentAmount', true);
         return $response;
     }
 

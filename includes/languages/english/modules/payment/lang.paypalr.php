@@ -155,7 +155,7 @@ $define = [
 
     'MODULE_PAYMENT_PAYPALR_TXN_TYPE' => 'Txn Type:',
     'MODULE_PAYMENT_PAYPALR_TXN_ID' => 'Txn ID:',
-    'MODULE_PAYMENT_PAYPALR_TXN_PARENT_TXN_ID' => 'Txn ID / Parent Txn ID:',
+    'MODULE_PAYMENT_PAYPALR_TXN_PARENT_TXN_ID' => 'Parent Txn ID / Txn ID:',
     'MODULE_PAYMENT_PAYPALR_ACTION' => 'Action',
         'MODULE_PAYMENT_PAYPALR_ACTION_DETAILS' => 'Details',
         'MODULE_PAYMENT_PAYPALR_ACTION_REAUTH' => 'Re-Authorize',
@@ -175,7 +175,9 @@ $define = [
     // -----
     // Constants used in the "Details" modal.
     //
-    'MODULE_PAYMENT_PAYPALR_DETAILS_TITLE' => 'PayPal Transaction Details',
+    'MODULE_PAYMENT_PAYPALR_DETAILS_TITLE' => 'PayPal Transaction Details (%s)',    //- %s is one of the following two strings
+        'MODULE_PAYMENT_PAYPALR_DETAILS_TYPE_PAYPAL' => 'PayPal Wallet',
+        'MODULE_PAYMENT_PAYPALR_DETAILS_TYPE_CARD' => 'Credit Card',
     'MODULE_PAYMENT_PAYPALR_BUYER_INFO' => 'Buyer Information',
     'MODULE_PAYMENT_PAYPALR_PAYER_NAME' => 'Payer Name:',
     'MODULE_PAYMENT_PAYPALR_PAYER_EMAIL' => 'Payer Email:',
@@ -189,6 +191,9 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_ADDRESS_COUNTRY' => 'Country:',
     'MODULE_PAYMENT_PAYPALR_SELLER_INFO' => 'Seller Information',
     'MODULE_PAYMENT_PAYPALR_CART_ITEMS' => 'Cart items:',
+    'MODULE_PAYMENT_PAYPALR_MERCHANT_NAME' => 'Seller Name:',
+    'MODULE_PAYMENT_PAYPALR_MERCHANT_EMAIL' => 'Seller Email:',
+    'MODULE_PAYMENT_PAYPALR_MERCHANT_ID' => 'Merchant ID:',
 
     // -----
     // Constants used in the "Refunds" modal.
@@ -241,6 +246,7 @@ $define = [
 
     'MODULE_PAYMENT_PAYPALR_CAPTURE_PARAM_ERROR' => 'Invalid parameters were supplied (CP %u) when attempting to capture funds for this order; please try again.',
     'MODULE_PAYMENT_PAYPALR_CAPTURE_ERROR' => 'There was a problem capturing the transaction.',
+    'MODULE_PAYMENT_PAYPALR_CAPTURE_AMOUNT' => 'The captured amount must be greater than zero unless you are capturing the remaining funds.',
 
     'MODULE_PAYMENT_PAYPALR_CAPTURE_COMPLETE' => 'The payment for order#%u has been captured.',
     'MODULE_PAYMENT_PAYPALR_PARTIAL_CAPTURE_MEMO' => 'Partially captured by %1$s for an amount of %2$s.',
@@ -254,7 +260,8 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_VOID_AUTH_ID' => 'Authorization ID:',
     'MODULE_PAYMENT_PAYPALR_VOID_DEFAULT_MESSAGE' => 'Transaction voided.',
 
-    'MODULE_PAYMENT_PAYPALR_VOID_PARAM_ERROR' => 'Invalid parameters were supplied (CP %u) when attempting to void this order; please try again.',
+    'MODULE_PAYMENT_PAYPALR_VOID_PARAM_ERROR' => 'Invalid parameters were supplied when attempting to void an authorization for this order; please try again.',
+    'MODULE_PAYMENT_PAYPALR_VOID_BAD_AUTH_ID' => 'Only an order\'s <em>primary</em> authorization can be voided; please try again.',
     'MODULE_PAYMENT_PAYPALR_VOID_ERROR' => 'There was a problem voiding the transaction.',
     'MODULE_PAYMENT_PAYPALR_VOID_MEMO' => 'Transaction voided by %1$s.',
     'MODULE_PAYMENT_PAYPALR_VOID_INVALID_TXN_ID' => 'The transaction ID you entered (%1$s) was not found; please try again.',

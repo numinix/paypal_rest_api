@@ -85,7 +85,7 @@ $_SESSION['PayPalRestful']['Order']['status'] = $order_status['status'];
 if ($op === 'return') {
     $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
 } else {
-    $_SESSION['PayPalRestful']['Order']['3DS_response'] = true;
+    $_SESSION['PayPalRestful']['Order']['3DS_response'] = $_SESSION['PayPalRestful']['Order']['PayerAction']['ccInfo'];
 }
 
 // -----

@@ -361,6 +361,8 @@ class paypalr extends base
              VALUES
                 ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now()),
 
+                ('Set Voided Order Status', 'MODULE_PAYMENT_PAYPALR_VOIDED_STATUS_ID', '1', 'Set the status of <em>voided</em> orders to this status.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+
                 ('Set Held Order Status', 'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID', '1', 'Set the status of orders that are held for review to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
                 ('List <var>handling-fee</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_HANDLING_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_loworderfee</code> &mdash; that add an <em>handling-fee</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
@@ -1067,6 +1069,7 @@ class paypalr extends base
             'create_time' => $create_time,
             'guid' => $order_guid,
             'payment_source' => $ppr_type,
+            'amount_mismatch' => $order_amount_mismatch,
         ];
         return true;
     }
@@ -1349,6 +1352,17 @@ class paypalr extends base
         // the caller.
         //
         if (isset($_SESSION['PayPalRestful']['Order']['3DS_response'])) {
+            // -----
+            // Save the pertinent credit-card information into the order so that it'll be
+            // recorded as part of the order.
+            //
+            $cc_info = $_SESSION['PayPalRestful']['Order']['3DS_response'];
+            $order->info['cc_type'] = $cc_info['cc_type'];
+            $order->info['cc_number'] = $cc_info['cc_number'];
+            $order->info['cc_owner'] = $cc_info['cc_owner'];
+            $order->info['cc_expires'] = $cc_info['cc_expires'];
+            unset($_SESSION['PayPalRestful']['Order']['3DS_response']);
+
             //-FIXME: Need to check the AVS response codes!
             return $this->captureOrAuthorizePayment('card');
         }
@@ -1429,11 +1443,21 @@ class paypalr extends base
                 // Save confirmation page to which the customer should be redirected upon
                 // a submittal on the SCA verification link.  That's used by the webhook.
                 //
+                // Note: The webhook copies the ccInfo element of the PayerAction into its
+                // 3DS_response for use by the top-of-method processing to ensure that the
+                // credit-card information gets recorded into the order itself.
+                //
                 global $current_page_base;
                 $_SESSION['PayPalRestful']['Order']['PayerAction'] = [
                     'current_page_base' => $current_page_base,
                     'savedPosts' => [
                         'securityToken' => $_SESSION['securityToken'],
+                    ],
+                    'ccInfo' => [
+                        'cc_type' => $order->info['cc_type'],
+                        'cc_number' => $order->info['cc_number'],
+                        'cc_owner' => $order->info['cc_owner'],
+                        'cc_expires' => $order->info['cc_expires'],
                     ],
                 ];
 
@@ -1662,6 +1686,7 @@ class paypalr extends base
         if (isset($payment['seller_protection'])) {
             $memo['seller_protection'] = $payment['seller_protection'];
         }
+        $memo['amount_mismatch'] = $_SESSION['PayPalRestful']['Order']['amount_mismatch'];
 
         $expiration_time = (isset($this->orderInfo['expiration_time'])) ? Helpers::convertPayPalDatePay2Db($this->orderInfo['expiration_time']) : 'null';
         $num_cart_items = $_SESSION['cart']->count_contents();
@@ -1869,13 +1894,15 @@ class paypalr extends base
 
                 ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now()),
 
-                ('Completed Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID', '2', 'Set the status of orders whose payment has been successfully <em>captured</em> to this value.<br>Recommended: <b>Processing[2]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+                ('Completed Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID', '2', 'Set the status of orders whose payment has been successfully <em>captured</em> to this status.<br>Recommended: <b>Processing[2]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
-                ('Set Unpaid Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID', '1', 'Set the status of orders whose payment has been successfully <em>authorized</em> to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+                ('Set Unpaid Order Status', 'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID', '1', 'Set the status of orders whose payment has been successfully <em>authorized</em> to this status.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
-                ('Set Refund Order Status', 'MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID', '1', 'Set the status of <em><b>fully</b>-refunded</em> or <em>voided</em> orders to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+                ('Set Refunded Order Status', 'MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID', '1', 'Set the status of <em><b>fully</b>-refunded</em> orders to this status.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
-                ('Set Held Order Status', 'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID', '1', 'Set the status of orders that are held for review to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+                ('Set Voided Order Status', 'MODULE_PAYMENT_PAYPALR_VOIDED_STATUS_ID', '1', 'Set the status of <em>voided</em> orders to this status.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
+
+                ('Set Held Order Status', 'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID', '1', 'Set the status of orders that are held for review to this status.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
                 ('PayPal Page Style', 'MODULE_PAYMENT_PAYPALR_PAGE_STYLE', 'Primary', 'The page-layout style you want customers to see when they visit the PayPal site. You can configure your <b>Custom Page Styles</b> in your PayPal Profile settings. This value is case-sensitive.', 6, 0, NULL, NULL, now()),
 
@@ -1972,6 +1999,7 @@ class paypalr extends base
             'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID',
+            'MODULE_PAYMENT_PAYPALR_VOIDED_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_CURRENCY',
             'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK',
