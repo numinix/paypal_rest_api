@@ -237,7 +237,7 @@ class PayPalRestfulApi extends ErrorInfo
             'final_capture' => $final_capture,
         ];
         $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/capture", $parameters);
-        $this->log->write('==> End capturePaymentRemaining', true);
+        $this->log->write("==> End capturePaymentRemaining\n", true);
         return $response;
     }
 
@@ -254,7 +254,7 @@ class PayPalRestfulApi extends ErrorInfo
             'final_capture' => $final_capture,
         ];
         $response = $this->curlPost("v2/payments/authorizations/$paypal_auth_id/capture", $parameters);
-        $this->log->write('==> End capturePaymentAmount', true);
+        $this->log->write("==> End capturePaymentAmount\n", true);
         return $response;
     }
 

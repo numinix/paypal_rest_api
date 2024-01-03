@@ -98,7 +98,7 @@ class DoCapture
             $capture_status = -1;
         } else {
             $capture_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
-            $capture_status = ($order_status > 0) ? $order_status : 2;
+            $capture_status = ($capture_status > 0) ? $capture_status : 2;
         }
         zen_update_orders_history($oID, $comments, null, $capture_status, 0);
 

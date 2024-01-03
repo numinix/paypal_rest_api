@@ -137,6 +137,7 @@ $define = [
 
     'MODULE_PAYMENT_PAYPALR_TXN_TABLE_CAPTION' => 'PayPal Transactions',
     'MODULE_PAYMENT_PAYPALR_PAYMENTS_TABLE_CAPTION' => 'Settled Payments',
+    'MODULE_PAYMENT_PAYPALR_PAYMENTS_TABLE_NOTE' => 'Note: Fees for refunds are reversed by PayPal!',
     'MODULE_PAYMENT_PAYPALR_PAYMENTS_NONE' => 'No currently-settled payments.',
     'MODULE_PAYMENT_PAYPALR_PAYMENTS_TOTAL' => 'Settled Totals:',
     'MODULE_PAYMENT_PAYPALR_NAME_EMAIL_ID' => 'Payer Name / Email / Payer ID',

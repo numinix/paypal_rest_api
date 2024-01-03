@@ -3,6 +3,9 @@
     border: 1px solid #d7d6cc;
     margin: 0.5vh 0;
 }
+.ppr-table caption small {
+    font-size: 50%;
+}
 tr.ppr-payments {
     font-weight: bold;
 }
@@ -21,10 +24,10 @@ tr.ppr-payments {
 .ppr-modal textarea {
     margin: 0.5vh 0;
 }
-.ppr-modal .control-label {
+#detailsModal .control-label {
     padding-top: 0;
 }
-.ppr-modal p.form-control-static {
+#detailsModal p.form-control-static {
     min-height: auto;
     padding-top: 0;
     padding-bottom: 0;

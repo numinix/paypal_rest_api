@@ -99,7 +99,10 @@ class MainDisplay
         $include_action_column = false;
         return
             "<table class=\"table ppr-table\">\n" .
-            '  <caption class="lead text-center">' . MODULE_PAYMENT_PAYPALR_PAYMENTS_TABLE_CAPTION . "</caption>\n" .
+            '  <caption class="lead text-center">' .
+                MODULE_PAYMENT_PAYPALR_PAYMENTS_TABLE_CAPTION .
+                '&nbsp;<small><sup>1</sup>' . MODULE_PAYMENT_PAYPALR_PAYMENTS_TABLE_NOTE . '</sup></small>' .
+            "</caption>\n" .
             "  <tbody>\n" .
                 $this->buildTableHeader(self::$paymentTableFields, $include_action_column) .
                 $this->buildPaymentTableData() .
@@ -201,11 +204,16 @@ class MainDisplay
                         break;
 
                     // -----
-                    // Special case for 'mc_gross' field, it's followed by its "mc_currency",
+                    // Special case for 'mc_gross' and 'payment_fee' fields, they're followed by its "mc_currency",
                     // if present.
                     //
                     case 'mc_gross':
-                        $value .= ' ' . $next_txn['mc_currency'];
+                    case 'payment_fee':
+                        if ($value === null) {
+                            $value = '&mdash;';
+                        } else {
+                            $value .= ' ' . $next_txn['mc_currency'];
+                        }
                         break;
 
                     default:
@@ -244,7 +252,8 @@ class MainDisplay
                     break;
 
                 case 'REFUND':
-                    [$action_buttons, $modals] = $this->createRefundButtonsAndModals($txn_index);
+                    $action_buttons = '';
+                    $modals = '';
                     break;
 
                 default:
@@ -518,13 +527,6 @@ class MainDisplay
             '</form>';
         return $this->createModal("refund-$capture_index", MODULE_PAYMENT_PAYPALR_REFUND_TITLE, $modal_body);
     }
-    protected function createRefundButtonsAndModals(int $refund_index): array
-    {
-        $action_buttons = '';
-        $modals = '';
-
-        return [$action_buttons, $modals];
-    }
 
     protected function createStaticFormGroup(int $label_width, string $label_text, string $value_text): string
     {
@@ -616,7 +618,7 @@ class MainDisplay
     protected function buildPaymentTableData(): string
     {
         // -----
-        // Sort this order's PayPal transactions by date.
+        // Sort this order's PayPal transactions by date (oldest to newest).
         //
         $sorted_transactions = $this->paypalDbTxns;
         uasort($sorted_transactions, function($a, $b) {
@@ -668,6 +670,16 @@ class MainDisplay
                         break;
 
                     // -----
+                    // Capture any exchange_rate, since refunds are not converted in the
+                    // the site's settlement currency.
+                    //
+                    case 'exchange_rate':
+                        if (!empty($value)) {
+                            $exchange_rate = $value;
+                        }
+                        break;
+
+                    // -----
                     // Special case for 'mc_gross' field, it's followed by its "mc_currency",
                     // if present.
                     //
@@ -679,8 +691,12 @@ class MainDisplay
                     // Payment fees are summed up for the totals row.
                     //
                     case 'payment_fee':
-                        $paypal_fees_total += $value;
-                        $value .= ' ' . $mc_currency;
+                        if ($next_txn['txn_type'] === 'REFUND') {
+                            $value = "<s>$value $mc_currency</s><sup>1</sup>";
+                        } else {
+                            $paypal_fees_total += $value;
+                            $value = "$value $mc_currency";
+                        }
                         break;
 
                     // -----
@@ -702,13 +718,16 @@ class MainDisplay
                     // the running total if the transaction was a REFUND; otherwise added.
                     //
                     case 'settle_amount':
-                        if ($next_txn['txn_type'] === 'REFUND') {
-                            $settled_total -= $value;
-                            $value = "-$value";
-                        } else {
+                        $settle_currency = $settle_currency ?? $next_txn['settle_currency'];
+                        if ($next_txn['txn_type'] !== 'REFUND') {
                             $settled_total += $value;
+                        } else {
+                            $value = $this->amount->getValueFromString((string)($value + $next_txn['payment_fee']));
+                            $value *= $exchange_rate ?? 1.00;
+                            $settled_total -= $value;
+                            $value = '-' . $this->amount->getValueFromFloat($value);
                         }
-                        $value .= ' ' . $next_txn['settle_currency'];
+                        $value .= ' ' . $settle_currency;
                         break;
 
                     default:
@@ -745,9 +764,9 @@ class MainDisplay
         $data .=
             "<tr class=\"dataTableHeadingRow text-right ppr-payments\">\n" .
                 "<td class=\"dataTableHeadingContent\" colspan=\"$column_count\">" . MODULE_PAYMENT_PAYPALR_PAYMENTS_TOTAL . "</td>\n" .
-                "<td class=\"dataTableHeadingContent\">" . $paypal_gross_total . "</td>\n" .
-                "<td class=\"dataTableHeadingContent\">" . $paypal_fees_total . "</td>\n" .
-                "<td class=\"dataTableHeadingContent\">" . $settled_total . "</td>\n" .
+                "<td class=\"dataTableHeadingContent\">" . $paypal_gross_total . ' ' . $mc_currency . "</td>\n" .
+                "<td class=\"dataTableHeadingContent\">" . $paypal_fees_total . ' ' . $mc_currency . "</td>\n" .
+                "<td class=\"dataTableHeadingContent\">" . $settled_total . ' ' . $settle_currency . "</td>\n" .
             "</tr>\n";
 
         return $data;
