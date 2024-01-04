@@ -32,3 +32,7 @@ tr.ppr-payments {
     padding-top: 0;
     padding-bottom: 0;
 }
+#pt-caption::after {
+    content: "\a";
+    white-space: pre;
+}

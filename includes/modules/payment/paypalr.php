@@ -1259,7 +1259,7 @@ class paypalr extends base
             if (!isset($_SESSION['PayPalRestful']['Order']['status']) || $_SESSION['PayPalRestful']['Order']['status'] !== PayPalRestfulApi::STATUS_APPROVED) {
                 $this->setMessageAndRedirect("paypalr::before_process, can't capture/authorize order; wrong status ({$_SESSION['PayPalRestful']['Order']['status']}).", FILENAME_CHECKOUT_SHIPPING);  //- FIXME
             }
-            $response = $this->captureOrAuthorizeOrder('paypal');
+            $response = $this->captureOrAuthorizePayment('paypal');
         }
 
         // -----

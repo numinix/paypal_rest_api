@@ -182,9 +182,8 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_BUYER_INFO' => 'Buyer Information',
     'MODULE_PAYMENT_PAYPALR_PAYER_NAME' => 'Payer Name:',
     'MODULE_PAYMENT_PAYPALR_PAYER_EMAIL' => 'Payer Email:',
-    'MODULE_PAYMENT_PAYPALR_ADDRESS' => 'Shipping Address:',
     'MODULE_PAYMENT_PAYPALR_BUSINESS_NAME' => 'Business Name:',
-    'MODULE_PAYMENT_PAYPALR_ADDRESS_NAME' => 'Name:',
+    'MODULE_PAYMENT_PAYPALR_ADDRESS_NAME' => 'Ship-to Name:',
     'MODULE_PAYMENT_PAYPALR_ADDRESS_STREET' => 'Street:',
     'MODULE_PAYMENT_PAYPALR_ADDRESS_CITY' => 'City:',
     'MODULE_PAYMENT_PAYPALR_ADDRESS_STATE' => 'State:',
@@ -195,6 +194,10 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_MERCHANT_NAME' => 'Seller Name:',
     'MODULE_PAYMENT_PAYPALR_MERCHANT_EMAIL' => 'Seller Email:',
     'MODULE_PAYMENT_PAYPALR_MERCHANT_ID' => 'Merchant ID:',
+    'MODULE_PAYMENT_PAYPALR_SELLER_PROTECTION' => 'Seller Protection:',
+    'MODULE_PAYMENT_PAYPALR_AMOUNT_MISMATCH' => 'Order Amount Mismatch: %s',    //- %s is the base order-calculation amount/currency-code
+    'MODULE_PAYMENT_PAYPALR_CALCULATED_AMOUNT' => 'Calculated Amount:',
+    'MODULE_PAYMENT_PAYPALR_INVOICE_NUMBER' => 'Invoice #:',
 
     // -----
     // Constants used in the "Refunds" modal.
@@ -226,11 +229,14 @@ $define = [
         'MODULE_PAYMENT_PAYPALR_REAUTH_NOTE4' => 'You can re-authorize an authorized payment <em>once</em> for up to 115%% of the original authorized amount (%s), not to exceed an increase of $75 USD.',
 
     'MODULE_PAYMENT_PAYPALR_REAUTH_ORIGINAL' => 'Original Amount:',
+    'MODULE_PAYMENT_PAYPALR_REAUTH_NEW_AMOUNT' => 'Authorized Amount:',
     'MODULE_PAYMENT_PAYPALR_REAUTH_DAYS_FROM_LAST' => 'Days Since Last Authorization:',
+    'MODULE_PAYMENT_PAYPALR_REAUTH_NOT_POSSIBLE' => 'The order cannot be re-authorized because an honor period is active.',
 
     'MODULE_PAYMENT_PAYPALR_REAUTH_PARAM_ERROR' => 'Invalid parameters were supplied (CP %u) when attempting to re-authorize this order; please try again.',
     'MODULE_PAYMENT_PAYPALR_REAUTH_ERROR' => 'There was a problem authorizing the transaction.',
     'MODULE_PAYMENT_PAYPALR_REAUTH_TOO_SOON' => 'A reauthorization is only allowed once from Day 4 to Day 29 since the date of the original authorization.',
+
 
     'MODULE_PAYMENT_PAYPALR_REAUTH_COMPLETE' => 'A re-authorization in the amount of %s has been completed.',
     'MODULE_PAYMENT_PAYPALR_REAUTH_MEMO' => 'Re-authorized by %1$s for an amount of %2$s.',
@@ -241,6 +247,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_CAPTURE_TITLE' => 'Capture an Authorization',
     'MODULE_PAYMENT_PAYPALR_CAPTURE_INSTRUCTIONS' => 'To capture all or part of the outstanding funds for this order, enter the &quot;Amount&quot; below, indicate whether this is the <b>final</b> capture for the order and click the &quot;Capture&quot; button.',
     'MODULE_PAYMENT_PAYPALR_CAPTURE_FINAL_TEXT' => 'Final Capture?',
+    'MODULE_PAYMENT_PAYPALR_CAPTURE_REMAINING' => 'Capture remaining funds?',
     'MODULE_PAYMENT_PAYPALR_CAPTURED_SO_FAR' => 'Previously Captured:',
     'MODULE_PAYMENT_PAYPALR_REMAINING_TO_CAPTURE' => 'Remaining to Capture:',
     'MODULE_PAYMENT_PAYPALR_CAPTURE_DEFAULT_MESSAGE' => 'Thank you for your order.',
@@ -249,6 +256,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_CAPTURE_ERROR' => 'There was a problem capturing the transaction.',
     'MODULE_PAYMENT_PAYPALR_CAPTURE_AMOUNT' => 'The captured amount must be greater than zero unless you are capturing the remaining funds.',
 
+    'MODULE_PAYMENT_PAYPALR_CAPTURE_NO_REMAINING' => 'All authorized funds for this order have been successfully captured.',
     'MODULE_PAYMENT_PAYPALR_CAPTURE_COMPLETE' => 'The payment for order#%u has been captured.',
     'MODULE_PAYMENT_PAYPALR_PARTIAL_CAPTURE_MEMO' => 'Partially captured by %1$s for an amount of %2$s.',
     'MODULE_PAYMENT_PAYPALR_FINAL_CAPTURE_MEMO' => 'Final capture by %1$s for an amount of %2$s.',

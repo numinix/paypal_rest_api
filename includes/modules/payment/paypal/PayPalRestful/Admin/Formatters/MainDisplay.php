@@ -100,8 +100,8 @@ class MainDisplay
         return
             "<table class=\"table ppr-table\">\n" .
             '  <caption class="lead text-center">' .
-                MODULE_PAYMENT_PAYPALR_PAYMENTS_TABLE_CAPTION .
-                '&nbsp;<small><sup>1</sup>' . MODULE_PAYMENT_PAYPALR_PAYMENTS_TABLE_NOTE . '</sup></small>' .
+                '<span id="pt-caption">' . MODULE_PAYMENT_PAYPALR_PAYMENTS_TABLE_CAPTION . '</span>' .
+                '<small><sup>1</sup>' . MODULE_PAYMENT_PAYPALR_PAYMENTS_TABLE_NOTE . '</sup></small>' .
             "</caption>\n" .
             "  <tbody>\n" .
                 $this->buildTableHeader(self::$paymentTableFields, $include_action_column) .
@@ -277,16 +277,47 @@ class MainDisplay
 
     protected function createDetailsModal(array $create_fields, string $days_to_settle): string
     {
+        // -----
+        // The 'memo' field of the PayPal table contains JSON-encoded "interesting bits" from the order's creation.
+        //
+        $memo = json_decode($create_fields['memo'] ?? '', true);
+        $amount_mismatch_panel = '';
+        $card_info = [];
+        if ($memo !== null) {
+            // -----
+            // If the amount_mismatch array isn't empty, there was a discrepancy between
+            // the order's total calculation by the payment-module and that calculated
+            // by the base Zen Cart handling.
+            //
+            if (!empty($memo['amount_mismatch'])) {
+                $amount_mismatch_panel = $this->createAmountMismatchPanel($memo['amount_mismatch']);
+            }
+
+            // -----
+            // Grab the 'card_info' element, if present, for the credit-card payment display.
+            //
+            if (!empty($memo['card_info'])) {
+                $card_info = $memo['card_info'];
+            }
+        }
+
         $modal_body =
-            '<div class="row">
+            '<div class="row">' .
+                $amount_mismatch_panel . '
                 <div class="col-md-6 ppr-pr-0">
                     <h5>' . MODULE_PAYMENT_PAYPALR_BUYER_INFO . '</h5>
                     <div class="form-horizontal">' .
                         $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_NAME, $create_fields['first_name'] . ' ' . $create_fields['last_name']);
+
         if ($create_fields['payment_type'] === 'paypal') {
             $modal_body .=
                 $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_ID, $create_fields['payer_id']) .
                 $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_STATUS, $create_fields['payer_status']);
+        } elseif (count($card_info) !== 0) {
+            $modal_body .=
+                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_CC_TYPE, $card_info['brand']) .
+                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_CC_NUMBER, $card_info['last_digits']) .
+                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_CC_EXPIRES, $card_info['expiry']);
         }
 
         if (!empty($create_fields['address_name'])) {
@@ -312,6 +343,7 @@ class MainDisplay
                     <div class="form-horizontal">';
 
         $seller_elements = [
+            'invoice' => MODULE_PAYMENT_PAYPALR_INVOICE_NUMBER,
             'business' => MODULE_PAYMENT_PAYPALR_MERCHANT_NAME,
             'receiver_email' => MODULE_PAYMENT_PAYPALR_MERCHANT_EMAIL,
             'receiver_id' => MODULE_PAYMENT_PAYPALR_MERCHANT_ID,
@@ -320,6 +352,10 @@ class MainDisplay
             if (!empty($create_fields[$field_name])) {
                 $modal_body .= $this->createStaticFormGroup(3, $label, $create_fields[$field_name]);
             }
+        }
+
+        if (!empty($memo['seller_protection'])) {
+            $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_SELLER_PROTECTION, $memo['seller_protection']['status']);
         }
 
         $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_GROSS_AMOUNT, $this->amount->getValueFromString($create_fields['mc_gross']) . ' ' . $create_fields['mc_currency']);
@@ -334,6 +370,42 @@ class MainDisplay
 
         $modal_title_type = ($create_fields['payment_type'] === 'paypal') ? MODULE_PAYMENT_PAYPALR_DETAILS_TYPE_PAYPAL : MODULE_PAYMENT_PAYPALR_DETAILS_TYPE_CARD;
         return $this->createModal('details', sprintf(MODULE_PAYMENT_PAYPALR_DETAILS_TITLE, $modal_title_type), $modal_body, 'lg');
+    }
+    protected function createAmountMismatchPanel(array $amount_mismatch): string
+    {
+        $order_amount = $amount_mismatch['value'] . ' ' . $amount_mismatch['currency_code'];
+        $panel =
+            '<div class="panel-group">
+                <div class="panel panel-warning">
+                    <div class="panel-heading">
+                        <h4 class="panel-title text-center">
+                            <a data-toggle="collapse" href="#details-mismatch">' . sprintf(MODULE_PAYMENT_PAYPALR_AMOUNT_MISMATCH, $order_amount) . '</a>
+                        </h4>
+                    </div>
+                    <div id="details-mismatch" class="panel-collapse collapse">
+                        <div class="panel-body">';
+
+        $calculated_amount = 0;
+        foreach ($amount_mismatch['breakdown'] as $element => $element_value) {
+            $calculated_amount += $element_value['value'];
+            $panel .= '
+                            <div class="row">
+                                <div class="col-md-6 text-right">' . $element . ':</div>
+                                 <div class="col-md-2 text-right">' . $element_value['value'] . ' ' . $element_value['currency_code'] . '</div>
+                            </div>';
+        }
+
+        $panel .= '
+                            <div class="row">
+                                <div class="col-md-6 text-right"><b>' . MODULE_PAYMENT_PAYPALR_CALCULATED_AMOUNT . '</b></div>
+                                <div class="col-md-2 text-right">' . $this->amount->getValueFromFloat($calculated_amount) . ' ' . $amount_mismatch['currency_code'] . '</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>';
+
+        return $panel;
     }
 
     protected function createAuthButtonsAndModals(int $auth_index, string $main_txn_id, string $days_to_settle): array
@@ -351,17 +423,15 @@ class MainDisplay
             $authorization = $this->paypalDbTxns[$auth_index];
             if ($authorization['parent_txn_id'] === $main_txn_id) {
                 if ($authorization['payment_status'] !== 'VOIDED') {
-                    $action_buttons = $this->createActionButton("reauth-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_REAUTH, 'primary');
-                    $modals = $this->createReauthModal($auth_index);
+                    $action_buttons =
+                        $this->createActionButton("reauth-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_REAUTH, 'primary') . ' ' .
+                        $this->createActionButton("void-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_VOID, 'danger') . ' ' .
+                        $this->createActionButton("capture-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_CAPTURE, 'warning');
 
-                    if ($action_buttons !== '') {
-                        $action_buttons .= ' ';
-                    }
-                    $action_buttons .= $this->createActionButton("void-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_VOID, 'danger');
-                    $modals .= $this->createVoidModal($auth_index);
-
-                    $action_buttons .= $this->createActionButton("capture-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_CAPTURE, 'warning');
-                    $modals .= $this->createCaptureModal($auth_index);
+                    $modals =
+                        $this->createReauthModal($auth_index) .
+                        $this->createVoidModal($auth_index) .
+                        $this->createCaptureModal($auth_index);
                 }
             }
         }
@@ -372,18 +442,26 @@ class MainDisplay
     {
         foreach ($this->paypalDbTxns as $next_txn) {
             if ($next_txn['txn_type'] === 'AUTHORIZE') {
-                $first_authorization = $next_txn;
-                break;
+                if (!isset($first_authorization)) {
+                    $first_authorization = $next_txn;
+                    $original_auth_value = $first_authorization['mc_gross'];
+                    $amount_authorized = $original_auth_value;
+                }
+                if ($next_txn['mc_gross'] !== $amount_authorized) {
+                    $amount_authorized = $next_txn['mc_gross'];
+                }
+                $last_authorization = $next_txn;
             }
         }
-        $last_authorization = $this->paypalDbTxns[$auth_index]; //-FIXME, not necessarily the last auth
 
-        $days_to_settle = Helpers::getDaysTo($last_authorization['expiration_time']);
+        $days_to_settle = Helpers::getDaysTo($first_authorization['expiration_time']);
 
-        $original_auth_value = $this->amount->getValueFromString($first_authorization['mc_gross']);
         $currency_decimals = $this->amount->getCurrencyDecimals();
         $multiplier = ($currency_decimals === 0) ? 1 : 100;
+        $original_auth_value = $this->amount->getValueFromString($original_auth_value);
         $maximum_auth_value = $this->amount->getValueFromFloat(floor($original_auth_value * 1.15 * $multiplier) / $multiplier);
+        $amount_authorized = $this->amount->getValueFromString($amount_authorized);
+
         $amount_input_params = 'type="number" min="0.01" max="' . $maximum_auth_value . '" step="0.01"';
         $amount_help_text = sprintf(MODULE_PAYMENT_PAYPALR_AMOUNT_RANGE, $this->currencyCode, $maximum_auth_value);
 
@@ -403,11 +481,24 @@ class MainDisplay
                     <li>' . MODULE_PAYMENT_PAYPALR_REAUTH_NOTE3 . '</li>
                     <li>' . sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_NOTE4, $maximum_auth_value . ' ' . $this->currencyCode) . '</li>
                 </ol>' .
-                $this->createStaticFormGroup(6, MODULE_PAYMENT_PAYPALR_REAUTH_ORIGINAL, $this->amount->getValueFromString($first_authorization['mc_gross']) . ' ' . $this->currencyCode) .
+                $this->createStaticFormGroup(6, MODULE_PAYMENT_PAYPALR_REAUTH_ORIGINAL, $original_auth_value . ' ' . $this->currencyCode) .
+                $this->createStaticFormGroup(6, MODULE_PAYMENT_PAYPALR_REAUTH_NEW_AMOUNT, $amount_authorized . ' ' . $this->currencyCode) .
                 $this->createStaticFormGroup(6, MODULE_PAYMENT_PAYPALR_DAYSTOSETTLE, $days_to_settle) .
-                $this->createStaticFormGroup(6, MODULE_PAYMENT_PAYPALR_REAUTH_DAYS_FROM_LAST, $days_since_last_auth) .
-                $this->createModalInput(6, MODULE_PAYMENT_PAYPALR_AMOUNT, $original_auth_value, "auth-amt-$auth_index", 'ppr-amount', $amount_input_params, $amount_help_text) .
-                $this->createModalButtons("ppr-reauth-submit-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_REAUTH, MODULE_PAYMENT_PAYPALR_CONFIRM) .
+                $this->createStaticFormGroup(6, MODULE_PAYMENT_PAYPALR_REAUTH_DAYS_FROM_LAST, $days_since_last_auth);
+
+        if ($days_since_last_auth > 3) {
+            $modal_body .=
+                $this->createModalInput(6, MODULE_PAYMENT_PAYPALR_AMOUNT, $amount_reauthorized, "auth-amt-$auth_index", 'ppr-amount', $amount_input_params, $amount_help_text) .
+                $this->createModalButtons("ppr-reauth-submit-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_REAUTH, MODULE_PAYMENT_PAYPALR_CONFIRM);
+        } else {
+            $modal_body .=
+                '<div class="form-group">' .
+                    '<p class="col-sm-12 text-center form-control-static text-warning">' .
+                        '<b>' . MODULE_PAYMENT_PAYPALR_REAUTH_NOT_POSSIBLE . '</b>' .
+                    '</p>' .
+                '</div>';
+        }
+        $modal_body .=
             '</form>';
 
         return $this->createModal("reauth-$auth_index", MODULE_PAYMENT_PAYPALR_REAUTH_TITLE, $modal_body);
@@ -415,19 +506,25 @@ class MainDisplay
     protected function createCaptureModal(int $auth_index): string
     {
         $auth_db_txn = $this->paypalDbTxns[$auth_index];
-        $original_auth_value = $this->amount->getValueFromString($auth_db_txn['mc_gross']);
+        $original_auth_value = $auth_db_txn['mc_gross'];
+        $amount_authorized = $original_auth_value;
 
         $previously_captured_value = 0;
         $auth_txn_id = $auth_db_txn['txn_id'];
         foreach ($this->paypalDbTxns as $next_txn) {
             if ($next_txn['txn_type'] === 'CAPTURE' && $next_txn['parent_txn_id'] === $auth_txn_id) {
                 $previously_captured_value += $next_txn['payment_gross'];
+            } elseif ($next_txn['txn_type'] === 'AUTHORIZE' && $next_txn['mc_gross'] !== $original_auth_value) {
+                $amount_authorized = $next_txn['mc_gross'];
             }
         }
 
-        $maximum_capt_value = $this->amount->getValueFromFloat((float)($original_auth_value - $previously_captured_value));
+        $original_auth_value = $this->amount->getValueFromString($original_auth_value);
+        $amount_authorized = $this->amount->getValueFromString($amount_authorized);
+        $amount_remaining = $amount_authorized - $previously_captured_value;
+        $maximum_capt_value = $this->amount->getValueFromFloat((float)$amount_remaining);
 
-        $amount_input_params = 'type="number" min="0" max="' . $maximum_capt_value . '" step="0.01"';
+        $amount_input_params = 'type="number" min="0.01" max="' . $maximum_capt_value . '" step="0.01"';
         $amount_help_text = sprintf(MODULE_PAYMENT_PAYPALR_AMOUNT_RANGE, $this->currencyCode, $maximum_capt_value);
 
         $modal_body =
@@ -436,14 +533,29 @@ class MainDisplay
                 zen_draw_hidden_field('auth_txn_id', $auth_db_txn['txn_id']) .
                 '<p>' . MODULE_PAYMENT_PAYPALR_CAPTURE_INSTRUCTIONS . '</p>' .
                 $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_REAUTH_ORIGINAL, $original_auth_value . ' ' . $this->currencyCode) .
+                $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_REAUTH_NEW_AMOUNT, $amount_authorized . ' ' . $this->currencyCode) .
                 $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_CAPTURED_SO_FAR, $this->amount->getValueFromFloat((float)$previously_captured_value) . ' ' . $this->currencyCode) .
-                $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_REMAINING_TO_CAPTURE, $maximum_capt_value . ' ' . $this->currencyCode) .
+                $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_REMAINING_TO_CAPTURE, $maximum_capt_value . ' ' . $this->currencyCode);
+
+        if ($amount_remaining > 0) {
+            $modal_body .=
                 $this->createModalInput(4, MODULE_PAYMENT_PAYPALR_AMOUNT, $maximum_capt_value, "capt-amt-$auth_index", 'ppr-amount', $amount_input_params, $amount_help_text) .
-                $this->createModalCheckbox(4, 'Capture remaining funds?', 'ppr-capt-remaining') .
+                $this->createModalCheckbox(4, MODULE_PAYMENT_PAYPALR_CAPTURE_REMAINING, 'ppr-capt-remaining') .
                 $this->createModalTextArea(4, MODULE_PAYMENT_PAYPALR_CUSTOMER_NOTE, MODULE_PAYMENT_PAYPALR_CAPTURE_DEFAULT_MESSAGE, "capt-note-$auth_index", 'ppr-capt-note') .
                 $this->createModalCheckbox(4, MODULE_PAYMENT_PAYPALR_CAPTURE_FINAL_TEXT, 'ppr-capt-final') .
-                $this->createModalButtons("ppr-capt-submit-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_CAPTURE, MODULE_PAYMENT_PAYPALR_CONFIRM) .
+                $this->createModalButtons("ppr-capt-submit-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_CAPTURE, MODULE_PAYMENT_PAYPALR_CONFIRM);
+        } else {
+            $modal_body .=
+                '<div class="form-group">' .
+                    '<p class="col-sm-12 text-center form-control-static text-warning">' .
+                        '<b>' . MODULE_PAYMENT_PAYPALR_CAPTURE_NO_REMAINING . '</b>' .
+                    '</p>' .
+                '</div>';
+        }
+
+        $modal_body .=
             '</form>';
+
         return $this->createModal("capture-$auth_index", MODULE_PAYMENT_PAYPALR_CAPTURE_TITLE, $modal_body);
     }
     protected function createVoidModal(int $auth_index): string
