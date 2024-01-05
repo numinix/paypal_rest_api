@@ -1476,12 +1476,16 @@ class paypalr extends base
     protected function checkCardPaymentResponse(array $response): string
     {
         // -----
-        // If the capture was completed, the authorization was created or if a
-        // payer-action is required (i.e. an SCA link); all's good and let the caller
-        // know.
+        // If a payer-action is required (i.e. an SCA link), there's no additional information
+        // in the payment-response, other than the rel="payer-action" link.  Let the caller
+        // deal with that SCA redirection.
         //
-        if (in_array($response['status'], ['COMPLETED', 'CREATED', 'PAYER_ACTION_REQUIRED'], true)) {
-            return '';
+        if ($response['status'] === 'PAYER_ACTION_REQUIRED') {
+            foreach ($response['links'] as $next_link) {
+                if ($next_link['rel'] === 'payer-action') {
+                    return '';
+                }
+            }
         }
 
         // -----
@@ -1498,6 +1502,20 @@ class paypalr extends base
         //
         $response_message = '';
         switch ($payment['status']) {
+            // -----
+            // If an authorization was CREATED or a funds' capture was COMPLETED, the caller
+            // can safely proceed processing the order.
+            //
+            case 'CREATED':
+            case 'COMPLETED':
+                return '';
+                break;
+
+            // -----
+            // If the authorization or capture is PENDING, then there's most likely a 'hold'
+            // placed by PayPal.  The order can be processed, but the order's status will remain
+            // in its 'pending' state.
+            //
             case 'PENDING':
                 $this->paymentIsPending = true;
                 break;
@@ -1506,6 +1524,11 @@ class paypalr extends base
                 $response_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR;
                 break;
 
+            // -----
+            // If an authorization was DENIED or a funds' capture was DECLINED, there
+            // was an issue of some sort with the card.  Determine the underlying issue.
+            //
+            case 'DENIED':
             case 'DECLINED':
                 $card_payment_source = $response['payment_source']['card'];
                 $card_type = $card_payment_source['brand'] ?? '';
