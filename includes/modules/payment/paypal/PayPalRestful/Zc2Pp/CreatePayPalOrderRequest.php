@@ -188,6 +188,19 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $name = $next_product['name'];
 
             // -----
+            // If the product has attributes, append only the attribute's value to
+            // the product's name as there's a 127-character limit for an item's
+            // name in the PayPal API.
+            //
+            if (!empty($next_product['attributes'])) {
+                $attribute_values = [];
+                foreach ($next_product['attributes'] as $next_attribute) {
+                    $attribute_values[] = $next_attribute['value'];
+                }
+                $name .= ': ' . implode('|', $attribute_values);
+            }
+
+            // -----
             // PayPal supports *only* integer-quanties in the order's item list,
             // so if any quantity is not an integer value, the items' array
             // can't be included in the PayPal order request.  Noting that this
