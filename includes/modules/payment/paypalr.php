@@ -197,7 +197,7 @@ class paypalr extends base
             return false;
         }
 
-        $this->enabled = (MODULE_PAYMENT_PAYPALR_STATUS === 'True');
+        $this->enabled = (MODULE_PAYMENT_PAYPALR_STATUS === 'True' || (IS_ADMIN_FLAG === true && MODULE_PAYMENT_PAYPALR_STATUS === 'Admin Only'));
         if ($this->enabled === false) {
             return;
         }
@@ -221,11 +221,14 @@ class paypalr extends base
         $this->zone = (int)MODULE_PAYMENT_PAYPALR_ZONE;
 
         if (IS_ADMIN_FLAG === true) {
+            if (MODULE_PAYMENT_PAYPALR_STATUS === 'Admin Only') {
+                $this->title .= ' <strong>(Admin Only)</strong>';
+            }
             if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
                 $this->title .= $this->alertMsg(' (sandbox active)');
             }
             if ($debug === true) {
-                $this->title .= '<strong> (Debug)</strong>';
+                $this->title .= ' <strong>(Debug)</strong>';
             }
             $this->tableCheckup();
         } else {
@@ -370,6 +373,14 @@ class paypalr extends base
                 ('List <var>insurance</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules that add an <em>insurance</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
                 ('List <var>discount</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_coupon</code>, <code>ot_gv</code> and <code>ot_group_pricing</code> &mdash; that add a <em>discount</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now())"
+        );
+
+        $db->Execute(
+            "UPDATE " . TABLE_CONFIGURATION . "
+                SET configuration_description = 'Do you want to enable this payment module?  Choose <em>False</em> (the default) to fully disable the module, <em>True</em> to fully enable the module or <em>Admin Only</em> to enable for admin use <b>only</b>.',
+                    set_function = 'zen_cfg_select_option([\'True\', \'False\', \'Admin Only\'], '
+              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_STATUS'
+              LIMIT 1"
         );
     }
 
@@ -1907,7 +1918,7 @@ class paypalr extends base
             "INSERT INTO " . TABLE_CONFIGURATION . "
                 (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
              VALUES
-                ('Enable this Payment Module?', 'MODULE_PAYMENT_PAYPALR_STATUS', 'False', 'Do you want to enable this payment module?', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now()),
+                ('Enable this Payment Module?', 'MODULE_PAYMENT_PAYPALR_STATUS', 'False', 'Do you want to enable this payment module?  Choose <em>False</em> (the default) to fully disable the module, <em>True</em> to fully enable the module or <em>Admin Only</em> to enable for admin use <b>only</b>.', 6, 0, 'zen_cfg_select_option([\'True\', \'False\', \'Admin Only\'], ', NULL, now()),
 
                 ('Environment', 'MODULE_PAYMENT_PAYPALR_SERVER', 'live', '<b>Live: </b> Used to process Live transactions<br><b>Sandbox: </b>For developers and testing', 6, 0, 'zen_cfg_select_option([\'live\', \'sandbox\'], ', NULL, now()),
 
