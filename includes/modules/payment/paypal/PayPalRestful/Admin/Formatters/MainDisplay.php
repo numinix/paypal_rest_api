@@ -312,6 +312,7 @@ class MainDisplay
         if ($create_fields['payment_type'] === 'paypal') {
             $modal_body .=
                 $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_ID, $create_fields['payer_id']) .
+                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_EMAIL, $create_fields['payer_email']) .
                 $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PAYER_STATUS, $create_fields['payer_status']);
         } elseif (count($card_info) !== 0) {
             $modal_body .=
@@ -488,7 +489,7 @@ class MainDisplay
 
         if ($days_since_last_auth > 3) {
             $modal_body .=
-                $this->createModalInput(6, MODULE_PAYMENT_PAYPALR_AMOUNT, $amount_reauthorized, "auth-amt-$auth_index", 'ppr-amount', $amount_input_params, $amount_help_text) .
+                $this->createModalInput(6, MODULE_PAYMENT_PAYPALR_AMOUNT, $amount_authorized, "auth-amt-$auth_index", 'ppr-amount', $amount_input_params, $amount_help_text) .
                 $this->createModalButtons("ppr-reauth-submit-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_REAUTH, MODULE_PAYMENT_PAYPALR_CONFIRM);
         } else {
             $modal_body .=
