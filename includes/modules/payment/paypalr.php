@@ -867,7 +867,7 @@ class paypalr extends base
         $paypal_order_created = $this->createPayPalOrder('paypal');
         if ($paypal_order_created === false) {
             $error_info = $this->ppr->getErrorInfo();
-            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';    //-FIXME: If the error code is AMOUNT_MISMATCH, resubmit without amount breakdown!
+            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
             $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN, MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info));
             $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALR_TEXT_TITLE, $error_code), FILENAME_CHECKOUT_PAYMENT);
         }
@@ -896,13 +896,12 @@ class paypalr extends base
         global $order;
         $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::WEBHOOK_NAME, $order);
         $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
-        if ($payment_choice_response === false) {
-            $this->setMessageAndRedirect("confirmPaymentSource failed\n" . Logger::logJSON($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT);  //- FIXME
-        }
-
-        $current_status = $payment_choice_response['status'];
-        if ($current_status !== PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
-            $this->setMessageAndRedirect("confirmPaymentSource invalid return status '$current_status', see log.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+        if ($payment_choice_response === false || $payment_choice_response['status'] !== PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
+            $this->sendAlertMessage(
+                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
+                MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
+            );
+            $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
         }
 
         // -----
@@ -917,8 +916,11 @@ class paypalr extends base
             }
         }
         if ($action_link === '') {
-            trigger_error("No payer-action link returned by PayPal, payment cannot be completed.\n", Logger::logJSON($payment_choice_response['links']), E_USER_WARNING);
-            $this->setMessageAndRedirect("confirmPaymentSource, no payer-action link found.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+            $this->sendAlertMessage(
+                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
+                MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response)
+            );
+            $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
         }
 
         // -----
@@ -1257,7 +1259,9 @@ class paypalr extends base
         //
         } else {
             if (!isset($_SESSION['PayPalRestful']['Order']['status']) || $_SESSION['PayPalRestful']['Order']['status'] !== PayPalRestfulApi::STATUS_APPROVED) {
-                $this->setMessageAndRedirect("paypalr::before_process, can't capture/authorize order; wrong status ({$_SESSION['PayPalRestful']['Order']['status']}).", FILENAME_CHECKOUT_SHIPPING);  //- FIXME
+                $this->log->write('paypalr::before_process, cannot capture/authorize paypal order; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));
+                unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+                $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
             }
             $response = $this->captureOrAuthorizePayment('paypal');
         }
@@ -1338,7 +1342,7 @@ class paypalr extends base
         }
 
         if ($response === false) {
-            $this->setMessageAndRedirect("paypalr::before_process ($payment_source), can't create/capture/authorize order; error in attempt, see log.", FILENAME_CHECKOUT_PAYMENT);  //- FIXME
+            $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
         }
         return $response;
     }
@@ -1363,7 +1367,6 @@ class paypalr extends base
             $order->info['cc_expires'] = $cc_info['cc_expires'];
             unset($_SESSION['PayPalRestful']['Order']['3DS_response']);
 
-            //-FIXME: Need to check the AVS response codes!
             return $this->captureOrAuthorizePayment('card');
         }
 
@@ -1372,8 +1375,11 @@ class paypalr extends base
         // that the card-related information submitted is valid, returning the customer
         // to the payment phase of the checkout process if something's not kosher.
         //
+        // Note that the validateCardInformation method has already set a specific
+        // message for the customer if one of its checks has failed.
+        //
         if ($this->validateCardInformation() === false) {
-            $this->setMessageAndRedirect("before_process, card failed validation.", FILENAME_CHECKOUT_PAYMENT); //-FIXME
+            zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
         }
 
         // -----
@@ -1405,7 +1411,7 @@ class paypalr extends base
 
         $response = $this->ppr->createOrder($create_order_request->get());
         if ($response === false) {
-            $this->setMessageAndRedirect("before_process, createOrder failed:\n" . json_encode($this->ppr->getErrorInfo()), FILENAME_CHECKOUT_PAYMENT); //-FIXME
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR . ' ' . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
         }
 
         // -----
@@ -1611,7 +1617,7 @@ class paypalr extends base
     {
         if ($log_only === false) {
             global $messageStack;
-            $messageStack->add_session('checkout', $error_message, 'error');  //- FIXME
+            $messageStack->add_session('checkout', $error_message, 'error');
         }
         $this->log->write($error_message);
         $this->resetOrder();

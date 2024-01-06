@@ -18,6 +18,8 @@ $define = [
     //
     'MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL' => 'Paying via PayPal Wallet',     //- Used by the confirmation method, when paying via PayPal Checkout (paypal)
     'MODULE_PAYMENT_PAYPALR_TEXT_NOTIFICATION_MISSING' => 'We are unable to process your %s payment at this time.  Please contact us for assistance.',  //- %s filled in with MODULE_PAYMENT_PAYPALR_TEXT_TITLE
+    'MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR' => 'We are unable to process your %s payment at this time.  Please contact us for assistance.',      //- %s filled in with MODULE_PAYMENT_PAYPALR_TEXT_TITLE
+    'MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH' => 'We were unable to process your payment-request.',
     'MODULE_PAYMENT_PAYPALR_TEXT_PLEASE_NOTE' => 'Please Note:',
     'MODULE_PAYMENT_PAYPALR_UNSUPPORTED_BILLING_COUNTRY' => 'Your billing address\' country not supported by PayPal; credit-card payments cannot be made.',
     'MODULE_PAYMENT_PAYPALR_UNSUPPORTED_SHIPPING_COUNTRY' => 'Your shipping address\' country not supported by PayPal; this payment method cannot be used.',
@@ -60,12 +62,14 @@ $define = [
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL' => 'Unknown Denial Reason',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD' => 'Lost/Stolen/Fraudulent Card',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_TOTAL_MISMATCH' => 'Calculation Mismatch',
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR' => 'Confirm Payment Choice', 
 
     'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
     'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypalrestful.php) was not loaded; the payment module has been disabled.',
     'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS' => 'The required notifications in the order_total.php class were not applied; the payment module cannot place orders.',
     'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE' => 'An error was returned by PayPal when attempting to initiate an order. As a courtesy, only the error \'code\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
     'MODULE_PAYMENT_PAYPALR_ALERT_TOTAL_MISMATCH' => 'A discrepancy was found between an order\'s overall value and its breakdown.  The order is being submitted to PayPal without items and cost breakdown included:',
+    'MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR' => 'An unprocessable return was received from PayPal when attempting to confirm a customer\'s payment choice from their PayPal Wallet.',
 
     // -----
     // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.

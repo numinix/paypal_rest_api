@@ -339,7 +339,6 @@ class GetPayPalOrderTransactions
             return [];
         }
 
-        //- FIXME, refunds/auths/voids don't include exchange-rate; that's set when the payment is captured
         return [
             'payment_gross' => $payment_info['gross_amount']['value'],
             'payment_fee' => $payment_info['paypal_fee']['value'],
