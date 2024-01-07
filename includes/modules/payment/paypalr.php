@@ -237,14 +237,11 @@ class paypalr extends base
             // observer gathers order-totals' changes to the order's 'info', enabling the order-creation
             // request to PayPal to be properly formed.
             //
-            // No observer?  No payment via this module.
+            // No observer?  No payment via this module and it's auto-disabled.
             //
             global $zcObserverPaypalrestful;
             if (!isset($zcObserverPaypalrestful)) {
-                if (!isset($_SESSION['PayPalRestful']['Order']['observerMissing'])) {
-                    $_SESSION['PayPalRestful']['Order']['observerMissing'] = true;
-                    $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER, true);
-                }
+                $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER);
                 $this->enabled = false;
                 return;
             }
@@ -381,6 +378,11 @@ class paypalr extends base
                     set_function = 'zen_cfg_select_option([\'True\', \'False\', \'Admin Only\'], '
               WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_STATUS'
               LIMIT 1"
+        );
+
+        $db->Execute(
+            "DELETE FROM " . TABLE_CONFIGURATION . "
+              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_PAGE_STYLE'"
         );
     }
 
@@ -1944,8 +1946,6 @@ class paypalr extends base
 
                 ('Set Held Order Status', 'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID', '1', 'Set the status of orders that are held for review to this status.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
 
-                ('PayPal Page Style', 'MODULE_PAYMENT_PAYPALR_PAGE_STYLE', 'Primary', 'The page-layout style you want customers to see when they visit the PayPal site. You can configure your <b>Custom Page Styles</b> in your PayPal Profile settings. This value is case-sensitive.', 6, 0, NULL, NULL, now()),
-
                 ('Store (Brand) Name at PayPal', 'MODULE_PAYMENT_PAYPALR_BRANDNAME', '', 'The name of your store as it should appear on the PayPal login page. If blank, your store name will be used.', 6, 0, NULL, NULL, now()),
 
                 ('Payment Action', 'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE', 'Final Sale', 'How do you want to obtain payment?<br><b>Default: Final Sale</b>', 6, 0, 'zen_cfg_select_option([\'Auth Only\', \'Final Sale\'], ', NULL,  now()),
@@ -1956,7 +1956,7 @@ class paypalr extends base
 
                 ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now()),
 
-                ('List <var>handling-fee</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_HANDLING_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_loworderfee</code> &mdash; that add an <em>handling-fee</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
+                ('List <var>handling-fee</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_HANDLING_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_loworderfee</code> &mdash; that add a <em>handling-fee</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
                 ('List <var>insurance</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules that add an <em>insurance</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
@@ -2044,7 +2044,6 @@ class paypalr extends base
             'MODULE_PAYMENT_PAYPALR_CURRENCY',
             'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK',
             'MODULE_PAYMENT_PAYPALR_BRANDNAME',
-            'MODULE_PAYMENT_PAYPALR_PAGE_STYLE',
             'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE',
             'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS',
             'MODULE_PAYMENT_PAYPALR_HANDLING_OT',
