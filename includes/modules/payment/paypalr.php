@@ -356,13 +356,16 @@ class paypalr extends base
 
     protected function tableCheckup()
     {
-        //-FIXME: This processing will be removed prior to the v1.0.0 release!
         global $db;
 
+        //-FIXME: This processing will be removed prior to the v1.0.0 release!
+        $current_version = self::CURRENT_VERSION;
         $db->Execute(
             "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
                 (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
              VALUES
+                ('Module Version', 'MODULE_PAYMENT_PAYPALR_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
+
                 ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now()),
 
                 ('Set Voided Order Status', 'MODULE_PAYMENT_PAYPALR_VOIDED_STATUS_ID', '1', 'Set the status of <em>voided</em> orders to this status.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
@@ -396,6 +399,18 @@ class paypalr extends base
             "DELETE FROM " . TABLE_CONFIGURATION . "
               WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_PAGE_STYLE'"
         );
+        //-END_FIXME
+
+        if (defined('MODULE_PAYMENT_PAYPALR_VERSION') && MODULE_PAYMENT_PAYPALR_VERSION !== self::CURRENT_VERSION) {
+            $current_version = self::CURRENT_VERSION;
+            $db->Execute(
+                "UPDATE " . TABLE_CONFIGURATION . "
+                    SET configuration_value = '$current_version',
+                        last_modified = now()
+                  WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_VERSION'
+                  LIMIT 1"
+            );
+        }
     }
 
     protected function checkCardsAcceptedForSite(): bool
@@ -1925,11 +1940,14 @@ class paypalr extends base
         }
         $currencies_list = rtrim($currencies_list, ',');
 
+        $current_version = self::CURRENT_VERSION;
         $db->Execute(
             "INSERT INTO " . TABLE_CONFIGURATION . "
                 (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
              VALUES
-                ('Enable this Payment Module?', 'MODULE_PAYMENT_PAYPALR_STATUS', 'False', 'Do you want to enable this payment module? Use the <b>Retired</b> setting if you are planning to remove this payment module but still have administrative actions to perform against orders placed with this module..', 6, 0, 'zen_cfg_select_option([\'True\', \'False\', \'Retired\'], ', NULL, now()),
+                ('Module Version', 'MODULE_PAYMENT_PAYPALR_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
+
+                ('Enable this Payment Module?', 'MODULE_PAYMENT_PAYPALR_STATUS', 'False', 'Do you want to enable this payment module? Use the <b>Retired</b> setting if you are planning to remove this payment module but still have administrative actions to perform against orders placed with this module.', 6, 0, 'zen_cfg_select_option([\'True\', \'False\', \'Retired\'], ', NULL, now()),
 
                 ('Environment', 'MODULE_PAYMENT_PAYPALR_SERVER', 'live', '<b>Live: </b> Used to process Live transactions<br><b>Sandbox: </b>For developers and testing', 6, 0, 'zen_cfg_select_option([\'live\', \'sandbox\'], ', NULL, now()),
 
@@ -2037,6 +2055,7 @@ class paypalr extends base
     public function keys(): array
     {
         return [
+            'MODULE_PAYMENT_PAYPALR_VERSION',
             'MODULE_PAYMENT_PAYPALR_STATUS',
             'MODULE_PAYMENT_PAYPALR_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_ZONE',
