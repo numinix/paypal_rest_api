@@ -197,7 +197,7 @@ class paypalr extends base
             return false;
         }
 
-        $this->enabled = (MODULE_PAYMENT_PAYPALR_STATUS === 'True' || (IS_ADMIN_FLAG === true && MODULE_PAYMENT_PAYPALR_STATUS === 'Admin Only'));
+        $this->enabled = (MODULE_PAYMENT_PAYPALR_STATUS === 'True' || (IS_ADMIN_FLAG === true && MODULE_PAYMENT_PAYPALR_STATUS === 'Retired'));
         if ($this->enabled === false) {
             return;
         }
@@ -221,8 +221,8 @@ class paypalr extends base
         $this->zone = (int)MODULE_PAYMENT_PAYPALR_ZONE;
 
         if (IS_ADMIN_FLAG === true) {
-            if (MODULE_PAYMENT_PAYPALR_STATUS === 'Admin Only') {
-                $this->title .= ' <strong>(Admin Only)</strong>';
+            if (MODULE_PAYMENT_PAYPALR_STATUS === 'Retired') {
+                $this->title .= ' <strong>(Retired)</strong>';
             }
             if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
                 $this->title .= $this->alertMsg(' (sandbox active)');
@@ -378,8 +378,8 @@ class paypalr extends base
 
         $db->Execute(
             "UPDATE " . TABLE_CONFIGURATION . "
-                SET configuration_description = 'Do you want to enable this payment module?  Choose <em>False</em> (the default) to fully disable the module, <em>True</em> to fully enable the module or <em>Admin Only</em> to enable for admin use <b>only</b>.',
-                    set_function = 'zen_cfg_select_option([\'True\', \'False\', \'Admin Only\'], '
+                SET configuration_description = 'Do you want to enable this payment module? Use the <b>Retired</b> setting if you are planning to remove this payment module but still have administrative actions to perform against orders placed with this module.',
+                    set_function = 'zen_cfg_select_option([\'True\', \'False\', \'Retired\'], '
               WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_STATUS'
               LIMIT 1"
         );
@@ -1929,7 +1929,7 @@ class paypalr extends base
             "INSERT INTO " . TABLE_CONFIGURATION . "
                 (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
              VALUES
-                ('Enable this Payment Module?', 'MODULE_PAYMENT_PAYPALR_STATUS', 'False', 'Do you want to enable this payment module?  Choose <em>False</em> (the default) to fully disable the module, <em>True</em> to fully enable the module or <em>Admin Only</em> to enable for admin use <b>only</b>.', 6, 0, 'zen_cfg_select_option([\'True\', \'False\', \'Admin Only\'], ', NULL, now()),
+                ('Enable this Payment Module?', 'MODULE_PAYMENT_PAYPALR_STATUS', 'False', 'Do you want to enable this payment module? Use the <b>Retired</b> setting if you are planning to remove this payment module but still have administrative actions to perform against orders placed with this module..', 6, 0, 'zen_cfg_select_option([\'True\', \'False\', \'Retired\'], ', NULL, now()),
 
                 ('Environment', 'MODULE_PAYMENT_PAYPALR_SERVER', 'live', '<b>Live: </b> Used to process Live transactions<br><b>Sandbox: </b>For developers and testing', 6, 0, 'zen_cfg_select_option([\'live\', \'sandbox\'], ', NULL, now()),
 
