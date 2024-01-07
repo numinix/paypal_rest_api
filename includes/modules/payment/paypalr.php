@@ -1106,15 +1106,12 @@ class paypalr extends base
         // If the required notifications in the order_total.php class haven't been applied, the
         // order's amount-breakdown can't be properly formed.
         //
-        // Kick the customer back to the payment phase of the checkout process.
+        // Force the module's status to disabled and kick the customer back to the payment phase of the checkout process.
         //
         global $zcObserverPaypalrestful;
         $order_info = $zcObserverPaypalrestful->getLastOrderValues();
         if (count($order_info) === 0) {
-            if (!isset($_SESSION['PayPalRestful']['Order']['notificationMissing'])) {
-                $_SESSION['PayPalRestful']['Order']['notificationMissing'] = true;
-                $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION, MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS, true);
-            }
+            $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS);
             $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_NOTIFICATION_MISSING, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
         }
         $order_info['free_shipping_coupon'] = $zcObserverPaypalrestful->orderHasFreeShippingCoupon();
