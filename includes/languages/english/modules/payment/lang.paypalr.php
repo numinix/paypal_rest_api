@@ -225,7 +225,6 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_REFUND_ERROR' => 'There was a problem refunding the transaction.',
 
     'MODULE_PAYMENT_PAYPALR_REFUND_COMPLETE' => 'A refund in the amount of %s has been completed.',
-    'MODULE_PAYMENT_PAYPALR_REFUND_MEMO' => 'Refunded by %1$s for an amount of %2$s.',
 
     // -----
     // Constants used in the "Re-Authorize" modal.
@@ -246,9 +245,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_REAUTH_ERROR' => 'There was a problem authorizing the transaction.',
     'MODULE_PAYMENT_PAYPALR_REAUTH_TOO_SOON' => 'A reauthorization is only allowed once from Day 4 to Day 29 since the date of the original authorization.',
 
-
     'MODULE_PAYMENT_PAYPALR_REAUTH_COMPLETE' => 'A re-authorization in the amount of %s has been completed.',
-    'MODULE_PAYMENT_PAYPALR_REAUTH_MEMO' => 'Re-authorized by %1$s for an amount of %2$s.',
 
     // -----
     // Constants used in the "Capture" modal.
@@ -267,8 +264,8 @@ $define = [
 
     'MODULE_PAYMENT_PAYPALR_CAPTURE_NO_REMAINING' => 'All authorized funds for this order have been successfully captured.',
     'MODULE_PAYMENT_PAYPALR_CAPTURE_COMPLETE' => 'The payment for order#%u has been captured.',
-    'MODULE_PAYMENT_PAYPALR_PARTIAL_CAPTURE_MEMO' => 'Partially captured by %1$s for an amount of %2$s.',
-    'MODULE_PAYMENT_PAYPALR_FINAL_CAPTURE_MEMO' => 'Final capture by %1$s for an amount of %2$s.',
+    'MODULE_PAYMENT_PAYPALR_PARTIAL_CAPTURE' => 'Partially captured.',
+    'MODULE_PAYMENT_PAYPALR_FINAL_CAPTURE' => 'Final capture.',
 
     // -----
     // Constants used in the "Void" modal.

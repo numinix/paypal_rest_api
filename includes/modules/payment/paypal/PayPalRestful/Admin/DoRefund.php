@@ -6,6 +6,8 @@
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
+ *
+ * Last updated: v1.0.0
  */
 namespace PayPalRestful\Admin;
 
@@ -71,11 +73,7 @@ class DoRefund
             return;
         }
 
-        $amount_refunded = $refund_response['amount']['value'] . ' ' . $refund_response['amount']['currency_code'];
-        $payer_note = "\n$payer_note";
-
-        $refund_memo = sprintf(MODULE_PAYMENT_PAYPALR_REFUND_MEMO, zen_updated_by_admin(), $amount_refunded) . "\n" . $payer_note;
-        $ppr_txns->addDbTransaction('REFUND', $refund_response, $refund_memo);
+        $ppr_txns->addDbTransaction('REFUND', $refund_response);
 
         $parent_capture_status = $ppr->getCaptureStatus($_POST['capture_txn_id']);
         if ($parent_capture_status === false) {
@@ -108,6 +106,8 @@ class DoRefund
             $refund_status = ($refund_status > 0) ? $refund_status : 2;
         }
 
+        $amount_refunded = $refund_response['amount']['value'] . ' ' . $refund_response['amount']['currency_code'];
+        $payer_note = "\n$payer_note";
         $comments =
             'REFUNDED. Trans ID: ' . $refund_response['id'] . "\n" .
             'Amount: ' . $amount_refunded . "\n" .

@@ -6,6 +6,8 @@
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
+ *
+ * Last updated: v1.0.0
  */
 namespace PayPalRestful\Admin;
 
@@ -73,12 +75,7 @@ class DoCapture
             return;
         }
 
-        $amount = $capture_response['amount']['value'] . ' ' . $capture_response['amount']['currency_code'];
-        $payer_note = "\n$payer_note";
-
-        $capture_memo_message = ($final_capture === true) ? MODULE_PAYMENT_PAYPALR_FINAL_CAPTURE_MEMO : MODULE_PAYMENT_PAYPALR_PARTIAL_CAPTURE_MEMO;
-        $capture_memo = sprintf($capture_memo_message, zen_updated_by_admin(), $amount) . "\n" . $payer_note;
-        $ppr_txns->addDbTransaction('CAPTURE', $capture_response, $capture_memo);
+        $ppr_txns->addDbTransaction('CAPTURE', $capture_response);
 
         $parent_auth_status = $ppr->getAuthorizationStatus($_POST['auth_txn_id']);
         if ($parent_auth_status === false) {
@@ -89,18 +86,24 @@ class DoCapture
 
         $ppr_txns->updateMainTransaction($capture_response);
 
+        $amount = $capture_response['amount']['value'] . ' ' . $capture_response['amount']['currency_code'];
+        $payer_note = "\n$payer_note";
+
         $comments =
             'FUNDS CAPTURED. Trans ID: ' . $capture_response['id'] . "\n" .
             "Amount: $amount\n" .
             $payer_note;
 
         if ($final_capture === false) {
+            $capture_admin_message = MODULE_PAYMENT_PAYPALR_PARTIAL_CAPTURE;
             $capture_status = -1;
         } else {
+            $capture_admin_message = MODULE_PAYMENT_PAYPALR_FINAL_CAPTURE;
             $capture_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
             $capture_status = ($capture_status > 0) ? $capture_status : 2;
         }
         zen_update_orders_history($oID, $comments, null, $capture_status, 0);
+        zen_update_orders_history($oID, $capture_admin_message);
 
         $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_CAPTURE_COMPLETE, $oID), 'success');
     }

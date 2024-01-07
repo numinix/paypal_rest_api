@@ -6,6 +6,8 @@
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
+ *
+ * Last updated: v1.0.0
  */
 namespace PayPalRestful\Admin;
 
@@ -64,9 +66,7 @@ class DoAuthorization
             return;
         }
 
-        $amount = $auth_response['amount']['value'] . ' ' . $auth_response['amount']['currency_code'];
-        $reauth_memo = sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_MEMO, zen_updated_by_admin(), $amount);
-        $ppr_txns->addDbTransaction('AUTHORIZE', $auth_response, $reauth_memo);
+        $ppr_txns->addDbTransaction('AUTHORIZE', $auth_response);
         $ppr_txns->updateMainTransaction($auth_response);
 
         // -----
@@ -86,6 +86,7 @@ class DoAuthorization
         // A re-authorization doesn't change an order's status.  Write an orders-history
         // record containing information for the admin's hidden view.
         //
+        $amount = $auth_response['amount']['value'] . ' ' . $auth_response['amount']['currency_code'];
         $comments =
             'AUTHORIZATION ADDED. Trans ID: ' . $auth_response['id'] . "\n" .
             'Amount: ' . $amount;
