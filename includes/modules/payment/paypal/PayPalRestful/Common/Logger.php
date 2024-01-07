@@ -5,6 +5,8 @@
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
+ *
+ * Last updated: v1.0.0
  */
 
 namespace PayPalRestful\Common;
@@ -42,7 +44,7 @@ class Logger
                 $logfile_suffix .= '-o' . $order->info['order_id'];
             }
         }
-        self::$debugLogFile = DIR_FS_LOGS . '/PayPalRestfulApi-' . $logfile_suffix . '-' . date('Ymd') . '.log';
+        self::$debugLogFile = DIR_FS_LOGS . '/paypalr-' . $logfile_suffix . '-' . date('Ymd') . '.log';
     }
 
     public function enableDebug()
