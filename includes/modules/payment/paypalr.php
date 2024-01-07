@@ -252,11 +252,14 @@ class paypalr extends base
             // Note: For this type of payment to be enabled on the storefront:
             // 1) The payment-method needs to be enabled via configuration.
             // 2) The site must _either_ be running on the 'sandbox' server or using SSL-encryption.
+            // 3) If credit-card payments should be offered *only* to account-holders, the current
+            //    checkout must not be a guest-checkout.
             //
             // If enabled via configuration, further check to see that at least one of the card types
             // supported by PayPal is also supported by the site.
             //
-            $this->cardsAccepted = (MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS === 'true' && (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox' || strpos(HTTP_SERVER, 'https://') === 0));
+            $cards_accepted = (MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS === 'true' || (MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS === 'Account-Holders Only' && !zen_in_guest_checkout()));
+            $this->cardsAccepted = ($cards_accepted === true && (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox' || strpos(HTTP_SERVER, 'https://') === 0));
             if ($this->cardsAccepted === true) {
                 $this->cardsAccepted = $this->checkCardsAcceptedForSite();
             }
@@ -353,6 +356,7 @@ class paypalr extends base
 
     protected function tableCheckup()
     {
+        //-FIXME: This processing will be removed prior to the v1.0.0 release!
         global $db;
 
         $db->Execute(
@@ -377,6 +381,14 @@ class paypalr extends base
                 SET configuration_description = 'Do you want to enable this payment module?  Choose <em>False</em> (the default) to fully disable the module, <em>True</em> to fully enable the module or <em>Admin Only</em> to enable for admin use <b>only</b>.',
                     set_function = 'zen_cfg_select_option([\'True\', \'False\', \'Admin Only\'], '
               WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_STATUS'
+              LIMIT 1"
+        );
+
+        $db->Execute(
+            "UPDATE " . TABLE_CONFIGURATION . "
+                SET configuration_description = 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><br>If your store uses One-Page Checkout, you can limit credit-card payments to account-holders.<br><b>Default: false</b>',
+                    set_function = 'zen_cfg_select_option([\'true\', \'false\', \'Account-Holders Only\'], '
+              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS'
               LIMIT 1"
         );
 
@@ -1951,7 +1963,7 @@ class paypalr extends base
 
                 ('Fall-back Currency', 'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK', 'USD', 'If the <b>Transaction Currency</b> is set to <em>Selected Currency</em>, what currency should be used as a fall-back when the customer\'s selected currency is not supported by PayPal?<br><b>Default: USD</b>', 6, 0, 'zen_cfg_select_option([\'USD\', \'GBP\'], ', NULL, now()),
 
-                ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now()),
+                ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><br>If your store uses One-Page Checkout, you can limit credit-card payments to account-holders.<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\', \'Account-Holders Only\'], ', NULL, now()),
 
                 ('List <var>handling-fee</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_HANDLING_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_loworderfee</code> &mdash; that add a <em>handling-fee</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
