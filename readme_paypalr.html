@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PayPal Restful Payment Module for Zen Cart 1.5.8a and Later</title>
+<style>
+a, a:active,
+a:visited {
+    color: #006666;
+}
+a:hover {
+    color:#00CC99;
+}
+body,
+p,
+h1,
+h2,
+h3,
+h4,
+li,
+td {
+    font-family: Verdana, AvantGarde, Tahoma, Arial, sans-serif;
+    font-size: 10pt;
+    color: black;
+    padding: 0px;
+    margin: 20px;
+}
+pre {
+    margin: 20px;
+}
+h1, 
+h2, 
+h3, 
+h4 { 
+    font-weight: bold
+}
+h1 { 
+    font-size: 20px;
+}
+h2 { 
+    font-size: 16px;
+    border-top: 1px solid black;
+    padding-top: 5px;
+}
+ol li,
+ul li { 
+    margin: 5px 0;
+}
+.corefile,
+.impt {
+    color: red;
+}
+.added {
+    color: blue;
+}
+img {
+    margin-left: 20px;
+    max-width: 95%;
+}
+.removed {
+    text-decoration: line-through;
+}
+.smaller {
+    font-size: smaller;
+}
+table {
+    margin-left: 20px;
+}
+table, table th, table td {
+    padding: 0.5rem;
+    border-collapse: collapse;
+    border: 1px solid black;
+}
+th, td {
+    text-align: left;
+}
+table table {
+    margin-top: 0.5rem;
+}
+.event-group {
+    text-transform: uppercase;
+    border-top: 1px solid black;
+    padding-top: 0.5rem;
+}
+.text-center {
+    text-align: center;
+}
+</style>
+</head>
+
+<body>
+    <h1>PayPal RESTful Payment Module (<var>paypalr</var>) for Zen Cart 1.5.8a and later</h1>
+    <h3>Version 1.0.0-beta4</h3>
+    <p>Current Support Thread at Zen Cart Forums: <a href="https://www.zen-cart.com/showthread.php?TBD" target="_blank">https://www.zen-cart.com/showthread.php?TBD</a></p>
+    <p>Zen Cart Download Link: <a href="https://www.zen-cart.com/downloads.php?do=file&id=TBD" target="_blank">https://www.zen-cart.com/downloads.php?do=file&id=TBD</a></p>
+    <p>GitHub repository: <a href="https://github.com/lat9/paypal4" target="_blank">https://github.com/lat9/paypalr</a></p>
+
+    <h2>Purpose</h2>
+    <p>This Zen Cart payment module combines the processing for the <b>PayPal Payments Pro</b> (<var>paypaldp</var>) and <b>PayPal Express Checkout</b> (<var>paypalwpp</var>) payment modules that are currently built into the Zen Cart distribution.  Instead of using the older NVP (<b>N</b>ame <b>V</b>alue <b>P</b>air) methods to communicate with PayPal, this payment module uses PayPal's now-current <a href="https://developer.paypal.com/api/rest/" target="_blank">REST APIs</a> and combines the two legacy methods into one.</p>
+    <p>The module's operation has been validated &hellip;</p>
+    <ol>
+        <li>With PHP versions 7.4 through 8.3; <b>PHP 7.3 will result in fatal PHP errors!</b></li>
+        <li>In Zen Cart's 3-page checkout environment (v1.5.8<b>a</b> and v2.0.0)</li>
+        <li>With <a href="https://www.zen-cart.com/downloads.php?do=file&id=2095" target="_blank">One-Page Checkout</a> (OPC)<ol type="a">
+            <li>Using <em>OPC</em>'s guest-checkout feature.</li>
+            <li>Both requiring confirmation and not!</li>
+        </ol></li>
+        <li>With both the built-in <var>responsive_classic</var> and <a href="https://www.zen-cart.com/downloads.php?do=file&id=2191" target="_blank"><var>ZCA Bootstrap</var></a> templates.</li>
+    </ol>
+    <p>For additional information, refer to the payment-module's <a href="https://github.com/lat9/paypalr/wiki" target="_blank">wiki articles</a>.</p>
+
+    <h2>Installation and Upgrade</h2>
+    <h3>Initial Installation</h3>
+    <h4>Before you start &hellip;</h4>
+    <ol>
+        <li>Follow the instructions in the payment module's wiki to <a href="https://github.com/lat9/paypalr/wiki/Creating-PayPal-Credentials" target="_blank">create the PayPal credentials</a> required to communicate with PayPal.</li>
+        <li><b>If your site is using a Zen Cart version <em>prior to</em> 2.0.0</b>, replace your site's copy of <var>/includes/classes/order_total.php</var> with the <a href="https://raw.githubusercontent.com/zencart/zencart/master/includes/classes/order_total.php" target="_blank">contents</a> of the current version of that file from Zen Cart's GitHub repository. Without this update, the payment module will <a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module#missing-required-notifications" target="_blank">automatically disable</a> itself.</li>
+    </ol>
+    <h4>Once you've completed those start-up steps &hellip;</h4>
+    <ol>
+        <li>Unzip this distribution's zip-file; you'll see the following files and directories:<ol>
+            <li>/ppr_webhook_main.php</li>
+            <li>/includes/classes/observers/auto.paypalrestful.php</li>
+            <li>/includes/languages/english/modules/payment/lang.paypalr.php</li>
+            <li>/includes/modules/payment/paypalr.php</li>
+            <li>/includes/modules/payment/paypal/pprAutoload.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.checkout.js</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.disable.js</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/paypalr.admin.css</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/paypalr.css</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Admin/AdminMain.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Admin/DoAuthorization.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Admin/DoCapture.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Admin/DoRefund.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Admin/DoVoid.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Admin/GetPayPalOrderTransactions.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Admin/Formatters/MainDisplay.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Admin/Formatters/Messages.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Api/PayPalRestfulApi.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Api/Data/CountryCodes.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Common/ErrorInfo.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Common/Logger.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/images/american_express.png</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/images/discover.png</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/images/jcb.png</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/images/maestro.png</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/images/mastercard.png</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/images/solo.png</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/images/visa.png</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Token/TokenCache.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/Address.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/Amount.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/ConfirmPaymentChoiceRequest.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/Name.php</li>
+        </ol></li>
+         <li>Copy the plugin's files to your site's file-system.</li>
+        <li>Log into your Zen Cart admin and navigate to <b><i>Modules :: Payment</i></b>.</li>
+        <li>You'll see a <em>PayPal Checkout (RESTful)</em> entry in the list of available payment modules.  Select that module, install it and follow the <a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module" target="_blank">configuration instructions</a> in the payment module's wiki.</li>
+    </ol>
+    <h3>Upgrading</h3>
+    <p>Simply copy the updated files to your site's file-system and navigate to your admin's <b><i>Modules :: Payment</i></b>.  The payment-module will automatically update.</p>
+
+    <h2>Version History</h2>
+    <p>This section identifies version-specific changes to the payment module.</p>
+    <ul>
+        <li>v1.0.0, 2024-xx-yy (lat9)<ul>
+            <li>Initial release.</li>
+        </ul></li>
+    </ul>
+</body>
+</html>
