@@ -33,7 +33,21 @@ class Helpers
 
     public static function convertPayPalDatePay2Db(string $paypal_date): string
     {
-        return convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $paypal_date)));
+        if (!function_exists('convertToLocalTimeZone')) {
+            return self::convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $paypal_date)));
+        } else {
+            return convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $paypal_date)));
+        }
+    }
+
+    // -----
+    // Required for zc158a; function was not defined until zc200!
+    //
+    protected static function convertToLocalTimeZone(string $dateTime, string $fromTz = 'UTC', string $outputFormat = 'Y-m-d H:i:s'): string
+    {
+        $localDateTime = new \DateTime($dateTime, new \DateTimeZone($fromTz));
+        $localDateTime->setTimezone((new \DateTime)->getTimezone());
+        return $localDateTime->format($outputFormat);
     }
 
     public static function getDaysTo(string $future_date): string
