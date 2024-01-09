@@ -420,7 +420,7 @@ class MainDisplay
         // - If that authorization has not been voided
         // - Up to and including the 29th day after the original AUTHORIZE transaction was placed.
         //
-        if ($days_to_settle <= 29) {
+        if ($days_to_settle <= 30) {
             $authorization = $this->paypalDbTxns[$auth_index];
             if ($authorization['parent_txn_id'] === $main_txn_id) {
                 if ($authorization['payment_status'] !== 'VOIDED') {
