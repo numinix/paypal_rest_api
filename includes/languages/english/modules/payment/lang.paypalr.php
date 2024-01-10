@@ -75,6 +75,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE' => 'An error was returned by PayPal when attempting to initiate an order. As a courtesy, only the error \'code\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
     'MODULE_PAYMENT_PAYPALR_ALERT_TOTAL_MISMATCH' => 'A discrepancy was found between an order\'s overall value and its breakdown.  The order is being submitted to PayPal without items and cost breakdown included:',
     'MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR' => 'An unprocessable return was received from PayPal when attempting to confirm a customer\'s payment choice from their PayPal Wallet.',
+    'MODULE_PAYMENT_PAYPALR_ALERT_EXTERNAL_TXNS' => 'Check the status of order #%u.  PayPal transactions were added outside of the payment-module\'s processing.',
 
     // -----
     // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.
@@ -137,6 +138,7 @@ $define = [
     //
     'MODULE_PAYMENT_PAYPALR_TEXT_GETDETAILS_ERROR' => 'There was a problem retrieving PayPal transaction details.',
     'MODULE_PAYMENT_PAYPALR_NO_RECORDS' => 'No \'%1$s\' records were found in the database for order #%2$u.',
+    'MODULE_PAYMENT_PAYPALR_EXTERNAL_ADDITION' => 'PayPal transactions were added outside of the payment-module\'s processing. Verify that the order\'s status is correct!',
 
     // -----
     // Used during the admin's display of the payment transactions on an

@@ -2,10 +2,12 @@
 /**
  * paypalr.php payment module class for PayPal RESTful API payment method
  *
- * @copyright Copyright 2023 Zen Cart Development Team
+ * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 Nov 21 Modified in v1.5.8a $
+ *
+ * Last updated: v1.0.0
  */
 /**
  * Load the support class' auto-loader.
@@ -1856,7 +1858,13 @@ class paypalr extends base
       */
     public function admin_notification($zf_order_id)
     {
-        $admin_main = new AdminMain($this->code, self::CURRENT_VERSION, (int)$zf_order_id, $this->ppr);
+        $zf_order_id = (int)$zf_order_id;
+        $admin_main = new AdminMain($this->code, self::CURRENT_VERSION, $zf_order_id, $this->ppr);
+
+        if ($admin_main->externalTxnAdded() === true) {
+            zen_update_orders_history($zf_order_id, MODULE_PAYMENT_PAYPALR_EXTERNAL_ADDITION);
+            $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN, sprintf(MODULE_PAYMENT_PAYPALR_ALERT_EXTERNAL_TXNS, $zf_order_id));
+        }
 
         return $admin_main->get();
     }

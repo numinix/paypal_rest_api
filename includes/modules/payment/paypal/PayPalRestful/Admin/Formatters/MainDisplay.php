@@ -3,9 +3,11 @@
  * A class that provides the main PayPal request history table for a given order
  * in the Zen Cart admin placed with the PayPal Restful payment module.
  *
- * @copyright Copyright 2023 Zen Cart Development Team
+ * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
+ *
+ * Last updated: v1.0.0
  */
 namespace PayPalRestful\Admin\Formatters;
 
@@ -463,7 +465,8 @@ class MainDisplay
         $maximum_auth_value = $this->amount->getValueFromFloat(floor($original_auth_value * 1.15 * $multiplier) / $multiplier);
         $amount_authorized = $this->amount->getValueFromString($amount_authorized);
 
-        $amount_input_params = 'type="number" min="0.01" max="' . $maximum_auth_value . '" step="0.01"';
+        $min_and_step = ($this->amount->getCurrencyDecimals() === 0) ? '1' : '.01';
+        $amount_input_params = 'type="number" min="' . $min_and_step . '" max="' . $maximum_auth_value . '" step="' . $min_and_step . '"';
         $amount_help_text = sprintf(MODULE_PAYMENT_PAYPALR_AMOUNT_RANGE, $this->currencyCode, $maximum_auth_value);
 
         $days_since_last_auth = Helpers::getDaysFrom($last_authorization['date_added']);
@@ -525,7 +528,8 @@ class MainDisplay
         $amount_remaining = $amount_authorized - $previously_captured_value;
         $maximum_capt_value = $this->amount->getValueFromFloat((float)$amount_remaining);
 
-        $amount_input_params = 'type="number" min="0.01" max="' . $maximum_capt_value . '" step="0.01"';
+        $min_and_step = ($this->amount->getCurrencyDecimals() === 0) ? '1' : '.01';
+        $amount_input_params = 'type="number" min="' . $min_and_step . '" max="' . $maximum_capt_value . '" step="' . $min_and_step . '"';
         $amount_help_text = sprintf(MODULE_PAYMENT_PAYPALR_AMOUNT_RANGE, $this->currencyCode, $maximum_capt_value);
 
         $modal_body =
@@ -569,7 +573,7 @@ class MainDisplay
                 $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_VOID_AUTH_ID, $auth_db_txn['txn_id']) .
                 $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_AMOUNT, $this->amount->getValueFromString($auth_db_txn['mc_gross']) . ' ' . $this->currencyCode) .
                 '<p>' . MODULE_PAYMENT_PAYPALR_VOID_INSTRUCTIONS . '</p>' .
-                $this->createModalInput(4, MODULE_PAYMENT_PAYPALR_VOID_AUTH_ID, '', "void-id-$auth_index", 'ppr-void-id', 'type="text" required') .
+                $this->createModalInput(4, MODULE_PAYMENT_PAYPALR_VOID_AUTH_ID, '', "void-id-$auth_index", 'ppr-void-id', 'type="text" pattern="[A-Za-z0-9]{17}" required') .
                 $this->createModalTextArea(4, MODULE_PAYMENT_PAYPALR_CUSTOMER_NOTE, MODULE_PAYMENT_PAYPALR_VOID_DEFAULT_MESSAGE, "void-note-$auth_index", 'ppr-void-note') .
                 $this->createModalButtons("ppr-void-submit-$auth_index", MODULE_PAYMENT_PAYPALR_ACTION_VOID, MODULE_PAYMENT_PAYPALR_CONFIRM) .
             '</form>';
@@ -616,7 +620,8 @@ class MainDisplay
 
         $maximum_refund_value = $this->amount->getValueFromFloat((float)($original_capture_value - $previously_refunded_value));
 
-        $amount_input_params = 'type="number" min="0.01" max="' . $maximum_refund_value . '" step="0.01"';
+        $min_and_step = ($this->amount->getCurrencyDecimals() === 0) ? '1' : '.01';
+        $amount_input_params = 'type="number" min="' . $min_and_step . '" max="' . $maximum_refund_value . '" step="' . $min_and_step . '"';
         $amount_help_text = sprintf(MODULE_PAYMENT_PAYPALR_AMOUNT_RANGE, $this->currencyCode, $maximum_refund_value);
 
         $modal_body =

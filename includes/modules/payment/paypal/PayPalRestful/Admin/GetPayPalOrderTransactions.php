@@ -3,7 +3,7 @@
  * A class that returns an array of 'current' transactions for a specified order for
  * Cart processing for the PayPal Restful payment module's admin_notifications processing.
  *
- * @copyright Copyright 2023 Zen Cart Development Team
+ * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
@@ -36,6 +36,8 @@ class GetPayPalOrderTransactions
 
     protected array $paypalTransactions = [];
 
+    protected bool $externalTxnAdded = false;
+
     public function __construct(string $module_name, string $module_version, int $oID, PayPalRestfulApi $ppr)
     {
         $this->moduleName = $module_name;
@@ -47,6 +49,11 @@ class GetPayPalOrderTransactions
         $this->messages = new Messages();
 
         $this->getPayPalDatabaseTransactionsForOrder();
+    }
+
+    public function externalTxnAdded(): bool
+    {
+        return $this->externalTxnAdded;
     }
 
     public function getDatabaseTxns(string $txn_type = ''): array
@@ -73,6 +80,10 @@ class GetPayPalOrderTransactions
     public function syncPaypalTxns()
     {
         $this->getPayPalUpdates($this->oID);
+
+        if ($this->externalTxnAdded === true) {
+            $this->messages->add(MODULE_PAYMENT_PAYPALR_EXTERNAL_ADDITION, 'warning');
+        }
 
         if ($this->messages->size !== 0) {
             $this->getPayPalDatabaseTransactionsForOrder();
@@ -197,11 +208,14 @@ class GetPayPalOrderTransactions
     {
         foreach ($authorizations as $next_authorization) {
             $authorization_txn_id = $next_authorization['id'];
+            $first_auth_txn_id = $first_auth_txn_id ?? $authorization_txn_id;
             if ($this->transactionExists($authorization_txn_id) === true) {
                 continue;
             }
-            $this->addDbTransaction('AUTHORIZE', $next_authorization, 'Authorization added during PayPal Management Console action.', true);
-            $this->updateMainTransaction($next_refund);
+
+            $this->externalTxnAdded = true;
+            $this->addDbTransaction('AUTHORIZE', $next_authorization, 'Externally added.', true, $first_auth_txn_id);
+            $this->updateMainTransaction($next_authorization);
         }
     }
 
@@ -212,10 +226,13 @@ class GetPayPalOrderTransactions
             if ($this->transactionExists($capture_txn_id) === true) {
                 continue;
             }
-            $parent_txn_id = $this->addDbTransaction('CAPTURE', $next_capture, 'Capture added during PayPal Management Console action.', true);
+
+            $this->externalTxnAdded = true;
+            $parent_txn_id = $authorizations[0]['id'];
+            $this->addDbTransaction('CAPTURE', $next_capture, 'Externally added.', true, $parent_txn_id);
             $parent_txn_response = $this->getParentTxnStatus($parent_txn_id, $authorizations);
             if (!empty($parent_txn_response)) {
-                $this->updateParentTxnDateAndStatus($parent_txn_id, $parent_txn_response);
+                $this->updateParentTxnDateAndStatus($parent_txn_response);
             }
             $this->updateMainTransaction($next_capture);
         }
@@ -228,10 +245,17 @@ class GetPayPalOrderTransactions
             if ($this->transactionExists($refund_txn_id) === true) {
                 continue;
             }
-            $parent_txn_id = $this->addDbTransaction('REFUND', $next_refund, 'Refund added during PayPal Management Console action.', true);
+
+            $this->externalTxnAdded = true;
+
+            // -----
+            // Need to get the refund's status to see what its parent capture's id is (from its links).
+            //
+            $refund_status = $this->ppr->getRefundStatus($refund_txn_id);
+            $parent_txn_id = $this->addDbTransaction('REFUND', $refund_status, 'Externally added', true);
             $parent_txn_response = $this->getParentTxnStatus($parent_txn_id, $captures);
             if (!empty($parent_txn_response)) {
-                $this->updateParentTxnDateAndStatus($parent_txn_id, $parent_txn_response);
+                $this->updateParentTxnDateAndStatus($parent_txn_response);
             }
             $this->updateMainTransaction($next_refund);
         }
@@ -259,7 +283,7 @@ class GetPayPalOrderTransactions
         return [];
     }
 
-    public function addDbTransaction(string $txn_type, array $paypal_response, string $memo_comment, bool $keep_links_in_log = false): string
+    public function addDbTransaction(string $txn_type, array $paypal_response, string $memo_comment = '', bool $keep_links_in_log = false, string $parent_txn_id = ''): string
     {
         $this->log->write("addDbTransaction($txn_type, ..., $memo_comment):\n" . Logger::logJSON($paypal_response, $keep_links_in_log));
 
@@ -280,7 +304,7 @@ class GetPayPalOrderTransactions
             $expiration_time = Helpers::convertPayPalDatePay2Db($expiration_time);
         }
 
-        $parent_txn_id = $this->getParentTxnFromResponse($paypal_response['links']);
+        $parent_txn_id = ($parent_txn_id === '') ? $this->getParentTxnFromResponse($paypal_response['links']) : $parent_txn_id;
         $sql_data_array = [
             'order_id' => $this->oID,
             'txn_type' => $txn_type,
