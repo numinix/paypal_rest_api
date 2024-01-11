@@ -1808,6 +1808,15 @@ class paypalr extends base
         ];
         $sql_data_array = array_merge($sql_data_array, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);
+
+        // -----
+        // If funds have been captured, fire a notification so that sites that
+        // manage payments are aware of the incoming funds.
+        //
+        if ($this->orderInfo['txn_type'] === 'CAPTURE') {
+            global $zco_notifier;
+            $zco_notifier->notify('NOTIFY_PAYPALR_FUNDS_CAPTURED', $sql_data_array);
+        }
     }
 
     /**

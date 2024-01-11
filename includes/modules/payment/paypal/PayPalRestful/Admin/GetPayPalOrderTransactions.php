@@ -327,6 +327,15 @@ class GetPayPalOrderTransactions
         $sql_data_array = array_merge($sql_data_array, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);
 
+        // -----
+        // If funds have been captured or refunded, fire a notification so that sites that
+        // manage payments are aware of the incoming/outgoing funds.
+        //
+        if ($txn_type === 'CAPTURE' || $txn_type === 'REFUND') {
+            global $zco_notifier;
+            $zco_notifier->notify('NOTIFY_PAYPALR_ADMIN_FUNDS_IN_OUT', $sql_data_array);
+        ]
+
         return $parent_txn_id;
     }
 
