@@ -3,9 +3,11 @@
  * A class to 'convert' a Zen Cart order to a PayPal order-creation request payload
  * for the PayPalRestful (paypalr) Payment Module
  *
- * @copyright Copyright 2023 Zen Cart Development Team
+ * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
+ *
+ * Last updated: v1.0.0
  */
 namespace PayPalRestful\Zc2Pp;
 
