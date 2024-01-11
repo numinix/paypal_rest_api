@@ -2096,8 +2096,6 @@ class paypalr extends base
             'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT',
             'MODULE_PAYMENT_PAYPALR_DEBUGGING',
         ];
-
-        $this->notify('NOTIFY_PAYMENT_PAYPALR_UNINSTALLED');
     }
 
     /**
