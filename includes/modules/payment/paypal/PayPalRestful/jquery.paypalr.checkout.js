@@ -18,9 +18,9 @@ jQuery(document).ready(function() {
 
     if (jQuery('#pmt-paypalr').is(':not(:checked)') || jQuery('#ppr-card').is(':not(:checked)')) {
         hidePprCcFields();
-        if (jQuery('#pmt-paypalr').is(':not(:checked)') && jQuery('#pmt-paypalr').is(':not(:hidden)')) {
+        if (jQuery('#pmt-paypalr').is(':not(:checked)') && jQuery('#pmt-paypalr').is(':radio')) {
             jQuery('#ppr-paypal, #ppr-card').prop('checked', false);
-        } else if (jQuery('#pmt-paypalr').is(':hidden')) {
+        } else if (jQuery('#pmt-paypalr').is(':not(:radio)')) {
             jQuery('#ppr-paypal').prop('checked', true);
         }
     }
@@ -39,7 +39,7 @@ jQuery(document).ready(function() {
     });
 
     jQuery('#ppr-paypal, #ppr-card').on('change', function() {
-        if (jQuery('#pmt-paypalr').is(':not(:checked)') && jQuery('#pmt-paypalr').is(':not(:hidden)')) {
+        if (jQuery('#pmt-paypalr').is(':not(:checked)') && jQuery('#pmt-paypalr').is(':radio')) {
             jQuery('input[name=payment]').prop('checked', false);
             jQuery('input[name=payment][value=paypalr]').prop('checked', true).trigger('change');
         }
