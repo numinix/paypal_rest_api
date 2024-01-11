@@ -334,7 +334,7 @@ class GetPayPalOrderTransactions
         if ($txn_type === 'CAPTURE' || $txn_type === 'REFUND') {
             global $zco_notifier;
             $zco_notifier->notify('NOTIFY_PAYPALR_ADMIN_FUNDS_IN_OUT', $sql_data_array);
-        ]
+        }
 
         return $parent_txn_id;
     }
