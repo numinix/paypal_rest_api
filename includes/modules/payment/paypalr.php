@@ -356,63 +356,32 @@ class paypalr extends base
         return '<b class="text-danger">' . $msg . '</b>';
     }
 
+    // -----
+    // This method, called during admin processing, gives the payment module the opportunity
+    // to make version-to-version configuration fix-ups.
+    //
     protected function tableCheckup()
     {
+        // -----
+        // If the payment module is installed and at the current version, nothing to be done.
+        //
+        $current_version = self::CURRENT_VERSION;
+        if (defined('MODULE_PAYMENT_PAYPALR_VERSION') && MODULE_PAYMENT_PAYPALR_VERSION === $current_version) {
+            return;
+        }
+
         global $db;
 
-        //-FIXME: This processing will be removed prior to the v1.0.0 release!
-        $current_version = self::CURRENT_VERSION;
-        $db->Execute(
-            "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
-                (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
-             VALUES
-                ('Module Version', 'MODULE_PAYMENT_PAYPALR_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
-
-                ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now()),
-
-                ('Set Voided Order Status', 'MODULE_PAYMENT_PAYPALR_VOIDED_STATUS_ID', '1', 'Set the status of <em>voided</em> orders to this status.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
-
-                ('Set Held Order Status', 'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID', '1', 'Set the status of orders that are held for review to this value.<br>Recommended: <b>Pending[1]</b><br>', 6, 0, 'zen_cfg_pull_down_order_statuses(', 'zen_get_order_status_name', now()),
-
-                ('List <var>handling-fee</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_HANDLING_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_loworderfee</code> &mdash; that add an <em>handling-fee</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
-
-                ('List <var>insurance</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules that add an <em>insurance</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
-
-                ('List <var>discount</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_coupon</code>, <code>ot_gv</code> and <code>ot_group_pricing</code> &mdash; that add a <em>discount</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now())"
-        );
-
+        // -----
+        // Record the current version of the payment module into its database configuration setting.
+        //
         $db->Execute(
             "UPDATE " . TABLE_CONFIGURATION . "
-                SET configuration_description = 'Do you want to enable this payment module? Use the <b>Retired</b> setting if you are planning to remove this payment module but still have administrative actions to perform against orders placed with this module.',
-                    set_function = 'zen_cfg_select_option([\'True\', \'False\', \'Retired\'], '
-              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_STATUS'
+                SET configuration_value = '$current_version',
+                    last_modified = now()
+              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_VERSION'
               LIMIT 1"
         );
-
-        $db->Execute(
-            "UPDATE " . TABLE_CONFIGURATION . "
-                SET configuration_description = 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><br>If your store uses One-Page Checkout, you can limit credit-card payments to account-holders.<br><b>Default: false</b>',
-                    set_function = 'zen_cfg_select_option([\'true\', \'false\', \'Account-Holders Only\'], '
-              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS'
-              LIMIT 1"
-        );
-
-        $db->Execute(
-            "DELETE FROM " . TABLE_CONFIGURATION . "
-              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_PAGE_STYLE'"
-        );
-        //-END_FIXME
-
-        if (defined('MODULE_PAYMENT_PAYPALR_VERSION') && MODULE_PAYMENT_PAYPALR_VERSION !== self::CURRENT_VERSION) {
-            $current_version = self::CURRENT_VERSION;
-            $db->Execute(
-                "UPDATE " . TABLE_CONFIGURATION . "
-                    SET configuration_value = '$current_version',
-                        last_modified = now()
-                  WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_VERSION'
-                  LIMIT 1"
-            );
-        }
     }
 
     protected function checkCardsAcceptedForSite(): bool
