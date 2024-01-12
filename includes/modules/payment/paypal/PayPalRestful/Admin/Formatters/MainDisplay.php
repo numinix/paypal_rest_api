@@ -628,7 +628,7 @@ class MainDisplay
             zen_draw_form("refund-form-$capture_index", FILENAME_ORDERS, zen_get_all_get_params(['action']) . '&action=doRefund', 'post', 'class="form-horizontal"') .
                 zen_draw_hidden_field('doRefundOid', $capture_db_txn['order_id']) .
                 zen_draw_hidden_field('capture_txn_id', $capture_db_txn['txn_id']) .
-                $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_VOID_AUTH_ID, $capture_db_txn['txn_id']) .
+                $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_REFUND_CAPTURE_ID, $capture_db_txn['txn_id']) .
                 $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_AMOUNT, $this->amount->getValueFromString($capture_db_txn['mc_gross']) . ' ' . $this->currencyCode) .
                 $this->createStaticFormGroup(4, MODULE_PAYMENT_PAYPALR_REMAINING_TO_REFUND, $maximum_refund_value . ' ' . $this->currencyCode) .
                 '<p>' . MODULE_PAYMENT_PAYPALR_REFUND_INSTRUCTIONS . '</p>' .

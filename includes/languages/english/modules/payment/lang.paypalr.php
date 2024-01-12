@@ -218,6 +218,7 @@ $define = [
         'MODULE_PAYMENT_PAYPALR_REFUND_NOTE1' => 'A <em>full</em> refund refunds the remaining unrefunded balance of the captured payment.',
         'MODULE_PAYMENT_PAYPALR_REFUND_NOTE2' => 'A <em>partial</em> refund refunds a portion of the captured payment.',
         'MODULE_PAYMENT_PAYPALR_REFUND_NOTE3' => 'You can issue multiple <em>partial</em> refunds, up to the remaining unrefunded balance.',
+    'MODULE_PAYMENT_PAYPALR_REFUND_CAPTURE_ID' => 'Capture Txn Id:',
     'MODULE_PAYMENT_PAYPALR_REMAINING_TO_REFUND' => 'Remaining to Refund:',
     'MODULE_PAYMENT_PAYPALR_REFUND_AMOUNT' => 'Amount to Refund:',
     'MODULE_PAYMENT_PAYPALR_REFUND_FULL' => 'Full Refund?',
