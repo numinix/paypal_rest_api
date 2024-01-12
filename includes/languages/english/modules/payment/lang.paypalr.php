@@ -287,19 +287,15 @@ $define = [
 ];
 
 if (IS_ADMIN_FLAG === true) {
-    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION'] = 'Instructions go here. v%s';
-/*
-        '<strong>PayPal Checkout</strong>%s<br>' .
-        '<a href="https://www.paypal.com" rel="noopener" target="_blank">Manage your PayPal account.</a><br><br>' .
-        '<span class="text-success">Configuration Instructions:</span><br><span class="alert">1. </span><a href="https://www.zen-cart.com/partners/paypal-ec" rel="noopener" target="_blank">Sign up for your PayPal account - click here.</a><br>' .
-        (defined('MODULE_PAYMENT_PAYPALR_STATUS') ?
-            '' :
-            '... and click &quot;install&quot; above to enable PayPal Checkout support.<br>' .
-            '<a href="https://www.zen-cart.com/getpaypal" rel="noopener" target="_blank">For additional detailed help, see this FAQ article</a><br>') .
-        ((!isset(define['MODULE_PAYMENT_PAYPALR_APISIGNATURE']) || $define['MODULE_PAYMENT_PAYPALR_APISIGNATURE'] === '') ? '<br><span class="alert">2. </span><strong>API credentials</strong> from the API Credentials option in your PayPal Profile Settings area. (Click <a href="https://www.paypal.com/us/cgi-bin/webscr?cmd=_get-api-signature&generic-flow=true" rel="noopener" target="_blank">here for API credentials</a>.) <br>This module uses the <strong>API Signature</strong> option -- you will need the username, password and signature to enter in the fields below.' : (substr($define['MODULE_PAYMENT_PAYPALR_MODULE_MODE'], 0, 7) == 'Payflow' && (!isset($define['MODULE_PAYMENT_PAYPALR_PFUSER']) || $define['MODULE_PAYMENT_PAYPALR_PFUSER'] == '') ? '<span class="alert">2. </span><strong>PAYFLOW credentials</strong> This module needs your <strong>PAYFLOW Partner+Vendor+User+Password settings</strong> entered in the 4 fields below. These will be used to communicate with the Payflow system and authorize transactions to your account.' : '<span class="alert">2. </span>Ensure you have entered the appropriate security data for username/pwd etc, below.')) .
-        ($define['MODULE_PAYMENT_PAYPALR_MODULE_MODE'] == 'PayPal' ? '<br><br><span class="alert">3. </span>In your PayPal account, enable <strong>Instant Payment Notification</strong>:<br>under "Profile", select <em>Instant Payment Notification Preferences</em><ul style="margin-top: 0.5em;"><li>click the checkbox to enable IPN</li><li>if there is not already a URL specified, set the URL to:<br><nobr><pre>' . str_replace('index.php?main_page=index', 'ipn_main_handler.php', zen_catalog_href_link(FILENAME_DEFAULT)) . '</pre></nobr></li></ul>' : '') .
-        '<font color="green"><hr><strong>Requirements:</strong></font><br><hr>*<strong>CURL</strong> is used for outbound communication with the gateway over ports 80 and 443, so must be active on your hosting server and able to use SSL.<br><hr>';
-*/
+    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION'] =
+        '<b>PayPal Checkout (RESTful)</b>, v%s<br><br>' .   //- %s is filled in with the current module version
+        '<a href="https://www.paypal.com" rel="noopener noreferrer" target="_blank">Manage your PayPal <b>business</b> account</a><br><br>' .
+        '<b>Configuration instructions:</b><br>' .
+        '<ol>
+            <li><a href="https://github.com/lat9/paypalr/wiki/Creating-PayPal-Credentials" rel="noopener noreferrer" target="_blank">Create your PayPal credentials.</a></li>
+            <li><a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module" rel="noopener noreferrer" target="_blank">Configure the module\'s additional settings.</a></li>
+         </ol>' .
+        '<p>Refer to the payment module\'s GitHub Wiki <a href="https://github.com/lat9/paypalr/wiki" rel="noopener noreferrer" target="_blank">articles</a> for additional information.</p>';
 }
 
 return $define;
