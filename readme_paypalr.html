@@ -114,8 +114,8 @@ table table {
     <h3>Initial Installation</h3>
     <h4>Before you start &hellip;</h4>
     <ol>
-        <li>Follow the instructions in the payment module's wiki to <a href="https://github.com/lat9/paypalr/wiki/Creating-PayPal-Credentials" target="_blank">create the PayPal credentials</a> required to communicate with PayPal.</li>
-        <li><b>If your site is using a Zen Cart version <em>prior to</em> 2.0.0</b>, replace your site's copy of <var>/includes/classes/order_total.php</var> with the <a href="https://raw.githubusercontent.com/zencart/zencart/master/includes/classes/order_total.php" target="_blank">contents</a> of the current version of that file from Zen Cart's GitHub repository. Without this update, the payment module will <a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module#missing-required-notifications" target="_blank">automatically disable</a> itself.</li>
+        <li>Follow the instructions in the payment module's Wiki to <a href="https://github.com/lat9/paypalr/wiki/Creating-PayPal-Credentials" target="_blank">create the PayPal credentials</a> required to communicate with PayPal.</li>
+        <li><b>If your site is using a Zen Cart version <em>prior to</em> 2.0.0</b>, add the payment module's <b>required</b> notifications to the <var>order_total</var> class, as described in <a href="https://github.com/lat9/paypalr/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank">this</a> Wiki article. Without this update, the payment module will <a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module#missing-required-notifications" target="_blank">automatically disable</a> itself.</li>
     </ol>
     <h4>Once you've completed those start-up steps &hellip;</h4>
     <ol>
@@ -158,7 +158,7 @@ table table {
         </ol></li>
          <li>Copy the plugin's files to your site's file-system.</li>
         <li>Log into your Zen Cart admin and navigate to <b><i>Modules :: Payment</i></b>.</li>
-        <li>You'll see a <em>PayPal Checkout (RESTful)</em> entry in the list of available payment modules.  Select that module, install it and follow the <a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module" target="_blank">configuration instructions</a> in the payment module's wiki.</li>
+        <li>You'll see a <em>PayPal Checkout (RESTful)</em> entry in the list of available payment modules.  Select that module, install it and follow the <a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module" target="_blank">configuration instructions</a> in the payment module's Wiki.</li>
     </ol>
     <h3>Upgrading</h3>
     <p>Simply copy the updated files to your site's file-system and navigate to your admin's <b><i>Modules :: Payment</i></b>.  The payment-module will automatically update.</p>
