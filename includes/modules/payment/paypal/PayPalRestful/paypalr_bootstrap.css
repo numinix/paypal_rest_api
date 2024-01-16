@@ -1,11 +1,8 @@
-#ppr-subtitle {
-    font-size: 85%;
-}
 .ppr-choice-label {
     font-weight: bold;
 }
 .ppr-button-choice {
-    height: 3.5rem;
+    height: 4rem;
     position: relative;
     display: flex;
     flex-wrap: wrap;
@@ -25,7 +22,7 @@
     z-index: 100;
 }
 .ppr-button-choice input[type="radio"]+label {
-    padding-bottom: .5rem;
+    padding: .5rem 0 .5rem;
     border: 2px solid #d3d3d3;
 }
 .ppr-button-choice input[type="radio"]:checked+label {
@@ -33,7 +30,7 @@
 }
 .ppr-button-choice label {
     cursor: pointer;
-    height: 2.5rem;
+    height: 4rem;
     font-weight: bold;
     width: 11rem;
     display: inline-block;

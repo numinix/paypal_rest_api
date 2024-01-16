@@ -651,7 +651,7 @@ class paypalr extends base
         //
         $chosen_button_color = 'MODULE_PAYMENT_PAYPALR_BUTTON_IMG_' . MODULE_PAYMENT_PAYPALR_BUTTON_COLOR;
         $paypal_button = (defined($chosen_button_color)) ? constant($chosen_button_color) : MODULE_PAYMENT_PAYPALR_BUTTON_IMG_YELLOW;
-        
+
         // -----
         // Create the default (PayPal only) selection.  This might be modified below to add a note
         // to the customer if either their shipping or billing address' country isn't supported by
@@ -733,10 +733,11 @@ class paypalr extends base
         //
         // Note: CSS 'inspired' by: https://codepen.io/phusum/pen/VQrQqy
         //
-        if (file_exists(DIR_FS_CATALOG . DIR_WS_TEMPLATE . 'css/paypalr.css')) {
-            $css_file_name = DIR_WS_TEMPLATE . 'css/paypalr.css';
+        $css_file = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true) ? 'paypalr_bootstrap.css' : 'paypalr.css';
+        if (file_exists(DIR_FS_CATALOG . DIR_WS_TEMPLATE . "css/$css_file")) {
+            $css_file_name = DIR_WS_TEMPLATE . "css/$css_file";
         } else {
-            $css_file_name = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css';
+            $css_file_name = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/' . $css_file;
         }
 
         // -----
@@ -751,7 +752,7 @@ class paypalr extends base
 
         $selection = [
             'id' => $this->code,
-            'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE,
+            'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE . ' <span id="ppr-subtitle" class="small">' . MODULE_PAYMENT_PAYPALR_SUBTITLE . '</span>',
             'fields' => [
                 [
                     'title' =>
@@ -764,17 +765,19 @@ class paypalr extends base
                                 '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
                             '</label>' .
                         '</div>',
+                    'tag' => 'ppr-paypal',
                 ],
                 [
                     'title' => '<span class="ppr-choice-label">' . MODULE_PAYMENT_PALPALR_CHOOSE_CARD . '</span>' ,
                     'field' =>
                         '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>' .
-                        '<div class="ppr-button-choice">' .
+                        '<div id="ppr-choice-card" class="ppr-button-choice">' .
                             zen_draw_radio_field('ppr_type', 'card', $card_selected, 'id="ppr-card" class="ppr-choice"') .
                             '<label for="ppr-card" class="ppr-choice-label">' .
                                 $this->buildCardsAccepted() .
                             '</label>' .
                         '</div>',
+                    'tag' => 'ppr-card',
                 ],
                 [
                     'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER,
