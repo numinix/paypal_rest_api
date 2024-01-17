@@ -230,7 +230,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             //
             $tax_rate = $next_product['tax'] / 100;
             $products_price = $this->getRateConvertedValue($next_product['final_price']);
-            $product_is_physical = ($next_product['products_virtual'] !== 1);
+            $product_is_physical = $this->isProductPhysical($next_product);
             $item = [
                 'name' => substr($name, 0, 127),
                 'quantity' => $quantity,
@@ -259,6 +259,39 @@ class CreatePayPalOrderRequest extends ErrorInfo
         }
 
         return ($item_errors === true) ? [] : $items;
+    }
+
+    // -----
+    // Determine if the specified product is a "physical" one, i.e. it's
+    //
+    // 1. Not marked as being virtual.
+    // 2. Not a "Gift Certificate".
+    // 3. Got no selected download attribute(s).
+    //
+    protected function isProductPhysical(array $product): bool
+    {
+        if ($product['products_virtual'] === 1 || strpos($product['model'], 'GIFT') === 0 || empty($product['attributes'])) {
+            return false;
+        }
+
+        $attributes_where = [];
+        foreach ($product['attributes'] as $next_att) {
+            $attributes_where[] = '(options_id = ' . $next_att['option_id'] . ' AND options_values_id = ' . $next_att['value_id'] . ')';
+        }
+
+        global $db;
+        $downloads = $db->Execute(
+            "SELECT products_attributes_id
+               FROM " . TABLE_PRODUCTS_ATTRIBUTES_DOWNLOAD . "
+              WHERE products_attributes_id IN (
+                    SELECT products_attributes_id
+                      FROM " . TABLE_PRODUCTS_ATTRIBUTES . "
+                     WHERE products_id = " . (int)$product['id'] . "
+                       AND (" . implode(' OR ', $attributes_where) . "
+                       )
+                    )"
+        );
+        return $downloads->EOF;
     }
 
     // -----
