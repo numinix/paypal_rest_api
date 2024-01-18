@@ -1057,9 +1057,11 @@ class paypalr extends base
         // Send the request off to register the order at PayPal.
         //
         $this->ppr->setPayPalRequestId($order_guid);
-        $order_response = $this->ppr->createOrder($create_order_request->get());
+        $order_request = $create_order_request->get();
+        $order_response = $this->ppr->createOrder($order_request);
         if ($order_response === false) {
             $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
+            $this->errorInfo['request'] = $order_request;
             return false;
         }
 
@@ -1880,7 +1882,7 @@ class paypalr extends base
      */
     public function _doCapt($oID, $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
     {
-        $do_void = new DoCapture((int)$oID, $this->ppr, $this->code, self::CURRENT_VERSION);
+        $do_capt = new DoCapture((int)$oID, $this->ppr, $this->code, self::CURRENT_VERSION);
     }
 
     /**
