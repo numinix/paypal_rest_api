@@ -733,7 +733,8 @@ class paypalr extends base
         //
         // Note: CSS 'inspired' by: https://codepen.io/phusum/pen/VQrQqy
         //
-        $css_file = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true) ? 'paypalr_bootstrap.css' : 'paypalr.css';
+        $is_bootstrap_template = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true);
+        $css_file = ($is_bootstrap_template === true) ? 'paypalr_bootstrap.css' : 'paypalr.css';
         if (file_exists(DIR_FS_CATALOG . DIR_WS_TEMPLATE . "css/$css_file")) {
             $css_file_name = DIR_WS_TEMPLATE . "css/$css_file";
         } else {
@@ -818,11 +819,22 @@ class paypalr extends base
         // testing.
         //
         if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
-            $selection['fields'][] = [
-                'title' => 'Enable SCA Always?',
-                'field' => zen_draw_checkbox_field('ppr_cc_sca_always', 'on', false, 'class="ppr-cc" id=ppr-cc-sca-always'),
-                'tag' => 'ppr-c-sca-always',
-            ];
+            if ($is_bootstrap_template === false) {
+                $selection['fields'][] = [
+                    'title' => 'Enable SCA Always?',
+                    'field' => zen_draw_checkbox_field('ppr_cc_sca_always', 'on', false, 'class="ppr-cc" id="ppr-cc-sca-always"'),
+                    'tag' => 'ppr-c-sca-always',
+                ];
+            } else {
+                $selection['fields'][] = [
+                    'title' => '&nbsp;',
+                    'field' =>
+                        '<div class="custom-control custom-checkbox ppr-cc">' .
+                            zen_draw_checkbox_field('ppr_cc_sca_always', 'on', false, 'id="ppr-cc-sca-always"') .
+                            '<label class="custom-control-label checkboxLabel" for="ppr-cc-sca-always">Enable SCA Always</label>' .
+                        '</div>',
+                ];
+            }
         }
 
         return $selection;
