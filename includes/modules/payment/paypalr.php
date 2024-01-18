@@ -823,7 +823,7 @@ class paypalr extends base
                 $selection['fields'][] = [
                     'title' => 'Enable SCA Always?',
                     'field' => zen_draw_checkbox_field('ppr_cc_sca_always', 'on', false, 'class="ppr-cc" id="ppr-cc-sca-always"'),
-                    'tag' => 'ppr-c-sca-always',
+                    'tag' => 'ppr-cc-sca-always',
                 ];
             } else {
                 $selection['fields'][] = [
