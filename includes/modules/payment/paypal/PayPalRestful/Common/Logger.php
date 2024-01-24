@@ -58,7 +58,8 @@ class Logger
 
     // -----
     // Format pretty-printed JSON for the debug-log, removing any HTTP Header
-    // information (present in the CURL options) and/or the actual access-token.
+    // information (present in the CURL options) and/or the actual access-token as well
+    // as obfuscating any credit-card information in the data supplied.
     //
     // Also remove unneeded return values that will just 'clutter up' the logged information,
     // unless requested to keep them.
@@ -71,6 +72,10 @@ class Logger
                 $data['access_token'],
                 $data['scope']
             );
+            if (isset($data['payment_source']['card'])) {
+                $data['payment_source']['card']['number'] = substr($data['payment_source']['card']['number'], -4);
+                $data['payment_source']['card']['security_code'] = str_repeat('*', strlen($data['payment_source']['card']['security_code']));
+            }
             if ($keep_links === false) {
                 unset(
                     $data['links'],
