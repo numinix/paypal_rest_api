@@ -2,11 +2,12 @@
 /**
  * Common error-information class for the PayPalRestful (paypalr) Payment Module
  *
- * @copyright Copyright 2023 Zen Cart Development Team
+ * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
+ *
+ * Last updated: v1.0.0
  */
-
 namespace PayPalRestful\Common;
 
 class ErrorInfo
@@ -36,7 +37,8 @@ class ErrorInfo
         $name = $response['name'] ?? 'n/a';
         $message = $response['message'] ?? 'n/a';
         $details = $response['details'] ?? 'n/a';
-        $this->errorInfo = compact('errNum', 'errMsg', 'curlErrno', 'name', 'message', 'details');
+        $debug_id = $response['debug_id'] ?? 'n/a';
+        $this->errorInfo = compact('errNum', 'errMsg', 'curlErrno', 'name', 'message', 'details', 'debug_id');
     }
 
     protected function resetErrorInfo()
@@ -48,6 +50,7 @@ class ErrorInfo
             'name' => '',
             'message' => '',
             'details' => [],
+            'debug_id' => '',
         ];
     }
 }
