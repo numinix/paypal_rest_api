@@ -270,8 +270,12 @@ class CreatePayPalOrderRequest extends ErrorInfo
     //
     protected function isProductPhysical(array $product): bool
     {
-        if ($product['products_virtual'] === 1 || strpos($product['model'], 'GIFT') === 0 || empty($product['attributes'])) {
+        if ($product['products_virtual'] === 1 || strpos($product['model'], 'GIFT') === 0) {
             return false;
+        }
+
+        if (empty($product['attributes'])) {
+            return true;
         }
 
         $attributes_where = [];
