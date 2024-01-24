@@ -531,7 +531,7 @@ class PayPalRestfulApi extends ErrorInfo
         $curl_options = array_replace($this->curlOptions, [CURLOPT_HTTPGET => true, CURLOPT_URL => $url]);  //-HTTPGET Needed since we might be toggling between GET and POST requests
         $curl_options = $this->setAuthorizationHeader($curl_options);
         if (count($curl_options) === 0) {
-            return null;
+            return false;
         }
 
         curl_setopt_array($this->ch, $curl_options);
