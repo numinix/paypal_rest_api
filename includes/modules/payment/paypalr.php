@@ -1139,9 +1139,12 @@ class paypalr extends base
     // hashing the base order's information and, if paying via card, the card
     // information as well.
     //
+    // Note: Including the transaction-mode (AUTHORIZE vs. CAPTURE), too ... just
+    // in case the site changes that mode while a customer's order is in-progress.
+    //
     protected function createOrderGuid(\order $order, string $ppr_type): string
     {
-        $hash_data = json_encode($order);
+        $hash_data = MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE . json_encode($order);
         if ($ppr_type !== 'paypal') {
             $hash_data .= json_encode($this->ccInfo);
         }
