@@ -1,5 +1,24 @@
 <?php
+/**
+ * Webhook for PayPal RESTful API payment method (paypalr)
+ *
+ * @copyright Copyright 2023-2024 Zen Cart Development Team
+ * @copyright Portions Copyright 2003 osCommerce
+ * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
+ * @version $Id: lat9 Nov 21 Modified in v1.5.8a $
+ *
+ * Last updated: v1.0.0
+ */
 require 'includes/application_top.php';
+
+// -----
+// If the paypalr payment module is not installed or is totally disabled, nothing further to be
+// done here.  Kill any session and whitescreen since it's an invalid access.
+//
+if (!defined('MODULE_PAYMENT_PAYPALR_STATUS') || MODULE_PAYMENT_PAYPALR_STATUS === 'False') {
+    require DIR_WS_INCLUDES . 'application_bottom.php';
+    die();
+}
 
 require DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
@@ -11,7 +30,7 @@ $logger = new Logger();
 if (strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false) {
     $logger->enableDebug();
 }
-$logger->write("ppr_webhook_main ($op) starts.\n" . Logger::logJSON($_GET), true, 'before');
+$logger->write("ppr_webhook_main ($op, " . MODULE_PAYMENT_PAYPALR_SERVER . ") starts.\n" . Logger::logJSON($_GET), true, 'before');
 
 $valid_operations = ['cancel', 'return', '3ds_cancel', '3ds_return'];
 if (!in_array($op, $valid_operations, true)) {
