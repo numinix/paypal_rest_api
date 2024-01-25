@@ -47,8 +47,8 @@ class TokenCache
 
     public function get(): string
     {
-        $seconds_to_expiration = $_SESSION['PayPalRestful']['TokenCache']['token_expires_ts'] - time();
-        if (!isset($_SESSION['PayPalRestful']['TokenCache']) || $seconds_to_expiration <= 0) {
+        $seconds_to_expiration = ($_SESSION['PayPalRestful']['TokenCache']['token_expires_ts'] ?? 0) - time();
+        if ($seconds_to_expiration <= 0) {
             $this->clear();
             return '';
         }
