@@ -70,7 +70,9 @@ class Logger
             unset(
                 $data[CURLOPT_HTTPHEADER],
                 $data['access_token'],
-                $data['scope']
+                $data['scope'],
+                $data['app_id'],
+                $data['nonce']
             );
             if (isset($data['payment_source']['card'])) {
                 $data['payment_source']['card']['number'] = substr($data['payment_source']['card']['number'], -4);

@@ -47,12 +47,13 @@ class TokenCache
 
     public function get(): string
     {
-        if (!isset($_SESSION['PayPalRestful']['TokenCache']) || time() > $_SESSION['PayPalRestful']['TokenCache']['token_expires_ts']) {
+        $seconds_to_expiration = $_SESSION['PayPalRestful']['TokenCache']['token_expires_ts'] - time();
+        if (!isset($_SESSION['PayPalRestful']['TokenCache']) || $seconds_to_expiration <= 0) {
             $this->clear();
             return '';
         }
 
-        $this->log->write("\nTokenCache::get, using saved access-token.");
+        $this->log->write("\nTokenCache::get, using saved access-token; expires in $seconds_to_expiration seconds.\n");
 
         $encrypted_token = $_SESSION['PayPalRestful']['TokenCache']['saved_token'];
         $iv = substr($encrypted_token, 0, $this->encryptionAlgoIvLen);
@@ -67,7 +68,7 @@ class TokenCache
 
     public function save(string $access_token, int $seconds_to_expiration)
     {
-        $this->log->write("\nTokenCache::save, saving access-token.");
+        $this->log->write("\nTokenCache::save, saving access-token; valid for $seconds_to_expiration seconds.\n");
         $iv = openssl_random_pseudo_bytes($this->encryptionAlgoIvLen);
         $_SESSION['PayPalRestful']['TokenCache'] = [
             'saved_token' => $iv . openssl_encrypt($access_token, $this->encryptionAlgorithm, $this->clientSecret, 0, $iv),
@@ -77,7 +78,7 @@ class TokenCache
 
     public function clear()
     {
-        $this->log->write('TokenCache::clear, clearing cached token.');
+        $this->log->write("\nTokenCache::clear, clearing cached token.\n");
         unset($_SESSION['PayPalRestful']['TokenCache']);
     }
 }
