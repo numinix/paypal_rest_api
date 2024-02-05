@@ -74,8 +74,10 @@ class Logger
                 $data['app_id'],
                 $data['nonce']
             );
-            if (isset($data['payment_source']['card'])) {
+            if (isset($data['payment_source']['card']['number'])) {
                 $data['payment_source']['card']['number'] = substr($data['payment_source']['card']['number'], -4);
+            }
+            if (isset($data['payment_source']['card']['security_code'])) {
                 $data['payment_source']['card']['security_code'] = str_repeat('*', strlen($data['payment_source']['card']['security_code']));
             }
             if ($keep_links === false) {
