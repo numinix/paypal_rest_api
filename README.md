@@ -12,6 +12,6 @@ The module's operation has been validated …
 3. With One-Page Checkout  (OPC), v2.4.6
    1. Using *OPC*'s guest-checkout feature.
    2. Both requiring confirmation and not!
-4. With both the built-in responsive_classic and [ZCA Bootstrap](https://www.zen-cart.com/downloads.php?do=file&id=2191) (v3.6.1) templates.
+4. With both the built-in responsive_classic and [ZCA Bootstrap](https://www.zen-cart.com/downloads.php?do=file&id=2191) (v3.6.2) templates.
 
 For additional information, refer to the payment-module's [wiki articles](https://github.com/lat9/paypalr/wiki).
