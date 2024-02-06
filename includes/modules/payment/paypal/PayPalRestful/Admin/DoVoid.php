@@ -81,7 +81,7 @@ class DoVoid
         // otherwise, goes to 'voided'.
         //
         $captured_txns = $ppr_txns->getDatabaseTxns('CAPTURE');
-        if (count($captured_txns) !== 0 {
+        if (count($captured_txns) !== 0) {
             $voided_status = -1;
         } else {
             $voided_status = (int)MODULE_PAYMENT_PAYPALR_VOIDED_STATUS_ID;
