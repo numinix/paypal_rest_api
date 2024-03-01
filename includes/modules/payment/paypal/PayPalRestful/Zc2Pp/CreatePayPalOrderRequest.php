@@ -7,7 +7,7 @@
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.0
+ * Last updated: v1.0.2
  */
 namespace PayPalRestful\Zc2Pp;
 
@@ -146,7 +146,11 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $purchase_amount = $this->request['purchase_units'][0]['amount'];
         $summed_amount = 0;
         foreach ($purchase_amount['breakdown'] as $name => $amount) {
-            $summed_amount += $amount['value'];
+            if ($name === 'discount') {
+                $summed_amount -= $amount['value'];
+            } else {
+                $summed_amount += $amount['value'];
+            }
         }
         if (number_format((float)$summed_amount, $this->amount->getCurrencyDecimals(), '.', '') !== $purchase_amount['value']) {
             $this->log->write("\n***--> CreatePayPalOrderRequest, amount mismatch ($summed_amount vs. {$purchase_amount['value']}). No items or cost breakdown included in the submission to PayPal. Error amount:\n" . Logger::logJSON($purchase_amount));
