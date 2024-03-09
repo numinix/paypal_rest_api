@@ -467,8 +467,13 @@ class CreatePayPalOrderRequest extends ErrorInfo
             ];
         }
         $level_3 = [];
+
+        // -----
+        // Note: Although undocumented in PayPal's API, apparently their endpoint
+        // "doesn't like" values with intervening spaces!
+        //
         if (SHIPPING_ORIGIN_ZIP !== '') {
-            $level_3['ships_from_postal_code'] = SHIPPING_ORIGIN_ZIP;
+            $level_3['ships_from_postal_code'] = str_replace(' ', '', SHIPPING_ORIGIN_ZIP);
         }
         if (!empty($purchase_unit['items'])) {
             $level_3['line_items'] = $purchase_unit['items'];
