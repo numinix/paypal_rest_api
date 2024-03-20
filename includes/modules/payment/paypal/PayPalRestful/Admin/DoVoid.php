@@ -7,7 +7,7 @@
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.0
+ * Last updated: v1.0.2
  */
 namespace PayPalRestful\Admin;
 
@@ -89,7 +89,7 @@ class DoVoid
         }
 
         $comments =
-            'VOIDED. Trans ID: ' . $last_auth_txn['txn_id'] . "\n" .
+            'VOIDED. Trans ID: ' . $auth_id_txn['paypal_ipn_id'] . "\n" .
             strip_tags($_POST['ppr-void-note']);
         zen_update_orders_history($oID, $comments, null, $voided_status, 0);
 
