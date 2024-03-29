@@ -6,6 +6,7 @@ jQuery(document).ready(function() {
             jQuery(this).prev('label').hide();
             jQuery(this).next('br, div.p-2').hide();
         });
+        jQuery('#paypalr_collects_onsite').val('');
     }
     function showPprCcFields()
     {
@@ -14,6 +15,7 @@ jQuery(document).ready(function() {
             jQuery(this).prev('label').show();
             jQuery(this).next('br, div.p-2').show();
         });
+        jQuery('#paypalr_collects_onsite').val(1);
     }
 
     if (jQuery('#pmt-paypalr').is(':not(:checked)') || jQuery('#ppr-card').is(':not(:checked)')) {

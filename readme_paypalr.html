@@ -173,9 +173,12 @@ table table {
             <li>BUGFIX: Remove intervening spaces in level-3 data's <code>ships_from_postal_code</code>.</li>
             <li>BUGFIX: Correct PHP Warnings when performing a transaction void.</li>
             <li>BUGFIX: Add CSS spinner during webhook operation to let customers know that something's happening.</li>
+            <li>BUGFIX: Indicate that card-data is collected on-site when the customer is paying via a credit-card.</li>
             <li>The following files were changed:<ol>
                 <li>/ppr_webhook_main.php</li>
+                <li>/includes/classes/observers/auto.paypalrestful.php</li>
                 <li>/includes/modules/payment/paypalr.php</li>
+                <li>/includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.checkout.js</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/Admin/DoVoid.php</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php</li>
             </ol></li>

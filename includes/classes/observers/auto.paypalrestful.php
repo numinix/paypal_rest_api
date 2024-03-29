@@ -5,6 +5,8 @@
  * introduced in this (https://github.com/zencart/zencart/pull/6090) Zen Cart PR,
  * to determine an order's overall value and what amounts each order-total
  * module has added/subtracted to the order's overall value.
+ *
+ * Last updated: v1.0.2
  */
 class zcObserverPaypalrestful extends base
 {
@@ -27,8 +29,17 @@ class zcObserverPaypalrestful extends base
         // calls to the order-totals' pre_confirmation_check method.  That method's run on that
         // page prior to paypalr's pre_confirmation_check method.
         //
+        // NOTE: The page that's set during the AJAX checkout-payment class is 'index'!
+        //
         global $current_page_base;
-        if ($current_page_base === FILENAME_CHECKOUT_CONFIRMATION || (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION)) {
+        $pages_to_watch = [
+            FILENAME_CHECKOUT_CONFIRMATION,
+            FILENAME_DEFAULT,
+        ];
+        if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION')) {
+            $pages_to_watch[] = FILENAME_CHECKOUT_ONE_CONFIRMATION;
+        }
+        if (in_array($current_page_base, $pages_to_watch)) {
             $this->attach($this, [
                 'NOTIFY_ORDER_TOTAL_PRE_CONFIRMATION_CHECK_STARTS',
                 'NOTIFY_ORDER_TOTAL_PRE_CONFIRMATION_CHECK_NEXT',

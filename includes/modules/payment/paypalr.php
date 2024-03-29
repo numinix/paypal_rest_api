@@ -109,6 +109,13 @@ class paypalr extends base
     public $form_action_url;
 
     /**
+     * The credit-card portion of this payment-module *does* collect card-data
+     * on-site. If credit-card payments are to be offered, the module's
+     * initialization will change this to (bool)true.
+     */
+    public $collectsCardDataOnsite = false;
+
+    /**
      * The orders::orders_id for a just-created order, supplied during
      * the 'checkout_process' step.
      */
@@ -290,28 +297,6 @@ class paypalr extends base
             }
 
             // -----
-            // Determine the currency to be used to send the order to PayPal and whether it's usable.
-            //
-            $order_currency = $order->info['currency'];
-            $paypal_default_currency = (MODULE_PAYMENT_PAYPALR_CURRENCY === 'Selected Currency') ? $order_currency : str_replace('Only ', '', MODULE_PAYMENT_PAYPALR_CURRENCY);
-            $amount = new Amount($paypal_default_currency);
-
-            $paypal_currency = $amount->getDefaultCurrencyCode();
-            if ($paypal_currency !== $order_currency) {
-                $this->log->write("==> order_status: Paypal currency ($paypal_currency) different from order's ($order_currency); checking validity.");
-
-                global $currencies;
-                if (!isset($currencies)) {
-                    $currencies = new currencies();
-                }
-                if ($currencies->is_set($paypal_currency) === false) {
-                    $this->log->write('  --> Payment method disabled; Paypal currency is not configured.');
-                    $this->enabled = false;
-                    return;
-                }
-            }
-
-            // -----
             // If on the storefront, check to make sure that the shipping/billing address
             // countries are supported by PayPal.
             //
@@ -335,6 +320,37 @@ class paypalr extends base
             $this->onOpcConfirmationPage = true;
             $this->paypalRestfulSessionOnEntry = $_SESSION['PayPalRestful'] ?? [];
             $this->attach($this, ['NOTIFY_OPC_OBSERVER_SESSION_FIXUPS']);
+        }
+
+        // -----
+        // NOTE: The checkout_process phase and zcAjaxPayment class instantiate the selected payment module **prior to**
+        // instantiating the order-object.
+        //
+        // Determine the currency to be used to send the order to PayPal and whether it's usable.
+        //
+        $order_currency = $order->info['currency'] ?? $_SESSION['currency'] ?? DEFAULT_CURRENCY;
+        $paypal_default_currency = (MODULE_PAYMENT_PAYPALR_CURRENCY === 'Selected Currency') ? $order_currency : str_replace('Only ', '', MODULE_PAYMENT_PAYPALR_CURRENCY);
+        $amount = new Amount($paypal_default_currency);
+
+        $paypal_currency = $amount->getDefaultCurrencyCode();
+        if ($paypal_currency !== $order_currency) {
+            $this->log->write("==> order_status: Paypal currency ($paypal_currency) different from order's ($order_currency); checking validity.");
+
+            global $currencies;
+            if (!isset($currencies)) {
+                $currencies = new currencies();
+            }
+            if ($currencies->is_set($paypal_currency) === false) {
+                $this->log->write('  --> Payment method disabled; Paypal currency is not configured.');
+                $this->enabled = false;
+                return;
+            }
+        }
+
+        if (isset($order)) {
+            $this->collectsCardDataOnsite = $this->cardsAccepted;
+        } elseif (isset($_POST['ppr_type']) && $_POST['ppr_type'] === 'card') {
+            $this->collectsCardDataOnsite = true;
         }
     }
 
@@ -541,6 +557,16 @@ class paypalr extends base
     {
         global $order;
 
+        // -----
+        // NOTE: The zcAjaxPayment class instantiates the selected payment module **prior to**
+        // instantiating the order-object. If an update_status request is received in the absence
+        // of the order, the assumption made here is that we're running in that path and these
+        // checks were previously made during the checkout's payment phase!
+        //
+        if (!isset($order)) {
+            return;
+        }
+
         if ($this->enabled === false || !isset($order->billing['country']['id'])) {
             $this->enabled = false;
             return;
@@ -610,9 +636,9 @@ class paypalr extends base
         return
             'if (payment_value == "' . $this->code . '") {' . "\n" .
                 'if (document.checkout_payment.ppr_type.value === "card") {' . "\n" .
-                    'var cc_owner = document.checkout_payment.ppr_cc_owner.value;' . "\n" .
-                    'var cc_number = document.checkout_payment.ppr_cc_number.value;' . "\n" .
-                    'var cc_cvv = document.checkout_payment.ppr_cc_cvv.value;' . "\n" .
+                    'var cc_owner = document.checkout_payment.paypalr_cc_owner.value;' . "\n" .
+                    'var cc_number = document.checkout_payment.paypalr_cc_number.value;' . "\n" .
+                    'var cc_cvv = document.checkout_payment.paypalr_cc_cvv.value;' . "\n" .
                     'if (cc_owner == "" || eval(cc_owner.length) < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
                         'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
                         'error = 1;' . "\n" .
@@ -751,6 +777,7 @@ class paypalr extends base
         $ppr_cc_expires_month_id = $this->code . '-cc-expires-month';
         $ppr_cc_cvv_id = $this->code . '-cc-cvv';
 
+        $billing_name = zen_output_string_protected($order->billing['firstname'] . ' ' . $order->billing['lastname']);
         $selection = [
             'id' => $this->code,
             'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE . ' <span id="ppr-subtitle" class="small">' . MODULE_PAYMENT_PAYPALR_SUBTITLE . '</span>',
@@ -783,25 +810,25 @@ class paypalr extends base
                 [
                     'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER,
                     'field' =>
-                        zen_draw_input_field('ppr_cc_owner', $order->billing['firstname'] . ' ' . $order->billing['lastname'], 'class="ppr-cc" id="' . $ppr_cc_owner_id . '" autocomplete="off"'),
+                        zen_draw_input_field('paypalr_cc_owner', $billing_name, 'class="ppr-cc" id="' . $ppr_cc_owner_id . '" autocomplete="off"'),
                     'tag' => $ppr_cc_owner_id,
                 ],
                 [
                     'title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER,
-                    'field' => zen_draw_input_field('ppr_cc_number', '', 'class="ppr-cc" id="' . $ppr_cc_number_id . '" autocomplete="off"'),
+                    'field' => zen_draw_input_field('paypalr_cc_number', '', 'class="ppr-cc" id="' . $ppr_cc_number_id . '" autocomplete="off"'),
                     'tag' => $ppr_cc_number_id,
                 ],
                 [
                     'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
                     'field' =>
-                        zen_draw_pull_down_menu('ppr_cc_expires_month', $expires_month, $zcDate->output('%m'), 'class="ppr-cc" id="' . $ppr_cc_expires_month_id . '"') .
+                        zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, $zcDate->output('%m'), 'class="ppr-cc" id="' . $ppr_cc_expires_month_id . '"') .
                         '&nbsp;' .
-                        zen_draw_pull_down_menu('ppr_cc_expires_year', $expires_year, '', 'class="ppr-cc" id="' . $ppr_cc_expires_year_id . '"'),
+                        zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-cc" id="' . $ppr_cc_expires_year_id . '"'),
                     'tag' => $ppr_cc_expires_month_id,
                 ],
                 [
                     'title' => MODULE_PAYMENT_PAYPALR_CC_CVV,
-                    'field' => zen_draw_input_field('ppr_cc_cvv', '', 'class="ppr-cc" id="' . $ppr_cc_cvv_id . '" autocomplete="off"'),
+                    'field' => zen_draw_input_field('paypalr_cc_cvv', '', 'class="ppr-cc" id="' . $ppr_cc_cvv_id . '" autocomplete="off"'),
                     'tag' => $ppr_cc_cvv_id,
                 ],
                 [
@@ -822,7 +849,7 @@ class paypalr extends base
             if ($is_bootstrap_template === false) {
                 $selection['fields'][] = [
                     'title' => 'Enable SCA Always?',
-                    'field' => zen_draw_checkbox_field('ppr_cc_sca_always', 'on', false, 'class="ppr-cc" id="ppr-cc-sca-always"'),
+                    'field' => zen_draw_checkbox_field('paypalr_cc_sca_always', 'on', false, 'class="ppr-cc" id="ppr-cc-sca-always"'),
                     'tag' => 'ppr-cc-sca-always',
                 ];
             } else {
@@ -830,7 +857,7 @@ class paypalr extends base
                     'title' => '&nbsp;',
                     'field' =>
                         '<div class="custom-control custom-checkbox ppr-cc">' .
-                            zen_draw_checkbox_field('ppr_cc_sca_always', 'on', false, 'id="ppr-cc-sca-always"') .
+                            zen_draw_checkbox_field('paypalr_cc_sca_always', 'on', false, 'id="ppr-cc-sca-always"') .
                             '<label class="custom-control-label checkboxLabel" for="ppr-cc-sca-always">Enable SCA Always</label>' .
                         '</div>',
                 ];
@@ -877,7 +904,7 @@ class paypalr extends base
         //
         $ppr_type = $_POST['ppr_type'];
         $_SESSION['PayPalRestful']['ppr_type'] = $ppr_type;
-        if ($ppr_type === 'card' && $this->validateCardInformation() === false) {
+        if ($ppr_type === 'card' && $this->validateCardInformation(true) === false) {
             $log_only = true;
             $this->setMessageAndRedirect("pre_confirmation_check, card failed initial validation.", FILENAME_CHECKOUT_PAYMENT, $log_only);
         }
@@ -961,21 +988,22 @@ class paypalr extends base
         $this->log->write('pre_confirmation_check, sending the payer-action off to PayPal.', true, 'after');
         zen_redirect($action_link);
     }
-    protected function validateCardInformation(): bool
+    protected function validateCardInformation(bool $is_preconfirmation): bool
     {
         global $messageStack, $order;
 
+        $postvar_prefix = ($is_preconfirmation === true) ? 'paypalr' : 'ppr';
         require DIR_WS_CLASSES . 'cc_validation.php';
         $cc_validation = new cc_validation();
         $result = $cc_validation->validate(
-            $_POST['ppr_cc_number'] ?? '',
-            $_POST['ppr_cc_expires_month'] ?? '',
-            $_POST['ppr_cc_expires_year'] ?? ''
+            $_POST[$postvar_prefix . '_cc_number'] ?? '',
+            $_POST[$postvar_prefix . '_cc_expires_month'] ?? '',
+            $_POST[$postvar_prefix . '_cc_expires_year'] ?? ''
         );
         switch ((int)$result) {
             case -1:
                 $error = MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD;
-                if (empty($_POST['ppr_cc_number'])) {
+                if (empty($_POST[$postvar_prefix . '_cc_number'])) {
                     $error = trim(MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER, '* \\n');
                 }
                 break;
@@ -996,14 +1024,14 @@ class paypalr extends base
             return false;
         }
 
-        $cvv_posted = $_POST['ppr_cc_cvv'] ?? '';
+        $cvv_posted = $_POST[$postvar_prefix . '_cc_cvv'] ?? '';
         $cvv_required_length = ($cc_validation->cc_type === 'American Express') ? 4 : 3;
         if (!ctype_digit($cvv_posted) || strlen($cvv_posted) !== $cvv_required_length) {
             $messageStack->add_session('checkout_payment', sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH, $cc_validation->cc_type, substr($cc_validation->cc_number, -4), $cvv_required_length), 'error');
             return false;
         }
 
-        $cc_owner = $_POST['ppr_cc_owner'] ?? '';
+        $cc_owner = $_POST[$postvar_prefix . '_cc_owner'] ?? '';
         if (strlen($cc_owner) < CC_OWNER_MIN_LENGTH) {
             $messageStack->add_session('checkout_payment', trim(MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER, '* \\n'), 'error');
             return false;
@@ -1174,10 +1202,10 @@ class paypalr extends base
         return [
             'title' => '',
             'fields' => [
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_OWNER, 'field' => '&nbsp;' . $_POST['ppr_cc_owner']],
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_OWNER, 'field' => '&nbsp;' . $_POST['paypalr_cc_owner']],
                 ['title' => MODULE_PAYMENT_PAYPALR_CC_TYPE, 'field' => '&nbsp;' . $this->ccInfo['type']],
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER, 'field' => '&nbsp;' . $this->obfuscateCcNumber($_POST['ppr_cc_number'])],
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES, 'field' => '&nbsp;' . $zcDate->output('%B, ', mktime(0, 0, 0, (int)$_POST['ppr_cc_expires_month'])) . $_POST['ppr_cc_expires_year']],
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER, 'field' => '&nbsp;' . $this->obfuscateCcNumber($_POST['paypalr_cc_number'])],
+                ['title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES, 'field' => '&nbsp;' . $zcDate->output('%B, ', mktime(0, 0, 0, (int)$_POST['paypalr_cc_expires_month'])) . $_POST['paypalr_cc_expires_year']],
             ],
         ];
     }
@@ -1194,13 +1222,13 @@ class paypalr extends base
         }
 
         $hidden_fields =
-            zen_draw_hidden_field('ppr_cc_owner', $_POST['ppr_cc_owner']) . "\n" .
-            zen_draw_hidden_field('ppr_cc_expires_month', $_POST['ppr_cc_expires_month']) . "\n" .
-            zen_draw_hidden_field('ppr_cc_expires_year', $_POST['ppr_cc_expires_year']) . "\n" .
-            zen_draw_hidden_field('ppr_cc_number', $_POST['ppr_cc_number']) . "\n" .
-            zen_draw_hidden_field('ppr_cc_cvv', $_POST['ppr_cc_cvv']) . "\n";
-        if (isset($_POST['ppr_cc_sca_always'])) {
-            $hidden_fields .= zen_draw_hidden_field('ppr_cc_sca_always', $_POST['ppr_cc_sca_always']);
+            zen_draw_hidden_field('ppr_cc_owner', $_POST['paypalr_cc_owner']) . "\n" .
+            zen_draw_hidden_field('ppr_cc_expires_month', $_POST['paypalr_cc_expires_month']) . "\n" .
+            zen_draw_hidden_field('ppr_cc_expires_year', $_POST['paypalr_cc_expires_year']) . "\n" .
+            zen_draw_hidden_field('ppr_cc_number', $_POST['paypalr_cc_number']) . "\n" .
+            zen_draw_hidden_field('ppr_cc_cvv', $_POST['paypalr_cc_cvv']) . "\n";
+        if (isset($_POST['paypalr_cc_sca_always'])) {
+            $hidden_fields .= zen_draw_hidden_field('ppr_cc_sca_always', $_POST['paypalr_cc_sca_always']);
         }
         return $hidden_fields;
     }
@@ -1209,16 +1237,20 @@ class paypalr extends base
         if ($_SESSION['PayPalRestful']['Order']['payment_source'] !== 'card') {
             return false;
         }
-        
-        return [
+
+        $ccFields = [
             'ccFields' => [
-                'ppr_cc_owner' => 'ppr_cc_owner',
-                'ppr_cc_expires_month' => 'ppr_cc_expires_month',
-                'ppr_cc_expires_year' => 'ppr_cc_expires_year',
-                'ppr_cc_number' => 'ppr_cc_number',
-                'ppr_cc_cvv' => 'ppr_cc_cvv',
+                'ppr_cc_owner' => 'paypalr_cc_owner',
+                'ppr_cc_expires_month' => 'paypalr_cc_expires_month',
+                'ppr_cc_expires_year' => 'paypalr_cc_expires_year',
+                'ppr_cc_number' => 'paypalr_cc_number',
+                'ppr_cc_cvv' => 'paypalr_cc_cvv',
             ],
         ];
+        if (isset($_POST['paypalr_cc_sca_always'])) {
+            $ccFields['ccFields']['ppr_cc_sca_always'] = 'paypalr_cc_sca_always';
+        }
+        return $ccFields;
     }
 
     /**
@@ -1406,7 +1438,7 @@ class paypalr extends base
         // Note that the validateCardInformation method has already set a specific
         // message for the customer if one of its checks has failed.
         //
-        if ($this->validateCardInformation() === false) {
+        if ($this->validateCardInformation(false) === false) {
             zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
         }
 
