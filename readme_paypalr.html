@@ -109,6 +109,7 @@ table table {
         <li>With both the built-in <var>responsive_classic</var> and <a href="https://www.zen-cart.com/downloads.php?do=file&id=2191" target="_blank"><var>ZCA Bootstrap</var></a> (v3.6.1)templates.</li>
     </ol>
     <p>For additional information, refer to the payment-module's <a href="https://github.com/lat9/paypalr/wiki" target="_blank">wiki articles</a>.</p>
+    <p><b>Credits:</b> CSS-based spinner compliments of <a href="https://loading.io/css/" target="_blank">loading.io css spinner</a>.</p>
 
     <h2>Installation and Upgrade</h2>
     <h3>Initial Installation</h3>
@@ -171,7 +172,9 @@ table table {
             <li>BUGFIX: Full cost breakdown not submitted to PayPal if an order has discounts.</li>
             <li>BUGFIX: Remove intervening spaces in level-3 data's <code>ships_from_postal_code</code>.</li>
             <li>BUGFIX: Correct PHP Warnings when performing a transaction void.</li>
+            <li>BUGFIX: Add CSS spinner during webhook operation to let customers know that something's happening.</li>
             <li>The following files were changed:<ol>
+                <li>/ppr_webhook_main.php</li>
                 <li>/includes/modules/payment/paypalr.php</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/Admin/DoVoid.php</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php</li>

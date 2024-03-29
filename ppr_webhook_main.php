@@ -7,7 +7,7 @@
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 Nov 21 Modified in v1.5.8a $
  *
- * Last updated: v1.0.0
+ * Last updated: v1.0.2
  */
 require 'includes/application_top.php';
 
@@ -113,12 +113,62 @@ if ($op === 'return') {
 // required for the integration with OPC when the associated payment-module
 // doesn't require that the confirmation page be displayed.
 //
+// NOTE: CSS-based spinner compliments of 'loading.io css spinner' ( https://loading.io/css/ )
+//
 $redirect_page = $_SESSION['PayPalRestful']['Order']['PayerAction']['current_page_base'];
 $logger->write("Order's status set to {$order_status['status']}; posting back to $redirect_page.", true, 'after');
 ?>
 <html>
 <body onload="document.transfer_form.submit();">
-   <form action="<?php echo zen_href_link($redirect_page); ?>" name="transfer_form" method="post">
+    <style>
+#lds-wrapper {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+.lds-ring {
+    display: inline-block;
+    position: relative;
+    top: 50%;
+    margin-top: -40px;
+    left: 50%;
+    margin-left: -40px;
+    width: 80px;
+    height: 80px;
+}
+.lds-ring div {
+    box-sizing: border-box;
+    display: block;
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    margin: 8px;
+    border: 8px solid #002b7f;
+    border-radius: 50%;
+    animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    border-color: #002b7f transparent transparent transparent;
+}
+.lds-ring div:nth-child(1) {
+    animation-delay: -0.45s;
+}
+.lds-ring div:nth-child(2) {
+    animation-delay: -0.3s;
+}
+.lds-ring div:nth-child(3) {
+    animation-delay: -0.15s;
+}
+@keyframes lds-ring {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+    </style>
+    <div id="lds-wrapper"><div class="lds-ring"><div></div><div></div><div></div><div></div></div></div>
+    <form action="<?php echo zen_href_link($redirect_page); ?>" name="transfer_form" method="post">
 <?php
 foreach ($_SESSION['PayPalRestful']['Order']['PayerAction']['savedPosts'] as $key => $value) {
     if (is_string($value)) {
@@ -133,7 +183,7 @@ foreach ($_SESSION['PayPalRestful']['Order']['PayerAction']['savedPosts'] as $ke
 }
 unset($_SESSION['PayPalRestful']['Order']['PayerAction']);
 ?>
-   </form>
+    </form>
 </body>
 </html>
 <?php
