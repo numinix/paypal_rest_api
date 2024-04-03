@@ -1101,7 +1101,6 @@ class paypalr extends base
         $order_response = $this->ppr->createOrder($order_request);
         if ($order_response === false) {
             $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
-            $this->errorInfo['request'] = $order_request;
             return false;
         }
 
@@ -1404,6 +1403,22 @@ class paypalr extends base
         if ($response === false) {
             $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
         }
+
+        if ($payment_source !== 'card') {
+            return $response;
+        }
+
+        // -----
+        // For a card payment-source, we've just come back from a 3DS authorization
+        // and the response from PayPal needs to be checked to see if the card's
+        // OK.  If not, set the appropriate message for the customer and redirect
+        // back to the payment phase of checkout.
+        //
+        $card_message = $this->checkCardPaymentResponse($response);
+        if ($card_message !== '') {
+            $this->setMessageAndRedirect($card_message, FILENAME_CHECKOUT_PAYMENT);
+        }
+
         return $response;
     }
     protected function createCreditCardOrder(\order $order, array $order_info): array
