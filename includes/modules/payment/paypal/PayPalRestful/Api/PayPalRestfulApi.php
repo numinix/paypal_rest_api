@@ -12,7 +12,7 @@
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.0
+ * Last updated: v1.0.2
  */
 namespace PayPalRestful\Api;
 
@@ -670,6 +670,7 @@ class PayPalRestfulApi extends ErrorInfo
             case 429:
             case 500:
             case 503:
+                $errMsg = "An interface error ($httpCode) was returned from PayPal.";
                 break;
 
             // -----
