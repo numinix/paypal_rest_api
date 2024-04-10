@@ -969,7 +969,7 @@ class paypalr extends base
             }
         }
         if ($action_link === '') {
-            $this->sendAlertMessage(
+            $this->sendAlertEmail(
                 MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
                 MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response)
             );
@@ -1662,7 +1662,7 @@ class paypalr extends base
                         $response_message =
                             sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED, $last_digits) .
                             ' ' .
-                            sprintf(MODULE_PAYMENT_PAYPALR_TEXT_DECLINED_UNKNOWN, $response_code);
+                            sprintf(MODULE_PAYMENT_PAYPALR_TEXT_DECLINED_REASON_UNKNOWN, $response_code);
 
                         $this->sendAlertEmail(
                             MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL,
