@@ -1625,15 +1625,23 @@ class paypalr extends base
                         $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS, $card_type, $last_digits);
                         break;
 
-                    case '00N7':
+                    case '00N7':    //- CVV check failed
+                    case '1380':    //- Invalid card verification value
                     case '5110':    //- CVV check failed
                         $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CVV_FAILED, $card_type, $last_digits);
                         break;
 
-                    case '5180':    //- Luhn check failed; don't use card
                     case '0500':    //- Card refused
                     case '1330':    //- Card not valid
+                    case '1380':    //- Invalid expiration
                     case '5100':    //- Generic decline
+                    case '5140':    //- Card closed
+                    case '5180':    //- Luhn check failed; don't use card
+                    case '5930':    //- Card not activated
+                    case '5950':    //- External decline as an updated card has been issued.
+                    case '9100':    //- Declined, please retry
+                    case '9510':    //- Security violation (not sure what this means)
+                    case '9540':    //- Card refused
                         $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED, $last_digits);
                         break;
 
@@ -1642,7 +1650,7 @@ class paypalr extends base
                         $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED, $last_digits);
 
                         // -----
-                        // Note: An alert-email is forced for this condition!
+                        // Note: An alert-email is forced for these conditions!
                         //
                         $this->sendAlertEmail(
                             MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD,
