@@ -248,10 +248,20 @@ class paypalr extends base
             //
             // No observer?  No payment via this module and it's auto-disabled.
             //
+            // The one exception to the above 'rule' is any load from the ipn_main_handler.  The
+            // paypal_ipn.core.php (for whatever reason) doesn't load the auto-loaded observers,
+            // so the paypalr one won't be there.  If that's the case, just indicate that the
+            // payment module is disabled and return.
+            //
             global $zcObserverPaypalrestful;
             if (!isset($zcObserverPaypalrestful)) {
-                $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER);
                 $this->enabled = false;
+
+                global $loaderPrefix;
+                if (($loaderPrefix ?? '') === 'paypal_ipn') {
+                    return;
+                }
+                $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER);
                 return;
             }
 
@@ -533,6 +543,8 @@ class paypalr extends base
     protected function setConfigurationDisabled(string $error_message)
     {
         global $db, $messageStack;
+
+        trigger_error("Setting configuration disabled: $error_message", E_USER_WARNING);
 
         $db->Execute(
             "UPDATE " . TABLE_CONFIGURATION . "
