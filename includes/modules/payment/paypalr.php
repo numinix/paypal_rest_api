@@ -7,7 +7,7 @@
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 Nov 21 Modified in v1.5.8a $
  *
- * Last updated: v1.0.2
+ * Last updated: v1.0.3
  */
 /**
  * Load the support class' auto-loader.
@@ -34,7 +34,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.0.2';
+    protected const CURRENT_VERSION = '1.0.3-beta1';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
@@ -950,7 +950,7 @@ class paypalr extends base
         $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::WEBHOOK_NAME, $order);
         $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
         if ($payment_choice_response === false || $payment_choice_response['status'] !== PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
-            $this->sendAlertMessage(
+            $this->sendAlertEmail(
                 MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
                 MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
             );

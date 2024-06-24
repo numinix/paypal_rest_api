@@ -91,7 +91,7 @@ table table {
 
 <body>
     <h1>PayPal RESTful Payment Module (<var>paypalr</var>) for Zen Cart 1.5.8a and later</h1>
-    <h3>Version 1.0.2</h3>
+    <h3>Version 1.0.3</h3>
     <p>Current Support Thread at Zen Cart Forums: <a href="https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support" target="_blank">https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support</a></p>
     <p>Zen Cart Download Link: <a href="https://www.zen-cart.com/downloads.php?do=file&id=2382" target="_blank">https://www.zen-cart.com/downloads.php?do=file&id=2382</a></p>
     <p>GitHub repository: <a href="https://github.com/lat9/paypalr" target="_blank">https://github.com/lat9/paypalr</a></p>
@@ -168,6 +168,12 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
+        <li>v1.0.3-beta1, 2024-06-24 (lat9)<ul>
+            <li>BUGFIX: Correct undefined method <samp>sendAlertMessage</samp>; should be <samp>sendAlertEmail</samp>.</li>
+            <li>The following files were changed:<ol>
+                <li>/includes/modules/payment/paypalr.php</li>
+            </ol></li>
+        </ul></li>
         <li>v1.0.2, 2024-04-28 (lat9)<ul>
             <li>BUGFIX: Full cost breakdown not submitted to PayPal if an order has discounts.</li>
             <li>BUGFIX: Remove intervening spaces in level-3 data's <code>ships_from_postal_code</code>.</li>
