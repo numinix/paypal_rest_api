@@ -34,7 +34,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.0.3-beta1';
+    protected const CURRENT_VERSION = '1.0.3-beta2';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
@@ -1183,7 +1183,8 @@ class paypalr extends base
     //
     protected function createOrderGuid(\order $order, string $ppr_type): string
     {
-        $hash_data = MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE . json_encode($order);
+        $_SESSION['PayPalRestful']['CompletedOrders'] = $_SESSION['PayPalRestful']['CompletedOrders'] ?? 0;
+        $hash_data = MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE . json_encode($order) . $_SESSION['securityToken'] . $_SESSION['PayPalRestful']['CompletedOrders'];
         if ($ppr_type !== 'paypal') {
             $hash_data .= json_encode($this->ccInfo);
         }
@@ -1879,11 +1880,16 @@ class paypalr extends base
      * Issued at the tail-end of the checkout_process' header_php.php, indicating that the
      * order's been recorded in the database and any required emails sent.
      *
+     * Bump the count of orders completed in the session to ensure that back-to-back
+     * identical order-contents within the same session have a unique GUID.
+     *
      * Add a customer-visible order-status-history record identifying the
      * associated transaction ID, payment method, timestamp, status and amount.
      */
     public function after_process()
     {
+        $_SESSION['PayPalRestful']['CompletedOrders']++;
+
         $payment_info = $this->orderInfo['payment_info'];
         $timestamp = '';
         if ($payment_info['created_date'] !== '') {
