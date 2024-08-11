@@ -4,12 +4,13 @@
  *
  * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
- * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.0
+ * Last updated: v1.0.3
  */
 
 namespace PayPalRestful\Common;
+
+use PayPalRestful\Common\Helpers;
 
 class Logger
 {
@@ -36,7 +37,7 @@ class Logger
         }
 
         if (IS_ADMIN_FLAG === false) {
-            $logfile_suffix = 'c-' . ($_SESSION['customer_id'] ?? 'na') . '-' . substr($_SESSION['customer_first_name'] ?? 'na', 0, 3) . substr($_SESSION['customer_last_name'] ?? 'na', 0, 3);
+            $logfile_suffix = 'c-' . ($_SESSION['customer_id'] ?? 'na') . '-' . Helpers::getCustomerNameSuffix();
         } else {
             $logfile_suffix = 'adm-a' . $_SESSION['admin_id'];
             global $order;

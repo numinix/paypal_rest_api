@@ -4,9 +4,8 @@
  *
  * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
- * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.0
+ * Last updated: v1.0.3
  */
 
 namespace PayPalRestful\Common;
@@ -60,5 +59,15 @@ class Helpers
     public static function getDaysFrom(string $past_date): string
     {
         return (string)ceil((time() - strtotime($past_date)) / 86400);
+    }
+
+    public static function getCustomerNameSuffix(): string
+    {
+        $substr_function = (function_exists('mb_substr')) ? 'mb_substr' : 'substr';
+        $log_suffix = $substr_function($_SESSION['customer_first_name'] ?? 'na', 0, 3) . $substr_function($_SESSION['customer_last_name'] ?? 'na', 0, 3);
+        if (function_exists('mb_ereg_replace')) {
+            return mb_ereg_replace('[^a-zA-Z0-9]', '_', $log_suffix);
+        }
+        return preg_replace('/[^a-zA-Z0-9]/', '_', $log_suffix);
     }
 }

@@ -5,13 +5,13 @@
  *
  * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
- * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.2
+ * Last updated: v1.0.3
  */
 namespace PayPalRestful\Zc2Pp;
 
 use PayPalRestful\Common\ErrorInfo;
+use PayPalRestful\Common\Helpers;
 use PayPalRestful\Common\Logger;
 use PayPalRestful\Zc2Pp\Address;
 use PayPalRestful\Zc2Pp\Amount;
@@ -90,7 +90,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
                         'PPR-' .
                         date('YmdHis') . '-' .
                         $_SESSION['customer_id'] . '-' .
-                        substr($_SESSION['customer_first_name'], 0, 3) . substr($_SESSION['customer_last_name'], 0, 3) . '-' .
+                        Helpers::getCustomerNameSuffix() . '-' .
                         bin2hex(random_bytes(4)),
                 ],
             ],
@@ -139,7 +139,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             }
         }
 
-        $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request));
+        $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . var_export($this->request, true));
     }
     protected function validateOrderAmounts()
     {

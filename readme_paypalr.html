@@ -168,12 +168,16 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
-        <li>v1.0.3-beta2, 2024-08-09 (lat9)<ul>
+        <li>v1.0.3-beta3, 2024-08-11 (lat9)<ul>
             <li>BUGFIX: Correct undefined method <samp>sendAlertMessage</samp>; should be <samp>sendAlertEmail</samp>.</li>
             <li>BUGFIX: Correct auto-disable during PayPal IPN processing.</li>
             <li>BUGFIX: Add <samp>$_SESSION['securityToken']</samp> as well as session's order-count to make GUID more unique.</li>
+            <li>BUGFIX: Correct 'MISSING_REQUIRED_PARAMETER' returned when customer's first/last contains multi-byte characters.</li>
             <li>The following files were changed:<ol>
                 <li>/includes/modules/payment/paypalr.php</li>
+                <li>/includes/modules/payment/paypal/PayPalRestful/Helpers.php</li>
+                <li>/includes/modules/payment/paypal/PayPalRestful/Logger.php</li>
+                <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php</li>
             </ol></li>
         </ul></li>
         <li>v1.0.2, 2024-04-28 (lat9)<ul>
