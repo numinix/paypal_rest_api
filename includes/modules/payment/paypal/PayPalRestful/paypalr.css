@@ -35,7 +35,7 @@
     cursor: pointer;
     height: 2.5rem;
     font-weight: bold;
-    width: 11rem;
+    width: fit-content;
     display: inline-block;
     text-align: center;
 }
