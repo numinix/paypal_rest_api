@@ -101,12 +101,12 @@ table table {
     <p>The module's operation has been validated &hellip;</p>
     <ol>
         <li>With PHP versions 7.4 through 8.3; <b>PHP 7.3 will result in fatal PHP errors!</b></li>
-        <li>In Zen Cart's 3-page checkout environment (v1.5.8<b>a</b> and v2.0.0)</li>
-        <li>With <a href="https://www.zen-cart.com/downloads.php?do=file&id=2095" target="_blank">One-Page Checkout</a> (OPC), v2.4.6<ol type="a">
+        <li>In Zen Cart's 3-page checkout environment (v1.5.8<b>a</b>, v2.0.x and v2.1.0-alpha)</li>
+        <li>With <a href="https://www.zen-cart.com/downloads.php?do=file&id=2095" target="_blank">One-Page Checkout</a> (OPC), v2.4.6-2.5.3<ol type="a">
             <li>Using <em>OPC</em>'s guest-checkout feature.</li>
             <li>Both requiring confirmation and not!</li>
         </ol></li>
-        <li>With both the built-in <var>responsive_classic</var> and <a href="https://www.zen-cart.com/downloads.php?do=file&id=2191" target="_blank"><var>ZCA Bootstrap</var></a> (v3.6.1)templates.</li>
+        <li>With both the built-in <var>responsive_classic</var> and <a href="https://www.zen-cart.com/downloads.php?do=file&id=2191" target="_blank"><var>ZCA Bootstrap</var></a> (v3.6.2-v3.7.2)templates.</li>
     </ol>
     <p>For additional information, refer to the payment-module's <a href="https://github.com/lat9/paypalr/wiki" target="_blank">wiki articles</a>.</p>
     <p><b>Credits:</b> CSS-based spinner compliments of <a href="https://loading.io/css/" target="_blank">loading.io css spinner</a>.</p>
@@ -168,7 +168,7 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
-        <li>v1.0.3-beta3, 2024-08-11 (lat9)<ul>
+        <li>v1.0.3, 2024-08-14 (lat9)<ul>
             <li>BUGFIX: Correct undefined method <samp>sendAlertMessage</samp>; should be <samp>sendAlertEmail</samp>.</li>
             <li>BUGFIX: Correct auto-disable during PayPal IPN processing.</li>
             <li>BUGFIX: Add <samp>$_SESSION['securityToken']</samp> as well as session's order-count to make GUID more unique.</li>
