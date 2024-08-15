@@ -5,9 +5,8 @@
  *
  * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
- * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.0
+ * Last updated: v1.0.4
  */
 namespace PayPalRestful\Admin;
 
@@ -79,7 +78,7 @@ class GetPayPalOrderTransactions
 
     public function syncPaypalTxns()
     {
-        $this->getPayPalUpdates($this->oID);
+        $this->getPayPalUpdates();
 
         if ($this->externalTxnAdded === true) {
             $this->messages->add(MODULE_PAYMENT_PAYPALR_EXTERNAL_ADDITION, 'warning');
@@ -156,6 +155,14 @@ class GetPayPalOrderTransactions
 
     protected function getPayPalUpdates()
     {
+        // -----
+        // If no database transactions were found for the current order, nothing
+        // further to be done here.
+        //
+        if (empty($this->databaseTxns[0]['txn_id'])) {
+            return;
+        }
+
         // -----
         // Retrieve the current status information for the primary/order transaction
         // from PayPal.
