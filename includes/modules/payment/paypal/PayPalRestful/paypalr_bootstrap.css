@@ -22,7 +22,7 @@
     z-index: 100;
 }
 .ppr-button-choice input[type="radio"]+label {
-    padding: .5rem 0 .5rem;
+    padding: .5rem;
     border: 2px solid #d3d3d3;
 }
 .ppr-button-choice input[type="radio"]:checked+label {
