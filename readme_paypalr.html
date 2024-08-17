@@ -168,9 +168,10 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
-        <li>v1.0.4-beta1, 2024-08-14 (lat9, dbltoe)<ul>
+        <li>v1.0.4-beta2, 2024-08-17 (lat9, dbltoe)<ul>
             <li>BUGFIX: Use 'fit-content' for credit-card selection's icon-list.</li>
             <li>BUGFIX: Correcting admin logs when no record exists in the <samp>paypal</samp> for the selected order.</li>
+            <li>BUGFIX: Use <samp>$template</samp> class to locate <code>.css</code> overrides instead of direct-directory checks.</li>
             <li>The following files were changed:<ol>
                 <li>/includes/modules/payment/paypalr.php</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/paypalr.css</li>

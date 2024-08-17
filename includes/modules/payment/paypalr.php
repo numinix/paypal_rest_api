@@ -33,7 +33,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.0.4-beta1';
+    protected const CURRENT_VERSION = '1.0.4-beta2';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
@@ -770,11 +770,12 @@ class paypalr extends base
         //
         // Note: CSS 'inspired' by: https://codepen.io/phusum/pen/VQrQqy
         //
+        global $template, $current_page_base;
+
         $is_bootstrap_template = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true);
         $css_file = ($is_bootstrap_template === true) ? 'paypalr_bootstrap.css' : 'paypalr.css';
-        if (file_exists(DIR_FS_CATALOG . DIR_WS_TEMPLATE . "css/$css_file")) {
-            $css_file_name = DIR_WS_TEMPLATE . "css/$css_file";
-        } else {
+        $css_file_name = $template->get_template_dir("^$css_file", DIR_WS_TEMPLATE, $current_page_base, 'css') . '/' . $css_file;
+        if (!file_exists($css_file_name)) {
             $css_file_name = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/' . $css_file;
         }
 
