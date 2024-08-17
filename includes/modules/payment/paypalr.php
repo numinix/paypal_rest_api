@@ -285,10 +285,11 @@ class paypalr extends base
 
         // -----
         // Validate the configuration, e.g. that the supplied Client ID/Secret are
-        // valid for the active PayPal server.
+        // valid for the active PayPal server. If the configuration's invalid (admin/storefront)
+        // or if we're processing for the admin, all finished here!
         //
         $this->enabled = $this->validateConfiguration($curl_installed);
-        if ($this->enabled === false) {
+        if ($this->enabled === false || IS_ADMIN_FLAG === true) {
             return;
         }
 
@@ -306,17 +307,14 @@ class paypalr extends base
             }
 
             // -----
-            // If on the storefront, check to make sure that the shipping/billing address
-            // countries are supported by PayPal.
+            // Check to make sure that the shipping/billing address countries are supported by PayPal.
             //
             // Note: The payment-module will remain enabled, with a customer message indicating
             // that the payment module cannot be used due to the currently-active address(es).
             //
-            if (IS_ADMIN_FLAG === false) {
-                $this->billingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->billing['country']['iso_code_2']) !== '');
-                if ($_SESSION['cart']->get_content_type() !== 'virtual') {
-                    $this->shippingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->delivery['country']['iso_code_2'] ?? '??') !== '');
-                }
+            $this->billingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->billing['country']['iso_code_2']) !== '');
+            if ($_SESSION['cart']->get_content_type() !== 'virtual') {
+                $this->shippingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->delivery['country']['iso_code_2'] ?? '??') !== '');
             }
         }
 
@@ -325,7 +323,7 @@ class paypalr extends base
         // for OPC's session-hash operation.
         //
         global $current_page_base;
-        if (IS_ADMIN_FLAG === false && defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
+        if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
             $this->onOpcConfirmationPage = true;
             $this->paypalRestfulSessionOnEntry = $_SESSION['PayPalRestful'] ?? [];
             $this->attach($this, ['NOTIFY_OPC_OBSERVER_SESSION_FIXUPS']);
