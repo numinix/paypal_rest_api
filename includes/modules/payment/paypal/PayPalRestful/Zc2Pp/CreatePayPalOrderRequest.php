@@ -6,7 +6,7 @@
  * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.0.3
+ * Last updated: v1.0.4
  */
 namespace PayPalRestful\Zc2Pp;
 
@@ -139,7 +139,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             }
         }
 
-        $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . var_export($this->request, true));
+        $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request, true, true));
     }
     protected function validateOrderAmounts()
     {

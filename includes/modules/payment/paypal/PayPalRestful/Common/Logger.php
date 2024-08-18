@@ -5,7 +5,7 @@
  * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.0.3
+ * Last updated: v1.0.4
  */
 
 namespace PayPalRestful\Common;
@@ -65,7 +65,7 @@ class Logger
     // Also remove unneeded return values that will just 'clutter up' the logged information,
     // unless requested to keep them.
     //
-    public static function logJSON($data, bool $keep_links = false): string
+    public static function logJSON($data, bool $keep_links = false, bool $use_var_export = false): string
     {
         if (is_array($data)) {
             unset(
@@ -98,7 +98,7 @@ class Logger
                 }
             }
         }
-        return json_encode($data, JSON_PRETTY_PRINT);
+        return ($use_var_export === true) ? var_export($data, true) : json_encode($data, JSON_PRETTY_PRINT);
     }
 
     public function write(string $message, bool $include_timestamp = false, string $include_separator = '')
