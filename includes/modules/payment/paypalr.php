@@ -386,10 +386,10 @@ class paypalr extends base
     protected function tableCheckup()
     {
         // -----
-        // Remove any PayPal RESTful storefront logs that were created for v1.0.3 (20240810-20240819).
+        // Remove any PayPal RESTful storefront logs that were created for v1.0.3 (202408).
         //
         if (defined('MODULE_PAYMENT_PAYPALR_VERSION') && version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.0.2', '>') && version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.0.4-beta3', '<')) {
-            $logfiles = glob(DIR_FS_LOGS . '/paypalr-c-*-2024081*.log');
+            $logfiles = glob(DIR_FS_LOGS . '/paypalr-c-*-202408*.log');
             foreach ($logfiles as $next_log) {
                 unlink($next_log);
             }
