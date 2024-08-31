@@ -171,6 +171,7 @@ table table {
         <li>v1.0.5-beta1, 2024-08-31 (lat9)<ul>
             <li>BUGFIX: Transmit billing address on PayPal Wallet requests.</li>
             <li>BUGFIX: Don't auto-disable in the absence of a billing-address.</li>
+            <li>BUGFIX: Don't send payment request to PayPal if there are existing payment-related messages to be displayed.</li>
             <li>The following files were changed:<ol>
                 <li>/includes/modules/payment/paypalr.php</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/ConfirmPayPalPaymentChoiceRequest.php</li>

@@ -907,6 +907,19 @@ class paypalr extends base
         $this->log->write("pre_confirmation_check starts ...\n", true, 'before');
 
         // -----
+        // If some other processing has set a message for 'checkout_payment', there's
+        // no need/sense in continuing since page-based processing will be redirecting
+        // back to the checkout's payment phase.
+        //
+        // This can happen, for instance, if the customer sets a coupon, selects paypalr
+        // and continues to the checkout phase all together.
+        //
+        global $messageStack;
+        if ($messageStack->size('checkout_payment') > 0) {
+            return;
+        }
+
+        // -----
         // If the PayPal Checkout payment-type isn't included in the posted data,
         // send the customer back to the payment phase of checkout to ensure that
         // the selection is made.
