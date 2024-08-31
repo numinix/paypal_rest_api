@@ -2,7 +2,7 @@
 /**
  * Language definitions for the paypalr (PayPal Restful Api) payment module.
  *
- * Last updated: v1.0.0
+ * Last updated: v1.0.5
  */
 $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_TITLE' => 'PayPal Checkout',
@@ -29,6 +29,15 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_PLEASE_NOTE' => 'Please Note:',
     'MODULE_PAYMENT_PAYPALR_UNSUPPORTED_BILLING_COUNTRY' => 'Your billing address\' country not supported by PayPal; credit-card payments cannot be made.',
     'MODULE_PAYMENT_PAYPALR_UNSUPPORTED_SHIPPING_COUNTRY' => 'Your shipping address\' country not supported by PayPal; this payment method cannot be used.',
+
+    // -----
+    // Storefront text used to compose an 'after_process' customer-visible note in the
+    // order's status-history.  Added for v1.0.5.
+    //
+    'MODULE_PAYMENT_PAYPALR_TRANSACTION_ID' => 'Transaction ID: ',  //- Should end with a space
+    'MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE' => 'Payment Type: PayPal Checkout (%s)',  //- %s filled in with either 'paypal' or 'card'
+    'MODULE_PAYMENT_PAYPALR_TRANSACTION_PAYMENT_STATUS' => 'Payment Status: ',  //- Should end with a space
+    'MODULE_PAYMENT_PAYPALR_TRANSACTION_AMOUNT' => 'Amount: ',  //- Should end with a space
 
     // -----
     // Used by the payment module's javascript_validation method.

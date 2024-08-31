@@ -1917,11 +1917,11 @@ class paypalr extends base
         }
 
         $message =
-            'Transaction ID: ' . $this->orderInfo['id'] . "\n" .
-            'Payment Type: PayPal Checkout (' . $payment_info['payment_type'] . ")\n" .
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_ID . $this->orderInfo['id'] . "\n" .
+            sprintf(MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE, $payment_info['payment_type']) . "\n" .
             $timestamp .
-            'Payment Status: ' . $this->orderInfo['payment_status'] . "\n" .
-            'Amount: ' . $payment_info['amount'];
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_PAYMENT_STATUS . $this->orderInfo['payment_status'] . "\n" .
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_AMOUNT . $payment_info['amount'];
         zen_update_orders_history($this->orderInfo['orders_id'], $message, null, -1, 0);
 
         // -----
