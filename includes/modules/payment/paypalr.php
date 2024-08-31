@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.0.4
+ * Last updated: v1.0.5
  */
 /**
  * Load the support class' auto-loader.
@@ -33,7 +33,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.0.4';
+    protected const CURRENT_VERSION = '1.0.5-beta1';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
@@ -312,7 +312,9 @@ class paypalr extends base
             // Note: The payment-module will remain enabled, with a customer message indicating
             // that the payment module cannot be used due to the currently-active address(es).
             //
-            $this->billingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->billing['country']['iso_code_2']) !== '');
+            if (isset($order->billing['country'])) {
+                $this->billingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->billing['country']['iso_code_2']) !== '');
+            }
             if ($_SESSION['cart']->get_content_type() !== 'virtual') {
                 $this->shippingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->delivery['country']['iso_code_2'] ?? '??') !== '');
             }
@@ -586,8 +588,7 @@ class paypalr extends base
             return;
         }
 
-        if ($this->enabled === false || !isset($order->billing['country']['id'])) {
-            $this->enabled = false;
+        if ($this->enabled === false) {
             return;
         }
 
@@ -605,7 +606,7 @@ class paypalr extends base
             return;
         }
 
-        if ($this->zone > 0) {
+        if ($this->zone > 0 && isset($order->billing['country']['id'])) {
             global $db;
 
             $sql =
