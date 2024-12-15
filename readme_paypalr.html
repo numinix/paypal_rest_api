@@ -168,12 +168,13 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
-        <li>v1.0.5-beta1, 2024-09-04 (lat9, brittainmark)<ul>
+        <li>v1.0.5-beta2, 2024-12-15 (lat9, brittainmark)<ul>
             <li>BUGFIX: Transmit billing address on PayPal Wallet requests.</li>
             <li>BUGFIX: Don't auto-disable in the absence of a billing-address.</li>
             <li>BUGFIX: Don't send payment request to PayPal if there are existing payment-related messages to be displayed.</li>
             <li>BUGFIX: Use language-constants for additional status-history record's information.</li>
             <li>BUGFIX: Remove intervening spaces from addresses' postal_codes.</li>
+            <li>BUGFIX: Correct MySQL error when checking out with a checkbox-type attributed product.</li>
             <li>The following files were changed:<ol>
                 <li>/includes/languages/english/modules/payment/lang.paypalr.php</li>
                 <li>/includes/modules/payment/paypalr.php</li>

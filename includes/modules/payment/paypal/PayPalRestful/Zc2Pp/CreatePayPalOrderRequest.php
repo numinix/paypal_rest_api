@@ -289,7 +289,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
         $attributes_where = [];
         foreach ($product['attributes'] as $next_att) {
-            $attributes_where[] = '(options_id = ' . $next_att['option_id'] . ' AND options_values_id = ' . $next_att['value_id'] . ')';
+            $attributes_where[] = '(options_id = ' . (int)$next_att['option_id'] . ' AND options_values_id = ' . (int)$next_att['value_id'] . ')';
         }
 
         global $db;
