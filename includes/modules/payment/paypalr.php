@@ -2,7 +2,7 @@
 /**
  * paypalr.php payment module class for PayPal RESTful API payment method
  *
- * @copyright Copyright 2023-2024 Zen Cart Development Team
+ * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
@@ -33,7 +33,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.0.5-beta1';
+    protected const CURRENT_VERSION = '1.0.5';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
