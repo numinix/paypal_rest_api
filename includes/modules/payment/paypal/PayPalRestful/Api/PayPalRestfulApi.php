@@ -166,7 +166,7 @@ class PayPalRestfulApi extends ErrorInfo
         $this->paypalRequestId = $request_id;
     }
 
-    public function setPayPalMockResponse(strong $mock_response)
+    public function setPayPalMockResponse(string $mock_response)
     {
         $this->paypalMockResponse = $mock_response;
     }
@@ -448,7 +448,7 @@ class PayPalRestfulApi extends ErrorInfo
     // - additional_curl_options
     //     An array of additional CURL options to be applied.
     // - token_required
-    //     An indication as to whether/not an authorization header is to be include.
+    //     An indication as to whether/not an authorization header is to be included.
     //
     // Return Values:
     // - On success, an associative array containing the PayPal response.
