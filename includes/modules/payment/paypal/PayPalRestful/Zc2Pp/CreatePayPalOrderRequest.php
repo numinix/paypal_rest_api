@@ -82,8 +82,13 @@ class CreatePayPalOrderRequest extends ErrorInfo
             'ot_diffs: ' . Logger::logJSON($ot_diffs)
         );
 
+        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || ($ppr_type !== 'card' && MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')) {
+            $intent = 'CAPTURE';
+        } else {
+            $intent = 'AUTHORIZE';
+        }
         $this->request = [
-            'intent' => (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') ? 'CAPTURE' : 'AUTHORIZE',
+            'intent' => $intent,
             'purchase_units' => [
                 [
                     'invoice_id' =>

@@ -223,7 +223,12 @@ class paypalr extends base
         // An order's *initial* order-status depending on the mode in which the PayPal transaction
         // is to be performed.
         //
-        $order_status = (int)(MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') ? MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID : MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+        $ppr_type = $_SESSION['PayPalRestful']['ppr_type'] ?? 'paypal';
+        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || ($ppr_type !== 'card' && MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')) {
+            $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+        } else {
+            $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+        }
         $this->order_status = ($order_status > 1) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
 
         $this->zone = (int)MODULE_PAYMENT_PAYPALR_ZONE;
@@ -406,6 +411,24 @@ class paypalr extends base
         }
 
         global $db;
+
+        // -----
+        // Check for version-specific configuration updates.
+        //
+        if (defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
+            switch (true) {
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.1.0', '<'):
+                    $db->Execute(
+                        "UPDATE " . TABLE_CONFIGURATION . "
+                            SET set_function = 'zen_cfg_select_option([\'Auth Only (All Txns)\', \'Final Sale\', \'Auth Only (Card-Only)\'] ,'
+                          WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE'
+                          LIMIT 1"
+                    );
+                    break;
+                default:
+                    break;
+            }
+        }
 
         // -----
         // Record the current version of the payment module into its database configuration setting.
@@ -1427,7 +1450,7 @@ class paypalr extends base
     {
         $paypal_id = $_SESSION['PayPalRestful']['Order']['id'];
         $this->ppr->setPayPalRequestId($_SESSION['PayPalRestful']['Order']['guid']);
-        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale') {
+        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || ($payment_source !== 'card' && MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')) {
             $response = $this->ppr->captureOrder($paypal_id);
         } else {
             $response = $this->ppr->authorizeOrder($paypal_id);
