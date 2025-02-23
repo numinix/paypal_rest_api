@@ -79,7 +79,7 @@ $define = [
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_TOTAL_MISMATCH' => 'Calculation Mismatch',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR' => 'Confirm Payment Choice', 
 
-    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to "Pending" due to a PayPal response status of \'%2$s\'.',
+    'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to &quot;Pending&quot; due to a PayPal response status of \'%2$s\'.',
     'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypalrestful.php) was not loaded; the payment module has been disabled.',
     'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_NOTIFICATIONS' => 'The required notifications in the order_total.php class were not applied; the payment module cannot place orders.',
     'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE' => 'An error was returned by PayPal when attempting to initiate an order. As a courtesy, only the error \'code\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
@@ -88,7 +88,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_ALERT_EXTERNAL_TXNS' => 'Check the status of order #%u.  PayPal transactions were added outside of the payment-module\'s processing.',
 
     // -----
-    // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudlent cards.
+    // Alert messages for unknown "DECLINED" reasons and lost/stolen/fraudulent cards.
     // -----
 
     // -----
@@ -119,7 +119,7 @@ $define = [
     //
     'MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRED' => 'The %1$s card ending with <var>%2$s</var> has expired.',
     'MODULE_PAYMENT_PAYPALR_TEXT_INSUFFICIENT_FUNDS' => 'The %1$s card ending with <var>%2$s</var> has insufficient funds.',
-    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_FAILED' => 'The "CVV Number" you entered for the %1$s card ending with <var>%2$s</var> is not correct.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_CVV_FAILED' => 'The &quot;CVV Number&quot; you entered for the %1$s card ending with <var>%2$s</var> is not correct.',
 
     // -----
     // $1$s ... MODULE_PAYMENT_PAYPALR_TEXT_TITLE
@@ -218,6 +218,10 @@ $define = [
         'MODULE_PAYMENT_PAYPALR_AVS_CODE' => 'AVS Code (%s)',
         'MODULE_PAYMENT_PAYPALR_RESPONSE_CODE' => 'Response Code (%s)',
         'MODULE_PAYMENT_PAYPALR_CVV_CODE' => 'CVV Code (%s)',
+    'MODULE_PAYMENT_PAYPALR_AUTH_RESULT' => 'Authentication Result:',
+        'MODULE_PAYMENT_PAYPALR_LIABILITY' => 'Liability Shift (%s)',
+        'MODULE_PAYMENT_PAYPALR_AUTH_STATUS' => 'Authentication Status (%s)',
+        'MODULE_PAYMENT_PAYPALR_ENROLL_STATUS' => 'Enrollment Status (%s)',
     'MODULE_PAYMENT_PAYPALR_AMOUNT_MISMATCH' => 'Order Amount Mismatch: %s',    //- %s is the base order-calculation amount/currency-code
     'MODULE_PAYMENT_PAYPALR_CALCULATED_AMOUNT' => 'Calculated Amount:',
     'MODULE_PAYMENT_PAYPALR_INVOICE_NUMBER' => 'Invoice #:',

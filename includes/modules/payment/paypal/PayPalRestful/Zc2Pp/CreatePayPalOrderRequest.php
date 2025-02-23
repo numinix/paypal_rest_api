@@ -3,10 +3,10 @@
  * A class to 'convert' a Zen Cart order to a PayPal order-creation request payload
  * for the PayPalRestful (paypalr) Payment Module
  *
- * @copyright Copyright 2023-2024 Zen Cart Development Team
+ * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.0.5
+ * Last updated: v1.1.0
  */
 namespace PayPalRestful\Zc2Pp;
 
@@ -476,7 +476,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
                 'cancel_url' => $cc_info['webhook'] . '?op=3ds_cancel',
             ],
         ];
-        if (isset($_POST['ppr_cc_sca_always'])) {
+        if (isset($_POST['ppr_cc_sca_always']) || (defined('MODULE_PAYMENT_PAYPALR_SCA_ALWAYS') && MODULE_PAYMENT_PAYPALR_SCA_ALWAYS === 'true')) {
             $payment_source['attributes']['verification']['method'] = 'SCA_ALWAYS'; //- Defaults to 'SCA_WHEN_REQUIRED' for live environment
         }
         return $payment_source;

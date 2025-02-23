@@ -372,6 +372,23 @@ class MainDisplay
             $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PROCESSOR_RESPONSE, implode(', ', $processor_response));
         }
 
+        if (!empty($memo['card_info']['authentication_result'])) {
+            $auth_result = $memo['card_info']['authentication_result'];
+            $auth_info = [];
+            if (isset($auth_result['liability_shift'])) {
+                $auth_info[] = sprintf(MODULE_PAYMENT_PAYPALR_LIABILITY, $auth_result['liability_shift']);
+            }
+            if (isset($auth_result['three_d_secure']['authentication_status'])) {
+                $auth_info[] = sprintf(MODULE_PAYMENT_PAYPALR_AUTH_STATUS, $auth_result['three_d_secure']['authentication_status']);
+            }
+            if (isset($auth_result['three_d_secure']['enrollment_status'])) {
+                $auth_info[] = sprintf(MODULE_PAYMENT_PAYPALR_ENROLL_STATUS, $auth_result['three_d_secure']['enrollment_status']);
+            }
+            if (count($auth_info) !== 0) {
+                $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_AUTH_RESULT, implode(', ', $auth_info));
+            }
+        }
+
         $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_GROSS_AMOUNT, $this->amount->getValueFromString($create_fields['mc_gross']) . ' ' . $create_fields['mc_currency']);
         if ($days_to_settle !== '') {
             $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_DAYSTOSETTLE, $days_to_settle);

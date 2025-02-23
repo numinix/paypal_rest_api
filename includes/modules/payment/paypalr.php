@@ -33,7 +33,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.1.0-beta1';
+    protected const CURRENT_VERSION = '1.1.0-beta2';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
@@ -423,6 +423,12 @@ class paypalr extends base
                             SET set_function = 'zen_cfg_select_option([\'Auth Only (All Txns)\', \'Final Sale\', \'Auth Only (Card-Only)\'] ,'
                           WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE'
                           LIMIT 1"
+                    );
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Trigger 3D Secure on <b>Every</b> Txn?', 'MODULE_PAYMENT_PAYPALR_SCA_ALWAYS', 'false', 'Choose <var>true</var> to trigger 3D Secure for <b>every</b> transaction, regardless of SCA requirements.<br><br><b>Default</b>: <var>false</var>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now())"
                     );
                     break;
                 default:
@@ -2195,6 +2201,7 @@ class paypalr extends base
             'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK',
             'MODULE_PAYMENT_PAYPALR_BRANDNAME',
             'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE',
+            'MODULE_PAYMENT_PAYPALR_SCA_ALWAYS',
             'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS',
             'MODULE_PAYMENT_PAYPALR_HANDLING_OT',
             'MODULE_PAYMENT_PAYPALR_INSURANCE_OT',

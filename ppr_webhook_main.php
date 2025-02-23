@@ -2,12 +2,12 @@
 /**
  * Webhook for PayPal RESTful API payment method (paypalr)
  *
- * @copyright Copyright 2023-2024 Zen Cart Development Team
+ * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 Nov 21 Modified in v1.5.8a $
  *
- * Last updated: v1.0.2
+ * Last updated: v1.1.0
  */
 require 'includes/application_top.php';
 
@@ -92,6 +92,23 @@ if ($order_status === false) {
     unset($_SESSION['PayPalRestful']['Order']);
     $logger->write('==> getOrderStatus failed, redirecting to shopping-cart', true, 'after');
     zen_redirect(zen_href_link(FILENAME_SHOPPING_CART));
+}
+
+// -----
+// If this is a 3DS verification return, check the associated parameters to see
+// if the order should proceed.  Refer to the following link for additional information:
+//
+// https://developer.paypal.com/docs/checkout/advanced/customize/3d-secure/response-parameters/
+//
+if ($op === '3ds_return') {
+    $auth_result = $order_status['payment_source']['card']['authentication_result'];
+    $liability_shift = $auth_result['liability_shift'];
+    $enrollment_status = $auth_result['three_d_secure']['enrollment_status'];
+    if ($liability_shift === 'UNKNOWN' || ($enrollment_status === 'Y' && $liability_shift === 'NO')) {
+        $messageStack->add_session('checkout_payment', MODULE_PAYMENT_PAYPALR_WEBHOOK_TRY_AGAIN, 'error');
+        unset($_SESSION['PayPalRestful']['Order']['PayerAction']);
+        zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
+    }
 }
 
 // -----
