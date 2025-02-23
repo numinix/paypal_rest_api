@@ -2,7 +2,7 @@
 /**
  * Language definitions for the paypalr (PayPal Restful Api) payment module.
  *
- * Last updated: v1.0.5
+ * Last updated: v1.1.0
  */
 $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_TITLE' => 'PayPal Checkout',
@@ -214,6 +214,10 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_MERCHANT_EMAIL' => 'Seller Email:',
     'MODULE_PAYMENT_PAYPALR_MERCHANT_ID' => 'Merchant ID:',
     'MODULE_PAYMENT_PAYPALR_SELLER_PROTECTION' => 'Seller Protection:',
+    'MODULE_PAYMENT_PAYPALR_PROCESSOR_RESPONSE' => 'Processor Response:',
+        'MODULE_PAYMENT_PAYPALR_AVS_CODE' => 'AVS Code (%s)',
+        'MODULE_PAYMENT_PAYPALR_RESPONSE_CODE' => 'Response Code (%s)',
+        'MODULE_PAYMENT_PAYPALR_CVV_CODE' => 'CVV Code (%s)',
     'MODULE_PAYMENT_PAYPALR_AMOUNT_MISMATCH' => 'Order Amount Mismatch: %s',    //- %s is the base order-calculation amount/currency-code
     'MODULE_PAYMENT_PAYPALR_CALCULATED_AMOUNT' => 'Calculated Amount:',
     'MODULE_PAYMENT_PAYPALR_INVOICE_NUMBER' => 'Invoice #:',

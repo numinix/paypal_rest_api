@@ -3,11 +3,11 @@
  * A class that provides the main PayPal request history table for a given order
  * in the Zen Cart admin placed with the PayPal Restful payment module.
  *
- * @copyright Copyright 2023-2024 Zen Cart Development Team
+ * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.0
+ * Last updated: v1.1.0
  */
 namespace PayPalRestful\Admin\Formatters;
 
@@ -359,6 +359,17 @@ class MainDisplay
 
         if (!empty($memo['seller_protection'])) {
             $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_SELLER_PROTECTION, $memo['seller_protection']['status']);
+        }
+
+        if (!empty($memo['processor_response'])) {
+            $processor_response = [
+                sprintf(MODULE_PAYMENT_PAYPALR_AVS_CODE, $memo['processor_response']['avs_code']),
+                sprintf(MODULE_PAYMENT_PAYPALR_RESPONSE_CODE, $memo['processor_response']['response_code']),
+            ];
+            if (isset($memo['processor_response']['cvv_code'])) {
+                $processor_response[] = sprintf(MODULE_PAYMENT_PAYPALR_CVV_CODE, $memo['processor_response']['cvv_code']);
+            }
+            $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PROCESSOR_RESPONSE, implode(', ', $processor_response));
         }
 
         $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_GROSS_AMOUNT, $this->amount->getValueFromString($create_fields['mc_gross']) . ' ' . $create_fields['mc_currency']);

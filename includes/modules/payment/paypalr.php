@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.0.5
+ * Last updated: v1.1.0
  */
 /**
  * Load the support class' auto-loader.
@@ -33,7 +33,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.0.5';
+    protected const CURRENT_VERSION = '1.1.0-beta1';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
