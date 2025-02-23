@@ -168,12 +168,14 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
-        <li>v1.1.0-beta1, 2025-02-23 (lat9)<ul>
+        <li>v1.1.0-beta1, 2025-02-23 (lat9, drbyte)<ul>
             <li>CHANGE: Display card payments' AVS/CVV status in the admin.</li>
+            <li>BUGFIX: Correct function signature.</li>
             <li>The following files were changed:<ol>
                 <li>/includes/languages/english/modules/payment/lang.paypalr.php</li>
                 <li>/includes/modules/payment/paypalr.php</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/Admin/Formatters/MainDisplay.php</li>
+                <li>/includes/modules/payment/paypal/PayPalRestful/API/PayPalRestfulApi.php</li>
             </ol></li>
         </ul></li>
         <li>v1.0.5, 2025-01-02 (lat9, brittainmark)<ul>

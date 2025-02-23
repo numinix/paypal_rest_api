@@ -8,11 +8,11 @@
  * - https://stackoverflow.com/questions/14451401/how-do-i-make-a-patch-request-in-php-using-curl
  * - https://developer.paypal.com/docs/checkout/standard/customize/
  *
- * @copyright Copyright 2023-2024 Zen Cart Development Team
+ * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.2
+ * Last updated: v1.1.0
  */
 namespace PayPalRestful\Api;
 
