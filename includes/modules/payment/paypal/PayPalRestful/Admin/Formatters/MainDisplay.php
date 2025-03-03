@@ -372,8 +372,8 @@ class MainDisplay
             $modal_body .= $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_PROCESSOR_RESPONSE, implode(', ', $processor_response));
         }
 
-        if (!empty($memo['card_info']['authentication_result'])) {
-            $auth_result = $memo['card_info']['authentication_result'];
+        if (!empty($memo['authentication_result'])) {
+            $auth_result = $memo['authentication_result'];
             $auth_info = [];
             if (isset($auth_result['liability_shift'])) {
                 $auth_info[] = sprintf(MODULE_PAYMENT_PAYPALR_LIABILITY, $auth_result['liability_shift']);

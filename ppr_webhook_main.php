@@ -106,7 +106,7 @@ if ($op === '3ds_return') {
     $enrollment_status = $auth_result['three_d_secure']['enrollment_status'];
     if ($liability_shift === 'UNKNOWN' || ($enrollment_status === 'Y' && $liability_shift === 'NO')) {
         $messageStack->add_session('checkout_payment', MODULE_PAYMENT_PAYPALR_WEBHOOK_TRY_AGAIN, 'error');
-        unset($_SESSION['PayPalRestful']['Order']['PayerAction']);
+        unset($_SESSION['PayPalRestful']['Order']['PayerAction'], $_SESSION['PayPalRestful']['Order']['authentication_result']);
         zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
     }
 }
@@ -122,6 +122,7 @@ if ($op === 'return') {
     $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
 } else {
     $_SESSION['PayPalRestful']['Order']['3DS_response'] = $_SESSION['PayPalRestful']['Order']['PayerAction']['ccInfo'];
+    $_SESSION['PayPalRestful']['Order']['authentication_result'] = $auth_result;
 }
 
 // -----

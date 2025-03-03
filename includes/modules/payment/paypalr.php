@@ -1752,6 +1752,7 @@ class paypalr extends base
                 break;
         }
 
+        unset($_SESSION['PayPalRestful']['Order']['authentication_result']);
         if ($response_message !== '') {
             $response_message .= ' ' . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN;
         }
@@ -1859,6 +1860,9 @@ class paypalr extends base
         }
         if (isset($payment['seller_protection'])) {
             $memo['seller_protection'] = $payment['seller_protection'];
+        }
+        if (isset($_SESSION['PayPalRestful']['Order']['authentication_result'])) {
+            $memo['authentication_result'] = $_SESSION['PayPalRestful']['Order']['authentication_result'];
         }
         $memo['amount_mismatch'] = $_SESSION['PayPalRestful']['Order']['amount_mismatch'];
 

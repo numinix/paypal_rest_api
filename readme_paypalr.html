@@ -169,10 +169,11 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
-        <li>v1.1.0-beta1, 2025-02-23 (lat9, drbyte)<ul>
+        <li>v1.1.0-beta2, 2025-03-03 (lat9, drbyte)<ul>
             <li>CHANGE: Display card payments' AVS/CVV status in the admin.</li>
             <li>BUGFIX: Correct function signature.</li>
             <li>CHANGE: Add <code>Auth Only (Card Only)</code> transaction type.</li>
+            <li>CHANGE: Add setting to enable <var>SCA_ALWAYS</var> on card payments and capture 3DS status from PayPal.</li>
             <li>The following files were changed or <span class="added">added</span>:<ol>
                 <li>/ppr_webhook_main.php</li>
                 <li><span class="added">/includes/languages/english/extra_definitions/lang.paypalr_webhook_definitions.php</span></li>
