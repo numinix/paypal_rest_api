@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.1.0
+ * Last updated: v1.1.1
  */
 /**
  * Load the support class' auto-loader.
@@ -33,7 +33,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.1.0';
+    protected const CURRENT_VERSION = '1.1.1-beta1';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
@@ -779,7 +779,7 @@ class paypalr extends base
         $expires_month = [];
         $expires_year = [];
         for ($month = 1; $month < 13; $month++) {
-            $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => $zcDate->output('%B - (%m)', mktime(0, 0, 0, $month))];
+            $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => $zcDate->output('%B - (%m)', mktime(0, 0, 0, $month, 1))];
         }
         $this_year = date('Y');
         for ($year = $this_year; $year < $this_year + 15; $year++) {
@@ -1266,7 +1266,10 @@ class paypalr extends base
                 ['title' => MODULE_PAYMENT_PAYPALR_CC_OWNER, 'field' => '&nbsp;' . $_POST['paypalr_cc_owner']],
                 ['title' => MODULE_PAYMENT_PAYPALR_CC_TYPE, 'field' => '&nbsp;' . $this->ccInfo['type']],
                 ['title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER, 'field' => '&nbsp;' . $this->obfuscateCcNumber($_POST['paypalr_cc_number'])],
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES, 'field' => '&nbsp;' . $zcDate->output('%B, ', mktime(0, 0, 0, (int)$_POST['paypalr_cc_expires_month'])) . $_POST['paypalr_cc_expires_year']],
+                [
+                    'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
+                    'field' => '&nbsp;' . $zcDate->output('%B, ', mktime(0, 0, 0, (int)$_POST['paypalr_cc_expires_month'], 1)) . $_POST['paypalr_cc_expires_year'],
+                ],
             ],
         ];
     }
