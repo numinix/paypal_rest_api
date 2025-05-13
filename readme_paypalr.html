@@ -169,9 +169,11 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
-        <li>v1.1.1-beta1, 2025-05-01 (lat9)<ul>
+        <li>v1.1.1-beta2, 2025-05-13 (lat9)<ul>
             <li>BUGFIX: Correct date-dependent displayed name of months with fewer than 31 days.</li>
+            <li>BUGFIX: Remove duplicated constant (<var>MODULE_PAYMENT_PAYPALR_PAYER_EMAIL</var>) from the language file.</li>
             <li>The following files were changed:<ol>
+                <li>/includes/languages/english/modules/payment/lang.paypalr.php</li>
                 <li>/includes/modules/payment/paypalr.php</li>
             </ol></li>
         </ul></li>

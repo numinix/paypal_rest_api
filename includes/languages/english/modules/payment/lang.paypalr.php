@@ -2,7 +2,7 @@
 /**
  * Language definitions for the paypalr (PayPal Restful Api) payment module.
  *
- * Last updated: v1.1.0
+ * Last updated: v1.1.1
  */
 $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_TITLE' => 'PayPal Checkout',
@@ -160,7 +160,6 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_PAYMENTS_NONE' => 'No currently-settled payments.',
     'MODULE_PAYMENT_PAYPALR_PAYMENTS_TOTAL' => 'Settled Totals:',
     'MODULE_PAYMENT_PAYPALR_NAME_EMAIL_ID' => 'Payer Name / Email / Payer ID',
-    'MODULE_PAYMENT_PAYPALR_PAYER_EMAIL' => 'Payer Email:',
     'MODULE_PAYMENT_PAYPALR_PAYER_ID' => 'Payer ID:',
     'MODULE_PAYMENT_PAYPALR_PAYER_STATUS' => 'Payer Status:',
     'MODULE_PAYMENT_PAYPALR_PAYMENT_TYPE' => 'Payment Type:',
