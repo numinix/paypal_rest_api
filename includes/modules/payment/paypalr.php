@@ -417,7 +417,7 @@ class paypalr extends base
         //
         if (defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
             switch (true) {
-                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.1.0', '<'):
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.1.1', '<'):
                     $db->Execute(
                         "UPDATE " . TABLE_CONFIGURATION . "
                             SET set_function = 'zen_cfg_select_option([\'Auth Only (All Txns)\', \'Final Sale\', \'Auth Only (Card-Only)\'] ,'
@@ -2191,6 +2191,13 @@ class paypalr extends base
         //
         $ppr_webhook_main = file_get_contents(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/ppr_webhook_main.php');
         file_put_contents(DIR_FS_CATALOG . 'ppr_webhook_main.php', $ppr_webhook_main);
+
+        // -----
+        // Define the module's current version so that the tableCheckup method
+        // will apply all changes since the module's introduction.
+        //
+        define('MODULE_PAYMENT_PAYPALR_VERSION', '0.0.0');
+        $this->tableCheckup();
 
         $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
     }
