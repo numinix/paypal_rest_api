@@ -121,9 +121,9 @@ table table {
     <h4>Once you've completed those start-up steps &hellip;</h4>
     <ol>
         <li>Unzip this distribution's zip-file; you'll see the following files and directories:<ol>
-            <li>/ppr_webhook_main.php</li>
+            <li><span class="removed">/ppr_webhook_main.php</span> <span class="smaller">(Moved in v1.1.1)</span></li>
             <li>/includes/classes/observers/auto.paypalrestful.php</li>
-            <li>/includes/languages/english/extra_definitions/lang.paypalr_webhook_definitions.php<span class="smaller">(Added in v1.1.0)</span></li>
+            <li>/includes/languages/english/extra_definitions/lang.paypalr_webhook_definitions.php <span class="smaller">(Added in v1.1.0)</span></li>
             <li>/includes/languages/english/modules/payment/lang.paypalr.php</li>
             <li>/includes/modules/payment/paypalr.php</li>
             <li>/includes/modules/payment/paypal/pprAutoload.php</li>
@@ -132,6 +132,7 @@ table table {
             <li>/includes/modules/payment/paypal/PayPalRestful/paypalr.admin.css</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/paypalr_bootstrap.css</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/paypalr.css</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/ppr_webhook_main.php <span class="smaller">(Moved from root in v1.1.1)</span></li>
             <li>/includes/modules/payment/paypal/PayPalRestful/Admin/AdminMain.php</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/Admin/DoAuthorization.php</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/Admin/DoCapture.php</li>
@@ -169,12 +170,15 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
-        <li>v1.1.1-beta2, 2025-05-13 (lat9)<ul>
+        <li>v1.1.1-beta3, 2025-05-30 (lat9)<ul>
             <li>BUGFIX: Correct date-dependent displayed name of months with fewer than 31 days.</li>
             <li>BUGFIX: Remove duplicated constant (<var>MODULE_PAYMENT_PAYPALR_PAYER_EMAIL</var>) from the language file.</li>
-            <li>The following files were changed:<ol>
+            <li>CHANGE: Maintain <code>/ppr_webhook_main.php</code> based on plugin install.</li>
+            <li>The following files were changed, <span class="added">added</span> or <span class="removed">removed</span>:<ol>
+                <li><span class="removed">/ppr_webhook_main.php</span></li>
                 <li>/includes/languages/english/modules/payment/lang.paypalr.php</li>
                 <li>/includes/modules/payment/paypalr.php</li>
+                <li><span class="added">/includes/modules/payment/paypal/PayPalRestful/ppr_webhook_main.php</span></li>
             </ol></li>
         </ul></li>
         <li>v1.1.0, 2025-03-08 (lat9, drbyte)<ul>

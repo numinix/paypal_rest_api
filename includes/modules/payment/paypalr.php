@@ -33,7 +33,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.1.1-beta1';
+    protected const CURRENT_VERSION = '1.1.1-beta3';
 
     protected const WEBHOOK_NAME = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook_main.php';
 
@@ -2184,6 +2184,14 @@ class paypalr extends base
             );
         }
 
+        // -----
+        // Starting with v1.1.1, installing the payment module includes creating
+        // its root-directory webhook from a copy within the module's storefront
+        // includes directory.
+        //
+        $ppr_webhook_main = file_get_contents(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/ppr_webhook_main.php');
+        file_put_contents(DIR_FS_CATALOG . 'ppr_webhook_main.php', $ppr_webhook_main);
+
         $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
     }
 
@@ -2225,6 +2233,12 @@ class paypalr extends base
         global $db;
 
         $db->Execute("DELETE FROM " . TABLE_CONFIGURATION . " WHERE configuration_key LIKE 'MODULE\_PAYMENT\_PAYPALR\_%'");
+
+        // -----
+        // Starting with v1.1.1, removing the payment module includes deleting
+        // its root-directory webhook.
+        //
+        unlink(DIR_FS_CATALOG . 'ppr_webhook_main.php');
 
         $this->notify('NOTIFY_PAYMENT_PAYPALR_UNINSTALLED');
     }
