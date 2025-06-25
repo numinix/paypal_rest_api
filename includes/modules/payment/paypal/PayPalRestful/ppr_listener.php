@@ -7,7 +7,7 @@
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 Nov 21 Modified in v1.5.8a $
  *
- * Last updated: v1.1.0
+ * Last updated: v1.2.0
  */
 require 'includes/application_top.php';
 

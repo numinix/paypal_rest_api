@@ -6,7 +6,7 @@
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.1.0
+ * Last updated: v1.2.0
  */
 namespace PayPalRestful\Zc2Pp;
 

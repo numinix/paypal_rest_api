@@ -91,7 +91,7 @@ table table {
 
 <body>
     <h1>PayPal RESTful Payment Module (<var>paypalr</var>) for Zen Cart 1.5.8a and later</h1>
-    <h3>Version 1.1.1</h3>
+    <h3>Version 1.2.0</h3>
     <p>Current Support Thread at Zen Cart Forums: <a href="https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support" target="_blank">https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support</a></p>
     <p>Zen Cart Download Link: <a href="https://www.zen-cart.com/downloads.php?do=file&id=2382" target="_blank">https://www.zen-cart.com/downloads.php?do=file&id=2382</a></p>
     <p>GitHub repository: <a href="https://github.com/lat9/paypalr" target="_blank">https://github.com/lat9/paypalr</a></p>
@@ -100,7 +100,7 @@ table table {
     <p>This Zen Cart payment module combines the processing for the <b>PayPal Payments Pro</b> (<var>paypaldp</var>) and <b>PayPal Express Checkout</b> (<var>paypalwpp</var>) payment modules that are currently built into the Zen Cart distribution.  Instead of using the older NVP (<b>N</b>ame <b>V</b>alue <b>P</b>air) methods to communicate with PayPal, this payment module uses PayPal's now-current <a href="https://developer.paypal.com/api/rest/" target="_blank">REST APIs</a> and combines the two legacy methods into one.</p>
     <p>The module's operation has been validated &hellip;</p>
     <ol>
-        <li>With PHP versions 7.4 through 8.3; <b>PHP 7.3 will result in fatal PHP errors!</b></li>
+        <li>With PHP versions 7.4 through 8.4; <b>PHP 7.3 will result in fatal PHP errors!</b></li>
         <li>In Zen Cart's 3-page checkout environment (v1.5.8<b>a</b>, v2.0.x and v2.1.0)</li>
         <li>With <a href="https://www.zen-cart.com/downloads.php?do=file&id=2095" target="_blank">One-Page Checkout</a> (OPC), v2.4.6-2.5.3<ol type="a">
             <li>Using <em>OPC</em>'s guest-checkout feature.</li>
@@ -121,9 +121,10 @@ table table {
     <h4>Once you've completed those start-up steps &hellip;</h4>
     <ol>
         <li>Unzip this distribution's zip-file; you'll see the following files and directories:<ol>
-            <li><span class="removed">/ppr_webhook_main.php</span> <span class="smaller">(Moved in v1.1.1)</span></li>
+            <li><span class="removed">/ppr_webhook_main.php</span> <span class="smaller">(Removed in v1.2.0)</span></li>
             <li>/includes/classes/observers/auto.paypalrestful.php</li>
-            <li>/includes/languages/english/extra_definitions/lang.paypalr_webhook_definitions.php <span class="smaller">(Added in v1.1.0)</span></li>
+            <li>/includes/languages/english/extra_definitions/lang.paypalr_webhook_definitions.php <span class="smaller">(Renamed in v1.2.0)</span></li>
+            <li>/includes/languages/english/extra_definitions/lang.paypalr_redirect_listener_definitions.php <span class="smaller">(Added in v1.2.0)</span></li>
             <li>/includes/languages/english/modules/payment/lang.paypalr.php</li>
             <li>/includes/modules/payment/paypalr.php</li>
             <li>/includes/modules/payment/paypal/pprAutoload.php</li>
@@ -132,7 +133,7 @@ table table {
             <li>/includes/modules/payment/paypal/PayPalRestful/paypalr.admin.css</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/paypalr_bootstrap.css</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/paypalr.css</li>
-            <li>/includes/modules/payment/paypal/PayPalRestful/ppr_webhook_main.php <span class="smaller">(Moved from root in v1.1.1)</span></li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/ppr_listener.php <span class="smaller">(Added in v1.2.0)</span></li>
             <li>/includes/modules/payment/paypal/PayPalRestful/Admin/AdminMain.php</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/Admin/DoAuthorization.php</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/Admin/DoCapture.php</li>
@@ -170,16 +171,20 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
-        <li>v1.1.1-beta3, 2025-05-30 (lat9)<ul>
+        <li>v1.2.0-beta1, 2025-06-25 (lat9, drbyte)<ul>
             <li>BUGFIX: Correct date-dependent displayed name of months with fewer than 31 days.</li>
             <li>BUGFIX: Remove duplicated constant (<var>MODULE_PAYMENT_PAYPALR_PAYER_EMAIL</var>) from the language file.</li>
             <li>CHANGE: Maintain <code>/ppr_webhook_main.php</code> based on plugin install.</li>
             <li>BUGFIX: Configuration settings changed or added for v1.1.0 weren't being applied on an initial installation.</li>
+            <li>CHANGE: Callback/redirect handler renamed from <code>ppr_webhook_main.php</code> to <code>ppr_listener.php</code>.</li>
             <li>The following files were changed, <span class="added">added</span> or <span class="removed">removed</span>:<ol>
                 <li><span class="removed">/ppr_webhook_main.php</span></li>
                 <li>/includes/languages/english/modules/payment/lang.paypalr.php</li>
+                <li><span class="added">/includes/languages/english/extra_definitions/lang.paypalr_redirect_listener_definitions.php</span></li>
+                <li><span class="removed">/includes/languages/english/extra_definitions/lang.paypalr_webhook_definitions.php</span></li>
                 <li>/includes/modules/payment/paypalr.php</li>
-                <li><span class="added">/includes/modules/payment/paypal/PayPalRestful/ppr_webhook_main.php</span></li>
+                <li><span class="added">/includes/modules/payment/paypal/PayPalRestful/ppr_listener.php</span></li>
+                <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php</li>
             </ol></li>
         </ul></li>
         <li>v1.1.0, 2025-03-08 (lat9, drbyte)<ul>
