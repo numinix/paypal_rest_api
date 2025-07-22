@@ -12,7 +12,7 @@
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.1.0
+ * Last updated: v1.2.0
  */
 namespace PayPalRestful\Api;
 
@@ -412,6 +412,7 @@ class PayPalRestfulApi extends ErrorInfo
             'Content-Type: application/json',
             "Authorization: Bearer $oauth2_token",
             'Prefer: return=representation',
+            'PayPal-Partner-Attribution-Id: ZenCart_SP_PPCP'
         ];
 
         // -----
