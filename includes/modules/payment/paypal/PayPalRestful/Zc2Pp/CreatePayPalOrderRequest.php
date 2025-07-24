@@ -69,6 +69,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
     //
     public function __construct(string $ppr_type, \order $order, array $cc_info, array $order_info, array $ot_diffs)
     {
+        parent::__construct();
+
         $this->log = new Logger();
 
         global $currencies;

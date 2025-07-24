@@ -131,6 +131,8 @@ class PayPalRestfulApi extends ErrorInfo
     //
     public function __construct(string $endpoint_type, string $client_id, string $client_secret)
     {
+        parent::__construct();
+
         $this->endpoint = ($endpoint_type === 'live') ? self::ENDPOINT_PRODUCTION : self::ENDPOINT_SANDBOX;
         $this->clientId = $client_id;
         $this->clientSecret = $client_secret;
@@ -592,8 +594,8 @@ class PayPalRestfulApi extends ErrorInfo
             $response = false;
             $this->handleCurlError($request_type, $option, $curl_options);
         // -----
-        // Otherwise, a response was returned.  Call the common response-handler to determine
-        // whether or not an error occurred.
+        // Otherwise, a response was returned.
+        // Call the common response-handler to determine whether or not an error occurred.
         //
         } else {
             $response = $this->handleResponse($request_type, $option, $curl_options, $curl_response);
