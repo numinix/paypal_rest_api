@@ -1940,7 +1940,8 @@ class paypalr extends base
      * identical order-contents within the same session have a unique GUID.
      *
      * Add a customer-visible order-status-history record identifying the
-     * associated transaction ID, payment method, timestamp, status and amount.
+     * associated transaction ID, payment method, timestamp, status, amount,
+     * and payment-source, buyer email and addresses, if not blank.
      */
     public function after_process()
     {
@@ -1957,7 +1958,15 @@ class paypalr extends base
             sprintf(MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE, $payment_info['payment_type']) . "\n" .
             $timestamp .
             MODULE_PAYMENT_PAYPALR_TRANSACTION_PAYMENT_STATUS . $this->orderInfo['payment_status'] . "\n" .
-            MODULE_PAYMENT_PAYPALR_TRANSACTION_AMOUNT . $payment_info['amount'];
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_AMOUNT . $payment_info['amount'] . "\n";
+
+        $payment_type = $this->orderInfo['payment_info']['payment_type'];
+        $message .= MODULE_PAYMENT_PAYPALR_FUNDING_SOURCE . $payment_type . "\n";
+
+        if (!empty($this->orderInfo['payment_source'][$payment_type]['email_address'])) {
+            $message .= MODULE_PAYMENT_PAYPALR_BUYER_EMAIL . $this->orderInfo['payment_source'][$payment_type]['email_address'] . "\n";
+        }
+
         zen_update_orders_history($this->orderInfo['orders_id'], $message, null, -1, 0);
 
         // -----
