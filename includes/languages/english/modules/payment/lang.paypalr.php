@@ -2,7 +2,7 @@
 /**
  * Language definitions for the paypalr (PayPal Restful Api) payment module.
  *
- * Last updated: v1.1.1
+ * Last updated: v1.2.0
  */
 $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_TITLE' => 'PayPal Checkout',
