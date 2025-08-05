@@ -38,6 +38,9 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE' => 'Payment Type: PayPal Checkout (%s)',  //- %s filled in with either 'paypal' or 'card'
     'MODULE_PAYMENT_PAYPALR_TRANSACTION_PAYMENT_STATUS' => 'Payment Status: ',  //- Should end with a space
     'MODULE_PAYMENT_PAYPALR_TRANSACTION_AMOUNT' => 'Amount: ',  //- Should end with a space
+    // Added for v1.2.0:
+    'MODULE_PAYMENT_PAYPALR_BUYER_EMAIL' => 'Buyer Email: ',  //- Should end with a space
+    'MODULE_PAYMENT_PAYPALR_FUNDING_SOURCE' => 'Funding Source: ',  //- Should end with a space
 
     // -----
     // Used by the payment module's javascript_validation method.
@@ -304,7 +307,7 @@ $define = [
 if (IS_ADMIN_FLAG === true) {
     $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION'] =
         '<b>PayPal Checkout (RESTful)</b>, v%s<br><br>' .   //- %s is filled in with the current module version
-        '<a href="https://www.paypal.com" rel="noopener noreferrer" target="_blank">Manage your PayPal <b>business</b> account</a><br><br>' .
+        '<a href="https://www.paypal.com/login" rel="noopener noreferrer" target="_blank">Manage your PayPal <b>business</b> account</a><br><br>' .
         '<b>Configuration instructions:</b><br>' .
         '<ol>
             <li><a href="https://github.com/lat9/paypalr/wiki/Creating-PayPal-Credentials" rel="noopener noreferrer" target="_blank">Create your PayPal credentials.</a></li>
