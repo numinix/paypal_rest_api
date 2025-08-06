@@ -364,8 +364,7 @@ class PayPalRestfulApi extends ErrorInfo
         string $carrier_code,
         string $action = 'ADD',
         bool $email_buyer = false,
-    ): false|array
-    {
+    ): false|array {
         $this->log->write("==> Start updatePackageTracking($paypal_txnid, " . Logger::logJSON($tracking_number) . ", $carrier_code, $action ...)\n", true);
 
         $orderDetails = $this->getOrderStatus($paypal_txnid);
@@ -416,7 +415,7 @@ class PayPalRestfulApi extends ErrorInfo
                 $this->log->write('No registered trackers found; nothing to update/cancel. Txn ID: ' . $paypal_txnid);
                 return false;
             }
-            foreach($trackers as $tracker) {
+            foreach ($trackers as $tracker) {
                 if (\str_ends_with($tracker['id'], $tracking_number)) {
                     if ($tracker['status'] === 'CANCELLED') {
                         $this->log->write("Tracker already CANCELLED for tracking_number $tracking_number; nothing to update/cancel. Txn ID: $paypal_txnid");

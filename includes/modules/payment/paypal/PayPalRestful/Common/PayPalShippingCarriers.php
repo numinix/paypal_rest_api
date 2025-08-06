@@ -20,8 +20,10 @@ class PayPalShippingCarriers
      */
     public static function isValid(string $carrier_code): bool
     {
-        foreach(explode(';', self::carriersCsv) as $line) {
-            if (empty($line)) continue;
+        foreach (explode(';', self::carriersCsv) as $line) {
+            if (empty($line)) {
+                continue;
+            }
             [$name, $code, $country] = explode(',', trim($line));
             if ($code === 'OTHER') {
                 continue;
@@ -44,8 +46,10 @@ class PayPalShippingCarriers
     {
         $found = [];
         $globals = [];
-        foreach(explode(';', self::carriersCsv) as $line) {
-            if (empty($line)) continue;
+        foreach (explode(';', self::carriersCsv) as $line) {
+            if (empty($line)) {
+                continue;
+            }
             [$name, $code, $country] = explode(',', trim($line));
             if ($code === 'OTHER') {
                 continue;
