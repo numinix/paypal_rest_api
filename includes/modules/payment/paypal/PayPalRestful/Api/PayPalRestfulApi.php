@@ -355,6 +355,19 @@ class PayPalRestfulApi extends ErrorInfo
         if (empty($this->webhooksToRegister)) {
             return;
         }
+        // skip unreachable localhost/testing domains
+        $domain = str_replace(['http'.'://', 'https'.'://'], '', rtrim(HTTP_SERVER, '/'));
+        foreach (['.local', '.test'] as $val) {
+            if (str_ends_with($domain, $val)) {
+                return;
+            }
+        }
+        foreach (['localhost', '127.0.0.1'] as $val) {
+            if (str_starts_with($domain, $val)) {
+                return;
+            }
+        }
+
         $url = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook.php';
 
         $events = [];
@@ -415,6 +428,19 @@ class PayPalRestfulApi extends ErrorInfo
         if (empty($webhook_id)) {
             $this->subscribeWebhook();
             return;
+        }
+
+        // skip unreachable localhost/testing domains
+        $domain = str_replace(['http'.'://', 'https'.'://'], '', rtrim(HTTP_SERVER, '/'));
+        foreach (['.local', '.test'] as $val) {
+            if (str_ends_with($domain, $val)) {
+                return;
+            }
+        }
+        foreach (['localhost', '127.0.0.1'] as $val) {
+            if (str_starts_with($domain, $val)) {
+                return;
+            }
         }
 
         // Check whether all the desired webhook actions are registered,
