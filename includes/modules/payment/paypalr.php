@@ -33,7 +33,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.2.0-beta1';
+    protected const CURRENT_VERSION = '1.2.0-beta3';
 
     protected const REDIRECT_LISTENER = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_listener.php';
 
@@ -444,6 +444,13 @@ class paypalr extends base
                          VALUES
                             ('Store (Sub-Brand) Identifier at PayPal', 'MODULE_PAYMENT_PAYPALR_SOFT_DESCRIPTOR', '', 'On customer credit card statements, your company name will show as <code>PAYPAL*(yourname)*(your-sub-brand-name)</code> (max 22 letters for (yourname)*(your-sub-brand-name)). You can add the sub-brand-name here if you want to differentiate purchases from this store vs any other PayPal sales you make.', 6, 0, NULL, NULL, now())"
                     );
+
+                    // -----
+                    // Starting with v1.2.0, installing the payment module includes creating
+                    // its root-directory listeners/handlers from a copy within the module's
+                    // storefront includes directory.
+                    //
+                    $this->manageRootDirectoryFiles();
                     break;
                 default:
                     break;
@@ -2216,6 +2223,25 @@ class paypalr extends base
         // its root-directory listeners/handlers from a copy within the module's
         // storefront includes directory.
         //
+        $this->manageRootDirectoryFiles();
+
+        // -----
+        // Define the module's current version so that the tableCheckup method
+        // will apply all changes since the module's introduction.
+        //
+        define('MODULE_PAYMENT_PAYPALR_VERSION', '0.0.0');
+        $this->tableCheckup();
+
+        $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
+    }
+
+    protected function manageRootDirectoryFiles(): void
+    {
+        // -----
+        // Starting with v1.2.0, installing the payment module includes creating
+        // its root-directory listeners/handlers from a copy within the module's
+        // storefront includes directory.
+        //
         $ppr_listener = file_get_contents(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/ppr_listener.php');
         file_put_contents(DIR_FS_CATALOG . 'ppr_listener.php', $ppr_listener);
 
@@ -2226,15 +2252,6 @@ class paypalr extends base
         if (file_exists(DIR_FS_CATALOG . 'ppr_webhook_main.php')) {
             unlink(DIR_FS_CATALOG . 'ppr_webhook_main.php');
         }
-
-        // -----
-        // Define the module's current version so that the tableCheckup method
-        // will apply all changes since the module's introduction.
-        //
-        define('MODULE_PAYMENT_PAYPALR_VERSION', '0.0.0');
-        $this->tableCheckup();
-
-        $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
     }
 
     public function keys(): array
