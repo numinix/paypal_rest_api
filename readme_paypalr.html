@@ -191,6 +191,7 @@ table table {
             <li>BUGFIX: Configuration settings changed or added for v1.1.0 weren't being applied on an initial installation.</li>
             <li>CHANGE: Callback/redirect handler renamed from <code>ppr_webhook_main.php</code> to <code>ppr_listener.php</code>.</li>
             <li>CHANGE: Add Webhook listening feature.</li>
+            <li>BUGFIX: Don't include customer's IP address in hash, since it can change.</li>
             <li>The following files were changed, <span class="added">added</span> or <span class="removed">removed</span>:<ol>
                 <li><span class="removed">/ppr_webhook_main.php</span></li>
                 <li><span class="added">/includes/auto_loaders/webhook.core.php</span></li>

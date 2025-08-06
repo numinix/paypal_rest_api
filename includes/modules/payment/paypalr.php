@@ -1247,6 +1247,7 @@ class paypalr extends base
     protected function createOrderGuid(\order $order, string $ppr_type): string
     {
         $_SESSION['PayPalRestful']['CompletedOrders'] = $_SESSION['PayPalRestful']['CompletedOrders'] ?? 0;
+        unset($order->info['ip_address']);
         $hash_data = MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE . json_encode($order) . $_SESSION['securityToken'] . $_SESSION['PayPalRestful']['CompletedOrders'];
         if ($ppr_type !== 'paypal') {
             $hash_data .= json_encode($this->ccInfo);
