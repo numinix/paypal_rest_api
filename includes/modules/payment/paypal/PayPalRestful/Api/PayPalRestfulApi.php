@@ -358,7 +358,7 @@ class PayPalRestfulApi extends ErrorInfo
         $url = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook.php';
 
         $events = [];
-        foreach($this->webhooksToRegister as $event) {
+        foreach ($this->webhooksToRegister as $event) {
             $events[] = ['name' => $event];
         }
         $parameters = ['url' => $url, 'event_types' => $events];
@@ -428,11 +428,11 @@ class PayPalRestfulApi extends ErrorInfo
 
         $patchRequired = false;
         $registeredEvents = [];
-        foreach($response['event_types'] as $event) {
+        foreach ($response['event_types'] as $event) {
             $registeredEvents[] = $event['name'];
         }
         if ($registeredEvents[0] !== '*') {
-            foreach($this->webhooksToRegister as $hook) {
+            foreach ($this->webhooksToRegister as $hook) {
                 if (!\in_array($hook, $registeredEvents, true)) {
                     $patchRequired = true;
                 }
@@ -444,7 +444,7 @@ class PayPalRestfulApi extends ErrorInfo
         }
 
         $events = [];
-        foreach($this->webhooksToRegister as $event) {
+        foreach ($this->webhooksToRegister as $event) {
             $events[] = ['name' => $event];
         }
         $parameters = ['op' => 'replace', 'path' => '/event_types', 'value' => $events];
@@ -531,7 +531,7 @@ class PayPalRestfulApi extends ErrorInfo
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/x-www-form-urlencoded',
                 'Authorization: Basic ' . base64_encode($client_id . ':' . $client_secret),
-            ]
+            ],
         ];
         $response = $this->curlPost('v1/oauth2/token', ['grant_type' => 'client_credentials'], $additional_curl_options, false);
 
@@ -564,7 +564,7 @@ class PayPalRestfulApi extends ErrorInfo
             'Content-Type: application/json',
             "Authorization: Bearer $oauth2_token",
             'Prefer: return=representation',
-            'PayPal-Partner-Attribution-Id: ZenCart_SP_PPCP'
+            'PayPal-Partner-Attribution-Id: ZenCart_SP_PPCP',
         ];
 
         // -----
