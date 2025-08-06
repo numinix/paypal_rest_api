@@ -54,7 +54,7 @@ class WebhookController
 
         // Ensure that the incoming request contains headers etc relevant to PayPal
         if (!$verifier->shouldRespond()) {
-            $this->ppr_logger->write('ppr_webhook IGNORED DUE TO HEADERS MISMATCH' . print_r($request_headers, true), false, 'before');
+            $this->ppr_logger->write('ppr_webhook IGNORED DUE TO HEADERS MISMATCH' . "\n" . print_r($request_headers, true), false, 'before');
             return false;
         }
 
