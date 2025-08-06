@@ -134,11 +134,16 @@ $autoLoadConfig[90][] = [
     'objectName' => 'currencies',
 ];
 /**
- * Breakpoint 96.
+ * Breakpoints 95,96.
  *
+ * require 'includes/init_includes/init_languages.php';
  * require 'includes/init_includes/init_sanitize.php';
  *
  */
+$autoLoadConfig[95][] = [
+    'autoType' => 'init_script',
+    'loadFile' => 'init_languages.php',
+];
 $autoLoadConfig[96][] = [
     'autoType' => 'init_script',
     'loadFile' => 'init_sanitize.php',
@@ -157,10 +162,6 @@ $autoLoadConfig[100][] = [
  * Breakpoint 110.
  *
  */
-$autoLoadConfig[110][] = [
-    'autoType' => 'init_script',
-    'loadFile' => 'init_languages.php',
-];
 $autoLoadConfig[110][] = [
     'autoType' => 'init_script',
     'loadFile' => 'init_templates.php',
