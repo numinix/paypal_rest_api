@@ -850,6 +850,7 @@ class PayPalRestfulApi extends ErrorInfo
             // 400: A general, usually interface-related, error occurred.
             // 403: Permissions error, the client doesn't have access to the requested endpoint.
             // 404: Something was not found.
+            // 409: Resource conflict: duplicate/request already in progress.
             // 422: Unprocessable entity, kind of like 400.
             // 429: Rate Limited (you're making too many requests too quickly; you should reduce your rate of requests to stay within our Acceptable Useage Policy)
             // 500: Server Error
@@ -858,6 +859,7 @@ class PayPalRestfulApi extends ErrorInfo
             case 400:
             case 403:
             case 404:
+            case 409:
             case 422:
             case 429:
             case 500:
