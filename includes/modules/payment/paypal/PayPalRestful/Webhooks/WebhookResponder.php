@@ -29,10 +29,10 @@ class WebhookResponder
      */
     public function shouldRespond(): bool
     {
-        $headers = $this->webhook->getHeaders();
+        $headers = array_change_key_case($this->webhook->getHeaders(), CASE_UPPER);
         $data = $this->webhook->getJsonBody();
-        if (array_key_exists('Paypal-Auth-Version', $headers)
-            && array_key_exists('Paypal-Auth-Algo', $headers)
+        if (array_key_exists('PAYPAL-AUTH-VERSION', $headers)
+            && array_key_exists('PAYPAL-AUTH-ALGO', $headers)
             && isset($data['event_type'])
             && \str_contains($this->webhook->getUserAgent(), 'PayPal/')
         ) {
@@ -72,16 +72,16 @@ class WebhookResponder
      */
     protected function doCrcCheck(): bool|null
     {
-        $headers = $this->webhook->getHeaders();
+        $headers = array_change_key_case($this->webhook->getHeaders(), CASE_UPPER);
 
-        $transmissionId = $headers['Paypal-Transmission-Id'];
-        $timestamp = $headers['Paypal-Transmission-Time'];
+        $transmissionId = $headers['PAYPAL-TRANSMISSION-ID'];
+        $timestamp = $headers['PAYPAL-TRANSMISSION-TIME'];
         $crc = \hexdec(\hash('crc32b', $this->webhook->getRawBody()));
         $calculatedSignature = "$transmissionId|$timestamp|$this->webhook_listener_subscribe_id|$crc";
-        $transmissionSignature = $headers['Paypal-Transmission-Sig'];
+        $transmissionSignature = $headers['PAYPAL-TRANSMISSION-SIG'];
         $decodedSignature = base64_decode($transmissionSignature);
 
-        $publicKeyUrl = $headers['Paypal-Cert-Url'];
+        $publicKeyUrl = $headers['PAYPAL-CERT-URL'];
 
         // @TODO - download and cache the public key, from the URL, instead of retrieving fresh in real time
         $pem_cert = \file_get_contents($publicKeyUrl); // @TODO add curl fallback option in case server blocks this way of reading
@@ -121,9 +121,8 @@ class WebhookResponder
      */
     protected function setWebhookSubscribeId()
     {
-        // @TODO - need to create this Config constant, or store in db some other way, when we register it upon installation of the paypalr module.
-        if (defined('PAYPALR_LISTENER_SUBSCRIBE_ID')) {
-            $this->webhook_listener_subscribe_id = PAYPALR_LISTENER_SUBSCRIBE_ID;
+        if (defined('MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS')) {
+            $this->webhook_listener_subscribe_id = MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS;
         }
     }
 }
