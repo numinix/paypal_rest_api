@@ -132,8 +132,6 @@ class paypalr extends base
 
     /**
      * An instance of the PayPalRestfulApi class.
-     *
-     * @var object PayPalRestfulApi
      */
     protected PayPalRestfulApi $ppr;
 
@@ -202,7 +200,7 @@ class paypalr extends base
 
         $this->sort_order = defined('MODULE_PAYMENT_PAYPALR_SORT_ORDER') ? ((int)MODULE_PAYMENT_PAYPALR_SORT_ORDER) : null;
         if (null === $this->sort_order) {
-            return false;
+            return;
         }
 
         // @TODO - "Retired" check should accommodate 'webhook' mode too, because we do want to still respond to webhooks when in Retired mode.
@@ -694,8 +692,8 @@ class paypalr extends base
     // --------------------------------------------
 
     /**
-     * Validate the credit card information via javascript (Number, Owner, and CVV lengths), if
-     * card payments are to be accepted.
+     * Validate the credit card information via javascript (Number, Owner, and CVV lengths),
+     * if card payments are to be accepted.
      */
     public function javascript_validation(): string
     {
@@ -803,7 +801,7 @@ class paypalr extends base
             $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => $zcDate->output('%B - (%m)', mktime(0, 0, 0, $month, 1))];
         }
         $this_year = date('Y');
-        for ($year = $this_year; $year < $this_year + 15; $year++) {
+        for ($year = $this_year; $year < (int)$this_year + 15; $year++) {
             $expires_year[] = ['id' => $year, 'text' => $year];
         }
 
