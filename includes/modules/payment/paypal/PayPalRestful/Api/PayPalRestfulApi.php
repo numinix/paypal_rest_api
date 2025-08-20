@@ -477,6 +477,18 @@ class PayPalRestfulApi extends ErrorInfo
         $response = $this->curlPatch("v1/notifications/webhooks/$webhook_id", [$parameters]);
     }
 
+    public function webhookVerifyByPostback($parameters): bool|null
+    {
+        $this->log->write("==> Start webhookVerifyByPostback", true);
+        $response = $this->curlPost('v1/notifications/verify-webhook-signature', $parameters);
+        if ($response === false) {
+            $this->log->write("==> End webhookVerifyByPostback (failed)", true);
+            return null;
+        }
+        $this->log->write("==> End webhookVerifyByPostback (success)", true);
+        return ($response['verification_status'] === 'SUCCESS');
+    }
+
     /**
      * When uninstalling this module, we should cleanup the webhook subscription record, so PayPal stops sending notifications.
      */

@@ -13,6 +13,8 @@
  */
 namespace PayPalRestful\Webhooks;
 
+use PayPalRestful\Api\PayPalRestfulApi;
+
 class WebhookResponder
 {
     protected bool $shouldRespond = false;
@@ -50,13 +52,13 @@ class WebhookResponder
 
         $valid = $this->doCrcCheck();
 
-        // In case we couldn't complete a CRC check (ie: internal issue, not "failed validation),
-        // this falls through to trying a postback instead
+        // Null means we couldn't complete a CRC check (ie: internal issue, not "failed validation"),
+        // So this falls through to trying a postback instead
         if ($valid === null) {
             $valid = $this->verifyByPostback();
         }
 
-        // null means "we" couldn't complete a verification attempt (and we *will* want PayPal to see it as failed-to-complete, so they keep re-sending)
+        // null means "we" (internally) couldn't complete a verification attempt (and we *will* want PayPal to see it as failed-to-complete, so they keep re-sending)
         // false means "failed validation"
         // true means "passed validation"
         if ($valid !== null) {
@@ -93,27 +95,36 @@ class WebhookResponder
     }
 
     /**
-     * @return bool|null  returns null if unable to use CURL
+     * @return bool|null  returns null if unable to use CURL or if the access token is invalid.
      */
     protected function verifyByPostback(): bool|null
     {
-        $headers = $this->webhook->getHeaders();
+        $headers = array_change_key_case($this->webhook->getHeaders(), CASE_UPPER);
+        $params_array = [
+            'transmission_id' => $headers['PAYPAL-TRANSMISSION-ID'],
+            'transmission_time' => $headers['PAYPAL-TRANSMISSION-TIME'],
+            'cert_url' => $headers['PAYPAL-CERT-URL'],
+            'auth_algo' => 'SHA256withRSA',
+            'transmission_sig' => $headers['PAYPAL-TRANSMISSION-SIG'],
+            'webhook_id' => $this->webhook_listener_subscribe_id,
+            'webhook_event' => json_decode($this->webhook->getRawBody(), false), // decoded here because we re-encode for transmission later.
+        ];
 
-// @TODO rewrite as curl() call, and set ACCESS-TOKEN
+        // Load the PayPal RESTful API class and get the credentials, so we can make the postback using the current access token
+        require DIR_WS_MODULES . 'payment/paypalr.php';
+        [$client_id, $secret] = \paypalr::getEnvironmentInfo();
+        $ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret);
 
-//  curl -X POST https://api.sandbox.paypal.com/v1/notifications/verify-webhook-signature \
-//  -H "Content-Type: application/json" \
-//  -H "Authorization: Bearer ACCESS-TOKEN" \
-//  -d '{
-//  "transmission_id": "$headers['Paypal-Transmission-Id']",
-//  "transmission_time": "$headers['Paypal-Transmission-Time']",
-//  "cert_url": "$headers['Paypal-Cert-Url']",
-//  "auth_algo": "SHA256withRSA",
-//  "transmission_sig": "$headers['Paypal-Transmission-Sig']",
-//  "webhook_id": "$this->webhook_listener_subscribe_id",
-//  "webhook_event": "$this->webhook->getRawBody()"
-//}'
-//
+        // We pass true here because we can only get an access token if it is valid; else we must just say the webhook validation failed
+        if ($ppr->validatePayPalCredentials(true) === false) {
+            //$this->ppr_logger->write('PayPal credentials are invalid or token expired; cannot verify webhook by postback.', false, 'before');
+            return null; // Unable to get a current access token.
+        }
+
+        // Now that the access token is confirmed, we submit this postback via CURL.
+        $result = $ppr->webhookVerifyByPostback($params_array);
+
+        return $result === true;
     }
 
     /**
