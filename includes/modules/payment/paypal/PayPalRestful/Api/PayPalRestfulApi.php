@@ -480,7 +480,7 @@ class PayPalRestfulApi extends ErrorInfo
     /**
      * When uninstalling this module, we should cleanup the webhook subscription record, so PayPal stops sending notifications.
      */
-    public function unsubscribeWebhooks()
+    public function unsubscribeWebhooks(): void
     {
         $this->log->write("==> Start deleteWebhook Registration", true);
         $url = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook.php';
