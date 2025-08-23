@@ -1,11 +1,11 @@
 <?php
 /**
- * Webhook for PayPal RESTful API payment method (paypalr)
+ * Page-Redirect Listener for PayPal RESTful API payment method (paypalr)
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
- * @version $Id: lat9 Nov 21 Modified in v1.5.8a $
+ * @version $Id:  $
  *
  * Last updated: v1.2.0
  */
@@ -16,6 +16,7 @@ require 'includes/application_top.php';
 // done here.  Kill any session and whitescreen since it's an invalid access.
 //
 if (!defined('MODULE_PAYMENT_PAYPALR_STATUS') || MODULE_PAYMENT_PAYPALR_STATUS === 'False') {
+    // @TODO - set a header to 403 Forbidden? or 401 Unauthorized? or 400 Bad Request?
     require DIR_WS_INCLUDES . 'application_bottom.php';
     die();
 }

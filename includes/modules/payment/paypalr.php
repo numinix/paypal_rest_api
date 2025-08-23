@@ -759,7 +759,7 @@ class paypalr extends base
         ];
 
         // -----
-        // Return **only** the PayPal selection as a button, if cards aren't to be accepted. If the customer's
+        // Return **only** the PayPal selection as a button, if cards aren't to be accepted. If the customer is
         // shipping to a country unsupported by PayPal, add some jQuery to disable the associated payment-module
         // selection and display a note to the customer.
         //
