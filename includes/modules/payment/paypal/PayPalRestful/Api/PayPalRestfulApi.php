@@ -391,7 +391,12 @@ class PayPalRestfulApi extends ErrorInfo
                 $this->log->write('ERROR: Package Tracking requires a carrier_code value when tracking_number is provided. Carrier code is empty.');
                 return false;
             }
-            $country_iso_3 = $orderDetails['purchase_units'][0]['shipping']['address']['country_code'] ?? '';
+            // find country code
+            $country_iso_2 = $orderDetails['purchase_units'][0]['shipping']['address']['country_code'] ?? '';
+            global $db;
+            $sql = "SELECT countries_iso_code_3 FROM " . TABLE_COUNTRIES . " WHERE countries_iso_code_2 = '" . zen_db_input($country_iso_2) . "'";
+            $result = $db->Execute($sql, 1);
+            $country_iso_3 = $result->fields['countries_iso_code_3'] ?? '';
             $checkedCode = PayPalShippingCarriers::findBestMatch($carrier_code, $country_iso_3);
 
             if ($checkedCode !== null) {
