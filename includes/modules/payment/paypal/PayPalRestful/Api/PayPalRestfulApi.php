@@ -391,8 +391,14 @@ class PayPalRestfulApi extends ErrorInfo
                 $this->log->write('ERROR: Package Tracking requires a carrier_code value when tracking_number is provided. Carrier code is empty.');
                 return false;
             }
+            $country_iso_3 = $orderDetails['purchase_units'][0]['shipping']['address']['country_code'] ?? '';
+            $checkedCode = PayPalShippingCarriers::findBestMatch($carrier_code, $country_iso_3);
+
+            if ($checkedCode !== null) {
+                $carrier_code = $checkedCode;
+            }
             // If carrier name is not officially supported, set to OTHER and use provided name as explanation
-            if (PayPalShippingCarriers::isValid($carrier_code)) {
+            if (!empty($checkedCode) || PayPalShippingCarriers::isValid($carrier_code)) {
                 $carrier_name_other = null;
             } else {
                 $carrier_name_other = $carrier_code;
@@ -409,6 +415,7 @@ class PayPalRestfulApi extends ErrorInfo
                 'notify_buyer' => $email_buyer,
             ];
             $response = $this->curlPost("v2/checkout/orders/$paypal_txnid/track", $parameters);
+
         } else { // $action == 'CANCEL' (to delete a package tracking number)
             $trackers = $orderDetails['purchase_units'][0]['shipping']['trackers'] ?? null;
             if (empty($trackers)) {

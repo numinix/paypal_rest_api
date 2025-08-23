@@ -35,6 +35,44 @@ class PayPalShippingCarriers
         return false;
     }
 
+    public static function findBestMatch(string $carrier_name, string $country_iso_3 = ''): ?string
+    {
+        $carrier_name = \strtoupper($carrier_name);
+        if ($carrier_name === 'OTHER') {
+            return 'OTHER';
+        }
+
+        $bestMatch = '';
+        $carriersForCountry = self::getCarriersForCountry($country_iso_3, true);
+        $carriersForCountry = \array_change_key_case($carriersForCountry, \CASE_UPPER);
+
+        // if we have an exact match on code, just return it
+        if (\array_key_exists($carrier_name, $carriersForCountry)) {
+            return $carrier_name;
+        }
+
+        // find longest-matching name
+        foreach ($carriersForCountry as $code => $name) {
+            $name = \strtoupper($name);
+            if (str_contains($carrier_name, $name)) {
+                if (strlen($name) > strlen($bestMatch)) {
+                    $bestMatch = $name;
+                }
+            }
+        }
+
+        // return the code for the best-matching name
+        if (!empty($bestMatch)) {
+            foreach ($carriersForCountry as $code => $name) {
+                if ($bestMatch === \strtoupper($name)) {
+                    return $code;
+                }
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Lookup available carriers by country code.
      *
