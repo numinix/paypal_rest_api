@@ -33,7 +33,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.2.0-beta1';
+    protected const CURRENT_VERSION = '1.2.0-beta3';
 
     protected const REDIRECT_LISTENER = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_listener.php';
 
@@ -132,8 +132,6 @@ class paypalr extends base
 
     /**
      * An instance of the PayPalRestfulApi class.
-     *
-     * @var object PayPalRestfulApi
      */
     protected PayPalRestfulApi $ppr;
 
@@ -202,7 +200,7 @@ class paypalr extends base
 
         $this->sort_order = defined('MODULE_PAYMENT_PAYPALR_SORT_ORDER') ? ((int)MODULE_PAYMENT_PAYPALR_SORT_ORDER) : null;
         if (null === $this->sort_order) {
-            return false;
+            return;
         }
 
         // @TODO - "Retired" check should accommodate 'webhook' mode too, because we do want to still respond to webhooks when in Retired mode.
@@ -444,6 +442,13 @@ class paypalr extends base
                          VALUES
                             ('Store (Sub-Brand) Identifier at PayPal', 'MODULE_PAYMENT_PAYPALR_SOFT_DESCRIPTOR', '', 'On customer credit card statements, your company name will show as <code>PAYPAL*(yourname)*(your-sub-brand-name)</code> (max 22 letters for (yourname)*(your-sub-brand-name)). You can add the sub-brand-name here if you want to differentiate purchases from this store vs any other PayPal sales you make.', 6, 0, NULL, NULL, now())"
                     );
+
+                    // -----
+                    // Starting with v1.2.0, installing the payment module includes creating
+                    // its root-directory listeners/handlers from a copy within the module's
+                    // storefront includes directory.
+                    //
+                    $this->manageRootDirectoryFiles();
                     break;
                 default:
                     break;
@@ -687,8 +692,8 @@ class paypalr extends base
     // --------------------------------------------
 
     /**
-     * Validate the credit card information via javascript (Number, Owner, and CVV lengths), if
-     * card payments are to be accepted.
+     * Validate the credit card information via javascript (Number, Owner, and CVV lengths),
+     * if card payments are to be accepted.
      */
     public function javascript_validation(): string
     {
@@ -754,7 +759,7 @@ class paypalr extends base
         ];
 
         // -----
-        // Return **only** the PayPal selection as a button, if cards aren't to be accepted. If the customer's
+        // Return **only** the PayPal selection as a button, if cards aren't to be accepted. If the customer is
         // shipping to a country unsupported by PayPal, add some jQuery to disable the associated payment-module
         // selection and display a note to the customer.
         //
@@ -796,7 +801,7 @@ class paypalr extends base
             $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => $zcDate->output('%B - (%m)', mktime(0, 0, 0, $month, 1))];
         }
         $this_year = date('Y');
-        for ($year = $this_year; $year < $this_year + 15; $year++) {
+        for ($year = $this_year; $year < (int)$this_year + 15; $year++) {
             $expires_year[] = ['id' => $year, 'text' => $year];
         }
 
@@ -2114,11 +2119,11 @@ class paypalr extends base
 
                 ('Client Secret (live)', 'MODULE_PAYMENT_PAYPALR_SECRET_L', '', 'The <em>Client Secret</em> from your PayPal API Signature settings under *API Access* for your <b>live</b> site. Required if using the <b>live</b> environment.', 6, 0, NULL, 'zen_cfg_password_display', now()),
 
-                ('Client ID (sandbox)', 'MODULE_PAYMENT_PAYPALR_CLIENTID_S', '', 'The <em>Client ID</em> from your PayPal API Signature settings under *API Access* for your <b>sandbox</b> site. Required if using the <b>sandbox</b> environment..', 6, 0, NULL, 'zen_cfg_password_display', now()),
+                ('Client ID (sandbox)', 'MODULE_PAYMENT_PAYPALR_CLIENTID_S', '', 'The <em>Client ID</em> from your PayPal API Signature settings under *API Access* for your <b>sandbox</b> site. Required if using the <b>sandbox</b> environment.', 6, 0, NULL, 'zen_cfg_password_display', now()),
 
                 ('Client Secret (sandbox)', 'MODULE_PAYMENT_PAYPALR_SECRET_S', '', 'The <em>Client Secret</em> from your PayPal API Signature settings under *API Access* for your <b>sandbox</b> site. Required if using the <b>sandbox</b> environment.', 6, 0, NULL, 'zen_cfg_password_display', now()),
 
-                ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
+                ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_SORT_ORDER', '-1', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
 
                 ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now()),
 
@@ -2216,16 +2221,7 @@ class paypalr extends base
         // its root-directory listeners/handlers from a copy within the module's
         // storefront includes directory.
         //
-        $ppr_listener = file_get_contents(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/ppr_listener.php');
-        file_put_contents(DIR_FS_CATALOG . 'ppr_listener.php', $ppr_listener);
-
-        $ppr_webhook = file_get_contents(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/ppr_webhook.php');
-        file_put_contents(DIR_FS_CATALOG . 'ppr_webhook.php', $ppr_webhook);
-
-        // We also delete the old ppr_webhook_main.php file if present
-        if (file_exists(DIR_FS_CATALOG . 'ppr_webhook_main.php')) {
-            unlink(DIR_FS_CATALOG . 'ppr_webhook_main.php');
-        }
+        $this->manageRootDirectoryFiles();
 
         // -----
         // Define the module's current version so that the tableCheckup method
@@ -2237,11 +2233,35 @@ class paypalr extends base
         $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
     }
 
+    protected function manageRootDirectoryFiles(): void
+    {
+        // -----
+        // Starting with v1.2.0, installing the payment module includes creating
+        // its root-directory listeners/handlers from a copy within the module's
+        // storefront includes directory.
+        //
+        $ppr_listener = file_get_contents(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/ppr_listener.php');
+        file_put_contents(DIR_FS_CATALOG . 'ppr_listener.php', $ppr_listener);
+
+        $ppr_webhook = file_get_contents(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/ppr_webhook.php');
+        file_put_contents(DIR_FS_CATALOG . 'ppr_webhook.php', $ppr_webhook);
+
+        // We also delete the old ppr_webhook_main.php file if present
+        if (file_exists(DIR_FS_CATALOG . 'ppr_webhook_main.php')) {
+            unlink(DIR_FS_CATALOG . 'ppr_webhook_main.php');
+        }
+    }
+
     public function keys(): array
     {
         return [
             'MODULE_PAYMENT_PAYPALR_VERSION',
             'MODULE_PAYMENT_PAYPALR_STATUS',
+            'MODULE_PAYMENT_PAYPALR_BRANDNAME',
+            'MODULE_PAYMENT_PAYPALR_SOFT_DESCRIPTOR',
+            'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE',
+            'MODULE_PAYMENT_PAYPALR_SCA_ALWAYS',
+            'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS',
             'MODULE_PAYMENT_PAYPALR_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_ZONE',
             'MODULE_PAYMENT_PAYPALR_SERVER',
@@ -2249,18 +2269,13 @@ class paypalr extends base
             'MODULE_PAYMENT_PAYPALR_SECRET_L',
             'MODULE_PAYMENT_PAYPALR_CLIENTID_S',
             'MODULE_PAYMENT_PAYPALR_SECRET_S',
+            'MODULE_PAYMENT_PAYPALR_CURRENCY',
+            'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK',
             'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_VOIDED_STATUS_ID',
             'MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID',
-            'MODULE_PAYMENT_PAYPALR_CURRENCY',
-            'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK',
-            'MODULE_PAYMENT_PAYPALR_BRANDNAME',
-            'MODULE_PAYMENT_PAYPALR_SOFT_DESCRIPTOR',
-            'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE',
-            'MODULE_PAYMENT_PAYPALR_SCA_ALWAYS',
-            'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS',
             'MODULE_PAYMENT_PAYPALR_HANDLING_OT',
             'MODULE_PAYMENT_PAYPALR_INSURANCE_OT',
             'MODULE_PAYMENT_PAYPALR_DISCOUNT_OT',

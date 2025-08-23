@@ -455,6 +455,19 @@ class PayPalRestfulApi extends ErrorInfo
         if (empty($this->webhooksToRegister)) {
             return;
         }
+        // skip unreachable localhost/testing domains
+        $domain = str_replace(['http'.'://', 'https'.'://'], '', rtrim(HTTP_SERVER, '/'));
+        foreach (['.local', '.test'] as $val) {
+            if (str_ends_with($domain, $val)) {
+                return;
+            }
+        }
+        foreach (['localhost', '127.0.0.1'] as $val) {
+            if (str_starts_with($domain, $val)) {
+                return;
+            }
+        }
+
         $url = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook.php';
 
         $events = [];
@@ -517,6 +530,19 @@ class PayPalRestfulApi extends ErrorInfo
             return;
         }
 
+        // skip unreachable localhost/testing domains
+        $domain = str_replace(['http'.'://', 'https'.'://'], '', rtrim(HTTP_SERVER, '/'));
+        foreach (['.local', '.test'] as $val) {
+            if (str_ends_with($domain, $val)) {
+                return;
+            }
+        }
+        foreach (['localhost', '127.0.0.1'] as $val) {
+            if (str_starts_with($domain, $val)) {
+                return;
+            }
+        }
+
         // Check whether all the desired webhook actions are registered,
         // if they're not, send an updated array of event_types names
 
@@ -551,10 +577,22 @@ class PayPalRestfulApi extends ErrorInfo
         $response = $this->curlPatch("v1/notifications/webhooks/$webhook_id", [$parameters]);
     }
 
+    public function webhookVerifyByPostback($parameters): bool|null
+    {
+        $this->log->write("==> Start webhookVerifyByPostback", true);
+        $response = $this->curlPost('v1/notifications/verify-webhook-signature', $parameters);
+        if ($response === false) {
+            $this->log->write("==> End webhookVerifyByPostback (failed)", true);
+            return null;
+        }
+        $this->log->write("==> End webhookVerifyByPostback (success)", true);
+        return ($response['verification_status'] === 'SUCCESS');
+    }
+
     /**
      * When uninstalling this module, we should cleanup the webhook subscription record, so PayPal stops sending notifications.
      */
-    public function unsubscribeWebhooks()
+    public function unsubscribeWebhooks(): void
     {
         $this->log->write("==> Start deleteWebhook Registration", true);
         $url = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook.php';

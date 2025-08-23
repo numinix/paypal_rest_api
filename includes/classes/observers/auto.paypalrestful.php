@@ -1,12 +1,12 @@
 <?php
 /**
- * Part of the paypalr (PayPal Restful Api) payment module.  This
- * observer-class watches for notifications from the 'order_total' class,
+ * Part of the paypalr (PayPal Restful Api) payment module.
+ * It also watches for notifications from the 'order_total' class,
  * introduced in this (https://github.com/zencart/zencart/pull/6090) Zen Cart PR,
  * to determine an order's overall value and what amounts each order-total
  * module has added/subtracted to the order's overall value.
  *
- * Last updated: v1.0.2
+ * Last updated: v1.2.0
  */
 class zcObserverPaypalrestful extends base
 {
@@ -17,7 +17,7 @@ class zcObserverPaypalrestful extends base
     public function __construct()
     {
         // -----
-        // If the paypalr payment-module isn't installed or isn't configurated to be
+        // If the paypalr payment-module isn't installed or isn't configured to be
         // enabled, nothing further to do here.
         //
         if (!defined('MODULE_PAYMENT_PAYPALR_STATUS') || MODULE_PAYMENT_PAYPALR_STATUS !== 'True') {
@@ -26,7 +26,7 @@ class zcObserverPaypalrestful extends base
 
         // -----
         // If currently on either the 3-page or OPC checkout-confirmation pages, need to monitor
-        // calls to the order-totals' pre_confirmation_check method.  That method's run on that
+        // calls to the order-totals' pre_confirmation_check method. That method is run on that
         // page prior to paypalr's pre_confirmation_check method.
         //
         // NOTE: The page that's set during the AJAX checkout-payment class is 'index'!

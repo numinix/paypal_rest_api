@@ -22,7 +22,11 @@ class WebhookObject
         protected string $rawBody = '', // request body, unaltered
         protected string $userAgent = '', // request User Agent
         protected array $metadata = [], // optional misc meta info
-    ) {
+    )
+    {
+        if (empty($this->rawBody)) {
+            return;
+        }
         $this->jsonBody = \json_decode($this->rawBody, true);
     }
 
@@ -84,6 +88,7 @@ class WebhookObject
 
     /**
      * Add more to the metadata array; note that matching array keys will overwrite
+     *
      * @param array $metadata
      */
     public function addMetadata(array $metadata): void

@@ -1,19 +1,21 @@
 <?php
 /**
- * An API-data class for Countrie used by the PayPalRestful (paypalr) Payment Module
+ * An API-data class for Countries used by the PayPalRestful (paypalr) Payment Module
  *
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.2
+ * Last updated: v1.2.0
  */
 namespace PayPalRestful\Api\Data;
 
 // -----
 // For reference, see https://developer.paypal.com/api/rest/reference/orders/v2/country-address-requirements/
 //
-// Which is a different list than https://developer.paypal.com/api/rest/reference/country-codes/ (sigh)
+// The following are different, but related, lists:
+// https://developer.paypal.com/api/rest/reference/country-codes/
+// https://developer.paypal.com/sdk/js/configuration/#locale
 //
 class CountryCodes
 {
