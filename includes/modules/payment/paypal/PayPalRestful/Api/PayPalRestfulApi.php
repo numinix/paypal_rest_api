@@ -367,6 +367,10 @@ class PayPalRestfulApi extends ErrorInfo
     ): false|array {
         $this->log->write("==> Start updatePackageTracking($paypal_txnid, " . Logger::logJSON($tracking_number) . ", $carrier_code, $action ...)\n", true);
 
+        if (empty($tracking_number)) {
+            return false;
+        }
+
         $orderDetails = $this->getOrderStatus($paypal_txnid);
         if (empty($orderDetails)) {
             $this->log->write('Cannot find order to update/cancel tracking. Txn ID: ' . $paypal_txnid);
@@ -374,10 +378,6 @@ class PayPalRestfulApi extends ErrorInfo
         }
         if (($orderStatus = $orderDetails['status'] ?? '(null)') !== 'COMPLETED' || empty($orderDetails['purchase_units'][0]['payments']['captures'])) {
             $this->log->write("Only orders with COMPLETED captures may add tracking. Txn ID: $paypal_txnid, Status: $orderStatus");
-            return false;
-        }
-
-        if (empty($tracking_number)) {
             return false;
         }
 
