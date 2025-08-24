@@ -112,7 +112,6 @@ class zcObserverPaypalrestful
 
     /**
      * @param array $data [int orders_id, int orders_status_id, date_added, int customer_notified, comments, updated_by]
-     * @param array $paypal [string txn_id, string parent_txn_id]
      */
     public function updateZenUpdateOrdersHistoryBeforeInsert(&$class, $eventID, $null, array $data): void
     {
@@ -123,7 +122,6 @@ class zcObserverPaypalrestful
 
     /**
      * @param array $data [int orders_id, int orders_status_id, date_added, int customer_notified, comments, updated_by]
-     * @param array $paypal [string txn_id, string parent_txn_id]
      */
     public function updateZenUpdateOrdersHistoryAfterInsert(&$class, $eventID, int $osh_id, array $data): void
     {
