@@ -2141,7 +2141,7 @@ class paypalr extends base
 
                 ('Store (Sub-Brand) Identifier at PayPal', 'MODULE_PAYMENT_PAYPALR_SOFT_DESCRIPTOR', '', 'On customer credit card statements, your company name will show as <code>PAYPAL*(yourname)*(your-sub-brand-name)</code> (max 22 letters for (yourname)*(your-sub-brand-name)). You can add the sub-brand-name here if you want to differentiate purchases from this store vs any other PayPal sales you make.', 6, 0, NULL, NULL, now()),
 
-                ('Payment Action', 'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE', 'Final Sale', 'How do you want to obtain payment?<br><b>Default: Final Sale</b>', 6, 0, 'zen_cfg_select_option([\'Auth Only\', \'Final Sale\'], ', NULL,  now()),
+                ('Payment Action', 'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE', 'Final Sale', 'How do you want to obtain payment?<br><b>Default: Final Sale</b>', 6, 0, 'zen_cfg_select_option([\'Auth Only (All Txns)\', \'Final Sale\', \'Auth Only (Card-Only)\'], ', NULL,  now()),
 
                 ('Transaction Currency', 'MODULE_PAYMENT_PAYPALR_CURRENCY', 'Selected Currency', 'In which currency should the order be sent to PayPal?<br>NOTE: If an unsupported currency is sent to PayPal, it will be auto-converted to the <em>Fall-back Currency</em>.<br><b>Default: Selected Currency</b>', 6, 0, 'zen_cfg_select_option([\'Selected Currency\', $currencies_list], ', NULL, now()),
 
