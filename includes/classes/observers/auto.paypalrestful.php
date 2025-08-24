@@ -21,6 +21,7 @@ class zcObserverPaypalrestful
     protected array $lastOrderValues = [];
     protected array $orderTotalChanges = [];
     protected bool $freeShippingCoupon = false;
+    protected bool $adminBeforeInsertDone = false;
 
     public function __construct()
     {
@@ -34,6 +35,9 @@ class zcObserverPaypalrestful
 
         if (IS_ADMIN_FLAG) {
             $this->attach($this, ['ZEN_UPDATE_ORDERS_HISTORY_AFTER_INSERT']);
+            if (zen_get_zcversion() < 2.2) {
+                $this->attach($this, ['ZEN_UPDATE_ORDERS_HISTORY_BEFORE_INSERT']);
+            }
             return;
         }
 
@@ -110,9 +114,21 @@ class zcObserverPaypalrestful
      * @param array $data [int orders_id, int orders_status_id, date_added, int customer_notified, comments, updated_by]
      * @param array $paypal [string txn_id, string parent_txn_id]
      */
-    public function updateZenUpdateOrdersHistoryAfterInsert(&$class, $eventID, int $osh_id, array $data, queryFactoryResult $paypalRecords): void
+    public function updateZenUpdateOrdersHistoryBeforeInsert(&$class, $eventID, $null, array $data): void
     {
-        if (empty($paypalRecords)) {
+        $this->updateZenUpdateOrdersHistoryAfterInsert($class, $eventID, 0, $data);
+        $this->detach($this, ['ZEN_UPDATE_ORDERS_HISTORY_BEFORE_INSERT']);
+        $this->adminBeforeInsertDone = true;
+    }
+
+    /**
+     * @param array $data [int orders_id, int orders_status_id, date_added, int customer_notified, comments, updated_by]
+     * @param array $paypal [string txn_id, string parent_txn_id]
+     */
+    public function updateZenUpdateOrdersHistoryAfterInsert(&$class, $eventID, int $osh_id, array $data): void
+    {
+        if ($this->adminBeforeInsertDone) {
+            // avoid double-processing when attached to an older version's ZEN_UPDATE_ORDERS_HISTORY_BEFORE_INSERT
             return;
         }
         // Parse POST for tracking IDs.
@@ -129,6 +145,7 @@ class zcObserverPaypalrestful
             return;
         }
         $order_id = (int)$data['orders_id'];
+        // Lookup the initial PayPal transaction record related to this order.
         $paypalLookup = $GLOBALS['db']->Execute(
             "SELECT txn_id, txn_type
                  FROM " . TABLE_PAYPAL . "
