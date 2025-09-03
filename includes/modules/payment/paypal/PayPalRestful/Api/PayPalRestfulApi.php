@@ -430,7 +430,7 @@ class PayPalRestfulApi extends ErrorInfo
             foreach ($trackers as $tracker) {
                 if (\str_ends_with($tracker['id'], $tracking_number)) {
                     if ($tracker['status'] === 'CANCELLED') {
-                        $this->log->write("Tracker already CANCELLED for tracking_number $tracking_number; nothing to update/cancel. Txn ID: $paypal_txnid");
+                        $this->log->write("Tracker ALREADY CANCELLED for tracking_number $tracking_number; nothing to update/cancel. Txn ID: $paypal_txnid");
                         return false;
                     }
                     // use the located id
