@@ -514,6 +514,7 @@ class PayPalRestfulApi extends ErrorInfo
                 'configuration_title' => 'PayPal webhooks subscribe ID',
                 'configuration_description' => 'This module registers certain actions to trigger webhook notifications to this store; here we store the ID of that registration so we can update or delete it later if needed.',
                 'configuration_group_id' => 6,
+                'sort_order' => 0,
                 'date_added' => 'now()',
                 'last_modified' => 'now()',
             ]);
