@@ -74,13 +74,13 @@ $define = [
     // -----
     // Store owner/admin alert-email messages.
     //
-    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPal Checkout Error (%s)',    //- %s is an additional error descriptor, see below
+    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPal Checkout (%s)',    //- %s is an additional error descriptor, see below
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION' => 'Configuration',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL' => 'Unknown Denial Reason',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD' => 'Lost/Stolen/Fraudulent Card',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_TOTAL_MISMATCH' => 'Calculation Mismatch',
-        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR' => 'Confirm Payment Choice', 
+        'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR' => 'Confirm Payment Choice',
 
     'MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to &quot;Pending&quot; due to a PayPal response status of \'%2$s\'.',
     'MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypalrestful.php) was not loaded; the payment module has been disabled.',
