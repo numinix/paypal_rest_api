@@ -419,6 +419,7 @@ class PayPalRestfulApi extends ErrorInfo
                 'carrier_name_other' => $carrier_name_other,
                 'notify_buyer' => $email_buyer,
             ];
+            // $this->log->write("==> Sending tracking update: $paypal_txnid, " . Logger::logJSON($parameters) . ")\n", true);
             $response = $this->curlPost("v2/checkout/orders/$paypal_txnid/track", $parameters);
 
         } else { // $action == 'CANCEL' (to delete a package tracking number)
@@ -443,6 +444,7 @@ class PayPalRestfulApi extends ErrorInfo
                 return false;
             }
             $parameters = ['op' => 'replace', 'path' => '/status', 'value' => 'CANCELLED'];
+            // $this->log->write("==> Sending tracking update: $paypal_txnid, " . Logger::logJSON($parameters) . ")\n", true);
             $response = $this->curlPatch("v2/checkout/orders/$paypal_txnid/trackers/$tracker_id", [$parameters]);
             if ($response === null) {
                 $response = ['success'];
