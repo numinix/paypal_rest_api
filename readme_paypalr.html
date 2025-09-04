@@ -106,7 +106,7 @@ table table {
             <li>Using <em>OPC</em>'s guest-checkout feature.</li>
             <li>Both requiring confirmation and not!</li>
         </ol></li>
-        <li>With both the built-in <var>responsive_classic</var> and <a href="https://www.zen-cart.com/downloads.php?do=file&id=2191" target="_blank"><var>ZCA Bootstrap</var></a> (v3.6.2-v3.7.2) templates.</li>
+        <li>With both the built-in <var>responsive_classic</var> and <a href="https://www.zen-cart.com/downloads.php?do=file&id=2191" target="_blank"><var>ZCA Bootstrap</var></a> (v3.6.2-v3.7.7) templates.</li>
     </ol>
     <p>For additional information, refer to the payment-module's <a href="https://github.com/lat9/paypalr/wiki" target="_blank">wiki articles</a>.</p>
     <p><b>Credits:</b> CSS-based spinner compliments of <a href="https://loading.io/css/" target="_blank">loading.io css spinner</a>.</p>
@@ -121,6 +121,7 @@ table table {
     <h4>Once you've completed those start-up steps &hellip;</h4>
     <ol>
         <li>Unzip this distribution's zip-file; you'll see the following files and directories:<ol>
+            <li>/admin/includes/classes/observers/auto.PayPalRestAdmin.php <span class="smaller">(Added in v1.2.0)</span></li>
             <li><span class="removed">/ppr_webhook_main.php</span> <span class="smaller">(Removed in v1.2.0)</span></li>
             <li>/includes/auto_loaders/webhook.core.php <span class="smaller">(Added in v1.2.0)</span></li>
             <li>/includes/classes/observers/auto.paypalrestful.php</li>
@@ -149,6 +150,7 @@ table table {
             <li>/includes/modules/payment/paypal/PayPalRestful/Common/ErrorInfo.php</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/Common/Logger.php</li>
+            <li>/includes/modules/payment/paypal/PayPalRestful/Common/PayPalShippingContainers.php <span class="smaller">(Added in v1.2.0)</span></li>
             <li>/includes/modules/payment/paypal/PayPalRestful/images/american_express.png</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/images/discover.png</li>
             <li>/includes/modules/payment/paypal/PayPalRestful/images/jcb.png</li>
@@ -184,7 +186,7 @@ table table {
     <h2>Version History</h2>
     <p>This section identifies version-specific changes to the payment module.</p>
     <ul>
-        <li>v1.2.0-beta2, 2025-08-09 (lat9, drbyte)<ul>
+        <li>v1.2.0-beta3, 2025-09-04 (lat9, drbyte)<ul>
             <li>BUGFIX: Correct date-dependent displayed name of months with fewer than 31 days.</li>
             <li>BUGFIX: Remove duplicated constant (<var>MODULE_PAYMENT_PAYPALR_PAYER_EMAIL</var>) from the language file.</li>
             <li>CHANGE: Maintain <code>/ppr_webhook_main.php</code> based on plugin install.</li>
@@ -194,9 +196,12 @@ table table {
             <li>BUGFIX: Don't include customer's IP address in hash, since it can change.</li>
             <li>BUGFIX: Prevent double-click of admin refund/capture buttons.</li>
             <li>BUGFIX: Update alert-subject language to remove &quot;Error&quot;.</li>
+            <li>CHANGE: Add package-tracking via v2 orders API.</li>
             <li>The following files were changed, <span class="added">added</span> or <span class="removed">removed</span>:<ol>
+                <li><span class="added">/admin/includes/classes/observers/auto.PayPalRestAdmin.php</span></li>
                 <li><span class="removed">/ppr_webhook_main.php</span></li>
                 <li><span class="added">/includes/auto_loaders/webhook.core.php</span></li>
+                <li>/includes/classes/observers/auto.paypalrestful.php</li>
                 <li>/includes/languages/english/modules/payment/lang.paypalr.php</li>
                 <li><span class="added">/includes/languages/english/extra_definitions/lang.paypalr_redirect_listener_definitions.php</span></li>
                 <li><span class="removed">/includes/languages/english/extra_definitions/lang.paypalr_webhook_definitions.php</span></li>
@@ -208,8 +213,11 @@ table table {
                 <li>/includes/modules/payment/paypal/PayPalRestful/Admin/Formatters/Messages.php</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/Admin/GetPayPalOrderTransactions.php</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/Api/PayPalRestfulApi.php</li>
+                <li>/includes/modules/payment/paypal/PayPalRestful/Api/Data/CountryCodes.php</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/Common/Logger.php</li>
+                <li><span class="added">/includes/modules/payment/paypal/PayPalRestful/Common/PayPalShippingContainers.php</span></li>
                 <li><span class="added">/includes/modules/payment/paypal/PayPalRestful/Webhooks/*.php</span></li>
+                <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/ConfirmPayPalPaymentChoiceRequest.php</li>
                 <li>/includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php</li>
             </ol></li>
         </ul></li>

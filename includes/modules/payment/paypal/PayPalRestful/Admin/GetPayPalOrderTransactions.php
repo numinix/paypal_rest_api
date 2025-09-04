@@ -3,10 +3,10 @@
  * A class that returns an array of 'current' transactions for a specified order for
  * Cart processing for the PayPal Restful payment module's admin_notifications processing.
  *
- * @copyright Copyright 2023-2024 Zen Cart Development Team
+ * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.0.4
+ * Last updated: v1.2.0
  */
 namespace PayPalRestful\Admin;
 
