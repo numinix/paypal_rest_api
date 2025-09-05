@@ -205,9 +205,6 @@ class paypalr extends base
 
         // @TODO - "Retired" check should accommodate 'webhook' mode too, because we do want to still respond to webhooks when in Retired mode.
         $this->enabled = (MODULE_PAYMENT_PAYPALR_STATUS === 'True' || (IS_ADMIN_FLAG === true && MODULE_PAYMENT_PAYPALR_STATUS === 'Retired'));
-        if ($this->enabled === false) {
-            return;
-        }
 
         $this->errorInfo = new ErrorInfo();
 
@@ -243,7 +240,7 @@ class paypalr extends base
                 $this->title .= ' <strong>(Debug)</strong>';
             }
             $this->tableCheckup();
-        } else {
+        } elseif ($this->enabled === true) {
             // -----
             // Ensure that the payment-module's observer-class is loaded (auto.paypalrestful.php).  That
             // observer gathers order-totals' changes to the order's 'info', enabling the order-creation
@@ -293,7 +290,7 @@ class paypalr extends base
         // If the configuration's invalid (admin/storefront)
         // or if we're processing for the admin or a webhook, all finished here!
         //
-        $this->enabled = $this->validateConfiguration($curl_installed);
+        $this->enabled = ($this->enabled === true && $this->validateConfiguration($curl_installed));
         if ($this->enabled && IS_ADMIN_FLAG === true) {
             // register/update known webhooks
             $this->ppr->registerAndUpdateSubscribedWebhooks();
@@ -434,8 +431,8 @@ class paypalr extends base
                          VALUES
                             ('Trigger 3D Secure on <b>Every</b> Txn?', 'MODULE_PAYMENT_PAYPALR_SCA_ALWAYS', 'false', 'Choose <var>true</var> to trigger 3D Secure for <b>every</b> transaction, regardless of SCA requirements.<br><br><b>Default</b>: <var>false</var>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now())"
                     );
-                    break;
-                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.2.0', '<'):
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.2.0', '<'): //- Fall through from above
                     $db->Execute(
                         "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
                             (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
@@ -449,8 +446,8 @@ class paypalr extends base
                     // storefront includes directory.
                     //
                     $this->manageRootDirectoryFiles();
-                    break;
-                default:
+
+                default:    //- Fall through from above
                     break;
             }
         }
