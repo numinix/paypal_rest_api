@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.2.0
+ * Last updated: v1.2.1
  */
 /**
  * Load the support class' auto-loader.
@@ -33,7 +33,7 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.2.0';
+    protected const CURRENT_VERSION = '1.2.1-beta1';
 
     protected const REDIRECT_LISTENER = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_listener.php';
 
@@ -2291,7 +2291,9 @@ class paypalr extends base
         global $db;
 
         // de-register known webhooks
-        $this->ppr->unsubscribeWebhooks();
+        if (isset($this->ppr)) {
+            $this->ppr->unsubscribeWebhooks();
+        }
 
         $db->Execute("DELETE FROM " . TABLE_CONFIGURATION . " WHERE configuration_key LIKE 'MODULE\_PAYMENT\_PAYPALR\_%'");
 
