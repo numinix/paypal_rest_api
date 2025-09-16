@@ -44,7 +44,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
     protected array $request;
 
     /**
-     * The items' pricing 'breakdown' elements, gathered by getItems and
+     * The items' pricing 'breakdown' elements, gathered by getItems
      * and subsequently used by getOrderTotals.
      */
     protected array $itemBreakdown = [
@@ -69,6 +69,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
     //
     public function __construct(string $ppr_type, \order $order, array $cc_info, array $order_info, array $ot_diffs)
     {
+        // Instantiate any ErrorInfo dependencies
         parent::__construct();
 
         $this->log = new Logger();
@@ -225,7 +226,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             }
 
             // -----
-            // PayPal supports *only* integer-quanties in the order's item list,
+            // PayPal supports *only* integer-quantities in the order's item list,
             // so if any quantity is not an integer value, the items' array
             // can't be included in the PayPal order request.  Noting that this
             // will be an issue for sites that sell fabric or cheeses, for instance.
@@ -396,7 +397,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
     }
 
     // -----
-    // Separate 'calculators' for the 'handling', 'insurance' and 'discount amounts
+    // Separate 'calculators' for the 'handling', 'insurance' and 'discount' amounts
     // for the order.
     //
     protected function calculateHandling(array $ot_diffs): float
