@@ -24,9 +24,12 @@ use PayPalRestful\Api\Data\CountryCodes;
 use PayPalRestful\Common\ErrorInfo;
 use PayPalRestful\Common\Helpers;
 use PayPalRestful\Common\Logger;
+use PayPalRestful\Compatibility\Language as LanguageCompatibility;
 use PayPalRestful\Zc2Pp\Amount;
 use PayPalRestful\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
 use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
+
+LanguageCompatibility::load();
 
 /**
  * The PayPal payment module using PayPal's RESTful API (v2)

@@ -25,6 +25,9 @@ require DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
 use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Common\Logger;
+use PayPalRestful\Compatibility\Language as LanguageCompatibility;
+
+LanguageCompatibility::load();
 
 $op = $_GET['op'] ?? '';
 $logger = new Logger();
