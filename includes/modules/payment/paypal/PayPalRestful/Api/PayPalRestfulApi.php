@@ -710,7 +710,7 @@ class PayPalRestfulApi extends ErrorInfo
             'Content-Type: application/json',
             "Authorization: Bearer $oauth2_token",
             'Prefer: return=representation',
-            'PayPal-Partner-Attribution-Id: ZenCart_SP_PPCP',
+            'PayPal-Partner-Attribution-Id: NuminixPPCP_SP',
         ];
 
         // -----

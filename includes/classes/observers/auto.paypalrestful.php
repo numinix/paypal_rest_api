@@ -285,7 +285,7 @@ class zcObserverPaypalrestful
         }
 
         $js_fields['integration-date'] = '2025-08-01';
-        $js_scriptparams[] = 'data-partner-attribution-id="ZenCart_SP_PPCP"';
+        $js_scriptparams[] = 'data-partner-attribution-id="NuminixPPCP_SP"';
         $js_scriptparams[] = 'data-namespace="PayPalSDK"';
 ?>
 
