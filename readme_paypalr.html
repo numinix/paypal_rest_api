@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PayPal Restful Payment Module for Zen Cart 1.5.8a and Later</title>
+<title>PayPal Restful Payment Module for Zen Cart 1.5.7c and Later</title>
 <style>
 a, a:active,
 a:visited {
@@ -90,7 +90,7 @@ table table {
 </head>
 
 <body>
-    <h1>PayPal RESTful Payment Module (<var>paypalr</var>) for Zen Cart 1.5.8a and later</h1>
+    <h1>PayPal RESTful Payment Module (<var>paypalr</var>) for Zen Cart 1.5.7c and later</h1>
     <h3>Version 1.2.1</h3>
     <p>Current Support Thread at Zen Cart Forums: <a href="https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support" target="_blank">https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support</a></p>
     <p>Zen Cart Download Link: <a href="https://www.zen-cart.com/downloads.php?do=file&id=2382" target="_blank">https://www.zen-cart.com/downloads.php?do=file&id=2382</a></p>
@@ -98,10 +98,17 @@ table table {
 
     <h2>Purpose</h2>
     <p>This Zen Cart payment module combines the processing for the <b>PayPal Payments Pro</b> (<var>paypaldp</var>) and <b>PayPal Express Checkout</b> (<var>paypalwpp</var>) payment modules that are currently built into the Zen Cart distribution.  Instead of using the older NVP (<b>N</b>ame <b>V</b>alue <b>P</b>air) methods to communicate with PayPal, this payment module uses PayPal's now-current <a href="https://developer.paypal.com/api/rest/" target="_blank">REST APIs</a> and combines the two legacy methods into one.</p>
+    <p><b>Zen Cart compatibility.</b> This release supports Zen Cart v1.5.7c and later, provided that the following requirements are met:</p>
+    <ol>
+        <li>Apply the module's <a href="https://github.com/lat9/paypalr/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank"><var>order_total</var> notifier patch</a>; this is the only change that touches a core file.</li>
+        <li>Use the bundled ObserverManager trait shim that the module installs automatically.</li>
+        <li>Use the bundled language shim that the module installs automatically.</li>
+    </ol>
+    <p>Those shims provide the 1.5.8a trait and language fallbacks automatically&mdash;no additional downloads are required beyond the <var>order_total</var> patch.</p>
     <p>The module's operation has been validated &hellip;</p>
     <ol>
         <li>With PHP versions 7.4 through 8.4; <b>PHP 7.3 will result in fatal PHP errors!</b></li>
-        <li>In Zen Cart's 3-page checkout environment (v1.5.8<b>a</b>, v2.0.x and v2.1.0)</li>
+        <li>In Zen Cart's 3-page checkout environment (v1.5.7<b>c</b>+, v2.0.x and v2.1.0)</li>
         <li>With <a href="https://www.zen-cart.com/downloads.php?do=file&id=2095" target="_blank">One-Page Checkout</a> (OPC), v2.4.6-2.5.3<ol type="a">
             <li>Using <em>OPC</em>'s guest-checkout feature.</li>
             <li>Both requiring confirmation and not!</li>
@@ -116,8 +123,14 @@ table table {
     <h4>Before you start &hellip;</h4>
     <ol>
         <li>Follow the instructions in the payment module's Wiki to <a href="https://github.com/lat9/paypalr/wiki/Creating-PayPal-Credentials" target="_blank">create the PayPal credentials</a> required to communicate with PayPal.</li>
-        <li><b>If your site is using a Zen Cart version <em>prior to</em> 2.0.0</b>, add the payment module's <b>required</b> notifications to the <var>order_total</var> class, as described in <a href="https://github.com/lat9/paypalr/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank">this</a> Wiki article. Without this update, the payment module will <a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module#missing-required-notifications" target="_blank">automatically disable</a> itself.</li>
+        <li>Confirm that your store meets the compatibility requirements listed below for your Zen Cart version.</li>
     </ol>
+
+    <h4>Running on Zen Cart &lt; 1.5.8a</h4>
+    <ol>
+        <li>Apply the module's <a href="https://github.com/lat9/paypalr/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank"><var>order_total</var> notifier patch</a>. This is the only compatibility change that touches a core file and, without it, the payment module will <a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module#missing-required-notifications" target="_blank">automatically disable</a> itself.</li>
+    </ol>
+    <p>The ObserverManager trait and language compatibility shims introduced in Zen Cart 1.5.8a are bundled with this distribution. They install automatically, so no additional downloads are needed when running on Zen Cart 1.5.7c.</p>
     <h4>Once you've completed those start-up steps &hellip;</h4>
     <ol>
         <li>Unzip this distribution's zip-file; you'll see the following files and directories:<ol>
