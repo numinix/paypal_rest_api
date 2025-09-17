@@ -37,6 +37,11 @@ LanguageCompatibility::load();
 class paypalr extends base
 {
     protected const CURRENT_VERSION = '1.3.0-alpha';
+    protected const WALLET_SUCCESS_STATUSES = [
+        PayPalRestfulApi::STATUS_APPROVED,
+        PayPalRestfulApi::STATUS_COMPLETED,
+        PayPalRestfulApi::STATUS_CAPTURED,
+    ];
 
     protected const REDIRECT_LISTENER = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_listener.php';
 
@@ -1041,7 +1046,7 @@ class paypalr extends base
         global $order;
         $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::REDIRECT_LISTENER, $order);
         $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
-        if ($payment_choice_response === false || $payment_choice_response['status'] !== PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
+        if ($payment_choice_response === false) {
             $this->sendAlertEmail(
                 MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
                 MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
@@ -1049,36 +1054,59 @@ class paypalr extends base
             $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
         }
 
-        // -----
-        // Locate the URL to which the customer is redirected at PayPal
-        // to confirm their payment choice.
-        //
-        $action_link = '';
-        foreach ($payment_choice_response['links'] as $next_link) {
-            if ($next_link['rel'] === 'payer-action') {
-                $action_link = $next_link['href'];
-                break;
+        $response_status = $payment_choice_response['status'] ?? '';
+        if ($response_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
+            // -----
+            // Locate the URL to which the customer is redirected at PayPal
+            // to confirm their payment choice.
+            //
+            $action_link = '';
+            foreach ($payment_choice_response['links'] ?? [] as $next_link) {
+                if ($next_link['rel'] === 'payer-action') {
+                    $action_link = $next_link['href'];
+                    break;
+                }
             }
-        }
-        if ($action_link === '') {
-            $this->sendAlertEmail(
-                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
-                MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response)
-            );
-            $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
+            if ($action_link === '') {
+                $this->sendAlertEmail(
+                    MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
+                    MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response)
+                );
+                $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
+            }
+
+            // -----
+            // Save the posted variables from the payment phase of checkout; the ppr_listener will use those to restore after
+            // PayPal returns.
+            //
+            global $current_page_base;
+            $_SESSION['PayPalRestful']['Order']['PayerAction'] = [
+                'current_page_base' => $current_page_base,
+                'savedPosts' => $_POST,
+            ];
+            $this->log->write('pre_confirmation_check, sending the payer-action off to PayPal.', true, 'after');
+            zen_redirect($action_link);
+            return;
         }
 
-        // -----
-        // Save the posted variables from the payment phase of checkout; the ppr_listener will use those to restore after
-        // PayPal returns.
-        //
-        global $current_page_base;
-        $_SESSION['PayPalRestful']['Order']['PayerAction'] = [
-            'current_page_base' => $current_page_base,
-            'savedPosts' => $_POST,
-        ];
-        $this->log->write('pre_confirmation_check, sending the payer-action off to PayPal.', true, 'after');
-        zen_redirect($action_link);
+        if ($response_status !== '' && in_array($response_status, self::WALLET_SUCCESS_STATUSES, true)) {
+            $this->log->write(
+                'pre_confirmation_check, wallet payment already confirmed at PayPal; status ' . $response_status . '. '
+                . Logger::logJSON($payment_choice_response),
+                true,
+                'after'
+            );
+            $_SESSION['PayPalRestful']['Order']['status'] = $response_status;
+            $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
+            $_SESSION['PayPalRestful']['Order']['payment_source'] = 'paypal';
+            return;
+        }
+
+        $this->sendAlertEmail(
+            MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
+            MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
+        );
+        $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
     }
     protected function validateCardInformation(bool $is_preconfirmation): bool
     {
@@ -1413,7 +1441,8 @@ class paypalr extends base
         // Otherwise, the customer's paying with their PayPal Wallet.
         //
         } else {
-            if (!isset($_SESSION['PayPalRestful']['Order']['status']) || $_SESSION['PayPalRestful']['Order']['status'] !== PayPalRestfulApi::STATUS_APPROVED) {
+            $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
+            if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true)) {
                 $this->log->write('paypalr::before_process, cannot capture/authorize paypal order; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));
                 unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
                 $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
