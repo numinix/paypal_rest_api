@@ -11,6 +11,7 @@
 global $psr4Autoloader;
 $psr4Autoloader->addPrefix('PayPalRestful\Admin', DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Admin');
 $psr4Autoloader->addPrefix('PayPalRestful\Admin\Formatters', DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Admin/Formatters');
+$psr4Autoloader->addPrefix('PayPalRestful\Compatibility', DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility');
 $psr4Autoloader->addPrefix('PayPalRestful\Api', DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Api');
 $psr4Autoloader->addPrefix('PayPalRestful\Api\Data', DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Api/Data');
 $psr4Autoloader->addPrefix('PayPalRestful\Common', DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Common');
