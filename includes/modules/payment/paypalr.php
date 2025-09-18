@@ -1916,21 +1916,31 @@ class paypalr extends base
         return substr($cc_number, 0, 4) . str_repeat('X', (strlen($cc_number) - 8)) . substr($cc_number, -4);
     }
 
-    /**
-     * Issued by /modules/checkout_process.php after the main order-record has
-     * been provided in the database, supplying the just-created order's 'id'.
-     *
-     * The before_process method has stored the successful PayPal response from the
-     * payment's capture (or authorization), based on the site's configuration, in
-     * the class' orderInfo property.
-     *
-     * Unlike other payment modules, paypalr stores its database information during
-     * the after_order_create method's processing, just in case some email issue arises,
-     * so that the information's written.
-     */
-    public function after_order_create($orders_id)
+    protected function paypalOrderRecordsExist(int $orders_id): bool
     {
+        if ($orders_id <= 0) {
+            return false;
+        }
+
+        global $db;
+        $order_lookup = $db->Execute(
+            "SELECT order_id FROM " . TABLE_PAYPAL . " WHERE order_id = " . (int)$orders_id . " LIMIT 1"
+        );
+
+        return ($order_lookup->EOF === false);
+    }
+
+    protected function recordPayPalOrderDetails(int $orders_id): void
+    {
+        if ($orders_id <= 0) {
+            return;
+        }
+
         $this->orderInfo['orders_id'] = $orders_id;
+
+        if ($this->paypalOrderRecordsExist($orders_id) === true) {
+            return;
+        }
 
         $purchase_unit = $this->orderInfo['purchase_units'][0];
         $address_info = [];
@@ -1966,9 +1976,6 @@ class paypalr extends base
             ];
         }
 
-        // -----
-        // Set information used by the after_process method's status-history record creation.
-        //
         $payment_type = array_key_first($this->orderInfo['payment_source']);
         $this->orderInfo['payment_info'] = [
             'payment_type' => $payment_type,
@@ -1976,9 +1983,6 @@ class paypalr extends base
             'created_date' => $payment['created_date'] ?? '',
         ];
 
-        // -----
-        // Payer information returned is different for 'paypal' and 'card' payments.
-        //
         $payment_source = $this->orderInfo['payment_source'][$payment_type];
         if ($payment_type !== 'card') {
             $first_name = $payment_source['name']['given_name'];
@@ -2060,14 +2064,27 @@ class paypalr extends base
         $sql_data_array = array_merge($sql_data_array, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);
 
-        // -----
-        // If funds have been captured, fire a notification so that sites that
-        // manage payments are aware of the incoming funds.
-        //
         if ($this->orderInfo['txn_type'] === 'CAPTURE') {
             global $zco_notifier;
             $zco_notifier->notify('NOTIFY_PAYPALR_FUNDS_CAPTURED', $sql_data_array);
         }
+    }
+
+    /**
+     * Issued by /modules/checkout_process.php after the main order-record has
+     * been provided in the database, supplying the just-created order's 'id'.
+     *
+     * The before_process method has stored the successful PayPal response from the
+     * payment's capture (or authorization), based on the site's configuration, in
+     * the class' orderInfo property.
+     *
+     * Unlike other payment modules, paypalr stores its database information during
+     * the after_order_create method's processing, just in case some email issue arises,
+     * so that the information's written.
+     */
+    public function after_order_create($orders_id)
+    {
+        $this->recordPayPalOrderDetails((int)$orders_id);
     }
 
     /**
@@ -2084,6 +2101,15 @@ class paypalr extends base
     public function after_process()
     {
         $_SESSION['PayPalRestful']['CompletedOrders']++;
+
+        $orders_id = (int)($this->orderInfo['orders_id'] ?? 0);
+        $paypal_records_exist = ($orders_id > 0) ? $this->paypalOrderRecordsExist($orders_id) : false;
+        if ($orders_id === 0 || $paypal_records_exist === false) {
+            $orders_id = (int)($orders_id ?: ($_SESSION['order_number_created'] ?? 0));
+            if ($orders_id > 0) {
+                $this->recordPayPalOrderDetails($orders_id);
+            }
+        }
 
         $payment_info = $this->orderInfo['payment_info'];
         $timestamp = '';
