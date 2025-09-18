@@ -1097,6 +1097,7 @@ class paypalr extends base
             global $current_page_base;
             $_SESSION['PayPalRestful']['Order']['PayerAction'] = [
                 'current_page_base' => $current_page_base,
+                'redirect_page' => $this->determinePayerActionRedirectPage($current_page_base, $_POST),
                 'savedPosts' => $_POST,
             ];
             $this->log->write('pre_confirmation_check, sending the payer-action off to PayPal.', true, 'after');
@@ -1188,6 +1189,34 @@ class paypalr extends base
     {
         $parameters = ($operation === '') ? '' : 'op=' . $operation;
         return zen_href_link('ppr_listener.php', $parameters, 'SSL', true, false);
+    }
+
+    protected function determinePayerActionRedirectPage(string $current_page_base, array $postVars): string
+    {
+        $redirectPage = $current_page_base;
+
+        if (isset($postVars['main_page'])) {
+            $postedMainPage = $postVars['main_page'];
+            if (is_string($postedMainPage)) {
+                $postedMainPage = trim($postedMainPage);
+                if ($postedMainPage !== '') {
+                    $redirectPage = preg_replace('/[^a-zA-Z0-9_]/', '', preg_replace('/\.php$/i', '', $postedMainPage));
+                }
+            }
+        }
+
+        if ($redirectPage === '' || $redirectPage === null) {
+            $redirectPage = $current_page_base;
+        }
+
+        if ($redirectPage === 'index' && defined('FILENAME_CHECKOUT_ONE_CONFIRMATION')) {
+            $opcConfirmationPage = constant('FILENAME_CHECKOUT_ONE_CONFIRMATION');
+            if (is_string($opcConfirmationPage) && $opcConfirmationPage !== '') {
+                $redirectPage = preg_replace('/[^a-zA-Z0-9_]/', '', preg_replace('/\.php$/i', '', $opcConfirmationPage));
+            }
+        }
+
+        return $redirectPage;
     }
     protected function createPayPalOrder(string $ppr_type): bool
     {
@@ -1679,6 +1708,9 @@ class paypalr extends base
                 global $current_page_base;
                 $_SESSION['PayPalRestful']['Order']['PayerAction'] = [
                     'current_page_base' => $current_page_base,
+                    'redirect_page' => $this->determinePayerActionRedirectPage($current_page_base, [
+                        'main_page' => $_POST['main_page'] ?? '',
+                    ]),
                     'savedPosts' => [
                         'securityToken' => $_SESSION['securityToken'],
                     ],

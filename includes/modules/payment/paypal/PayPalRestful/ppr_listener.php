@@ -137,7 +137,8 @@ if ($op === 'return') {
 //
 // NOTE: CSS-based spinner compliments of 'loading.io css spinner' ( https://loading.io/css/ )
 //
-$redirect_page = $_SESSION['PayPalRestful']['Order']['PayerAction']['current_page_base'];
+$redirect_page = $_SESSION['PayPalRestful']['Order']['PayerAction']['redirect_page']
+    ?? $_SESSION['PayPalRestful']['Order']['PayerAction']['current_page_base'];
 $logger->write("Order's status set to {$order_status['status']}; posting back to $redirect_page.", true, 'after');
 ?>
 <html>
