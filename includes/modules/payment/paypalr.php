@@ -43,8 +43,6 @@ class paypalr extends base
         PayPalRestfulApi::STATUS_CAPTURED,
     ];
 
-    protected const REDIRECT_LISTENER = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_listener.php';
-
     /**
      * name of this module
      *
@@ -457,11 +455,11 @@ class paypalr extends base
                     );
 
                     // -----
-                    // Starting with v1.2.0, installing the payment module includes creating
-                    // its root-directory listeners/handlers from a copy within the module's
-                    // storefront includes directory.
+                    // Remove the legacy webhook handler that existed prior to v1.2.0 if it's still present.
                     //
-                    $this->manageRootDirectoryFiles();
+                    if (file_exists(DIR_FS_CATALOG . 'ppr_webhook_main.php')) {
+                        unlink(DIR_FS_CATALOG . 'ppr_webhook_main.php');
+                    }
 
                 default:    //- Fall through from above
                     break;
@@ -1044,7 +1042,9 @@ class paypalr extends base
         // or back to the checkout_payment page if they cancelled-out from PayPal.
         //
         global $order;
-        $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::REDIRECT_LISTENER, $order);
+        $return_listener = $this->buildListenerUrl('return');
+        $cancel_listener = $this->buildListenerUrl('cancel');
+        $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest($return_listener, $cancel_listener, $order);
         $_SESSION['PayPalRestful']['Order']['user_action'] = $confirm_payment_choice_request->getUserAction();
         $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
         if ($payment_choice_response === false) {
@@ -1097,6 +1097,7 @@ class paypalr extends base
             global $current_page_base;
             $_SESSION['PayPalRestful']['Order']['PayerAction'] = [
                 'current_page_base' => $current_page_base,
+                'redirect_page' => $this->determinePayerActionRedirectPage($current_page_base, $_POST),
                 'savedPosts' => $_POST,
             ];
             $this->log->write('pre_confirmation_check, sending the payer-action off to PayPal.', true, 'after');
@@ -1179,9 +1180,63 @@ class paypalr extends base
             'expiry_year' => $cc_validation->cc_expiry_year,
             'name' => $cc_owner,
             'security_code' => $cvv_posted,
-            'redirect' => self::REDIRECT_LISTENER,
+            'redirect' => $this->buildListenerUrl(),
         ];
         return true;
+    }
+
+    protected function buildListenerUrl(string $operation = ''): string
+    {
+        $parameters = ($operation === '') ? '' : 'op=' . $operation;
+        return zen_href_link('ppr_listener.php', $parameters, 'SSL', true, false);
+    }
+
+    protected function determinePayerActionRedirectPage(string $current_page_base, array $postVars): string
+    {
+        $redirectPage = $current_page_base;
+        $mainPageCandidate = null;
+
+        if (isset($postVars['main_page'])) {
+            $postedMainPage = $postVars['main_page'];
+            if (is_string($postedMainPage)) {
+                $postedMainPage = trim($postedMainPage);
+                if ($postedMainPage !== '') {
+                    $mainPageCandidate = $postedMainPage;
+
+                    if (stripos($postedMainPage, 'main_page=') !== false) {
+                        $queryString = parse_url($postedMainPage, PHP_URL_QUERY);
+                        if ($queryString === false || $queryString === null) {
+                            $queryString = $postedMainPage;
+                        }
+
+                        parse_str((string) $queryString, $queryParameters);
+                        if (isset($queryParameters['main_page']) && is_string($queryParameters['main_page'])) {
+                            $mainPageCandidate = $queryParameters['main_page'];
+                        }
+                    }
+
+                    $mainPageCandidate = preg_replace('/\.php$/i', '', $mainPageCandidate);
+                    $mainPageCandidate = preg_replace('/[^a-zA-Z0-9_]/', '', $mainPageCandidate);
+                }
+            }
+        }
+
+        if ($mainPageCandidate !== null && $mainPageCandidate !== '') {
+            $redirectPage = $mainPageCandidate;
+        }
+
+        if ($redirectPage === '' || $redirectPage === null) {
+            $redirectPage = $current_page_base;
+        }
+
+        if ($redirectPage === 'index' && defined('FILENAME_CHECKOUT_ONE_CONFIRMATION')) {
+            $opcConfirmationPage = constant('FILENAME_CHECKOUT_ONE_CONFIRMATION');
+            if (is_string($opcConfirmationPage) && $opcConfirmationPage !== '') {
+                $redirectPage = preg_replace('/[^a-zA-Z0-9_]/', '', preg_replace('/\.php$/i', '', $opcConfirmationPage));
+            }
+        }
+
+        return $redirectPage;
     }
     protected function createPayPalOrder(string $ppr_type): bool
     {
@@ -1673,6 +1728,9 @@ class paypalr extends base
                 global $current_page_base;
                 $_SESSION['PayPalRestful']['Order']['PayerAction'] = [
                     'current_page_base' => $current_page_base,
+                    'redirect_page' => $this->determinePayerActionRedirectPage($current_page_base, [
+                        'main_page' => $_POST['main_page'] ?? '',
+                    ]),
                     'savedPosts' => [
                         'securityToken' => $_SESSION['securityToken'],
                     ],
@@ -2276,11 +2334,11 @@ class paypalr extends base
         }
 
         // -----
-        // Starting with v1.2.0, installing the payment module includes creating
-        // its root-directory listeners/handlers from a copy within the module's
-        // storefront includes directory.
+        // Remove the legacy webhook handler that existed prior to v1.2.0 if it's still present.
         //
-        $this->manageRootDirectoryFiles();
+        if (file_exists(DIR_FS_CATALOG . 'ppr_webhook_main.php')) {
+            unlink(DIR_FS_CATALOG . 'ppr_webhook_main.php');
+        }
 
         // -----
         // Define the module's current version so that the tableCheckup method
@@ -2290,25 +2348,6 @@ class paypalr extends base
         $this->tableCheckup();
 
         $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
-    }
-
-    protected function manageRootDirectoryFiles(): void
-    {
-        // -----
-        // Starting with v1.2.0, installing the payment module includes creating
-        // its root-directory listeners/handlers from a copy within the module's
-        // storefront includes directory.
-        //
-        $ppr_listener = file_get_contents(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/ppr_listener.php');
-        file_put_contents(DIR_FS_CATALOG . 'ppr_listener.php', $ppr_listener);
-
-        $ppr_webhook = file_get_contents(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/ppr_webhook.php');
-        file_put_contents(DIR_FS_CATALOG . 'ppr_webhook.php', $ppr_webhook);
-
-        // We also delete the old ppr_webhook_main.php file if present
-        if (file_exists(DIR_FS_CATALOG . 'ppr_webhook_main.php')) {
-            unlink(DIR_FS_CATALOG . 'ppr_webhook_main.php');
-        }
     }
 
     public function keys(): array
@@ -2358,13 +2397,11 @@ class paypalr extends base
         $db->Execute("DELETE FROM " . TABLE_CONFIGURATION . " WHERE configuration_key LIKE 'MODULE\_PAYMENT\_PAYPALR\_%'");
 
         // -----
-        // Starting with v1.1.1, removing the payment module includes deleting its root-directory
-        // listener and webhook handlers, and the prior versions' ppr_webhook_main.php handler.
+        // Starting with v1.1.1, removing the payment module includes deleting the prior versions'
+        // ppr_webhook_main.php handler if it's still present.
         //
-        foreach (['ppr_listener.php', 'ppr_webhook.php', 'ppr_webhook_main.php'] as $file) {
-            if (file_exists(DIR_FS_CATALOG . $file)) {
-                unlink(DIR_FS_CATALOG . $file);
-            }
+        if (file_exists(DIR_FS_CATALOG . 'ppr_webhook_main.php')) {
+            unlink(DIR_FS_CATALOG . 'ppr_webhook_main.php');
         }
 
         $this->notify('NOTIFY_PAYMENT_PAYPALR_UNINSTALLED');
