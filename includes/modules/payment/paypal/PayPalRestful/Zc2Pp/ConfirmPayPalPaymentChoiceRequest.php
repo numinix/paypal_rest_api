@@ -29,7 +29,7 @@ class ConfirmPayPalPaymentChoiceRequest
     // -----
     // Constructor.  Creates the payload for a PayPal payment-choice confirmation request.
     //
-    public function __construct(string $return_url, string $cancel_url, \order $order)
+    public function __construct(string $listener_endpoint, \order $order)
     {
         // -----
         // Determine the shipping-preference, one of:
@@ -76,8 +76,8 @@ class ConfirmPayPalPaymentChoiceRequest
                     'landing_page' => 'NO_PREFERENCE',  //- LOGIN, GUEST_CHECKOUT or NO_PREFERENCE
                     'shipping_preference' => $shipping_preference,    //- GET_FROM_FILE (allows shipping address change on PayPal), NO_SHIPPING, SET_PROVIDED_ADDRESS (customer can't change)
                     'user_action' => $this->userAction,  //- PAY_NOW or CONTINUE
-                    'return_url' => $return_url,
-                    'cancel_url' => $cancel_url,
+                    'return_url' => $listener_endpoint . '?op=return',
+                    'cancel_url' => $listener_endpoint . '?op=cancel',
                 ],
             ],
         ];

@@ -474,9 +474,6 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
     protected function buildCardPaymentSource(\order $order, array $cc_info): array
     {
-        $return_url = $cc_info['redirect_urls']['3ds_return'] ?? $this->buildListenerRedirect($cc_info['redirect'] ?? '', '3ds_return');
-        $cancel_url = $cc_info['redirect_urls']['3ds_cancel'] ?? $this->buildListenerRedirect($cc_info['redirect'] ?? '', '3ds_cancel');
-
         $payment_source = [
             'name' => $cc_info['name'],
             'number' => $cc_info['number'],
@@ -484,24 +481,14 @@ class CreatePayPalOrderRequest extends ErrorInfo
             'expiry' => $cc_info['expiry_year'] . '-' . $cc_info['expiry_month'],
             'billing_address' => Address::get($order->billing),
             'experience_context' => [
-                'return_url' => $return_url,
-                'cancel_url' => $cancel_url,
+                'return_url' => $cc_info['redirect'] . '?op=3ds_return',
+                'cancel_url' => $cc_info['redirect'] . '?op=3ds_cancel',
             ],
         ];
         if (isset($_POST['ppr_cc_sca_always']) || (defined('MODULE_PAYMENT_PAYPALR_SCA_ALWAYS') && MODULE_PAYMENT_PAYPALR_SCA_ALWAYS === 'true')) {
             $payment_source['attributes']['verification']['method'] = 'SCA_ALWAYS'; //- Defaults to 'SCA_WHEN_REQUIRED' for live environment
         }
         return $payment_source;
-    }
-
-    protected function buildListenerRedirect(string $base_url, string $operation): string
-    {
-        if ($base_url === '') {
-            return '';
-        }
-
-        $separator = (strpos($base_url, '?') === false) ? '?' : '&';
-        return $base_url . $separator . 'op=' . $operation;
     }
 
     protected function buildLevel2Level3Data(array $purchase_unit): array
