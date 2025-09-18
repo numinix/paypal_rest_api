@@ -24,6 +24,7 @@ use PayPalRestful\Api\Data\CountryCodes;
 use PayPalRestful\Common\ErrorInfo;
 use PayPalRestful\Common\Helpers;
 use PayPalRestful\Common\Logger;
+use PayPalRestful\Common\VaultManager;
 use PayPalRestful\Compatibility\Language as LanguageCompatibility;
 use PayPalRestful\Zc2Pp\Amount;
 use PayPalRestful\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
@@ -166,6 +167,11 @@ class paypalr extends base
      * Indicates whether/not an otherwise approved payment is pending review.
      */
     protected bool $paymentIsPending = false;
+
+    /**
+     * Cache of orders' customer identifiers to reduce repeated database lookups when storing vault details.
+     */
+    protected array $orderCustomerCache = [];
 
     /**
      * Indicates whether/not we're on the One-Page-Checkout confirmation page.  Possibly
@@ -399,6 +405,8 @@ class paypalr extends base
     //
     protected function tableCheckup()
     {
+        global $db;
+
         // -----
         // Remove any PayPal RESTful storefront logs that were created for v1.0.3 (202408).
         //
@@ -413,11 +421,10 @@ class paypalr extends base
         // If the payment module is installed and at the current version, nothing to be done.
         //
         $current_version = self::CURRENT_VERSION;
+        VaultManager::ensureSchema();
         if (defined('MODULE_PAYMENT_PAYPALR_VERSION') && MODULE_PAYMENT_PAYPALR_VERSION === $current_version) {
             return;
         }
-
-        global $db;
 
         // -----
         // Check for version-specific configuration updates.
@@ -2002,6 +2009,14 @@ class paypalr extends base
                 'processor_response' => $payment['processor_response'] ?? 'n/a',
                 'network_transaction_reference' => $payment['network_transaction_reference'] ?? 'n/a',
             ];
+
+            $storedVault = $this->storeVaultCardData($orders_id, $payment_source);
+            if ($storedVault !== null) {
+                $memo['vault'] = [
+                    'vault_id' => $storedVault['vault_id'],
+                    'status' => $storedVault['status'],
+                ];
+            }
         }
         if (isset($payment['seller_protection'])) {
             $memo['seller_protection'] = $payment['seller_protection'];
@@ -2068,6 +2083,51 @@ class paypalr extends base
             global $zco_notifier;
             $zco_notifier->notify('NOTIFY_PAYPALR_FUNDS_CAPTURED', $sql_data_array);
         }
+    }
+
+    protected function storeVaultCardData(int $orders_id, array $card_source): ?array
+    {
+        if (($card_source['vault']['id'] ?? '') === '') {
+            return null;
+        }
+
+        $customers_id = $this->getCustomersIdForOrder($orders_id);
+        if ($customers_id <= 0) {
+            return null;
+        }
+
+        $storedVault = VaultManager::saveVaultedCard($customers_id, $orders_id, $card_source);
+        if ($storedVault !== null) {
+            $this->notify('NOTIFY_PAYPALR_VAULT_CARD_SAVED', $storedVault);
+        }
+
+        return $storedVault;
+    }
+
+    protected function getCustomersIdForOrder(int $orders_id): int
+    {
+        $orders_id = (int)$orders_id;
+        if ($orders_id <= 0) {
+            return 0;
+        }
+
+        if (isset($this->orderCustomerCache[$orders_id])) {
+            return $this->orderCustomerCache[$orders_id];
+        }
+
+        global $db;
+
+        $customerLookup = $db->Execute(
+            "SELECT customers_id" .
+            "   FROM " . TABLE_ORDERS .
+            "  WHERE orders_id = $orders_id" .
+            "  LIMIT 1"
+        );
+
+        $customers_id = ($customerLookup->EOF) ? 0 : (int)$customerLookup->fields['customers_id'];
+        $this->orderCustomerCache[$orders_id] = $customers_id;
+
+        return $customers_id;
     }
 
     /**
@@ -2375,6 +2435,7 @@ class paypalr extends base
         //
         define('MODULE_PAYMENT_PAYPALR_VERSION', '0.0.0');
         $this->tableCheckup();
+        VaultManager::ensureSchema();
 
         $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
     }
@@ -2454,6 +2515,11 @@ class paypalr extends base
                 'paymentalert'
             );
         }
+    }
+
+    public static function getVaultedCardsForCustomer(int $customers_id, bool $active_only = true): array
+    {
+        return VaultManager::getCustomerVaultedCards($customers_id, $active_only);
     }
 
     public function getCurrentVersion(): string

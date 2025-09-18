@@ -480,6 +480,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             'security_code' => $cc_info['security_code'],
             'expiry' => $cc_info['expiry_year'] . '-' . $cc_info['expiry_month'],
             'billing_address' => Address::get($order->billing),
+            'store_in_vault' => 'ON_SUCCESS',
             'experience_context' => [
                 'return_url' => $cc_info['redirect'] . '?op=3ds_return',
                 'cancel_url' => $cc_info['redirect'] . '?op=3ds_cancel',
