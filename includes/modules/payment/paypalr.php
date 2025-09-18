@@ -1179,16 +1179,9 @@ class paypalr extends base
             'expiry_month' => $cc_validation->cc_expiry_month,
             'expiry_year' => $cc_validation->cc_expiry_year,
             'name' => $cc_owner,
-            'security_code' => $cvv_posted,
-            'redirect' => $this->buildListenerUrl(),
+            'security_code' => $cvv_posted
         ];
         return true;
-    }
-
-    protected function buildListenerUrl(string $operation = ''): string
-    {
-        $parameters = ($operation === '') ? '' : 'op=' . $operation;
-        return zen_href_link('ppr_listener.php', $parameters, 'SSL', true, false);
     }
 
     protected function determinePayerActionRedirectPage(string $current_page_base, array $postVars): string
