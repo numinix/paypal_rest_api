@@ -54,7 +54,10 @@ class zcObserverPaypalrestful
         if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION')) {
             $pages_to_watch[] = FILENAME_CHECKOUT_ONE_CONFIRMATION;
         }
-        if (in_array($current_page_base, $pages_to_watch)) {
+        foreach ($this->getNuminixOpcPageKeys() as $numinixPage) {
+            $pages_to_watch[] = $numinixPage;
+        }
+        if (in_array($current_page_base, array_unique($pages_to_watch), true)) {
             $this->attach($this, [
                 'NOTIFY_ORDER_TOTAL_PRE_CONFIRMATION_CHECK_STARTS',
                 'NOTIFY_ORDER_TOTAL_PRE_CONFIRMATION_CHECK_NEXT',
@@ -146,6 +149,30 @@ class zcObserverPaypalrestful
             'shipping_tax' => $order_info['shipping_tax'],
             'tax_groups' => $order_info['tax_groups'],
         ];
+    }
+
+    protected function getNuminixOpcPageKeys(): array
+    {
+        $pageKeys = [
+            'one_page_checkout',
+            'one_page_confirmation',
+        ];
+
+        $potentialConstants = [
+            'FILENAME_ONE_PAGE_CHECKOUT',
+            'FILENAME_ONE_PAGE_CONFIRMATION',
+        ];
+
+        foreach ($potentialConstants as $constantName) {
+            if (defined($constantName)) {
+                $constantValue = constant($constantName);
+                if (is_string($constantValue) && $constantValue !== '') {
+                    $pageKeys[] = $constantValue;
+                }
+            }
+        }
+
+        return array_values(array_unique($pageKeys));
     }
 
     // -----
