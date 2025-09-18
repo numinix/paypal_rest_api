@@ -1194,15 +1194,35 @@ class paypalr extends base
     protected function determinePayerActionRedirectPage(string $current_page_base, array $postVars): string
     {
         $redirectPage = $current_page_base;
+        $mainPageCandidate = null;
 
         if (isset($postVars['main_page'])) {
             $postedMainPage = $postVars['main_page'];
             if (is_string($postedMainPage)) {
                 $postedMainPage = trim($postedMainPage);
                 if ($postedMainPage !== '') {
-                    $redirectPage = preg_replace('/[^a-zA-Z0-9_]/', '', preg_replace('/\.php$/i', '', $postedMainPage));
+                    $mainPageCandidate = $postedMainPage;
+
+                    if (stripos($postedMainPage, 'main_page=') !== false) {
+                        $queryString = parse_url($postedMainPage, PHP_URL_QUERY);
+                        if ($queryString === false || $queryString === null) {
+                            $queryString = $postedMainPage;
+                        }
+
+                        parse_str((string) $queryString, $queryParameters);
+                        if (isset($queryParameters['main_page']) && is_string($queryParameters['main_page'])) {
+                            $mainPageCandidate = $queryParameters['main_page'];
+                        }
+                    }
+
+                    $mainPageCandidate = preg_replace('/\.php$/i', '', $mainPageCandidate);
+                    $mainPageCandidate = preg_replace('/[^a-zA-Z0-9_]/', '', $mainPageCandidate);
                 }
             }
+        }
+
+        if ($mainPageCandidate !== null && $mainPageCandidate !== '') {
+            $redirectPage = $mainPageCandidate;
         }
 
         if ($redirectPage === '' || $redirectPage === null) {
