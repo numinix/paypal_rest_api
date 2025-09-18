@@ -101,6 +101,11 @@ class PayPalRestfulApi extends ErrorInfo
     private string $clientSecret;
 
     /**
+     * PayPal partner identifier, used for onboarding follow-up requests.
+     */
+    protected string $partnerId = '';
+
+    /**
      * The CURL channel, initialized during construction.
      */
     protected $ch = false;
@@ -192,6 +197,11 @@ class PayPalRestfulApi extends ErrorInfo
         $this->keepTxnLinks = $keep_links;
     }
 
+    public function setPartnerId(string $partner_id)
+    {
+        $this->partnerId = trim($partner_id);
+    }
+
     // ===== Start Token-required Methods =====
 
     public function createOrder(array $order_request)
@@ -207,6 +217,43 @@ class PayPalRestfulApi extends ErrorInfo
         $this->log->write('==> Start createPartnerReferral', true);
         $response = $this->curlPost('v2/customer/partner-referrals', $payload);
         $this->log->write('==> End createPartnerReferral', true);
+        return $response;
+    }
+
+    public function getPartnerReferral(string $partner_referral_id)
+    {
+        $this->log->write('==> Start getPartnerReferral', true);
+        $partner_referral_id = trim($partner_referral_id);
+        if ($partner_referral_id === '') {
+            $this->setErrorInfo(self::ERR_CURL_ERROR, 'Partner referral ID is required for getPartnerReferral.');
+            $this->log->write('Partner referral ID missing for getPartnerReferral.', true);
+            return false;
+        }
+        $response = $this->curlGet('v2/customer/partner-referrals/' . rawurlencode($partner_referral_id));
+        $this->log->write('==> End getPartnerReferral', true);
+        return $response;
+    }
+
+    public function getMerchantIntegration(string $merchant_id, string $partner_id = '')
+    {
+        $this->log->write('==> Start getMerchantIntegration', true);
+        $merchant_id = trim($merchant_id);
+        $partner_id = trim($partner_id);
+        if ($partner_id === '') {
+            $partner_id = $this->partnerId;
+        }
+        if ($partner_id === '' || $merchant_id === '') {
+            $this->setErrorInfo(self::ERR_CURL_ERROR, 'Partner ID and merchant ID are required for getMerchantIntegration.');
+            $this->log->write('Missing partner or merchant identifier for getMerchantIntegration.', true);
+            return false;
+        }
+        $endpoint = sprintf(
+            'v2/customer/partners/%s/merchant-integrations/%s',
+            rawurlencode($partner_id),
+            rawurlencode($merchant_id)
+        );
+        $response = $this->curlGet($endpoint);
+        $this->log->write('==> End getMerchantIntegration', true);
         return $response;
     }
 
