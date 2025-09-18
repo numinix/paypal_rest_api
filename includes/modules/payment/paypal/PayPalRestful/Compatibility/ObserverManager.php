@@ -2,11 +2,27 @@
 
 namespace Zencart\Traits;
 
-use Zencart\Events\EventDto;
-
 if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
     trait ObserverManager
     {
+        /**
+         * Determine which notifier implementation is available.
+         *
+         * Zen Cart 2.0+ ships with the namespaced EventDto class, while
+         * earlier versions (e.g. 1.5.7) use the legacy global notifier.
+         * This helper caches the detection to avoid repeated checks.
+         */
+        private function observerManagerUsesEventDto(): bool
+        {
+            static $supportsEventDto = null;
+
+            if ($supportsEventDto === null) {
+                $supportsEventDto = class_exists('\\Zencart\\Events\\EventDto');
+            }
+
+            return $supportsEventDto;
+        }
+
         /**
          * method used to an attach an observer to the notifier object
          *
@@ -18,11 +34,24 @@ if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
          * @param object Reference to the observer class
          * @param array An array of eventId's to observe
          */
-        function attach(&$observer, $eventIDArray)
+        public function attach(&$observer, $eventIDArray)
         {
+            if ($this->observerManagerUsesEventDto()) {
+                foreach ($eventIDArray as $eventID) {
+                    $nameHash = md5(get_class($observer) . $eventID);
+                    \Zencart\Events\EventDto::getInstance()->setObserver($nameHash, array('obs' => &$observer, 'eventID' => $eventID));
+                }
+
+                return;
+            }
+
+            global $zco_notifier;
+            if (!is_object($zco_notifier)) {
+                return;
+            }
+
             foreach ($eventIDArray as $eventID) {
-                $nameHash = md5(get_class($observer) . $eventID);
-                EventDto::getInstance()->setObserver($nameHash, array('obs' => &$observer, 'eventID' => $eventID));
+                $zco_notifier->attach($observer, array($eventID));
             }
         }
 
@@ -31,11 +60,24 @@ if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
          * @param object
          * @param array
          */
-        function detach($observer, $eventIDArray)
+        public function detach($observer, $eventIDArray)
         {
+            if ($this->observerManagerUsesEventDto()) {
+                foreach ($eventIDArray as $eventID) {
+                    $nameHash = md5(get_class($observer) . $eventID);
+                    \Zencart\Events\EventDto::getInstance()->removeObserver($nameHash);
+                }
+
+                return;
+            }
+
+            global $zco_notifier;
+            if (!is_object($zco_notifier)) {
+                return;
+            }
+
             foreach ($eventIDArray as $eventID) {
-                $nameHash = md5(get_class($observer) . $eventID);
-                EventDto::getInstance()->removeObserver($nameHash);
+                $zco_notifier->detach($observer, array($eventID));
             }
         }
     }
