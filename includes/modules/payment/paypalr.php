@@ -550,6 +550,45 @@ class paypalr extends base
         ];
     }
 
+    public static function getPartnerCredentials(string $environment): array
+    {
+        $environment = (strtolower($environment) === 'live') ? 'live' : 'sandbox';
+        $credentials = ['', ''];
+
+        $config_credentials = self::loadPartnerCredentialConfig();
+        if (isset($config_credentials[$environment])) {
+            $env_credentials = $config_credentials[$environment];
+            $client_id = $env_credentials['client_id'] ?? $env_credentials['clientId'] ?? '';
+            $client_secret = $env_credentials['client_secret'] ?? $env_credentials['clientSecret'] ?? '';
+            if ($client_id !== '' && $client_secret !== '') {
+                $credentials = array_map('trim', [(string)$client_id, (string)$client_secret]);
+            }
+        } else {
+            $suffix = ($environment === 'live') ? 'LIVE' : 'SANDBOX';
+            $client_id = getenv('PAYPAL_PARTNER_CLIENT_ID_' . $suffix);
+            $client_secret = getenv('PAYPAL_PARTNER_CLIENT_SECRET_' . $suffix);
+            if ($client_id !== false) {
+                $credentials[0] = trim($client_id);
+            }
+            if ($client_secret !== false) {
+                $credentials[1] = trim($client_secret);
+            }
+        }
+
+        return $credentials;
+    }
+
+    protected static function loadPartnerCredentialConfig(): array
+    {
+        $config_file = DIR_FS_CATALOG . 'includes/local/paypal_partner_credentials.php';
+        if (!file_exists($config_file)) {
+            return [];
+        }
+
+        $credentials = include $config_file;
+        return (is_array($credentials)) ? $credentials : [];
+    }
+
     // -----
     // Validate the configuration settings to ensure that the payment module
     // can be enabled for use.

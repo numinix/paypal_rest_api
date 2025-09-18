@@ -202,6 +202,14 @@ class PayPalRestfulApi extends ErrorInfo
         return $response;
     }
 
+    public function createPartnerReferral(array $payload)
+    {
+        $this->log->write('==> Start createPartnerReferral', true);
+        $response = $this->curlPost('v2/customer/partner-referrals', $payload);
+        $this->log->write('==> End createPartnerReferral', true);
+        return $response;
+    }
+
     public function getOrderStatus(string $paypal_id)
     {
         $this->log->write('==> Start getOrderStatus', true);
