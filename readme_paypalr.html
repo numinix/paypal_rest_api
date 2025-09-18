@@ -118,6 +118,56 @@ table table {
     <p>For additional information, refer to the payment-module's <a href="https://github.com/lat9/paypalr/wiki" target="_blank">wiki articles</a>.</p>
     <p><b>Credits:</b> CSS-based spinner compliments of <a href="https://loading.io/css/" target="_blank">loading.io css spinner</a>.</p>
 
+    <h2>Charging vaulted cards from custom code</h2>
+    <p>When the checkout flow completes a card payment, PayPal returns a <code>payment_source.card</code> payload that contains the vault token. The module saves that response via <code>PayPalRestful\Common\VaultManager::saveVaultedCard</code> and broadcasts the <code>NOTIFY_PAYPALR_VAULT_CARD_SAVED</code> notifier so observers can act on newly stored or updated instruments.</p>
+    <p>Custom code can reuse those vaulted instruments to bill recurring subscriptions or other merchant-initiated payments without prompting customers for their card details again:</p>
+    <ol>
+        <li>Load the module's autoloader before referencing any of its classes:
+            <pre><code>&lt;?php
+require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/pprAutoload.php';
+            </code></pre>
+        </li>
+        <li>Fetch the customer's vaulted records using <code>paypalr::getVaultedCardsForCustomer($customers_id, $activeOnly = true)</code> or <code>PayPalRestful\Common\VaultManager::getCustomerVaultedCards($customers_id)</code>. Each entry contains the vault identifier, status, masked digits, expiry date, billing address, and a normalized copy of the original <code>payment_source.card</code> array returned by PayPal.</li>
+        <li>Instantiate <code>PayPalRestful\Api\PayPalRestfulApi</code> with the credentials from <code>paypalr::getEnvironmentInfo()</code> and create a new order that references the stored card. A minimal capture-only example looks like:
+            <pre><code>&lt;?php
+[$clientId, $clientSecret] = paypalr::getEnvironmentInfo();
+$api = new \PayPalRestful\Api\PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $clientId, $clientSecret);
+
+$card = $vaultCards[0]; // Obtained in the previous step
+
+$orderRequest = [
+    'intent' =&gt; 'CAPTURE',
+    'purchase_units' =&gt; [[
+        'amount' =&gt; [
+            'currency_code' =&gt; 'USD',
+            'value' =&gt; '10.00',
+        ],
+    ]],
+    'payment_source' =&gt; [
+        'card' =&gt; [
+            'vault_id' =&gt; $card['vault_id'],
+            'expiry' =&gt; $card['expiry'],
+            'last_digits' =&gt; $card['last_digits'],
+            'billing_address' =&gt; $card['billing_address'],
+            'attributes' =&gt; [
+                'stored_credential' =&gt; [
+                    'payment_initiator' =&gt; 'MERCHANT',
+                    'payment_type' =&gt; 'RECURRING',
+                    'usage' =&gt; 'SUBSEQUENT',
+                ],
+            ],
+        ],
+    ],
+];
+
+$createResponse = $api-&gt;createOrder($orderRequest);
+$captureResponse = $api-&gt;captureOrder($createResponse['id']);
+            </code></pre>
+            <p>Adjust the purchase units, intent, and stored credential metadata to match your billing scenario. PayPal's <a href="https://developer.paypal.com/docs/multiparty/seller/checkout/facilitator/vault/" target="_blank">vault documentation</a> covers additional optional fields, such as supplying the previous network transaction reference.</p>
+        </li>
+        <li>Once PayPal returns the new authorization or capture, call <code>VaultManager::saveVaultedCard($customers_id, $orders_id, $payment_source['card'])</code> with the updated response so the vault record's <em>last used</em> timestamp and status stay current.</li>
+    </ol>
+
     <h2>Installation and Upgrade</h2>
     <h3>Initial Installation</h3>
     <h4>Before you start &hellip;</h4>
