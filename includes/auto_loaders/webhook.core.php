@@ -11,6 +11,10 @@ if (!defined('IS_ADMIN_FLAG')) {
     die('Illegal Access');
 }
 
+if (!class_exists('notifier')) {
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/LegacyNotifier.php';
+}
+
 $autoLoadConfig[0][] = [
     'autoType' => 'include',
     'loadFile' => DIR_WS_INCLUDES . 'version.php',
