@@ -43,8 +43,6 @@ class paypalr extends base
         PayPalRestfulApi::STATUS_CAPTURED,
     ];
 
-    protected const REDIRECT_LISTENER = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_listener.php';
-
     /**
      * name of this module
      *
@@ -1044,7 +1042,9 @@ class paypalr extends base
         // or back to the checkout_payment page if they cancelled-out from PayPal.
         //
         global $order;
-        $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::REDIRECT_LISTENER, $order);
+        $return_listener = $this->buildListenerUrl('return');
+        $cancel_listener = $this->buildListenerUrl('cancel');
+        $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest($return_listener, $cancel_listener, $order);
         $_SESSION['PayPalRestful']['Order']['user_action'] = $confirm_payment_choice_request->getUserAction();
         $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
         if ($payment_choice_response === false) {
@@ -1179,9 +1179,15 @@ class paypalr extends base
             'expiry_year' => $cc_validation->cc_expiry_year,
             'name' => $cc_owner,
             'security_code' => $cvv_posted,
-            'redirect' => self::REDIRECT_LISTENER,
+            'redirect' => $this->buildListenerUrl(),
         ];
         return true;
+    }
+
+    protected function buildListenerUrl(string $operation = ''): string
+    {
+        $parameters = ($operation === '') ? '' : 'op=' . $operation;
+        return zen_href_link('ppr_listener.php', $parameters, 'SSL', true, false);
     }
     protected function createPayPalOrder(string $ppr_type): bool
     {
