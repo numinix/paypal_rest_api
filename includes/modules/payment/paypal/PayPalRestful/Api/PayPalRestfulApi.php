@@ -363,7 +363,7 @@ class PayPalRestfulApi extends ErrorInfo
         string $tracking_number,
         string $carrier_code,
         string $action = 'ADD',
-        bool $email_buyer = false,
+        bool $email_buyer = false
     ): false|array {
         $this->log->write("==> Start updatePackageTracking($paypal_txnid, " . Logger::logJSON($tracking_number) . ", $carrier_code, $action ...)\n", true);
 
