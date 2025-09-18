@@ -100,6 +100,8 @@ class PayPalRestfulApi extends ErrorInfo
     private string $clientId;
     private string $clientSecret;
 
+    public const PARTNER_ATTRIBUTION_ID = 'NuminixPPCP_SP';
+
     /**
      * PayPal partner identifier, used for onboarding follow-up requests.
      */
@@ -765,7 +767,7 @@ class PayPalRestfulApi extends ErrorInfo
             'Content-Type: application/json',
             "Authorization: Bearer $oauth2_token",
             'Prefer: return=representation',
-            'PayPal-Partner-Attribution-Id: NuminixPPCP_SP',
+            'PayPal-Partner-Attribution-Id: ' . self::PARTNER_ATTRIBUTION_ID,
         ];
 
         // -----

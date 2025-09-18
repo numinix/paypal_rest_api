@@ -24,6 +24,30 @@ The module's operation has been validated …
 
 For additional information, refer to the payment-module's [wiki articles](https://github.com/lat9/paypalr/wiki).
 
+## Integrated sign-up (ISU)
+
+Zen Cart's admin exposes a **Complete PayPal setup** button that launches PayPal's integrated sign-up (ISU) experience. The helper posts the store's metadata to PayPal, opens the hosted onboarding flow in a new window, and then routes the merchant back through `admin/paypalr_integrated_signup.php` so the module can finish configuration.
+
+### Prerequisites
+
+* Install the module and apply the required `order_total` notifier patch.
+* Populate the storefront metadata that ISU sends to PayPal (store name, owner name, and owner email address) from Zen Cart's configuration.
+* Provide PayPal partner credentials for both sandbox and live environments without committing secrets to version control. Use either `includes/local/paypal_partner_credentials.php` (not shipped in the plugin package) or set environment variables:
+  * `PAYPAL_PARTNER_CLIENT_ID_SANDBOX` / `PAYPAL_PARTNER_CLIENT_SECRET_SANDBOX`
+  * `PAYPAL_PARTNER_CLIENT_ID_LIVE` / `PAYPAL_PARTNER_CLIENT_SECRET_LIVE`
+
+### Sandbox versus live
+
+The module chooses the sandbox or live onboarding flow based on the **PayPal Server** setting (`MODULE_PAYMENT_PAYPALR_SERVER`). Sandbox flows let you test onboarding without touching production accounts. Live onboarding requires production partner credentials and writes the resulting merchant credentials back to your configuration (via the helper's `paypalr_isu` session data) once PayPal redirects to Zen Cart.
+
+### Partner attribution and redirects
+
+PayPal requires partners to identify themselves whenever merchants onboard. The helper injects PayPal's partner attribution id `NuminixPPCP_SP` into the API request and sets both return and cancel URLs so PayPal can route the merchant back to `admin/paypalr_integrated_signup.php?action=return` or `action=cancel`. After a successful return the helper verifies the onboarding status, stores the newly issued merchant credentials, and finally redirects the administrator to the Payment Modules page.
+
+## Partner credential packaging guidance
+
+Partner credentials should never be committed to a repository or shipped in a plugin archive. Keep secrets in `includes/local/paypal_partner_credentials.php` (which stays outside the distribution) or rely on environment variables when deploying to staging and production. The helper reads from the local configuration file first and then from the environment, making it safe to package the module without exposing API keys.
+
 ## Charging vaulted cards from custom code
 
 When a customer pays by card, PayPal returns a `payment_source.card` element that includes the vaulted token. The module saves that response in the vault table via `PayPalRestful\Common\VaultManager::saveVaultedCard` and raises the `NOTIFY_PAYPALR_VAULT_CARD_SAVED` observer event so other plugins can react to the new or updated token.【F:includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php†L63-L151】【F:includes/modules/payment/paypalr.php†L2052-L2141】

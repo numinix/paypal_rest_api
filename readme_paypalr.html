@@ -118,6 +118,28 @@ table table {
     <p>For additional information, refer to the payment-module's <a href="https://github.com/lat9/paypalr/wiki" target="_blank">wiki articles</a>.</p>
     <p><b>Credits:</b> CSS-based spinner compliments of <a href="https://loading.io/css/" target="_blank">loading.io css spinner</a>.</p>
 
+    <h2>Integrated sign-up (ISU)</h2>
+    <p>Zen Cart's admin exposes a <b>Complete PayPal setup</b> button that launches PayPal's integrated sign-up (ISU) experience. The helper posts your store's metadata to PayPal, opens the hosted onboarding flow in a new window, and then routes the merchant back through <code>admin/paypalr_integrated_signup.php</code> so the module can finish configuration.</p>
+
+    <h3>Prerequisites</h3>
+    <ul>
+        <li>Install the module and apply the required <code>order_total</code> notifier patch.</li>
+        <li>Populate Zen Cart's core configuration values for store name, owner name and owner email address so ISU can share them with PayPal.</li>
+        <li>Provide PayPal partner credentials for sandbox and live without committing secrets to version control. Either create <code>includes/local/paypal_partner_credentials.php</code> (not shipped in the plugin package) or set environment variables:<ul>
+            <li><code>PAYPAL_PARTNER_CLIENT_ID_SANDBOX</code> / <code>PAYPAL_PARTNER_CLIENT_SECRET_SANDBOX</code></li>
+            <li><code>PAYPAL_PARTNER_CLIENT_ID_LIVE</code> / <code>PAYPAL_PARTNER_CLIENT_SECRET_LIVE</code></li>
+        </ul></li>
+    </ul>
+
+    <h3>Sandbox versus live</h3>
+    <p>The module chooses the sandbox or live onboarding flow based on the <b>PayPal Server</b> setting (<code>MODULE_PAYMENT_PAYPALR_SERVER</code>). Sandbox lets you rehearse onboarding, while live requires production partner credentials and, after PayPal redirects to Zen Cart, stores the new merchant credentials via the helper's <code>paypalr_isu</code> session data.</p>
+
+    <h3>Partner attribution and redirects</h3>
+    <p>The helper injects PayPal's partner attribution id <code>NuminixPPCP_SP</code> into the API request and sets return and cancel URLs so PayPal can route the merchant back to <code>admin/paypalr_integrated_signup.php?action=return</code> or <code>action=cancel</code>. After a successful return the helper verifies the onboarding status, stores the issued merchant credentials, and then redirects the administrator to the Payment Modules page.</p>
+
+    <h2>Partner credential packaging guidance</h2>
+    <p>Partner credentials should never be stored in your repository or included in a distribution archive. Keep secrets in <code>includes/local/paypal_partner_credentials.php</code> (which remains outside of the packaged plugin) or supply them through environment variables for staging and production deployments. The helper checks the local configuration first and then the environment, allowing you to ship the module without exposing API keys.</p>
+
     <h2>Charging vaulted cards from custom code</h2>
     <p>When the checkout flow completes a card payment, PayPal returns a <code>payment_source.card</code> payload that contains the vault token. The module saves that response via <code>PayPalRestful\Common\VaultManager::saveVaultedCard</code> and broadcasts the <code>NOTIFY_PAYPALR_VAULT_CARD_SAVED</code> notifier so observers can act on newly stored or updated instruments.</p>
     <p>Custom code can reuse those vaulted instruments to bill recurring subscriptions or other merchant-initiated payments without prompting customers for their card details again:</p>

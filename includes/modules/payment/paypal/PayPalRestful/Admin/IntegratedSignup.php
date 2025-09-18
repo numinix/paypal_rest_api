@@ -171,17 +171,30 @@ class IntegratedSignup
         [$givenName, $surname] = $this->parseOwnerName();
         $trackingId = $this->generateTrackingId();
 
+        $redirectUrls = array_filter([
+            'return_url' => $this->getReturnUrl(),
+            'cancel_url' => $this->getCancelUrl(),
+        ]);
+
+        $thirdPartyDetails = [
+            'features' => ['PAYMENT', 'REFUND', 'PARTNER_FEE'],
+            'partner_attribution_id' => PayPalRestfulApi::PARTNER_ATTRIBUTION_ID,
+        ];
+
+        $restIntegration = [
+            'integration_method' => 'PAYPAL',
+            'integration_type' => 'THIRD_PARTY',
+            'third_party_details' => $thirdPartyDetails,
+        ];
+        if (!empty($redirectUrls)) {
+            $restIntegration['redirect_urls'] = $redirectUrls;
+        }
+
         $operations = [
             [
                 'operation' => 'API_INTEGRATION',
                 'api_integration_preference' => [
-                    'rest_api_integration' => [
-                        'integration_method' => 'PAYPAL',
-                        'integration_type' => 'THIRD_PARTY',
-                        'third_party_details' => [
-                            'features' => ['PAYMENT', 'REFUND', 'PARTNER_FEE'],
-                        ],
-                    ],
+                    'rest_api_integration' => $restIntegration,
                 ],
             ],
         ];
@@ -298,10 +311,30 @@ class IntegratedSignup
 
     private function getReturnUrl(): string
     {
-        if (function_exists('zen_href_link')) {
-            return zen_href_link(FILENAME_MODULES, 'set=payment&module=paypalr', 'SSL');
+        $url = $this->getOnboardingUrl('return');
+        if ($url !== '') {
+            return $url;
         }
 
         return $this->getStorefrontUrl();
+    }
+
+    private function getCancelUrl(): string
+    {
+        $url = $this->getOnboardingUrl('cancel');
+        if ($url !== '') {
+            return $url;
+        }
+
+        return $this->getStorefrontUrl();
+    }
+
+    private function getOnboardingUrl(string $action): string
+    {
+        if (function_exists('zen_href_link')) {
+            return zen_href_link('paypalr_integrated_signup.php', 'action=' . $action, 'SSL');
+        }
+
+        return '';
     }
 }
