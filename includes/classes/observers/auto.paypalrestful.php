@@ -371,17 +371,44 @@ let paypalMessageableStyles = <?= !empty($messageStyles) ? json_encode($messageS
         $limit = defined('MODULE_PAYMENT_PAYPALR_PAYLATER_MESSAGING') ? MODULE_PAYMENT_PAYPALR_PAYLATER_MESSAGING : 'All';
         $limit = explode(', ', $limit);
 
-        return match(true) {
-            !empty(array_intersect($limit, ['All', 'Checkout'])) && str_starts_with($current_page_base, "checkout") => 'checkout',
-            !empty(array_intersect($limit, ['All', 'Shopping Cart'])) && $current_page_base === 'shopping_cart' => 'cart',
-            //!empty(array_intersect($limit, ['All', 'Shopping Cart'])) && $current_page_base === 'mini-cart' => 'mini-cart', // @TODO this is more for a header box
-            !empty(array_intersect($limit, ['All', 'Product Pages'])) && in_array($current_page_base, zen_get_buyable_product_type_handlers(), true) => 'product-details',
-            !empty(array_intersect($limit, ['All', 'Product Listings and Search Results'])) && ($category_depth === 'products' || ($tpl_page_body ?? null) === 'tpl_index_product_list.php') => 'product-listing',
-            !empty(array_intersect($limit, ['All', 'Product Listings and Search Results'])) && str_ends_with($current_page_base, 'search_result') => 'search-results',
-            !empty($limit) && $this_is_home_page => 'home',
-            !empty($limit) => 'other',
-            default => 'None',
-        };
+        $limitAllCheckout = !empty(array_intersect($limit, ['All', 'Checkout']));
+        if ($limitAllCheckout && strpos((string)$current_page_base, 'checkout') === 0) {
+            return 'checkout';
+        }
+
+        if (!empty(array_intersect($limit, ['All', 'Shopping Cart'])) && $current_page_base === 'shopping_cart') {
+            return 'cart';
+        }
+
+        //if (!empty(array_intersect($limit, ['All', 'Shopping Cart'])) && $current_page_base === 'mini-cart') {
+        //    return 'mini-cart'; // @TODO this is more for a header box
+        //}
+
+        if (!empty(array_intersect($limit, ['All', 'Product Pages'])) && in_array($current_page_base, zen_get_buyable_product_type_handlers(), true)) {
+            return 'product-details';
+        }
+
+        if (!empty(array_intersect($limit, ['All', 'Product Listings and Search Results']))
+            && ($category_depth === 'products' || ($tpl_page_body ?? null) === 'tpl_index_product_list.php')
+        ) {
+            return 'product-listing';
+        }
+
+        if (!empty(array_intersect($limit, ['All', 'Product Listings and Search Results']))
+            && substr((string)$current_page_base, -strlen('search_result')) === 'search_result'
+        ) {
+            return 'search-results';
+        }
+
+        if (!empty($limit) && $this_is_home_page) {
+            return 'home';
+        }
+
+        if (!empty($limit)) {
+            return 'other';
+        }
+
+        return 'None';
     }
 }
 

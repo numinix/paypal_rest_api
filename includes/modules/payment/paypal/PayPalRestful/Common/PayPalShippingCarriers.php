@@ -54,7 +54,7 @@ class PayPalShippingCarriers
         // find longest-matching name
         foreach ($carriersForCountry as $code => $name) {
             $name = \strtoupper($name);
-            if (str_contains($carrier_name, $name)) {
+            if ($name === '' || strpos($carrier_name, $name) !== false) {
                 if (strlen($name) > strlen($bestMatch)) {
                     $bestMatch = $name;
                 }
