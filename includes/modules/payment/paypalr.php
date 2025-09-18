@@ -957,6 +957,17 @@ class paypalr extends base
         return $cards_accepted;
     }
 
+    protected function getListenerEndpoint(): string
+    {
+        // Build the base URL used by the PayPal redirect-listener; the specific
+        // operation (return/cancel) is appended by the confirmation request.
+        if (defined('REDIRECT_LISTENER')) {
+            return REDIRECT_LISTENER;
+        }
+
+        return HTTP_SERVER . DIR_WS_CATALOG . 'ppr_listener.php';
+    }
+
     // --------------------------------------------
     // Issued during the "confirmation" phase of the checkout process, called
     // here IFF this payment module was selected during the "payment" phase!
@@ -1042,9 +1053,8 @@ class paypalr extends base
         // or back to the checkout_payment page if they cancelled-out from PayPal.
         //
         global $order;
-        //$return_listener = $this->buildListenerUrl('return');
-        //$cancel_listener = $this->buildListenerUrl('cancel');
-        $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest($return_listener, $cancel_listener, $order);
+        $listener_endpoint = $this->getListenerEndpoint();
+        $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest($listener_endpoint, $order);
         $_SESSION['PayPalRestful']['Order']['user_action'] = $confirm_payment_choice_request->getUserAction();
         $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
         if ($payment_choice_response === false) {
