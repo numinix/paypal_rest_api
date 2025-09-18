@@ -1042,8 +1042,8 @@ class paypalr extends base
         // or back to the checkout_payment page if they cancelled-out from PayPal.
         //
         global $order;
-        $return_listener = $this->buildListenerUrl('return');
-        $cancel_listener = $this->buildListenerUrl('cancel');
+        //$return_listener = $this->buildListenerUrl('return');
+        //$cancel_listener = $this->buildListenerUrl('cancel');
         $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest($return_listener, $cancel_listener, $order);
         $_SESSION['PayPalRestful']['Order']['user_action'] = $confirm_payment_choice_request->getUserAction();
         $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
