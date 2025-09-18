@@ -21,6 +21,11 @@ class ConfirmPayPalPaymentChoiceRequest
      */
     protected array $request;
 
+    /**
+     * The resolved user-action to be supplied in the experience-context.
+     */
+    protected string $userAction;
+
     // -----
     // Constructor.  Creates the payload for a PayPal payment-choice confirmation request.
     //
@@ -48,11 +53,11 @@ class ConfirmPayPalPaymentChoiceRequest
         //
         // Otherwise, the customer confirms their order on the PayPal payment selection.
         //
-        $user_action = 'CONTINUE';
+        $this->userAction = 'CONTINUE';
         global $current_page_base;
         if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && defined('CHECKOUT_ONE_CONFIRMATION_REQUIRED') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
             if (!in_array('paypalr', explode(',', str_replace(' ', '', CHECKOUT_ONE_CONFIRMATION_REQUIRED)))) {
-                $user_action = 'PAY_NOW';
+                $this->userAction = 'PAY_NOW';
             }
         }
 
@@ -70,7 +75,7 @@ class ConfirmPayPalPaymentChoiceRequest
 //                    'locale' => 'en-US',
                     'landing_page' => 'NO_PREFERENCE',  //- LOGIN, GUEST_CHECKOUT or NO_PREFERENCE
                     'shipping_preference' => $shipping_preference,    //- GET_FROM_FILE (allows shipping address change on PayPal), NO_SHIPPING, SET_PROVIDED_ADDRESS (customer can't change)
-                    'user_action' => $user_action,  //- PAY_NOW or CONTINUE
+                    'user_action' => $this->userAction,  //- PAY_NOW or CONTINUE
                     'return_url' => $listener_endpoint . '?op=return',
                     'cancel_url' => $listener_endpoint . '?op=cancel',
                 ],
@@ -84,5 +89,10 @@ class ConfirmPayPalPaymentChoiceRequest
     public function get(): array
     {
         return $this->request;
+    }
+
+    public function getUserAction(): string
+    {
+        return $this->userAction;
     }
 }

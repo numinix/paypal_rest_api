@@ -1045,6 +1045,7 @@ class paypalr extends base
         //
         global $order;
         $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest(self::REDIRECT_LISTENER, $order);
+        $_SESSION['PayPalRestful']['Order']['user_action'] = $confirm_payment_choice_request->getUserAction();
         $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
         if ($payment_choice_response === false) {
             $this->sendAlertEmail(
@@ -1068,6 +1069,20 @@ class paypalr extends base
                 }
             }
             if ($action_link === '') {
+                $user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';
+                if ($user_action === 'PAY_NOW') {
+                    $this->log->write(
+                        'pre_confirmation_check, STATUS_PAYER_ACTION_REQUIRED without payer-action link for PAY_NOW; continuing without redirect.'
+                        . "\n" . Logger::logJSON($payment_choice_response),
+                        true,
+                        'after'
+                    );
+                    $_SESSION['PayPalRestful']['Order']['status'] = $response_status;
+                    $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
+                    $_SESSION['PayPalRestful']['Order']['payment_source'] = 'paypal';
+                    return;
+                }
+
                 $this->sendAlertEmail(
                     MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
                     MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response)
@@ -1442,7 +1457,9 @@ class paypalr extends base
         //
         } else {
             $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
-            if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true)) {
+            $wallet_user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';
+            $payer_action_fast_path = ($wallet_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
+            if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false) {
                 $this->log->write('paypalr::before_process, cannot capture/authorize paypal order; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));
                 unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
                 $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
