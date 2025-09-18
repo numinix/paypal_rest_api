@@ -305,8 +305,13 @@ $define = [
 ];
 
 if (IS_ADMIN_FLAG === true) {
+    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_INTRO'] = 'Get started with the PayPal Checkout (RESTful) integrated sign-up experience to quickly connect your store to PayPal.';
+    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON'] = 'Complete PayPal setup';
+
     $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION'] =
         '<b>PayPal Checkout (RESTful)</b>, v%s<br><br>' .   //- %s is filled in with the current module version
+        '<p>' . $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_INTRO'] . '</p>' .
+        '<p><a class="paypalr-isu-button" data-partner-attribution-id="NuminixPPCP_SP" href="' . zen_href_link('paypalr_integrated_signup.php', 'action=start', 'SSL') . '" rel="noopener noreferrer" target="_blank">' . $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON'] . '</a></p>' .
         '<a href="https://www.paypal.com/login" rel="noopener noreferrer" target="_blank">Manage your PayPal <b>business</b> account</a><br><br>' .
         '<b>Configuration instructions:</b><br>' .
         '<ol>
