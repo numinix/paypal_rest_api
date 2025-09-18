@@ -37,7 +37,7 @@ class Logger
             return;
         }
         
-        if (!empty($current_page_base) && \str_contains($current_page_base, 'webhook')) {
+        if (!empty($current_page_base) && strpos((string)$current_page_base, 'webhook') !== false) {
             $logfile_suffix = 'webhook-' . $uniqueName;
             $logfile_suffix = trim($logfile_suffix, '-');
         } elseif (IS_ADMIN_FLAG === false) {

@@ -429,7 +429,7 @@ class PayPalRestfulApi extends ErrorInfo
                 return false;
             }
             foreach ($trackers as $tracker) {
-                if (\str_ends_with($tracker['id'], $tracking_number)) {
+                if ($this->stringEndsWith($tracker['id'], $tracking_number)) {
                     if ($tracker['status'] === 'CANCELLED') {
                         $this->log->write("Tracker ALREADY CANCELLED for tracking_number $tracking_number; nothing to update/cancel. Txn ID: $paypal_txnid");
                         return false;
@@ -465,12 +465,12 @@ class PayPalRestfulApi extends ErrorInfo
         // skip unreachable localhost/testing domains
         $domain = str_replace(['http'.'://', 'https'.'://'], '', rtrim(HTTP_SERVER, '/'));
         foreach (['.local', '.test'] as $val) {
-            if (str_ends_with($domain, $val)) {
+            if ($this->stringEndsWith($domain, $val)) {
                 return;
             }
         }
         foreach (['localhost', '127.0.0.1'] as $val) {
-            if (str_starts_with($domain, $val)) {
+            if ($this->stringStartsWith($domain, $val)) {
                 return;
             }
         }
@@ -541,12 +541,12 @@ class PayPalRestfulApi extends ErrorInfo
         // skip unreachable localhost/testing domains
         $domain = str_replace(['http'.'://', 'https'.'://'], '', rtrim(HTTP_SERVER, '/'));
         foreach (['.local', '.test'] as $val) {
-            if (str_ends_with($domain, $val)) {
+            if ($this->stringEndsWith($domain, $val)) {
                 return;
             }
         }
         foreach (['localhost', '127.0.0.1'] as $val) {
-            if (str_starts_with($domain, $val)) {
+            if ($this->stringStartsWith($domain, $val)) {
                 return;
             }
         }
@@ -1034,4 +1034,36 @@ class PayPalRestfulApi extends ErrorInfo
         return false;
     }
     // ===== End CURL Interface Methods =====
+
+    /**
+     * Polyfill for PHP < 8.0 str_starts_with().
+     */
+    private function stringStartsWith($haystack, $needle): bool
+    {
+        $haystack = (string)$haystack;
+        $needle = (string)$needle;
+
+        if ($needle === '') {
+            return true;
+        }
+
+        return strncmp($haystack, $needle, strlen($needle)) === 0;
+    }
+
+    /**
+     * Polyfill for PHP < 8.0 str_ends_with().
+     */
+    private function stringEndsWith($haystack, $needle): bool
+    {
+        $haystack = (string)$haystack;
+        $needle = (string)$needle;
+
+        if ($needle === '') {
+            return true;
+        }
+
+        $length = strlen($needle);
+
+        return substr($haystack, -$length) === $needle;
+    }
 }

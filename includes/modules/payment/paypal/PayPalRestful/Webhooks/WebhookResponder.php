@@ -39,7 +39,7 @@ class WebhookResponder
         if (array_key_exists('PAYPAL-AUTH-VERSION', $headers)
             && array_key_exists('PAYPAL-AUTH-ALGO', $headers)
             && isset($data['event_type'])
-            && \str_contains($this->webhook->getUserAgent(), 'PayPal/')
+            && strpos((string)$this->webhook->getUserAgent(), 'PayPal/') !== false
         ) {
             $this->shouldRespond = true;
         }
