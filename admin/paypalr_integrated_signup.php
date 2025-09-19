@@ -24,7 +24,7 @@ if (!$paypalrAdminLoggedIn) {
     zen_redirect(zen_href_link(FILENAME_LOGIN, '', 'SSL'));
 }
 
-require DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
 use PayPalRestful\Admin\IntegratedSignup;
 use PayPalRestful\Api\PayPalRestfulApi;

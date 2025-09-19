@@ -21,7 +21,7 @@ if (!defined('MODULE_PAYMENT_PAYPALR_STATUS') || MODULE_PAYMENT_PAYPALR_STATUS =
     die();
 }
 
-require DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
 use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Common\Logger;
