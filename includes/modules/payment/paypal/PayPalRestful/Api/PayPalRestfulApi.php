@@ -214,6 +214,115 @@ class PayPalRestfulApi extends ErrorInfo
         return $response;
     }
 
+    public function createProduct(array $product_request)
+    {
+        $this->log->write('==> Start createProduct', true);
+        $response = $this->curlPost('v1/catalogs/products', $product_request);
+        $this->log->write('==> End createProduct', true);
+        return $response;
+    }
+
+    public function createPlan(array $plan_request)
+    {
+        $this->log->write('==> Start createPlan', true);
+        $response = $this->curlPost('v1/billing/plans', $plan_request);
+        $this->log->write('==> End createPlan', true);
+        return $response;
+    }
+
+    public function activatePlan(string $plan_id)
+    {
+        $this->log->write('==> Start activatePlan', true);
+        $plan_id = trim($plan_id);
+        if ($plan_id === '') {
+            $this->setErrorInfo(self::ERR_CURL_ERROR, 'Plan ID is required for activatePlan.');
+            $this->log->write('Missing plan identifier for activatePlan.', true);
+            return false;
+        }
+        $response = $this->curlPost('v1/billing/plans/' . rawurlencode($plan_id) . '/activate', []);
+        $this->log->write('==> End activatePlan', true);
+        return $response;
+    }
+
+    public function createSubscription(array $subscription_request)
+    {
+        $this->log->write('==> Start createSubscription', true);
+        $response = $this->curlPost('v1/billing/subscriptions', $subscription_request);
+        $this->log->write('==> End createSubscription', true);
+        return $response;
+    }
+
+    public function getSubscription(string $subscription_id)
+    {
+        $this->log->write('==> Start getSubscription', true);
+        $subscription_id = trim($subscription_id);
+        if ($subscription_id === '') {
+            $this->setErrorInfo(self::ERR_CURL_ERROR, 'Subscription ID is required for getSubscription.');
+            $this->log->write('Subscription identifier missing for getSubscription.', true);
+            return false;
+        }
+        $response = $this->curlGet('v1/billing/subscriptions/' . rawurlencode($subscription_id));
+        $this->log->write('==> End getSubscription', true);
+        return $response;
+    }
+
+    public function cancelSubscription(string $subscription_id, $payload = [])
+    {
+        return $this->updateSubscriptionStatus('cancel', $subscription_id, $payload);
+    }
+
+    public function suspendSubscription(string $subscription_id, $payload = [])
+    {
+        return $this->updateSubscriptionStatus('suspend', $subscription_id, $payload);
+    }
+
+    public function activateSubscription(string $subscription_id, $payload = [])
+    {
+        return $this->updateSubscriptionStatus('activate', $subscription_id, $payload);
+    }
+
+    protected function updateSubscriptionStatus(string $action, string $subscription_id, $payload)
+    {
+        $this->log->write("==> Start {$action}Subscription", true);
+        $subscription_id = trim($subscription_id);
+        if ($subscription_id === '') {
+            $this->setErrorInfo(self::ERR_CURL_ERROR, sprintf('Subscription ID is required for %sSubscription.', $action));
+            $this->log->write('Subscription identifier missing for status update.', true);
+            return false;
+        }
+
+        $requestPayload = $this->normalizeSubscriptionStatusPayload($payload, $action);
+        $endpoint = sprintf('v1/billing/subscriptions/%s/%s', rawurlencode($subscription_id), $action);
+        $response = $this->curlPost($endpoint, $requestPayload);
+        $this->log->write("==> End {$action}Subscription", true);
+        return $response;
+    }
+
+    protected function normalizeSubscriptionStatusPayload($payload, string $action): array
+    {
+        if (is_string($payload) && $payload !== '') {
+            return ['reason' => $payload];
+        }
+        if (is_array($payload) && !empty($payload)) {
+            return $payload;
+        }
+
+        switch ($action) {
+            case 'suspend':
+                $reason = 'Suspended by merchant.';
+                break;
+            case 'activate':
+                $reason = 'Reactivated by merchant.';
+                break;
+            case 'cancel':
+            default:
+                $reason = 'Cancelled by merchant.';
+                break;
+        }
+
+        return ['reason' => $reason];
+    }
+
     public function createPartnerReferral(array $payload)
     {
         $this->log->write('==> Start createPartnerReferral', true);
