@@ -42,7 +42,7 @@ The module chooses the sandbox or live onboarding flow based on the **PayPal Ser
 
 ### Partner attribution and redirects
 
-PayPal requires partners to identify themselves whenever merchants onboard. The helper injects PayPal's partner attribution id `NuminixPPCP_SP` into the API request and sets both return and cancel URLs so PayPal can route the merchant back to `admin/paypalr_integrated_signup.php?action=return` or `action=cancel`. After a successful return the helper verifies the onboarding status, stores the newly issued merchant credentials, and finally redirects the administrator to the Payment Modules page.
+PayPal requires partners to identify themselves whenever merchants onboard. The helper injects the partner attribution header automatically and sets both return and cancel URLs so PayPal can route the merchant back to `admin/paypalr_integrated_signup.php?action=return` or `action=cancel`. After a successful return the helper verifies the onboarding status, stores the newly issued merchant credentials, and finally redirects the administrator to the Payment Modules page.
 
 ## Partner credential packaging guidance
 
