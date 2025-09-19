@@ -11,7 +11,16 @@
 
 require 'includes/application_top.php';
 
-if (!zen_admin_check_login()) {
+// Zen Cart v2.0.2+ exposes zen_admin_check_login(); fall back to the session when
+// running on earlier stores so administrators can still reach the onboarding flow.
+$paypalrAdminLoggedIn = true;
+if (function_exists('zen_admin_check_login')) {
+    $paypalrAdminLoggedIn = zen_admin_check_login();
+} else {
+    $paypalrAdminLoggedIn = (int)($_SESSION['admin_id'] ?? 0) > 0;
+}
+
+if (!$paypalrAdminLoggedIn) {
     zen_redirect(zen_href_link(FILENAME_LOGIN, '', 'SSL'));
 }
 
