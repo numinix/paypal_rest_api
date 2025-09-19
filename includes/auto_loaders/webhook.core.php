@@ -15,6 +15,10 @@ if (!class_exists('notifier')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/LegacyNotifier.php';
 }
 
+if (!class_exists('zcDate')) {
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ZcDate.php';
+}
+
 $autoLoadConfig[0][] = [
     'autoType' => 'include',
     'loadFile' => DIR_WS_INCLUDES . 'version.php',
