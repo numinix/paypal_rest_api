@@ -19,6 +19,10 @@ if (!class_exists('zcDate')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ZcDate.php';
 }
 
+if (!class_exists('sniffer')) {
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Sniffer.php';
+}
+
 $autoLoadConfig[0][] = [
     'autoType' => 'include',
     'loadFile' => DIR_WS_INCLUDES . 'version.php',
@@ -76,7 +80,6 @@ $autoLoadConfig[45][] = [
     'autoType' => 'init_script',
     'loadFile' => 'init_non_db_settings.php',
 ];
-//- sniffer class loaded via psr4Autoload.php
 $autoLoadConfig[50][] = [
     'autoType' => 'classInstantiate',
     'className' => 'sniffer',
