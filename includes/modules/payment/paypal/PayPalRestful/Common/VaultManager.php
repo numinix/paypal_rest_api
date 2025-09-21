@@ -165,6 +165,129 @@ class VaultManager
     }
 
     /**
+     * Update a stored vaulted card using a webhook payload's normalized card resource.
+     *
+     * @param array $resource The normalized payment_source.card payload containing vault metadata.
+     *
+     * @return array|null The updated record or null if no matching vault entry exists.
+     */
+    public static function updateFromWebhookPayload(array $resource): ?array
+    {
+        $vault = $resource['vault'] ?? [];
+        $vaultId = self::sanitizeString($vault['id'] ?? '', 64);
+        if ($vaultId === '') {
+            return null;
+        }
+
+        self::ensureSchema();
+
+        global $db;
+
+        $existing = $db->Execute(
+            "SELECT paypal_vault_id" .
+            "   FROM " . TABLE_PAYPAL_VAULT .
+            "  WHERE vault_id = '" . zen_db_input($vaultId) . "'" .
+            "  LIMIT 1"
+        );
+
+        if ($existing->EOF) {
+            return null;
+        }
+
+        $now = date('Y-m-d H:i:s');
+
+        $sqlData = [
+            'last_modified' => $now,
+        ];
+
+        $status = self::sanitizeString($vault['status'] ?? '', 32);
+        if ($status !== '') {
+            $sqlData['status'] = strtoupper($status);
+        }
+
+        $brand = self::sanitizeString($resource['brand'] ?? '', 32);
+        if ($brand !== '') {
+            $sqlData['brand'] = $brand;
+        }
+
+        $lastDigits = $resource['last_digits'] ?? '';
+        if ($lastDigits !== '') {
+            $sqlData['last_digits'] = self::sanitizeString(substr($lastDigits, -4), 4);
+        }
+
+        $cardType = self::sanitizeString($resource['type'] ?? '', 32);
+        if ($cardType !== '') {
+            $sqlData['card_type'] = $cardType;
+        }
+
+        $expiry = self::sanitizeString($resource['expiry'] ?? '', 7);
+        if ($expiry !== '') {
+            $sqlData['expiry'] = $expiry;
+        }
+
+        $cardholder = self::sanitizeString($resource['name'] ?? '', 96);
+        if ($cardholder !== '') {
+            $sqlData['cardholder_name'] = $cardholder;
+        }
+
+        if (isset($vault['customer']['payer_id'])) {
+            $payerId = self::sanitizeString($vault['customer']['payer_id'], 64);
+            if ($payerId !== '') {
+                $sqlData['payer_id'] = $payerId;
+            }
+        }
+
+        if (isset($vault['customer']['id'])) {
+            $customerId = self::sanitizeString($vault['customer']['id'], 64);
+            if ($customerId !== '') {
+                $sqlData['paypal_customer_id'] = $customerId;
+            }
+        }
+
+        if (array_key_exists('billing_address', $resource)) {
+            $billingAddress = self::encodeJson($resource['billing_address']);
+            if ($billingAddress !== null) {
+                $sqlData['billing_address'] = $billingAddress;
+            }
+        }
+
+        $cardData = self::encodeJson($resource);
+        if ($cardData !== null) {
+            $sqlData['card_data'] = $cardData;
+        }
+
+        $createTime = self::convertPayPalDate($vault['create_time'] ?? null);
+        if ($createTime !== null) {
+            $sqlData['create_time'] = $createTime;
+        }
+
+        $updateTime = self::convertPayPalDate($vault['update_time'] ?? null);
+        if ($updateTime !== null) {
+            $sqlData['update_time'] = $updateTime;
+            $sqlData['last_used'] = $updateTime;
+        } else {
+            $sqlData['last_used'] = $now;
+        }
+
+        $paypalVaultId = (int)$existing->fields['paypal_vault_id'];
+
+        zen_db_perform(TABLE_PAYPAL_VAULT, $sqlData, 'update', 'paypal_vault_id = ' . $paypalVaultId);
+
+        $stored = $db->Execute(
+            "SELECT *" .
+            "   FROM " . TABLE_PAYPAL_VAULT .
+            "  WHERE vault_id = '" . zen_db_input($vaultId) . "'" .
+            "  LIMIT 1"
+        );
+
+        if ($stored->EOF) {
+            return null;
+        }
+
+        return self::mapRow($stored->fields);
+    }
+
+    /**
      * Retrieve a customer's vaulted cards.
      *
      * @param int  $customers_id The Zen Cart customer's identifier.

@@ -73,6 +73,7 @@ class PayPalRestfulApi extends ErrorInfo
         'PAYMENT.CAPTURE.PENDING',
         'PAYMENT.CAPTURE.REFUNDED',
         'PAYMENT.CAPTURE.REVERSED',
+        'VAULT.PAYMENT-TOKEN.UPDATED',
     ];
 
     /**
