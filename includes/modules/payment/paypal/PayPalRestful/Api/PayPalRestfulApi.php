@@ -96,6 +96,11 @@ class PayPalRestfulApi extends ErrorInfo
     protected string $endpoint;
 
     /**
+     * Indicates which environment (live or sandbox) the instance is using.
+     */
+    protected string $environmentType = 'sandbox';
+
+    /**
      * OAuth client id and secret, set during class construction.
      */
     private string $clientId;
@@ -151,11 +156,17 @@ class PayPalRestfulApi extends ErrorInfo
     // -----
     // Class constructor, saves endpoint (live vs. sandbox), clientId and clientSecret
     //
-    public function __construct(string $endpoint_type, string $client_id, string $client_secret)
+    public function __construct(string $endpoint_type, string $client_id = '', string $client_secret = '')
     {
         parent::__construct();
 
-        $this->endpoint = ($endpoint_type === 'live') ? self::ENDPOINT_PRODUCTION : self::ENDPOINT_SANDBOX;
+        $this->environmentType = $this->resolveEnvironmentType($endpoint_type);
+        [$configuredClientId, $configuredClientSecret] = $this->getConfiguredCredentials($this->environmentType);
+
+        $client_id = ($client_id !== '') ? $client_id : $configuredClientId;
+        $client_secret = ($client_secret !== '') ? $client_secret : $configuredClientSecret;
+
+        $this->endpoint = ($this->environmentType === 'live') ? self::ENDPOINT_PRODUCTION : self::ENDPOINT_SANDBOX;
         $this->clientId = $client_id;
         $this->clientSecret = $client_secret;
 
@@ -167,6 +178,15 @@ class PayPalRestfulApi extends ErrorInfo
 
         $this->log = new Logger();
         $this->tokenCache = new TokenCache($client_secret);
+
+        if ($client_id === '' || $client_secret === '') {
+            $this->log->write(
+                sprintf(
+                    "PayPalRestfulApi::__construct: REST credentials for the %s environment are not fully configured.",
+                    $this->environmentType
+                )
+            );
+        }
     }
 
     // ----
@@ -198,6 +218,41 @@ class PayPalRestfulApi extends ErrorInfo
     public function setKeepTxnLinks(bool $keep_links)
     {
         $this->keepTxnLinks = $keep_links;
+    }
+
+    public function getEnvironmentType(): string
+    {
+        return $this->environmentType;
+    }
+
+    protected function resolveEnvironmentType(string $endpoint_type): string
+    {
+        $endpoint_type = strtolower($endpoint_type);
+        if ($endpoint_type === 'live' || $endpoint_type === 'sandbox') {
+            return $endpoint_type;
+        }
+
+        if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
+            $configured = strtolower((string)MODULE_PAYMENT_PAYPALR_SERVER);
+            if ($configured === 'live') {
+                return 'live';
+            }
+        }
+
+        return 'sandbox';
+    }
+
+    protected function getConfiguredCredentials(string $environment): array
+    {
+        if ($environment === 'live') {
+            $client_id = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L') ? (string)MODULE_PAYMENT_PAYPALR_CLIENTID_L : '';
+            $client_secret = defined('MODULE_PAYMENT_PAYPALR_SECRET_L') ? (string)MODULE_PAYMENT_PAYPALR_SECRET_L : '';
+        } else {
+            $client_id = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S') ? (string)MODULE_PAYMENT_PAYPALR_CLIENTID_S : '';
+            $client_secret = defined('MODULE_PAYMENT_PAYPALR_SECRET_S') ? (string)MODULE_PAYMENT_PAYPALR_SECRET_S : '';
+        }
+
+        return [trim($client_id), trim($client_secret)];
     }
 
     public function setPartnerId(string $partner_id)
