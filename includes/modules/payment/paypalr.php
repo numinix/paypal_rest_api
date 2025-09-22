@@ -1157,6 +1157,14 @@ class paypalr extends base
                 'savedPosts' => $_POST,
             ];
             $this->log->write('pre_confirmation_check, sending the payer-action off to PayPal.', true, 'after');
+            if ($this->isOpcAjaxRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'status' => 'redirect',
+                    'redirect_url' => $action_link,
+                ]);
+                exit;
+            }
             zen_redirect($action_link);
             return;
         }
@@ -1179,6 +1187,23 @@ class paypalr extends base
             MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
         );
         $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
+    }
+
+    protected function isOpcAjaxRequest(): bool
+    {
+        if (isset($_SESSION['request']) && $_SESSION['request'] === 'ajax') {
+            return true;
+        }
+
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            return true;
+        }
+
+        if (isset($_REQUEST['request']) && $_REQUEST['request'] === 'ajax') {
+            return true;
+        }
+
+        return false;
     }
     protected function validateCardInformation(bool $is_preconfirmation): bool
     {
