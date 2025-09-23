@@ -1142,22 +1142,45 @@ class PayPalRestfulApi extends ErrorInfo
         // -----
         // Issue the CURL request.
         //
-        $curl_response = curl_exec($this->ch);
+        $retry_on_expired_token = true;
 
-        // -----
-        // If a CURL error is indicated, call the common error-handling method to record that error.
-        //
-        if ($curl_response === false) {
-            $response = false;
-            $this->handleCurlError($request_type, $option, $curl_options);
-        // -----
-        // Otherwise, a response was returned.
-        // Call the common response-handler to determine whether or not an error occurred.
-        //
-        } else {
-            $response = $this->handleResponse($request_type, $option, $curl_options, $curl_response);
+        while (true) {
+            $curl_response = curl_exec($this->ch);
+
+            // -----
+            // If a CURL error is indicated, call the common error-handling method to record that error.
+            //
+            if ($curl_response === false) {
+                $response = false;
+                $this->handleCurlError($request_type, $option, $curl_options);
+            // -----
+            // Otherwise, a response was returned.
+            // Call the common response-handler to determine whether or not an error occurred.
+            //
+            } else {
+                $response = $this->handleResponse($request_type, $option, $curl_options, $curl_response);
+            }
+
+            if ($response !== false || $curl_response === false) {
+                return $response;
+            }
+
+            $error_info = $this->getErrorInfo();
+            if ($retry_on_expired_token === true && ($error_info['errNum'] ?? 0) === 401) {
+                $retry_on_expired_token = false;
+                $curl_options = $this->setAuthorizationHeader($curl_options);
+                if (count($curl_options) === 0) {
+                    return false;
+                }
+
+                $this->log->write("Retrying $request_type ($option) after refreshing an expired token.");
+                curl_reset($this->ch);
+                curl_setopt_array($this->ch, $curl_options);
+                continue;
+            }
+
+            return false;
         }
-        return $response;
     }
 
     // -----
@@ -1211,7 +1234,7 @@ class PayPalRestfulApi extends ErrorInfo
             case 401:
                 $this->tokenCache->clear();
                 $errMsg = 'An expired-token error was received.';
-                trigger_error($errMsg, E_USER_WARNING);
+                $this->log->write("The $method ($option) request returned an expired-token error.");
                 break;
 
             // -----
