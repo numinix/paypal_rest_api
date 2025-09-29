@@ -165,7 +165,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $purchase_amount = $this->request['purchase_units'][0]['amount'];
         $summed_amount = 0;
         foreach ($purchase_amount['breakdown'] as $name => $amount) {
-            if ($name === 'discount') {
+            if (in_array($name, ['discount', 'shipping_discount'], true)) {
                 $summed_amount -= $amount['value'];
             } else {
                 $summed_amount += $amount['value'];
@@ -372,7 +372,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // Calculate any shipping-discount associated with the order and, if non-zero, include
         // that value in the breakdown.
         //
-        $shipping_discount_total = ($order_info['free_shipping_coupon'] === false) ? 0.0 : $shipping_total;
+        $shipping_discount_total = $this->calculateShippingDiscount($ot_diffs);
         if ($shipping_discount_total > 0) {
             $breakdown['shipping_discount'] = $this->setRateConvertedValue($shipping_discount_total);
         }
@@ -381,7 +381,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // Calculate any discounts (e.g. coupons, gift-vouchers or group-pricing) associated
         // with the order and, if non-zero, include that value in the breakdown.
         //
-        $discount_total = $this->calculateDiscount($ot_diffs) - $shipping_discount_total;
+        $discount_total = max(0.0, $this->calculateDiscount($ot_diffs) - $shipping_discount_total);
         if ($discount_total > 0) {
             $breakdown['discount'] = $this->setRateConvertedValue($discount_total);
         }
@@ -411,6 +411,28 @@ class CreatePayPalOrderRequest extends ErrorInfo
     protected function calculateDiscount(array $ot_diffs): float
     {
         return abs($this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT . ', ot_coupon, ot_gv, ot_group_pricing', $ot_diffs));
+    }
+    protected function calculateShippingDiscount(array $ot_diffs): float
+    {
+        $shipping_discount_total = 0.0;
+        $discount_modules = trim(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT);
+        $discount_modules = ($discount_modules === '') ? '' : $discount_modules . ',';
+        $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv')));
+
+        foreach ($eligible_modules as $next_module) {
+            if (!isset($ot_diffs[$next_module]['diff'])) {
+                continue;
+            }
+            $diff = $ot_diffs[$next_module]['diff'];
+            foreach (['shipping_cost', 'shipping_tax'] as $shipping_key) {
+                if (!isset($diff[$shipping_key]) || $diff[$shipping_key] >= 0) {
+                    continue;
+                }
+                $shipping_discount_total += abs((float)$diff[$shipping_key]);
+            }
+        }
+
+        return $shipping_discount_total;
     }
     protected function calculateOrderElementValue(string $ot_class_names, array $ot_diffs): float
     {
