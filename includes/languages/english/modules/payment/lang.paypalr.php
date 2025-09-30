@@ -305,13 +305,17 @@ $define = [
 ];
 
 if (IS_ADMIN_FLAG === true) {
-    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_INTRO'] = 'Get started with the PayPal Checkout (RESTful) integrated sign-up experience to quickly connect your store to PayPal.';
-    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON'] = 'Complete PayPal setup';
+    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_INTRO'] = 'Launch the Numinix onboarding portal to connect your store to PayPal Complete Payments.';
+    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON'] = 'Launch PayPal onboarding';
+    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_RETURN_MESSAGE'] = 'PayPal onboarding completed via the Numinix portal. Review the credentials you received and paste them into the configuration fields below.';
+    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_CANCEL_MESSAGE'] = 'PayPal onboarding was cancelled or closed before completion. Restart the flow when you are ready.';
+    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_ERROR_MESSAGE'] = 'Unable to reach the Numinix onboarding portal. Check your connection and try again.';
 
     $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION'] =
         '<b>PayPal Checkout (RESTful)</b>, v%s<br><br>' .   //- %s is filled in with the current module version
         '<p>' . $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_INTRO'] . '</p>' .
-        '<p><a class="paypalr-isu-button" data-partner-attribution-id="NuminixPPCP_SP" href="' . zen_href_link('paypalr_integrated_signup.php', 'action=start', 'SSL') . '" rel="noopener noreferrer" target="_blank">' . $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON'] . '</a></p>' .
+        '<p><a class="paypalr-isu-button" data-partner-attribution-id="NuminixPPCP_SP" href="' + zen_href_link('paypalr_integrated_signup.php', '', 'SSL') + '" rel="noopener noreferrer" target="_blank">' . $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON'] . '</a></p>' .
+        '<p>We will open a secure browser tab on <strong>numinix.com</strong>. Complete the PayPal steps there and copy the issued credentials into the configuration fields below.</p>' .
         '<a href="https://www.paypal.com/login" rel="noopener noreferrer" target="_blank">Manage your PayPal <b>business</b> account</a><br><br>' .
         '<b>Configuration instructions:</b><br>' .
         '<ol>
@@ -320,5 +324,6 @@ if (IS_ADMIN_FLAG === true) {
          </ol>' .
         '<p>Refer to the payment module\'s GitHub Wiki <a href="https://github.com/lat9/paypalr/wiki" rel="noopener noreferrer" target="_blank">articles</a> for additional information.</p>';
 }
+
 
 return $define;

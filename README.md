@@ -26,23 +26,21 @@ For additional information, refer to the payment-module's [wiki articles](https:
 
 ## Integrated sign-up (ISU)
 
-Zen Cart's admin exposes a **Complete PayPal setup** button that launches PayPal's integrated sign-up (ISU) experience. The helper posts the store's metadata to PayPal, opens the hosted onboarding flow in a new window, and then routes the merchant back through `admin/paypalr_integrated_signup.php` so the module can finish configuration.
+Zen Cart's admin exposes a **Complete PayPal setup** button that now opens the Numinix onboarding portal. The bridge script collects your storefront metadata, generates a tracking reference and redirects administrators to [numinix.com](https://www.numinix.com/) where the secure PayPal flow runs. Once onboarding finishes, the portal returns administrators to the Payment Modules page so they can paste the issued credentials into the module configuration.
 
 ### Prerequisites
 
 * Install the module and apply the required `order_total` notifier patch.
 * Populate the storefront metadata that ISU sends to PayPal (store name, owner name, and owner email address) from Zen Cart's configuration.
-* Provide PayPal partner credentials for both sandbox and live environments without committing secrets to version control. Use either `includes/local/paypal_partner_credentials.php` (not shipped in the plugin package) or set environment variables:
-  * `PAYPAL_PARTNER_CLIENT_ID_SANDBOX` / `PAYPAL_PARTNER_CLIENT_SECRET_SANDBOX`
-  * `PAYPAL_PARTNER_CLIENT_ID_LIVE` / `PAYPAL_PARTNER_CLIENT_SECRET_LIVE`
+* Ensure the store can establish outbound HTTPS requests so the onboarding portal can load successfully.
 
 ### Sandbox versus live
 
-The module chooses the sandbox or live onboarding flow based on the **PayPal Server** setting (`MODULE_PAYMENT_PAYPALR_SERVER`). Sandbox flows let you test onboarding without touching production accounts. Live onboarding requires production partner credentials and writes the resulting merchant credentials back to your configuration (via the helper's `paypalr_isu` session data) once PayPal redirects to Zen Cart.
+The module chooses the sandbox or live onboarding flow based on the **PayPal Server** setting (`MODULE_PAYMENT_PAYPALR_SERVER`). Sandbox flows let you test onboarding without touching production accounts. Live onboarding uses the production PayPal environment managed by Numinix and returns credentials that you enter manually.
 
 ### Partner attribution and redirects
 
-PayPal requires partners to identify themselves whenever merchants onboard. The helper injects the partner attribution header automatically and sets both return and cancel URLs so PayPal can route the merchant back to `admin/paypalr_integrated_signup.php?action=return` or `action=cancel`. After a successful return the helper verifies the onboarding status, stores the newly issued merchant credentials, and finally redirects the administrator to the Payment Modules page.
+The bridge forwards the partner attribution header automatically and includes the admin Payment Modules URL as the `redirect_url` parameter. When the portal finishes onboarding it redirects to `admin/paypalr_integrated_signup.php?action=return`, which then routes administrators back to the module configuration page with a status message. If the portal is closed early, `action=cancel` is triggered instead so the admin sees a reminder that onboarding was not completed.
 
 ## Partner credential packaging guidance
 
