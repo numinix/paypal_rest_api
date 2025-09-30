@@ -23,6 +23,10 @@ if (!class_exists('sniffer')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Sniffer.php';
 }
 
+if (!class_exists('shoppingCart')) {
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ShoppingCart.php';
+}
+
 $autoLoadConfig[0][] = [
     'autoType' => 'include',
     'loadFile' => DIR_WS_INCLUDES . 'version.php',
