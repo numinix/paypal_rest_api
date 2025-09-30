@@ -26,6 +26,18 @@ if (!class_exists('sniffer')) {
 if (!class_exists('shoppingCart')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ShoppingCart.php';
 }
+if (!class_exists('cache')) {
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Cache.php';
+}
+if (!class_exists('currencies')) {
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Currencies.php';
+}
+if (!class_exists('template_func')) {
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/TemplateFunc.php';
+}
+if (!class_exists('messageStack')) {
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/MessageStack.php';
+}
 
 $autoLoadConfig[0][] = [
     'autoType' => 'include',
