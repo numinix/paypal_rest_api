@@ -42,10 +42,6 @@ The module chooses the sandbox or live onboarding flow based on the **PayPal Ser
 
 The bridge forwards the partner attribution header automatically and includes the admin Payment Modules URL as the `redirect_url` parameter. When the portal finishes onboarding it redirects to `admin/paypalr_integrated_signup.php?action=return`, which then routes administrators back to the module configuration page with a status message. If the portal is closed early, `action=cancel` is triggered instead so the admin sees a reminder that onboarding was not completed.
 
-## Partner credential packaging guidance
-
-Partner credentials should never be committed to a repository or shipped in a plugin archive. Keep secrets in `includes/local/paypal_partner_credentials.php` (which stays outside the distribution) or rely on environment variables when deploying to staging and production. The helper reads from the local configuration file first and then from the environment, making it safe to package the module without exposing API keys.
-
 ## Charging vaulted cards from custom code
 
 When a customer pays by card, PayPal returns a `payment_source.card` element that includes the vaulted token. The module saves that response in the vault table via `PayPalRestful\Common\VaultManager::saveVaultedCard` and raises the `NOTIFY_PAYPALR_VAULT_CARD_SAVED` observer event so other plugins can react to the new or updated token.【F:includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php†L63-L151】【F:includes/modules/payment/paypalr.php†L2052-L2141】

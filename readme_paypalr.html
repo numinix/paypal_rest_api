@@ -134,9 +134,6 @@ table table {
     <h3>Partner attribution and redirects</h3>
     <p>The bridge injects the partner attribution header automatically and includes the Payment Modules URL as <code>redirect_url</code>. When the portal finishes, it calls <code>admin/paypalr_integrated_signup.php?action=return</code>, which adds a success message before redirecting back to the module. If the onboarding window is closed early, <code>action=cancel</code> informs the administrator that the process did not finish.</p>
 
-    <h2>Partner credential packaging guidance</h2>
-    <p>Partner credentials should never be stored in your repository or included in a distribution archive. Keep secrets in <code>includes/local/paypal_partner_credentials.php</code> (which remains outside of the packaged plugin) or supply them through environment variables for staging and production deployments. The helper checks the local configuration first and then the environment, allowing you to ship the module without exposing API keys.</p>
-
     <h2>Charging vaulted cards from custom code</h2>
     <p>When the checkout flow completes a card payment, PayPal returns a <code>payment_source.card</code> payload that contains the vault token. The module saves that response via <code>PayPalRestful\Common\VaultManager::saveVaultedCard</code> and broadcasts the <code>NOTIFY_PAYPALR_VAULT_CARD_SAVED</code> notifier so observers can act on newly stored or updated instruments.</p>
     <p>Custom code can reuse those vaulted instruments to bill recurring subscriptions or other merchant-initiated payments without prompting customers for their card details again:</p>
