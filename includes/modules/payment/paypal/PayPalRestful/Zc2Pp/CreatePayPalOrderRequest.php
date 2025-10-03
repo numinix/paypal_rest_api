@@ -496,6 +496,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
     protected function buildCardPaymentSource(\order $order, array $cc_info): array
     {
+        $listener_endpoint = $this->resolveListenerEndpoint($cc_info['redirect'] ?? '');
         $payment_source = [
             'name' => $cc_info['name'],
             'number' => $cc_info['number'],
@@ -504,14 +505,40 @@ class CreatePayPalOrderRequest extends ErrorInfo
             'billing_address' => Address::get($order->billing),
             'store_in_vault' => 'ON_SUCCESS',
             'experience_context' => [
-                'return_url' => $cc_info['redirect'] . '?op=3ds_return',
-                'cancel_url' => $cc_info['redirect'] . '?op=3ds_cancel',
+                'return_url' => $this->buildScaUrl($listener_endpoint, '3ds_return'),
+                'cancel_url' => $this->buildScaUrl($listener_endpoint, '3ds_cancel'),
             ],
         ];
         if (isset($_POST['ppr_cc_sca_always']) || (defined('MODULE_PAYMENT_PAYPALR_SCA_ALWAYS') && MODULE_PAYMENT_PAYPALR_SCA_ALWAYS === 'true')) {
             $payment_source['attributes']['verification']['method'] = 'SCA_ALWAYS'; //- Defaults to 'SCA_WHEN_REQUIRED' for live environment
         }
         return $payment_source;
+    }
+
+    protected function resolveListenerEndpoint(?string $listener_endpoint): string
+    {
+        $listener_endpoint = trim((string)($listener_endpoint ?? ''));
+
+        if ($listener_endpoint === '') {
+            if (defined('REDIRECT_LISTENER')) {
+                $listener_endpoint = (string)constant('REDIRECT_LISTENER');
+            } else {
+                $listener_endpoint = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_listener.php';
+            }
+        }
+
+        if (filter_var($listener_endpoint, FILTER_VALIDATE_URL) === false) {
+            $catalog_base = rtrim(HTTP_SERVER, '/') . '/' . ltrim(DIR_WS_CATALOG, '/');
+            $listener_endpoint = rtrim($catalog_base, '/') . '/' . ltrim($listener_endpoint, '/');
+        }
+
+        return $listener_endpoint;
+    }
+
+    protected function buildScaUrl(string $listener_endpoint, string $operation): string
+    {
+        $separator = (strpos($listener_endpoint, '?') === false) ? '?' : '&';
+        return $listener_endpoint . $separator . 'op=' . $operation;
     }
 
     protected function buildLevel2Level3Data(array $purchase_unit): array

@@ -1237,7 +1237,8 @@ class paypalr extends base
             'expiry_month' => $cc_validation->cc_expiry_month,
             'expiry_year' => $cc_validation->cc_expiry_year,
             'name' => $cc_owner,
-            'security_code' => $cvv_posted
+            'security_code' => $cvv_posted,
+            'redirect' => $this->getListenerEndpoint(),
         ];
         return true;
     }
