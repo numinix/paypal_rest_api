@@ -80,5 +80,81 @@ if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
                 $zco_notifier->detach($observer, array($eventID));
             }
         }
+
+        /**
+         * Proxy a notification through the available notifier implementation.
+         *
+         * Prior to Zen Cart 2.0, notifications are handled by the global
+         * $zco_notifier instance.  When running on newer cores, the
+         * namespaced EventDto dispatcher is available instead.  This
+         * compatibility method forwards the notification to whichever
+         * implementation is present.
+         */
+        public function notify(
+            $eventID,
+            $param1 = [],
+            &$param2 = null,
+            &$param3 = null,
+            &$param4 = null,
+            &$param5 = null,
+            &$param6 = null,
+            &$param7 = null,
+            &$param8 = null,
+            &$param9 = null
+        ) {
+            if ($this->observerManagerUsesEventDto()) {
+                $eventDispatcher = \Zencart\Events\EventDto::getInstance();
+
+                if (method_exists($eventDispatcher, 'notify')) {
+                    $eventDispatcher->notify(
+                        $eventID,
+                        $param1,
+                        $param2,
+                        $param3,
+                        $param4,
+                        $param5,
+                        $param6,
+                        $param7,
+                        $param8,
+                        $param9
+                    );
+
+                    return;
+                }
+
+                if (method_exists($eventDispatcher, 'dispatch')) {
+                    $eventDispatcher->dispatch(
+                        $eventID,
+                        $param1,
+                        $param2,
+                        $param3,
+                        $param4,
+                        $param5,
+                        $param6,
+                        $param7,
+                        $param8,
+                        $param9
+                    );
+
+                    return;
+                }
+            }
+
+            global $zco_notifier;
+            if (is_object($zco_notifier) && method_exists($zco_notifier, 'notify')) {
+                $zco_notifier->notify(
+                    $eventID,
+                    $param1,
+                    $param2,
+                    $param3,
+                    $param4,
+                    $param5,
+                    $param6,
+                    $param7,
+                    $param8,
+                    $param9
+                );
+            }
+        }
     }
 }
