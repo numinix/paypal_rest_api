@@ -140,7 +140,7 @@ class paypalr extends base
     /**
      * An instance of the PayPalRestfulApi class.
      */
-    protected PayPalRestfulApi $ppr;
+    protected ?PayPalRestfulApi $ppr = null;
 
     /**
      * An array (set by before_process) containing the captured/authorized order's
@@ -614,6 +614,22 @@ class paypalr extends base
         // Got here?  The configuration's valid.
         //
         return true;
+    }
+
+    protected function getPayPalRestfulApi(): ?PayPalRestfulApi
+    {
+        if ($this->ppr instanceof PayPalRestfulApi) {
+            return $this->ppr;
+        }
+
+        [$client_id, $secret] = self::getEnvironmentInfo();
+        if ($client_id === '' || $secret === '') {
+            return null;
+        }
+
+        $this->ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret);
+
+        return $this->ppr;
     }
     protected function setConfigurationDisabled(string $error_message)
     {
@@ -2244,7 +2260,12 @@ class paypalr extends base
     public function admin_notification($zf_order_id)
     {
         $zf_order_id = (int)$zf_order_id;
-        $admin_main = new AdminMain($this->code, self::CURRENT_VERSION, $zf_order_id, $this->ppr);
+        $ppr = $this->getPayPalRestfulApi();
+        if ($ppr === null) {
+            return '';
+        }
+
+        $admin_main = new AdminMain($this->code, self::CURRENT_VERSION, $zf_order_id, $ppr);
 
         if ($admin_main->externalTxnAdded() === true) {
             zen_update_orders_history($zf_order_id, MODULE_PAYMENT_PAYPALR_EXTERNAL_ADDITION);
@@ -2266,7 +2287,12 @@ class paypalr extends base
      */
     public function _doRefund($oID)
     {
-        $do_refund = new DoRefund((int)$oID, $this->ppr, $this->code, self::CURRENT_VERSION);
+        $ppr = $this->getPayPalRestfulApi();
+        if ($ppr === null) {
+            return;
+        }
+
+        $do_refund = new DoRefund((int)$oID, $ppr, $this->code, self::CURRENT_VERSION);
     }
 
     /**
@@ -2275,7 +2301,12 @@ class paypalr extends base
      */
     public function _doAuth($oID, $order_amt, $currency = 'USD')
     {
-        $do_auth = new DoAuthorization((int)$oID, $this->ppr, $this->code, self::CURRENT_VERSION);
+        $ppr = $this->getPayPalRestfulApi();
+        if ($ppr === null) {
+            return;
+        }
+
+        $do_auth = new DoAuthorization((int)$oID, $ppr, $this->code, self::CURRENT_VERSION);
     }
 
     /**
@@ -2284,7 +2315,12 @@ class paypalr extends base
      */
     public function _doCapt($oID, $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
     {
-        $do_capt = new DoCapture((int)$oID, $this->ppr, $this->code, self::CURRENT_VERSION);
+        $ppr = $this->getPayPalRestfulApi();
+        if ($ppr === null) {
+            return;
+        }
+
+        $do_capt = new DoCapture((int)$oID, $ppr, $this->code, self::CURRENT_VERSION);
     }
 
     /**
@@ -2296,7 +2332,12 @@ class paypalr extends base
      */
     public function _doVoid($oID)
     {
-        $do_void = new DoVoid((int)$oID, $this->ppr, $this->code, self::CURRENT_VERSION);
+        $ppr = $this->getPayPalRestfulApi();
+        if ($ppr === null) {
+            return;
+        }
+
+        $do_void = new DoVoid((int)$oID, $ppr, $this->code, self::CURRENT_VERSION);
     }
 
     /**
