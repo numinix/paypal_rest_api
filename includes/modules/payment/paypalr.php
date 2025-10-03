@@ -832,7 +832,7 @@ class paypalr extends base
         $expires_month = [];
         $expires_year = [];
         for ($month = 1; $month < 13; $month++) {
-            $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => $zcDate->output('%B - (%m)', mktime(0, 0, 0, $month, 1))];
+            $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => date('F - (m)', mktime(0, 0, 0, $month, 1))];
         }
         $this_year = date('Y');
         for ($year = $this_year; $year < (int)$this_year + 15; $year++) {
@@ -925,7 +925,7 @@ class paypalr extends base
                 [
                     'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
                     'field' =>
-                        zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, $zcDate->output('%m'), 'class="ppr-cc" id="' . $ppr_cc_expires_month_id . '"') .
+                        zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-cc" id="' . $ppr_cc_expires_month_id . '"') .
                         '&nbsp;' .
                         zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-cc" id="' . $ppr_cc_expires_year_id . '"'),
                     'tag' => $ppr_cc_expires_month_id,
@@ -1448,7 +1448,7 @@ class paypalr extends base
                 ['title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER, 'field' => '&nbsp;' . $this->obfuscateCcNumber($_POST['paypalr_cc_number'])],
                 [
                     'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
-                    'field' => '&nbsp;' . $zcDate->output('%B, ', mktime(0, 0, 0, (int)$_POST['paypalr_cc_expires_month'], 1)) . $_POST['paypalr_cc_expires_year'],
+                    'field' => '&nbsp;' . date('F, ', mktime(0, 0, 0, (int)$_POST['paypalr_cc_expires_month'], 1)) . $_POST['paypalr_cc_expires_year'],
                 ],
             ],
         ];
