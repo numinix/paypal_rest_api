@@ -291,13 +291,15 @@ class zcObserverPaypalrestful
         $js_scriptparams = [];
 
         $js_fields['client-id'] = MODULE_PAYMENT_PAYPALR_SERVER === 'live' ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
+        $buyerCountry = $this->determineBuyerCountryCode();
 
         if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
             $js_fields['client-id'] = 'sb'; // 'sb' for sandbox
             $js_fields['debug'] = 'true'; // sandbox only, un-minifies the JS
-            $buyerCountry = CountryCodes::ConvertCountryCode($order->delivery['country']['iso_code_2'] ?? 'US');
             $js_fields['buyer-country'] = $paypalSandboxBuyerCountryCodeOverride ?? $buyerCountry; // sandbox only
             $js_fields['locale'] = $paypalSandboxLocaleOverride ?? 'en_US'; // only passing this in sandbox to allow override testing; otherwise just letting it default to customer's browser
+        } else {
+            $js_fields['buyer-country'] = $buyerCountry;
         }
 
         if (!empty($order->info['currency'])) {
@@ -322,6 +324,33 @@ class zcObserverPaypalrestful
 <script title="PayPalSDK" id="PayPalJSSDK" src="<?= $js_url . '?'. str_replace('%2C', ',', http_build_query($js_fields)) ?>" <?= implode(' ', $js_scriptparams) ?> async></script>
 
 <?php
+    }
+
+    protected function determineBuyerCountryCode(): string
+    {
+        global $order;
+
+        $countryCodes = [];
+        if (isset($order) && is_object($order)) {
+            $deliveryIsoCode = $order->delivery['country']['iso_code_2'] ?? '';
+            $billingIsoCode = $order->billing['country']['iso_code_2'] ?? '';
+
+            if ($deliveryIsoCode !== '') {
+                $countryCodes[] = $deliveryIsoCode;
+            }
+            if ($billingIsoCode !== '') {
+                $countryCodes[] = $billingIsoCode;
+            }
+        }
+
+        foreach ($countryCodes as $isoCode) {
+            $convertedCode = CountryCodes::convertCountryCode($isoCode);
+            if ($convertedCode !== '') {
+                return $convertedCode;
+            }
+        }
+
+        return 'US';
     }
 
     protected function outputJsFooter($current_page_base): void
