@@ -93,10 +93,12 @@ $autoLoadConfig[40][] = [
  * require 'includes/init_includes/init_non_db_settings.php';
  *
  */
-$autoLoadConfig[45][] = [
-    'autoType' => 'init_script',
-    'loadFile' => 'init_non_db_settings.php',
-];
+if (file_exists(DIR_FS_CATALOG . DIR_WS_INCLUDES . 'init_includes/init_non_db_settings.php')) {
+    $autoLoadConfig[45][] = [
+        'autoType' => 'init_script',
+        'loadFile' => 'init_non_db_settings.php',
+    ];
+}
 $autoLoadConfig[50][] = [
     'autoType' => 'classInstantiate',
     'className' => 'sniffer',
