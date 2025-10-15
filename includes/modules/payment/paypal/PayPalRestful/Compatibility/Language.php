@@ -126,3 +126,7 @@ class Language
         return $templateDirectory;
     }
 }
+
+if (!class_exists('language', false)) {
+    class_alias(__NAMESPACE__ . '\\Language', 'language');
+}
