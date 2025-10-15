@@ -3,7 +3,7 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <meta name="viewport" content="width=device-width">
-  <title>ChatGPT Agentic Product Feed for Zen Cart</title>
+  <title>PayPal Expanded Checkout for Zen Cart</title>
 
   <!-- FONTS -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,7 +26,7 @@
   <script type="text/javascript" src="js/documentation.js"></script>
 </head>
 <body>
-  
+
   <div id="wrapper" class="tk-museo-slab">
     <!--BOF Header-->
     <div id="headerContainer">
@@ -46,7 +46,8 @@
             <li><a href="#Installation" id="btnInstallation" class="btn" title="Installation" data-target="Installation">Installation</a></li>
             <li><a href="#Configuration" id="btnConfiguration" class="btn" title="Configuration" data-target="Configuration">Configuration</a></li>
             <li><a href="#Usage" id="btnUsage" class="btn" title="Usage" data-target="Usage">Usage</a></li>
-            <li><a href="#Automation" id="btnAutomation" class="btn" title="Automation" data-target="Automation">Automation</a></li>
+            <li><a href="#Automation" id="btnAutomation" class="btn" title="Operations" data-target="Automation">Operations</a></li>
+            <li><a href="#Uninstallation" id="btnUninstallation" class="btn" title="Uninstallation" data-target="Uninstallation">Uninstallation</a></li>
             <li><a href="#Troubleshooting" id="btnTroubleshooting" class="btn" title="Troubleshooting" data-target="Troubleshooting">Troubleshooting</a></li>
             <li><a href="#Support" id="btnSupport" class="btn" title="Support" data-target="Support">Support</a></li>
             <li><a href="#License" id="btnLicense" class="btn" title="License" data-target="License">License</a></li>
@@ -58,8 +59,8 @@
       </div>
     </div>
     <div id="headerTitle">
-      <h1 class="clearBoth">ChatGPT Agentic Product Feed for Zen Cart</h1>
-      <p>Connect your store to ChatGPT—where your data becomes insights, suggestions, and real customer answers.</p>
+      <h1 class="clearBoth">PayPal Expanded Checkout for Zen Cart</h1>
+      <p>Modernize Zen Cart checkout with a unified PayPal REST integration that streamlines Express and Payments Pro flows.</p>
     </div>
     <br class="clearBoth" />
     <!--EOF Header-->
@@ -72,16 +73,16 @@
           <span class="bodyHeaderTxt">Overview</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">The ChatGPT Agentic Product Feed for Zen Cart generates curated product data designed for OpenAI-powered agents and assistants. The module exposes an intuitive admin experience that mirrors the look and feel of other Numinix dashboards while giving you granular control over which catalog items are discoverable by conversational AI.</p>
-          <p class="bodyText">Use this document to install the plugin, configure the catalog rules, and automate feed generation so ChatGPT always has access to your latest inventory.</p>
+          <p class="bodyText">PayPal Expanded Checkout (also known as <code>paypalr</code>) combines PayPal Payments Pro and Express Checkout into a single REST-based payment module for Zen Cart 1.5.7c and later. It ships with observer and language shims to support older stores, delivering the modern PayPal REST experience with minimal core changes.</p>
+          <p class="bodyText">Use this document to install, configure, operate, and maintain the module. For supplemental diagrams, API examples, and historical release notes, review <strong>readme_paypalr.html</strong> before removing it from your deployment.</p>
           <ul class="bodyList">
-            <li>Validated with Zen Cart 1.5.5e through 1.5.8, with the dashboard UX optimized for 1.5.6 and newer releases.</li>
-            <li>Requires PHP 7.2.34+ with cURL and JSON extensions enabled; syntax checks pass through PHP 8.x.</li>
-            <li>Outputs a JSON feed purpose-built for ChatGPT Action integrations.</li>
+            <li>Validated in Zen Cart 1.5.7c+, 2.0.x, and 2.1.0 with both <code>responsive_classic</code> and <code>ZCA Bootstrap</code> templates.</li>
+            <li>Requires PHP 7.4 through 8.4 with cURL, JSON, and OpenSSL enabled. PHP 7.3 and older are not supported.</li>
+            <li>Supports 3-page checkout, One Page Checkout (OPC 2.4.6-2.5.3), guest checkout, and vaulted card reuse.</li>
           </ul>
           <h4>Compatibility &amp; requirements</h4>
-          <p class="bodyText">The module adheres to Zen Cart APIs introduced prior to 1.5.5e and avoids modern PHP features such as arrow functions, typed properties, union types, and nullsafe operators so stores on long-term support stacks can deploy without core upgrades.</p>
-          <p class="bodyText">For production use we recommend PHP 7.3 or newer to take advantage of upstream security fixes, but stores running PHP 7.2.34 remain supported. When deployed on PHP 8.x environments the exporter continues to build feeds successfully, making it suitable for hosts that have already upgraded.</p>
+          <p class="bodyText">Install the provided notifier patch for <code>includes/classes/order_total.php</code> before enabling the module. Without the notifier, PayPal Expanded Checkout detects the missing integration point and automatically disables itself.</p>
+          <p class="bodyText">Ensure outbound HTTPS requests are allowed so administrators can complete PayPal&rsquo;s Integrated Sign-Up flow. Populate the store name, owner name, and owner email in Zen Cart&rsquo;s configuration to pre-fill the onboarding forms.</p>
         </div>
       </div>
       <!--EOF OVERVIEW-->
@@ -92,26 +93,27 @@
           <span class="bodyHeaderTxt">Installation</span>
         </div>
         <div class="bodyWrapper">
-          <h4>Preparing your store</h4>
+          <h4>Before you start</h4>
           <ol>
-            <li>Install the <a href="https://www.numinix.com/numinix-premium-plugin-installer-for-zen-cart-1345">Numinix Premium Plugin Installer</a> to add the <code>nxPluginLicCheck</code> dependency required by the module bootstrap.</li>
-            <li>Backup your Zen Cart database and catalog files before making any changes.</li>
-            <li>Verify that your hosting environment meets the PHP requirements listed in the Overview.</li>
-            <li>Ensure your admin directory name is updated in the package&rsquo;s <code>YOUR_ADMIN/</code> folder before uploading.</li>
+            <li>Back up your Zen Cart database and store files.</li>
+            <li>Review the compatibility checklist in the Overview, including the PHP version and required extensions.</li>
+            <li>Apply the <a href="https://github.com/lat9/paypalr/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank">order total notifier patch</a> if your store runs on Zen Cart versions prior to 1.5.8a.</li>
+            <li>Create PayPal REST API credentials (client ID and secret) for both Sandbox and Live modes using the steps described in the module wiki.</li>
           </ol>
           <h4>Uploading files</h4>
           <ol>
-            <li>Unzip the distribution package locally.</li>
-            <li>Upload the <code>includes/</code> and <code>YOUR_ADMIN/</code> contents to the matching directories in your store, merging with existing files.</li>
-            <li>Place <code>chatgpt_product_feeder_run.php</code> in the root of your Zen Cart catalog.</li>
+            <li>Unzip the release package locally.</li>
+            <li>Rename the <code>YOUR_ADMIN/</code> directory to match your store&rsquo;s admin directory name.</li>
+            <li>Upload the contents of <code>includes/</code> and your renamed admin folder to the corresponding locations in your Zen Cart installation, merging when prompted.</li>
+            <li>Verify that <code>includes/modules/payment/paypalr.php</code> and the accompanying <code>PayPalRestful</code> library files are present on the server.</li>
           </ol>
           <h4>Database updates</h4>
           <ol>
             <li>Log in to your Zen Cart admin.</li>
-            <li>Navigate to <strong>Tools → Install SQL Patches</strong>.</li>
-            <li>Upload and execute <code>uninstall.sql</code> only if you are replacing an older beta build. Fresh installs do not require manual SQL patches.</li>
+            <li>Navigate to <strong>Modules → Payment</strong> and confirm that <strong>PayPal Expanded Checkout</strong> appears in the list. No manual SQL patches are required for a fresh install.</li>
+            <li>If upgrading from an older beta, follow the upgrade checklist in <strong>readme_paypalr.html</strong> to reconcile any schema or configuration changes before enabling the new code.</li>
           </ol>
-          <p class="bodyText">After the files are in place, the admin menu will display <strong>Tools → ChatGPT Agentic Product Feed</strong> and the configuration group will appear under <strong>Configuration</strong>.</p>
+          <p class="bodyText">After the files are in place, the module&rsquo;s configuration group appears under <strong>Configuration → PayPal Modules</strong> and the payment method is ready for activation via <strong>Modules → Payment</strong>.</p>
         </div>
       </div>
       <!--EOF INSTALLATION-->
@@ -122,35 +124,38 @@
           <span class="bodyHeaderTxt">Configuration</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">Open <strong>Configuration → ChatGPT Agentic Product Feed</strong> to tailor how the module maps your catalog to the ChatGPT schema.</p>
+          <p class="bodyText">Open <strong>Configuration → PayPal Modules → PayPal Expanded Checkout</strong> to tailor how the module communicates with PayPal and presents options during checkout.</p>
           <ol class="steps">
             <li>
-              <h4 class="step-title">Store identity</h4>
+              <h4 class="step-title">General settings</h4>
               <ul>
-                <li>Populate your storefront name, support email, and primary storefront URL.</li>
-                <li>Select the default currency and language that the feed should reference.</li>
+                <li>Select the default transaction mode (Sandbox or Live) and configure the payment zone if you restrict availability to certain countries.</li>
+                <li>Choose whether to capture funds immediately or authorize and capture later via the order management tools.</li>
+                <li>Define the order statuses used for pending authorizations, completed captures, and failures.</li>
               </ul>
             </li>
             <li>
-              <h4 class="step-title">Catalog scope</h4>
+              <h4 class="step-title">API credentials</h4>
               <ul>
-                <li>Choose which categories are eligible for exposure to ChatGPT.</li>
-                <li>Enable or disable inclusion of out-of-stock products.</li>
-                <li>Define default shipping and fulfillment notes that help the agent answer logistical questions.</li>
+                <li>Enter the PayPal REST client ID and secret for both Sandbox and Live environments.</li>
+                <li>Enable Integrated Sign-Up to let administrators onboard directly from Zen Cart&rsquo;s Payment Modules page.</li>
+                <li>Confirm that your server firewall allows outbound HTTPS requests to <code>api-m.paypal.com</code> and <code>api-m.sandbox.paypal.com</code>.</li>
               </ul>
             </li>
             <li>
-              <h4 class="step-title">Product enrichment</h4>
+              <h4 class="step-title">Checkout experience</h4>
               <ul>
-                <li>Map custom fields or attributes to the standardized ChatGPT product properties (brand, condition, identifiers, etc.).</li>
-                <li>Optionally enable the <strong>AI Highlights</strong> composer to inject short persuasive blurbs into the feed.</li>
+                <li>Choose the layout for the Express Checkout button and whether to display it on the shopping cart, checkout shipping, and checkout payment pages.</li>
+                <li>Enable card vaulting to store customer instruments for subsequent merchant-initiated transactions.</li>
+                <li>Configure Pay Upon Invoice or alternate payment methods if supported in your region.</li>
               </ul>
             </li>
             <li>
-              <h4 class="step-title">Security</h4>
+              <h4 class="step-title">Risk management &amp; logging</h4>
               <ul>
-                <li>Generate a signed URL token to restrict access to the feed endpoint.</li>
-                <li>Restrict the admin tool to specific Zen Cart administrator profiles if desired.</li>
+                <li>Enable debug logging when diagnosing API responses, and periodically clear <code>/logs/paypalr/</code> to keep storage usage in check.</li>
+                <li>Require confirmed addresses, limit acceptance based on country and currency combinations, or adjust fraud filters according to your policy.</li>
+                <li>Set notification emails for administrator alerts so your team is notified of failed or flagged transactions.</li>
               </ul>
             </li>
           </ol>
@@ -164,34 +169,27 @@
           <span class="bodyHeaderTxt">Usage</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">Once configured, head to <strong>Tools → ChatGPT Agentic Product Feed</strong> to work with the interactive dashboard.</p>
+          <p class="bodyText">After configuration, enable the module via <strong>Modules → Payment</strong> and move it into the preferred display order. Test both sandbox and live transactions before accepting production orders.</p>
           <ol class="steps">
             <li>
-              <h4 class="step-title">Review the overview tiles</h4>
-              <p>At the top of the screen you&rsquo;ll find totals for included products, pending refreshes, and the timestamp of the most recent feed build.</p>
+              <h4 class="step-title">Complete a sandbox transaction</h4>
+              <p>Switch the module to Sandbox mode, place a test order using PayPal Checkout or a direct credit card, and confirm that the order status and PayPal transaction IDs are recorded correctly.</p>
             </li>
             <li>
-              <h4 class="step-title">Filter the catalog</h4>
-              <p>Use quick filter chips or open the advanced drawer to combine rules for category, stock status, pricing, keywords, and refresh state.</p>
+              <h4 class="step-title">Validate live credentials</h4>
+              <p>After a successful sandbox test, switch to Live mode, copy in the production client ID and secret, and run a low-value transaction to verify settlement.</p>
             </li>
             <li>
-              <h4 class="step-title">Curate inclusion</h4>
-              <p>Toggle products in or out of the ChatGPT feed using the row-level switch or the bulk toolbar actions. Mark specific items for refresh to regenerate their payload during the next run.</p>
+              <h4 class="step-title">Manage orders</h4>
+              <p>Use the Zen Cart orders screen to capture authorized payments, issue refunds, or void transactions. The module relays those actions to PayPal and synchronizes the order history.</p>
             </li>
             <li>
-              <h4 class="step-title">Generate the feed</h4>
-              <p>Click <strong>Build Feed</strong> to produce the latest JSON file. The admin will surface the public URL and signed token (if enabled) so you can register it with your ChatGPT Action or agent manifest.</p>
+              <h4 class="step-title">Leverage vaulted cards</h4>
+              <p>When customers opt to save their cards, retrieve the vault token using <code>paypalr::getVaultedCardsForCustomer()</code> or <code>PayPalRestful\Common\VaultManager::getCustomerVaultedCards()</code> and submit subsequent captures through <code>PayPalRestful\Api\PayPalRestfulApi</code>.</p>
             </li>
           </ol>
-          <h4>Virtual product support</h4>
-          <p class="bodyText">Catalog items flagged as virtual automatically omit weight, dimensional, and shipping attributes. The exporter marks them as <code>in_stock</code> with a minimum quantity of <code>1</code> so digital goods publish without requiring physical fulfillment details.</p>
-          <h4>Feed registration with OpenAI</h4>
-          <ol>
-            <li>Create or edit your ChatGPT Action in the OpenAI dashboard.</li>
-            <li>Set the data source URL to the feed endpoint provided by the module.</li>
-            <li>Specify the refresh schedule that matches your automation cadence.</li>
-            <li>Test the Action to ensure product responses match your storefront content.</li>
-          </ol>
+          <h4>Integrated Sign-Up (ISU)</h4>
+          <p class="bodyText">Launch the <strong>Complete PayPal setup</strong> button on the Payment Modules page to onboard merchants directly with PayPal. The portal returns credentials to the administrator and records whether the process completed or was cancelled.</p>
         </div>
       </div>
       <!--EOF USAGE-->
@@ -199,22 +197,37 @@
       <!--BOF AUTOMATION-->
       <div class="bodyHeaderContainer" id="Automation">
         <div class="bodyHeader" id="blue">
-          <span class="bodyHeaderTxt">Automation</span>
+          <span class="bodyHeaderTxt">Operations</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">Automate regeneration so your ChatGPT Action stays synchronized with inventory updates.</p>
-          <ol>
-            <li>Edit your server&rsquo;s cron table (<code>crontab -e</code>).</li>
-            <li>Add a schedule that matches how frequently your catalog changes. For example:</li>
-          </ol>
-          <div class="code">
-            <div class="codeTitle"></div>
-            <pre class="sh_php sh_sourceCode"><code>0 * * * * /usr/bin/php /path/to/zen-cart/chatgpt_product_feeder_run.php</code></pre>
-          </div>
-          <p class="bodyText">The runner script executes the same logic as the admin build button, respecting inclusion choices and refresh flags. Review your server logs periodically to confirm the job executes without errors.</p>
+          <p class="bodyText">Keep your integration healthy with these recurring tasks.</p>
+          <ul class="bodyList">
+            <li><strong>Webhooks:</strong> Configure PayPal webhooks to notify your store of disputes, subscription updates, and risk events. Implement listeners using the module&rsquo;s notifier hooks if you extend functionality.</li>
+            <li><strong>Logging:</strong> Review <code>/logs/paypalr/</code> for API failures or timeouts. Rotate logs regularly, especially on shared hosting.</li>
+            <li><strong>Credentials:</strong> Periodically rotate your PayPal client secrets and update the configuration. Re-run sandbox smoke tests after every credential change.</li>
+            <li><strong>Extensions:</strong> Consult the project wiki for recipes that automate vaulted card captures, payment retries, or external ERP integrations.</li>
+          </ul>
         </div>
       </div>
       <!--EOF AUTOMATION-->
+
+      <!--BOF UNINSTALLATION-->
+      <div class="bodyHeaderContainer" id="Uninstallation">
+        <div class="bodyHeader" id="blue">
+          <span class="bodyHeaderTxt">Uninstallation</span>
+        </div>
+        <div class="bodyWrapper">
+          <ol>
+            <li>Switch the module to Sandbox mode and confirm that no live transactions are processing.</li>
+            <li>In <strong>Modules → Payment</strong>, select <strong>PayPal Expanded Checkout</strong> and click <strong>Remove</strong> to clear the configuration keys from your database.</li>
+            <li>Delete the uploaded module files from <code>includes/modules/payment/</code>, <code>includes/languages/</code>, <code>includes/classes/observers/</code>, and your admin directory.</li>
+            <li>If no other plugins rely on it, remove the notifier patch from <code>includes/classes/order_total.php</code> or restore the backup you created prior to installation.</li>
+            <li>Revoke the REST API credentials in the PayPal developer dashboard to prevent unintended access.</li>
+          </ol>
+          <p class="bodyText">Keep a copy of <strong>readme_paypalr.html</strong> outside of your production store if you need historical context or upgrade guidance in the future.</p>
+        </div>
+      </div>
+      <!--EOF UNINSTALLATION-->
 
       <!--BOF TROUBLESHOOTING-->
       <div class="bodyHeaderContainer" id="Troubleshooting">
@@ -223,11 +236,12 @@
         </div>
         <div class="bodyWrapper">
           <ul class="bodyList">
-            <li><strong>Empty feed?</strong> Confirm that at least one category is enabled and that the inclusion toggle is switched on for the products you expect.</li>
-            <li><strong>Encoding issues?</strong> Ensure product descriptions and custom fields use UTF-8 and remove any invalid characters before saving.</li>
-            <li><strong>Timeouts when building?</strong> Reduce the batch size in configuration or increase <code>max_execution_time</code> in <code>php.ini</code>.</li>
-            <li><strong>Permission errors?</strong> The module writes feed files to <code>/feed/</code> by default. Confirm the directory is writable by the web server user (typically 0755 or 0775).</li>
-            <li><strong>Security reminders:</strong> Protect the feed directory with HTTP authentication or IP allowlists if you expose the URL publicly. Rotate signed tokens whenever staff access changes.</li>
+            <li><strong>Module disappears after enabling?</strong> Confirm the <code>order_total</code> notifier patch is present. The module hides itself if the notifier is missing.</li>
+            <li><strong>API authentication errors?</strong> Verify that the client ID and secret match the selected server (Sandbox vs. Live) and that your host allows outbound TLS connections.</li>
+            <li><strong>Orders remain in pending capture?</strong> Ensure your capture mode aligns with the order status settings, and run the capture or void via the order details screen.</li>
+            <li><strong>Checkout button not visible?</strong> Review the configuration toggles that control Express Checkout button placement and confirm your template includes the standard Zen Cart button hooks.</li>
+            <li><strong>Integrated Sign-Up fails?</strong> Check your browser console for blocked pop-ups, verify HTTPS connectivity to <code>numinix.com</code>, and retry after clearing admin cache.</li>
+            <li><strong>Need more help?</strong> Consult the project wiki and the Zen Cart forum thread linked in <strong>readme_paypalr.html</strong> for deep-dive diagnostics.</li>
           </ul>
         </div>
       </div>
@@ -239,10 +253,10 @@
           <span class="bodyHeaderTxt">Support</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">Need assistance? The Numinix support team is ready to help you connect your Zen Cart catalog to ChatGPT.</p>
+          <p class="bodyText">Need assistance? The Numinix support team is ready to help you launch and optimize PayPal Expanded Checkout.</p>
           <ul class="bodyList">
             <li>Email <a href="mailto:support@numinix.com">support@numinix.com</a> with detailed steps to reproduce any issues.</li>
-            <li>Include your Zen Cart version, PHP version, and whether cron automation is enabled.</li>
+            <li>Include your Zen Cart version, PHP version, hosting environment, and whether webhooks or vaulted cards are enabled.</li>
             <li>Attach relevant log excerpts or screenshots from the admin dashboard.</li>
           </ul>
         </div>
@@ -266,7 +280,7 @@
           <span class="bodyHeaderTxt">Disclaimer</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">OpenAI integrations are subject to the OpenAI terms of use and rate limits. Monitor the feed output and ChatGPT responses regularly to ensure compliance with your regional regulations and company policies. Numinix is not liable for any damages that arise from improper configuration or misuse of this plugin.</p>
+          <p class="bodyText">PayPal integrations are subject to PayPal&rsquo;s terms of use, risk controls, and regional availability. Monitor live transactions regularly to ensure compliance with your business policies and local regulations. Numinix is not liable for damages resulting from improper configuration or misuse of this module.</p>
         </div>
       </div>
       <!--EOF DISCLAIMER-->
@@ -275,8 +289,8 @@
     <footer class="readme-footer" aria-label="Numinix contact and resources">
       <div class="readme-footer-container">
         <div class="footer-column footer-column-1">
-          <h2 class="title">Need a hand with your feed?</h2>
-          <p class="paragraph">Partner with the Numinix team to tailor your ChatGPT product experience, automate updates, and keep your Zen Cart store discoverable.</p>
+          <h2 class="title">Need a hand with your integration?</h2>
+          <p class="paragraph">Partner with the Numinix team to tailor PayPal Expanded Checkout, optimize conversions, and keep your Zen Cart store secure.</p>
           <a class="connect-link" href="https://www.numinix.com/contact" target="_blank" rel="noopener">Connect with Numinix</a>
           <div class="details">
             <img src="images/numinix-emblem.png" alt="Numinix emblem" />
@@ -333,7 +347,8 @@
             <div class="links">
               <h4>Operations</h4>
               <div class="links-list">
-                <a href="#Automation">Automation</a>
+                <a href="#Automation">Operations</a>
+                <a href="#Uninstallation">Uninstallation</a>
                 <a href="#Troubleshooting">Troubleshooting</a>
                 <a href="#Support">Support</a>
               </div>
