@@ -5,7 +5,7 @@
  * Last updated: v1.3.1
  */
 $define = [
-    'MODULE_PAYMENT_PAYPALR_TEXT_TITLE' => 'PayPal Expanded Checkout',
+    'MODULE_PAYMENT_PAYPALR_TEXT_TITLE' => 'PayPal',
         'MODULE_PAYMENT_PAYPALR_SUBTITLE' => '(Use either your <b>PayPal Wallet</b> or a <b>Credit Card</b>)',
     'MODULE_PAYMENT_PAYPALR_TEXT_TITLE_ADMIN' => 'PayPal Expanded Checkout',
     'MODULE_PAYMENT_PAYPALR_TEXT_DESCRIPTION' => '<strong>PayPal Expanded Checkout</strong>',
