@@ -243,7 +243,10 @@ trait PayPalRestfulLegacyNotifierTrait
         return array_key_exists($eventId, $this->observerAliases);
     }
 
-    private function substituteAlias(string $eventId): string|false
+    /**
+     * @return string|false
+     */
+    private function substituteAlias(string $eventId)
     {
         if ($this->eventIdHasAlias($eventId)) {
             return $this->observerAliases[$eventId];
