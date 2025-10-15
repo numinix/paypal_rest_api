@@ -1,6 +1,6 @@
 <?php
 /**
- * PayPalRestfulApi.php communications class for PayPal Rest payment module
+ * PayPalRestfulApi.php communications class for the PayPal Expanded Checkout payment module
  *
  * Applicable PayPal documentation:
  *
@@ -12,7 +12,7 @@
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.2.0
+ * Last updated: v1.3.1
  */
 namespace PayPalRestful\Api;
 
@@ -860,7 +860,7 @@ class PayPalRestfulApi extends ErrorInfo
     }
 
     // -----
-    // Sets the common authorization header into the CURL options for a PayPal Restful request.
+    // Sets the common authorization header into the CURL options for a PayPal Expanded Checkout request.
     //
     // If the request to retrieve the token fails, an empty array is returned; otherwise,
     // the authorization-header containing the successfully-retrieved token is merged into

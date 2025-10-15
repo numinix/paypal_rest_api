@@ -6,7 +6,7 @@
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: DrByte June 2025 $
  *
- * Last updated: v1.2.0
+ * Last updated: v1.3.1
  *
  * This webhook handler must listen on HTTPS port 443.
  * For webhook message deliveries to be successful, the handler must respond with an HTTP 2xx success status every time a webhook is posted.

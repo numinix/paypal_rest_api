@@ -1,13 +1,13 @@
 <?php
 /**
  * A class that provides the actions needed to void an order placed with
- * the PayPal Restful payment module.
+ * the PayPal Expanded Checkout payment module.
  *
  * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.0.2
+ * Last updated: v1.3.1
  */
 namespace PayPalRestful\Admin;
 

@@ -1,7 +1,9 @@
-# PayPal RESTful API Payment Module
-This Zen Cart payment module (`paypalr`) combines the processing for the **PayPal Payments Pro** (`paypaldp`) and **PayPal Express Checkout** (`paypalwpp`) payment modules that are currently built into Zen Cart distributions.  Instead of using the older NVP (**N**ame **V**alue **P**air) methods to communicate with PayPal, this payment module uses PayPal's now-current [REST APIs](https://developer.paypal.com/api/rest/) and combines the two legacy methods into one.
+# PayPal Expanded Checkout Payment Module
+This Zen Cart payment module (`paypalr`) combines the processing for the **PayPal Payments Pro** (`paypaldp`) and **PayPal Express Checkout** (`paypalwpp`) payment modules that are currently built into Zen Cart distributions. The PayPal Expanded Checkout plugin uses PayPal's now-current [REST APIs](https://developer.paypal.com/api/rest/) to replace the older NVP (**N**ame **V**alue **P**air) communication methods and unifies the two legacy modules into one.
 
-Zen Cart Support Thread: https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support
+> **Note:** This fork is branded as **PayPal Expanded Checkout** to distinguish it from Zen Cart's core PayPal REST API module and prevent versioning conflicts.
+
+Zen Cart Support Thread (legacy PayPal RESTful): https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support
 
 Zen Cart Plugin Download Link: https://www.zen-cart.com/downloads.php?do=file&id=2382
 

@@ -1,9 +1,9 @@
 <?php
 /**
- * Part of the paypalr (PayPal Restful Api) payment module.
+ * Part of the paypalr (PayPal Expanded Checkout) payment module.
  * Admin handles package tracking updates.
  *
- * Last updated: v1.2.0
+ * Last updated: v1.3.1
  */
 
 use PayPalRestful\Api\Data\CountryCodes;

@@ -1,13 +1,13 @@
 <?php
 /**
- * Page-Redirect Listener for PayPal RESTful API payment method (paypalr)
+ * Page-Redirect Listener for the PayPal Expanded Checkout payment method (paypalr)
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id:  $
  *
- * Last updated: v1.2.0
+ * Last updated: v1.3.1
  */
 require 'includes/application_top.php';
 
