@@ -1,0 +1,398 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width">
+  <title>ChatGPT Agentic Product Feed for Zen Cart</title>
+
+  <!-- FONTS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- FONTS -->
+
+  <link href="css/stylesheet.css" rel="stylesheet" type="text/css" />
+  <link href="css/sh_style.css" rel="stylesheet" type="text/css" />
+  <script
+    src="https://code.jquery.com/jquery-3.7.1.min.js"
+    integrity="sha256-7N0x4zTz9Fq6ZtJECprd2qfBWFdOCOG2fE/6H2y9CJo="
+    crossorigin="anonymous"></script>
+  <script type="text/javascript" src="js/sh_main.min.js"></script>
+  <script type="text/javascript" src="js/sh_html.min.js"></script>
+  <script type="text/javascript" src="js/sh_php.min.js"></script>
+  <script type="text/javascript" src="js/sh_javascript.min.js"></script>
+  <script type="text/javascript" src="js/sh_sql.min.js"></script>
+  <script type="text/javascript" src="js/sh_css.min.js"></script>
+  <script type="text/javascript" src="js/documentation.js"></script>
+</head>
+<body>
+  
+  <div id="wrapper" class="tk-museo-slab">
+    <!--BOF Header-->
+    <div id="headerContainer">
+      <div id="mainMenu" class="headerWrapper">
+
+        <div class="logoWrapper">
+          <a href="https://www.numinix.com/"><img src="images/logo.png" alt="Numinix.com" title="Numinix" id="logo" class="headerLogo" /></a>
+          <span class="nav-icon" id="js-nav-icon">
+            <img src="images/nav-icon.png" alt="nav icon">
+          </span>
+        </div>
+
+        <!--BOF Links-->
+        <div class="contentMenu">
+          <ul>
+            <li><a href="#Overview" id="btnOverview" class="btn" title="Overview" data-target="Overview">Overview</a></li>
+            <li><a href="#Installation" id="btnInstallation" class="btn" title="Installation" data-target="Installation">Installation</a></li>
+            <li><a href="#Configuration" id="btnConfiguration" class="btn" title="Configuration" data-target="Configuration">Configuration</a></li>
+            <li><a href="#Usage" id="btnUsage" class="btn" title="Usage" data-target="Usage">Usage</a></li>
+            <li><a href="#Automation" id="btnAutomation" class="btn" title="Automation" data-target="Automation">Automation</a></li>
+            <li><a href="#Troubleshooting" id="btnTroubleshooting" class="btn" title="Troubleshooting" data-target="Troubleshooting">Troubleshooting</a></li>
+            <li><a href="#Support" id="btnSupport" class="btn" title="Support" data-target="Support">Support</a></li>
+            <li><a href="#License" id="btnLicense" class="btn" title="License" data-target="License">License</a></li>
+            <li><a href="#Disclaimer" id="btnDisclaimer" class="btn" title="Disclaimer" data-target="Disclaimer">Disclaimer</a></li>
+          </ul>
+        </div>
+        <!--EOF Links-->
+
+      </div>
+    </div>
+    <div id="headerTitle">
+      <h1 class="clearBoth">ChatGPT Agentic Product Feed for Zen Cart</h1>
+      <p>Connect your store to ChatGPT—where your data becomes insights, suggestions, and real customer answers.</p>
+    </div>
+    <br class="clearBoth" />
+    <!--EOF Header-->
+
+    <div class="contentWrapper">
+
+      <!--BOF OVERVIEW-->
+      <div class="bodyHeaderContainer" id="Overview">
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Overview</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">The ChatGPT Agentic Product Feed for Zen Cart generates curated product data designed for OpenAI-powered agents and assistants. The module exposes an intuitive admin experience that mirrors the look and feel of other Numinix dashboards while giving you granular control over which catalog items are discoverable by conversational AI.</p>
+          <p class="bodyText">Use this document to install the plugin, configure the catalog rules, and automate feed generation so ChatGPT always has access to your latest inventory.</p>
+          <ul class="bodyList">
+            <li>Validated with Zen Cart 1.5.5e through 1.5.8, with the dashboard UX optimized for 1.5.6 and newer releases.</li>
+            <li>Requires PHP 7.2.34+ with cURL and JSON extensions enabled; syntax checks pass through PHP 8.x.</li>
+            <li>Outputs a JSON feed purpose-built for ChatGPT Action integrations.</li>
+          </ul>
+          <h4>Compatibility &amp; requirements</h4>
+          <p class="bodyText">The module adheres to Zen Cart APIs introduced prior to 1.5.5e and avoids modern PHP features such as arrow functions, typed properties, union types, and nullsafe operators so stores on long-term support stacks can deploy without core upgrades.</p>
+          <p class="bodyText">For production use we recommend PHP 7.3 or newer to take advantage of upstream security fixes, but stores running PHP 7.2.34 remain supported. When deployed on PHP 8.x environments the exporter continues to build feeds successfully, making it suitable for hosts that have already upgraded.</p>
+        </div>
+      </div>
+      <!--EOF OVERVIEW-->
+
+      <!--BOF INSTALLATION-->
+      <div class="bodyHeaderContainer" id="Installation">
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Installation</span>
+        </div>
+        <div class="bodyWrapper">
+          <h4>Preparing your store</h4>
+          <ol>
+            <li>Install the <a href="https://www.numinix.com/numinix-premium-plugin-installer-for-zen-cart-1345">Numinix Premium Plugin Installer</a> to add the <code>nxPluginLicCheck</code> dependency required by the module bootstrap.</li>
+            <li>Backup your Zen Cart database and catalog files before making any changes.</li>
+            <li>Verify that your hosting environment meets the PHP requirements listed in the Overview.</li>
+            <li>Ensure your admin directory name is updated in the package&rsquo;s <code>YOUR_ADMIN/</code> folder before uploading.</li>
+          </ol>
+          <h4>Uploading files</h4>
+          <ol>
+            <li>Unzip the distribution package locally.</li>
+            <li>Upload the <code>includes/</code> and <code>YOUR_ADMIN/</code> contents to the matching directories in your store, merging with existing files.</li>
+            <li>Place <code>chatgpt_product_feeder_run.php</code> in the root of your Zen Cart catalog.</li>
+          </ol>
+          <h4>Database updates</h4>
+          <ol>
+            <li>Log in to your Zen Cart admin.</li>
+            <li>Navigate to <strong>Tools → Install SQL Patches</strong>.</li>
+            <li>Upload and execute <code>uninstall.sql</code> only if you are replacing an older beta build. Fresh installs do not require manual SQL patches.</li>
+          </ol>
+          <p class="bodyText">After the files are in place, the admin menu will display <strong>Tools → ChatGPT Agentic Product Feed</strong> and the configuration group will appear under <strong>Configuration</strong>.</p>
+        </div>
+      </div>
+      <!--EOF INSTALLATION-->
+
+      <!--BOF CONFIGURATION-->
+      <div class="bodyHeaderContainer" id="Configuration">
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Configuration</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Open <strong>Configuration → ChatGPT Agentic Product Feed</strong> to tailor how the module maps your catalog to the ChatGPT schema.</p>
+          <ol class="steps">
+            <li>
+              <h4 class="step-title">Store identity</h4>
+              <ul>
+                <li>Populate your storefront name, support email, and primary storefront URL.</li>
+                <li>Select the default currency and language that the feed should reference.</li>
+              </ul>
+            </li>
+            <li>
+              <h4 class="step-title">Catalog scope</h4>
+              <ul>
+                <li>Choose which categories are eligible for exposure to ChatGPT.</li>
+                <li>Enable or disable inclusion of out-of-stock products.</li>
+                <li>Define default shipping and fulfillment notes that help the agent answer logistical questions.</li>
+              </ul>
+            </li>
+            <li>
+              <h4 class="step-title">Product enrichment</h4>
+              <ul>
+                <li>Map custom fields or attributes to the standardized ChatGPT product properties (brand, condition, identifiers, etc.).</li>
+                <li>Optionally enable the <strong>AI Highlights</strong> composer to inject short persuasive blurbs into the feed.</li>
+              </ul>
+            </li>
+            <li>
+              <h4 class="step-title">Security</h4>
+              <ul>
+                <li>Generate a signed URL token to restrict access to the feed endpoint.</li>
+                <li>Restrict the admin tool to specific Zen Cart administrator profiles if desired.</li>
+              </ul>
+            </li>
+          </ol>
+        </div>
+      </div>
+      <!--EOF CONFIGURATION-->
+
+      <!--BOF USAGE-->
+      <div class="bodyHeaderContainer" id="Usage">
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Usage</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Once configured, head to <strong>Tools → ChatGPT Agentic Product Feed</strong> to work with the interactive dashboard.</p>
+          <ol class="steps">
+            <li>
+              <h4 class="step-title">Review the overview tiles</h4>
+              <p>At the top of the screen you&rsquo;ll find totals for included products, pending refreshes, and the timestamp of the most recent feed build.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Filter the catalog</h4>
+              <p>Use quick filter chips or open the advanced drawer to combine rules for category, stock status, pricing, keywords, and refresh state.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Curate inclusion</h4>
+              <p>Toggle products in or out of the ChatGPT feed using the row-level switch or the bulk toolbar actions. Mark specific items for refresh to regenerate their payload during the next run.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Generate the feed</h4>
+              <p>Click <strong>Build Feed</strong> to produce the latest JSON file. The admin will surface the public URL and signed token (if enabled) so you can register it with your ChatGPT Action or agent manifest.</p>
+            </li>
+          </ol>
+          <h4>Virtual product support</h4>
+          <p class="bodyText">Catalog items flagged as virtual automatically omit weight, dimensional, and shipping attributes. The exporter marks them as <code>in_stock</code> with a minimum quantity of <code>1</code> so digital goods publish without requiring physical fulfillment details.</p>
+          <h4>Feed registration with OpenAI</h4>
+          <ol>
+            <li>Create or edit your ChatGPT Action in the OpenAI dashboard.</li>
+            <li>Set the data source URL to the feed endpoint provided by the module.</li>
+            <li>Specify the refresh schedule that matches your automation cadence.</li>
+            <li>Test the Action to ensure product responses match your storefront content.</li>
+          </ol>
+        </div>
+      </div>
+      <!--EOF USAGE-->
+
+      <!--BOF AUTOMATION-->
+      <div class="bodyHeaderContainer" id="Automation">
+        <div class="bodyHeader" id="blue">
+          <span class="bodyHeaderTxt">Automation</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Automate regeneration so your ChatGPT Action stays synchronized with inventory updates.</p>
+          <ol>
+            <li>Edit your server&rsquo;s cron table (<code>crontab -e</code>).</li>
+            <li>Add a schedule that matches how frequently your catalog changes. For example:</li>
+          </ol>
+          <div class="code">
+            <div class="codeTitle"></div>
+            <pre class="sh_php sh_sourceCode"><code>0 * * * * /usr/bin/php /path/to/zen-cart/chatgpt_product_feeder_run.php</code></pre>
+          </div>
+          <p class="bodyText">The runner script executes the same logic as the admin build button, respecting inclusion choices and refresh flags. Review your server logs periodically to confirm the job executes without errors.</p>
+        </div>
+      </div>
+      <!--EOF AUTOMATION-->
+
+      <!--BOF TROUBLESHOOTING-->
+      <div class="bodyHeaderContainer" id="Troubleshooting">
+        <div class="bodyHeader" id="blue">
+          <span class="bodyHeaderTxt">Troubleshooting</span>
+        </div>
+        <div class="bodyWrapper">
+          <ul class="bodyList">
+            <li><strong>Empty feed?</strong> Confirm that at least one category is enabled and that the inclusion toggle is switched on for the products you expect.</li>
+            <li><strong>Encoding issues?</strong> Ensure product descriptions and custom fields use UTF-8 and remove any invalid characters before saving.</li>
+            <li><strong>Timeouts when building?</strong> Reduce the batch size in configuration or increase <code>max_execution_time</code> in <code>php.ini</code>.</li>
+            <li><strong>Permission errors?</strong> The module writes feed files to <code>/feed/</code> by default. Confirm the directory is writable by the web server user (typically 0755 or 0775).</li>
+            <li><strong>Security reminders:</strong> Protect the feed directory with HTTP authentication or IP allowlists if you expose the URL publicly. Rotate signed tokens whenever staff access changes.</li>
+          </ul>
+        </div>
+      </div>
+      <!--EOF TROUBLESHOOTING-->
+
+      <!--BOF SUPPORT-->
+      <div class="bodyHeaderContainer" id="Support">
+        <div class="bodyHeader" id="blue">
+          <span class="bodyHeaderTxt">Support</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Need assistance? The Numinix support team is ready to help you connect your Zen Cart catalog to ChatGPT.</p>
+          <ul class="bodyList">
+            <li>Email <a href="mailto:support@numinix.com">support@numinix.com</a> with detailed steps to reproduce any issues.</li>
+            <li>Include your Zen Cart version, PHP version, and whether cron automation is enabled.</li>
+            <li>Attach relevant log excerpts or screenshots from the admin dashboard.</li>
+          </ul>
+        </div>
+      </div>
+      <!--EOF SUPPORT-->
+
+      <!--BOF LICENSE-->
+      <div class="bodyHeaderContainer" id="License">
+        <div class="bodyHeader" id="grey">
+          <span class="bodyHeaderTxt">License</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">This plugin is licensed for use on a single Zen Cart installation per purchase. Redistribution without written consent from Numinix is prohibited. Refer to <a href="license.txt">license.txt</a> for the complete terms.</p>
+        </div>
+      </div>
+      <!--EOF LICENSE-->
+
+      <!--BOF DISCLAIMER-->
+      <div class="bodyHeaderContainer" id="Disclaimer">
+        <div class="bodyHeader" id="grey">
+          <span class="bodyHeaderTxt">Disclaimer</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">OpenAI integrations are subject to the OpenAI terms of use and rate limits. Monitor the feed output and ChatGPT responses regularly to ensure compliance with your regional regulations and company policies. Numinix is not liable for any damages that arise from improper configuration or misuse of this plugin.</p>
+        </div>
+      </div>
+      <!--EOF DISCLAIMER-->
+
+    </div>
+    <footer class="readme-footer" aria-label="Numinix contact and resources">
+      <div class="readme-footer-container">
+        <div class="footer-column footer-column-1">
+          <h2 class="title">Need a hand with your feed?</h2>
+          <p class="paragraph">Partner with the Numinix team to tailor your ChatGPT product experience, automate updates, and keep your Zen Cart store discoverable.</p>
+          <a class="connect-link" href="https://www.numinix.com/contact" target="_blank" rel="noopener">Connect with Numinix</a>
+          <div class="details">
+            <img src="images/numinix-emblem.png" alt="Numinix emblem" />
+            <ul>
+              <li>
+                <span aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                  </svg>
+                </span>
+                <div>
+                  <strong>Email</strong><br />
+                  <a href="mailto:support@numinix.com">support@numinix.com</a>
+                </div>
+              </li>
+              <li>
+                <span aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.86 19.86 0 0 1 11.09 18a19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2 4.18 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.72 12.8 12.8 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8 9l3 3 1.34-1.29a2 2 0 0 1 2.11-.45 12.8 12.8 0 0 0 2.81.7A2 2 0 0 1 19 13h3a2 2 0 0 1 2 2.18z" />
+                  </svg>
+                </span>
+                <div>
+                  <strong>Phone</strong><br />
+                  <a href="tel:+16043100027">+1 (604) 310-0027</a>
+                </div>
+              </li>
+              <li>
+                <span aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 21s-6-5.686-6-10A6 6 0 1 1 18 11c0 4.314-6 10-6 10z" />
+                    <circle cx="12" cy="11" r="2.5" />
+                  </svg>
+                </span>
+                <div>
+                  <strong>Address</strong><br />
+                  Vancouver, British Columbia
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-column footer-column-2">
+          <div class="links-group">
+            <div class="links">
+              <h4>Documentation</h4>
+              <div class="links-list">
+                <a href="#Overview">Overview</a>
+                <a href="#Installation">Installation</a>
+                <a href="#Configuration">Configuration</a>
+                <a href="#Usage">Usage</a>
+              </div>
+            </div>
+            <div class="links">
+              <h4>Operations</h4>
+              <div class="links-list">
+                <a href="#Automation">Automation</a>
+                <a href="#Troubleshooting">Troubleshooting</a>
+                <a href="#Support">Support</a>
+              </div>
+            </div>
+            <div class="links">
+              <h4>Policies</h4>
+              <div class="links-list">
+                <a href="#License">License</a>
+                <a href="#Disclaimer">Disclaimer</a>
+                <a href="license.txt">License file</a>
+              </div>
+            </div>
+            <div class="links">
+              <h4>Numinix</h4>
+              <div class="links-list">
+                <a href="https://www.numinix.com/zen-cart-services" target="_blank" rel="noopener">Zen Cart services</a>
+                <a href="https://www.numinix.com/portfolio" target="_blank" rel="noopener">Case studies</a>
+                <a href="https://www.numinix.com/blog" target="_blank" rel="noopener">Insights</a>
+              </div>
+            </div>
+          </div>
+          <div class="socials" aria-label="Follow Numinix">
+            <a href="https://www.facebook.com/numinix" aria-label="Numinix on Facebook" target="_blank" rel="noopener">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#1877F2" aria-hidden="true">
+                <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.988H7.898v-2.89h2.54V9.845c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.261c-1.243 0-1.63.772-1.63 1.562v1.875h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
+              </svg>
+            </a>
+            <a href="https://www.linkedin.com/company/numinix/" aria-label="Numinix on LinkedIn" target="_blank" rel="noopener">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#0A66C2" aria-hidden="true">
+                <path d="M20.447 20.452H16.89V15.84c0-1.099-.02-2.511-1.533-2.511-1.535 0-1.77 1.197-1.77 2.431v4.692H10.03V9h3.41v1.561h.049c.476-.9 1.637-1.848 3.37-1.848 3.602 0 4.268 2.37 4.268 5.455v6.284zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zM7.119 20.452H3.554V9H7.12v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.226.792 24 1.771 24h20.451C23.2 24 24 23.226 24 22.271V1.73C24 .774 23.2 0 22.222 0h.003z" />
+              </svg>
+            </a>
+            <a href="https://twitter.com/numinix" aria-label="Numinix on X" target="_blank" rel="noopener">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#171717" aria-hidden="true">
+                <path d="M17.21 3H20.5l-7.61 8.69L21.5 21h-6.69l-5.23-6.11L3.69 21H.4l8.18-9.36L.5 3h6.78l4.73 5.52L17.21 3zm-1.18 16.2h1.86L7.9 4.69H5.91l10.12 14.51z" />
+              </svg>
+            </a>
+          </div>
+          <div class="payment-methods" aria-label="Accepted payment methods">
+            <a href="https://www.numinix.com/" target="_blank" rel="noopener"><img src="images/visa.png" alt="Visa" /></a>
+            <a href="https://www.numinix.com/" target="_blank" rel="noopener"><img src="images/american-express.png" alt="American Express" /></a>
+            <a href="https://www.numinix.com/" target="_blank" rel="noopener"><img src="images/discover.png" alt="Discover" /></a>
+            <a href="https://www.numinix.com/" target="_blank" rel="noopener"><img src="images/maestro.png" alt="Maestro" /></a>
+            <a href="https://www.numinix.com/" target="_blank" rel="noopener"><img src="images/paypal.png" alt="PayPal" /></a>
+          </div>
+        </div>
+      </div>
+      <div class="readme-footer-bottom">
+        <p class="copyright">&copy; 2024 Numinix Web Design Inc.</p>
+        <p class="madewith">Made with
+          <span aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#E63946">
+              <path d="M12 21s-6.716-4.568-9.192-9.192C.565 8.43 2.112 4 6.322 4c2.055 0 3.23 1.232 3.83 2.219C10.448 5.232 11.623 4 13.678 4c4.21 0 5.757 4.43 3.514 7.808C18.716 16.432 12 21 12 21z" />
+            </svg>
+          </span>
+          by <a href="https://www.numinix.com/" target="_blank" rel="noopener">Numinix</a>
+        </p>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
