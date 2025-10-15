@@ -12,10 +12,13 @@ class sniffer
     /**
      * Database adapter instance.
      *
-     * @var mixed|null
+     * @var mixed
      */
     private $db;
 
+    /**
+     * @param mixed $db
+     */
     public function __construct($db = null)
     {
         $this->db = $db;
@@ -74,7 +77,7 @@ class sniffer
     }
 
     /**
-     * @return mixed|null
+     * @return mixed
      */
     private function resolveDb()
     {

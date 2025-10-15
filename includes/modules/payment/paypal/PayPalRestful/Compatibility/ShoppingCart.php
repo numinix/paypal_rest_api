@@ -19,22 +19,22 @@ class shoppingCart
      *
      * @var array<string, array<string, mixed>>
      */
-    protected array $contents = [];
+    protected $contents = [];
 
     /**
      * Cached total value of items in the cart.
      */
-    protected float $total = 0.0;
+    protected $total = 0.0;
 
     /**
      * Cached total weight of the cart's contents.
      */
-    protected float $weight = 0.0;
+    protected $weight = 0.0;
 
     /**
      * Denotes the nature of cart contents (mirrors core behaviour).
      */
-    protected string $content_type = 'virtual';
+    protected $content_type = 'virtual';
 
     public function __construct()
     {

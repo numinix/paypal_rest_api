@@ -13,7 +13,10 @@ trait PayPalRestfulLegacyNotifierTrait
     /**
      * Map of historical notifier aliases used by the core implementation.
      */
-    private array $observerAliases = [
+    /**
+     * @var array<string, string>
+     */
+    private $observerAliases = [
         'NOTIFIY_ORDER_CART_SUBTOTAL_CALCULATE' => 'NOTIFY_ORDER_CART_SUBTOTAL_CALCULATE',
         'NOTIFY_ADMIN_INVOIVE_HEADERS_AFTER_TAX' => 'NOTIFY_ADMIN_INVOICE_HEADERS_AFTER_TAX',
     ];
@@ -21,7 +24,10 @@ trait PayPalRestfulLegacyNotifierTrait
     /**
      * Registry of observers keyed by event identifier and observer hash.
      */
-    private array $registeredObservers = [];
+    /**
+     * @var array<string, array<string, array{obs: object, eventID: string}>>
+     */
+    private $registeredObservers = [];
 
     /**
      * Attach an observer to the supplied notifier events.
