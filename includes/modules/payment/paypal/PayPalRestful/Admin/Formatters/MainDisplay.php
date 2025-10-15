@@ -16,26 +16,27 @@ use PayPalRestful\Zc2Pp\Amount;
 
 class MainDisplay
 {
-    protected string $mainDisplay = '';
-
-    protected array $settledFunds = [
+    /** @var string */
+    protected $mainDisplay = '';
+    /** @var array */
+    protected $settledFunds = [
         'currency' => '',
         'value' => 0,
         'fee' => 0,
         'exchange_rate' => 0,
     ];
-
-    protected string $modals = '';
-
-    protected Amount $amount;
-
-    protected string $currencyCode;
-
-    protected array $paypalDbTxns;
-
-    protected bool $jQueryLoadRequired = false;
-
-    protected static array $txnTableFields = [
+    /** @var string */
+    protected $modals = '';
+    /** @var Amount */
+    protected $amount;
+    /** @var string */
+    protected $currencyCode;
+    /** @var array */
+    protected $paypalDbTxns;
+    /** @var bool */
+    protected $jQueryLoadRequired = false;
+    /** @var array */
+    protected static $txnTableFields = [
         ['name' => MODULE_PAYMENT_PAYPALR_TXN_TYPE, 'field' => 'txn_type', 'align' => 'center'],
         ['name' => MODULE_PAYMENT_PAYPALR_TXN_PARENT_TXN_ID, 'field' => 'txn_id', 'align' => 'center'],
         ['name' => MODULE_PAYMENT_PAYPALR_DATE_CREATED, 'field' => 'date_added', 'align' => 'center'],
@@ -45,8 +46,8 @@ class MainDisplay
         ['name' => MODULE_PAYMENT_PAYPALR_GROSS_AMOUNT, 'field' => 'mc_gross', 'align' => 'right', 'is_amount' => true],
         ['name' => MODULE_PAYMENT_PAYPALR_PAYMENT_FEE, 'field' => 'payment_fee', 'align' => 'right', 'is_amount' => true],
     ];
-
-    protected static array $paymentTableFields = [
+    /** @var array */
+    protected static $paymentTableFields = [
         ['name' => MODULE_PAYMENT_PAYPALR_TXN_TYPE, 'field' => 'txn_type', 'align' => 'center'],
         ['name' => MODULE_PAYMENT_PAYPALR_TXN_ID, 'field' => 'txn_id', 'align' => 'center'],
         ['name' => MODULE_PAYMENT_PAYPALR_DATE_CREATED, 'field' => 'date_added', 'align' => 'center'],
@@ -56,7 +57,6 @@ class MainDisplay
         ['name' => MODULE_PAYMENT_PAYPALR_PAYMENT_FEE, 'field' => 'payment_fee', 'align' => 'right', 'is_amount' => true],
         ['name' => MODULE_PAYMENT_PAYPALR_SETTLE_AMOUNT, 'field' => 'settle_amount', 'align' => 'right', 'is_amount' => true],
     ];
-
     public function __construct(array $paypal_db_txns)
     {
         $this->paypalDbTxns = $paypal_db_txns;

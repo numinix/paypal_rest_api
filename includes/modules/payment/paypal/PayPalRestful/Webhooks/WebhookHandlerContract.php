@@ -17,18 +17,20 @@ use PayPalRestful\Common\Logger;
 
 abstract class WebhookHandlerContract
 {
-    protected array $eventsHandled = [];
-
-    protected WebhookObject $webhook;
-    protected array $data;
-    protected string $eventType;
-
-    protected Logger $log;
-
-    protected PayPalRestfulApi $ppr;
-    protected \paypalr $paymentModule;
-
-
+    /** @var array */
+    protected $eventsHandled = [];
+    /** @var WebhookObject */
+    protected $webhook;
+    /** @var array */
+    protected $data;
+    /** @var string */
+    protected $eventType;
+    /** @var Logger */
+    protected $log;
+    /** @var PayPalRestfulApi */
+    protected $ppr;
+    /** @var \paypalr */
+    protected $paymentModule;
     public function __construct(WebhookObject $webhook)
     {
         $this->webhook = $webhook;

@@ -18,8 +18,8 @@ class currencies
      *
      * @var array<string, array{value: float}>
      */
-    protected array $currencies = [];
-
+    /** @var array */
+    protected $currencies = [];
     public function __construct(array $currencies = [])
     {
         foreach ($currencies as $code => $currency) {

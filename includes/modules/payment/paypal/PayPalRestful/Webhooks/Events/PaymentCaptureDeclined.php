@@ -16,10 +16,10 @@ use PayPalRestful\Webhooks\WebhookHandlerContract;
 
 class PaymentCaptureDeclined extends WebhookHandlerContract
 {
-    protected array $eventsHandled = [
+    /** @var array */
+    protected $eventsHandled = [
         'PAYMENT.CAPTURE.DECLINED',
     ];
-
     public function action(): void
     {
         // A payment capture is declined.

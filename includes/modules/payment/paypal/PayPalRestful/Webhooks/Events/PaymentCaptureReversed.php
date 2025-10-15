@@ -16,10 +16,10 @@ use PayPalRestful\Webhooks\WebhookHandlerContract;
 
 class PaymentCaptureReversed extends WebhookHandlerContract
 {
-    protected array $eventsHandled = [
+    /** @var array */
+    protected $eventsHandled = [
         'PAYMENT.CAPTURE.REVERSED',
     ];
-
     public function action(): void
     {
         // PayPal reverses a payment capture (not the merchant)

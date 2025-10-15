@@ -16,10 +16,10 @@ use PayPalRestful\Webhooks\WebhookHandlerContract;
 
 class PaymentAuthorizationVoided extends WebhookHandlerContract
 {
-    protected array $eventsHandled = [
+    /** @var array */
+    protected $eventsHandled = [
         'PAYMENT.AUTHORIZATION.VOIDED',
     ];
-
     public function action(): void
     {
         // A payment authorization is voided either due to authorization

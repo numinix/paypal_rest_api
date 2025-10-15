@@ -16,8 +16,8 @@ namespace PayPalRestful\Compatibility;
 
 final class LanguageAutoloader
 {
-    private static bool $registered = false;
-
+    /** @var bool */
+    private static $registered = false;
     public static function register(): void
     {
         if (self::$registered) {

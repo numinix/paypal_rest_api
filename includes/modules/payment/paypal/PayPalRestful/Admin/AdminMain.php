@@ -16,12 +16,12 @@ use PayPalRestful\Api\PayPalRestfulApi;
 
 class AdminMain
 {
-    protected PayPalRestfulApi $ppr;
-
-    protected string $adminNotifications = '';
-    
-    protected bool $externalTxnAdded = false;
-
+    /** @var PayPalRestfulApi */
+    protected $ppr;
+    /** @var string */
+    protected $adminNotifications = '';
+    /** @var bool */
+    protected $externalTxnAdded = false;
     public function __construct(string $module_name, string $module_version, int $oID, PayPalRestfulApi $ppr)
     {
         $this->ppr = $ppr;

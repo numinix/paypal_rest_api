@@ -14,20 +14,20 @@ if (class_exists('base', false)) {
 final class LanguageShim extends LanguageShimBase
 {
     /** @var array<string,mixed> */
-    public array $language = [];
-
+    /** @var array */
+    public $language = [];
     /** @var array<string,array<string,mixed>> */
-    public array $catalog_languages = [];
-
+    /** @var array */
+    public $catalog_languages = [];
     /** @var array<string,array<string,mixed>> */
-    private array $languagesByCode = [];
-
+    /** @var array */
+    private $languagesByCode = [];
     /** @var array<int,array<string,mixed>> */
-    private array $languagesById = [];
-
+    /** @var array */
+    private $languagesById = [];
     /** @var array<string,array<string,mixed>> */
-    private array $languagesByDirectory = [];
-
+    /** @var array */
+    private $languagesByDirectory = [];
     public function __construct(string $language = '')
     {
         $this->initializeLanguages();

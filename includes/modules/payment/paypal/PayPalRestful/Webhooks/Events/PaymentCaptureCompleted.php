@@ -16,10 +16,10 @@ use PayPalRestful\Webhooks\WebhookHandlerContract;
 
 class PaymentCaptureCompleted extends WebhookHandlerContract
 {
-    protected array $eventsHandled = [
+    /** @var array */
+    protected $eventsHandled = [
         'PAYMENT.CAPTURE.COMPLETED',
     ];
-
     public function action(): void
     {
         // A payment capture completes

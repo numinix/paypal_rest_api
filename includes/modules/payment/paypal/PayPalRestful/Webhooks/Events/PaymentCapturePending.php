@@ -16,10 +16,10 @@ use PayPalRestful\Webhooks\WebhookHandlerContract;
 
 class PaymentCapturePending extends WebhookHandlerContract
 {
-    protected array $eventsHandled = [
+    /** @var array */
+    protected $eventsHandled = [
         'PAYMENT.CAPTURE.PENDING',
     ];
-
     public function action(): void
     {
         // The state of a payment capture changes to pending

@@ -17,26 +17,26 @@ use PayPalRestful\Common\Logger;
 
 class GetPayPalOrderTransactions
 {
-    protected string $moduleName;
-
-    protected string $moduleVersion;
-
-    protected int $oID;
-
-    protected PayPalRestfulApi $ppr;
-
-    protected Logger $log;
-
-    protected array $databaseTxns = [];
-
-    protected Messages $messages;
-
-    protected string $paymentType;
-
-    protected array $paypalTransactions = [];
-
-    protected bool $externalTxnAdded = false;
-
+    /** @var string */
+    protected $moduleName;
+    /** @var string */
+    protected $moduleVersion;
+    /** @var int */
+    protected $oID;
+    /** @var PayPalRestfulApi */
+    protected $ppr;
+    /** @var Logger */
+    protected $log;
+    /** @var array */
+    protected $databaseTxns = [];
+    /** @var Messages */
+    protected $messages;
+    /** @var string */
+    protected $paymentType;
+    /** @var array */
+    protected $paypalTransactions = [];
+    /** @var bool */
+    protected $externalTxnAdded = false;
     public function __construct(string $module_name, string $module_version, int $oID, PayPalRestfulApi $ppr)
     {
         $this->moduleName = $module_name;
