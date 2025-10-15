@@ -10,6 +10,12 @@
  * payment module configuration page with an appropriate status message.
  */
 
+$autoloaderPath = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
+if (is_file($autoloaderPath)) {
+    require_once $autoloaderPath;
+    \PayPalRestful\Compatibility\LanguageAutoloader::register();
+}
+
 require 'includes/application_top.php';
 
 if (function_exists('zen_admin_check_login')) {
