@@ -19,7 +19,8 @@ namespace PayPalRestful\Api\Data;
 //
 class CountryCodes
 {
-    protected static array $countryCodes = [
+    /** @var array */
+    protected static $countryCodes = [
         'AF',  //- Afghanistan
         'AX',  //- Aland Islands
         'AL',  //- Albania
@@ -270,7 +271,6 @@ class CountryCodes
         'ZM',  //- Zambia
         'ZW',  //- Zimbabwe
     ];
-
     public static function convertCountryCode(string $country_code): string
     {
         if (in_array($country_code, self::$countryCodes)) {

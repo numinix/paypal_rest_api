@@ -18,9 +18,10 @@ use PayPalRestful\Common\Logger;
 
 class WebhookController
 {
-    protected bool $enableDebugFileLogging = true;
-    protected Logger $ppr_logger;
-
+    /** @var bool */
+    protected $enableDebugFileLogging = true;
+    /** @var Logger */
+    protected $ppr_logger;
     public function __invoke(): ?bool
     {
         defined('TABLE_PAYPAL_WEBHOOKS') or define('TABLE_PAYPAL_WEBHOOKS', DB_PREFIX . 'paypal_webhooks');

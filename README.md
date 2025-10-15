@@ -15,9 +15,11 @@ Zen Cart Plugin Download Link: https://www.zen-cart.com/downloads.php?do=file&id
 
 Those shims provide the 1.5.8a trait and language fallbacks automatically&mdash;no additional downloads are needed beyond the `order_total` patch.
 
+> :warning: Zen Cart 1.5.7c can be installed on hosts that still default to PHP 7.0 or 7.1. The module relies on PHP 7.1 language features such as nullable type hints and scalar return types (for example `PayPalRestful\Zc2Pp\CreatePayPalOrderRequest::resolveListenerEndpoint(?string $listener_endpoint)` and `PayPalRestful\Compatibility\TemplateFunc::determineTemplateDirectory(): ?string`). Running it on PHP 7.0 or older will trigger fatal parse errors similar to `unexpected '?'`. Upgrade the store's PHP version to at least 7.1 (PHP 7.4+ recommended) before enabling the module.【F:includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php†L514-L520】【F:includes/modules/payment/paypal/PayPalRestful/Compatibility/TemplateFunc.php†L48-L105】
+
 The module's operation has been validated …
 
-1. With PHP versions 7.4 through 8.4; **PHP 7.3 will result in fatal PHP errors!**
+1. With PHP versions 7.1 through 8.4; **PHP 7.0 or older will result in fatal PHP errors.**
 2. In Zen Cart's 3-page checkout environment (v1.5.7**c**+, v2.0.x and v2.1.0)
 3. With One-Page Checkout  (OPC), v2.4.6-2.5.3
    1. Using *OPC*'s guest-checkout feature.

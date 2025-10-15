@@ -13,10 +13,10 @@ use PayPalRestful\Webhooks\WebhookHandlerContract;
 
 class VaultPaymentTokenUpdated extends WebhookHandlerContract
 {
-    protected array $eventsHandled = [
+    /** @var array */
+    protected $eventsHandled = [
         'VAULT.PAYMENT-TOKEN.UPDATED',
     ];
-
     public function action(): void
     {
         $this->log->write('VAULT.PAYMENT-TOKEN.UPDATED - action() triggered');

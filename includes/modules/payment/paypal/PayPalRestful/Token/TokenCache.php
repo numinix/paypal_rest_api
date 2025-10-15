@@ -23,15 +23,16 @@ class TokenCache
     // Variable that holds the selected cryptographic algorithm and its IV length.
     // Set during construction.
     //
-    private string $encryptionAlgorithm;
-    private int $encryptionAlgoIvLen;
-    private string $clientSecret;
-
-    // -----
+    /** @var string */
+    private $encryptionAlgorithm;
+    /** @var int */
+    private $encryptionAlgoIvLen;
+    /** @var string */
+    private $clientSecret; // -----
     // Contains an instance of the common Logger class.
     //
-    protected Logger $log;
-
+    /** @var Logger */
+    protected $log;
     public function __construct(string $client_secret)
     {
         $this->log = new Logger();

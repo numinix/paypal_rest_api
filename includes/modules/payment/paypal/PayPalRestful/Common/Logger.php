@@ -20,10 +20,10 @@ class Logger
      * @debugLogFile string
      * @debug bool
      */
-    protected static bool $debug = false;
-    protected static string $debugLogFile;
-
-    // -----
+    /** @var bool */
+    protected static $debug = false;
+    /** @var string */
+    protected static $debugLogFile; // -----
     // Class constructor.
     //
     public function __construct(string $uniqueName = '')

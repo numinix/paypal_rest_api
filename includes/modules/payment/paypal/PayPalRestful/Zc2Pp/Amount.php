@@ -12,16 +12,19 @@ use PayPalRestful\Common\Logger;
 
 class Amount
 {
-    protected array $amount = [
+    /** @var array */
+    protected $amount = [
         'currency_code' => '',
         'value' => '',
     ];
-    protected static array $defaultCurrencyCode = [
+    /** @var array */
+    protected static $defaultCurrencyCode = [
         'value' => '',
         'no_decimals' => false,
         'in_country_only' => false,
     ];
-    protected static array $supportedCurrencyCodes = [
+    /** @var array */
+    protected static $supportedCurrencyCodes = [
         'AUD' => [],    //- Australian dollar
         'BRL' => [],    //- Brazilian real
         'CAD' => [],    //- Canadian dollar
@@ -48,11 +51,11 @@ class Amount
         'THB' => [],    //- Thai bhat
         'USD' => [],    //- United States dollar
     ];
-
     /**
      * Debug interface, shared with the PayPalRestfulApi class.
      */
-    protected Logger $log; //- An instance of the Logger class, logs debug tracing information.
+    /** @var Logger */
+    protected $log; //- An instance of the Logger class, logs debug tracing information.
 
     // -----
     // An alias for setDefaultCurrency.

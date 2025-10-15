@@ -17,10 +17,10 @@ use PayPalRestful\Webhooks\WebhookHandlerContract;
 
 class CheckoutPaymentApprovalReversed extends WebhookHandlerContract
 {
-    protected array $eventsHandled = [
+    /** @var array */
+    protected $eventsHandled = [
         'CHECKOUT.PAYMENT-APPROVAL.REVERSED',
     ];
-
     public function action(): void
     {
         // A problem occurred after the buyer approved the order but before you captured the payment.

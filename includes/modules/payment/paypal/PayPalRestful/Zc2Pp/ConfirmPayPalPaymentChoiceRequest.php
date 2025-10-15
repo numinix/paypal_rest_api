@@ -19,14 +19,13 @@ class ConfirmPayPalPaymentChoiceRequest
     /**
      * The request to be submitted to a v2/orders/{id}/confirm-payment-choice PayPal endpoint.
      */
-    protected array $request;
-
+    /** @var array */
+    protected $request;
     /**
      * The resolved user-action to be supplied in the experience-context.
      */
-    protected string $userAction;
-
-    // -----
+    /** @var string */
+    protected $userAction; // -----
     // Constructor.  Creates the payload for a PayPal payment-choice confirmation request.
     //
     public function __construct(string $listener_endpoint, \order $order)

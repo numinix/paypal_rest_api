@@ -16,10 +16,10 @@ use PayPalRestful\Webhooks\WebhookHandlerContract;
 
 class PaymentCaptureRefunded extends WebhookHandlerContract
 {
-    protected array $eventsHandled = [
+    /** @var array */
+    protected $eventsHandled = [
         'PAYMENT.CAPTURE.REFUNDED',
     ];
-
     public function action(): void
     {
         // A merchant refunds a payment capture.

@@ -65,7 +65,8 @@ class PayPalRestfulApi extends ErrorInfo
     /**
      * Webhook actions we intend to listen for notifications regarding.
      */
-    protected array $webhooksToRegister = [
+    /** @var array */
+    protected $webhooksToRegister = [
         'CHECKOUT.PAYMENT-APPROVAL.REVERSED',
         'PAYMENT.AUTHORIZATION.VOIDED',
         'PAYMENT.CAPTURE.COMPLETED',
@@ -75,37 +76,37 @@ class PayPalRestfulApi extends ErrorInfo
         'PAYMENT.CAPTURE.REVERSED',
         'VAULT.PAYMENT-TOKEN.UPDATED',
     ];
-
     /**
      * Variables associated with interface logging;
      *
      * @log Logger object, logs debug tracing information.
      */
-    protected Logger $log;
-
+    /** @var Logger */
+    protected $log;
     /**
      * Variables associated with interface logging;
      *
      * @token TokenCache object, caches any access-token retrieved from PayPal.
      */
-    protected TokenCache $tokenCache;
-
+    /** @var TokenCache */
+    protected $tokenCache;
     /**
      * Sandbox or production? Set during class construction.
      */
-    protected string $endpoint;
-
+    /** @var string */
+    protected $endpoint;
     /**
      * Indicates which environment (live or sandbox) the instance is using.
      */
-    protected string $environmentType = 'sandbox';
-
+    /** @var string */
+    protected $environmentType = 'sandbox';
     /**
      * OAuth client id and secret, set during class construction.
      */
-    private string $clientId;
-    private string $clientSecret;
-
+    /** @var string */
+    private $clientId;
+    /** @var string */
+    private $clientSecret;
     public const PARTNER_ATTRIBUTION_ID = 'NuminixPPCP_SP';
 
     /**
@@ -117,7 +118,8 @@ class PayPalRestfulApi extends ErrorInfo
      * Options for cURL. Defaults to preferred (constant) options.  Used by
      * the curlGet and curlPost methods.
      */
-    protected array $curlOptions = [
+    /** @var array */
+    protected $curlOptions = [
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_FORBID_REUSE => true,
@@ -126,29 +128,27 @@ class PayPalRestfulApi extends ErrorInfo
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 45,
     ];
-
     /**
      * Contains the (optional) HTTP Header's PayPal-Request-Id value;
      * required for payments with a payment_source *other than* paypal
      * (the default).  See https://developer.paypal.com/api/rest/requests/#http-request-headers
      * for additional information.
      */
-    protected string $paypalRequestId = '';
-
+    /** @var string */
+    protected $paypalRequestId = '';
     /**
      * Contains an (optional) "Mock Response" to be included in the HTTP
      * header's PayPal-Mock-Response value, enabling testing to be performed
      * for error responses; see the above link for additional information.
      */
-    protected string $paypalMockResponse = '';
-
+    /** @var string */
+    protected $paypalMockResponse = '';
     /**
      * A binary flag that indicates whether/not the caller wants to keep the 'links' returned
      * by the various PayPal responses.
      */
-    protected bool $keepTxnLinks = false;
-
-    // -----
+    /** @var bool */
+    protected $keepTxnLinks = false; // -----
     // Class constructor, saves endpoint (live vs. sandbox), clientId and clientSecret
     //
     public function __construct(string $endpoint_type, string $client_id = '', string $client_secret = '')

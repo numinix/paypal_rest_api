@@ -17,12 +17,12 @@ use PayPalRestful\Api\PayPalRestfulApi;
 
 class WebhookResponder
 {
-    protected bool $shouldRespond = false;
-
-    protected ?string $webhook_listener_subscribe_id = null;
-
-    protected WebhookObject $webhook;
-
+    /** @var bool */
+    protected $shouldRespond = false;
+    /** @var ?string */
+    protected $webhook_listener_subscribe_id = null;
+    /** @var WebhookObject */
+    protected $webhook;
     public function __construct(WebhookObject $webhook) {
         $this->webhook = $webhook;
         $this->setWebhookSubscribeId();

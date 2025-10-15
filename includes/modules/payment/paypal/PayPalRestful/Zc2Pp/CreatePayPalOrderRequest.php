@@ -25,44 +25,44 @@ class CreatePayPalOrderRequest extends ErrorInfo
     /**
      * Debug interface, shared with the PayPalRestfulApi class.
      */
-    protected Logger $log; //- An instance of the Logger class, logs debug tracing information.
+    /** @var Logger */
+    protected $log; //- An instance of the Logger class, logs debug tracing information.
 
     /**
      * Local "Amount" class; it's got the to-be-used currency for the PayPal order
      * stashed in a static variable!
      */
-    protected Amount $amount;
-
+    /** @var Amount */
+    protected $amount;
     /**
      * The currency-code in which the PayPal order is to be 'built'.
      */
-    protected string $paypalCurrencyCode;
-
+    /** @var string */
+    protected $paypalCurrencyCode;
     /**
      * The request to be submitted to a v2/orders/create PayPal endpoint.
      */
-    protected array $request;
-
+    /** @var array */
+    protected $request;
     /**
      * The items' pricing 'breakdown' elements, gathered by getItems
      * and subsequently used by getOrderTotals.
      */
-    protected array $itemBreakdown = [
+    /** @var array */
+    protected $itemBreakdown = [
         'item_onetime_charges' => 0.0,
         'item_total' => 0,
         'item_tax_total' => 0,
         'all_products_virtual' => true,
         'breakdown_mismatch' => [],  //- NOTE, only has values if a breakdown-mismatch was found!
     ];
-
     /**
      * The overall discount applied to the order (both shipping and items).
      * Set by getOrderAmountAndBreakdown and used by buildLevel2Level3Data for
      * the level-3 data.
      */
-    protected float $overallDiscount = 0.0;
-
-    // -----
+    /** @var float */
+    protected $overallDiscount = 0.0; // -----
     // Constructor.  "Converts" a Zen Cart order into an PayPal /orders/create object.
     //
     // Note: The $order_info and $ot_diffs arrays are created by the payment-module's auto.paypalrestful.php observer.
