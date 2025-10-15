@@ -12,12 +12,12 @@ class sniffer
     /**
      * Database adapter instance.
      */
-    private mixed $db = null;
+    private mixed $db;
 
     public function __construct(mixed $db = null)
     {
-        if ($db !== null) {
-            $this->db = $db;
+        $this->db = $db;
+        if ($this->db !== null) {
             return;
         }
 
