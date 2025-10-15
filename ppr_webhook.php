@@ -25,6 +25,12 @@
 /**
  * Set supporting application_top parameters, and boot up
  */
+$autoloaderPath = __DIR__ . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
+if (is_file($autoloaderPath)) {
+    require_once $autoloaderPath;
+    \PayPalRestful\Compatibility\LanguageAutoloader::register();
+}
+
 $loaderPrefix = 'webhook';
 require 'includes/application_top.php';
 $current_page_base = 'ppr_webhook';
