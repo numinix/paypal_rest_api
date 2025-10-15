@@ -13,8 +13,7 @@ namespace PayPalRestful\Compatibility;
 class Language
 {
     /** @var bool */
-    /** @var static */
-    protected $loaded = false;
+    protected static $loaded = false;
     public static function load(): void
     {
         if (self::$loaded === true) {
