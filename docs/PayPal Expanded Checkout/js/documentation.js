@@ -1,86 +1,162 @@
-jQuery(document).ready(function($) {
-  var $sections = $(".bodyHeaderContainer");
+/* global sh_highlightDocument */
+document.addEventListener("DOMContentLoaded", function() {
+  var sections = Array.prototype.slice.call(document.querySelectorAll(".bodyHeaderContainer"));
+  var links = Array.prototype.slice.call(document.querySelectorAll(".contentMenu a"));
   var sectionIds = [];
+  var contentMenu = document.querySelector(".contentMenu");
+  var tabList = contentMenu ? contentMenu.querySelector("ul") : null;
 
-  $("body").addClass("has-doc-tabs");
+  if (!sections.length || !links.length) {
+    return;
+  }
 
-  $(".contentMenu a").each(function() {
-    var $link = $(this);
-    var target = $link.data("target");
+  document.body.classList.add("has-doc-tabs");
+
+  if (tabList) {
+    tabList.setAttribute("role", "tablist");
+  }
+
+  sections.forEach(function(section) {
+    section.setAttribute("role", "tabpanel");
+    section.setAttribute("aria-hidden", "true");
+    section.style.display = "none";
+  });
+
+  links.forEach(function(link) {
+    var target = link.getAttribute("data-target");
 
     if (!target) {
-      var href = $link.attr("href");
+      var href = link.getAttribute("href");
       if (href && href.indexOf("#") === 0) {
         target = href.substring(1);
       }
     }
 
     if (target) {
-      sectionIds.push(target);
-      $link.data("target", target);
+      if (sectionIds.indexOf(target) === -1) {
+        sectionIds.push(target);
+      }
+      link.setAttribute("data-target", target);
+      link.setAttribute("role", "tab");
+      link.setAttribute("aria-controls", target);
+      link.setAttribute("aria-selected", "false");
+      link.setAttribute("tabindex", "-1");
     }
   });
 
-  function showSection(sectionId) {
-    if (!sectionId || !document.getElementById(sectionId)) {
+  function showSection(sectionId, options) {
+    var opts = Object.assign({ updateHash: true, scrollIntoView: false }, options || {});
+
+    if (sectionIds.indexOf(sectionId) === -1) {
       return;
     }
 
-    $sections.removeClass("is-active").hide();
-    $("#" + sectionId)
-      .addClass("is-active")
-      .show();
-    $(".contentMenu a").removeClass("active");
-    $(".contentMenu a[data-target='" + sectionId + "']").addClass("active");
+    var activeSection = null;
+
+    sections.forEach(function(section) {
+      var isActive = section.id === sectionId;
+      section.classList.toggle("is-active", isActive);
+      section.style.display = isActive ? "" : "none";
+      section.setAttribute("aria-hidden", isActive ? "false" : "true");
+      if (isActive) {
+        activeSection = section;
+      }
+    });
+
+    links.forEach(function(link) {
+      var matches = link.getAttribute("data-target") === sectionId;
+      link.classList.toggle("active", matches);
+      link.setAttribute("aria-selected", matches ? "true" : "false");
+      link.setAttribute("tabindex", matches ? "0" : "-1");
+    });
+
+    if (opts.updateHash) {
+      if (window.history && typeof window.history.replaceState === "function") {
+        window.history.replaceState(null, document.title, "#" + sectionId);
+      } else {
+        window.location.hash = sectionId;
+      }
+    }
+
+    if (activeSection && opts.scrollIntoView && typeof activeSection.scrollIntoView === "function") {
+      activeSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
-  $(".contentMenu a").on("click", function(event) {
-    var target = $(this).data("target");
+  links.forEach(function(link) {
+    link.addEventListener("click", function(event) {
+      var target = link.getAttribute("data-target");
 
-    if (target) {
-      event.preventDefault();
-      showSection(target);
-
-      if (window.history && window.history.replaceState) {
-        window.history.replaceState(null, document.title, "#" + target);
-      } else {
-        window.location.hash = target;
+      if (!target) {
+        return;
       }
 
-      $(".contentMenu").removeClass("active");
-    }
+      event.preventDefault();
+      showSection(target, { scrollIntoView: true });
+
+      if (contentMenu) {
+        contentMenu.classList.remove("active");
+      }
+    });
   });
 
-  $("#js-nav-icon").on("click", function(event) {
-    event.preventDefault();
-    $(".contentMenu").toggleClass("active");
-  });
+  var navIcon = document.getElementById("js-nav-icon");
+
+  if (navIcon) {
+    navIcon.addEventListener("click", function(event) {
+      event.preventDefault();
+      if (contentMenu) {
+        contentMenu.classList.toggle("active");
+      }
+    });
+  }
 
   var initialTarget = window.location.hash ? window.location.hash.substring(1) : "";
 
-  if (jQuery.inArray(initialTarget, sectionIds) === -1) {
+  if (sectionIds.indexOf(initialTarget) === -1) {
     initialTarget = sectionIds.length ? sectionIds[0] : null;
   }
 
   if (initialTarget) {
-    showSection(initialTarget);
+    showSection(initialTarget, { updateHash: false });
   }
 
-  $(window).on("hashchange", function() {
+  window.addEventListener("hashchange", function() {
     var target = window.location.hash ? window.location.hash.substring(1) : "";
 
-    if (jQuery.inArray(target, sectionIds) !== -1) {
-      showSection(target);
+    if (sectionIds.indexOf(target) !== -1) {
+      showSection(target, { updateHash: false, scrollIntoView: true });
     }
   });
 
-  // CODE BOXES
-  // highlight
-  sh_highlightDocument();
-  // select all functionality
-  jQuery(document).on('click', '.select', function() {
-    selectCode(jQuery(this).parent('div').next('pre').children('code')[0]);
-  });
+  if (typeof sh_highlightDocument === "function") {
+    sh_highlightDocument();
+  }
+});
+
+document.addEventListener("click", function(event) {
+  var trigger = event.target.closest(".select");
+
+  if (!trigger) {
+    return;
+  }
+
+  var container = trigger.parentElement;
+  var sibling = container ? container.nextElementSibling : null;
+
+  while (sibling && sibling.tagName !== "PRE") {
+    sibling = sibling.nextElementSibling;
+  }
+
+  if (!sibling) {
+    return;
+  }
+
+  var codeElement = sibling.querySelector("code");
+
+  if (codeElement) {
+    selectCode(codeElement);
+  }
 });
 
 function selectCode(a)
