@@ -1,13 +1,13 @@
 <?php
 /**
- * Part of the paypalr (PayPal Restful Api) payment module.
+ * Part of the paypalr (PayPal Expanded Checkout) payment module.
  * This observer class handles the JS SDK integration logic.
  * It also watches for notifications from the 'order_total' class,
  * introduced in this (https://github.com/zencart/zencart/pull/6090) Zen Cart PR,
  * to determine an order's overall value and what amounts each order-total
  * module has added/subtracted to the order's overall value.
  *
- * Last updated: v1.3.0
+ * Last updated: v1.3.1
  */
 
 use PayPalRestful\Api\Data\CountryCodes;

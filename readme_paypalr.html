@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PayPal Restful Payment Module for Zen Cart 1.5.7c and Later</title>
+<title>PayPal Expanded Checkout Payment Module for Zen Cart 1.5.7c and Later</title>
 <style>
 a, a:active,
 a:visited {
@@ -90,11 +90,13 @@ table table {
 </head>
 
 <body>
-    <h1>PayPal RESTful Payment Module (<var>paypalr</var>) for Zen Cart 1.5.7c and later</h1>
-    <h3>Version 1.3.0-alpha</h3>
-    <p>Current Support Thread at Zen Cart Forums: <a href="https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support" target="_blank">https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support</a></p>
+    <h1>PayPal Expanded Checkout Module (<var>paypalr</var>) for Zen Cart 1.5.7c and later</h1>
+    <h3>Version 1.3.1</h3>
+    <p>Current Support Thread (legacy PayPal RESTful) at Zen Cart Forums: <a href="https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support" target="_blank">https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support</a></p>
     <p>Zen Cart Download Link: <a href="https://www.zen-cart.com/downloads.php?do=file&id=2382" target="_blank">https://www.zen-cart.com/downloads.php?do=file&id=2382</a></p>
     <p>GitHub repository: <a href="https://github.com/lat9/paypalr" target="_blank">https://github.com/lat9/paypalr</a></p>
+
+    <p><strong>Note:</strong> This fork is branded as <strong>PayPal Expanded Checkout</strong> to differentiate it from Zen Cart's core PayPal REST API module and to avoid version conflicts.</p>
 
     <h2>Purpose</h2>
     <p>This Zen Cart payment module combines the processing for the <b>PayPal Payments Pro</b> (<var>paypaldp</var>) and <b>PayPal Express Checkout</b> (<var>paypalwpp</var>) payment modules that are currently built into the Zen Cart distribution.  Instead of using the older NVP (<b>N</b>ame <b>V</b>alue <b>P</b>air) methods to communicate with PayPal, this payment module uses PayPal's now-current <a href="https://developer.paypal.com/api/rest/" target="_blank">REST APIs</a> and combines the two legacy methods into one.</p>
@@ -257,7 +259,7 @@ $captureResponse = $api-&gt;captureOrder($createResponse['id']);
         </ol></li>
          <li>Copy the plugin's files to your site's file-system.</li>
         <li>Log into your Zen Cart admin and navigate to <b><i>Modules :: Payment</i></b>.</li>
-        <li>You'll see a <em>PayPal Checkout (RESTful)</em> entry in the list of available payment modules.  Select that module, install it and follow the <a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module" target="_blank">configuration instructions</a> in the payment module's Wiki.</li>
+        <li>You'll see a <em>PayPal Expanded Checkout</em> entry in the list of available payment modules.  Select that module, install it and follow the <a href="https://github.com/lat9/paypalr/wiki/Configuring-the-Payment-Module" target="_blank">configuration instructions</a> in the payment module's Wiki.</li>
     </ol>
     <h3>Upgrading</h3>
     <p>Simply copy the updated files to your site's file-system and navigate to your admin's <b><i>Modules :: Payment</i></b>.  The payment-module will automatically update.</p>

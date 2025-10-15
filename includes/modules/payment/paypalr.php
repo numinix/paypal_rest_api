@@ -1,12 +1,12 @@
 <?php
 /**
- * paypalr.php payment module class for PayPal RESTful API payment method
+ * paypalr.php payment module class for the PayPal Expanded Checkout payment method
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.0
+ * Last updated: v1.3.1
  */
 /**
  * Load the support class' auto-loader.
@@ -33,11 +33,11 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
 LanguageCompatibility::load();
 
 /**
- * The PayPal payment module using PayPal's RESTful API (v2)
+ * The PayPal payment module using PayPal's REST APIs (v2)
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.3.0-alpha';
+    protected const CURRENT_VERSION = '1.3.1';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -408,7 +408,7 @@ class paypalr extends base
         global $db;
 
         // -----
-        // Remove any PayPal RESTful storefront logs that were created for v1.0.3 (202408).
+        // Remove any PayPal Expanded Checkout storefront logs that were created for v1.0.3 (202408).
         //
         if (defined('MODULE_PAYMENT_PAYPALR_VERSION') && version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.0.2', '>') && version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.0.4-beta3', '<')) {
             $logfiles = glob(DIR_FS_LOGS . '/paypalr-c-*-202408*.log');
@@ -813,7 +813,7 @@ class paypalr extends base
 
         // -----
         // If cards *can* be selected, but the billing country isn't supported by PayPal,
-        // add a 'field' to the PayPal Checkout payment's display, noting the condition.
+        // add a 'field' to the PayPal Expanded Checkout payment's display, noting the condition.
         //
         if ($this->billingCountryIsSupported === false) {
             $selection['fields'] = [
@@ -1014,7 +1014,7 @@ class paypalr extends base
         }
 
         // -----
-        // If the PayPal Checkout payment-type isn't included in the posted data,
+        // If the PayPal Expanded Checkout payment-type isn't included in the posted data,
         // send the customer back to the payment phase of checkout to ensure that
         // the selection is made.
         //

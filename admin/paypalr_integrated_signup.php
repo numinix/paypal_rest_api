@@ -1,6 +1,6 @@
 <?php
 /**
- * PayPal RESTful (paypalr) partner integrated sign-up bridge.
+ * PayPal Expanded Checkout (paypalr) partner integrated sign-up bridge.
  *
  * Routes the "Complete PayPal setup" button to the Numinix onboarding
  * experience hosted on numinix.com. The helper collects basic storefront
