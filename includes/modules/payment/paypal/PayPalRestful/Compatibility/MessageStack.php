@@ -10,7 +10,7 @@ if (class_exists('messageStack')) {
 class messageStack
 {
     /** @var array<string, array<int, array{text: string, type: string}>> */
-    protected array $messages = [];
+    protected $messages = [];
 
     public function add_session($stack, $message = null, $type = 'error'): void
     {

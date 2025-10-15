@@ -14,7 +14,8 @@ use Exception;
 
 class zcDate
 {
-    private DateTimeZone $timezone;
+    /** @var DateTimeZone */
+    private $timezone;
 
     public function __construct(?DateTimeZone $timezone = null)
     {
@@ -26,7 +27,10 @@ class zcDate
         $this->timezone = $timezone;
     }
 
-    public function output(string $format, mixed $timestamp = null): string
+    /**
+     * @param mixed $timestamp
+     */
+    public function output(string $format, $timestamp = null): string
     {
         $dateTime = $this->normalizeToDateTime($timestamp);
 
@@ -35,7 +39,10 @@ class zcDate
         return $dateTime->setTimezone($this->timezone)->format($convertedFormat);
     }
 
-    private function normalizeToDateTime(mixed $timestamp): DateTimeImmutable
+    /**
+     * @param mixed $timestamp
+     */
+    private function normalizeToDateTime($timestamp): DateTimeImmutable
     {
         if ($timestamp instanceof DateTimeInterface) {
             return DateTimeImmutable::createFromInterface($timestamp);

@@ -11,10 +11,15 @@ class sniffer
 {
     /**
      * Database adapter instance.
+     *
+     * @var mixed
      */
-    private mixed $db;
+    private $db;
 
-    public function __construct(mixed $db = null)
+    /**
+     * @param mixed $db
+     */
+    public function __construct($db = null)
     {
         $this->db = $db;
         if ($this->db !== null) {
@@ -71,7 +76,10 @@ class sniffer
         return $this->extractFirstRow($result);
     }
 
-    private function resolveDb(): mixed
+    /**
+     * @return mixed
+     */
+    private function resolveDb()
     {
         if (isset($this->db) && is_object($this->db)) {
             return $this->db;
@@ -85,7 +93,10 @@ class sniffer
         return null;
     }
 
-    private function extractFirstRow(mixed $result): ?array
+    /**
+     * @param mixed $result
+     */
+    private function extractFirstRow($result): ?array
     {
         if (is_array($result)) {
             if (empty($result)) {

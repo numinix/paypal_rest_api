@@ -14,7 +14,7 @@ if (class_exists('PayPalRestCache', false)) {
 class PayPalRestCache
 {
     /** @var array<string, mixed> */
-    protected array $storage = [];
+    protected $storage = [];
 
     public function __construct()
     {

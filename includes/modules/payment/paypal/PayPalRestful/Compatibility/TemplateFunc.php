@@ -52,7 +52,9 @@ class template_func
 
         $directories[] = $base_dir . '/template_default/' . $template_type;
 
-        return array_values(array_unique(array_map(static fn ($dir) => rtrim($dir, '/'), $directories)));
+        return array_values(array_unique(array_map(static function ($dir) {
+            return rtrim($dir, '/');
+        }, $directories)));
     }
 
     protected function determineTemplateDirectory(): ?string

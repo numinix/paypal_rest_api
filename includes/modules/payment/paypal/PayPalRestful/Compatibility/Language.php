@@ -13,7 +13,7 @@ namespace PayPalRestful\Compatibility;
 class Language
 {
     /** @var bool */
-    protected static bool $loaded = false;
+    protected static $loaded = false;
 
     public static function load(): void
     {
@@ -48,7 +48,9 @@ class Language
             $directories[] = DIR_FS_ADMIN . DIR_WS_LANGUAGES . $language . '/';
         }
 
-        $directories = array_filter($directories, static fn ($directory) => is_dir($directory));
+        $directories = array_filter($directories, static function ($directory) {
+            return is_dir($directory);
+        });
 
         return array_values(array_unique($directories));
     }
@@ -79,7 +81,9 @@ class Language
         }
         $paths[] = $directory . 'lang.paypalr.php';
 
-        return array_filter($paths, static fn ($file) => is_file($file));
+        return array_filter($paths, static function ($file) {
+            return is_file($file);
+        });
     }
 
     protected static function getExtraDefinitionPaths(string $directory): array
@@ -93,7 +97,9 @@ class Language
             $paths[] = $directory . $filename;
         }
 
-        return array_filter($paths, static fn ($file) => is_file($file));
+        return array_filter($paths, static function ($file) {
+            return is_file($file);
+        });
     }
 
     protected static function includeAndDefine(string $file): void
