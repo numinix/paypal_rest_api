@@ -29,6 +29,7 @@ if (!class_exists('shoppingCart')) {
 if (!class_exists('cache')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Cache.php';
 }
+$paypalRestCacheClass = class_exists('cache') ? 'cache' : 'PayPalRestCache';
 if (!class_exists('currencies')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Currencies.php';
 }
@@ -73,7 +74,7 @@ $autoLoadConfig[5][] = [
  */
 $autoLoadConfig[30][] = [
     'autoType' => 'classInstantiate',
-    'className' => 'cache',
+    'className' => $paypalRestCacheClass,
     'objectName' => 'zc_cache',
 ];
 /**
