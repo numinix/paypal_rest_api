@@ -2186,7 +2186,7 @@ class paypalr extends base
      */
     public function after_order_create($orders_id)
     {
-        $this->recordPayPalOrderDetails((int)$orders_id);
+        
     }
 
     /**
