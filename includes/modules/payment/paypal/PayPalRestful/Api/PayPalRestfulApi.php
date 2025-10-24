@@ -533,6 +533,40 @@ class PayPalRestfulApi extends ErrorInfo
     }
 
     /**
+     * Update a vaulted payment token using JSON Patch operations.
+     */
+    public function updateVaultPaymentToken(string $vault_id, array $patchOperations)
+    {
+        $vault_id = trim($vault_id);
+        if ($vault_id === '') {
+            return false;
+        }
+
+        $this->log->write("==> Start updateVaultPaymentToken($vault_id)\n" . Logger::logJSON($patchOperations), true);
+        $response = $this->curlPatch('v3/vault/payment-tokens/' . rawurlencode($vault_id), $patchOperations);
+        $this->log->write('==> End updateVaultPaymentToken', true);
+
+        return $response;
+    }
+
+    /**
+     * Retrieve the details for a vaulted payment token.
+     */
+    public function getVaultPaymentToken(string $vault_id)
+    {
+        $vault_id = trim($vault_id);
+        if ($vault_id === '') {
+            return false;
+        }
+
+        $this->log->write("==> Start getVaultPaymentToken($vault_id)", true);
+        $response = $this->curlGet('v3/vault/payment-tokens/' . rawurlencode($vault_id));
+        $this->log->write('==> End getVaultPaymentToken', true);
+
+        return $response;
+    }
+
+    /**
      * Send package tracking details to PayPal for a given PayPal Transaction ID
      *
      * @param string $paypal_txnid
