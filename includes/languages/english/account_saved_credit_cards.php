@@ -1,38 +1,58 @@
 <?php
 /**
- * Language definitions for the saved credit cards page.
+ * Backwards compatibility language loader for the saved credit cards account page.
+ *
+ * Zen Cart v1.5.8+ automatically loads the lang.account_saved_credit_cards.php file. This
+ * shim loads that file and defines the associated constants for earlier Zen Cart versions
+ * without emitting duplicate-definition warnings on newer installations.
  */
 
-define('NAVBAR_TITLE_1', 'My Account');
-define('NAVBAR_TITLE_2', 'Saved credit & debit cards');
+if (defined('NAVBAR_TITLE_1')) {
+    return;
+}
 
-define('HEADING_TITLE', 'Saved credit & debit cards');
-define('HEADING_TITLE_DELETE_CARD', 'Remove saved card');
+if (!function_exists('accountSavedCardsLanguageGetTemplateOverrideDirectory')) {
+    function accountSavedCardsLanguageGetTemplateOverrideDirectory()
+    {
+        $templateDirectory = null;
+        if (defined('DIR_WS_TEMPLATE')) {
+            $templateDirectory = basename(rtrim((string)DIR_WS_TEMPLATE, '/'));
+        } elseif (defined('TEMPLATE_DIR')) {
+            $templateDirectory = basename((string)TEMPLATE_DIR);
+        } elseif (!empty($_SESSION['tplDir'])) {
+            $templateDirectory = basename((string)$_SESSION['tplDir']);
+        }
 
-define('TEXT_SAVED_CARDS_DISABLED', 'Saved cards are currently unavailable. Please contact us if you need assistance with your payment details.');
-define('TEXT_SAVED_CARDS_INTRO', 'Manage the cards you have saved with PayPal Vault. You can remove cards that you no longer use and review their billing details.');
-define('TEXT_NO_SAVED_CARDS', 'You have not saved any cards yet. A card will appear here the next time you choose to save it during checkout.');
+        if ($templateDirectory === null || $templateDirectory === '' || $templateDirectory === '.' || $templateDirectory === '..') {
+            return null;
+        }
 
-define('TEXT_SAVED_CARD_STATUS_ACTIVE', 'Active');
-define('TEXT_SAVED_CARD_STATUS_INACTIVE', 'Inactive');
-define('TEXT_SAVED_CARD_STATUS_CANCELED', 'Canceled');
-define('TEXT_SAVED_CARD_STATUS_SUSPENDED', 'Suspended');
-define('TEXT_SAVED_CARD_STATUS_PENDING', 'Pending');
-define('TEXT_SAVED_CARD_STATUS_EXPIRED', 'Expired');
+        return $templateDirectory;
+    }
+}
 
-define('TEXT_CARD_ENDING_IN', 'Ending in %s');
-define('TEXT_CARD_EXPIRY', 'Expires %s');
-define('TEXT_CARDHOLDER_NAME', 'Cardholder: %s');
-define('TEXT_CARD_LAST_USED', 'Last used: %s');
-define('TEXT_CARD_UPDATED', 'Updated: %s');
-define('TEXT_CARD_ADDED', 'Added: %s');
-define('TEXT_CARD_BILLING_ADDRESS', 'Billing address');
+$languageDirectory = __DIR__ . '/';
 
-define('TEXT_SAVED_CARD_DETAILS_BUTTON', 'View billing details');
-define('TEXT_SAVED_CARD_HIDE_DETAILS', 'Hide billing details');
-define('TEXT_SAVED_CARD_DELETE_BUTTON', 'Remove card');
+$languageFiles = [];
+$templateDirectory = accountSavedCardsLanguageGetTemplateOverrideDirectory();
+if ($templateDirectory !== null) {
+    $languageFiles[] = $languageDirectory . $templateDirectory . '/lang.account_saved_credit_cards.php';
+}
+$languageFiles[] = $languageDirectory . 'lang.account_saved_credit_cards.php';
 
-define('TEXT_DELETE_CARD_CONFIRMATION', 'Are you sure you want to remove the %1$s card ending in %2$s? You will need to re-enter the details the next time you check out.');
-define('TEXT_DELETE_CARD_SUCCESS', 'The saved card has been removed.');
-define('TEXT_DELETE_CARD_ERROR', 'We were unable to remove the selected card. Please try again or contact us for help.');
-define('TEXT_SAVED_CARD_MISSING', 'The requested saved card could not be found.');
+foreach ($languageFiles as $languageFile) {
+    if (!is_file($languageFile)) {
+        continue;
+    }
+
+    $definitions = include $languageFile;
+    if (is_array($definitions)) {
+        foreach ($definitions as $constant => $value) {
+            if (!defined($constant)) {
+                define($constant, $value);
+            }
+        }
+    }
+
+    break;
+}
