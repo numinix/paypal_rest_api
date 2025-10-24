@@ -497,13 +497,32 @@ class CreatePayPalOrderRequest extends ErrorInfo
     protected function buildCardPaymentSource(\order $order, array $cc_info): array
     {
         $listener_endpoint = $this->resolveListenerEndpoint($cc_info['redirect'] ?? '');
+        if (!empty($cc_info['vault_id'])) {
+            $payment_source = [
+                'vault_id' => $cc_info['vault_id'],
+            ];
+            if (!empty($cc_info['expiry'])) {
+                $payment_source['expiry'] = $cc_info['expiry'];
+            }
+            if (!empty($cc_info['last_digits'])) {
+                $payment_source['last_digits'] = $cc_info['last_digits'];
+            }
+            if (!empty($cc_info['billing_address'])) {
+                $payment_source['billing_address'] = $cc_info['billing_address'];
+            }
+            if (!empty($cc_info['stored_credential'])) {
+                $payment_source['attributes']['stored_credential'] = $cc_info['stored_credential'];
+            }
+            return $payment_source;
+        }
+
         $payment_source = [
             'name' => $cc_info['name'],
             'number' => $cc_info['number'],
             'security_code' => $cc_info['security_code'],
             'expiry' => $cc_info['expiry_year'] . '-' . $cc_info['expiry_month'],
             'billing_address' => Address::get($order->billing),
-            'store_in_vault' => 'ON_SUCCESS',
+            'store_in_vault' => (!empty($cc_info['store_card']) ? 'ON_SUCCESS' : 'OFF'),
             'experience_context' => [
                 'return_url' => $this->buildScaUrl($listener_endpoint, '3ds_return'),
                 'cancel_url' => $this->buildScaUrl($listener_endpoint, '3ds_cancel'),

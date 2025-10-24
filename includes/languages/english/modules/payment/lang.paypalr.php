@@ -57,6 +57,13 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_CC_NUMBER' => 'Credit Card Number:',
     'MODULE_PAYMENT_PAYPALR_CC_EXPIRES' => 'Credit Card Expiry Date:',
     'MODULE_PAYMENT_PAYPALR_CC_CVV' => 'CVV Number:',
+    'MODULE_PAYMENT_PAYPALR_SAVED_CARDS' => 'Saved cards:',
+    'MODULE_PAYMENT_PAYPALR_SAVED_CARD_LABEL' => '%1$s ending in %2$s (expires %3$s)',
+    'MODULE_PAYMENT_PAYPALR_SAVED_CARD_NEW' => 'Use a different card',
+    'MODULE_PAYMENT_PAYPALR_SAVED_CARD_EXPIRY_UNKNOWN' => 'unknown',
+    'MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC' => 'Card',
+    'MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT' => 'Save this card for future checkouts?',
+    'MODULE_PAYMENT_PAYPALR_TEXT_SAVED_CARD_INVALID' => 'The saved card you selected is no longer available. Please choose another payment option.',
 
     'MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH' => 'The <em>CVV Number</em> for your %1$s card ending in <var>%2$s</var> must be %3$u digits in length.',  //- %1$s is the card type, , %2$s is the last-r, %3$u is the CVV length
     'MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD' => 'We apologize for the inconvenience, but the credit card type you entered is not one that we accept. Please use a different credit card.',

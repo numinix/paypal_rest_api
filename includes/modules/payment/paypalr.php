@@ -174,6 +174,11 @@ class paypalr extends base
     protected array $orderCustomerCache = [];
 
     /**
+     * Cached active vault cards for the current customer.
+     */
+    protected ?array $customerVaultCards = null;
+
+    /**
      * Indicates whether/not we're on the One-Page-Checkout confirmation page.  Possibly
      * set true by the update_status method.  Also captured on this page is the original,
      * pre-confirmation check, value of the $_SESSION['PayPalRestful'] element.
@@ -718,7 +723,13 @@ class paypalr extends base
 
     protected function resetOrder()
     {
-        unset($_SESSION['PayPalRestful']['Order'], $_SESSION['PayPalRestful']['ppr_type']);
+        unset(
+            $_SESSION['PayPalRestful']['Order'],
+            $_SESSION['PayPalRestful']['ppr_type'],
+            $_SESSION['PayPalRestful']['saved_card'],
+            $_SESSION['PayPalRestful']['save_card']
+        );
+        $this->customerVaultCards = null;
     }
 
     // --------------------------------------------
@@ -738,23 +749,134 @@ class paypalr extends base
         return
             'if (payment_value == "' . $this->code . '") {' . "\n" .
                 'if (document.checkout_payment.ppr_type.value === "card") {' . "\n" .
-                    'var cc_owner = document.checkout_payment.paypalr_cc_owner.value;' . "\n" .
-                    'var cc_number = document.checkout_payment.paypalr_cc_number.value;' . "\n" .
-                    'var cc_cvv = document.checkout_payment.paypalr_cc_cvv.value;' . "\n" .
-                    'if (cc_owner == "" || eval(cc_owner.length) < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
-                        'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
-                        'error = 1;' . "\n" .
+                    'var savedCard = document.checkout_payment.paypalr_saved_card;' . "\n" .
+                    'var useSavedCard = false;' . "\n" .
+                    'if (typeof savedCard !== "undefined") {' . "\n" .
+                        'if (savedCard.length) {' . "\n" .
+                            'for (var i = 0; i < savedCard.length; i++) {' . "\n" .
+                                'if (savedCard[i].checked && savedCard[i].value !== "new") {' . "\n" .
+                                    'useSavedCard = true;' . "\n" .
+                                    'break;' . "\n" .
+                                '}' . "\n" .
+                            '}' . "\n" .
+                        '} else if (savedCard.checked && savedCard.value !== "new") {' . "\n" .
+                            'useSavedCard = true;' . "\n" .
+                        '}' . "\n" .
                     '}' . "\n" .
-                    'if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
-                        'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
-                        'error = 1;' . "\n" .
-                    '}' . "\n" .
-                    'if (cc_cvv == "" || cc_cvv.length < 3 || cc_cvv.length > 4) {' . "\n".
-                        'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_CVV . '";' . "\n" .
-                        'error = 1;' . "\n" .
+                    'if (!useSavedCard) {' . "\n" .
+                        'var cc_owner = document.checkout_payment.paypalr_cc_owner.value;' . "\n" .
+                        'var cc_number = document.checkout_payment.paypalr_cc_number.value;' . "\n" .
+                        'var cc_cvv = document.checkout_payment.paypalr_cc_cvv.value;' . "\n" .
+                        'if (cc_owner == "" || eval(cc_owner.length) < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
+                            'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
+                            'error = 1;' . "\n" .
+                        '}' . "\n" .
+                        'if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
+                            'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
+                            'error = 1;' . "\n" .
+                        '}' . "\n" .
+                        'if (cc_cvv == "" || cc_cvv.length < 3 || cc_cvv.length > 4) {' . "\n" .
+                            'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_CVV . '";' . "\n" .
+                            'error = 1;' . "\n" .
+                        '}' . "\n" .
                     '}' . "\n" .
                 '}' . "\n" .
             '}' . "\n";
+    }
+
+    protected function getActiveVaultedCardsForCustomer(): array
+    {
+        if ($this->customerVaultCards !== null) {
+            return $this->customerVaultCards;
+        }
+
+        $customers_id = $_SESSION['customer_id'] ?? 0;
+        if ($customers_id <= 0) {
+            $this->customerVaultCards = [];
+            return $this->customerVaultCards;
+        }
+
+        $this->customerVaultCards = VaultManager::getCustomerVaultedCards($customers_id, true);
+        return $this->customerVaultCards;
+    }
+
+    protected function findVaultedCard(string $vaultId): ?array
+    {
+        if ($vaultId === '') {
+            return null;
+        }
+
+        foreach ($this->getActiveVaultedCardsForCustomer() as $card) {
+            if ($card['vault_id'] === $vaultId) {
+                return $card;
+            }
+        }
+
+        return null;
+    }
+
+    protected function formatVaultExpiry(?string $expiry): string
+    {
+        if ($expiry === null || $expiry === '') {
+            return '';
+        }
+
+        if (preg_match('/^(\d{4})-(\d{2})/', $expiry, $matches)) {
+            return $matches[2] . '/' . $matches[1];
+        }
+
+        return $expiry;
+    }
+
+    protected function buildSavedCardOptions(array $vaultedCards, string $selectedVaultId, bool $isBootstrapTemplate): string
+    {
+        $options = '';
+        $containerClass = 'ppr-saved-card-option';
+        $inputClass = 'ppr-saved-card-choice';
+        $labelClass = '';
+        if ($isBootstrapTemplate === true) {
+            $containerClass = 'custom-control custom-radio ppr-saved-card-option';
+            $inputClass = 'custom-control-input ppr-saved-card-choice';
+            $labelClass = 'custom-control-label checkboxLabel';
+        }
+
+        foreach ($vaultedCards as $index => $card) {
+            $cardId = $this->code . '-saved-card-' . $index;
+            $isSelected = ($card['vault_id'] === $selectedVaultId);
+            $brand = $card['brand'] ?: $card['card_type'] ?: MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC;
+            $lastDigits = $card['last_digits'] ?: '????';
+            $expiryText = $this->formatVaultExpiry($card['expiry']);
+            if ($expiryText === '') {
+                $expiryText = MODULE_PAYMENT_PAYPALR_SAVED_CARD_EXPIRY_UNKNOWN;
+            }
+            $labelText = sprintf(
+                MODULE_PAYMENT_PAYPALR_SAVED_CARD_LABEL,
+                zen_output_string_protected($brand),
+                zen_output_string_protected($lastDigits),
+                zen_output_string_protected($expiryText)
+            );
+            $options .= '<div class="' . $containerClass . '">';
+            $options .= zen_draw_radio_field('paypalr_saved_card', $card['vault_id'], $isSelected, 'id="' . $cardId . '" class="' . $inputClass . '"');
+            $labelAttributes = 'for="' . $cardId . '"';
+            if ($labelClass !== '') {
+                $labelAttributes = 'class="' . $labelClass . '" ' . $labelAttributes;
+            }
+            $options .= '<label ' . $labelAttributes . '>' . $labelText . '</label>';
+            $options .= '</div>';
+        }
+
+        $newId = $this->code . '-saved-card-new';
+        $isNewSelected = ($selectedVaultId === 'new' || $selectedVaultId === '');
+        $options .= '<div class="' . $containerClass . '">';
+        $options .= zen_draw_radio_field('paypalr_saved_card', 'new', $isNewSelected, 'id="' . $newId . '" class="' . $inputClass . '"');
+        $labelAttributes = 'for="' . $newId . '"';
+        if ($labelClass !== '') {
+            $labelAttributes = 'class="' . $labelClass . '" ' . $labelAttributes;
+        }
+        $options .= '<label ' . $labelAttributes . '>' . zen_output_string_protected(MODULE_PAYMENT_PAYPALR_SAVED_CARD_NEW) . '</label>';
+        $options .= '</div>';
+
+        return '<div class="ppr-saved-card-options">' . $options . '</div>';
     }
 
     /**
@@ -880,93 +1002,148 @@ class paypalr extends base
         $ppr_cc_expires_month_id = $this->code . '-cc-expires-month';
         $ppr_cc_cvv_id = $this->code . '-cc-cvv';
 
+        $vaultedCards = $this->getActiveVaultedCardsForCustomer();
+        $savedCardSelection = $_POST['paypalr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? '');
+        if ($savedCardSelection === '' && !empty($vaultedCards)) {
+            $savedCardSelection = $vaultedCards[0]['vault_id'];
+        }
+        if ($savedCardSelection !== '' && $savedCardSelection !== 'new') {
+            $validSavedCard = false;
+            foreach ($vaultedCards as $card) {
+                if ($card['vault_id'] === $savedCardSelection) {
+                    $validSavedCard = true;
+                    break;
+                }
+            }
+            if ($validSavedCard === false) {
+                $savedCardSelection = 'new';
+            }
+        }
+        if ($savedCardSelection === '' || $savedCardSelection === null) {
+            $savedCardSelection = 'new';
+        }
+        $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
+        $saveCardChecked = $allowSaveCard === true && (!empty($_POST['paypalr_cc_save_card']) || (!empty($_SESSION['PayPalRestful']['save_card'])));
+        if ($savedCardSelection !== 'new') {
+            $saveCardChecked = false;
+        }
+
         $billing_name = zen_output_string_protected($order->billing['firstname'] . ' ' . $order->billing['lastname']);
-        $selection = [
-            'id' => $this->code,
-            'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE . ' <span id="ppr-subtitle" class="small">' . MODULE_PAYMENT_PAYPALR_SUBTITLE . '</span>',
-            'fields' => [
-                [
-                    'title' =>
-                        '<style nonce="">' . file_get_contents($css_file_name) . '</style>' .
-                        '<span class="ppr-choice-label">' . MODULE_PAYMENT_PAYPALR_CHOOSE_PAYPAL . '</span>',
-                    'field' =>
-                        '<div id="paypal-message-container"></div>' .
-                        '<div id="ppr-choice-paypal" class="ppr-button-choice">' .
-                            zen_draw_radio_field('ppr_type', 'paypal', $paypal_selected, 'id="ppr-paypal" class="ppr-choice"') .
-                            '<label for="ppr-paypal" class="ppr-choice-label">' .
-                                '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
-                            '</label>' .
-                        '</div>',
-                    'tag' => 'ppr-paypal',
-                ],
-                [
-                    'title' => '<span class="ppr-choice-label">' . MODULE_PAYMENT_PALPALR_CHOOSE_CARD . '</span>' ,
-                    'field' =>
-                        '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>' .
-                        '<div id="ppr-choice-card" class="ppr-button-choice">' .
-                            zen_draw_radio_field('ppr_type', 'card', $card_selected, 'id="ppr-card" class="ppr-choice"') .
-                            '<label for="ppr-card" class="ppr-choice-label">' .
-                                $this->buildCardsAccepted() .
-                            '</label>' .
-                        '</div>',
-                    'tag' => 'ppr-card',
-                ],
-                [
-                    'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER,
-                    'field' =>
-                        zen_draw_input_field('paypalr_cc_owner', $billing_name, 'class="ppr-cc" id="' . $ppr_cc_owner_id . '" autocomplete="off"'),
-                    'tag' => $ppr_cc_owner_id,
-                ],
-                [
-                    'title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER,
-                    'field' => zen_draw_input_field('paypalr_cc_number', '', 'class="ppr-cc" id="' . $ppr_cc_number_id . '" autocomplete="off"'),
-                    'tag' => $ppr_cc_number_id,
-                ],
-                [
-                    'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
-                    'field' =>
-                        zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-cc" id="' . $ppr_cc_expires_month_id . '"') .
-                        '&nbsp;' .
-                        zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-cc" id="' . $ppr_cc_expires_year_id . '"'),
-                    'tag' => $ppr_cc_expires_month_id,
-                ],
-                [
-                    'title' => MODULE_PAYMENT_PAYPALR_CC_CVV,
-                    'field' => zen_draw_input_field('paypalr_cc_cvv', '', 'class="ppr-cc" id="' . $ppr_cc_cvv_id . '" autocomplete="off"'),
-                    'tag' => $ppr_cc_cvv_id,
-                ],
-                [
-                    'title' => '&nbsp;',
-                    'field' =>
-                        '<small class="ppr-cc">' .
-                            sprintf(MODULE_PAYMENT_PAYPALR_CARD_PROCESSING, '<a href="' . MODULE_PAYMENT_PAYPALR_PAYPAL_PRIVACY_LINK . '" target="_blank">' . MODULE_PAYMENT_PAYPALR_PAYPAL_PRIVACY_STMT . '</a>') .
-                        '</small>',
-                ],
+        $fields = [
+            [
+                'title' =>
+                    '<style nonce="">' . file_get_contents($css_file_name) . '</style>' .
+                    '<span class="ppr-choice-label">' . MODULE_PAYMENT_PAYPALR_CHOOSE_PAYPAL . '</span>',
+                'field' =>
+                    '<div id="paypal-message-container"></div>' .
+                    '<div id="ppr-choice-paypal" class="ppr-button-choice">' .
+                        zen_draw_radio_field('ppr_type', 'paypal', $paypal_selected, 'id="ppr-paypal" class="ppr-choice"') .
+                        '<label for="ppr-paypal" class="ppr-choice-label">' .
+                            '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
+                        '</label>' .
+                    '</div>',
+                'tag' => 'ppr-paypal',
+            ],
+            [
+                'title' => '<span class="ppr-choice-label">' . MODULE_PAYMENT_PALPALR_CHOOSE_CARD . '</span>',
+                'field' =>
+                    '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>' .
+                    '<div id="ppr-choice-card" class="ppr-button-choice">' .
+                        zen_draw_radio_field('ppr_type', 'card', $card_selected, 'id="ppr-card" class="ppr-choice"') .
+                        '<label for="ppr-card" class="ppr-choice-label">' .
+                            $this->buildCardsAccepted() .
+                        '</label>' .
+                    '</div>',
+                'tag' => 'ppr-card',
             ],
         ];
 
-        // -----
-        // If running in the sandbox environment, add a checkbox input to enable SCA
-        // testing.
-        //
+        if (!empty($vaultedCards)) {
+            $fields[] = [
+                'title' => MODULE_PAYMENT_PAYPALR_SAVED_CARDS,
+                'field' =>
+                    '<div class="ppr-cc ppr-card-section ppr-card-saved">' .
+                        $this->buildSavedCardOptions($vaultedCards, $savedCardSelection, $is_bootstrap_template) .
+                    '</div>',
+                'tag' => 'ppr-saved-card',
+            ];
+        }
+
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER,
+            'field' =>
+                zen_draw_input_field('paypalr_cc_owner', $billing_name, 'class="ppr-cc ppr-card-section ppr-card-new" id="' . $ppr_cc_owner_id . '" autocomplete="off"'),
+            'tag' => $ppr_cc_owner_id,
+        ];
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER,
+            'field' => zen_draw_input_field('paypalr_cc_number', '', 'class="ppr-cc ppr-card-section ppr-card-new" id="' . $ppr_cc_number_id . '" autocomplete="off"'),
+            'tag' => $ppr_cc_number_id,
+        ];
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
+            'field' =>
+                zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-cc ppr-card-section ppr-card-new" id="' . $ppr_cc_expires_month_id . '"') .
+                '&nbsp;' .
+                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-cc ppr-card-section ppr-card-new" id="' . $ppr_cc_expires_year_id . '"'),
+            'tag' => $ppr_cc_expires_month_id,
+        ];
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALR_CC_CVV,
+            'field' => zen_draw_input_field('paypalr_cc_cvv', '', 'class="ppr-cc ppr-card-section ppr-card-new" id="' . $ppr_cc_cvv_id . '" autocomplete="off"'),
+            'tag' => $ppr_cc_cvv_id,
+        ];
+        $fields[] = [
+            'title' => '&nbsp;',
+            'field' =>
+                '<small class="ppr-cc ppr-card-section ppr-card-new">' .
+                    sprintf(MODULE_PAYMENT_PAYPALR_CARD_PROCESSING, '<a href="' . MODULE_PAYMENT_PAYPALR_PAYPAL_PRIVACY_LINK . '" target="_blank">' . MODULE_PAYMENT_PAYPALR_PAYPAL_PRIVACY_STMT . '</a>') .
+                '</small>',
+        ];
+
+        if ($allowSaveCard === true) {
+            if ($is_bootstrap_template === false) {
+                $fields[] = [
+                    'title' => MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT,
+                    'field' => zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'class="ppr-cc ppr-card-section ppr-card-new" id="ppr-cc-save-card"'),
+                    'tag' => 'ppr-cc-save-card',
+                ];
+            } else {
+                $fields[] = [
+                    'title' => '&nbsp;',
+                    'field' =>
+                        '<div class="custom-control custom-checkbox ppr-cc ppr-card-section ppr-card-new">' .
+                            zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'id="ppr-cc-save-card" class="custom-control-input"') .
+                            '<label class="custom-control-label checkboxLabel" for="ppr-cc-save-card">' . MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT . '</label>' .
+                        '</div>',
+                ];
+            }
+        }
+
         if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
             if ($is_bootstrap_template === false) {
-                $selection['fields'][] = [
+                $fields[] = [
                     'title' => 'Enable SCA Always?',
-                    'field' => zen_draw_checkbox_field('paypalr_cc_sca_always', 'on', false, 'class="ppr-cc" id="ppr-cc-sca-always"'),
+                    'field' => zen_draw_checkbox_field('paypalr_cc_sca_always', 'on', false, 'class="ppr-cc ppr-card-section ppr-card-new" id="ppr-cc-sca-always"'),
                     'tag' => 'ppr-cc-sca-always',
                 ];
             } else {
-                $selection['fields'][] = [
+                $fields[] = [
                     'title' => '&nbsp;',
                     'field' =>
-                        '<div class="custom-control custom-checkbox ppr-cc">' .
-                            zen_draw_checkbox_field('paypalr_cc_sca_always', 'on', false, 'id="ppr-cc-sca-always"') .
+                        '<div class="custom-control custom-checkbox ppr-cc ppr-card-section ppr-card-new">' .
+                            zen_draw_checkbox_field('paypalr_cc_sca_always', 'on', false, 'id="ppr-cc-sca-always" class="custom-control-input"') .
                             '<label class="custom-control-label checkboxLabel" for="ppr-cc-sca-always">Enable SCA Always</label>' .
                         '</div>',
                 ];
             }
         }
+
+        $selection = [
+            'id' => $this->code,
+            'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE . ' <span id="ppr-subtitle" class="small">' . MODULE_PAYMENT_PAYPALR_SUBTITLE . '</span>',
+            'fields' => $fields,
+        ];
 
         return $selection;
     }
@@ -1187,6 +1364,66 @@ class paypalr extends base
         global $messageStack, $order;
 
         $postvar_prefix = ($is_preconfirmation === true) ? 'paypalr' : 'ppr';
+        $savedCardSelection = $_POST[$postvar_prefix . '_saved_card'] ?? 'new';
+        if ($savedCardSelection !== 'new') {
+            $savedCard = $this->findVaultedCard($savedCardSelection);
+            if ($savedCard === null) {
+                $messageStack->add_session('checkout_payment', MODULE_PAYMENT_PAYPALR_TEXT_SAVED_CARD_INVALID, 'error');
+                $_SESSION['PayPalRestful']['saved_card'] = 'new';
+                unset($_SESSION['PayPalRestful']['save_card']);
+                return false;
+            }
+
+            $_SESSION['PayPalRestful']['saved_card'] = $savedCardSelection;
+            unset($_SESSION['PayPalRestful']['save_card']);
+
+            $lastDigits = $savedCard['last_digits'] ?: '0000';
+            $expiry = (string)($savedCard['expiry'] ?? '');
+            $expiryMonth = '';
+            $expiryYear = '';
+            if ($expiry !== '' && preg_match('/^(\d{4})-(\d{2})/', $expiry, $matches) === 1) {
+                $expiryYear = $matches[1];
+                $expiryMonth = $matches[2];
+            }
+
+            $cardholderName = trim((string)($savedCard['cardholder_name'] ?? ''));
+            if ($cardholderName === '') {
+                $cardholderName = trim($order->billing['firstname'] . ' ' . $order->billing['lastname']);
+            }
+
+            $storedCredential = [];
+            if (isset($savedCard['card_data']['attributes']['stored_credential']) && is_array($savedCard['card_data']['attributes']['stored_credential'])) {
+                $storedCredential = $savedCard['card_data']['attributes']['stored_credential'];
+            }
+            if (empty($storedCredential)) {
+                $storedCredential = [
+                    'payment_initiator' => 'CUSTOMER',
+                    'payment_type' => 'UNSCHEDULED',
+                    'usage' => 'SUBSEQUENT',
+                ];
+            }
+
+            $this->ccInfo = [
+                'type' => $savedCard['brand'] ?: $savedCard['card_type'] ?: MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC,
+                'number' => '0000' . $lastDigits,
+                'last_digits' => $lastDigits,
+                'expiry_month' => $expiryMonth,
+                'expiry_year' => $expiryYear,
+                'expiry' => $expiry,
+                'name' => $cardholderName,
+                'redirect' => $this->getListenerEndpoint(),
+                'vault_id' => $savedCard['vault_id'],
+                'billing_address' => (is_array($savedCard['billing_address']) ? $savedCard['billing_address'] : []),
+                'stored_credential' => $storedCredential,
+                'store_card' => false,
+                'use_vault' => true,
+            ];
+
+            return true;
+        }
+
+        $_SESSION['PayPalRestful']['saved_card'] = 'new';
+
         require DIR_WS_CLASSES . 'cc_validation.php';
         $cc_validation = new cc_validation();
         $result = $cc_validation->validate(
@@ -1231,6 +1468,9 @@ class paypalr extends base
             return false;
         }
 
+        $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
+        $storeCard = $allowSaveCard && !empty($_POST[$postvar_prefix . '_cc_save_card']);
+
         $this->ccInfo = [
             'type' => $cc_validation->cc_type,
             'number' => $cc_validation->cc_number,
@@ -1239,7 +1479,16 @@ class paypalr extends base
             'name' => $cc_owner,
             'security_code' => $cvv_posted,
             'redirect' => $this->getListenerEndpoint(),
+            'last_digits' => substr($cc_validation->cc_number, -4),
+            'store_card' => $storeCard,
         ];
+
+        if ($storeCard === true) {
+            $_SESSION['PayPalRestful']['save_card'] = true;
+        } else {
+            unset($_SESSION['PayPalRestful']['save_card']);
+        }
+
         return true;
     }
 
@@ -1440,18 +1689,29 @@ class paypalr extends base
             ];
         }
 
-        global $zcDate;
+        $fields = [
+            ['title' => MODULE_PAYMENT_PAYPALR_CC_OWNER, 'field' => '&nbsp;' . zen_output_string_protected($this->ccInfo['name'])],
+            ['title' => MODULE_PAYMENT_PAYPALR_CC_TYPE, 'field' => '&nbsp;' . zen_output_string_protected($this->ccInfo['type'])],
+        ];
+
+        if (!empty($this->ccInfo['use_vault'])) {
+            $fields[] = ['title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER, 'field' => '&nbsp;' . zen_output_string_protected('XXXX' . ($this->ccInfo['last_digits'] ?? ''))];
+            $expiryText = $this->formatVaultExpiry($this->ccInfo['expiry'] ?? '');
+            if ($expiryText === '') {
+                $expiryText = MODULE_PAYMENT_PAYPALR_SAVED_CARD_EXPIRY_UNKNOWN;
+            }
+            $fields[] = ['title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES, 'field' => '&nbsp;' . zen_output_string_protected($expiryText)];
+        } else {
+            $fields[] = ['title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER, 'field' => '&nbsp;' . $this->obfuscateCcNumber($this->ccInfo['number'])];
+            $fields[] = [
+                'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
+                'field' => '&nbsp;' . zen_output_string_protected(date('F, ', mktime(0, 0, 0, (int)$this->ccInfo['expiry_month'], 1)) . $this->ccInfo['expiry_year']),
+            ];
+        }
+
         return [
             'title' => '',
-            'fields' => [
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_OWNER, 'field' => '&nbsp;' . $_POST['paypalr_cc_owner']],
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_TYPE, 'field' => '&nbsp;' . $this->ccInfo['type']],
-                ['title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER, 'field' => '&nbsp;' . $this->obfuscateCcNumber($_POST['paypalr_cc_number'])],
-                [
-                    'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
-                    'field' => '&nbsp;' . date('F, ', mktime(0, 0, 0, (int)$_POST['paypalr_cc_expires_month'], 1)) . $_POST['paypalr_cc_expires_year'],
-                ],
-            ],
+            'fields' => $fields,
         ];
     }
 
@@ -1466,14 +1726,21 @@ class paypalr extends base
             return false;
         }
 
-        $hidden_fields =
-            zen_draw_hidden_field('ppr_cc_owner', $_POST['paypalr_cc_owner']) . "\n" .
-            zen_draw_hidden_field('ppr_cc_expires_month', $_POST['paypalr_cc_expires_month']) . "\n" .
-            zen_draw_hidden_field('ppr_cc_expires_year', $_POST['paypalr_cc_expires_year']) . "\n" .
-            zen_draw_hidden_field('ppr_cc_number', $_POST['paypalr_cc_number']) . "\n" .
-            zen_draw_hidden_field('ppr_cc_cvv', $_POST['paypalr_cc_cvv']) . "\n";
-        if (isset($_POST['paypalr_cc_sca_always'])) {
-            $hidden_fields .= zen_draw_hidden_field('ppr_cc_sca_always', $_POST['paypalr_cc_sca_always']);
+        $savedCardSelection = $_POST['paypalr_saved_card'] ?? 'new';
+        $hidden_fields = zen_draw_hidden_field('ppr_saved_card', $savedCardSelection) . "\n";
+        if ($savedCardSelection === 'new') {
+            $hidden_fields .=
+                zen_draw_hidden_field('ppr_cc_owner', $_POST['paypalr_cc_owner']) . "\n" .
+                zen_draw_hidden_field('ppr_cc_expires_month', $_POST['paypalr_cc_expires_month']) . "\n" .
+                zen_draw_hidden_field('ppr_cc_expires_year', $_POST['paypalr_cc_expires_year']) . "\n" .
+                zen_draw_hidden_field('ppr_cc_number', $_POST['paypalr_cc_number']) . "\n" .
+                zen_draw_hidden_field('ppr_cc_cvv', $_POST['paypalr_cc_cvv']) . "\n";
+            if (!empty($_POST['paypalr_cc_save_card'])) {
+                $hidden_fields .= zen_draw_hidden_field('ppr_cc_save_card', $_POST['paypalr_cc_save_card']) . "\n";
+            }
+            if (isset($_POST['paypalr_cc_sca_always'])) {
+                $hidden_fields .= zen_draw_hidden_field('ppr_cc_sca_always', $_POST['paypalr_cc_sca_always']);
+            }
         }
         return $hidden_fields;
     }
@@ -1483,17 +1750,24 @@ class paypalr extends base
             return false;
         }
 
+        $savedCardSelection = $_POST['paypalr_saved_card'] ?? 'new';
         $ccFields = [
             'ccFields' => [
-                'ppr_cc_owner' => 'paypalr_cc_owner',
-                'ppr_cc_expires_month' => 'paypalr_cc_expires_month',
-                'ppr_cc_expires_year' => 'paypalr_cc_expires_year',
-                'ppr_cc_number' => 'paypalr_cc_number',
-                'ppr_cc_cvv' => 'paypalr_cc_cvv',
+                'ppr_saved_card' => 'paypalr_saved_card',
             ],
         ];
-        if (isset($_POST['paypalr_cc_sca_always'])) {
-            $ccFields['ccFields']['ppr_cc_sca_always'] = 'paypalr_cc_sca_always';
+        if ($savedCardSelection === 'new') {
+            $ccFields['ccFields']['ppr_cc_owner'] = 'paypalr_cc_owner';
+            $ccFields['ccFields']['ppr_cc_expires_month'] = 'paypalr_cc_expires_month';
+            $ccFields['ccFields']['ppr_cc_expires_year'] = 'paypalr_cc_expires_year';
+            $ccFields['ccFields']['ppr_cc_number'] = 'paypalr_cc_number';
+            $ccFields['ccFields']['ppr_cc_cvv'] = 'paypalr_cc_cvv';
+            if (!empty($_POST['paypalr_cc_save_card'])) {
+                $ccFields['ccFields']['ppr_cc_save_card'] = 'paypalr_cc_save_card';
+            }
+            if (isset($_POST['paypalr_cc_sca_always'])) {
+                $ccFields['ccFields']['ppr_cc_sca_always'] = 'paypalr_cc_sca_always';
+            }
         }
         return $ccFields;
     }
@@ -1710,10 +1984,17 @@ class paypalr extends base
         // Save the pertinent credit-card information into the order so that it'll be
         // included in the GUID.
         //
-        $order->info['cc_type'] = $this->ccInfo['type'];
-        $order->info['cc_number'] = $this->obfuscateCcNumber($this->ccInfo['number']);
-        $order->info['cc_owner'] = $this->ccInfo['name'];
-        $order->info['cc_expires'] = ''; //- $this->ccInfo['expiry_month'] . substr($this->ccInfo['expiry_year'], -2);
+        if (!empty($this->ccInfo['use_vault'])) {
+            $order->info['cc_type'] = $this->ccInfo['type'];
+            $order->info['cc_number'] = 'XXXX' . ($this->ccInfo['last_digits'] ?? '');
+            $order->info['cc_owner'] = $this->ccInfo['name'];
+            $order->info['cc_expires'] = '';
+        } else {
+            $order->info['cc_type'] = $this->ccInfo['type'];
+            $order->info['cc_number'] = $this->obfuscateCcNumber($this->ccInfo['number']);
+            $order->info['cc_owner'] = $this->ccInfo['name'];
+            $order->info['cc_expires'] = ''; //- $this->ccInfo['expiry_month'] . substr($this->ccInfo['expiry_year'], -2);
+        }
 
         // -----
         // Create a GUID (Globally Unique IDentifier) for the order's
