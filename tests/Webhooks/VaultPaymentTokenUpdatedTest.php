@@ -37,22 +37,54 @@ namespace {
 
     class VaultTestResult
     {
-        public bool $EOF;
-        public array $fields;
+        public bool $EOF = true;
+        public array $fields = [];
 
-        public function __construct(?array $fields)
+        /** @var array<int,array<string,mixed>> */
+        private array $rows = [];
+
+        private int $index = 0;
+
+        public function __construct($rows)
         {
-            $this->EOF = ($fields === null);
-            $this->fields = $fields ?? [];
+            if (!is_array($rows)) {
+                $rows = [];
+            }
+
+            if ($rows !== [] && array_keys($rows) !== range(0, count($rows) - 1)) {
+                $rows = [$rows];
+            }
+
+            $this->rows = array_values($rows);
+            $this->index = 0;
+            $this->refresh();
         }
 
         public function RecordCount(): int
         {
-            return $this->EOF ? 0 : 1;
+            return count($this->rows);
         }
 
         public function MoveNext(): void
         {
+            if ($this->EOF) {
+                return;
+            }
+
+            $this->index++;
+            $this->refresh();
+        }
+
+        private function refresh(): void
+        {
+            if ($this->index >= count($this->rows)) {
+                $this->EOF = true;
+                $this->fields = [];
+                return;
+            }
+
+            $this->EOF = false;
+            $this->fields = $this->rows[$this->index];
         }
     }
 
@@ -65,13 +97,28 @@ namespace {
         {
             $sql = trim($sql);
             if (stripos($sql, 'create table') === 0) {
-                return new VaultTestResult(null);
+                return new VaultTestResult([]);
+            }
+
+            if (preg_match("/DELETE\\s+FROM\\s+" . preg_quote(TABLE_PAYPAL_VAULT, '/') . "\\s+WHERE\\s+paypal_vault_id\\s*=\\s*(\\d+)\\s+AND\\s+customers_id\\s*=\\s*(\\d+)/i", $sql, $matches)) {
+                $this->deleteVaultByInternalId((int)$matches[1], (int)$matches[2]);
+                return new VaultTestResult([]);
             }
 
             if (preg_match("/FROM\\s+" . preg_quote(TABLE_PAYPAL_VAULT, '/') . "\\s+WHERE\\s+vault_id\s*=\s*'([^']+)'/i", $sql, $matches)) {
                 $vaultId = stripslashes($matches[1]);
                 $row = $this->getVaultById($vaultId);
-                return new VaultTestResult($row);
+                return new VaultTestResult($row === null ? [] : $row);
+            }
+
+            if (preg_match("/FROM\\s+" . preg_quote(TABLE_PAYPAL_VAULT, '/') . "\\s+WHERE\\s+paypal_vault_id\\s*=\\s*(\\d+)\\s+AND\\s+customers_id\\s*=\\s*(\\d+)/i", $sql, $matches)) {
+                $row = $this->getVaultByInternalId((int)$matches[1], (int)$matches[2]);
+                return new VaultTestResult($row === null ? [] : $row);
+            }
+
+            if (preg_match("/FROM\\s+" . preg_quote(TABLE_PAYPAL_VAULT, '/') . "\\s+WHERE\\s+customers_id\\s*=\\s*(\\d+)/i", $sql, $matches)) {
+                $rows = $this->getVaultsByCustomerId((int)$matches[1]);
+                return new VaultTestResult($rows);
             }
 
             throw new \RuntimeException('Unhandled SQL: ' . $sql);
@@ -116,6 +163,48 @@ namespace {
             }
 
             return null;
+        }
+
+        public function getVaultByInternalId(int $paypalVaultId, int $customersId): ?array
+        {
+            foreach ($this->tables[TABLE_PAYPAL_VAULT] ?? [] as $row) {
+                if ((int)($row['paypal_vault_id'] ?? 0) === $paypalVaultId && (int)($row['customers_id'] ?? 0) === $customersId) {
+                    return $row;
+                }
+            }
+
+            return null;
+        }
+
+        /**
+         * @return array<int,array<string,mixed>>
+         */
+        public function getVaultsByCustomerId(int $customersId): array
+        {
+            $rows = [];
+            foreach ($this->tables[TABLE_PAYPAL_VAULT] ?? [] as $row) {
+                if ((int)($row['customers_id'] ?? 0) === $customersId) {
+                    $rows[] = $row;
+                }
+            }
+
+            return $rows;
+        }
+
+        public function deleteVaultByInternalId(int $paypalVaultId, int $customersId): void
+        {
+            $tableData = &$this->tables[TABLE_PAYPAL_VAULT];
+            if (!is_array($tableData)) {
+                return;
+            }
+
+            foreach ($tableData as $index => $row) {
+                if ((int)($row['paypal_vault_id'] ?? 0) === $paypalVaultId && (int)($row['customers_id'] ?? 0) === $customersId) {
+                    unset($tableData[$index]);
+                    $tableData = array_values($tableData);
+                    return;
+                }
+            }
         }
     }
 

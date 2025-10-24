@@ -1,306 +1,231 @@
 <?php
-/**
- * Header code file for the saved credit card page
- *
- * @package page
- * @copyright Copyright 2003-2011 Zen Cart Development Team
- * @copyright Portions Copyright 2003 osCommerce
- * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
- * @version $Id: header_php.php 18695 2011-05-04 05:24:19Z drbyte $
- */
-// This should be first line of the script:
-$zco_notifier->notify('NOTIFY_HEADER_START_ACCOUNT_SAVED_CREDIT_CARDS'); 
+use PayPalRestful\Api\PayPalRestfulApi;
+use PayPalRestful\Common\VaultManager;
 
+if (!function_exists('paypalr_format_vault_expiry')) {
+    function paypalr_format_vault_expiry(string $rawExpiry): string
+    {
+        $rawExpiry = trim($rawExpiry);
+        if ($rawExpiry === '') {
+            return '';
+        }
 
-if (!$_SESSION['customer_id']) {
-  $_SESSION['navigation']->set_snapshot();
-  zen_redirect(zen_href_link(FILENAME_LOGIN, '', 'SSL'));
+        if (preg_match('/^(\d{4})-(\d{2})$/', $rawExpiry, $matches) === 1) {
+            return $matches[2] . '/' . $matches[1];
+        }
+
+        if (preg_match('/^(\d{2})(\d{2})$/', $rawExpiry, $matches) === 1) {
+            return $matches[1] . '/20' . $matches[2];
+        }
+
+        return $rawExpiry;
+    }
 }
 
-require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_curl.php');
-require_once(DIR_WS_MODULES . 'payment/paypal/class.paypal_wpp_recurring.php');
-require_once(DIR_WS_MODULES . 'payment/paypalsavedcard.php');
+if (!function_exists('paypalr_format_vault_date')) {
+    function paypalr_format_vault_date(?string $rawDate): string
+    {
+        if ($rawDate === null || $rawDate === '') {
+            return '';
+        }
 
-$paypalsavedcard = new paypalsavedcard();
+        $datePortion = substr($rawDate, 0, 10);
+        if ($datePortion === false || $datePortion === '') {
+            return '';
+        }
 
-//(MODULE_PAYMENT_PAYPALWPP_SERVER == 'sandbox' ? true : false)
-$PayPalConfig = array('Sandbox' => (MODULE_PAYMENT_PAYPALWPP_SERVER == 'sandbox' ? true : false), 'APIUsername' => MODULE_PAYMENT_PAYPALWPP_APIUSERNAME, 'APIPassword' => MODULE_PAYMENT_PAYPALWPP_APIPASSWORD, 'APISignature' => MODULE_PAYMENT_PAYPALWPP_APISIGNATURE);
+        return zen_date_short($datePortion);
+    }
+}
 
+if (!function_exists('paypalr_format_vault_address')) {
+    /**
+     * @return string[]
+     */
+    function paypalr_format_vault_address(array $billingAddress): array
+    {
+        $lines = [];
 
-/*$PayPalConfig = array(
-                'Sandbox' => (true),
-                'APIUsername' => 'kristin_api1.numinix.com',
-                'APIPassword' => '1407891473',
-                'APISignature' => 'AFcWxV21C7fd0v3bYYYRCpSSRl31A.64wjvZo3iLG2NO0.3H-0RB8RXP'
-        );
-*/
+        foreach (['address_line_1', 'address_line_2', 'address_line_3'] as $field) {
+            if (!empty($billingAddress[$field])) {
+                $lines[] = $billingAddress[$field];
+            }
+        }
+
+        $cityLine = '';
+        if (!empty($billingAddress['admin_area_2'])) {
+            $cityLine = $billingAddress['admin_area_2'];
+        }
+        if (!empty($billingAddress['admin_area_1'])) {
+            $cityLine .= ($cityLine === '' ? '' : ', ') . $billingAddress['admin_area_1'];
+        }
+        if (!empty($billingAddress['postal_code'])) {
+            $cityLine .= ($cityLine === '' ? '' : ' ') . $billingAddress['postal_code'];
+        }
+        if ($cityLine !== '') {
+            $lines[] = $cityLine;
+        }
+
+        if (!empty($billingAddress['country_code'])) {
+            $lines[] = $billingAddress['country_code'];
+        }
+
+        return array_map('zen_output_string_protected', $lines);
+    }
+}
+
+if (!function_exists('paypalr_get_vault_status_map')) {
+    /**
+     * @return array<string,array{0:string,1:string}>
+     */
+    function paypalr_get_vault_status_map(): array
+    {
+        return [
+            'ACTIVE' => [TEXT_SAVED_CARD_STATUS_ACTIVE, 'is-active'],
+            'APPROVED' => [TEXT_SAVED_CARD_STATUS_ACTIVE, 'is-active'],
+            'VAULTED' => [TEXT_SAVED_CARD_STATUS_ACTIVE, 'is-active'],
+            'INACTIVE' => [TEXT_SAVED_CARD_STATUS_INACTIVE, 'is-inactive'],
+            'CANCELLED' => [TEXT_SAVED_CARD_STATUS_CANCELED, 'is-inactive'],
+            'CANCELED' => [TEXT_SAVED_CARD_STATUS_CANCELED, 'is-inactive'],
+            'DELETED' => [TEXT_SAVED_CARD_STATUS_CANCELED, 'is-inactive'],
+            'EXPIRED' => [TEXT_SAVED_CARD_STATUS_EXPIRED, 'is-inactive'],
+            'SUSPENDED' => [TEXT_SAVED_CARD_STATUS_SUSPENDED, 'is-warning'],
+            'PENDING' => [TEXT_SAVED_CARD_STATUS_PENDING, 'is-warning'],
+            'UNKNOWN' => [TEXT_SAVED_CARD_STATUS_PENDING, 'is-warning'],
+        ];
+    }
+}
+
+if (!function_exists('paypalr_normalize_vault_card')) {
+    /**
+     * @param array<string,mixed> $record
+     * @param array<string,array{0:string,1:string}> $statusMap
+     *
+     * @return array<string,mixed>
+     */
+    function paypalr_normalize_vault_card(array $record, array $statusMap): array
+    {
+        $brand = trim((string)($record['brand'] ?? ''));
+        if ($brand === '') {
+            $brand = trim((string)($record['card_type'] ?? ''));
+        }
+
+        $statusKey = strtoupper((string)($record['status'] ?? ''));
+        if ($statusKey === '') {
+            $statusKey = 'UNKNOWN';
+        }
+        if (!isset($statusMap[$statusKey])) {
+            $statusKey = 'UNKNOWN';
+        }
+        [$statusLabel, $statusClass] = $statusMap[$statusKey];
+
+        $paypalVaultId = (int)($record['paypal_vault_id'] ?? 0);
+
+        return [
+            'paypal_vault_id' => $paypalVaultId,
+            'vault_id' => (string)($record['vault_id'] ?? ''),
+            'brand' => $brand,
+            'last_digits' => (string)($record['last_digits'] ?? ''),
+            'expiry' => paypalr_format_vault_expiry((string)($record['expiry'] ?? '')),
+            'cardholder_name' => (string)($record['cardholder_name'] ?? ''),
+            'status_label' => $statusLabel,
+            'status_class' => $statusClass,
+            'status_raw' => $statusKey,
+            'last_used' => paypalr_format_vault_date($record['last_used'] ?? ''),
+            'updated' => paypalr_format_vault_date($record['last_modified'] ?? ($record['update_time'] ?? '')),
+            'created' => paypalr_format_vault_date($record['date_added'] ?? ''),
+            'billing_address' => paypalr_format_vault_address($record['billing_address'] ?? []),
+            'details_id' => 'saved-card-details-' . $paypalVaultId,
+            'delete_href' => ($paypalVaultId > 0)
+                ? zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, 'delete=' . $paypalVaultId, 'SSL')
+                : '',
+        ];
+    }
+}
+
+$zco_notifier->notify('NOTIFY_HEADER_START_ACCOUNT_SAVED_CREDIT_CARDS');
+
+if (empty($_SESSION['customer_id'])) {
+    $_SESSION['navigation']->set_snapshot();
+    zen_redirect(zen_href_link(FILENAME_LOGIN, '', 'SSL'));
+}
+
 require(DIR_WS_MODULES . zen_get_module_directory('require_languages.php'));
 
-/**
- * Process deletes
- */
-
-if (isset($_GET['delete_confirm']) && is_numeric($_GET['delete_confirm']))  {
-  $delete_card_id = zen_db_prepare_input($_GET['delete_confirm']);
-  $sql = "SELECT * FROM " . TABLE_SAVED_CREDIT_CARDS . " WHERE customers_id = " . (int)$_SESSION['customer_id'] . " AND is_deleted = '0' AND saved_credit_card_id = " . $delete_card_id;
-  $result = $db->Execute($sql);
-  $saved_credit_cards = array();
-  $delete_card = $result->fields;
-
+$customers_id = (int)$_SESSION['customer_id'];
+$hide_saved_cards_page = true;
+if (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS === 'True') {
+    $hide_saved_cards_page = false;
 }
 
-if (isset($_GET['delete']) && is_numeric($_GET['delete']))  {
-  $reassigned_card_message = $paypalsavedcard->delete_card(zen_db_prepare_input($_GET['delete']), $_SESSION['customer_id']);  
-  $zco_notifier->notify('NOTIFY_HEADER_CREDIT_CARD_DELETION_DONE');
+$saved_credit_cards = [];
+$delete_card = null;
 
-  //BOF saved card recurring mod. Handling if a card linked to a subscription is deleted.
-  if(!class_exists('paypalSavedCardRecurring')) {
-    require_once(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php');
-  }
-  $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-  $reassigned_card_message = $paypalSavedCardRecurring->card_was_deleted(zen_db_prepare_input($_GET['delete']), $_SESSION['customer_id']);
-  //EOF saved card recurring mod
+if ($hide_saved_cards_page === false) {
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/pprAutoload.php';
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr.php';
 
-  $messageStack->add_session('saved_credit_cards', SUCCESS_SAVED_CREDIT_CARD_DELETED . ' ' . $reassigned_card_message, 'success');
-}
- 
-/*
-* Process set primary card
-* 
-*/
-if (isset($_GET['setprimary']) && is_numeric($_GET['setprimary'])) {
+    $statusMap = paypalr_get_vault_status_map();
 
-  $set_primary_id = zen_db_prepare_input($_GET['setprimary']);
-  $sql = "UPDATE " . TABLE_SAVED_CREDIT_CARDS . " SET is_primary = '0' WHERE customers_id = " . (int)$_SESSION['customer_id'];
-  $db->execute($sql);
- 
-  $sql = "UPDATE " . TABLE_SAVED_CREDIT_CARDS . " SET is_primary = '1' WHERE customers_id = " . (int)$_SESSION['customer_id'] . " AND saved_credit_card_id = " . $set_primary_id;
-  $db->execute($sql);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $action = $_POST['action'] ?? '';
+        if ($action === 'delete-card') {
+            if (!isset($_POST['securityToken']) || $_POST['securityToken'] !== $_SESSION['securityToken']) {
+                $messageStack->add('saved_credit_cards', ERROR_SECURITY_TOKEN, 'error');
+            } else {
+                $paypal_vault_id = (int)zen_db_prepare_input($_POST['paypal_vault_id'] ?? 0);
+                if ($paypal_vault_id <= 0) {
+                    $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
+                } else {
+                    $rawCard = VaultManager::getCustomerVaultCard($customers_id, $paypal_vault_id);
+                    if ($rawCard === null) {
+                        $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
+                    } else {
+                        $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER);
+                        $deleteResponse = $api->deleteVaultPaymentToken((string)$rawCard['vault_id']);
+                        $deleteFailed = false;
+                        if ($deleteResponse === false) {
+                            $errorInfo = $api->getErrorInfo();
+                            if (($errorInfo['errNum'] ?? 0) !== 404) {
+                                $deleteFailed = true;
+                            }
+                        }
 
-  $zco_notifier->notify('NOTIFY_HEADER_CREDIT_CARD_PRIMARY_UPDATED', array('customers_id' => $_SESSION['customer_id']));
-  
-} 
-
-/*
-* Process get card details for editing
-* 
-*/
-if ((isset($_GET['edit']) && is_numeric($_GET['edit'])) || (isset($_POST['existing_address_id']) && $_POST['existing_address_id'] > 0)) {
-  $edit_card_id = is_numeric($_GET['edit']) ? zen_db_prepare_input($_GET['edit']) : $_POST['existing_address_id'];
-  $sql = "SELECT * FROM " . TABLE_SAVED_CREDIT_CARDS . " WHERE customers_id = " . (int)$_SESSION['customer_id'] . " AND is_deleted = '0' AND saved_credit_card_id = " . $edit_card_id;
-  $result = $db->Execute($sql);
-  $saved_credit_cards = array();
-  $edit_card = $result->fields; 
-}
-
-/**
- * Save form
- */
-
-if (isset($_POST['action'])) {
-  $_SESSION['invalid_count'] = isset($_SESSION['invalid_count']) ? $_SESSION['invalid_count'] : 0; // bof modified for STRIN-1374
-  $saved_credit_card_id = zen_db_prepare_input($_POST['saved_credit_card_id']); 
-  $fullname = zen_db_prepare_input($_POST['fullname']);
-  $cardnumber = zen_db_prepare_input($_POST['cardnumber']);
-  $cvv = zen_db_prepare_input(str_replace(' ', '', $_POST['cvv']));
-  $expirydate = zen_db_prepare_input($_POST['monthexpiry']) . substr(zen_db_prepare_input($_POST['yearexpiry']), -2);
-  $paymenttype = zen_db_prepare_input($_POST['paymenttype']);
-  $primary = zen_db_prepare_input($_POST['primary']); 
-  $primary = ($primary == 'on') ? '1' : '0';
-  
-  if (!class_exists('cc_validation')) {
-      include_once (DIR_WS_CLASSES . 'cc_validation.php');
-  }
-  if (!is_object($cc_validation)) {
-      $cc_validation = new cc_validation();
-  }
-  $validCard = $cc_validation->validate($_POST['cardnumber'], $_POST['monthexpiry'], $_POST['yearexpiry'], null, null); // Switch and Solo needs start date
-  
-  if($validCard){
-      $cardnumber = $cc_validation->cc_number;
-      $expirydate = $cc_validation->cc_expiry_month . substr($cc_validation->cc_expiry_year, - 2);
-      $paymenttype = $cc_validation->cc_type;
-
-      if($_POST['address_book_id'] != $_POST['existing_address_id'] || $_POST['address_book_id'] == 0) { //updating existing address or adding new address
-    
-      //country is stored differently in orders table, the input form, and paypal.  Find different formats here.
-          $country_id =  zen_db_prepare_input($_POST['zone_country_id']);
-           if(is_numeric($country_id)) {
-             $country_name = zen_get_country_name($country_id);
-             $country_info = zen_get_countries($country_id);
-             $country_code = $country_info['countries_iso_code_2'];
-           }
-           else {
-             $country_name = '';
-          }
-          //bof modified for STRIN-1516 :: Saved card updating wipes out address
-          if(isset($_POST['company']))
-            $company = $_POST['company'];
-          else
-            $company = '';
-          //eof modified for STRIN-1516 :: Saved card updating wipes out address
-         // bof modified for STRIN-710 : Add Address Line 3
-         $order_address_update = array(
-          //bof modified for STRIN-1516 :: Saved card updating wipes out address
-             'billing_firstname' => zen_db_prepare_input($_POST['firstname']),
-             'billing_lastname' => zen_db_prepare_input($_POST['lastname']),
-             'billing_company' => $company,
-             //eof modified for STRIN-1516 :: Saved card updating wipes out address
-             'billing_street_address' => zen_db_prepare_input($_POST['street_address']),
-             'billing_suburb' => zen_db_prepare_input($_POST['suburb']),
-             'billing_suburb2' => zen_db_prepare_input($_POST['suburb2']),
-             'billing_city' => zen_db_prepare_input($_POST['city']),
-             'billing_postcode' => zen_db_prepare_input($_POST['postcode']),
-             'billing_state' => zen_db_prepare_input($_POST['state']),
-             'billing_zone_id' =>zen_db_prepare_input($_POST['zone_id']), 
-             'billing_country' => $country_name
-           );
-    
-         $paypal_address_info = $paypalsavedcard->make_address($order_address_update['billing_street_address'], $order_address_update['billing_suburb'], $order_address_update['billing_suburb2'], $order_address_update['billing_city'], $order_address_update['billing_postcode'], $order_address_update['billing_state'], $order_address_update['billing_zone_id'], $country_code);
-         }
-         else { //use saved address
-           $sql = 'SELECT * FROM ' . TABLE_ADDRESS_BOOK . ' WHERE address_book_id = ' . $_POST['address_book_id']  . ' AND customers_id = ' . (int)$_SESSION['customer_id'];
-           $result = $db->Execute($sql);
-           $saved_address = $result->fields;
-    
-           $country_info = zen_get_countries($saved_address['entry_country_id']);
-           $country_code = $country_info['countries_iso_code_2'];
-    
-           $paypal_address_info = $paypalsavedcard->make_address($saved_address['entry_street_address'], $saved_address['entry_suburb'], $saved_address['entry_suburb2'], $saved_address['entry_city'], $saved_address['entry_postcode'], $saved_address['entry_state'], $saved_address['entry_zone_id'], $country_code);
-         }
-    
-          $new_credit_card_id = $paypalsavedcard->add_saved_card($cardnumber, $cvv, $expirydate, $fullname, $paymenttype, 1, $primary, $saved_credit_card_id, $paypal_address_info); //will either update or add the card
-    
-      if($new_credit_card_id > 0) {
-    
-        if($_POST['address_book_id'] == $_POST['existing_address_id'] || $_POST['address_book_id'] == 0) { //updating existing address or adding new address
-           $sql_data_array= array(
-            //bof modified for STRIN-1516 :: Saved card updating wipes out address
-              array('fieldName'=>'entry_firstname', 'value'=>$order_address_update['billing_firstname'], 'type'=>'string'),
-              array('fieldName'=>'entry_lastname', 'value'=>$order_address_update['billing_lastname'], 'type'=>'string'),
-              array('fieldName'=>'entry_company', 'value'=>$order_address_update['billing_company'], 'type'=>'string'),
-              //eof modified for STRIN-1516 :: Saved card updating wipes out address
-              array('fieldName'=>'entry_street_address', 'value'=>$order_address_update['billing_street_address'], 'type'=>'string'),
-              array('fieldName'=>'entry_suburb', 'value'=>$order_address_update['billing_suburb'], 'type'=>'string'),
-              array('fieldName'=>'entry_suburb2', 'value'=>$order_address_update['billing_suburb2'], 'type'=>'string'),
-              array('fieldName'=>'entry_city', 'value'=>$order_address_update['billing_city'], 'type'=>'string'),
-              array('fieldName'=>'entry_postcode', 'value'=>$order_address_update['billing_postcode'], 'type'=>'string'),
-              array('fieldName'=>'entry_state', 'value'=>$order_address_update['billing_state'], 'type'=>'string'),
-              array('fieldName'=>'entry_zone_id', 'value'=>$order_address_update['billing_zone_id'], 'type'=>'string'),
-              array('fieldName'=>'entry_country_id', 'value'=>$country_id, 'type'=>'string'),
-              array('fieldName'=>'address_title', 'value'=>'Billing', 'type'=>'string'),
-              array('fieldName'=>'customers_id', 'value'=>(int)$_SESSION['customer_id'], 'type'=>'integer')
-            );
-            // eof modified for STRIN-710 : Add Address Line 3
-    
-          if($_POST['address_book_id'] > 0) { //update existing address
-            $address_book_id = $_POST['address_book_id'];
-          }
-          else {  //add new address
-            $db->perform(TABLE_ADDRESS_BOOK, $sql_data_array);
-            $address_book_id = $db->insert_ID();
-          }
+                        if ($deleteFailed === false) {
+                            VaultManager::deleteCustomerVaultCard($customers_id, $paypal_vault_id);
+                            $messageStack->add_session('saved_credit_cards', TEXT_DELETE_CARD_SUCCESS, 'success');
+                            zen_redirect(zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'));
+                        } else {
+                            $messageStack->add('saved_credit_cards', TEXT_DELETE_CARD_ERROR, 'error');
+                        }
+                    }
+                }
+            }
         }
-        else {
-          $address_book_id = $_POST['address_book_id']; //use address selected by user
+    }
+
+    if (isset($_GET['delete'])) {
+        $requested_id = (int)zen_db_prepare_input($_GET['delete']);
+        if ($requested_id > 0) {
+            $rawDeleteCard = VaultManager::getCustomerVaultCard($customers_id, $requested_id);
+            if ($rawDeleteCard !== null) {
+                $delete_card = paypalr_normalize_vault_card($rawDeleteCard, $statusMap);
+            } else {
+                $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
+            }
         }
-    
-        $sql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS . ' SET address_id = ' . $address_book_id . ' WHERE saved_credit_card_id = ' . $new_credit_card_id;
-        $db->execute($sql);
-        $_SESSION['invalid_count'] = 0; // bof modified for STRIN-1374
-        $messageStack->add_session('saved_credit_cards', $saved_credit_card_id > 0 ? NOTIFY_HEADER_CREDIT_CARD_EDITED : NOTIFY_HEADER_CREDIT_CARD_ADDED, 'success');
-      }
-      else {
-        $_SESSION['invalid_count'] += 1; // bof modified for STRIN-1374
-        $messageStack->add_session('saved_credit_cards', NOTIFY_HEADER_CREDIT_CARD_FAILED, 'error');
-      }
-  }
-  else {
-    $_SESSION['invalid_count'] += 1; // bof modified for STRIN-1374
-    $messageStack->add_session('saved_credit_cards', NOTIFY_HEADER_CREDIT_CARD_FAILED, 'error');
-  }
-  // bof modified for STRIN-1374
-  if ($_SESSION['invalid_count'] > 2) {
-    zen_session_destroy();
-    zen_redirect(zen_href_link(FILENAME_LOGIN, '', 'SSL'));
-  }
-  // eof modified for STRIN-1374
+    }
+
+    $rawCards = VaultManager::getCustomerVaultedCards($customers_id, false);
+    foreach ($rawCards as $rawCard) {
+        $normalized = paypalr_normalize_vault_card($rawCard, $statusMap);
+        if ($normalized['paypal_vault_id'] > 0) {
+            $saved_credit_cards[] = $normalized;
+        }
+    }
 }
-
-/*
-* Get customers credit cards for displaying on page
-*/
-
-$sql = "SELECT *
-    FROM " . TABLE_SAVED_CREDIT_CARDS . " scc
-    LEFT JOIN " . TABLE_ADDRESS_BOOK . " ab ON (scc.address_id = ab.address_book_id)
-    WHERE scc.customers_id = " . (int)$_SESSION['customer_id'] . "
-    AND scc.is_deleted = 0
-    AND scc.is_visible = 1";
-$result = $db->Execute($sql);
-$saved_credit_cards = array();
-
-while(!$result->EOF) {
-  $saved_credit_cards[] = $result->fields;
-  $result->moveNext();
-}
-
-
-/*
-*  Get customers addresses for displaying on page
-*/
-
-$sql = 'SELECT * FROM ' . TABLE_ADDRESS_BOOK . ' WHERE customers_id = ' . (int)$_SESSION['customer_id'];
-$result = $db->Execute($sql);
-$saved_addresses = array();
-
-// STRIN-525: only shows enter new address if there is user has less addresses than max allowed
-$address_count = zen_count_customer_address_book_entries((int)$_SESSION['customer_id']);
-$add_address_enabled = ($address_count < MAX_ADDRESS_BOOK_ENTRIES ? true : false);
-if($add_address_enabled) {
-  $saved_addresses[] = array('id'=> 0, 'text'=> OPTION_ENTER_NEW_ADDRESS);
-}
-
-while(!$result->EOF) {
-  $saved_addresses[] = array('id'=>$result->fields['address_book_id'], 'text'=>$result->fields['entry_street_address']);
-  $result->moveNext();
-}
-
-/*
-* Get address associated with this saved card
-*/
-
-if($edit_card['address_id'] > 0) {
-  $addresses_query = 'SELECT
-                     * 
-                    FROM ' . TABLE_ADDRESS_BOOK . ' WHERE address_book_id = ' . $edit_card['address_id'];
-
-//   $addresses_query = $db->bindVars($addresses_query, ':customersID', $_SESSION['customer_id'], 'integer');
-   $entry = $db->Execute($addresses_query);
-}
-if ($process == false) {
-  $selected_country = $entry->fields['entry_country_id'];
-} else {
-  $selected_country = (isset($_POST['zone_country_id']) && $_POST['zone_country_id'] != '') ? $country : SHOW_CREATE_ACCOUNT_DEFAULT_COUNTRY;
-  $entry->fields['entry_country_id'] = $selected_country;
-}
-$flag_show_pulldown_states = ((($process == true || $entry_state_has_zones == true) && $zone_name == '') || ACCOUNT_STATE_DRAW_INITIAL_DROPDOWN == 'true' || $error_state_input) ? true : false;
-$state = ($flag_show_pulldown_states && $state != FALSE) ? $state : $zone_name;
-$state_field_label = ($flag_show_pulldown_states) ? '' : ENTRY_STATE;
 
 $breadcrumb->add(NAVBAR_TITLE_1, zen_href_link(FILENAME_ACCOUNT, '', 'SSL'));
 $breadcrumb->add(NAVBAR_TITLE_2, zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'));
 
-// if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
-//   $breadcrumb->add(NAVBAR_TITLE_SAVED_CREDIT_CARD_MODIFY_ENTRY);
-// } elseif (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
-//   $breadcrumb->add(NAVBAR_TITLE_SAVED_CREDIT_CARD_DELETE_ENTRY);
-// }elseif (isset($_GET['action']) && $_GET['action'] == 'add') {
-//   $breadcrumb->add(HEADING_TITLE_ADD_NEW_CARD);
-// } 
-// else {
-//   $breadcrumb->add(HEADING_TITLE);
-// }
-
-// This should be last line of the script:
 $zco_notifier->notify('NOTIFY_HEADER_END_ACCOUNT_SAVED_CREDIT_CARDS');
