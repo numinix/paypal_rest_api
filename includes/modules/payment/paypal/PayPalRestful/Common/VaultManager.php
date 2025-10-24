@@ -318,11 +318,78 @@ class VaultManager
            ORDER BY last_modified DESC"
         );
 
-        foreach ($records as $record) {
-            $vaultedCards[] = self::mapRow($record);
+        if (is_object($records)) {
+            while (!$records->EOF) {
+                $vaultedCards[] = self::mapRow($records->fields);
+                $records->MoveNext();
+            }
         }
 
         return $vaultedCards;
+    }
+
+    /**
+     * Retrieve a single vaulted card for the supplied customer.
+     */
+    public static function getCustomerVaultCard(int $customers_id, int $paypal_vault_id): ?array
+    {
+        if ($customers_id <= 0 || $paypal_vault_id <= 0) {
+            return null;
+        }
+
+        self::ensureSchema();
+
+        global $db;
+
+        $record = $db->Execute(
+            "SELECT *
+               FROM " . TABLE_PAYPAL_VAULT . "
+              WHERE paypal_vault_id = " . (int)$paypal_vault_id .
+            " AND customers_id = " . (int)$customers_id .
+            " LIMIT 1"
+        );
+
+        if (!is_object($record) || $record->EOF) {
+            return null;
+        }
+
+        return self::mapRow($record->fields);
+    }
+
+    /**
+     * Remove a vaulted card for the supplied customer.
+     */
+    public static function deleteCustomerVaultCard(int $customers_id, int $paypal_vault_id): bool
+    {
+        if ($customers_id <= 0 || $paypal_vault_id <= 0) {
+            return false;
+        }
+
+        self::ensureSchema();
+
+        global $db;
+
+        $record = $db->Execute(
+            "SELECT paypal_vault_id
+               FROM " . TABLE_PAYPAL_VAULT . "
+              WHERE paypal_vault_id = " . (int)$paypal_vault_id .
+            " AND customers_id = " . (int)$customers_id .
+            " LIMIT 1"
+        );
+
+        if (!is_object($record) || $record->EOF) {
+            return false;
+        }
+
+        $db->Execute(
+            "DELETE
+               FROM " . TABLE_PAYPAL_VAULT . "
+              WHERE paypal_vault_id = " . (int)$paypal_vault_id .
+            " AND customers_id = " . (int)$customers_id .
+            " LIMIT 1"
+        );
+
+        return true;
     }
 
     /**

@@ -516,6 +516,23 @@ class PayPalRestfulApi extends ErrorInfo
     }
 
     /**
+     * Remove a vaulted payment token from PayPal's vault.
+     */
+    public function deleteVaultPaymentToken(string $vault_id)
+    {
+        $vault_id = trim($vault_id);
+        if ($vault_id === '') {
+            return false;
+        }
+
+        $this->log->write("==> Start deleteVaultPaymentToken($vault_id)", true);
+        $response = $this->curlDelete('v3/vault/payment-tokens/' . rawurlencode($vault_id));
+        $this->log->write('==> End deleteVaultPaymentToken', true);
+
+        return $response;
+    }
+
+    /**
      * Send package tracking details to PayPal for a given PayPal Transaction ID
      *
      * @param string $paypal_txnid
