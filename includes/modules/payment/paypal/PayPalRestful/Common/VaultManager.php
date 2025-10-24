@@ -288,6 +288,182 @@ class VaultManager
     }
 
     /**
+     * Update a stored vaulted card from a PayPal vault token response.
+     */
+    public static function updateFromVaultToken(int $customers_id, int $paypal_vault_id, array $token): ?array
+    {
+        if ($customers_id <= 0 || $paypal_vault_id <= 0) {
+            return null;
+        }
+
+        $paymentSource = $token['payment_source']['card'] ?? null;
+        if (!is_array($paymentSource)) {
+            return null;
+        }
+
+        $vaultMeta = [
+            'id' => self::sanitizeString($token['id'] ?? '', 64),
+            'status' => self::sanitizeString($token['status'] ?? '', 32),
+        ];
+
+        if (isset($token['customer_id'])) {
+            $vaultMeta['customer']['id'] = self::sanitizeString($token['customer_id'], 64);
+        }
+        if (isset($token['payer_id'])) {
+            $vaultMeta['customer']['payer_id'] = self::sanitizeString($token['payer_id'], 64);
+        }
+        if (isset($token['customer']) && is_array($token['customer'])) {
+            if (isset($token['customer']['id'])) {
+                $vaultMeta['customer']['id'] = self::sanitizeString($token['customer']['id'], 64);
+            }
+            if (isset($token['customer']['payer_id'])) {
+                $vaultMeta['customer']['payer_id'] = self::sanitizeString($token['customer']['payer_id'], 64);
+            }
+        }
+
+        if (isset($token['update_time'])) {
+            $vaultMeta['update_time'] = $token['update_time'];
+        } elseif (isset($token['time_updated'])) {
+            $vaultMeta['update_time'] = $token['time_updated'];
+        }
+
+        if (isset($token['create_time'])) {
+            $vaultMeta['create_time'] = $token['create_time'];
+        } elseif (isset($token['time_created'])) {
+            $vaultMeta['create_time'] = $token['time_created'];
+        }
+
+        return self::applyCardUpdate($customers_id, $paypal_vault_id, $paymentSource, $vaultMeta);
+    }
+
+    /**
+     * Apply card updates to an existing vault record using normalized card and vault metadata.
+     *
+     * @param array<string,mixed> $cardSource
+     * @param array<string,mixed> $vaultMeta
+     */
+    public static function applyCardUpdate(int $customers_id, int $paypal_vault_id, array $cardSource, array $vaultMeta = []): ?array
+    {
+        if ($customers_id <= 0 || $paypal_vault_id <= 0) {
+            return null;
+        }
+
+        self::ensureSchema();
+
+        global $db;
+
+        $existing = $db->Execute(
+            "SELECT paypal_vault_id" .
+            "   FROM " . TABLE_PAYPAL_VAULT .
+            "  WHERE paypal_vault_id = " . (int)$paypal_vault_id .
+            "    AND customers_id = " . (int)$customers_id .
+            "  LIMIT 1"
+        );
+
+        if (!is_object($existing) || $existing->EOF) {
+            return null;
+        }
+
+        $now = date('Y-m-d H:i:s');
+
+        $sqlData = [
+            'last_modified' => $now,
+        ];
+
+        $status = self::sanitizeString($vaultMeta['status'] ?? '', 32);
+        if ($status !== '') {
+            $sqlData['status'] = strtoupper($status);
+        }
+
+        $brand = self::sanitizeString($cardSource['brand'] ?? '', 32);
+        if ($brand !== '') {
+            $sqlData['brand'] = $brand;
+        }
+
+        $lastDigits = $cardSource['last_digits'] ?? ($cardSource['number'] ?? '');
+        if ($lastDigits !== '') {
+            $sqlData['last_digits'] = self::sanitizeString(substr($lastDigits, -4), 4);
+        }
+
+        $cardType = self::sanitizeString($cardSource['type'] ?? '', 32);
+        if ($cardType !== '') {
+            $sqlData['card_type'] = $cardType;
+        }
+
+        $expiry = self::sanitizeString($cardSource['expiry'] ?? '', 7);
+        if ($expiry !== '') {
+            $sqlData['expiry'] = $expiry;
+        }
+
+        $cardholder = self::sanitizeString($cardSource['name'] ?? '', 96);
+        if ($cardholder !== '') {
+            $sqlData['cardholder_name'] = $cardholder;
+        }
+
+        if (isset($vaultMeta['customer']['payer_id'])) {
+            $payerId = self::sanitizeString($vaultMeta['customer']['payer_id'], 64);
+            if ($payerId !== '') {
+                $sqlData['payer_id'] = $payerId;
+            }
+        }
+
+        if (isset($vaultMeta['customer']['id'])) {
+            $customerId = self::sanitizeString($vaultMeta['customer']['id'], 64);
+            if ($customerId !== '') {
+                $sqlData['paypal_customer_id'] = $customerId;
+            }
+        }
+
+        if (array_key_exists('billing_address', $cardSource)) {
+            $billingAddress = self::encodeJson($cardSource['billing_address']);
+            if ($billingAddress !== null) {
+                $sqlData['billing_address'] = $billingAddress;
+            }
+        }
+
+        $cardData = $cardSource;
+        if (!empty($vaultMeta)) {
+            $cardData['vault'] = $vaultMeta;
+        }
+        $encodedCardData = self::encodeJson($cardData);
+        if ($encodedCardData !== null) {
+            $sqlData['card_data'] = $encodedCardData;
+        }
+
+        $createTime = self::convertPayPalDate($vaultMeta['create_time'] ?? null);
+        if ($createTime !== null) {
+            $sqlData['create_time'] = $createTime;
+        }
+
+        $updateTime = self::convertPayPalDate($vaultMeta['update_time'] ?? null);
+        if ($updateTime !== null) {
+            $sqlData['update_time'] = $updateTime;
+            $sqlData['last_used'] = $updateTime;
+        }
+
+        zen_db_perform(
+            TABLE_PAYPAL_VAULT,
+            $sqlData,
+            'update',
+            'paypal_vault_id = ' . (int)$paypal_vault_id . ' AND customers_id = ' . (int)$customers_id
+        );
+
+        $stored = $db->Execute(
+            "SELECT *" .
+            "   FROM " . TABLE_PAYPAL_VAULT .
+            "  WHERE paypal_vault_id = " . (int)$paypal_vault_id .
+            "    AND customers_id = " . (int)$customers_id .
+            "  LIMIT 1"
+        );
+
+        if (!is_object($stored) || $stored->EOF) {
+            return null;
+        }
+
+        return self::mapRow($stored->fields);
+    }
+
+    /**
      * Retrieve a customer's vaulted cards.
      *
      * @param int  $customers_id The Zen Cart customer's identifier.

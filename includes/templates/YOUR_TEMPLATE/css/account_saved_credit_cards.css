@@ -168,3 +168,33 @@
 #savedCreditCardsDefault .saved-cards-confirm .saved-card__actions {
   padding-left: 0;
 }
+
+#savedCreditCardsDefault .saved-cards-editor {
+  box-shadow: 0 1rem 2.25rem rgba(15, 23, 42, 0.12);
+}
+
+#savedCreditCardsDefault .saved-cards-editor .form-label {
+  font-weight: 600;
+}
+
+#savedCreditCardsDefault .saved-card-editor__billing {
+  border: 1px solid rgba(82, 96, 109, 0.25);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  background: #f9fafb;
+}
+
+#savedCreditCardsDefault .saved-card-editor__billing legend {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+#savedCreditCardsDefault .saved-card-editor__address .form-label {
+  font-weight: 500;
+}
+
+#savedCreditCardsDefault .saved-card-editor__address .form-control,
+#savedCreditCardsDefault .saved-card-editor__address .form-select {
+  min-height: 2.75rem;
+}
