@@ -542,7 +542,7 @@ class PayPalRestfulApi extends ErrorInfo
             return false;
         }
 
-        $this->log->write("==> Start updateVaultPaymentToken($vault_id)\n" . Logger::logJSON($patchOperations), true);
+        $this->log->write("==> Start updateVaultPaymentToken($vault_id)", true);
         $response = $this->curlPatch('v3/vault/payment-tokens/' . rawurlencode($vault_id), $patchOperations);
         $this->log->write('==> End updateVaultPaymentToken', true);
 
