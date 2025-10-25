@@ -1188,7 +1188,12 @@ class PayPalRestfulApi extends ErrorInfo
     {
         $this->setErrorInfo(self::ERR_CURL_ERROR, curl_error($this->ch), curl_errno($this->ch));
         curl_reset($this->ch);
-        $this->log->write("handleCurlError for $method ($option) : CURL error (" . Logger::logJSON($this->errorInfo) . "\nCURL Options:\n" . Logger::logJSON($curl_options));
+        $this->log->write(
+            "handleCurlError for $method ($option) : CURL error (" .
+            Logger::logJSON($this->errorInfo) .
+            "\nCURL Options:\n" .
+            Logger::logJSON($this->getLoggableCurlOptions($curl_options))
+        );
     }
 
     // -----
@@ -1270,7 +1275,12 @@ class PayPalRestfulApi extends ErrorInfo
         // let the caller know that the request was unsuccessful.
         //
         $this->setErrorInfo($httpCode, $errMsg, 0, $response);
-        $this->log->write("The $method ($option) request was unsuccessful.\n" . Logger::logJSON($this->errorInfo) . "\nCURL Options: " . Logger::logJSON($curl_options));
+        $this->log->write(
+            "The $method ($option) request was unsuccessful.\n" .
+            Logger::logJSON($this->errorInfo) .
+            "\nCURL Options: " .
+            Logger::logJSON($this->getLoggableCurlOptions($curl_options))
+        );
 
         return false;
     }
@@ -1306,5 +1316,14 @@ class PayPalRestfulApi extends ErrorInfo
         $length = strlen($needle);
 
         return substr($haystack, -$length) === $needle;
+    }
+
+    private function getLoggableCurlOptions(array $curl_options): array
+    {
+        if (isset($curl_options[CURLOPT_POSTFIELDS])) {
+            $curl_options[CURLOPT_POSTFIELDS] = '**REDACTED**';
+        }
+
+        return $curl_options;
     }
 }
