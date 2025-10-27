@@ -47,6 +47,7 @@ class zcObserverPaypalrestful
         // NOTE: The page that's set during the AJAX checkout-payment class is 'index'!
         //
         global $current_page_base;
+        $numinixOpcPageKeys = $this->getNuminixOpcPageKeys();
         $pages_to_watch = [
             FILENAME_CHECKOUT_CONFIRMATION,
             FILENAME_DEFAULT,
@@ -54,10 +55,17 @@ class zcObserverPaypalrestful
         if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION')) {
             $pages_to_watch[] = FILENAME_CHECKOUT_ONE_CONFIRMATION;
         }
-        foreach ($this->getNuminixOpcPageKeys() as $numinixPage) {
-            $pages_to_watch[] = $numinixPage;
-        }
-        if (in_array($current_page_base, array_unique($pages_to_watch), true)) {
+        $pages_to_watch = array_unique(array_merge($pages_to_watch, $numinixOpcPageKeys));
+
+        $oprcPageKeys = array_filter(
+            $numinixOpcPageKeys,
+            static function ($pageBase) {
+                return is_string($pageBase) && strpos($pageBase, 'oprc_checkout_') === 0;
+            }
+        );
+        $oprcProcessKey = in_array('oprc_checkout_process', $oprcPageKeys, true) ? 'oprc_checkout_process' : null;
+
+        if (in_array($current_page_base, $pages_to_watch, true)) {
             $this->attach($this, [
                 'NOTIFY_ORDER_TOTAL_PRE_CONFIRMATION_CHECK_STARTS',
                 'NOTIFY_ORDER_TOTAL_PRE_CONFIRMATION_CHECK_NEXT',
@@ -68,7 +76,8 @@ class zcObserverPaypalrestful
         // order-totals' process method.  That method's run on that page prior to
         // paypalr's before_process method.
         //
-        } elseif ($current_page_base === FILENAME_CHECKOUT_PROCESS) {
+        }
+        if ($current_page_base === FILENAME_CHECKOUT_PROCESS || ($oprcProcessKey !== null && $current_page_base === $oprcProcessKey)) {
             $this->attach($this, [
                 'NOTIFY_ORDER_TOTAL_PROCESS_STARTS',
                 'NOTIFY_ORDER_TOTAL_PROCESS_NEXT',
@@ -156,6 +165,9 @@ class zcObserverPaypalrestful
         $pageKeys = [
             'one_page_checkout',
             'one_page_confirmation',
+            'oprc_checkout_process',
+            'oprc_checkout_payment',
+            'oprc_checkout_confirmation',
         ];
 
         $potentialConstants = [
