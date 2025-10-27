@@ -1,15 +1,15 @@
 <?php
 /**
- * Language definitions for the paypalr (PayPal Expanded Checkout) payment module.
+ * Language definitions for the paypalr (PayPal Advanced Checkout) payment module.
  *
  * Last updated: v1.3.2
  */
 $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_TITLE' => 'PayPal',
         'MODULE_PAYMENT_PAYPALR_SUBTITLE' => '(Use either your <b>PayPal Wallet</b> or a <b>Credit Card</b>)',
-    'MODULE_PAYMENT_PAYPALR_TEXT_TITLE_ADMIN' => 'PayPal Expanded Checkout',
-    'MODULE_PAYMENT_PAYPALR_TEXT_DESCRIPTION' => '<strong>PayPal Expanded Checkout</strong>',
-    'MODULE_PAYMENT_PAYPALR_TEXT_TYPE' => 'PayPal Expanded Checkout',
+    'MODULE_PAYMENT_PAYPALR_TEXT_TITLE_ADMIN' => 'PayPal Advanced Checkout',
+    'MODULE_PAYMENT_PAYPALR_TEXT_DESCRIPTION' => '<strong>PayPal Advanced Checkout</strong>',
+    'MODULE_PAYMENT_PAYPALR_TEXT_TYPE' => 'PayPal Advanced Checkout',
 
     // -----
     // Configuration-related errors displayed during the payment module's admin configuration.
@@ -22,7 +22,7 @@ $define = [
     // -----
     // Storefront messages.
     //
-    'MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL' => 'Paying via PayPal Wallet',     //- Used by the confirmation method, when paying via PayPal Expanded Checkout (paypal)
+    'MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL' => 'Paying via PayPal Wallet',     //- Used by the confirmation method, when paying via PayPal Advanced Checkout (paypal)
     'MODULE_PAYMENT_PAYPALR_TEXT_NOTIFICATION_MISSING' => 'We are unable to process your %s payment at this time.  Please contact us for assistance.',  //- %s filled in with MODULE_PAYMENT_PAYPALR_TEXT_TITLE
     'MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR' => 'We are unable to process your %s payment at this time.  Please contact us for assistance.',      //- %s filled in with MODULE_PAYMENT_PAYPALR_TEXT_TITLE
     'MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH' => 'We were unable to process your payment-request.',
@@ -35,7 +35,7 @@ $define = [
     // order's status-history.  Added for v1.0.5.
     //
     'MODULE_PAYMENT_PAYPALR_TRANSACTION_ID' => 'Transaction ID: ',  //- Should end with a space
-    'MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE' => 'Payment Type: PayPal Expanded Checkout (%s)',  //- %s filled in with either 'paypal' or 'card'
+    'MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE' => 'Payment Type: PayPal Advanced Checkout (%s)',  //- %s filled in with either 'paypal' or 'card'
     'MODULE_PAYMENT_PAYPALR_TRANSACTION_PAYMENT_STATUS' => 'Payment Status: ',  //- Should end with a space
     'MODULE_PAYMENT_PAYPALR_TRANSACTION_AMOUNT' => 'Amount: ',  //- Should end with a space
     // Added for v1.2.0:
@@ -81,7 +81,7 @@ $define = [
     // -----
     // Store owner/admin alert-email messages.
     //
-    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPal Expanded Checkout (%s)',    //- %s is an additional error descriptor, see below
+    'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT' => 'ALERT: PayPal Advanced Checkout (%s)',    //- %s is an additional error descriptor, see below
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIGURATION' => 'Configuration',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
         'MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_UNKNOWN_DENIAL' => 'Unknown Denial Reason',
@@ -319,7 +319,7 @@ if (IS_ADMIN_FLAG === true) {
     $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_ERROR_MESSAGE'] = 'Unable to reach the Numinix onboarding portal. Check your connection and try again.';
 
     $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION'] =
-        '<b>PayPal Expanded Checkout</b>, v%s<br><br>' .   //- %s is filled in with the current module version
+        '<b>PayPal Advanced Checkout</b>, v%s<br><br>' .   //- %s is filled in with the current module version
         '<p>' . $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_INTRO'] . '</p>' .
         '<p><a class="paypalr-isu-button" data-partner-attribution-id="NuminixPPCP_SP" href="' . zen_href_link('paypalr_integrated_signup.php', '', 'SSL') . '" rel="noopener noreferrer" target="_blank">' . $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON'] . '</a></p>' .
         '<p>We will open a secure browser tab on <strong>numinix.com</strong>. Complete the PayPal steps there and copy the issued credentials into the configuration fields below.</p>' .

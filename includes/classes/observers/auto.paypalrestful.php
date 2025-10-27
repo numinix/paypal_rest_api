@@ -1,6 +1,6 @@
 <?php
 /**
- * Part of the paypalr (PayPal Expanded Checkout) payment module.
+ * Part of the paypalr (PayPal Advanced Checkout) payment module.
  * This observer class handles the JS SDK integration logic.
  * It also watches for notifications from the 'order_total' class,
  * introduced in this (https://github.com/zencart/zencart/pull/6090) Zen Cart PR,

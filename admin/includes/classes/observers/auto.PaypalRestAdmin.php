@@ -1,6 +1,6 @@
 <?php
 /**
- * Part of the paypalr (PayPal Expanded Checkout) payment module.
+ * Part of the paypalr (PayPal Advanced Checkout) payment module.
  * Admin handles package tracking updates.
  *
  * Last updated: v1.3.1

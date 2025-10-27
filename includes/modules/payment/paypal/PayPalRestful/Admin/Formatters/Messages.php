@@ -1,7 +1,7 @@
 <?php
 /**
  * A class that formats admin messageStack messages for use by the
- * admin_notifications method of the PayPal Expanded Checkout payment module.
+ * admin_notifications method of the PayPal Advanced Checkout payment module.
  *
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0

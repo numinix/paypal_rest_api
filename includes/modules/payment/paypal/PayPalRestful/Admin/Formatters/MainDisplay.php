@@ -1,7 +1,7 @@
 <?php
 /**
  * A class that provides the main PayPal request history table for a given order
- * in the Zen Cart admin placed with the PayPal Expanded Checkout payment module.
+ * in the Zen Cart admin placed with the PayPal Advanced Checkout payment module.
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
