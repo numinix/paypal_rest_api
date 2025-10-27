@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.1
+ * Last updated: v1.3.2
  */
 /**
  * Load the support class' auto-loader.
@@ -37,7 +37,7 @@ LanguageCompatibility::load();
  */
 class paypalr extends base
 {
-    protected const CURRENT_VERSION = '1.3.1';
+    protected const CURRENT_VERSION = '1.3.2';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -473,6 +473,14 @@ class paypalr extends base
                         unlink(DIR_FS_CATALOG . 'ppr_webhook_main.php');
                     }
 
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.2', '<'): //- Fall through from above
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Disable Module on Checkout Errors?', 'MODULE_PAYMENT_PAYPALR_DISABLE_ON_ERROR', 'False', 'Choose <var>True</var> to automatically disable this payment module when a checkout-related error occurs. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now())"
+                    );
+
                 default:    //- Fall through from above
                     break;
             }
@@ -577,7 +585,7 @@ class paypalr extends base
         // CURL to 'do its business'.
         //
         if ($curl_installed === false) {
-            $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL);
+            $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL, true);
             return false;
         }
 
@@ -611,7 +619,7 @@ class paypalr extends base
         // Any credential errors detected, the payment module's auto-disabled.
         //
         if ($error_message !== '') {
-            $this->setConfigurationDisabled($error_message);
+            $this->setConfigurationDisabled($error_message, true);
             return false;
         }
 
@@ -636,20 +644,29 @@ class paypalr extends base
 
         return $this->ppr;
     }
-    protected function setConfigurationDisabled(string $error_message)
+    protected function setConfigurationDisabled(string $error_message, bool $force_disable = false)
     {
         global $db, $messageStack;
 
+        $this->enabled = false;
         trigger_error("Setting configuration disabled: $error_message", E_USER_WARNING);
 
-        $db->Execute(
-            "UPDATE " . TABLE_CONFIGURATION . "
-                SET configuration_value = 'False'
-              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_STATUS'
-              LIMIT 1"
-        );
+        $auto_disable = $force_disable;
+        if ($auto_disable === false) {
+            $auto_disable = (defined('MODULE_PAYMENT_PAYPALR_DISABLE_ON_ERROR') && MODULE_PAYMENT_PAYPALR_DISABLE_ON_ERROR === 'True');
+        }
 
-        $error_message .= MODULE_PAYMENT_PAYPALR_AUTO_DISABLED;
+        if ($auto_disable === true) {
+            $db->Execute(
+                "UPDATE " . TABLE_CONFIGURATION . "
+                    SET configuration_value = 'False'
+                  WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_STATUS'
+                  LIMIT 1"
+            );
+
+            $error_message .= MODULE_PAYMENT_PAYPALR_AUTO_DISABLED;
+        }
+
         if (IS_ADMIN_FLAG === true) {
             $messageStack->add_session($error_message, 'error');
             $this->description = $this->alertMsg($error_message) . '<br><br>' . $this->description;
@@ -2665,6 +2682,8 @@ class paypalr extends base
 
                 ('Enable this Payment Module?', 'MODULE_PAYMENT_PAYPALR_STATUS', 'False', 'Do you want to enable this payment module? Use the <b>Retired</b> setting if you are planning to remove this payment module but still have administrative actions to perform against orders placed with this module.', 6, 0, 'zen_cfg_select_option([\'True\', \'False\', \'Retired\'], ', NULL, now()),
 
+                ('Disable Module on Checkout Errors?', 'MODULE_PAYMENT_PAYPALR_DISABLE_ON_ERROR', 'False', 'Choose <var>True</var> to automatically disable this payment module when a checkout-related error occurs. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now()),
+
                 ('PayLater Messaging', 'MODULE_PAYMENT_PAYPALR_PAYLATER_MESSAGING', 'Checkout, Shopping Cart, Product Pages', 'On which pages should PayPal PayLater messaging be displayed? (It will automatically not be displayed in regions where it is not available. Only available in USD, GBP, EUR, AUD.) When enabled, it will show the lower installment-based pricing for the presented product or cart amount. This may accelerate buying decisions.<br><b>Default: All</b>', 6, 0, 'zen_cfg_select_multioption([\'Checkout\', \'Shopping Cart\', \'Product Pages\', \'Product Listings and Search Results\'], ', NULL, now()),
 
                 ('Environment', 'MODULE_PAYMENT_PAYPALR_SERVER', 'live', '<b>Live: </b> Used to process Live transactions<br><b>Sandbox: </b>For developers and testing', 6, 0, 'zen_cfg_select_option([\'live\', \'sandbox\'], ', NULL, now()),
@@ -2793,6 +2812,7 @@ class paypalr extends base
         return [
             'MODULE_PAYMENT_PAYPALR_VERSION',
             'MODULE_PAYMENT_PAYPALR_STATUS',
+            'MODULE_PAYMENT_PAYPALR_DISABLE_ON_ERROR',
             'MODULE_PAYMENT_PAYPALR_BRANDNAME',
             'MODULE_PAYMENT_PAYPALR_SOFT_DESCRIPTOR',
             'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE',
