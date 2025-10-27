@@ -24,6 +24,8 @@ class Logger
     protected static $debug = false;
     /** @var string */
     protected static $debugLogFile; // -----
+    /** @var string */
+    protected static $logsDirectory;
     // Class constructor.
     //
     public function __construct(string $uniqueName = '')
@@ -49,12 +51,23 @@ class Logger
                 $logfile_suffix .= '-o' . $order->info['order_id'];
             }
         }
-        self::$debugLogFile = DIR_FS_LOGS . '/paypalr-' . $logfile_suffix . '-' . date('Ymd') . '.log';
+        $logDirectory = self::determineLogDirectory();
+        if ($logDirectory === '') {
+            return;
+        }
+
+        if (self::ensureLogDirectoryExists($logDirectory) === false) {
+            return;
+        }
+
+        self::$debugLogFile = $logDirectory . DIRECTORY_SEPARATOR . 'paypalr-' . $logfile_suffix . '-' . date('Ymd') . '.log';
     }
 
     public function enableDebug()
     {
-        self::$debug = true;
+        if (isset(self::$debugLogFile)) {
+            self::$debug = true;
+        }
     }
     public function disableDebug()
     {
@@ -109,7 +122,7 @@ class Logger
     {
         global $current_page_base;
 
-        if (self::$debug === true) {
+        if (self::$debug === true && isset(self::$debugLogFile)) {
             $timestamp = ($include_timestamp === false) ? '' : ("\n" . date('Y-m-d H:i:s: ') . "($current_page_base) ");
             $separator = '';
             $separator_before = '';
@@ -124,5 +137,47 @@ class Logger
             }
             error_log($separator_before . $timestamp . $message . $separator_after, 3, self::$debugLogFile);
         }
+    }
+
+    protected static function determineLogDirectory(): string
+    {
+        if (isset(self::$logsDirectory)) {
+            return self::$logsDirectory;
+        }
+
+        if (defined('DIR_FS_LOGS') && DIR_FS_LOGS !== '') {
+            $logsDirectory = rtrim(DIR_FS_LOGS, '\/');
+        } elseif (defined('DIR_FS_CATALOG') && DIR_FS_CATALOG !== '') {
+            $logsDirectory = rtrim(DIR_FS_CATALOG, '\/')
+                . DIRECTORY_SEPARATOR . 'includes'
+                . DIRECTORY_SEPARATOR . 'modules'
+                . DIRECTORY_SEPARATOR . 'payment'
+                . DIRECTORY_SEPARATOR . 'paypal'
+                . DIRECTORY_SEPARATOR . 'logs';
+        } else {
+            $logsDirectory = sys_get_temp_dir();
+        }
+
+        self::$logsDirectory = $logsDirectory;
+
+        return self::$logsDirectory;
+    }
+
+    protected static function ensureLogDirectoryExists(string $logDirectory): bool
+    {
+        if (is_dir($logDirectory)) {
+            return is_writable($logDirectory);
+        }
+
+        $umask = umask(0);
+        $directoryCreated = @mkdir($logDirectory, 0775, true);
+        umask($umask);
+
+        if ($directoryCreated === false && !is_dir($logDirectory)) {
+            trigger_error('PayPalRestful Logger unable to create log directory: ' . $logDirectory, E_USER_WARNING);
+            return false;
+        }
+
+        return is_writable($logDirectory);
     }
 }
