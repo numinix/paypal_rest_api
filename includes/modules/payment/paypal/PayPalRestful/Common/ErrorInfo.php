@@ -32,6 +32,24 @@ class ErrorInfo
         $this->errorInfo = $error_info;
     }
 
+    public function hasErrorInfo(): bool
+    {
+        return (
+            $this->errorInfo['errNum'] !== 0 ||
+            $this->errorInfo['errMsg'] !== '' ||
+            $this->errorInfo['curlErrno'] !== 0 ||
+            $this->errorInfo['name'] !== '' ||
+            $this->errorInfo['message'] !== '' ||
+            !empty($this->errorInfo['details']) ||
+            $this->errorInfo['debug_id'] !== ''
+        );
+    }
+
+    public function reset(): void
+    {
+        $this->resetErrorInfo();
+    }
+
     protected function setErrorInfo(int $errNum, string $errMsg, int $curlErrno = 0, $response = [])
     {
         $name = $response['name'] ?? 'n/a';
