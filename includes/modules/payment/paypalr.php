@@ -1273,9 +1273,20 @@ class paypalr extends base
         $listener_endpoint = $this->getListenerEndpoint();
         $confirm_payment_choice_request = new ConfirmPayPalPaymentChoiceRequest($listener_endpoint, $order);
         $_SESSION['PayPalRestful']['Order']['user_action'] = $confirm_payment_choice_request->getUserAction();
-        $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
+        $payment_choice_request_payload = $confirm_payment_choice_request->get();
+        $payment_choice_response = $this->ppr->confirmPaymentSource(
+            $_SESSION['PayPalRestful']['Order']['id'],
+            $payment_choice_request_payload
+        );
         if ($payment_choice_response === false) {
             $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
+            $this->log->write(
+                "pre_confirmation_check, confirmPaymentSource failed.\n"
+                . "Request payload:\n" . Logger::logJSON(['payment_source' => $payment_choice_request_payload]) . "\n"
+                . "PayPal error info:\n" . Logger::logJSON($this->errorInfo->getErrorInfo()),
+                true,
+                'after'
+            );
             $this->sendAlertEmail(
                 MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
                 MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
