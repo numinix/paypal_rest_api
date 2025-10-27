@@ -1275,6 +1275,7 @@ class paypalr extends base
         $_SESSION['PayPalRestful']['Order']['user_action'] = $confirm_payment_choice_request->getUserAction();
         $payment_choice_response = $this->ppr->confirmPaymentSource($_SESSION['PayPalRestful']['Order']['id'], $confirm_payment_choice_request->get());
         if ($payment_choice_response === false) {
+            $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
             $this->sendAlertEmail(
                 MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
                 MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
@@ -1353,6 +1354,7 @@ class paypalr extends base
             return;
         }
 
+        $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
         $this->sendAlertEmail(
             MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
             MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
@@ -1941,6 +1943,7 @@ class paypalr extends base
         }
 
         if ($response === false) {
+            $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
             $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
         }
 
@@ -2033,6 +2036,7 @@ class paypalr extends base
 
         $response = $this->ppr->createOrder($create_order_request->get());
         if ($response === false) {
+            $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_CC_ERROR . ' ' . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
         }
 
@@ -2253,7 +2257,12 @@ class paypalr extends base
             global $messageStack;
             $messageStack->add_session('checkout', $error_message, 'error');
         }
-        $this->log->write($error_message);
+        $log_message = $error_message;
+        if ($this->errorInfo->hasErrorInfo()) {
+            $log_message .= "\n" . Logger::logJSON($this->errorInfo->getErrorInfo());
+            $this->errorInfo->reset();
+        }
+        $this->log->write($log_message);
         $this->resetOrder();
         zen_redirect(zen_href_link($redirect_page, '', 'SSL'));
     }
