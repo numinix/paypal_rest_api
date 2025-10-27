@@ -113,7 +113,7 @@ class WebhookResponder
             'webhook_event' => json_decode($this->webhook->getRawBody(), false), // decoded here because we re-encode for transmission later.
         ];
 
-        // Load the PayPal Expanded Checkout API class and get the credentials, so we can make the postback using the current access token
+        // Load the PayPal Advanced Checkout API class and get the credentials, so we can make the postback using the current access token
         require DIR_WS_MODULES . 'payment/paypalr.php';
         [$client_id, $secret] = \paypalr::getEnvironmentInfo();
         $ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret);

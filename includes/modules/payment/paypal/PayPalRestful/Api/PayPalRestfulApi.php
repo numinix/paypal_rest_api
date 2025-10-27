@@ -1,6 +1,6 @@
 <?php
 /**
- * PayPalRestfulApi.php communications class for the PayPal Expanded Checkout payment module
+ * PayPalRestfulApi.php communications class for the PayPal Advanced Checkout payment module
  *
  * Applicable PayPal documentation:
  *
@@ -911,7 +911,7 @@ class PayPalRestfulApi extends ErrorInfo
     }
 
     // -----
-    // Sets the common authorization header into the CURL options for a PayPal Expanded Checkout request.
+    // Sets the common authorization header into the CURL options for a PayPal Advanced Checkout request.
     //
     // If the request to retrieve the token fails, an empty array is returned; otherwise,
     // the authorization-header containing the successfully-retrieved token is merged into

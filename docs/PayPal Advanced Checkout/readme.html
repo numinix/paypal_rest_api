@@ -3,7 +3,7 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <meta name="viewport" content="width=device-width">
-  <title>PayPal Expanded Checkout for Zen Cart</title>
+  <title>PayPal Advanced Checkout for Zen Cart</title>
 
   <!-- FONTS -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -59,7 +59,7 @@
       </div>
     </div>
     <div id="headerTitle">
-      <h1 class="clearBoth">PayPal Expanded Checkout for Zen Cart</h1>
+      <h1 class="clearBoth">PayPal Advanced Checkout for Zen Cart</h1>
       <p>Modernize Zen Cart checkout with a unified PayPal REST integration that streamlines Express and Payments Pro flows.</p>
     </div>
     <br class="clearBoth" />
@@ -73,7 +73,7 @@
           <span class="bodyHeaderTxt">Overview</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">PayPal Expanded Checkout (also known as <code>paypalr</code>) combines PayPal Payments Pro and Express Checkout into a single REST-based payment module for Zen Cart 1.5.7c and later. It ships with observer and language shims to support older stores, delivering the modern PayPal REST experience with minimal core changes.</p>
+          <p class="bodyText">PayPal Advanced Checkout (also known as <code>paypalr</code>) combines PayPal Payments Pro and Express Checkout into a single REST-based payment module for Zen Cart 1.5.7c and later. It ships with observer and language shims to support older stores, delivering the modern PayPal REST experience with minimal core changes.</p>
           <p class="bodyText">Use this document to install, configure, operate, and maintain the module. For supplemental diagrams, API examples, and historical release notes, consult the project wiki and release archives.</p>
           <ul class="bodyList">
             <li>Validated in Zen Cart 1.5.7c+, 2.0.x, and 2.1.0 with both <code>responsive_classic</code> and <code>ZCA Bootstrap</code> templates.</li>
@@ -81,7 +81,7 @@
             <li>Supports 3-page checkout, One Page Checkout (OPC 2.4.6-2.5.3), guest checkout, and vaulted card reuse.</li>
           </ul>
           <h4>Compatibility &amp; requirements</h4>
-          <p class="bodyText">Install the provided notifier patch for <code>includes/classes/order_total.php</code> before enabling the module. Without the notifier, PayPal Expanded Checkout detects the missing integration point and automatically disables itself.</p>
+          <p class="bodyText">Install the provided notifier patch for <code>includes/classes/order_total.php</code> before enabling the module. Without the notifier, PayPal Advanced Checkout detects the missing integration point and automatically disables itself.</p>
           <p class="bodyText">Ensure outbound HTTPS requests are allowed so administrators can complete PayPal&rsquo;s Integrated Sign-Up flow. Populate the store name, owner name, and owner email in Zen Cart&rsquo;s configuration to pre-fill the onboarding forms.</p>
         </div>
       </div>
@@ -110,12 +110,12 @@
           <h4>Database updates</h4>
           <ol>
             <li>Log in to your Zen Cart admin.</li>
-            <li>Navigate to <strong>Modules → Payment</strong> and confirm that <strong>PayPal Expanded Checkout</strong> appears in the list. No manual SQL patches are required for a fresh install.</li>
+            <li>Navigate to <strong>Modules → Payment</strong> and confirm that <strong>PayPal Advanced Checkout</strong> appears in the list. No manual SQL patches are required for a fresh install.</li>
             <li>If upgrading from an older beta, follow the upgrade checklist in the module wiki to reconcile any schema or configuration changes before enabling the new code.</li>
           </ol>
           <p class="bodyText">After the files are in place, the module&rsquo;s configuration group appears under <strong>Configuration → PayPal Modules</strong> and the payment method is ready for activation via <strong>Modules → Payment</strong>.</p>
           <h4>Optional saved card management page</h4>
-          <p class="bodyText">PayPal Expanded Checkout ships with a customer-facing page for reviewing vaulted cards. The page relies on the <strong>CSS/JS Loader</strong> plugin to enqueue its JavaScript and CSS assets. Install and configure the loader before enabling the page.</p>
+          <p class="bodyText">PayPal Advanced Checkout ships with a customer-facing page for reviewing vaulted cards. The page relies on the <strong>CSS/JS Loader</strong> plugin to enqueue its JavaScript and CSS assets. Install and configure the loader before enabling the page.</p>
           <ol>
             <li>Install <a href="https://www.numinix.com/css-js-loader-828" target="_blank" rel="noopener">CSS/JS Loader</a> so Zen Cart can load the page-specific jQuery 3.7.1 and jQuery Migrate 3.4.1 assets.</li>
             <li>Copy the contents of <code>includes/templates/YOUR_TEMPLATE/</code> into your active storefront template, renaming the <code>YOUR_TEMPLATE</code> directory to match.</li>
@@ -132,7 +132,7 @@
           <span class="bodyHeaderTxt">Configuration</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">Open <strong>Configuration → PayPal Modules → PayPal Expanded Checkout</strong> to tailor how the module communicates with PayPal and presents options during checkout.</p>
+          <p class="bodyText">Open <strong>Configuration → PayPal Modules → PayPal Advanced Checkout</strong> to tailor how the module communicates with PayPal and presents options during checkout.</p>
           <ol class="steps">
             <li>
               <h4 class="step-title">General settings</h4>
@@ -227,7 +227,7 @@
         <div class="bodyWrapper">
           <ol>
             <li>Switch the module to Sandbox mode and confirm that no live transactions are processing.</li>
-            <li>In <strong>Modules → Payment</strong>, select <strong>PayPal Expanded Checkout</strong> and click <strong>Remove</strong> to clear the configuration keys from your database.</li>
+            <li>In <strong>Modules → Payment</strong>, select <strong>PayPal Advanced Checkout</strong> and click <strong>Remove</strong> to clear the configuration keys from your database.</li>
             <li>Delete the uploaded module files from <code>includes/modules/payment/</code>, <code>includes/languages/</code>, <code>includes/classes/observers/</code>, and your admin directory.</li>
             <li>If no other plugins rely on it, remove the notifier patch from <code>includes/classes/order_total.php</code> or restore the backup you created prior to installation.</li>
             <li>Revoke the REST API credentials in the PayPal developer dashboard to prevent unintended access.</li>
@@ -261,7 +261,7 @@
           <span class="bodyHeaderTxt">Support</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">Need assistance? The Numinix support team is ready to help you launch and optimize PayPal Expanded Checkout.</p>
+          <p class="bodyText">Need assistance? The Numinix support team is ready to help you launch and optimize PayPal Advanced Checkout.</p>
           <ul class="bodyList">
             <li>Email <a href="mailto:support@numinix.com">support@numinix.com</a> with detailed steps to reproduce any issues.</li>
             <li>Include your Zen Cart version, PHP version, hosting environment, and whether webhooks or vaulted cards are enabled.</li>
@@ -298,7 +298,7 @@
       <div class="readme-footer-container">
         <div class="footer-column footer-column-1">
           <h2 class="title">Need a hand with your integration?</h2>
-          <p class="paragraph">Partner with the Numinix team to tailor PayPal Expanded Checkout, optimize conversions, and keep your Zen Cart store secure.</p>
+          <p class="paragraph">Partner with the Numinix team to tailor PayPal Advanced Checkout, optimize conversions, and keep your Zen Cart store secure.</p>
           <a class="connect-link" href="https://www.numinix.com/contact" target="_blank" rel="noopener">Connect with Numinix</a>
           <div class="details">
             <img src="images/numinix-emblem.png" alt="Numinix emblem" />

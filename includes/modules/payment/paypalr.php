@@ -1,6 +1,6 @@
 <?php
 /**
- * paypalr.php payment module class for the PayPal Expanded Checkout payment method
+ * paypalr.php payment module class for the PayPal Advanced Checkout payment method
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @copyright Portions Copyright 2003 osCommerce
@@ -413,7 +413,7 @@ class paypalr extends base
         global $db;
 
         // -----
-        // Remove any PayPal Expanded Checkout storefront logs that were created for v1.0.3 (202408).
+        // Remove any PayPal Advanced Checkout storefront logs that were created for v1.0.3 (202408).
         //
         if (defined('MODULE_PAYMENT_PAYPALR_VERSION') && version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.0.2', '>') && version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.0.4-beta3', '<')) {
             $logfiles = glob(DIR_FS_LOGS . '/paypalr-c-*-202408*.log');
@@ -952,7 +952,7 @@ class paypalr extends base
 
         // -----
         // If cards *can* be selected, but the billing country isn't supported by PayPal,
-        // add a 'field' to the PayPal Expanded Checkout payment's display, noting the condition.
+        // add a 'field' to the PayPal Advanced Checkout payment's display, noting the condition.
         //
         if ($this->billingCountryIsSupported === false) {
             $selection['fields'] = [
@@ -1208,7 +1208,7 @@ class paypalr extends base
         }
 
         // -----
-        // If the PayPal Expanded Checkout payment-type isn't included in the posted data,
+        // If the PayPal Advanced Checkout payment-type isn't included in the posted data,
         // send the customer back to the payment phase of checkout to ensure that
         // the selection is made.
         //

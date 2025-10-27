@@ -1,6 +1,6 @@
 <?php
 /**
- * Page-Redirect Listener for the PayPal Expanded Checkout payment method (paypalr)
+ * Page-Redirect Listener for the PayPal Advanced Checkout payment method (paypalr)
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @copyright Portions Copyright 2003 osCommerce

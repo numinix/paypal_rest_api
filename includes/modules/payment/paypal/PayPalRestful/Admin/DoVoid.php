@@ -1,7 +1,7 @@
 <?php
 /**
  * A class that provides the actions needed to void an order placed with
- * the PayPal Expanded Checkout payment module.
+ * the PayPal Advanced Checkout payment module.
  *
  * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0

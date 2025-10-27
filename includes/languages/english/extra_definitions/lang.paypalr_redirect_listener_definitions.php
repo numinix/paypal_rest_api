@@ -1,6 +1,6 @@
 <?php
 /**
- * Language definitions for the paypalr (PayPal Expanded Checkout) payment module's
+ * Language definitions for the paypalr (PayPal Advanced Checkout) payment module's
  * /ppr_listener.php
  *
  * Last updated: v1.3.1

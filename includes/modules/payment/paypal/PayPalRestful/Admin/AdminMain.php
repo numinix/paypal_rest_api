@@ -1,7 +1,7 @@
 <?php
 /**
  * A class that provides the overall layout of "Additional Handling Methods" when
- * an order in the Zen Cart admin is placed with the PayPal Expanded Checkout payment module.
+ * an order in the Zen Cart admin is placed with the PayPal Advanced Checkout payment module.
  *
  * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -66,7 +66,7 @@ class AdminMain
 
         // -----
         // Record the processing flag that indicates whether/not PayPal transactions
-        // were added outside of the PayPal Expanded Checkout payment module's processing.
+        // were added outside of the PayPal Advanced Checkout payment module's processing.
         //
         $this->externalTxnAdded = $ppr_txns->externalTxnAdded();
     }
