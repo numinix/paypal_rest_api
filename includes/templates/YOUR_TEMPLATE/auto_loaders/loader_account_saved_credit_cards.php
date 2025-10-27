@@ -1,4 +1,9 @@
 <?php
+
+if (!defined('FILENAME_ACCOUNT_SAVED_CREDIT_CARDS')) {
+    define('FILENAME_ACCOUNT_SAVED_CREDIT_CARDS', 'account_saved_credit_cards');
+}
+
 $cssFiles = [
     'account_saved_credit_cards.css' => 99,
 ];

@@ -2,6 +2,10 @@
 use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Common\VaultManager;
 
+if (!defined('FILENAME_ACCOUNT_SAVED_CREDIT_CARDS')) {
+    define('FILENAME_ACCOUNT_SAVED_CREDIT_CARDS', 'account_saved_credit_cards');
+}
+
 if (!function_exists('paypalr_format_vault_expiry')) {
     function paypalr_format_vault_expiry(string $rawExpiry): string
     {
