@@ -1289,7 +1289,7 @@ class paypalr extends base
             );
             $this->sendAlertEmail(
                 MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
-                MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
+                MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON(['payment_source' => $payment_choice_request_payload]) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
             );
             $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_GENERAL_ERROR, MODULE_PAYMENT_PAYPALR_TEXT_TITLE), FILENAME_CHECKOUT_PAYMENT);
         }
@@ -1322,6 +1322,15 @@ class paypalr extends base
                     return;
                 }
 
+                $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
+                $this->log->write(
+                    "pre_confirmation_check, STATUS_PAYER_ACTION_REQUIRED missing payer-action link.\n"
+                    . "Request payload:\n" . Logger::logJSON(['payment_source' => $payment_choice_request_payload]) . "\n"
+                    . "PayPal response:\n" . Logger::logJSON($payment_choice_response) . "\n"
+                    . "PayPal error info:\n" . Logger::logJSON($this->errorInfo->getErrorInfo()),
+                    true,
+                    'after'
+                );
                 $this->sendAlertEmail(
                     MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
                     MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response)
@@ -1366,6 +1375,14 @@ class paypalr extends base
         }
 
         $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
+        $this->log->write(
+            "pre_confirmation_check, confirmPaymentSource returned unexpected status '{$response_status}'.\n"
+            . "Request payload:\n" . Logger::logJSON(['payment_source' => $payment_choice_request_payload]) . "\n"
+            . "PayPal response:\n" . Logger::logJSON($payment_choice_response) . "\n"
+            . "PayPal error info:\n" . Logger::logJSON($this->errorInfo->getErrorInfo()),
+            true,
+            'after'
+        );
         $this->sendAlertEmail(
             MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_CONFIRMATION_ERROR,
             MODULE_PAYMENT_PAYPALR_ALERT_CONFIRMATION_ERROR . "\n" . Logger::logJSON($payment_choice_response) . "\n" . Logger::logJSON($this->ppr->getErrorInfo())
