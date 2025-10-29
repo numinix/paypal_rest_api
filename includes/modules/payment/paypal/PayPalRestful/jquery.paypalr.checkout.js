@@ -132,4 +132,102 @@ jQuery(document).ready(function() {
     });
 
     updateSavedCardVisibility();
+
+    var $ccNumberInput = jQuery('#paypalr-cc-number');
+    if ($ccNumberInput.length) {
+        function getCardGrouping(digits)
+        {
+            if (/^3[47]/.test(digits)) {
+                return [4, 6, 5];
+            }
+            if (/^3(?:0[0-5]|[68])/.test(digits)) {
+                return [4, 6, 4];
+            }
+            return [4, 4, 4, 4, 3];
+        }
+
+        function formatCardNumber(digits)
+        {
+            var cleaned = digits.replace(/\D/g, '').substring(0, 19);
+            var grouping = getCardGrouping(cleaned);
+            var formatted = [];
+            var position = 0;
+
+            for (var i = 0; i < grouping.length && position < cleaned.length; i++) {
+                var groupSize = grouping[i];
+                if (groupSize <= 0) {
+                    break;
+                }
+                formatted.push(cleaned.substr(position, groupSize));
+                position += groupSize;
+            }
+
+            if (position < cleaned.length) {
+                formatted.push(cleaned.substr(position));
+            }
+
+            return formatted.join(' ');
+        }
+
+        function digitsBeforeCaret(value, caretPosition)
+        {
+            var digitsCount = 0;
+            for (var i = 0; i < Math.min(caretPosition, value.length); i++) {
+                if (/\d/.test(value.charAt(i))) {
+                    digitsCount++;
+                }
+            }
+            return digitsCount;
+        }
+
+        function caretFromDigits(value, digitsCount)
+        {
+            if (digitsCount <= 0) {
+                return 0;
+            }
+
+            var digitsSeen = 0;
+            for (var i = 0; i < value.length; i++) {
+                if (/\d/.test(value.charAt(i))) {
+                    digitsSeen++;
+                    if (digitsSeen === digitsCount) {
+                        return i + 1;
+                    }
+                }
+            }
+
+            return value.length;
+        }
+
+        function applyFormattedValue(input)
+        {
+            var currentValue = input.value;
+            var caretStart = input.selectionStart || 0;
+            var digitsCount = digitsBeforeCaret(currentValue, caretStart);
+            var formattedValue = formatCardNumber(currentValue);
+
+            input.value = formattedValue;
+
+            if (document.activeElement === input && typeof input.setSelectionRange === 'function') {
+                var newCaret = caretFromDigits(formattedValue, digitsCount);
+                input.setSelectionRange(newCaret, newCaret);
+            }
+        }
+
+        $ccNumberInput.on('input', function() {
+            applyFormattedValue(this);
+        });
+
+        $ccNumberInput.on('blur', function() {
+            this.value = formatCardNumber(this.value);
+        });
+
+        jQuery('form[name="checkout_payment"]').on('submit', function() {
+            if ($ccNumberInput.length) {
+                $ccNumberInput.val($ccNumberInput.val().replace(/\D/g, '').substring(0, 19));
+            }
+        });
+
+        applyFormattedValue($ccNumberInput.get(0));
+    }
 });
