@@ -327,6 +327,9 @@ class zcObserverPaypalrestful
         if (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS !== 'False') {
             $components[] = 'applepay';
         }
+        if (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS !== 'False') {
+            $components[] = 'venmo';
+        }
         $js_fields['components'] = implode(',', array_unique($components));
 
         $js_page_type = $this->getMessagesPageType();
