@@ -1763,6 +1763,12 @@ class paypalr extends base
             ];
         }
 
+        if ($payment_source === 'apple_pay') {
+            return [
+                'title' => defined('MODULE_PAYMENT_PAYPALR_PAYING_WITH_APPLE_PAY') ? MODULE_PAYMENT_PAYPALR_PAYING_WITH_APPLE_PAY : MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL,
+            ];
+        }
+
         if ($payment_source !== 'card') {
             return [
                 'title' => MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL,
@@ -2401,7 +2407,7 @@ class paypalr extends base
         ];
 
         $payment_source = $this->orderInfo['payment_source'][$payment_type];
-        $card_like_payment = in_array($payment_type, ['card', 'google_pay'], true);
+        $card_like_payment = in_array($payment_type, ['card', 'google_pay', 'apple_pay'], true);
         if ($card_like_payment === false) {
             $first_name = $payment_source['name']['given_name'];
             $last_name = $payment_source['name']['surname'];
@@ -2409,7 +2415,7 @@ class paypalr extends base
             $payer_id = $this->orderInfo['payer']['payer_id'];
             $memo = [];
         } else {
-            if ($payment_type === 'google_pay') {
+            if (in_array($payment_type, ['google_pay', 'apple_pay'], true)) {
                 $card_source = $payment_source['card'] ?? [];
                 if (isset($payment_source['vault'])) {
                     $card_source['vault'] = $payment_source['vault'];
