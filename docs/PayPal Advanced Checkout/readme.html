@@ -167,6 +167,15 @@
               </ul>
             </li>
           </ol>
+          <h4>Wallet add-on modules</h4>
+          <p class="bodyText">Install the bundled Apple Pay, Google Pay, and Venmo payment modules if you want to surface each wallet alongside the core PayPal Advanced Checkout option. They inherit the parent module's API credentials and diagnostics.</p>
+          <ol>
+            <li>Confirm that the primary <strong>PayPal Advanced Checkout</strong> module is installed and enabled; the wallet modules disable themselves if the parent configuration key <code>MODULE_PAYMENT_PAYPALR_VERSION</code> is missing.</li>
+            <li>Work with your PayPal account manager to activate each wallet for your merchant ID. Apple Pay also requires you to host the <code>.well-known/apple-developer-merchantid-domain-association</code> file that PayPal supplies.</li>
+            <li>Install <strong>PayPal Apple Pay</strong>, <strong>PayPal Google Pay</strong>, or <strong>PayPal Venmo</strong> via <strong>Modules &rarr; Payment</strong>, enable them, and optionally scope them with zone and sort-order settings.</li>
+            <li>Clear compiled templates so the checkout payment page can load the matching JavaScript helpers (<code>jquery.paypalr.applepay.js</code>, <code>jquery.paypalr.googlepay.js</code>, <code>jquery.paypalr.venmo.js</code>). Each script injects a placeholder, listens for PayPal wallet events, and stores the confirmed payload in hidden form fields.</li>
+            <li>Run sandbox test orders to confirm that PayPal returns a successful status. The module accepts <code>COMPLETED</code>, <code>APPROVED</code>, and <code>AUTHORIZED</code> responses and will prompt the customer to retry if <code>PAYER_ACTION_REQUIRED</code> is returned.</li>
+          </ol>
         </div>
       </div>
       <!--EOF CONFIGURATION-->
@@ -198,6 +207,30 @@
           </ol>
           <h4>Integrated Sign-Up (ISU)</h4>
           <p class="bodyText">Launch the <strong>Complete PayPal setup</strong> button on the Payment Modules page to onboard merchants directly with PayPal. The portal returns credentials to the administrator and records whether the process completed or was cancelled.</p>
+          <h4>Recurring products and subscriptions</h4>
+          <p class="bodyText">Leverage PayPal Billing Plans and Subscriptions if you sell memberships or recurring services. The bundled API client exposes the full plan and subscription lifecycle.</p>
+          <ol class="steps">
+            <li>
+              <h4 class="step-title">Publish a PayPal plan</h4>
+              <p>Define the billing cycles using PayPal's developer dashboard or by calling <code>createPlan</code> from a short admin script. Activate the plan before promoting it to customers.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Map plans to Zen Cart products</h4>
+              <p>Store the PayPal plan ID in a product attribute or custom table so your checkout observer can look it up when the item is present in the cart.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Create subscriptions at checkout</h4>
+              <p>Detect the plan-enabled product, instantiate <code>PayPalRestfulApi</code>, and call <code>createSubscription</code> with subscriber details and return URLs. Redirect shoppers to PayPal for approval.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Process webhook callbacks</h4>
+              <p>Point PayPal's webhook destination at <code>ppr_webhook.php</code> so the module can validate events. Update your orders or membership records when activation, payment, or cancellation notices arrive.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Offer self-service management</h4>
+              <p>Enable the optional saved-card management page (<code>account_saved_credit_cards</code>) so subscribers can update vault details that PayPal uses for subsequent charges.</p>
+            </li>
+          </ol>
         </div>
       </div>
       <!--EOF USAGE-->
