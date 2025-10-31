@@ -324,6 +324,9 @@ class zcObserverPaypalrestful
         if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS !== 'False') {
             $components[] = 'googlepay';
         }
+        if (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS !== 'False') {
+            $components[] = 'applepay';
+        }
         $js_fields['components'] = implode(',', array_unique($components));
 
         $js_page_type = $this->getMessagesPageType();

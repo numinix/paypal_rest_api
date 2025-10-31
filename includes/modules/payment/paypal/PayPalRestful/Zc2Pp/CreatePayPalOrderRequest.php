@@ -152,6 +152,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
             }
         } elseif ($ppr_type === 'google_pay') {
             $this->request['payment_source']['google_pay'] = $this->buildGooglePayPaymentSource($order);
+        } elseif ($ppr_type === 'apple_pay') {
+            $this->request['payment_source']['apple_pay'] = $this->buildApplePayPaymentSource($order);
         } else {
             $this->request['payment_source']['paypal'] = $this->buildPayPalPaymentSource($order);
         }
@@ -541,6 +543,32 @@ class CreatePayPalOrderRequest extends ErrorInfo
             ],
             'email_address' => $order->customer['email_address'],
             'billing_address' => Address::get($order->billing),
+        ];
+
+        $phone = $order->customer['telephone'] ?? '';
+        if ($phone !== '') {
+            $payment_source['phone_number'] = [
+                'national_number' => preg_replace('/[^0-9]/', '', (string)$phone),
+            ];
+        }
+
+        return $payment_source;
+    }
+
+    protected function buildApplePayPaymentSource(\order $order): array
+    {
+        $payment_source = [
+            'name' => [
+                'given_name' => $order->billing['firstname'],
+                'surname' => $order->billing['lastname'],
+            ],
+            'email_address' => $order->customer['email_address'],
+            'billing_address' => Address::get($order->billing),
+            'attributes' => [
+                'vault' => [
+                    'store_in_vault' => 'ON_SUCCESS',
+                ],
+            ],
         ];
 
         $phone = $order->customer['telephone'] ?? '';
