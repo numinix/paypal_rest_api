@@ -124,3 +124,29 @@ PayPal Advanced Checkout does not create subscription catalog entries inside Zen
 5. **Let customers manage stored cards.** Direct subscribers to the optional saved-card management page (`account_saved_credit_cards`) so they can update billing addresses or remove expired cards. The page renders editable vault entries, validates address updates, and issues PATCH requests to PayPal when the customer edits a card.【F:includes/modules/pages/account_saved_credit_cards/header_php.php†L49-L775】
 
 To pause or cancel an active subscription, call `$api->suspendSubscription()` or `$api->cancelSubscription()` with the PayPal subscription ID and an explanatory note. Reactivations use `$api->activateSubscription()`. Each helper validates the input identifier and sends the appropriate REST call, logging the response for audit purposes.【F:includes/modules/payment/paypal/PayPalRestful/Api/PayPalRestfulApi.php†L315-L341】
+### Configuring product attributes for recurring items
+
+The checkout observer watches each line item that flows through `NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_CREATE_ADD_PRODUCTS`. A product is treated as a subscription only when it includes the attribute labels listed below. Create the option names in **Catalog &gt; Option Name Manager** and assign them to the product via the **Attributes Controller** so the order writer copies the values into `orders_products_attributes`.
+
+| Attribute label | Suggested type | Notes |
+| --- | --- | --- |
+| PayPal Subscription Plan ID | Text | Required. Stores the PayPal plan identifier returned by `createPlan()`.【F:includes/classes/observers/auto.paypalrestful_recurring.php†L29-L66】【F:includes/classes/observers/auto.paypalrestful_recurring.php†L146-L176】
+| PayPal Subscription Billing Period | Dropdown | Required. Accepts Day, Week, Month, Year, or Semi-Month (the observer normalizes common variants to PayPal's interval units).【F:includes/classes/observers/auto.paypalrestful_recurring.php†L37-L55】【F:includes/classes/observers/auto.paypalrestful_recurring.php†L178-L214】
+| PayPal Subscription Billing Frequency | Text | Required. Numeric value specifying how many periods occur between charges. Values less than 1 are ignored. |
+| PayPal Subscription Total Billing Cycles | Text | Optional. Use `0` to renew indefinitely. |
+| PayPal Subscription Trial Period | Dropdown | Optional. Uses the same vocabulary as the billing period column. Leave blank to skip trials. |
+| PayPal Subscription Trial Frequency | Text | Optional. Only applied when a trial period is present. |
+| PayPal Subscription Trial Total Billing Cycles | Text | Optional. Limits the number of trial renewals. |
+| PayPal Subscription Setup Fee | Text | Optional. Parsed as a decimal amount; currency symbols are stripped automatically.【F:includes/classes/observers/auto.paypalrestful_recurring.php†L214-L236】
+
+Make sure the attribute labels match exactly— the observer lowercases and slugifies each option name before looking for the keys above. If you prefer different customer-facing labels, use the same option name and override the storefront template text instead of renaming the attribute.
+
+### Subscription logging and troubleshooting
+
+When a customer pays with the PayPal Advanced Checkout card flow and chooses to vault the instrument, the observer stores a snapshot of each subscription line in the `paypal_subscriptions` table. The record includes the order, product, normalized billing metadata, and the linked vault profile so follow-up captures can reuse the saved card token.【F:includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php†L17-L96】【F:includes/classes/observers/auto.paypalrestful_recurring.php†L96-L149】
+
+* **Status values.** `pending` indicates a vault token was available during checkout. `awaiting_vault` means no vault metadata was returned; confirm the buyer opted to save the card and that the card payment was captured successfully.【F:includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php†L19-L92】【F:includes/classes/observers/auto.paypalrestful_recurring.php†L126-L149】
+* **Attribute typos.** If a subscription is missing from the log, review the product in **Attributes Controller** to confirm the option names use the exact labels listed above. The observer skips products with incomplete data rather than logging partial records.【F:includes/classes/observers/auto.paypalrestful_recurring.php†L150-L205】
+* **Vault lookups.** The observer reuses the `VaultManager` helper to find the most recent vault record for the order's customer. If the `paypal_vault_id` column is `0`, the module could not find a matching vaulted card. Inspect the customer's saved cards via the `account_saved_credit_cards` page or enable the module's debug logging to trace the card flow.【F:includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php†L63-L152】【F:includes/classes/observers/auto.paypalrestful_recurring.php†L214-L236】
+
+The observer raises `NOTIFY_RECURRING_ORDER_LOGGED` after it writes at least one subscription, preserving compatibility with legacy plugins that listened for recurring-order events.【F:includes/classes/observers/auto.paypalrestful_recurring.php†L142-L149】

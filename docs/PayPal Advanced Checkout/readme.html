@@ -231,6 +231,68 @@
               <p>Enable the optional saved-card management page (<code>account_saved_credit_cards</code>) so subscribers can update vault details that PayPal uses for subsequent charges.</p>
             </li>
           </ol>
+          <h5>Configure product attributes</h5>
+          <p class="bodyText">Create the subscription attributes in <strong>Catalog &rarr; Option Name Manager</strong> and assign them to each recurring product via the <strong>Attributes Controller</strong>. The observer lowercases and slugifies the option labels, so keep the exact wording shown below.</p>
+          <table class="bodyTable">
+            <thead>
+              <tr>
+                <th>Attribute label</th>
+                <th>Suggested type</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>PayPal Subscription Plan ID</td>
+                <td>Text</td>
+                <td>Required. Stores the PayPal plan identifier returned by <code>createPlan()</code>.</td>
+              </tr>
+              <tr>
+                <td>PayPal Subscription Billing Period</td>
+                <td>Dropdown</td>
+                <td>Required. Accepts Day, Week, Month, Year, or Semi-Month. The observer normalizes common variants to PayPal&rsquo;s interval units.</td>
+              </tr>
+              <tr>
+                <td>PayPal Subscription Billing Frequency</td>
+                <td>Text</td>
+                <td>Required. Numeric value representing the number of intervals between charges. Values less than 1 are ignored.</td>
+              </tr>
+              <tr>
+                <td>PayPal Subscription Total Billing Cycles</td>
+                <td>Text</td>
+                <td>Optional. Use <code>0</code> to renew indefinitely.</td>
+              </tr>
+              <tr>
+                <td>PayPal Subscription Trial Period</td>
+                <td>Dropdown</td>
+                <td>Optional. Uses the same vocabulary as the billing period column. Leave blank to skip trials.</td>
+              </tr>
+              <tr>
+                <td>PayPal Subscription Trial Frequency</td>
+                <td>Text</td>
+                <td>Optional. Only applied when a trial period is present.</td>
+              </tr>
+              <tr>
+                <td>PayPal Subscription Trial Total Billing Cycles</td>
+                <td>Text</td>
+                <td>Optional. Limits the number of trial renewals.</td>
+              </tr>
+              <tr>
+                <td>PayPal Subscription Setup Fee</td>
+                <td>Text</td>
+                <td>Optional. Parsed as a decimal amount; currency symbols are stripped automatically.</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="bodyText">Assign the attributes to each subscription SKU. The observer ignores products that are missing any of the required fields so that partial records are never written.</p>
+          <h5>Subscription logging &amp; troubleshooting</h5>
+          <p class="bodyText">When the buyer saves their card during checkout, the observer records a row in the <code>paypal_subscriptions</code> table for every qualifying line item. Each entry captures the order and product identifiers, normalized billing metadata, and the vault profile so follow-up captures can reuse the saved card token.</p>
+          <ul class="bodyList">
+            <li><strong>Status values:</strong> <code>pending</code> indicates a vault token was present. <code>awaiting_vault</code> means no vault metadata was returned; confirm the shopper opted to store the card and that the payment captured successfully.</li>
+            <li><strong>Attribute typos:</strong> Verify the option names match the labels above exactly if a subscription fails to appear in the log.</li>
+            <li><strong>Vault lookups:</strong> The observer consults the customer&rsquo;s saved cards to locate the vault token. If <code>paypal_vault_id</code> is <code>0</code>, review the customer&rsquo;s saved cards page or enable PayPal Advanced Checkout debug logging.</li>
+            <li><strong>Notifier hook:</strong> The module raises <code>NOTIFY_RECURRING_ORDER_LOGGED</code> after logging at least one subscription so legacy observers continue to fire.</li>
+          </ul>
         </div>
       </div>
       <!--EOF USAGE-->
