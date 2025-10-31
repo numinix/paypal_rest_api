@@ -139,13 +139,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // If this is a request to pay via PayPal Wallet, add the 'paypal' payment source
         // to the order-creation request;
         //
-        if ($ppr_type !== 'card') {
-            $this->request['payment_source']['paypal'] = $this->buildPayPalPaymentSource($order);
-        // -----
-        // If this is a request to pay for via a credit card, add the 'card' payment source
-        // to the order-creation request.
-        //
-        } else {
+        if ($ppr_type === 'card') {
             $this->request['payment_source']['card'] = $this->buildCardPaymentSource($order, $cc_info);
 
             // -----
@@ -156,6 +150,10 @@ class CreatePayPalOrderRequest extends ErrorInfo
             if (count($supplementary_data) !== 0) {
                 $this->request['purchase_units'][0]['supplementary_data'] = $supplementary_data;
             }
+        } elseif ($ppr_type === 'google_pay') {
+            $this->request['payment_source']['google_pay'] = $this->buildGooglePayPaymentSource($order);
+        } else {
+            $this->request['payment_source']['paypal'] = $this->buildPayPalPaymentSource($order);
         }
 
         $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request, true, true));
@@ -531,6 +529,27 @@ class CreatePayPalOrderRequest extends ErrorInfo
         if (isset($_POST['ppr_cc_sca_always']) || (defined('MODULE_PAYMENT_PAYPALR_SCA_ALWAYS') && MODULE_PAYMENT_PAYPALR_SCA_ALWAYS === 'true')) {
             $payment_source['attributes']['verification']['method'] = 'SCA_ALWAYS'; //- Defaults to 'SCA_WHEN_REQUIRED' for live environment
         }
+        return $payment_source;
+    }
+
+    protected function buildGooglePayPaymentSource(\order $order): array
+    {
+        $payment_source = [
+            'name' => [
+                'given_name' => $order->billing['firstname'],
+                'surname' => $order->billing['lastname'],
+            ],
+            'email_address' => $order->customer['email_address'],
+            'billing_address' => Address::get($order->billing),
+        ];
+
+        $phone = $order->customer['telephone'] ?? '';
+        if ($phone !== '') {
+            $payment_source['phone_number'] = [
+                'national_number' => preg_replace('/[^0-9]/', '', (string)$phone),
+            ];
+        }
+
         return $payment_source;
     }
 

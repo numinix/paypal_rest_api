@@ -37,6 +37,31 @@ LanguageCompatibility::load();
  */
 class paypalr extends base
 {
+    /**
+     * Allows module variants to override the status configuration used to determine whether
+     * the PayPal REST integration should be initialised.
+     */
+    protected function getModuleStatusSetting(): string
+    {
+        return defined('MODULE_PAYMENT_PAYPALR_STATUS') ? MODULE_PAYMENT_PAYPALR_STATUS : 'False';
+    }
+
+    /**
+     * Allows module variants to supply their own sort-order configuration value.
+     */
+    protected function getModuleSortOrder(): ?int
+    {
+        return defined('MODULE_PAYMENT_PAYPALR_SORT_ORDER') ? (int)MODULE_PAYMENT_PAYPALR_SORT_ORDER : null;
+    }
+
+    /**
+     * Allows module variants to supply their own zone restriction identifier.
+     */
+    protected function getModuleZoneSetting(): int
+    {
+        return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
+    }
+
     protected const CURRENT_VERSION = '1.3.2';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
@@ -215,13 +240,14 @@ class paypalr extends base
             $this->description = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION, self::CURRENT_VERSION);
         }
 
-        $this->sort_order = defined('MODULE_PAYMENT_PAYPALR_SORT_ORDER') ? ((int)MODULE_PAYMENT_PAYPALR_SORT_ORDER) : null;
+        $this->sort_order = $this->getModuleSortOrder();
         if (null === $this->sort_order) {
             return;
         }
 
         // @TODO - "Retired" check should accommodate 'webhook' mode too, because we do want to still respond to webhooks when in Retired mode.
-        $this->enabled = (MODULE_PAYMENT_PAYPALR_STATUS === 'True' || (IS_ADMIN_FLAG === true && MODULE_PAYMENT_PAYPALR_STATUS === 'Retired'));
+        $module_status_setting = $this->getModuleStatusSetting();
+        $this->enabled = ($module_status_setting === 'True' || (IS_ADMIN_FLAG === true && $module_status_setting === 'Retired'));
 
         $this->errorInfo = new ErrorInfo();
 
@@ -244,10 +270,10 @@ class paypalr extends base
         }
         $this->order_status = ($order_status > 1) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
 
-        $this->zone = (int)MODULE_PAYMENT_PAYPALR_ZONE;
+        $this->zone = $this->getModuleZoneSetting();
 
         if (IS_ADMIN_FLAG === true) {
-            if (MODULE_PAYMENT_PAYPALR_STATUS === 'Retired') {
+            if ($module_status_setting === 'Retired') {
                 $this->title .= ' <strong>(Retired)</strong>';
             }
             if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
@@ -1730,7 +1756,14 @@ class paypalr extends base
      */
     public function confirmation()
     {
-        if ($_SESSION['PayPalRestful']['Order']['payment_source'] !== 'card') {
+        $payment_source = $_SESSION['PayPalRestful']['Order']['payment_source'] ?? 'paypal';
+        if ($payment_source === 'google_pay') {
+            return [
+                'title' => defined('MODULE_PAYMENT_PAYPALR_PAYING_WITH_GOOGLE_PAY') ? MODULE_PAYMENT_PAYPALR_PAYING_WITH_GOOGLE_PAY : MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL,
+            ];
+        }
+
+        if ($payment_source !== 'card') {
             return [
                 'title' => MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL,
             ];
@@ -2368,26 +2401,49 @@ class paypalr extends base
         ];
 
         $payment_source = $this->orderInfo['payment_source'][$payment_type];
-        if ($payment_type !== 'card') {
+        $card_like_payment = in_array($payment_type, ['card', 'google_pay'], true);
+        if ($card_like_payment === false) {
             $first_name = $payment_source['name']['given_name'];
             $last_name = $payment_source['name']['surname'];
             $email_address = $payment_source['email_address'];
             $payer_id = $this->orderInfo['payer']['payer_id'];
             $memo = [];
         } else {
-            $name_elements = explode(' ', $payment_source['name']);
-            $first_name = $name_elements[0];
-            unset($name_elements[0]);
-            $last_name = implode(' ', $name_elements);
-            $email_address = '';
-            $payer_id = '';
+            if ($payment_type === 'google_pay') {
+                $card_source = $payment_source['card'] ?? [];
+                if (isset($payment_source['vault'])) {
+                    $card_source['vault'] = $payment_source['vault'];
+                }
+
+                $name = $payment_source['name'] ?? [];
+                if (is_array($name)) {
+                    $first_name = $name['given_name'] ?? '';
+                    $last_name = $name['surname'] ?? '';
+                } else {
+                    $name_elements = preg_split('/\s+/', (string)$name);
+                    $first_name = $name_elements[0] ?? '';
+                    unset($name_elements[0]);
+                    $last_name = implode(' ', $name_elements);
+                }
+                $email_address = $payment_source['email_address'] ?? '';
+                $payer_id = $this->orderInfo['payer']['payer_id'] ?? '';
+            } else {
+                $card_source = $payment_source;
+                $name_elements = explode(' ', $payment_source['name']);
+                $first_name = $name_elements[0];
+                unset($name_elements[0]);
+                $last_name = implode(' ', $name_elements);
+                $email_address = '';
+                $payer_id = '';
+            }
+
             $memo = [
-                'card_info' => $payment_source,
+                'card_info' => $card_source,
                 'processor_response' => $payment['processor_response'] ?? 'n/a',
                 'network_transaction_reference' => $payment['network_transaction_reference'] ?? 'n/a',
             ];
 
-            $storedVault = $this->storeVaultCardData($orders_id, $payment_source);
+            $storedVault = $this->storeVaultCardData($orders_id, $card_source);
             if ($storedVault !== null) {
                 $memo['vault'] = [
                     'vault_id' => $storedVault['vault_id'],
