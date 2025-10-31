@@ -1769,6 +1769,12 @@ class paypalr extends base
             ];
         }
 
+        if ($payment_source === 'venmo') {
+            return [
+                'title' => defined('MODULE_PAYMENT_PAYPALR_PAYING_WITH_VENMO') ? MODULE_PAYMENT_PAYPALR_PAYING_WITH_VENMO : MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL,
+            ];
+        }
+
         if ($payment_source !== 'card') {
             return [
                 'title' => MODULE_PAYMENT_PALPALR_PAYING_WITH_PAYPAL,
