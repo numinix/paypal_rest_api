@@ -320,7 +320,11 @@ class zcObserverPaypalrestful
         }
 
         // possible components for future SDK integration: buttons,marks,messages,funding-eligibility,hosted-fields,card-fields,applepay
-        $js_fields['components'] = 'messages';
+        $components = ['messages'];
+        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS !== 'False') {
+            $components[] = 'googlepay';
+        }
+        $js_fields['components'] = implode(',', array_unique($components));
 
         $js_page_type = $this->getMessagesPageType();
 
