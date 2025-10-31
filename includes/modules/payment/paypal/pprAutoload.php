@@ -18,3 +18,6 @@ $psr4Autoloader->addPrefix('PayPalRestful\Common', DIR_FS_CATALOG . DIR_WS_MODUL
 $psr4Autoloader->addPrefix('PayPalRestful\Token', DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Token');
 $psr4Autoloader->addPrefix('PayPalRestful\Webhooks', DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Webhooks');
 $psr4Autoloader->addPrefix('PayPalRestful\Zc2Pp', DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Zc2Pp');
+
+require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/StoreCredit.php';
+\PayPalRestful\Compatibility\StoreCredit::ensureSafeApplyCredit();
