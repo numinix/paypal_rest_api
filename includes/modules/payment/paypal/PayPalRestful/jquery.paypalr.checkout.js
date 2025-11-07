@@ -136,6 +136,14 @@ jQuery(document).ready(function() {
     var $checkoutForm = jQuery('form[name="checkout_payment"]');
     var $paypalButton = jQuery('#ppr-choice-paypal .ppr-choice-label');
 
+    if (!$paypalButton.length) {
+        $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"] img');
+    }
+
+    if (!$paypalButton.length) {
+        $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"]');
+    }
+
     if ($checkoutForm.length && $paypalButton.length) {
         $paypalButton.on('click', function() {
             window.setTimeout(function() {
