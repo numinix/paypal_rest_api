@@ -133,6 +133,27 @@ jQuery(document).ready(function() {
 
     updateSavedCardVisibility();
 
+    var $checkoutForm = jQuery('form[name="checkout_payment"]');
+    var $paypalButton = jQuery('#ppr-choice-paypal .ppr-choice-label');
+
+    if ($checkoutForm.length && $paypalButton.length) {
+        $paypalButton.on('click', function() {
+            window.setTimeout(function() {
+                if (!jQuery('#ppr-paypal').is(':checked')) {
+                    return;
+                }
+
+                var $moduleRadio = jQuery('#pmt-paypalr');
+                var moduleSelected =
+                    !$moduleRadio.length || !$moduleRadio.is(':radio') || $moduleRadio.is(':checked');
+
+                if (moduleSelected) {
+                    $checkoutForm.trigger('submit');
+                }
+            }, 0);
+        });
+    }
+
     var $ccNumberInput = jQuery('#paypalr-cc-number');
     if ($ccNumberInput.length) {
         function getCardGrouping(digits)
