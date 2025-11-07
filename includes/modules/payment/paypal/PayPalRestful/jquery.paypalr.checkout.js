@@ -144,10 +144,35 @@ jQuery(document).ready(function() {
         $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"]');
     }
 
+    function paypalWalletIsSelected()
+    {
+        var $paypalRadio = jQuery('#ppr-paypal');
+        if ($paypalRadio.length && $paypalRadio.is(':radio')) {
+            return $paypalRadio.is(':checked');
+        }
+
+        var $pprTypeInputs = jQuery('input[name="ppr_type"]');
+        if (!$pprTypeInputs.length) {
+            return true;
+        }
+
+        var $checkedInput = $pprTypeInputs.filter(':checked');
+        if ($checkedInput.length) {
+            return $checkedInput.val() === 'paypal';
+        }
+
+        var paypalHidden = $pprTypeInputs.filter(function() {
+            var inputType = (jQuery(this).attr('type') || '').toLowerCase();
+            return inputType === 'hidden' && jQuery(this).val() === 'paypal';
+        });
+
+        return paypalHidden.length > 0;
+    }
+
     if ($checkoutForm.length && $paypalButton.length) {
         $paypalButton.on('click', function() {
             window.setTimeout(function() {
-                if (!jQuery('#ppr-paypal').is(':checked')) {
+                if (!paypalWalletIsSelected()) {
                     return;
                 }
 
@@ -156,7 +181,29 @@ jQuery(document).ready(function() {
                     !$moduleRadio.length || !$moduleRadio.is(':radio') || $moduleRadio.is(':checked');
 
                 if (moduleSelected) {
-                    $checkoutForm.trigger('submit');
+                    if (typeof window.oprcShowProcessingOverlay === 'function') {
+                        window.oprcShowProcessingOverlay();
+                    }
+
+                    var formElement = $checkoutForm.get(0);
+                    if (!formElement) {
+                        return;
+                    }
+
+                    var previousAllowState = typeof window.oprcAllowNativeCheckoutSubmit !== 'undefined' 
+                        ? window.oprcAllowNativeCheckoutSubmit 
+                        : false;
+                    window.oprcAllowNativeCheckoutSubmit = true;
+
+                    try {
+                        if (typeof formElement.requestSubmit === 'function') {
+                            formElement.requestSubmit();
+                        } else if (typeof formElement.submit === 'function') {
+                            formElement.submit();
+                        }
+                    } finally {
+                        window.oprcAllowNativeCheckoutSubmit = previousAllowState;
+                    }
                 }
             }, 0);
         });

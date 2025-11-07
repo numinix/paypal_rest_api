@@ -950,11 +950,14 @@ class paypalr extends base
         // to the customer if either their shipping or billing address' country isn't supported by
         // PayPal.
         //
+        $checkoutScript = '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>';
+
         $selection = [
             'id' => $this->code,
             'module' =>
                 '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
-                zen_draw_hidden_field('ppr_type', 'paypal'),
+                zen_draw_hidden_field('ppr_type', 'paypal') .
+                $checkoutScript,
         ];
 
         // -----
@@ -1090,7 +1093,6 @@ class paypalr extends base
             [
                 'title' => '<span class="ppr-choice-label">' . MODULE_PAYMENT_PALPALR_CHOOSE_CARD . '</span>',
                 'field' =>
-                    '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>' .
                     '<div id="ppr-choice-card" class="ppr-button-choice">' .
                         zen_draw_radio_field('ppr_type', 'card', $card_selected, 'id="ppr-card" class="ppr-choice"') .
                         '<label for="ppr-card" class="ppr-choice-label">' .
