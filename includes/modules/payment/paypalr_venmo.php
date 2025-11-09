@@ -105,9 +105,9 @@ class paypalr_venmo extends paypalr
         ];
     }
 
-    public function javascript_validation()
+    public function javascript_validation(): string
     {
-        return false;
+        return '';
     }
 
     public function pre_confirmation_check()
