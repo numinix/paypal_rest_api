@@ -333,14 +333,12 @@ class paypalr extends base
         // If the configuration's invalid (admin/storefront)
         // or if we're processing for the admin or a webhook, all finished here!
         //
-        $this->enabled = ($this->enabled === true && $this->validateConfiguration($curl_installed));
-        if ($this->enabled && IS_ADMIN_FLAG === true) {
-            // register/update known webhooks
-            // Note: Skip webhook registration when just listing modules on the admin page to avoid
-            // synchronous HTTP calls that can timeout and block page loading. Webhook registration
-            // will still occur when editing module configuration or during install/update operations.
-            global $current_page;
-            if ($current_page !== FILENAME_MODULES) {
+        if (IS_ADMIN_FLAG === true && $current_page === FILENAME_MODULES) {
+            // Don’t validate (no network) when simply listing modules
+            // Leave $this->enabled as-is so the row renders quickly.
+        } else {
+            $this->enabled = ($this->enabled === true && $this->validateConfiguration($curl_installed));
+            if ($this->enabled && IS_ADMIN_FLAG === true && $current_page !== FILENAME_MODULES) {
                 $this->ppr->registerAndUpdateSubscribedWebhooks();
             }
         }
