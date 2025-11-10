@@ -13,7 +13,6 @@
 use PayPalRestful\Api\Data\CountryCodes;
 use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Zc2Pp\Amount;
-use Zencart\Traits\ObserverManager;
 
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
@@ -22,7 +21,7 @@ if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
 
 class zcObserverPaypalrestful
 {
-    use ObserverManager;
+    use \Zencart\Traits\ObserverManager;
 
     protected array $lastOrderValues = [];
     protected array $orderTotalChanges = [];
