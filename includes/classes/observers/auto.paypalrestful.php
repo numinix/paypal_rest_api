@@ -13,16 +13,12 @@
 use PayPalRestful\Api\Data\CountryCodes;
 use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Zc2Pp\Amount;
-use Zencart\Traits\ObserverManager;
 
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
-if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
-    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ObserverManager.php';
-}
 
 class zcObserverPaypalrestful
 {
-    use ObserverManager;
+    use \Zencart\Traits\ObserverManager;
 
     protected array $lastOrderValues = [];
     protected array $orderTotalChanges = [];
@@ -460,6 +456,84 @@ let paypalMessageableStyles = <?= !empty($messageStyles) ? json_encode($messageS
         }
 
         return 'None';
+    }
+
+    private function observerManagerUsesEventDto(): bool
+    {
+        static $supportsEventDto = null;
+
+        if ($supportsEventDto === null) {
+            $supportsEventDto = class_exists('\\Zencart\\Events\\EventDto');
+        }
+
+        return $supportsEventDto;
+    }
+
+    public function notify(
+        $eventID,
+        $param1 = [],
+        &$param2 = null,
+        &$param3 = null,
+        &$param4 = null,
+        &$param5 = null,
+        &$param6 = null,
+        &$param7 = null,
+        &$param8 = null,
+        &$param9 = null
+    ) {
+        if ($this->observerManagerUsesEventDto()) {
+            $eventDispatcher = \Zencart\Events\EventDto::getInstance();
+
+            if (method_exists($eventDispatcher, 'notify')) {
+                $eventDispatcher->notify(
+                    $eventID,
+                    $param1,
+                    $param2,
+                    $param3,
+                    $param4,
+                    $param5,
+                    $param6,
+                    $param7,
+                    $param8,
+                    $param9
+                );
+
+                return;
+            }
+
+            if (method_exists($eventDispatcher, 'dispatch')) {
+                $eventDispatcher->dispatch(
+                    $eventID,
+                    $param1,
+                    $param2,
+                    $param3,
+                    $param4,
+                    $param5,
+                    $param6,
+                    $param7,
+                    $param8,
+                    $param9
+                );
+
+                return;
+            }
+        }
+
+        global $zco_notifier;
+        if (is_object($zco_notifier) && method_exists($zco_notifier, 'notify')) {
+            $zco_notifier->notify(
+                $eventID,
+                $param1,
+                $param2,
+                $param3,
+                $param4,
+                $param5,
+                $param6,
+                $param7,
+                $param8,
+                $param9
+            );
+        }
     }
 }
 
