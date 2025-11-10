@@ -336,7 +336,13 @@ class paypalr extends base
         $this->enabled = ($this->enabled === true && $this->validateConfiguration($curl_installed));
         if ($this->enabled && IS_ADMIN_FLAG === true) {
             // register/update known webhooks
-            $this->ppr->registerAndUpdateSubscribedWebhooks();
+            // Note: Skip webhook registration when just listing modules on the admin page to avoid
+            // synchronous HTTP calls that can timeout and block page loading. Webhook registration
+            // will still occur when editing module configuration or during install/update operations.
+            global $current_page;
+            if ($current_page !== FILENAME_MODULES) {
+                $this->ppr->registerAndUpdateSubscribedWebhooks();
+            }
         }
         if ($this->enabled === false || IS_ADMIN_FLAG === true || $loaderPrefix === 'webhook') {
             return;
