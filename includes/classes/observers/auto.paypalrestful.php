@@ -287,6 +287,82 @@ class zcObserverPaypalrestful
         return $this->freeShippingCoupon;
     }
 
+    // -----
+    // Ensure notify() method is available, even if the ObserverManager trait
+    // doesn't provide it (compatibility fix for various Zen Cart versions).
+    // This method delegates to the appropriate notification system based on
+    // what's available in the current environment.
+    //
+    public function notify(
+        $eventID,
+        $param1 = [],
+        &$param2 = null,
+        &$param3 = null,
+        &$param4 = null,
+        &$param5 = null,
+        &$param6 = null,
+        &$param7 = null,
+        &$param8 = null,
+        &$param9 = null
+    ) {
+        // -----
+        // Check if the newer EventDto notifier is available (ZC 2.0+)
+        //
+        if (class_exists('\\Zencart\\Events\\EventDto')) {
+            $eventDispatcher = \Zencart\Events\EventDto::getInstance();
+
+            if (method_exists($eventDispatcher, 'notify')) {
+                $eventDispatcher->notify(
+                    $eventID,
+                    $param1,
+                    $param2,
+                    $param3,
+                    $param4,
+                    $param5,
+                    $param6,
+                    $param7,
+                    $param8,
+                    $param9
+                );
+                return;
+            }
+
+            if (method_exists($eventDispatcher, 'dispatch')) {
+                $eventDispatcher->dispatch(
+                    $eventID,
+                    $param1,
+                    $param2,
+                    $param3,
+                    $param4,
+                    $param5,
+                    $param6,
+                    $param7,
+                    $param8,
+                    $param9
+                );
+                return;
+            }
+        }
+
+        // -----
+        // Fall back to the legacy $zco_notifier (ZC 1.5.x)
+        //
+        global $zco_notifier;
+        if (is_object($zco_notifier) && method_exists($zco_notifier, 'notify')) {
+            $zco_notifier->notify(
+                $eventID,
+                $param1,
+                $param2,
+                $param3,
+                $param4,
+                $param5,
+                $param6,
+                $param7,
+                $param8,
+                $param9
+            );
+        }
+    }
 
     /** Internal methods **/
 
