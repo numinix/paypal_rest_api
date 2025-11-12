@@ -111,6 +111,21 @@ jQuery(document).ready(function() {
         }
     });
 
+    // Handle mousedown events to ensure parent radio is selected BEFORE the sub-radio changes
+    // This ensures the main payment radio is selected before any validation occurs
+    jQuery('#ppr-paypal, #ppr-card').on('mousedown', function() {
+        if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
+            jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
+        }
+    });
+
+    // Handle mousedown on labels as well to cover all click scenarios
+    jQuery('label[for="ppr-paypal"], label[for="ppr-card"]').on('mousedown', function() {
+        if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
+            jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
+        }
+    });
+
     jQuery('#ppr-paypal, #ppr-card').on('change', function() {
         // When a sub-radio (PayPal Wallet or Credit Card) is selected,
         // ensure the parent payment module radio is also selected
