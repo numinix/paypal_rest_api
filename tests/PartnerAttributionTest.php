@@ -4,8 +4,8 @@ declare(strict_types=1);
 /**
  * Test to verify that the Numinix partner attribution ID is included in all PayPal API calls.
  * 
- * This test confirms that all payment modules (paypalr, paypalr_applepay, paypalr_googlepay, 
- * paypalr_venmo) and all supporting code (admin observers, listeners, webhooks, vault management)
+ * This test confirms that all payment modules (paypalr, paypal_applepay, paypal_googlepay, 
+ * paypal_venmo) and all supporting code (admin observers, listeners, webhooks, vault management)
  * use the centralized PayPalRestfulApi class which automatically includes the partner attribution
  * header in all HTTP requests to PayPal.
  *
@@ -173,9 +173,9 @@ namespace {
      */
     echo "\nTest 4: Checking wallet modules extend paypalr...\n";
     $walletModules = [
-        'paypalr_applepay' => dirname(__DIR__) . '/includes/modules/payment/paypalr_applepay.php',
-        'paypalr_googlepay' => dirname(__DIR__) . '/includes/modules/payment/paypalr_googlepay.php',
-        'paypalr_venmo' => dirname(__DIR__) . '/includes/modules/payment/paypalr_venmo.php',
+        'paypal_applepay' => dirname(__DIR__) . '/includes/modules/payment/paypal_applepay.php',
+        'paypal_googlepay' => dirname(__DIR__) . '/includes/modules/payment/paypal_googlepay.php',
+        'paypal_venmo' => dirname(__DIR__) . '/includes/modules/payment/paypal_venmo.php',
     ];
     
     foreach ($walletModules as $moduleName => $modulePath) {
