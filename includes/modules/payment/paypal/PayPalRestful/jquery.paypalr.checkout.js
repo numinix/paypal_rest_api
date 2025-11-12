@@ -1,4 +1,7 @@
 jQuery(document).ready(function() {
+    // Flag to prevent interference when selecting sub-radios
+    var selectingSubRadio = false;
+    
     function hidePprCcFields()
     {
         jQuery('.ppr-cc').each(function() {
@@ -99,7 +102,8 @@ jQuery(document).ready(function() {
     jQuery('input[name=payment]').on('change', function() {
         if (jQuery('#pmt-paypalr').is(':not(:checked)')) {
             jQuery('#ppr-paypal, #ppr-card').prop('checked', false);
-        } else if (jQuery('#ppr-paypal').is(':not(:checked)') && jQuery('#ppr-card').is(':not(:checked)')) {
+        } else if (!selectingSubRadio && jQuery('#ppr-paypal').is(':not(:checked)') && jQuery('#ppr-card').is(':not(:checked)')) {
+            // Only auto-select ppr-paypal if we're not in the middle of selecting a sub-radio
             jQuery('#ppr-paypal').prop('checked', true);
         }
         if (jQuery('#ppr-card').is(':checked')) {
@@ -114,16 +118,26 @@ jQuery(document).ready(function() {
     // Handle mousedown events to ensure parent radio is selected BEFORE the sub-radio changes
     // This ensures the main payment radio is selected before any validation occurs
     jQuery('#ppr-paypal, #ppr-card').on('mousedown', function() {
+        selectingSubRadio = true;
         if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
             jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
         }
+        // Clear the flag after a short delay to allow the click to complete
+        setTimeout(function() {
+            selectingSubRadio = false;
+        }, 50);
     });
 
     // Handle mousedown on labels as well to cover all click scenarios
     jQuery('label[for="ppr-paypal"], label[for="ppr-card"]').on('mousedown', function() {
+        selectingSubRadio = true;
         if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
             jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
         }
+        // Clear the flag after a short delay to allow the click to complete
+        setTimeout(function() {
+            selectingSubRadio = false;
+        }, 50);
     });
 
     jQuery('#ppr-paypal, #ppr-card').on('change', function() {
