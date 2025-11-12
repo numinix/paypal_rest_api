@@ -29,6 +29,9 @@ class paypalr_applepay extends paypalr
         }
 
         $this->code = 'paypalr_applepay';
+        
+        // Load wallet-specific language file to override parent module constants
+        $this->loadWalletLanguageFile();
 
         $module_status_setting = $this->getModuleStatusSetting();
         $debugActive = (strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false);
@@ -77,6 +80,26 @@ class paypalr_applepay extends paypalr
     protected function getModuleZoneSetting(): int
     {
         return $this->variantZoneSetting;
+    }
+
+    protected function loadWalletLanguageFile(): void
+    {
+        $language = $_SESSION['language'] ?? 'english';
+        if (IS_ADMIN_FLAG === true) {
+            $language = $_SESSION['admin_language'] ?? 'english';
+        }
+        
+        $langFile = DIR_FS_CATALOG . DIR_WS_LANGUAGES . $language . '/modules/payment/lang.' . $this->code . '.php';
+        if (file_exists($langFile)) {
+            $definitions = include $langFile;
+            if (is_array($definitions)) {
+                foreach ($definitions as $constant => $value) {
+                    if (!defined($constant)) {
+                        define($constant, $value);
+                    }
+                }
+            }
+        }
     }
 
     public function selection(): array

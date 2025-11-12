@@ -89,15 +89,28 @@ jQuery(document).ready(function() {
         }
     }
 
-    if (jQuery('#pmt-paypalr').is(':not(:checked)') || jQuery('#ppr-card').is(':not(:checked)')) {
-        hidePprCcFields();
-        if (jQuery('#pmt-paypalr').is(':not(:checked)') && jQuery('#pmt-paypalr').is(':radio')) {
+    // Initialize parent radio selection if sub-radios are checked
+    if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
+        // Check if any sub-radio is selected
+        if (jQuery('#ppr-paypal').is(':checked') || jQuery('#ppr-card').is(':checked')) {
+            // If a sub-radio is selected, select the parent radio
+            jQuery('#pmt-paypalr').prop('checked', true);
+        } else {
+            // If no sub-radio is selected, ensure they're unchecked
             jQuery('#ppr-paypal, #ppr-card').prop('checked', false);
-        } else if (jQuery('#pmt-paypalr').is(':not(:radio)')) {
-            jQuery('#ppr-paypal').prop('checked', true);
         }
-        updateSavedCardVisibility();
+    } else if (jQuery('#pmt-paypalr').is(':not(:radio)')) {
+        // If pmt-paypalr is not a radio (only payment method), default to PayPal
+        jQuery('#ppr-paypal').prop('checked', true);
     }
+    
+    // Handle initial credit card field visibility
+    if (jQuery('#ppr-card').is(':checked')) {
+        showPprCcFields();
+    } else {
+        hidePprCcFields();
+    }
+    updateSavedCardVisibility();
 
     jQuery('input[name=payment]').on('change', function() {
         if (jQuery('#pmt-paypalr').is(':not(:checked)')) {

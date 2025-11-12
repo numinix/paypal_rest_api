@@ -334,7 +334,7 @@ class paypalr extends base
         // or if we're processing for the admin or a webhook, all finished here!
         //
         if (IS_ADMIN_FLAG === true && $current_page === FILENAME_MODULES) {
-            // Don’t validate (no network) when simply listing modules
+            // Donï¿½t validate (no network) when simply listing modules
             // Leave $this->enabled as-is so the row renders quickly.
         } else {
             $this->enabled = ($this->enabled === true && $this->validateConfiguration($curl_installed));
@@ -1079,6 +1079,35 @@ class paypalr extends base
         }
 
         $billing_name = zen_output_string_protected($order->billing['firstname'] . ' ' . $order->billing['lastname']);
+        // Inline script to ensure parent radio is selected when sub-radios are clicked
+        $parentRadioScript = '<script>
+            jQuery(document).ready(function() {
+                // Bind to sub-radio clicks to select parent radio
+                jQuery("#ppr-paypal, #ppr-card").on("click change", function() {
+                    var $parentRadio = jQuery("#pmt-paypalr");
+                    if ($parentRadio.length && $parentRadio.is(":radio") && !$parentRadio.is(":checked")) {
+                        $parentRadio.prop("checked", true).trigger("change");
+                    }
+                });
+                
+                // Bind to sub-radio label clicks
+                jQuery("label[for=\"ppr-paypal\"], label[for=\"ppr-card\"]").on("click", function() {
+                    var $parentRadio = jQuery("#pmt-paypalr");
+                    if ($parentRadio.length && $parentRadio.is(":radio") && !$parentRadio.is(":checked")) {
+                        $parentRadio.prop("checked", true).trigger("change");
+                    }
+                });
+                
+                // Initialize parent radio if sub-radio is already checked
+                if ((jQuery("#ppr-paypal").is(":checked") || jQuery("#ppr-card").is(":checked"))) {
+                    var $parentRadio = jQuery("#pmt-paypalr");
+                    if ($parentRadio.length && $parentRadio.is(":radio") && !$parentRadio.is(":checked")) {
+                        $parentRadio.prop("checked", true);
+                    }
+                }
+            });
+        </script>';
+
         $fields = [
             [
                 'title' =>
@@ -1091,7 +1120,8 @@ class paypalr extends base
                         '<label for="ppr-paypal" class="ppr-choice-label">' .
                             '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
                         '</label>' .
-                    '</div>',
+                    '</div>' .
+                    $parentRadioScript,
                 'tag' => 'ppr-paypal',
             ],
             [
