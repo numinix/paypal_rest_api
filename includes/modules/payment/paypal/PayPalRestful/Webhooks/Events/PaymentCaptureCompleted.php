@@ -20,6 +20,32 @@ class PaymentCaptureCompleted extends WebhookHandlerContract
     protected $eventsHandled = [
         'PAYMENT.CAPTURE.COMPLETED',
     ];
+
+    /**
+     * Check if a capture transaction already exists in the database
+     *
+     * @param string $txnID The PayPal transaction ID
+     * @param int $oID The order ID
+     * @return bool True if the capture exists, false otherwise
+     */
+    protected function checkCaptureExists(string $txnID, int $oID): bool
+    {
+        global $db;
+
+        $txnID = $db->prepare_input($txnID);
+
+        $result = $db->ExecuteNoCache(
+            "SELECT txn_id
+               FROM " . TABLE_PAYPAL . "
+              WHERE txn_id = '$txnID'
+                AND order_id = $oID
+                AND txn_type = 'CAPTURE'
+              LIMIT 1"
+        );
+
+        return !$result->EOF;
+    }
+
     public function action(): void
     {
         // A payment capture completes
@@ -49,15 +75,24 @@ class PaymentCaptureCompleted extends WebhookHandlerContract
             return;
         }
 
+        // Check if this capture transaction already exists before syncing
+        // This prevents duplicate status updates when PayPal sends multiple capture notifications
+        $captureAlreadyExists = $this->checkCaptureExists($txnID, $oID);
+
         // Sync our database with all updates from PayPal
         $this->getApiAndCredentials();
         $ppr_txns = new GetPayPalOrderTransactions($this->paymentModule->code, $this->paymentModule->getCurrentVersion(), $oID, $this->ppr);
         $ppr_txns->syncPaypalTxns();
 
+        // If this capture was already recorded previously, don't update order status
+        // to prevent orders from being moved back to "paid" status after they've been shipped
+        if ($captureAlreadyExists) {
+            $this->log->write("PAYMENT.CAPTURE.COMPLETED - Capture transaction $txnID already exists. Skipping order status update to prevent duplication.");
+            return;
+        }
+
         // Update order-status records noting what's happened
         $summary = $this->data['summary'];
-
-        // @TODO check status: was it already captured previously (according to our internal records)? if yes, abort to prevent duplications
 
         $amount = $this->data['resource']['amount']['value'];
         $comments =
@@ -82,7 +117,6 @@ class PaymentCaptureCompleted extends WebhookHandlerContract
             sprintf(MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION, $oID, $this->data['resource']['status'])
         );
 
-        // @TODO - is this risking duplication if the order was already captured in-real-time?
         // If funds have been captured, fire a notification so that sites that
         // manage payments are aware of the incoming funds.
         //
