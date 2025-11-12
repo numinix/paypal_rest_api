@@ -5,7 +5,7 @@
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
-require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypalr.php';
+require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr.php';
 
 use PayPalRestful\Api\PayPalRestfulApi;
 
