@@ -954,7 +954,18 @@ class paypalr extends base
         // to the customer if either their shipping or billing address' country isn't supported by
         // PayPal.
         //
-        $checkoutScript = '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '</script>';
+        $checkoutScript = '<script>
+(function() {
+    function initPayPalCheckout() {
+        if (typeof jQuery === "undefined") {
+            setTimeout(initPayPalCheckout, 50);
+            return;
+        }
+        ' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js') . '
+    }
+    initPayPalCheckout();
+})();
+</script>';
 
         $selection = [
             'id' => $this->code,
@@ -975,7 +986,18 @@ class paypalr extends base
                     [
                         'title' => '<b>' . MODULE_PAYMENT_PAYPALR_TEXT_PLEASE_NOTE . '</b>',
                         'field' =>
-                            '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.disable.js') . '</script>' .
+                            '<script>
+(function() {
+    function initPayPalDisable() {
+        if (typeof jQuery === "undefined") {
+            setTimeout(initPayPalDisable, 50);
+            return;
+        }
+        ' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.disable.js') . '
+    }
+    initPayPalDisable();
+})();
+</script>' .
                             '<small>' . MODULE_PAYMENT_PAYPALR_UNSUPPORTED_SHIPPING_COUNTRY . '</small>',
                         ],
                 ];
@@ -1081,31 +1103,40 @@ class paypalr extends base
         $billing_name = zen_output_string_protected($order->billing['firstname'] . ' ' . $order->billing['lastname']);
         // Inline script to ensure parent radio is selected when sub-radios are clicked
         $parentRadioScript = '<script>
-            jQuery(document).ready(function() {
-                // Bind to sub-radio clicks to select parent radio
-                jQuery("#ppr-paypal, #ppr-card").on("click change", function() {
-                    var $parentRadio = jQuery("#pmt-paypalr");
-                    if ($parentRadio.length && $parentRadio.is(":radio") && !$parentRadio.is(":checked")) {
-                        $parentRadio.prop("checked", true).trigger("change");
-                    }
-                });
-                
-                // Bind to sub-radio label clicks
-                jQuery("label[for=\"ppr-paypal\"], label[for=\"ppr-card\"]").on("click", function() {
-                    var $parentRadio = jQuery("#pmt-paypalr");
-                    if ($parentRadio.length && $parentRadio.is(":radio") && !$parentRadio.is(":checked")) {
-                        $parentRadio.prop("checked", true).trigger("change");
-                    }
-                });
-                
-                // Initialize parent radio if sub-radio is already checked
-                if ((jQuery("#ppr-paypal").is(":checked") || jQuery("#ppr-card").is(":checked"))) {
-                    var $parentRadio = jQuery("#pmt-paypalr");
-                    if ($parentRadio.length && $parentRadio.is(":radio") && !$parentRadio.is(":checked")) {
-                        $parentRadio.prop("checked", true);
-                    }
+(function() {
+    function initParentRadioHandler() {
+        if (typeof jQuery === "undefined") {
+            setTimeout(initParentRadioHandler, 50);
+            return;
+        }
+        jQuery(document).ready(function() {
+            // Bind to sub-radio clicks to select parent radio
+            jQuery("#ppr-paypal, #ppr-card").on("click change", function() {
+                var $parentRadio = jQuery("#pmt-paypalr");
+                if ($parentRadio.length && $parentRadio.is(":radio") && !$parentRadio.is(":checked")) {
+                    $parentRadio.prop("checked", true).trigger("change");
                 }
             });
+            
+            // Bind to sub-radio label clicks
+            jQuery("label[for=\"ppr-paypal\"], label[for=\"ppr-card\"]").on("click", function() {
+                var $parentRadio = jQuery("#pmt-paypalr");
+                if ($parentRadio.length && $parentRadio.is(":radio") && !$parentRadio.is(":checked")) {
+                    $parentRadio.prop("checked", true).trigger("change");
+                }
+            });
+            
+            // Initialize parent radio if sub-radio is already checked
+            if ((jQuery("#ppr-paypal").is(":checked") || jQuery("#ppr-card").is(":checked"))) {
+                var $parentRadio = jQuery("#pmt-paypalr");
+                if ($parentRadio.length && $parentRadio.is(":radio") && !$parentRadio.is(":checked")) {
+                    $parentRadio.prop("checked", true);
+                }
+            }
+        });
+    }
+    initParentRadioHandler();
+})();
         </script>';
 
         $fields = [
