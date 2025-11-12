@@ -1,7 +1,7 @@
 <?php
 $define = [
-    'MODULE_PAYMENT_PAYPALR_APPLEPAY_TEXT_TITLE' => 'PayPal Apple Pay',
-    'MODULE_PAYMENT_PAYPALR_APPLEPAY_TEXT_TITLE_ADMIN' => 'PayPal Apple Pay',
+    'MODULE_PAYMENT_PAYPALR_APPLEPAY_TEXT_TITLE' => 'Apple Pay',
+    'MODULE_PAYMENT_PAYPALR_APPLEPAY_TEXT_TITLE_ADMIN' => 'Apple Pay via PayPal Advanced Checkout',
     'MODULE_PAYMENT_PAYPALR_APPLEPAY_TEXT_DESCRIPTION' => 'Accept Apple Pay digital wallet transactions using your existing PayPal Advanced Checkout credentials.',
     'MODULE_PAYMENT_PAYPALR_APPLEPAY_TEXT_SELECTION' => '<strong>Pay with Apple Pay</strong> (processed by PayPal)',
     'MODULE_PAYMENT_PAYPALR_APPLEPAY_ERROR_PAYPAL_REQUIRED' => ' The PayPal Apple Pay module requires the primary PayPal Advanced Checkout extension to be installed.',

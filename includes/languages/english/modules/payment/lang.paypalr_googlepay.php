@@ -1,7 +1,7 @@
 <?php
 $define = [
-    'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_TITLE' => 'PayPal Google Pay',
-    'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_TITLE_ADMIN' => 'PayPal Google Pay',
+    'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_TITLE' => 'Google Pay',
+    'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_TITLE_ADMIN' => 'Google Pay via PayPal Advanced Checkout',
     'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_DESCRIPTION' => 'Accept Google Pay digital wallet transactions using your existing PayPal Advanced Checkout credentials.',
     'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_SELECTION' => '<strong>Pay with Google Pay</strong> (processed by PayPal)',
     'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_PAYPAL_REQUIRED' => ' The PayPal Google Pay module requires the primary PayPal Advanced Checkout extension to be installed.',

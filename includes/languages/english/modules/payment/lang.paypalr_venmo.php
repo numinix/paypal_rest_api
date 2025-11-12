@@ -1,7 +1,7 @@
 <?php
 $define = [
-    'MODULE_PAYMENT_PAYPALR_VENMO_TEXT_TITLE' => 'PayPal Venmo',
-    'MODULE_PAYMENT_PAYPALR_VENMO_TEXT_TITLE_ADMIN' => 'PayPal Venmo',
+    'MODULE_PAYMENT_PAYPALR_VENMO_TEXT_TITLE' => 'Venmo',
+    'MODULE_PAYMENT_PAYPALR_VENMO_TEXT_TITLE_ADMIN' => 'Venmo via PayPal Advanced Checkout',
     'MODULE_PAYMENT_PAYPALR_VENMO_TEXT_DESCRIPTION' => 'Accept Venmo digital wallet transactions using your existing PayPal Advanced Checkout credentials.',
     'MODULE_PAYMENT_PAYPALR_VENMO_TEXT_SELECTION' => '<strong>Pay with Venmo</strong> (processed by PayPal)',
     'MODULE_PAYMENT_PAYPALR_VENMO_ERROR_PAYPAL_REQUIRED' => ' The PayPal Venmo module requires the primary PayPal Advanced Checkout extension to be installed.',
