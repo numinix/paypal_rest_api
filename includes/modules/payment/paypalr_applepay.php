@@ -214,70 +214,7 @@ class paypalr_applepay extends base
 
     protected function tableCheckup()
     {
-        global $db, $sniffer;
-        if (!defined('TABLE_PAYPAL')) {
-            define('TABLE_PAYPAL', DB_PREFIX . 'paypal');
-        }
-        $paypal_table = $db->Execute("SHOW TABLES LIKE '" . TABLE_PAYPAL . "'");
-        if ($paypal_table->EOF) {
-            $this->createPayPalTable();
-        }
-    }
-
-    protected function createPayPalTable()
-    {
-        global $db;
-        $db->Execute(
-            "CREATE TABLE " . TABLE_PAYPAL . " (
-                paypal_ipn_id int(11) NOT NULL auto_increment,
-                order_id int(11) NOT NULL default 0,
-                txn_type varchar(40) NOT NULL default '',
-                module_name varchar(40) NOT NULL default '',
-                module_mode varchar(40) default NULL,
-                reason_code varchar(40) default NULL,
-                payment_type varchar(40) NOT NULL default '',
-                payment_status varchar(32) NOT NULL default '',
-                pending_reason varchar(64) default NULL,
-                invoice varchar(128) default NULL,
-                mc_currency char(3) NOT NULL default '',
-                first_name varchar(32) NOT NULL default '',
-                last_name varchar(32) NOT NULL default '',
-                payer_business_name varchar(64) default NULL,
-                address_name varchar(64) default NULL,
-                address_street varchar(254) default NULL,
-                address_city varchar(120) default NULL,
-                address_state varchar(120) default NULL,
-                address_zip varchar(10) default NULL,
-                address_country varchar(64) default NULL,
-                address_status varchar(11) default NULL,
-                payer_email varchar(127) default NULL,
-                payer_id varchar(32) NOT NULL default '',
-                payer_status varchar(10) default NULL,
-                payment_date datetime default NULL,
-                business varchar(64) default NULL,
-                receiver_email varchar(127) default NULL,
-                receiver_id varchar(32) default NULL,
-                txn_id varchar(20) NOT NULL default '',
-                parent_txn_id varchar(20) default NULL,
-                num_cart_items int(2) default 0,
-                mc_gross decimal(15,4) default NULL,
-                mc_fee decimal(15,4) default NULL,
-                payment_gross decimal(15,4) default NULL,
-                payment_fee decimal(15,4) default NULL,
-                settle_amount decimal(15,4) default NULL,
-                settle_currency char(3) default NULL,
-                exchange_rate decimal(15,4) default NULL,
-                notify_version varchar(20) NOT NULL default '',
-                verify_sign varchar(127) default NULL,
-                date_added datetime NOT NULL default '0001-01-01 00:00:00',
-                last_modified datetime default NULL,
-                expiration_time datetime default NULL,
-                memo text,
-                final_capture tinyint(1) NOT NULL default 0,
-                PRIMARY KEY  (paypal_ipn_id),
-                KEY idx_order_id_zen (order_id)
-            )"
-        );
+        $this->paypalCommon->tableCheckup();
     }
 
     protected function validateConfiguration(bool $curl_installed): bool
@@ -359,10 +296,7 @@ class paypalr_applepay extends base
         }
     }
 
-    protected function resetOrder()
-    {
-        unset($_SESSION['PayPalRestful']['Order']);
-    }
+
 
     public function javascript_validation(): string
     {
@@ -463,16 +397,7 @@ class paypalr_applepay extends base
 
     protected function createOrderGuid(\order $order, string $ppr_type): string
     {
-        $orders_completed = $_SESSION['PayPalRestful']['CompletedOrders'] ?? 0;
-        $guid_base = $_SESSION['customer_id'] . '-' . $_SESSION['cartID'] . '-' . $orders_completed . '-' . $ppr_type;
-
-        $cart_hash = '';
-        foreach ($order->products as $product) {
-            $cart_hash .= $product['id'] . $product['qty'];
-        }
-        $cart_hash = md5($cart_hash);
-
-        return substr($guid_base . '-' . $cart_hash, 0, 127);
+        return $this->paypalCommon->createOrderGuid($order, $ppr_type);
     }
 
     protected function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
@@ -569,14 +494,9 @@ class paypalr_applepay extends base
 
     protected function captureOrAuthorizePayment(string $payment_source): array
     {
-        $paypal_order_id = $_SESSION['PayPalRestful']['Order']['id'];
+        $response = $this->paypalCommon->captureWalletPayment($this->ppr, $this->log, 'Apple Pay');
         
-        // Apple Pay always uses capture (final sale)
-        $response = $this->ppr->captureOrder($paypal_order_id);
-
         if ($response === false) {
-            $this->log->write('Apple Pay: capture failed. ' . Logger::logJSON($this->ppr->getErrorInfo()));
-            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_CAPTURE_FAILED ?? 'Capture failed', FILENAME_CHECKOUT_PAYMENT);
         }
 
@@ -590,48 +510,9 @@ class paypalr_applepay extends base
 
     public function after_process()
     {
-        $_SESSION['PayPalRestful']['CompletedOrders'] = ($_SESSION['PayPalRestful']['CompletedOrders'] ?? 0) + 1;
-
-        $orders_id = (int)($this->orderInfo['orders_id'] ?? 0);
-        $paypal_records_exist = ($orders_id > 0) ? $this->paypalCommon->paypalOrderRecordsExist($orders_id) : false;
-        
-        if ($orders_id === 0 || $paypal_records_exist === false) {
-            $orders_id = (int)($orders_id ?: ($_SESSION['order_number_created'] ?? 0));
-            if ($orders_id > 0) {
-                $this->recordPayPalOrderDetails($orders_id);
-            }
-        }
-
-        $payment_info = $this->orderInfo['payment_info'] ?? [];
-        $timestamp = '';
-        if (isset($payment_info['created_date']) && $payment_info['created_date'] !== '') {
-            $timestamp = 'Timestamp: ' . $payment_info['created_date'] . "\n";
-        }
-
-        $message =
-            MODULE_PAYMENT_PAYPALR_TRANSACTION_ID . ($this->orderInfo['id'] ?? '') . "\n" .
-            sprintf(MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE, $payment_info['payment_type'] ?? 'apple_pay') . "\n" .
-            $timestamp .
-            MODULE_PAYMENT_PAYPALR_TRANSACTION_PAYMENT_STATUS . ($this->orderInfo['payment_status'] ?? '') . "\n" .
-            MODULE_PAYMENT_PAYPALR_TRANSACTION_AMOUNT . ($payment_info['amount'] ?? '') . "\n";
-
-        $payment_type = $this->orderInfo['payment_info']['payment_type'] ?? 'apple_pay';
-        $message .= MODULE_PAYMENT_PAYPALR_FUNDING_SOURCE . $payment_type . "\n";
-
-        if (!empty($this->orderInfo['payment_source'][$payment_type]['email_address'])) {
-            $message .= MODULE_PAYMENT_PAYPALR_BUYER_EMAIL . $this->orderInfo['payment_source'][$payment_type]['email_address'] . "\n";
-        }
-
-        zen_update_orders_history($this->orderInfo['orders_id'], $message, null, -1, 0);
-
-        if (($this->orderInfo['admin_alert_needed'] ?? false) === true) {
-            $this->paypalCommon->sendAlertEmail(
-                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN ?? 'Order Attention',
-                sprintf(MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION ?? 'Order %d created with status %s', $this->orderInfo['orders_id'], $this->orderInfo['paypal_payment_status'])
-            );
-        }
-
-        $this->resetOrder();
+        $this->paypalCommon->processAfterOrder($this->orderInfo);
+        $this->paypalCommon->updateOrderHistory($this->orderInfo, 'apple_pay');
+        $this->paypalCommon->resetOrder();
     }
 
     protected function recordPayPalOrderDetails(int $orders_id): void

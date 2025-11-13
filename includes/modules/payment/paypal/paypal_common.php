@@ -375,4 +375,200 @@ class PayPalCommon {
             );
         }
     }
+
+    /**
+     * Common table checkup - ensures PayPal table exists
+     *
+     * @return void
+     */
+    public function tableCheckup()
+    {
+        global $db, $sniffer;
+        if (!defined('TABLE_PAYPAL')) {
+            define('TABLE_PAYPAL', DB_PREFIX . 'paypal');
+        }
+        $paypal_table = $db->Execute("SHOW TABLES LIKE '" . TABLE_PAYPAL . "'");
+        if ($paypal_table->EOF) {
+            $this->createPayPalTable();
+        }
+    }
+
+    /**
+     * Create PayPal tracking table
+     *
+     * @return void
+     */
+    protected function createPayPalTable()
+    {
+        global $db;
+        $db->Execute(
+            "CREATE TABLE " . TABLE_PAYPAL . " (
+                paypal_ipn_id int(11) NOT NULL auto_increment,
+                order_id int(11) NOT NULL default 0,
+                txn_type varchar(40) NOT NULL default '',
+                module_name varchar(40) NOT NULL default '',
+                module_mode varchar(40) default NULL,
+                reason_code varchar(40) default NULL,
+                payment_type varchar(40) NOT NULL default '',
+                payment_status varchar(32) NOT NULL default '',
+                pending_reason varchar(64) default NULL,
+                invoice varchar(128) default NULL,
+                mc_currency char(3) NOT NULL default '',
+                first_name varchar(32) NOT NULL default '',
+                last_name varchar(32) NOT NULL default '',
+                payer_business_name varchar(64) default NULL,
+                address_name varchar(64) default NULL,
+                address_street varchar(254) default NULL,
+                address_city varchar(120) default NULL,
+                address_state varchar(120) default NULL,
+                address_zip varchar(10) default NULL,
+                address_country varchar(64) default NULL,
+                address_status varchar(11) default NULL,
+                payer_email varchar(127) default NULL,
+                payer_id varchar(32) NOT NULL default '',
+                payer_status varchar(10) default NULL,
+                payment_date datetime default NULL,
+                business varchar(64) default NULL,
+                receiver_email varchar(127) default NULL,
+                receiver_id varchar(32) default NULL,
+                txn_id varchar(20) NOT NULL default '',
+                parent_txn_id varchar(20) default NULL,
+                num_cart_items int(2) default 0,
+                mc_gross decimal(15,4) default NULL,
+                mc_fee decimal(15,4) default NULL,
+                payment_gross decimal(15,4) default NULL,
+                payment_fee decimal(15,4) default NULL,
+                settle_amount decimal(15,4) default NULL,
+                settle_currency char(3) default NULL,
+                exchange_rate decimal(15,4) default NULL,
+                notify_version varchar(20) NOT NULL default '',
+                verify_sign varchar(127) default NULL,
+                date_added datetime NOT NULL default '0001-01-01 00:00:00',
+                last_modified datetime default NULL,
+                expiration_time datetime default NULL,
+                memo text,
+                final_capture tinyint(1) NOT NULL default 0,
+                PRIMARY KEY  (paypal_ipn_id),
+                KEY idx_order_id_zen (order_id)
+            )"
+        );
+    }
+
+    /**
+     * Common captureOrAuthorizePayment method for wallet modules
+     * Wallet modules always use capture (final sale)
+     *
+     * @param PayPalRestfulApi $ppr PayPal REST API instance
+     * @param Logger $log Logger instance
+     * @param string $payment_source Payment source name (e.g., 'google_pay')
+     * @return array|false
+     */
+    public function captureWalletPayment(PayPalRestfulApi $ppr, Logger $log, string $payment_source)
+    {
+        $paypal_order_id = $_SESSION['PayPalRestful']['Order']['id'];
+        
+        // Wallets always use capture (final sale)
+        $response = $ppr->captureOrder($paypal_order_id);
+
+        if ($response === false) {
+            $log->write($payment_source . ': capture failed. ' . Logger::logJSON($ppr->getErrorInfo()));
+            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+            return false;
+        }
+
+        return $response;
+    }
+
+    /**
+     * Common after_process logic for recording orders
+     *
+     * @param array &$orderInfo Order information
+     * @return void
+     */
+    public function processAfterOrder(array &$orderInfo)
+    {
+        $_SESSION['PayPalRestful']['CompletedOrders'] = ($_SESSION['PayPalRestful']['CompletedOrders'] ?? 0) + 1;
+
+        $orders_id = (int)($orderInfo['orders_id'] ?? 0);
+        $paypal_records_exist = ($orders_id > 0) ? $this->paypalOrderRecordsExist($orders_id) : false;
+        
+        if ($orders_id === 0 || $paypal_records_exist === false) {
+            $orders_id = (int)($orders_id ?: ($_SESSION['order_number_created'] ?? 0));
+            if ($orders_id > 0) {
+                $this->recordPayPalOrderDetails($orders_id, $orderInfo);
+            }
+        }
+    }
+
+    /**
+     * Common resetOrder logic
+     *
+     * @return void
+     */
+    public function resetOrder()
+    {
+        unset($_SESSION['PayPalRestful']['Order']);
+        $_SESSION['PayPalRestful']['ppr_type'] = '';
+        unset($_SESSION['ppcheckout']);
+    }
+
+    /**
+     * Common createOrderGuid logic
+     *
+     * @param \order $order Order object
+     * @param string $ppr_type Payment type
+     * @return string
+     */
+    public function createOrderGuid($order, string $ppr_type): string
+    {
+        $orders_completed = $_SESSION['PayPalRestful']['CompletedOrders'] ?? 0;
+        $guid_base = $_SESSION['customer_id'] . '-' . $_SESSION['cartID'] . '-' . $orders_completed . '-' . $ppr_type;
+
+        $cart_hash = '';
+        foreach ($order->products as $product) {
+            $cart_hash .= $product['id'] . $product['qty'];
+        }
+        $cart_hash = md5($cart_hash);
+
+        return substr($guid_base . '-' . $cart_hash, 0, 127);
+    }
+
+    /**
+     * Common update order history logic
+     *
+     * @param array $orderInfo Order information
+     * @param string $payment_type Payment type (e.g., 'google_pay', 'apple_pay', 'venmo')
+     * @return void
+     */
+    public function updateOrderHistory(array $orderInfo, string $payment_type)
+    {
+        $payment_info = $orderInfo['payment_info'] ?? [];
+        $timestamp = '';
+        if (isset($payment_info['created_date']) && $payment_info['created_date'] !== '') {
+            $timestamp = 'Timestamp: ' . $payment_info['created_date'] . "\n";
+        }
+
+        $message =
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_ID . ($orderInfo['id'] ?? '') . "\n" .
+            sprintf(MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE, $payment_info['payment_type'] ?? $payment_type) . "\n" .
+            $timestamp .
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_PAYMENT_STATUS . ($orderInfo['payment_status'] ?? '') . "\n" .
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_AMOUNT . ($payment_info['amount'] ?? '') . "\n";
+
+        $payment_source_type = $orderInfo['payment_info']['payment_type'] ?? $payment_type;
+        $message .= MODULE_PAYMENT_PAYPALR_FUNDING_SOURCE . $payment_source_type . "\n";
+
+        if (!empty($orderInfo['payment_source'][$payment_source_type]['email_address'])) {
+            $message .= MODULE_PAYMENT_PAYPALR_BUYER_EMAIL . $orderInfo['payment_source'][$payment_source_type]['email_address'] . "\n";
+        }
+
+        zen_update_orders_history($orderInfo['orders_id'], $message, null, -1, 0);
+
+        if (($orderInfo['admin_alert_needed'] ?? false) === true) {
+            $this->sendAlertEmail(
+                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN ?? 'Order Attention',
+                sprintf(MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION ?? 'Order %d created with status %s', $orderInfo['orders_id'], $orderInfo['paypal_payment_status'])
+            );
+        }
+    }
 }
