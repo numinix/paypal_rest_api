@@ -12,6 +12,7 @@
  * Load the support class' auto-loader.
  */
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_common.php');
 
 use PayPalRestful\Admin\AdminMain;
 use PayPalRestful\Admin\DoAuthorization;
@@ -223,6 +224,12 @@ class paypalr extends base
     protected bool $shippingCountryIsSupported = true;
 
     /**
+     * Instance of the shared PayPal common class.
+     * @var PayPalCommon
+     */
+    protected $paypalCommon;
+
+    /**
      * class constructor
      */
     public function __construct()
@@ -257,6 +264,9 @@ class paypalr extends base
             $this->log->enableDebug();
         }
         $this->emailAlerts = (MODULE_PAYMENT_PAYPALR_DEBUGGING === 'Alerts Only' || MODULE_PAYMENT_PAYPALR_DEBUGGING === 'Log and Email');
+
+        // Initialize the shared PayPal common class
+        $this->paypalCommon = new PayPalCommon($this);
 
         // -----
         // An order's *initial* order-status depending on the mode in which the PayPal transaction
@@ -2355,16 +2365,7 @@ class paypalr extends base
 
     protected function paypalOrderRecordsExist(int $orders_id): bool
     {
-        if ($orders_id <= 0) {
-            return false;
-        }
-
-        global $db;
-        $order_lookup = $db->Execute(
-            "SELECT order_id FROM " . TABLE_PAYPAL . " WHERE order_id = " . (int)$orders_id . " LIMIT 1"
-        );
-
-        return ($order_lookup->EOF === false);
+        return $this->paypalCommon->paypalOrderRecordsExist($orders_id);
     }
 
     protected function recordPayPalOrderDetails(int $orders_id): void
@@ -2559,28 +2560,7 @@ class paypalr extends base
 
     protected function getCustomersIdForOrder(int $orders_id): int
     {
-        $orders_id = (int)$orders_id;
-        if ($orders_id <= 0) {
-            return 0;
-        }
-
-        if (isset($this->orderCustomerCache[$orders_id])) {
-            return $this->orderCustomerCache[$orders_id];
-        }
-
-        global $db;
-
-        $customerLookup = $db->Execute(
-            "SELECT customers_id" .
-            "   FROM " . TABLE_ORDERS .
-            "  WHERE orders_id = $orders_id" .
-            "  LIMIT 1"
-        );
-
-        $customers_id = ($customerLookup->EOF) ? 0 : (int)$customerLookup->fields['customers_id'];
-        $this->orderCustomerCache[$orders_id] = $customers_id;
-
-        return $customers_id;
+        return $this->paypalCommon->getCustomersIdForOrder($orders_id, $this->orderCustomerCache);
     }
 
     /**
@@ -2984,18 +2964,7 @@ class paypalr extends base
      */
     public function sendAlertEmail(string $subject_detail, string $message, bool $force_send = false)
     {
-        if ($this->emailAlerts === true || $force_send === true) {
-            zen_mail(
-                STORE_NAME,
-                STORE_OWNER_EMAIL_ADDRESS,
-                sprintf(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT, $subject_detail),
-                $message,
-                STORE_OWNER,
-                STORE_OWNER_EMAIL_ADDRESS,
-                ['EMAIL_MESSAGE_HTML' => nl2br($message, false)],   //- Replace new-lines with HTML5 <br>
-                'paymentalert'
-            );
-        }
+        $this->paypalCommon->sendAlertEmail($subject_detail, $message, $force_send);
     }
 
     public static function getVaultedCardsForCustomer(int $customers_id, bool $active_only = true): array
