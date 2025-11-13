@@ -122,7 +122,18 @@ class zcObserverPaypalrestful
     //
     public function updateNotifyOtCouponCalcsFinished(&$class, $eventID, array $parameters)
     {
-        $coupon_type = $parameters['coupon']['coupon_type'];
+        $coupon = $parameters['coupon'];
+        // Handle both array and object structures for coupon data
+        if (isset($coupon->fields) && isset($coupon->fields['coupon_type'])) {
+            // Object with fields property
+            $coupon_type = $coupon->fields['coupon_type'];
+        } elseif (is_array($coupon) && isset($coupon['coupon_type'])) {
+            // Array with coupon_type key
+            $coupon_type = $coupon['coupon_type'];
+        } else {
+            // Fallback to empty string if neither structure is found
+            $coupon_type = '';
+        }
         $this->freeShippingCoupon = in_array($coupon_type, ['S', 'E', 'O']);
     }
 
