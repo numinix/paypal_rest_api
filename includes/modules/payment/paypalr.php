@@ -1086,6 +1086,7 @@ class paypalr extends base
                     '<style nonce="">' . file_get_contents($css_file_name) . '</style>' .
                     '<span class="ppr-choice-label">' . MODULE_PAYMENT_PAYPALR_CHOOSE_PAYPAL . '</span>',
                 'field' =>
+                    $checkoutScript .
                     '<div id="paypal-message-container"></div>' .
                     '<div id="ppr-choice-paypal" class="ppr-button-choice">' .
                         zen_draw_radio_field('ppr_type', 'paypal', $paypal_selected, 'id="ppr-paypal" class="ppr-choice"') .
