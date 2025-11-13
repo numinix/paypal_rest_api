@@ -89,7 +89,7 @@ class paypalr_googlepay extends paypalr
             $language = $_SESSION['admin_language'] ?? 'english';
         }
         
-        $langFile = DIR_FS_CATALOG . DIR_WS_LANGUAGES . $language . '/modules/payment/lang.' . $this->code . '.php';
+        $langFile = DIR_FS_CATALOG . rtrim(DIR_WS_LANGUAGES, '/') . '/' . $language . '/modules/payment/lang.' . $this->code . '.php';
         if (file_exists($langFile)) {
             $definitions = include $langFile;
             if (is_array($definitions)) {
