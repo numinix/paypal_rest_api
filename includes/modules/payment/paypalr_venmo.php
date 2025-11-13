@@ -5,6 +5,7 @@
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
+require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr.php';
 require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_common.php');
 
 use PayPalRestful\Api\PayPalRestfulApi;
@@ -33,7 +34,7 @@ class paypalr_venmo extends paypalr
         $this->code = 'paypalr_venmo';
         
         // Load wallet-specific language file to override parent module constants
-        $this->loadWalletLanguageFile();
+        $this->paypalCommon->loadWalletLanguageFile($this->code);
 
         $module_status_setting = $this->getModuleStatusSetting();
         $debugActive = (strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false);
@@ -84,26 +85,6 @@ class paypalr_venmo extends paypalr
         return $this->variantZoneSetting;
     }
 
-    protected function loadWalletLanguageFile(): void
-    {
-        $language = $_SESSION['language'] ?? 'english';
-        if (IS_ADMIN_FLAG === true) {
-            $language = $_SESSION['admin_language'] ?? 'english';
-        }
-        
-        $langFile = DIR_FS_CATALOG . rtrim(DIR_WS_LANGUAGES, '/') . '/' . $language . '/modules/payment/lang.' . $this->code . '.php';
-        if (file_exists($langFile)) {
-            $definitions = include $langFile;
-            if (is_array($definitions)) {
-                foreach ($definitions as $constant => $value) {
-                    if (!defined($constant)) {
-                        define($constant, $value);
-                    }
-                }
-            }
-        }
-    }
-
     public function selection(): array
     {
         unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
@@ -135,56 +116,17 @@ class paypalr_venmo extends paypalr
 
     public function pre_confirmation_check()
     {
-        global $messageStack;
-
-        if ($messageStack->size('checkout_payment') > 0) {
-            return;
-        }
-
-        $_POST['ppr_type'] = 'venmo';
-        $_SESSION['PayPalRestful']['ppr_type'] = 'venmo';
-
-        $payloadRaw = $_POST['paypalr_venmo_payload'] ?? '';
-        if (trim($payloadRaw) === '') {
-            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_VENMO_ERROR_PAYLOAD_MISSING, FILENAME_CHECKOUT_PAYMENT);
-        }
-
-        $payload = json_decode($payloadRaw, true);
-        if (!is_array($payload)) {
-            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_VENMO_ERROR_PAYLOAD_INVALID, FILENAME_CHECKOUT_PAYMENT);
-        }
-
-        $paypal_order_created = $this->createPayPalOrder('venmo');
-        if ($paypal_order_created === false) {
-            $error_info = $this->ppr->getErrorInfo();
-            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
-            $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN, MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . \PayPalRestful\Common\Logger::logJSON($error_info));
-            $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALR_VENMO_TEXT_TITLE, $error_code), FILENAME_CHECKOUT_PAYMENT);
-        }
-
-        $confirm_response = $this->ppr->confirmPaymentSource(
-            $_SESSION['PayPalRestful']['Order']['id'],
-            ['venmo' => $payload]
+        $this->paypalCommon->processWalletConfirmation(
+            'venmo',
+            'paypalr_venmo_payload',
+            [
+                'title' => MODULE_PAYMENT_PAYPALR_VENMO_TEXT_TITLE,
+                'payload_missing' => MODULE_PAYMENT_PAYPALR_VENMO_ERROR_PAYLOAD_MISSING,
+                'payload_invalid' => MODULE_PAYMENT_PAYPALR_VENMO_ERROR_PAYLOAD_INVALID,
+                'confirm_failed' => MODULE_PAYMENT_PAYPALR_VENMO_ERROR_CONFIRM_FAILED,
+                'payer_action' => MODULE_PAYMENT_PAYPALR_VENMO_ERROR_PAYER_ACTION,
+            ]
         );
-        if ($confirm_response === false) {
-            $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
-            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_VENMO_ERROR_CONFIRM_FAILED, FILENAME_CHECKOUT_PAYMENT);
-        }
-
-        $response_status = $confirm_response['status'] ?? '';
-        if ($response_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
-            $this->log->write('pre_confirmation_check (venmo) unexpected payer action requirement.' . \PayPalRestful\Common\Logger::logJSON($confirm_response), true, 'after');
-            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_VENMO_ERROR_PAYER_ACTION, FILENAME_CHECKOUT_PAYMENT);
-        }
-
-        if ($response_status !== '' && in_array($response_status, self::WALLET_SUCCESS_STATUSES, true)) {
-            $_SESSION['PayPalRestful']['Order']['status'] = $response_status;
-        }
-
-        $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
-        $_SESSION['PayPalRestful']['Order']['payment_source'] = 'venmo';
-
-        $this->log->write('pre_confirmation_check (venmo) completed successfully.', true, 'after');
     }
 
     public function confirmation()
