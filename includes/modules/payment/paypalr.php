@@ -521,6 +521,14 @@ class paypalr extends base
                             ('Disable Module on Checkout Errors?', 'MODULE_PAYMENT_PAYPALR_DISABLE_ON_ERROR', 'False', 'Choose <var>True</var> to automatically disable this payment module when a checkout-related error occurs. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now())"
                     );
 
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.3', '<'): //- Fall through from above
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Enable PayPal Vault?', 'MODULE_PAYMENT_PAYPALR_ENABLE_VAULT', 'False', 'Choose <var>True</var> to allow customers to save credit cards for future checkouts using PayPal Vault. When disabled, saved card options will not be displayed. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now())"
+                    );
+
                 default:    //- Fall through from above
                     break;
             }
@@ -847,6 +855,13 @@ class paypalr extends base
             return $this->customerVaultCards;
         }
 
+        // If vault is not enabled, return empty array
+        $vaultEnabled = (defined('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT') && MODULE_PAYMENT_PAYPALR_ENABLE_VAULT === 'True');
+        if (!$vaultEnabled) {
+            $this->customerVaultCards = [];
+            return $this->customerVaultCards;
+        }
+
         $customers_id = $_SESSION['customer_id'] ?? 0;
         if ($customers_id <= 0) {
             $this->customerVaultCards = [];
@@ -1119,7 +1134,8 @@ class paypalr extends base
             ],
         ];
 
-        if (!empty($vaultedCards)) {
+        $vaultEnabled = (defined('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT') && MODULE_PAYMENT_PAYPALR_ENABLE_VAULT === 'True');
+        if ($vaultEnabled && !empty($vaultedCards)) {
             $fields[] = [
                 'title' => MODULE_PAYMENT_PAYPALR_SAVED_CARDS,
                 'field' =>
@@ -1162,7 +1178,7 @@ class paypalr extends base
                 '</small>',
         ];
 
-        if ($allowSaveCard === true) {
+        if ($vaultEnabled && $allowSaveCard === true) {
             if ($is_bootstrap_template === false) {
                 $fields[] = [
                     'title' => MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT,
@@ -1459,7 +1475,11 @@ class paypalr extends base
         if ($savedCardSelection !== 'new') {
             $savedCard = $this->findVaultedCard($savedCardSelection);
             if ($savedCard === null) {
-                $messageStack->add_session('checkout_payment', MODULE_PAYMENT_PAYPALR_TEXT_SAVED_CARD_INVALID, 'error');
+                // Only show error if user actually has vaulted cards (vault is enabled and they selected an invalid one)
+                $vaultedCards = $this->getActiveVaultedCardsForCustomer();
+                if (!empty($vaultedCards)) {
+                    $messageStack->add_session('checkout_payment', MODULE_PAYMENT_PAYPALR_TEXT_SAVED_CARD_INVALID, 'error');
+                }
                 $_SESSION['PayPalRestful']['saved_card'] = 'new';
                 unset($_SESSION['PayPalRestful']['save_card']);
                 return false;
@@ -2815,6 +2835,8 @@ class paypalr extends base
 
                 ('Accept Credit Cards?', 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'false', 'Should the payment-module accept credit-card payments? If running <var>live</var> transactions, your storefront <b>must</b> be configured to use <var>https</var> protocol for the card-payments to be accepted!<br><br>If your store uses One-Page Checkout, you can limit credit-card payments to account-holders.<br><b>Default: false</b>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\', \'Account-Holders Only\'], ', NULL, now()),
 
+                ('Enable PayPal Vault?', 'MODULE_PAYMENT_PAYPALR_ENABLE_VAULT', 'False', 'Choose <var>True</var> to allow customers to save credit cards for future checkouts using PayPal Vault. When disabled, saved card options will not be displayed. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now()),
+
                 ('List <var>handling-fee</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_HANDLING_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_loworderfee</code> &mdash; that add a <em>handling-fee</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
                 ('List <var>insurance</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules that add an <em>insurance</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
@@ -2911,6 +2933,7 @@ class paypalr extends base
             'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE',
             'MODULE_PAYMENT_PAYPALR_SCA_ALWAYS',
             'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS',
+            'MODULE_PAYMENT_PAYPALR_ENABLE_VAULT',
             'MODULE_PAYMENT_PAYPALR_PAYLATER_MESSAGING',
             'MODULE_PAYMENT_PAYPALR_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_ZONE',
