@@ -2592,7 +2592,10 @@ class paypalr extends base
             return null;
         }
 
-        $storedVault = VaultManager::saveVaultedCard($customers_id, $orders_id, $card_source);
+        // Determine visibility based on user's save card preference
+        $visible = !empty($_POST['paypalr_cc_save_card']) || !empty($_SESSION['PayPalRestful']['save_card']);
+
+        $storedVault = VaultManager::saveVaultedCard($customers_id, $orders_id, $card_source, $visible);
         if ($storedVault !== null) {
             $this->notify('NOTIFY_PAYPALR_VAULT_CARD_SAVED', $storedVault);
         }
@@ -2641,9 +2644,14 @@ class paypalr extends base
             return;
         }
 
+        // Determine if the card should be visible based on the user's checkbox selection
+        // Check both POST and session for the save card preference
+        $visible = !empty($_POST['paypalr_cc_save_card']) || !empty($_SESSION['PayPalRestful']['save_card']);
+
         // Store in session for the observer to process
         $_SESSION['PayPalRestful']['VaultCardData'] = [
             'card_source' => $card_source,
+            'visible' => $visible,
         ];
     }
 

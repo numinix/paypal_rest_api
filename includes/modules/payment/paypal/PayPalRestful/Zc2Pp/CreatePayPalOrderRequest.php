@@ -524,7 +524,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             'security_code' => $cc_info['security_code'],
             'expiry' => $cc_info['expiry_year'] . '-' . $cc_info['expiry_month'],
             'billing_address' => Address::get($order->billing),
-            'store_in_vault' => (!empty($cc_info['store_card']) ? 'ON_SUCCESS' : 'OFF'),
+            'store_in_vault' => 'ON_SUCCESS',  // Always vault cards for security and recurring billing
             'experience_context' => [
                 'return_url' => $this->buildScaUrl($listener_endpoint, '3ds_return'),
                 'cancel_url' => $this->buildScaUrl($listener_endpoint, '3ds_cancel'),

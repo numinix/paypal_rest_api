@@ -82,7 +82,8 @@ class zcObserverPaypalrestfulVault
 
         // Save the vault card data
         $cardSource = $vaultCardData['card_source'];
-        $storedVault = VaultManager::saveVaultedCard($customersId, $ordersId, $cardSource);
+        $visible = $vaultCardData['visible'] ?? true;  // Default to visible for backward compatibility
+        $storedVault = VaultManager::saveVaultedCard($customersId, $ordersId, $cardSource, $visible);
         
         if ($storedVault !== null) {
             // Notify other observers that a vault card was saved
