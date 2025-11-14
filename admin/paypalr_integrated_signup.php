@@ -77,7 +77,7 @@ function paypalr_onboarding_message(string $message, string $type = 'warning'): 
         return;
     }
 
-    $messageStack->add_session('header', $message, $type);
+    $messageStack->add_session('main', $message, $type);
 }
 
 function paypalr_redirect_to_modules(): void

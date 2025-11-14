@@ -106,7 +106,7 @@ class paypalr_venmo extends base
             if (version_compare($installed_version, self::CURRENT_VERSION, '<')) {
                 $this->description .= sprintf(
                     MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_UPGRADE_AVAILABLE ?? 
-                    '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="button" href="%3$s">Upgrade to %2$s</a></p>',
+                    '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="paypalr-upgrade-button" href="%3$s">Upgrade to %2$s</a></p>',
                     $installed_version,
                     self::CURRENT_VERSION,
                     zen_href_link('paypalr_upgrade.php', 'module=paypalr_venmo&action=upgrade', 'SSL')
