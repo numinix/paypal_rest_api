@@ -1596,7 +1596,7 @@ class paypalr extends base
         }
 
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
-        $storeCard = $allowSaveCard && !empty($_POST[$postvar_prefix . '_cc_save_card']);
+        $storeCard = $allowSaveCard && !empty($_POST['paypalr_cc_save_card']);
 
         $this->ccInfo = [
             'type' => $cc_validation->cc_type,
