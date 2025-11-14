@@ -60,7 +60,20 @@ When the wallet modules are enabled alongside the base PayPal Advanced Checkout 
 
 ## Charging vaulted cards from custom code
 
-When a customer pays by card, PayPal returns a `payment_source.card` element that includes the vaulted token. The module saves that response in the vault table via `PayPalRestful\Common\VaultManager::saveVaultedCard` and raises the `NOTIFY_PAYPALR_VAULT_CARD_SAVED` observer event so other plugins can react to the new or updated token.【F:includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php†L63-L151】【F:includes/modules/payment/paypalr.php†L2052-L2141】
+### Card Vaulting Behavior
+
+**All card payments are automatically vaulted with PayPal for security and recurring billing support.** The module controls card visibility separately through a `visible` flag in the vault table:
+
+* **Visible cards** (`visible = 1`): Customer explicitly checked "Save this card for future checkouts" during checkout. These cards appear in:
+  * The checkout payment selection page (when `MODULE_PAYMENT_PAYPALR_ENABLE_VAULT` is enabled)
+  * The `account_saved_credit_cards` page for customer management
+
+* **Hidden cards** (`visible = 0`): Customer did not check the save checkbox, but the card is still vaulted for:
+  * PCI compliance and security best practices
+  * Recurring billing and subscription processing
+  * Merchant-initiated transactions (when using `$activeOnly = false`)
+
+When a customer pays by card, PayPal returns a `payment_source.card` element that includes the vaulted token. The module saves that response in the vault table via `PayPalRestful\Common\VaultManager::saveVaultedCard` and raises the `NOTIFY_PAYPALR_VAULT_CARD_SAVED` observer event so other plugins can react to the new or updated token.【F:includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php†L73-L165】【F:includes/modules/payment/paypalr.php†L2010-L2020】
 
 Third-party integrations can use the stored information to perform subsequent charges (for example, recurring subscriptions) without asking the customer to re-enter their card details:
 
@@ -70,7 +83,12 @@ Third-party integrations can use the stored information to perform subsequent ch
    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/pprAutoload.php';
    ```
 
-2. Retrieve the customer's vaulted cards. The helper `paypalr::getVaultedCardsForCustomer($customers_id, $activeOnly = true)` returns an array of normalized records (vault identifier, status, masked digits, expiry, billing address, and the original `payment_source.card` payload). You can also call `PayPalRestful\Common\VaultManager::getCustomerVaultedCards` directly if you prefer.【F:includes/modules/payment/paypalr.php†L2559-L2561】【F:includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php†L168-L283】
+2. Retrieve the customer's vaulted cards. The helper `paypalr::getVaultedCardsForCustomer($customers_id, $activeOnly = true)` returns an array of normalized records (vault identifier, status, masked digits, expiry, billing address, and the original `payment_source.card` payload). 
+   
+   * Use `$activeOnly = true` (default) to get only visible cards for checkout display
+   * Use `$activeOnly = false` to get all cards (visible and hidden) for merchant-initiated billing
+   
+   You can also call `PayPalRestful\Common\VaultManager::getCustomerVaultedCards` directly if you prefer.【F:includes/modules/payment/paypalr.php†L3062-L3065】【F:includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php†L488-L524】
 
 3. Build a new PayPal order with the vaulted instrument. Instantiate `PayPalRestful\Api\PayPalRestfulApi` using the environment credentials returned by `paypalr::getEnvironmentInfo()`, create an order payload that references the stored `vault_id`, and then authorize or capture the order. A minimal example that immediately captures a payment looks like:
 

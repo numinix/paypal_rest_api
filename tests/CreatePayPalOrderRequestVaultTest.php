@@ -165,16 +165,17 @@ namespace {
         $failures++;
     }
 
-    // New card without saving to vault.
+    // New card - ALL cards are now vaulted for security and recurring billing support.
+    // The visibility is controlled separately in the database, not by the store_in_vault parameter.
     $cc_info_nosave = $cc_info_save;
     unset($cc_info_nosave['store_card']);
     $request_nosave = new CreatePayPalOrderRequest('card', $order, $cc_info_nosave, $order_info, []);
     $payload_nosave = $request_nosave->get();
     $card_source_nosave = $payload_nosave['payment_source']['card'] ?? [];
 
-    if (($card_source_nosave['store_in_vault'] ?? '') !== 'OFF') {
+    if (($card_source_nosave['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
         fwrite(STDERR, sprintf(
-            "Expected store_in_vault OFF when save not requested, got %s.\n",
+            "Expected store_in_vault ON_SUCCESS (all cards are now vaulted), got %s.\n",
             json_encode($card_source_nosave['store_in_vault'] ?? null)
         ));
         $failures++;

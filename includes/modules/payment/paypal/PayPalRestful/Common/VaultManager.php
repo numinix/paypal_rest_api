@@ -50,12 +50,24 @@ class VaultManager
                 date_added DATETIME DEFAULT NULL,
                 last_modified DATETIME DEFAULT NULL,
                 last_used DATETIME DEFAULT NULL,
+                visible TINYINT(1) NOT NULL DEFAULT 1,
                 PRIMARY KEY (paypal_vault_id),
                 UNIQUE KEY idx_paypal_vault_id (vault_id),
                 KEY idx_paypal_vault_customer (customers_id),
                 KEY idx_paypal_vault_status (customers_id, status)
             )"
         );
+        
+        // Add visible column to existing tables if it doesn't exist
+        $result = $db->Execute(
+            "SHOW COLUMNS FROM " . TABLE_PAYPAL_VAULT . " LIKE 'visible'"
+        );
+        if ($result->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . TABLE_PAYPAL_VAULT . " 
+                 ADD COLUMN visible TINYINT(1) NOT NULL DEFAULT 1"
+            );
+        }
     }
 
     /**
@@ -64,10 +76,11 @@ class VaultManager
      * @param int   $customers_id The Zen Cart customer's identifier.
      * @param int   $orders_id    The order identifier that produced the vault token.
      * @param array $cardSource   The card payment_source element returned by PayPal.
+     * @param bool  $visible      Whether the card should be visible in checkout/account (default: true for backward compatibility).
      *
      * @return array|null The stored record as an associative array or null if nothing was saved.
      */
-    public static function saveVaultedCard(int $customers_id, int $orders_id, array $cardSource): ?array
+    public static function saveVaultedCard(int $customers_id, int $orders_id, array $cardSource, bool $visible = true): ?array
     {
         if ($customers_id <= 0 || $orders_id <= 0) {
             return null;
@@ -108,6 +121,7 @@ class VaultManager
             'paypal_customer_id' => self::sanitizeString($vault['customer']['id'] ?? '', 64),
             'cardholder_name' => self::sanitizeString($cardSource['name'] ?? '', 96),
             'last_modified' => $now,
+            'visible' => $visible ? 1 : 0,
         ];
 
         $billingAddress = self::encodeJson($cardSource['billing_address'] ?? null);
@@ -467,7 +481,7 @@ class VaultManager
      * Retrieve a customer's vaulted cards.
      *
      * @param int  $customers_id The Zen Cart customer's identifier.
-     * @param bool $activeOnly   When true (default), limit to active/approved vault entries and exclude expired cards.
+     * @param bool $activeOnly   When true (default), limit to active/approved vault entries, exclude expired cards, and only return visible cards.
      *
      * @return array[]
      */
@@ -483,7 +497,7 @@ class VaultManager
 
         $whereClause = "customers_id = " . (int)$customers_id;
         if ($activeOnly === true) {
-            $whereClause .= " AND status IN ('ACTIVE','APPROVED','VAULTED')";
+            $whereClause .= " AND status IN ('ACTIVE','APPROVED','VAULTED') AND visible = 1";
         }
 
         $vaultedCards = [];
@@ -693,6 +707,7 @@ class VaultManager
             'date_added' => $row['date_added'] ?? null,
             'last_modified' => $row['last_modified'] ?? null,
             'last_used' => $row['last_used'] ?? null,
+            'visible' => (bool)($row['visible'] ?? true),
         ];
     }
 }

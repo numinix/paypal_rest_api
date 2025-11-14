@@ -209,8 +209,8 @@ namespace {
         echo "  ✓ Regular checkout flow correctly sets store_in_vault to ON_SUCCESS\n";
     }
 
-    // Test 3: Verify checkbox not checked results in vault OFF
-    echo "\nTest 3: Checkbox not checked (should not save to vault)...\n";
+    // Test 3: Verify all cards are vaulted (the visibility is controlled separately)
+    echo "\nTest 3: Checkbox not checked (all cards are vaulted, visibility controlled separately)...\n";
     unset($_POST['paypalr_cc_save_card']);
     unset($_POST['ppr_cc_save_card']);
 
@@ -220,21 +220,22 @@ namespace {
         'security_code' => '123',
         'expiry_month' => '09',
         'expiry_year' => '2030',
-        'store_card' => false,  // This should be false when checkbox is not checked
+        'store_card' => false,  // This is false when checkbox is not checked, but card is still vaulted
         'redirect' => 'ppr_listener.php',
     ];
     $request_nosave = new CreatePayPalOrderRequest('card', $order, $cc_info_nosave, $order_info, []);
     $payload_nosave = $request_nosave->get();
     $card_source_nosave = $payload_nosave['payment_source']['card'] ?? [];
 
-    if (($card_source_nosave['store_in_vault'] ?? '') !== 'OFF') {
+    if (($card_source_nosave['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
         fwrite(STDERR, sprintf(
-            "Test 3 FAILED: Expected store_in_vault OFF when checkbox not checked, got %s.\n",
+            "Test 3 FAILED: Expected store_in_vault ON_SUCCESS (all cards are vaulted), got %s.\n",
             json_encode($card_source_nosave['store_in_vault'] ?? null)
         ));
         $failures++;
     } else {
-        echo "  ✓ Correctly sets store_in_vault to OFF when checkbox not checked\n";
+        echo "  ✓ Correctly sets store_in_vault to ON_SUCCESS (all cards are vaulted)\n";
+        echo "     (visibility is controlled separately in the database)\n";
     }
 
     if ($failures > 0) {
@@ -243,6 +244,6 @@ namespace {
     }
 
     echo "\n✅ All vault save card field name tests passed.\n";
-    echo "   The fix ensures that the save card checkbox is correctly read in both\n";
-    echo "   pre-confirmation and regular 3-page checkout flows.\n";
+    echo "   The fix ensures that ALL cards are vaulted with PayPal for security.\n";
+    echo "   Card visibility in checkout/account is controlled by the 'visible' database field.\n";
 }
