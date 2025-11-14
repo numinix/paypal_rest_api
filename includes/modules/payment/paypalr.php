@@ -2004,6 +2004,12 @@ class paypalr extends base
         $this->orderInfo = $response;
 
         // -----
+        // Store vault card data in session for the observer to save after order creation.
+        // This ensures vault cards are saved across all checkout systems (3-page, OPC, etc.).
+        //
+        $this->storeVaultCardDataInSession($response);
+
+        // -----
         // If the payment is pending (e.g. under-review), set the payment module's order
         // status to indicate as such.
         //
@@ -2592,6 +2598,53 @@ class paypalr extends base
         }
 
         return $storedVault;
+    }
+
+    /**
+     * Store vault card data in session for the observer to save after order creation.
+     * 
+     * This method extracts vault card information from the PayPal response and stores
+     * it in the session, making it available to the observer that runs after order
+     * creation. This ensures vault cards are saved across all checkout systems.
+     *
+     * @param array $response The PayPal order response containing payment source data
+     */
+    protected function storeVaultCardDataInSession(array $response): void
+    {
+        // Extract payment source information
+        $payment_type = array_key_first($response['payment_source'] ?? []);
+        if ($payment_type === null) {
+            return;
+        }
+
+        $payment_source = $response['payment_source'][$payment_type] ?? [];
+        
+        // Determine if this is a card-like payment that can be vaulted
+        $card_like_payment = in_array($payment_type, ['card', 'google_pay', 'apple_pay'], true);
+        if ($card_like_payment === false) {
+            return;
+        }
+
+        // Extract card source data
+        $card_source = null;
+        if (in_array($payment_type, ['google_pay', 'apple_pay'], true)) {
+            $card_source = $payment_source['card'] ?? [];
+            if (!empty($card_source) && isset($payment_source['vault'])) {
+                $card_source['vault'] = $payment_source['vault'];
+            }
+        } else {
+            $card_source = $payment_source;
+        }
+
+        // Only store if we have vault data
+        if (empty($card_source) || ($card_source['vault']['id'] ?? '') === '') {
+            return;
+        }
+
+        // Store in session for the observer to process
+        $_SESSION['PayPalRestful']['VaultCardData'] = [
+            'card_source' => $card_source,
+        ];
     }
 
     protected function getCustomersIdForOrder(int $orders_id): int
