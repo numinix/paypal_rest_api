@@ -53,3 +53,20 @@ tr.ppr-payments {
     border-color: #184e7d;
     color: #fff !important;
 }
+
+.paypalr-upgrade-button {
+    display: inline-block;
+    padding: 0.4em 0.9em;
+    background-color: #2a7abd;
+    border: 1px solid #1e5f97;
+    border-radius: 3px;
+    color: #fff !important;
+    text-decoration: none;
+}
+
+.paypalr-upgrade-button:focus,
+.paypalr-upgrade-button:hover {
+    background-color: #1e5f97;
+    border-color: #184e7d;
+    color: #fff !important;
+}
