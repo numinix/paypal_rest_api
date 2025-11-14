@@ -188,6 +188,19 @@ jQuery(document).ready(function() {
         }
     });
 
+    // When user clicks on any credit card input field, select the PayPal payment method and card option
+    jQuery(document).on('focus click', '.ppr-card-new input, .ppr-card-new select', function(event) {
+        // First, ensure the parent payment module is selected
+        if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
+            jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
+        }
+        
+        // Then, ensure the card option is selected
+        if (jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
+            jQuery('#ppr-card').prop('checked', true).trigger('change');
+        }
+    });
+
     updateSavedCardVisibility();
 
     var $checkoutForm = jQuery('form[name="checkout_payment"]');
