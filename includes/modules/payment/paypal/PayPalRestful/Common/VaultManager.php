@@ -467,7 +467,7 @@ class VaultManager
      * Retrieve a customer's vaulted cards.
      *
      * @param int  $customers_id The Zen Cart customer's identifier.
-     * @param bool $activeOnly   When true (default), limit to active/approved vault entries.
+     * @param bool $activeOnly   When true (default), limit to active/approved vault entries and exclude expired cards.
      *
      * @return array[]
      */
@@ -496,7 +496,12 @@ class VaultManager
 
         if (is_object($records)) {
             while (!$records->EOF) {
-                $vaultedCards[] = self::mapRow($records->fields);
+                $card = self::mapRow($records->fields);
+                // When activeOnly is true (checkout context), exclude expired cards
+                // When activeOnly is false (account context), include all cards for updating
+                if (!$activeOnly || !self::isCardExpired($card['expiry'])) {
+                    $vaultedCards[] = $card;
+                }
                 $records->MoveNext();
             }
         }
@@ -625,6 +630,42 @@ class VaultManager
         }
 
         return $decoded;
+    }
+
+    /**
+     * Check if a card has expired based on its expiry date.
+     *
+     * @param string $expiry Card expiry in YYYY-MM format (e.g., "2030-09")
+     * @return bool True if the card is expired, false otherwise
+     */
+    protected static function isCardExpired(string $expiry): bool
+    {
+        if ($expiry === '') {
+            return false;
+        }
+
+        // Parse YYYY-MM format
+        if (!preg_match('/^(\d{4})-(\d{2})$/', $expiry, $matches)) {
+            return false;
+        }
+
+        $expiryYear = (int)$matches[1];
+        $expiryMonth = (int)$matches[2];
+
+        // Get current year and month
+        $currentYear = (int)date('Y');
+        $currentMonth = (int)date('m');
+
+        // Card is expired if the expiry date is before the current month
+        if ($expiryYear < $currentYear) {
+            return true;
+        }
+
+        if ($expiryYear === $currentYear && $expiryMonth < $currentMonth) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
