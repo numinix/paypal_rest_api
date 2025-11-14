@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.2
+ * Last updated: v1.3.3
  */
 /**
  * Load the support class' auto-loader.
@@ -63,7 +63,7 @@ class paypalr extends base
         return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.2';
+    protected const CURRENT_VERSION = '1.3.3';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -245,6 +245,18 @@ class paypalr extends base
         } else {
             $this->title = MODULE_PAYMENT_PAYPALR_TEXT_TITLE_ADMIN . (($curl_installed === true) ? '' : $this->alertMsg(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL));
             $this->description = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION, self::CURRENT_VERSION);
+            
+            // Add upgrade button if current version is less than latest version
+            $installed_version = defined('MODULE_PAYMENT_PAYPALR_VERSION') ? MODULE_PAYMENT_PAYPALR_VERSION : '0.0.0';
+            if (version_compare($installed_version, self::CURRENT_VERSION, '<')) {
+                $this->description .= sprintf(
+                    MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_UPGRADE_AVAILABLE ?? 
+                    '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="button" href="%3$s">Upgrade to %2$s</a></p>',
+                    $installed_version,
+                    self::CURRENT_VERSION,
+                    zen_href_link('paypalr_upgrade.php', 'module=paypalr&action=upgrade', 'SSL')
+                );
+            }
         }
 
         $this->sort_order = $this->getModuleSortOrder();
@@ -528,6 +540,10 @@ class paypalr extends base
                          VALUES
                             ('Enable PayPal Vault?', 'MODULE_PAYMENT_PAYPALR_ENABLE_VAULT', 'False', 'Choose <var>True</var> to allow customers to save credit cards for future checkouts using PayPal Vault. When disabled, saved card options will not be displayed. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now())"
                     );
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.4', '<'): //- Fall through from above
+                    // Placeholder for future version upgrades
+                    // Add any v1.3.4-specific database or configuration changes here
 
                 default:    //- Fall through from above
                     break;

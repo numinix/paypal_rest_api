@@ -317,6 +317,7 @@ if (IS_ADMIN_FLAG === true) {
     $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_RETURN_MESSAGE'] = 'PayPal onboarding completed via the Numinix portal. Review the credentials you received and paste them into the configuration fields below.';
     $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_CANCEL_MESSAGE'] = 'PayPal onboarding was cancelled or closed before completion. Restart the flow when you are ready.';
     $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_ERROR_MESSAGE'] = 'Unable to reach the Numinix onboarding portal. Check your connection and try again.';
+    $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_UPGRADE_AVAILABLE'] = '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="button" href="%3$s">Upgrade to %2$s</a></p>';
 
     $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION'] =
         '<b>PayPal Advanced Checkout</b>, v%s<br><br>' .   //- %s is filled in with the current module version
