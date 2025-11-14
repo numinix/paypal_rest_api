@@ -5,7 +5,7 @@
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.2
+ * Last updated: v1.3.3
  */
 /**
  * Load the support class' auto-loader and common class.
@@ -52,7 +52,7 @@ class paypalr_googlepay extends base
         return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.2';
+    protected const CURRENT_VERSION = '1.3.3';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -100,6 +100,18 @@ class paypalr_googlepay extends base
         } else {
             $this->title = (MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_TITLE_ADMIN ?? 'PayPal Google Pay') . (($curl_installed === true) ? '' : $this->alertMsg(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL ?? 'cURL not installed'));
             $this->description = sprintf(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_DESCRIPTION ?? 'Google Pay via PayPal Advanced Checkout (v%s)', self::CURRENT_VERSION);
+            
+            // Add upgrade button if current version is less than latest version
+            $installed_version = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION') ? MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION : '0.0.0';
+            if (version_compare($installed_version, self::CURRENT_VERSION, '<')) {
+                $this->description .= sprintf(
+                    MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_UPGRADE_AVAILABLE ?? 
+                    '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="button" href="%3$s">Upgrade to %2$s</a></p>',
+                    $installed_version,
+                    self::CURRENT_VERSION,
+                    zen_href_link('paypalr_upgrade.php', 'module=paypalr_googlepay&action=upgrade', 'SSL')
+                );
+            }
         }
 
         $this->sort_order = $this->getModuleSortOrder();
@@ -214,7 +226,37 @@ class paypalr_googlepay extends base
 
     protected function tableCheckup()
     {
+        global $db;
+        
+        // First, let the paypalCommon handle its tableCheckup
         $this->paypalCommon->tableCheckup();
+        
+        // If the payment module is installed and at the current version, nothing to be done.
+        $current_version = self::CURRENT_VERSION;
+        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION === $current_version) {
+            return;
+        }
+        
+        // Check for version-specific configuration updates
+        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION')) {
+            switch (true) {
+                // Add future version-specific upgrades here
+                // case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.4', '<'):
+                //     // Add v1.3.4-specific changes here
+                
+                default:
+                    break;
+            }
+        }
+        
+        // Record the current version of the payment module into its database configuration setting
+        $db->Execute(
+            "UPDATE " . TABLE_CONFIGURATION . "
+                SET configuration_value = '$current_version',
+                    last_modified = now()
+              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION'
+              LIMIT 1"
+        );
     }
 
     protected function validateConfiguration(bool $curl_installed): bool
@@ -641,19 +683,26 @@ class paypalr_googlepay extends base
     {
         global $db;
         
+        $current_version = self::CURRENT_VERSION;
         $db->Execute(
             "INSERT INTO " . TABLE_CONFIGURATION . "
                 (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
              VALUES
+                ('Module Version', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
                 ('Enable PayPal Google Pay?', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS', 'False', 'Do you want to enable PayPal Google Pay payments?', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
                 ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
                 ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())"
         );
+        
+        // Define the module's current version so that the tableCheckup method will apply all changes
+        define('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION', '0.0.0');
+        $this->tableCheckup();
     }
 
     public function keys(): array
     {
         return [
+            'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE',
