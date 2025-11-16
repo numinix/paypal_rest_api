@@ -8,18 +8,11 @@
     flex-wrap: wrap;
     flex-direction: row;
 }
-.ppr-button-choice label,
-.ppr-button-choice input {
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-}
 .ppr-button-choice input[type="radio"] {
-    opacity: 0.011;
-    z-index: 100;
+    opacity: 1;
+    position: static;
+    z-index: auto;
+    margin-right: .5rem;
 }
 .ppr-button-choice input[type="radio"]+label {
     padding: .5rem;
@@ -33,7 +26,8 @@
     height: 4rem;
     font-weight: bold;
     width: fit-content;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     text-align: center;
 }
 #ppr-choice-paypal+br {
