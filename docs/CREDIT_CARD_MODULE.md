@@ -18,14 +18,14 @@ The `paypalr_creditcard` module addresses these issues by creating a separate mo
 
 - **Independent Module**: Appears as a separate payment method option in both admin and storefront
 - **Credit Cards Only**: Shows only credit card input fields, no PayPal wallet button
-- **Shared Infrastructure**: Extends `paypalr` to reuse all payment processing, vault, 3DS, and validation logic
+- **Shared Infrastructure**: Uses `PayPalCommon` class for shared payment processing logic, follows same pattern as wallet modules (Google Pay, Apple Pay, Venmo)
 - **Individual Control**: Can be enabled/disabled independently from the PayPal wallet option
 - **Full Feature Support**: Supports all credit card features including:
   - Saved cards (PayPal Vault)
-  - 3D Secure authentication
   - Multiple card types (Visa, MasterCard, Amex, Discover, etc.)
   - Authorization and capture modes
   - Refunds, voids, and captures from admin
+  - 3D Secure authentication support
 
 ## Installation
 
@@ -94,18 +94,26 @@ You can use the modules in different configurations:
 ### Architecture
 
 ```
-paypalr_creditcard extends paypalr extends base
+paypalr_creditcard extends base
+
+Uses PayPalCommon class for shared logic:
+├── processCreditCardPayment() - Payment processing (auth/capture)
+├── getVaultedCardsForCustomer() - Vault card retrieval  
+├── storeVaultCardData() - Vault card storage
+└── Other shared payment methods...
 ```
 
 The credit card module:
-- Extends the `paypalr` class to inherit all payment processing logic
-- Overrides only the presentation layer (`selection()` method)
-- Shares all PayPal API communication, vault management, and transaction processing
+- Extends `base` class (same pattern as Google Pay, Apple Pay, Venmo)
+- Uses `PayPalCommon` class for shared payment processing logic
+- Implements credit card-specific UI in `selection()` method
+- Handles credit card validation in module
+- Delegates payment processing to common class
 - Forces `ppr_type='card'` in the session when selected
 
 ### Security
 
-The module enforces the same security requirements as the parent `paypalr` module:
+The module enforces the same security requirements as other PayPal modules:
 
 - **SSL Required**: Credit card payments require HTTPS in production (sandbox allows HTTP for testing)
 - **Card Type Validation**: At least one supported card type must be enabled in Zen Cart's credit card configuration
