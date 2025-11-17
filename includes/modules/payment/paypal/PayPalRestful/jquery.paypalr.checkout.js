@@ -207,13 +207,18 @@ jQuery(document).ready(function() {
         // Only proceed if this field has a value (autofill happened)
         if (jQuery(this).val()) {
             // Ensure the parent payment module is selected
+            // Don't trigger change to avoid cascading events that could uncheck the radio
             if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
-                jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
+                jQuery('#pmt-paypalr').prop('checked', true);
             }
             
             // Ensure the card option is selected
+            // Don't trigger change to avoid cascading events that could uncheck the parent radio
             if (jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
-                jQuery('#ppr-card').prop('checked', true).trigger('change');
+                jQuery('#ppr-card').prop('checked', true);
+                // Manually update visibility since we're not triggering change
+                showPprCcFields();
+                updateSavedCardVisibility();
             }
         }
     });
