@@ -664,4 +664,127 @@ class PayPalCommon {
 
         return $cards;
     }
+
+    /**
+     * Create PayPal order for payment processing
+     * Shared by all payment modules
+     *
+     * @param object $paymentModule The payment module instance
+     * @param object $order The Zen Cart order object
+     * @param array $order_info Order totals information
+     * @param string $ppr_type Payment type (card, paypal, google_pay, etc.)
+     * @param object $currencies Currency object
+     * @return bool True on success, false on failure
+     */
+    public function createPayPalOrder($paymentModule, $order, array $order_info, string $ppr_type, $currencies): bool
+    {
+        $create_order_request = new \PayPalRestful\Zc2Pp\CreatePayPalOrderRequest(
+            $order,
+            $order_info,
+            $ppr_type,
+            $this->createOrderGuid($order, $ppr_type),
+            $currencies
+        );
+
+        $paypal_order = $paymentModule->ppr->createOrder($create_order_request);
+
+        if ($paypal_order === false) {
+            return false;
+        }
+
+        $_SESSION['PayPalRestful']['Order'] = [
+            'id' => $paypal_order['id'],
+            'status' => $paypal_order['status'],
+            'payment_source' => $ppr_type,
+            'amount_mismatch' => false,
+        ];
+
+        return true;
+    }
+
+    /**
+     * Process refund transaction
+     * Shared by all payment modules
+     *
+     * @param int $oID Order ID
+     * @param object $ppr PayPal API instance
+     * @param string $module_code Module code for logging
+     * @return mixed Refund result
+     */
+    public function processRefund($oID, $ppr, string $module_code)
+    {
+        if ($ppr === null) {
+            return false;
+        }
+
+        $do_refund = new \PayPalRestful\Admin\DoRefund($oID, $ppr, $module_code);
+        return $do_refund->process();
+    }
+
+    /**
+     * Process authorization transaction  
+     * Shared by all payment modules (returns false for modules that don't support it)
+     *
+     * @param int $oID Order ID
+     * @param object|null $ppr PayPal API instance
+     * @param string $module_code Module code for logging
+     * @param float $order_amt Order amount
+     * @param string $currency Currency code
+     * @param bool $supports_auth Whether this module supports separate authorization
+     * @return mixed Authorization result or false
+     */
+    public function processAuthorization($oID, $ppr, string $module_code, $order_amt, $currency, bool $supports_auth = false)
+    {
+        if (!$supports_auth) {
+            return false;
+        }
+
+        if ($ppr === null) {
+            return false;
+        }
+
+        $do_auth = new \PayPalRestful\Admin\DoAuthorization($oID, $ppr, $module_code);
+        return $do_auth->process($order_amt, $currency);
+    }
+
+    /**
+     * Process capture transaction
+     * Shared by all payment modules
+     *
+     * @param int $oID Order ID
+     * @param object|null $ppr PayPal API instance
+     * @param string $module_code Module code for logging
+     * @param string $captureType Capture type (Complete, etc.)
+     * @param float $order_amt Order amount
+     * @param string $order_currency Currency code
+     * @return mixed Capture result
+     */
+    public function processCapture($oID, $ppr, string $module_code, string $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
+    {
+        if ($ppr === null) {
+            return false;
+        }
+
+        $do_capture = new \PayPalRestful\Admin\DoCapture($oID, $ppr, $module_code);
+        return $do_capture->process($captureType, $order_amt, $order_currency);
+    }
+
+    /**
+     * Process void transaction
+     * Shared by all payment modules
+     *
+     * @param int $oID Order ID
+     * @param object|null $ppr PayPal API instance
+     * @param string $module_code Module code for logging
+     * @return mixed Void result
+     */
+    public function processVoid($oID, $ppr, string $module_code)
+    {
+        if ($ppr === null) {
+            return false;
+        }
+
+        $do_void = new \PayPalRestful\Admin\DoVoid($oID, $ppr, $module_code);
+        return $do_void->process();
+    }
 }
