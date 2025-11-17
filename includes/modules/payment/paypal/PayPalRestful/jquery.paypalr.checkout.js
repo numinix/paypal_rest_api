@@ -201,6 +201,23 @@ jQuery(document).ready(function() {
         }
     });
 
+    // Handle browser autofill events which trigger 'change' and 'input' events
+    // This ensures the parent radio stays checked when autofill populates credit card fields
+    jQuery(document).on('change input', '.ppr-card-new input, .ppr-card-new select', function(event) {
+        // Only proceed if this field has a value (autofill happened)
+        if (jQuery(this).val()) {
+            // Ensure the parent payment module is selected
+            if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
+                jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
+            }
+            
+            // Ensure the card option is selected
+            if (jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
+                jQuery('#ppr-card').prop('checked', true).trigger('change');
+            }
+        }
+    });
+
     updateSavedCardVisibility();
 
     var $checkoutForm = jQuery('form[name="checkout_payment"]');
