@@ -77,13 +77,23 @@ class paypalr_creditcard extends paypalr
             }
         }
 
-        // Force credit cards to be accepted for this module
-        $this->cardsAccepted = true;
-        $this->collectsCardDataOnsite = true;
-
-        // Force the session to use 'card' payment type when this module is selected
-        if (isset($_SESSION['payment']) && $_SESSION['payment'] === $this->code) {
-            $_SESSION['PayPalRestful']['ppr_type'] = 'card';
+        // Ensure credit cards are properly configured and enabled
+        // The parent constructor already checked SSL, card types, etc.
+        // If parent disabled cards due to missing requirements, show appropriate message
+        if (IS_ADMIN_FLAG === false && $this->enabled === true) {
+            if ($this->cardsAccepted === false) {
+                // Cards are not accepted - likely due to SSL or configuration issues
+                // Disable this module as it has no purpose without card acceptance
+                $this->enabled = false;
+            } else {
+                // Cards are accepted - ensure collection flag is set
+                $this->collectsCardDataOnsite = true;
+                
+                // Force the session to use 'card' payment type when this module is selected
+                if (isset($_SESSION['payment']) && $_SESSION['payment'] === $this->code) {
+                    $_SESSION['PayPalRestful']['ppr_type'] = 'card';
+                }
+            }
         }
     }
 
