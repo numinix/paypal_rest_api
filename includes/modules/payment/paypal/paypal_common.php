@@ -571,4 +571,97 @@ class PayPalCommon {
             );
         }
     }
+
+    /**
+     * Process credit card payment (capture or authorize)
+     * 
+     * @param PayPalRestfulApi $ppr PayPal API instance
+     * @param Logger $log Logger instance
+     * @param string $transaction_mode Transaction mode (Final Sale, Auth Only, etc.)
+     * @param string $ppr_type Payment type (card, paypal, etc.)
+     * @return array|false Response array or false on failure
+     */
+    public function processCreditCardPayment(PayPalRestfulApi $ppr, Logger $log, string $transaction_mode, string $ppr_type)
+    {
+        $paypal_order_id = $_SESSION['PayPalRestful']['Order']['id'] ?? '';
+        
+        if (empty($paypal_order_id)) {
+            $log->write('Credit Card: No PayPal order ID found in session');
+            return false;
+        }
+
+        // Determine if we should capture or authorize based on transaction mode
+        $should_capture = ($transaction_mode === 'Final Sale' || 
+                          ($ppr_type !== 'card' && $transaction_mode === 'Auth Only (Card-Only)'));
+
+        if ($should_capture) {
+            $response = $ppr->captureOrder($paypal_order_id);
+            if ($response === false) {
+                $log->write('Credit Card: capture failed. ' . Logger::logJSON($ppr->getErrorInfo()));
+                return false;
+            }
+        } else {
+            $response = $ppr->authorizeOrder($paypal_order_id);
+            if ($response === false) {
+                $log->write('Credit Card: authorization failed. ' . Logger::logJSON($ppr->getErrorInfo()));
+                return false;
+            }
+        }
+
+        return $response;
+    }
+
+    /**
+     * Get vaulted cards for a customer
+     *
+     * @param int $customers_id Customer ID
+     * @param bool $activeOnly If true, only return visible cards; if false, return all cards
+     * @return array Array of vaulted card information
+     */
+    public function getVaultedCardsForCustomer(int $customers_id, bool $activeOnly = true): array
+    {
+        if ($customers_id <= 0) {
+            return [];
+        }
+
+        global $db;
+        
+        $active_clause = $activeOnly ? ' AND visible = 1' : '';
+        $vault_query = $db->Execute(
+            "SELECT vault_id, status, last_digits, card_type, expiry, billing_name, 
+                    billing_address_line_1, billing_address_line_2, billing_admin_area_2,
+                    billing_admin_area_1, billing_postal_code, billing_country_code,
+                    last_used, created_at, visible
+             FROM " . TABLE_PAYPAL_VAULT . "
+             WHERE customers_id = " . (int)$customers_id . 
+             $active_clause . "
+             ORDER BY last_used DESC, created_at DESC"
+        );
+
+        $cards = [];
+        while (!$vault_query->EOF) {
+            $cards[] = [
+                'vault_id' => $vault_query->fields['vault_id'],
+                'status' => $vault_query->fields['status'],
+                'last_digits' => $vault_query->fields['last_digits'],
+                'card_type' => $vault_query->fields['card_type'],
+                'expiry' => $vault_query->fields['expiry'],
+                'billing_address' => [
+                    'name' => $vault_query->fields['billing_name'],
+                    'address_line_1' => $vault_query->fields['billing_address_line_1'],
+                    'address_line_2' => $vault_query->fields['billing_address_line_2'],
+                    'admin_area_2' => $vault_query->fields['billing_admin_area_2'],
+                    'admin_area_1' => $vault_query->fields['billing_admin_area_1'],
+                    'postal_code' => $vault_query->fields['billing_postal_code'],
+                    'country_code' => $vault_query->fields['billing_country_code'],
+                ],
+                'last_used' => $vault_query->fields['last_used'],
+                'created_at' => $vault_query->fields['created_at'],
+                'visible' => $vault_query->fields['visible'],
+            ];
+            $vault_query->MoveNext();
+        }
+
+        return $cards;
+    }
 }
