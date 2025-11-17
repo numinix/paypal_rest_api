@@ -1,198 +1,701 @@
 <?php
 /**
- * paypalr_creditcard.php payment module class for Credit Card payments via PayPal Advanced Checkout
+ * paypalr_creditcard.php payment module class for handling Credit Cards via PayPal Advanced Checkout.
  *
- * @copyright Copyright 2023-2025 Zen Cart Development Team
- * @copyright Portions Copyright 2003 osCommerce
- * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
+ * @copyright Copyright 2025 Zen Cart Development Team
+ * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
  * Last updated: v1.3.3
  */
+/**
+ * Load the support class' auto-loader and common class.
+ */
+require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_common.php');
+
+use PayPalRestful\Admin\AdminMain;
+use PayPalRestful\Admin\DoAuthorization;
+use PayPalRestful\Admin\DoCapture;
+use PayPalRestful\Admin\DoRefund;
+use PayPalRestful\Admin\DoVoid;
+use PayPalRestful\Admin\GetPayPalOrderTransactions;
+use PayPalRestful\Api\PayPalRestfulApi;
+use PayPalRestful\Api\Data\CountryCodes;
+use PayPalRestful\Common\ErrorInfo;
+use PayPalRestful\Common\Helpers;
+use PayPalRestful\Common\Logger;
+use PayPalRestful\Common\VaultManager;
+use PayPalRestful\Compatibility\Language as LanguageCompatibility;
+use PayPalRestful\Zc2Pp\Amount;
+use PayPalRestful\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
+use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
+
+LanguageCompatibility::load();
 
 /**
- * Load the base paypalr module which this extends
+ * The PayPal Credit Cards payment module using PayPal's REST APIs (v2)
  */
-require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr.php';
-
-/**
- * The Credit Card payment module using PayPal's REST APIs (v2)
- * This module extends paypalr and shows ONLY credit card payment options
- */
-class paypalr_creditcard extends paypalr
+class paypalr_creditcard extends base
 {
-    /**
-     * Override to use credit card-specific status setting
-     */
     protected function getModuleStatusSetting(): string
     {
         return defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS') ? MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS : 'False';
     }
 
-    /**
-     * Override to use credit card-specific sort order
-     */
     protected function getModuleSortOrder(): ?int
     {
         return defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER') ? (int)MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER : null;
     }
 
-    /**
-     * Override to use credit card-specific zone setting
-     */
     protected function getModuleZoneSetting(): int
     {
         return defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE : 0;
     }
+
+    protected const CURRENT_VERSION = '1.3.3';
+    protected const WALLET_SUCCESS_STATUSES = [
+        PayPalRestfulApi::STATUS_APPROVED,
+        PayPalRestfulApi::STATUS_COMPLETED,
+        PayPalRestfulApi::STATUS_CAPTURED,
+    ];
+
+    public string $code;
+    public string $title;
+    public string $description = '';
+    public bool $enabled;
+    public ?int $sort_order = null;
+    public int $zone = 0;
+    public int $order_status = 0;
+    
+    // Credit Cards DOES use on-site card entry
+    public bool $cardsAccepted = true;
+    public bool $collectsCardDataOnsite = true;
+
+    protected PayPalRestfulApi $ppr;
+    protected ErrorInfo $errorInfo;
+    protected Logger $log;
+    protected bool $emailAlerts = false;
+    protected PayPalCommon $paypalCommon;
+    protected array $orderInfo = [];
+    protected bool $paymentIsPending = false;
+    protected bool $billingCountryIsSupported = true;
+    protected bool $shippingCountryIsSupported = true;
+    protected array $orderCustomerCache = [];
+    protected bool $onOpcConfirmationPage = false;
+    protected array $paypalRestfulSessionOnEntry = [];
 
     /**
      * class constructor
      */
     public function __construct()
     {
-        // Call parent constructor to initialize all the base functionality
-        parent::__construct();
+        global $order, $messageStack, $loaderPrefix;
 
-        // Override the module code to distinguish this from the base paypalr module
         $this->code = 'paypalr_creditcard';
 
-        // Override titles for this module
-        if (IS_ADMIN_FLAG === false) {
-            $this->title = MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE ?? 'PayPal Credit Cards';
-        } else {
-            $this->title = (MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE_ADMIN ?? 'PayPal Credit Cards') . 
-                          (function_exists('curl_init') ? '' : $this->alertMsg(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL ?? ''));
-            $this->description = sprintf(
-                MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_DESCRIPTION ?? 'Accept credit card payments via PayPal Advanced Checkout (v%s). Requires the main PayPal Advanced Checkout module to be installed.',
-                self::CURRENT_VERSION
-            );
+        $curl_installed = (function_exists('curl_init'));
 
-            // Add version check
+        if (IS_ADMIN_FLAG === false) {
+            $this->title = MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE ?? 'Credit Card';
+        } else {
+            $this->title = (MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE_ADMIN ?? 'Credit Cards via PayPal Advanced Checkout') . (($curl_installed === true) ? '' : $this->alertMsg(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL ?? 'cURL not installed'));
+            $this->description = sprintf(MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_DESCRIPTION ?? 'Accept credit card payments via PayPal Advanced Checkout (v%s)', self::CURRENT_VERSION);
+            
+            // Add upgrade button if current version is less than latest version
             $installed_version = defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION') ? MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION : '0.0.0';
             if (version_compare($installed_version, self::CURRENT_VERSION, '<')) {
                 $this->description .= sprintf(
-                    '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p>',
+                    MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_UPGRADE_AVAILABLE ?? 
+                    '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="paypalr-upgrade-button" href="%3$s">Upgrade to %2$s</a></p>',
                     $installed_version,
-                    self::CURRENT_VERSION
+                    self::CURRENT_VERSION,
+                    zen_href_link('paypalr_upgrade.php', 'module=paypalr_creditcard&action=upgrade', 'SSL')
                 );
             }
         }
 
-        // Ensure credit cards are properly configured and enabled
-        // The parent constructor already checked SSL, card types, etc.
-        // If parent disabled cards due to missing requirements, show appropriate message
-        if (IS_ADMIN_FLAG === false && $this->enabled === true) {
-            if ($this->cardsAccepted === false) {
-                // Cards are not accepted - likely due to SSL or configuration issues
-                // Disable this module as it has no purpose without card acceptance
+        $this->sort_order = $this->getModuleSortOrder();
+        if (null === $this->sort_order) {
+            return;
+        }
+
+        $module_status_setting = $this->getModuleStatusSetting();
+        $this->enabled = ($module_status_setting === 'True' || (IS_ADMIN_FLAG === true && $module_status_setting === 'Retired'));
+
+        $this->errorInfo = new ErrorInfo();
+
+        $this->log = new Logger();
+        $debug = (strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false);
+        if ($debug === true) {
+            $this->log->enableDebug();
+        }
+        $this->emailAlerts = (MODULE_PAYMENT_PAYPALR_DEBUGGING === 'Alerts Only' || MODULE_PAYMENT_PAYPALR_DEBUGGING === 'Log and Email');
+
+        // Initialize the shared PayPal common class
+        $this->paypalCommon = new PayPalCommon($this);
+
+        // Credit cards support both auth-only and final sale modes
+        $ppr_type = $_SESSION['PayPalRestful']['ppr_type'] ?? 'card';
+        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || ($ppr_type !== 'card' && MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')) {
+            $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+        } else {
+            $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+        }
+        $this->order_status = ($order_status > 1) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
+
+        $this->zone = $this->getModuleZoneSetting();
+
+        if (IS_ADMIN_FLAG === true) {
+            if ($module_status_setting === 'Retired') {
+                $this->title .= ' <strong>(Retired)</strong>';
+            }
+            if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
+                $this->title .= $this->alertMsg(' (sandbox active)');
+            }
+            if ($debug === true) {
+                $this->title .= ' <strong>(Debug)</strong>';
+            }
+            $this->tableCheckup();
+        } elseif ($this->enabled === true) {
+            global $zcObserverPaypalrestful;
+            if (!isset($zcObserverPaypalrestful)) {
                 $this->enabled = false;
-            } else {
-                // Cards are accepted - ensure collection flag is set
-                $this->collectsCardDataOnsite = true;
-                
-                // Force the session to use 'card' payment type when this module is selected
-                if (isset($_SESSION['payment']) && $_SESSION['payment'] === $this->code) {
-                    $_SESSION['PayPalRestful']['ppr_type'] = 'card';
+
+                if (in_array($loaderPrefix ?? '', ['paypal_ipn', 'webhook'], true)) {
+                    return;
                 }
+                $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing');
+                return;
+            }
+        }
+
+        // Validate the configuration
+        if (IS_ADMIN_FLAG === true && $current_page === FILENAME_MODULES) {
+            // Don't validate when simply listing modules
+        } else {
+            $this->enabled = ($this->enabled === true && $this->validateConfiguration($curl_installed));
+            if ($this->enabled && IS_ADMIN_FLAG === true && $current_page !== FILENAME_MODULES) {
+                $this->ppr->registerAndUpdateSubscribedWebhooks();
+            }
+        }
+        if ($this->enabled === false || IS_ADMIN_FLAG === true || $loaderPrefix === 'webhook') {
+            return;
+        }
+
+        if (is_object($order)) {
+            $this->update_status();
+            if ($this->enabled === false) {
+                return;
+            }
+
+            if (isset($order->billing['country'])) {
+                $this->billingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->billing['country']['iso_code_2']) !== '');
+            }
+            if ($_SESSION['cart']->get_content_type() !== 'virtual') {
+                $this->shippingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->delivery['country']['iso_code_2'] ?? '??') !== '');
+            }
+        }
+
+        global $current_page_base;
+        if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
+            $this->onOpcConfirmationPage = true;
+            $this->paypalRestfulSessionOnEntry = $_SESSION['PayPalRestful'] ?? [];
+            $this->attach($this, ['NOTIFY_OPC_OBSERVER_SESSION_FIXUPS']);
+        }
+
+        // Check for required main PayPal module
+        if (!defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
+            $this->enabled = false;
+            if (IS_ADMIN_FLAG === true) {
+                $this->title .= $this->alertMsg(MODULE_PAYMENT_PAYPALR_CREDITCARD_ERROR_PAYPAL_REQUIRED ?? ' (Requires main PayPal module)');
+            }
+            return;
+        }
+    }
+
+    public function updateNotifyOpcObserverSessionFixups(&$class, $eventID, $empty_string, &$session_data)
+    {
+        if ($this->onOpcConfirmationPage === false || empty($this->paypalRestfulSessionOnEntry)) {
+            return;
+        }
+        $session_data['PayPalRestful'] = $this->paypalRestfulSessionOnEntry;
+    }
+
+    protected function alertMsg(string $msg): string
+    {
+        return '<span class="alert">' . $msg . '</span>';
+    }
+
+    protected function tableCheckup()
+    {
+        global $db;
+        
+        // First, let the paypalCommon handle its tableCheckup
+        $this->paypalCommon->tableCheckup();
+        
+        // If the payment module is installed and at the current version, nothing to be done.
+        $current_version = self::CURRENT_VERSION;
+        if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION') && MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION === $current_version) {
+            return;
+        }
+        
+        // Check for version-specific configuration updates
+        if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION')) {
+            switch (true) {
+                // Add future version-specific upgrades here
+                // case version_compare(MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION, '1.3.4', '<'):
+                //     // Add v1.3.4-specific changes here
+                
+                default:
+                    break;
+            }
+        }
+        
+        // Record the current version of the payment module into its database configuration setting
+        $db->Execute(
+            "UPDATE " . TABLE_CONFIGURATION . "
+                SET configuration_value = '$current_version',
+                    last_modified = now()
+              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION'
+              LIMIT 1"
+        );
+    }
+
+    protected function validateConfiguration(bool $curl_installed): bool
+    {
+        if ($curl_installed === false) {
+            $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL ?? 'cURL not installed');
+            return false;
+        }
+
+        $this->ppr = $this->getPayPalRestfulApi();
+        if ($this->ppr === null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function getPayPalRestfulApi(): ?PayPalRestfulApi
+    {
+        $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
+        $secret = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_SECRET_L : MODULE_PAYMENT_PAYPALR_SECRET_S;
+
+        if (empty($client_id) || empty($secret)) {
+            $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ALERT_INVALID_CONFIGURATION ?? 'Invalid configuration');
+            return null;
+        }
+
+        try {
+            $ppr = new PayPalRestfulApi(
+                $client_id,
+                $secret,
+                MODULE_PAYMENT_PAYPALR_SERVER,
+                $this->log
+            );
+            return $ppr;
+        } catch (\Exception $e) {
+            $this->log->write('Credit Cards: Error creating PayPalRestfulApi: ' . $e->getMessage());
+            $this->setConfigurationDisabled($e->getMessage());
+            return null;
+        }
+    }
+
+    protected function setConfigurationDisabled(string $error_message, bool $force_disable = false)
+    {
+        $this->enabled = false;
+        if (IS_ADMIN_FLAG === true || $force_disable === true) {
+            $this->title .= $this->alertMsg($error_message);
+        }
+    }
+
+    public function update_status()
+    {
+        global $order, $db;
+
+        if ($this->enabled === false || !is_object($order)) {
+            return;
+        }
+
+        if ((int)$this->zone > 0 && isset($order->billing['country']['id'])) {
+            $check_flag = false;
+            $check = $db->Execute(
+                "SELECT zone_id
+                   FROM " . TABLE_ZONES_TO_GEO_ZONES . "
+                  WHERE geo_zone_id = '" . (int)$this->zone . "'
+                    AND zone_country_id = '" . (int)$order->billing['country']['id'] . "'
+               ORDER BY zone_id"
+            );
+            while (!$check->EOF) {
+                if ($check->fields['zone_id'] < 1 || $check->fields['zone_id'] == $order->billing['zone_id']) {
+                    $check_flag = true;
+                    break;
+                }
+                $check->MoveNext();
+            }
+
+            if ($check_flag === false) {
+                $this->enabled = false;
             }
         }
     }
 
-    /**
-     * Override selection to show ONLY credit card fields (no PayPal button)
-     */
+
+
+    public function javascript_validation(): string
+    {
+        // TODO: Add credit card validation logic from paypalr.php
+        // Validates card owner name, number, and CVV lengths
+        return '';
+    }
+
     public function selection(): array
     {
-        // Get the parent selection which includes both PayPal and credit card options
-        $parent_selection = parent::selection();
+        unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
 
-        // If the parent returned an error or unsupported country message, return as-is
-        if (isset($parent_selection['fields']) && count($parent_selection['fields']) === 1) {
-            $first_field = $parent_selection['fields'][0];
-            if (isset($first_field['title']) && strpos($first_field['title'], 'PLEASE NOTE') !== false) {
-                return $parent_selection;
-            }
-        }
-
-        // Remove the PayPal wallet option fields - keep only credit card fields
-        // The parent selection() returns fields array with PayPal button as first two elements
-        // We want to remove those and keep only the credit card fields
-        if (isset($parent_selection['fields']) && is_array($parent_selection['fields'])) {
-            $credit_card_fields = [];
-            $found_card_choice = false;
-            
-            foreach ($parent_selection['fields'] as $field) {
-                // Skip the PayPal choice field (identified by tag='ppr-paypal')
-                if (isset($field['tag']) && $field['tag'] === 'ppr-paypal') {
-                    continue;
-                }
-                
-                // Skip the card choice radio button field as we only have one option
-                if (isset($field['tag']) && $field['tag'] === 'ppr-card') {
-                    $found_card_choice = true;
-                    continue;
-                }
-                
-                // Keep all other fields (credit card input fields)
-                $credit_card_fields[] = $field;
-            }
-            
-            $parent_selection['fields'] = $credit_card_fields;
-        }
-
-        // Update the module display to just show credit card images
-        $parent_selection['module'] = $this->buildCardsAccepted() .
-            '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>' .
-            zen_draw_hidden_field('ppr_type', 'card');
-
-        return $parent_selection;
+        // TODO: Implement credit card form fields
+        // Should display:
+        // - Saved cards (if vault enabled)
+        // - Card owner name
+        // - Card number
+        // - Expiry month/year
+        // - CVV
+        // - Save card checkbox (if vault enabled)
+        
+        return [
+            'id' => $this->code,
+            'module' => MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_SELECTION ?? 'Credit Card',
+            'fields' => [
+                [
+                    'title' => 'Credit Card Payment',
+                    'field' => zen_draw_hidden_field('ppr_type', 'card') . '<p>Credit card form fields will be implemented here</p>',
+                ],
+            ],
+        ];
     }
 
-    /**
-     * Evaluate installation status of this module
-     */
+    public function pre_confirmation_check()
+    {
+        // TODO: Implement credit card validation
+        // Should validate card information and create PayPal order
+        $_SESSION['PayPalRestful']['ppr_type'] = 'card';
+    }
+
+    protected function isOpcAjaxRequest(): bool
+    {
+        return (defined('IS_AJAX_REQUEST') && IS_AJAX_REQUEST === true);
+    }
+
+    protected function createPayPalOrder(string $ppr_type): bool
+    {
+        global $order, $currencies;
+
+        $order_info = $this->getOrderTotalsInfo();
+
+        $create_order_request = new CreatePayPalOrderRequest(
+            $order,
+            $order_info,
+            $ppr_type,
+            $this->createOrderGuid($order, $ppr_type),
+            $currencies
+        );
+
+        $paypal_order = $this->ppr->createOrder($create_order_request);
+
+        if ($paypal_order === false) {
+            return false;
+        }
+
+        $_SESSION['PayPalRestful']['Order'] = [
+            'id' => $paypal_order['id'],
+            'status' => $paypal_order['status'],
+            'payment_source' => $ppr_type,
+            'amount_mismatch' => false,
+        ];
+
+        return true;
+    }
+
+    protected function getOrderTotalsInfo(): array
+    {
+        global $zcObserverPaypalrestful;
+
+        if (!isset($zcObserverPaypalrestful) || !is_object($zcObserverPaypalrestful)) {
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
+        }
+
+        $order_info = $zcObserverPaypalrestful->getOrderInfo();
+
+        if ($order_info === false) {
+            $this->log->write('Credit Cards: Missing order_total modifications; getOrderInfo returned false.');
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
+        }
+
+        return $order_info;
+    }
+
+    protected function createOrderGuid(\order $order, string $ppr_type): string
+    {
+        return $this->paypalCommon->createOrderGuid($order, $ppr_type);
+    }
+
+    protected function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
+    {
+        global $messageStack;
+
+        $this->log->write('Credit Cards redirect: ' . $error_message);
+
+        if ($log_only === false) {
+            $messageStack->add_session('checkout_payment', $error_message, 'error');
+        }
+
+        zen_redirect(zen_href_link($redirect_page, '', 'SSL'));
+    }
+
+    public function confirmation()
+    {
+        return false;
+    }
+
+    public function process_button()
+    {
+        return false;
+    }
+
+    public function process_button_ajax()
+    {
+        return [];
+    }
+
+    public function alterShippingEditButton()
+    {
+        return '';
+    }
+
+    public function clear_payments()
+    {
+        unset($_SESSION['PayPalRestful']);
+    }
+
+    public function before_process()
+    {
+        global $order;
+
+        $order_info = $this->getOrderTotalsInfo();
+
+        $this->paymentIsPending = false;
+
+        $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
+        $wallet_user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';
+        $payer_action_fast_path = ($wallet_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
+        
+        if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false) {
+            $this->log->write('Credit Cards::before_process, cannot capture/authorize; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));
+            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
+        }
+        
+        $response = $this->captureOrAuthorizePayment('card');
+
+        $_SESSION['PayPalRestful']['Order']['status'] = $response['status'];
+        unset($response['links']);
+        $this->orderInfo = $response;
+
+        if ($this->paymentIsPending === true) {
+            $pending_status = (int)MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID;
+            if ($pending_status > 0) {
+                $this->order_status = $pending_status;
+                $order->info['order_status'] = $pending_status;
+            }
+        }
+
+        $txn_type = $this->orderInfo['intent'];
+        $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
+        $payment_status = ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalRestfulApi::STATUS_CAPTURED : PayPalRestfulApi::STATUS_APPROVED);
+
+        $this->orderInfo['payment_status'] = $payment_status;
+        $this->orderInfo['paypal_payment_status'] = $payment['status'];
+        $this->orderInfo['txn_type'] = $txn_type;
+
+        $this->orderInfo['expiration_time'] = $payment['expiration_time'] ?? null;
+
+        if ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED) {
+            $pending_status = (int)MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID;
+            if ($pending_status > 0) {
+                $this->order_status = $pending_status;
+                $order->info['order_status'] = $pending_status;
+            }
+            $this->orderInfo['admin_alert_needed'] = true;
+        } else {
+            $this->orderInfo['admin_alert_needed'] = false;
+        }
+    }
+
+    protected function captureOrAuthorizePayment(string $payment_source): array
+    {
+        $response = $this->paypalCommon->captureWalletPayment($this->ppr, $this->log, 'Credit Cards');
+        
+        if ($response === false) {
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_CAPTURE_FAILED ?? 'Capture failed', FILENAME_CHECKOUT_PAYMENT);
+        }
+
+        return $response;
+    }
+
+    public function after_order_create($orders_id)
+    {
+        // Placeholder for future functionality
+    }
+
+    public function after_process()
+    {
+        $this->paypalCommon->processAfterOrder($this->orderInfo);
+        $this->paypalCommon->updateOrderHistory($this->orderInfo, 'card');
+        $this->paypalCommon->resetOrder();
+    }
+
+    protected function recordPayPalOrderDetails(int $orders_id): void
+    {
+        // Delegate to common class - but for googlepay we have specific handling
+        // Implementation similar to paypalr but adapted for Credit Cards
+        if ($orders_id <= 0) {
+            return;
+        }
+
+        $this->orderInfo['orders_id'] = $orders_id;
+
+        if ($this->paypalCommon->paypalOrderRecordsExist($orders_id) === true) {
+            return;
+        }
+
+        // Record order details in PayPal table
+        global $db;
+        
+        $purchase_unit = $this->orderInfo['purchase_units'][0];
+        $payment = $purchase_unit['payments']['captures'][0] ?? $purchase_unit['payments']['authorizations'][0];
+        
+        $payment_type = 'card';
+        $payment_source = $this->orderInfo['payment_source'][$payment_type] ?? [];
+        
+        $card_source = $payment_source['card'] ?? [];
+        $name = $payment_source['name'] ?? [];
+        
+        $first_name = is_array($name) ? ($name['given_name'] ?? '') : '';
+        $last_name = is_array($name) ? ($name['surname'] ?? '') : '';
+        $email_address = $payment_source['email_address'] ?? '';
+        
+        $memo = [
+            'source' => 'card',
+            'card_info' => $card_source,
+        ];
+
+        $sql_data_array = [
+            'order_id' => $orders_id,
+            'txn_type' => 'CREATE',
+            'module_name' => $this->code,
+            'module_mode' => $this->orderInfo['txn_type'],
+            'payment_type' => $payment_type,
+            'payment_status' => $this->orderInfo['payment_status'],
+            'mc_currency' => $payment['amount']['currency_code'],
+            'first_name' => substr($first_name, 0, 32),
+            'last_name' => substr($last_name, 0, 32),
+            'payer_email' => $email_address,
+            'txn_id' => $this->orderInfo['id'],
+            'mc_gross' => $payment['amount']['value'],
+            'date_added' => Helpers::convertPayPalDatePay2Db($this->orderInfo['create_time']),
+            'notify_version' => self::CURRENT_VERSION,
+            'memo' => json_encode($memo),
+        ];
+
+        zen_db_perform(TABLE_PAYPAL, $sql_data_array);
+    }
+
+    public function admin_notification($zf_order_id)
+    {
+        $zf_order_id = (int)$zf_order_id;
+        $ppr = $this->getPayPalRestfulApi();
+        if ($ppr === null) {
+            return '';
+        }
+
+        $admin_main = new AdminMain($this->code, self::CURRENT_VERSION, $zf_order_id, $ppr);
+
+        return $admin_main->get();
+    }
+
+    public function help()
+    {
+        return '';
+    }
+
+    public function _doRefund($oID)
+    {
+        $ppr = $this->getPayPalRestfulApi();
+        if ($ppr === null) {
+            return false;
+        }
+
+        $do_refund = new DoRefund($oID, $ppr, $this->code);
+        return $do_refund->process();
+    }
+
+    public function _doAuth($oID, $order_amt, $currency = 'USD')
+    {
+        return false; // Credit Cards doesn't support separate auth
+    }
+
+    public function _doCapt($oID, $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
+    {
+        $ppr = $this->getPayPalRestfulApi();
+        if ($ppr === null) {
+            return false;
+        }
+
+        $do_capture = new DoCapture($oID, $ppr, $this->code);
+        return $do_capture->process($captureType, $order_amt, $order_currency);
+    }
+
+    public function _doVoid($oID)
+    {
+        $ppr = $this->getPayPalRestfulApi();
+        if ($ppr === null) {
+            return false;
+        }
+
+        $do_void = new DoVoid($oID, $ppr, $this->code);
+        return $do_void->process();
+    }
+
     public function check(): bool
     {
         global $db;
-
         if (!isset($this->_check)) {
-            $check_query = $db->Execute(
-                "SELECT configuration_value
-                   FROM " . TABLE_CONFIGURATION . "
-                  WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS'
-                  LIMIT 1"
-            );
+            $check_query = $db->Execute("SELECT configuration_value FROM " . TABLE_CONFIGURATION . " WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS'");
             $this->_check = !$check_query->EOF;
         }
         return $this->_check;
     }
 
-    /**
-     * Install the credit card module configuration
-     */
     public function install()
     {
         global $db;
-
+        
         $current_version = self::CURRENT_VERSION;
         $db->Execute(
             "INSERT INTO " . TABLE_CONFIGURATION . "
                 (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
              VALUES
                 ('Module Version', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
-
-                ('Enable Credit Card Payments?', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS', 'False', 'Do you want to enable credit card payments via PayPal? This module requires the main PayPal Advanced Checkout (paypalr) module to be installed and configured with valid API credentials. Use the <b>Retired</b> setting if you are planning to remove this payment module but still have administrative actions to perform against orders placed with this module.', 6, 0, 'zen_cfg_select_option([\'True\', \'False\', \'Retired\'], ', NULL, now()),
-
+                ('Enable PayPal Credit Cards?', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS', 'False', 'Do you want to enable PayPal Credit Cards payments?', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
                 ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
-
                 ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())"
         );
-
-        $this->notify('NOTIFY_PAYMENT_PAYPALR_CREDITCARD_INSTALLED');
+        
+        // Define the module's current version so that the tableCheckup method will apply all changes
+        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION', '0.0.0');
+        $this->tableCheckup();
     }
 
-    /**
-     * Return the configuration keys for this module
-     */
     public function keys(): array
     {
         return [
@@ -203,15 +706,19 @@ class paypalr_creditcard extends paypalr
         ];
     }
 
-    /**
-     * Uninstall this module
-     */
     public function remove()
     {
         global $db;
+        $db->Execute("DELETE FROM " . TABLE_CONFIGURATION . " WHERE configuration_key LIKE 'MODULE_PAYMENT_PAYPALR_CREDITCARD_%'");
+    }
 
-        $db->Execute("DELETE FROM " . TABLE_CONFIGURATION . " WHERE configuration_key LIKE 'MODULE\_PAYMENT\_PAYPALR\_CREDITCARD\_%'");
+    public function sendAlertEmail(string $subject_detail, string $message, bool $force_send = false)
+    {
+        $this->paypalCommon->sendAlertEmail($subject_detail, $message, $force_send);
+    }
 
-        $this->notify('NOTIFY_PAYMENT_PAYPALR_CREDITCARD_UNINSTALLED');
+    public function getCurrentVersion(): string
+    {
+        return self::CURRENT_VERSION;
     }
 }
