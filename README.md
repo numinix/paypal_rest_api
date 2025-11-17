@@ -58,6 +58,50 @@ The plugin bundles standalone payment modules for Apple Pay, Google Pay, and Ven
 
 When the wallet modules are enabled alongside the base PayPal Advanced Checkout method, Zen Cart renders one radio option per wallet plus the traditional card/PayPal button. Because each wallet inherits the parent module’s logging, any issues appear in the `/logs/paypalr/` directory with the wallet type noted in the message prefix.
 
+## Credit Card module (PayPal Credit Cards)
+
+The plugin also includes a standalone credit card payment module (`paypalr_creditcard`) that separates credit card payments from the PayPal wallet option. This allows merchants to present credit card and PayPal wallet as two distinct payment method choices on the checkout page.
+
+### Why a separate credit card module?
+
+Prior to this module, the base `paypalr` module combined both PayPal wallet and credit card payment within a single module selection. While functional, this meant:
+- Both payment methods appeared as one option in the modules list
+- Customers saw both PayPal and credit card UI within the same payment selection
+- Administrators could not independently control availability of each payment method
+
+The separate credit card module addresses these limitations by providing clean separation at the module level.
+
+### Installation and setup
+
+1. **Prerequisite**: The base **PayPal Advanced Checkout** (`paypalr`) module must be installed and configured with valid API credentials.
+
+2. **Install the credit card module**:
+   - Navigate to **Modules → Payment** in admin
+   - Find "PayPal Credit Cards" and click Install
+   - Enable the module and set sort order
+
+3. **Configure the base module for wallet-only** (recommended):
+   - Edit the PayPal Advanced Checkout (`paypalr`) module
+   - Set "Accept Credit Cards?" to `false`
+   - This makes `paypalr` show only the PayPal wallet button
+
+Now customers will see two separate payment options:
+- **PayPal** - For PayPal wallet payments
+- **Credit Card** - For credit card payments via PayPal
+
+### Features
+
+- **Independent control**: Enable/disable separately from PayPal wallet
+- **Full feature support**: Includes vault (saved cards), 3D Secure, refunds, captures
+- **Shared infrastructure**: Extends `paypalr` to reuse payment processing, validation, and API communication
+- **Same credentials**: Uses the PayPal API credentials configured in the base module
+
+### Technical details
+
+The credit card module extends the `paypalr` class and overrides only the presentation layer to show credit card fields without the PayPal wallet button. It shares all payment processing logic, vault management, 3DS authentication, and transaction handling with the parent module.
+
+For complete documentation, see [docs/CREDIT_CARD_MODULE.md](docs/CREDIT_CARD_MODULE.md).
+
 ## Charging vaulted cards from custom code
 
 ### Card Vaulting Behavior
