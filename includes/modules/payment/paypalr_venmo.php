@@ -395,28 +395,7 @@ class paypalr_venmo extends base
 
         $order_info = $this->getOrderTotalsInfo();
 
-        $create_order_request = new CreatePayPalOrderRequest(
-            $order,
-            $order_info,
-            $ppr_type,
-            $this->createOrderGuid($order, $ppr_type),
-            $currencies
-        );
-
-        $paypal_order = $this->ppr->createOrder($create_order_request);
-
-        if ($paypal_order === false) {
-            return false;
-        }
-
-        $_SESSION['PayPalRestful']['Order'] = [
-            'id' => $paypal_order['id'],
-            'status' => $paypal_order['status'],
-            'payment_source' => $ppr_type,
-            'amount_mismatch' => false,
-        ];
-
-        return true;
+        return $this->paypalCommon->createPayPalOrder($this, $order, $order_info, $ppr_type, $currencies);
     }
 
     protected function getOrderTotalsInfo(): array
@@ -631,40 +610,22 @@ class paypalr_venmo extends base
 
     public function _doRefund($oID)
     {
-        $ppr = $this->getPayPalRestfulApi();
-        if ($ppr === null) {
-            return false;
-        }
-
-        $do_refund = new DoRefund($oID, $ppr, $this->code);
-        return $do_refund->process();
+        return $this->paypalCommon->processRefund($oID, $this->getPayPalRestfulApi(), $this->code);
     }
 
     public function _doAuth($oID, $order_amt, $currency = 'USD')
     {
-        return false; // Venmo doesn't support separate auth
+        return $this->paypalCommon->processAuthorization($oID, $this->getPayPalRestfulApi(), $this->code, $order_amt, $currency, false);
     }
 
     public function _doCapt($oID, $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
     {
-        $ppr = $this->getPayPalRestfulApi();
-        if ($ppr === null) {
-            return false;
-        }
-
-        $do_capture = new DoCapture($oID, $ppr, $this->code);
-        return $do_capture->process($captureType, $order_amt, $order_currency);
+        return $this->paypalCommon->processCapture($oID, $this->getPayPalRestfulApi(), $this->code, $captureType, $order_amt, $order_currency);
     }
 
     public function _doVoid($oID)
     {
-        $ppr = $this->getPayPalRestfulApi();
-        if ($ppr === null) {
-            return false;
-        }
-
-        $do_void = new DoVoid($oID, $ppr, $this->code);
-        return $do_void->process();
+        return $this->paypalCommon->processVoid($oID, $this->getPayPalRestfulApi(), $this->code);
     }
 
     public function check(): bool
