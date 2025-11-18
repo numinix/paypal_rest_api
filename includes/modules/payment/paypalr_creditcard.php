@@ -1,6 +1,6 @@
 <?php
 /**
- * paypalr_googlepay.php payment module class for handling Google Pay via PayPal Advanced Checkout.
+ * paypalr_creditcard.php payment module class for handling Credit Cards via PayPal Advanced Checkout.
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -33,23 +33,23 @@ use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
 LanguageCompatibility::load();
 
 /**
- * The PayPal Google Pay payment module using PayPal's REST APIs (v2)
+ * The PayPal Credit Cards payment module using PayPal's REST APIs (v2)
  */
-class paypalr_googlepay extends base
+class paypalr_creditcard extends base
 {
     protected function getModuleStatusSetting(): string
     {
-        return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS : 'False';
+        return defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS') ? MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS : 'False';
     }
 
     protected function getModuleSortOrder(): ?int
     {
-        return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER : null;
+        return defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER') ? (int)MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER : null;
     }
 
     protected function getModuleZoneSetting(): int
     {
-        return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE : 0;
+        return defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE : 0;
     }
 
     protected const CURRENT_VERSION = '1.3.3';
@@ -67,9 +67,9 @@ class paypalr_googlepay extends base
     public int $zone = 0;
     public int $order_status = 0;
     
-    // Google Pay never uses on-site card entry
-    public bool $cardsAccepted = false;
-    public bool $collectsCardDataOnsite = false;
+    // Credit Cards DOES use on-site card entry
+    public bool $cardsAccepted = true;
+    public bool $collectsCardDataOnsite = true;
 
     protected PayPalRestfulApi $ppr;
     protected ErrorInfo $errorInfo;
@@ -91,25 +91,25 @@ class paypalr_googlepay extends base
     {
         global $order, $messageStack, $loaderPrefix;
 
-        $this->code = 'paypalr_googlepay';
+        $this->code = 'paypalr_creditcard';
 
         $curl_installed = (function_exists('curl_init'));
 
         if (IS_ADMIN_FLAG === false) {
-            $this->title = MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_TITLE ?? 'PayPal Google Pay';
+            $this->title = MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE ?? 'Credit Card';
         } else {
-            $this->title = (MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_TITLE_ADMIN ?? 'PayPal Google Pay') . (($curl_installed === true) ? '' : $this->alertMsg(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL ?? 'cURL not installed'));
-            $this->description = sprintf(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_DESCRIPTION ?? 'Google Pay via PayPal Advanced Checkout (v%s)', self::CURRENT_VERSION);
+            $this->title = (MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE_ADMIN ?? 'Credit Cards via PayPal Advanced Checkout') . (($curl_installed === true) ? '' : $this->alertMsg(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL ?? 'cURL not installed'));
+            $this->description = sprintf(MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_DESCRIPTION ?? 'Accept credit card payments via PayPal Advanced Checkout (v%s)', self::CURRENT_VERSION);
             
             // Add upgrade button if current version is less than latest version
-            $installed_version = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION') ? MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION : '0.0.0';
+            $installed_version = defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION') ? MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION : '0.0.0';
             if (version_compare($installed_version, self::CURRENT_VERSION, '<')) {
                 $this->description .= sprintf(
                     MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_UPGRADE_AVAILABLE ?? 
                     '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="paypalr-upgrade-button" href="%3$s">Upgrade to %2$s</a></p>',
                     $installed_version,
                     self::CURRENT_VERSION,
-                    zen_href_link('paypalr_upgrade.php', 'module=paypalr_googlepay&action=upgrade', 'SSL')
+                    zen_href_link('paypalr_upgrade.php', 'module=paypalr_creditcard&action=upgrade', 'SSL')
                 );
             }
         }
@@ -134,8 +134,13 @@ class paypalr_googlepay extends base
         // Initialize the shared PayPal common class
         $this->paypalCommon = new PayPalCommon($this);
 
-        // Google Pay uses final sale mode
-        $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+        // Credit cards support both auth-only and final sale modes
+        $ppr_type = $_SESSION['PayPalRestful']['ppr_type'] ?? 'card';
+        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || ($ppr_type !== 'card' && MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')) {
+            $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+        } else {
+            $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+        }
         $this->order_status = ($order_status > 1) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
 
         $this->zone = $this->getModuleZoneSetting();
@@ -198,14 +203,11 @@ class paypalr_googlepay extends base
             $this->attach($this, ['NOTIFY_OPC_OBSERVER_SESSION_FIXUPS']);
         }
 
-        // Load wallet-specific language file
-        $this->paypalCommon->loadWalletLanguageFile($this->code);
-
         // Check for required main PayPal module
         if (!defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
             $this->enabled = false;
             if (IS_ADMIN_FLAG === true) {
-                $this->title .= $this->alertMsg(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_PAYPAL_REQUIRED ?? 'Main PayPal module required');
+                $this->title .= $this->alertMsg(MODULE_PAYMENT_PAYPALR_CREDITCARD_ERROR_PAYPAL_REQUIRED ?? ' (Requires main PayPal module)');
             }
             return;
         }
@@ -233,15 +235,15 @@ class paypalr_googlepay extends base
         
         // If the payment module is installed and at the current version, nothing to be done.
         $current_version = self::CURRENT_VERSION;
-        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION === $current_version) {
+        if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION') && MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION === $current_version) {
             return;
         }
         
         // Check for version-specific configuration updates
-        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION')) {
+        if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION')) {
             switch (true) {
                 // Add future version-specific upgrades here
-                // case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.4', '<'):
+                // case version_compare(MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION, '1.3.4', '<'):
                 //     // Add v1.3.4-specific changes here
                 
                 default:
@@ -254,7 +256,7 @@ class paypalr_googlepay extends base
             "UPDATE " . TABLE_CONFIGURATION . "
                 SET configuration_value = '$current_version',
                     last_modified = now()
-              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION'
+              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION'
               LIMIT 1"
         );
     }
@@ -293,7 +295,7 @@ class paypalr_googlepay extends base
             );
             return $ppr;
         } catch (\Exception $e) {
-            $this->log->write('Google Pay: Error creating PayPalRestfulApi: ' . $e->getMessage());
+            $this->log->write('Credit Cards: Error creating PayPalRestfulApi: ' . $e->getMessage());
             $this->setConfigurationDisabled($e->getMessage());
             return null;
         }
@@ -342,46 +344,269 @@ class paypalr_googlepay extends base
 
     public function javascript_validation(): string
     {
-        return '';
+        $js = '';
+        if (defined('CC_OWNER_MIN_LENGTH') && defined('CC_NUMBER_MIN_LENGTH')) {
+            $js = '  if (payment_value == "' . $this->code . '") {' . "\n" .
+                  '    var cc_owner = document.checkout_payment.paypalr_cc_owner.value;' . "\n" .
+                  '    var cc_number = document.checkout_payment.paypalr_cc_number.value;' . "\n";
+            
+            if (CC_OWNER_MIN_LENGTH > 0) {
+                $js .= '    if (cc_owner == "" || cc_owner.length < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
+                       '      error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
+                       '      error = 1;' . "\n" .
+                       '    }' . "\n";
+            }
+            
+            if (CC_NUMBER_MIN_LENGTH > 0) {
+                $js .= '    if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
+                       '      error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
+                       '      error = 1;' . "\n" .
+                       '    }' . "\n";
+            }
+            
+            $js .= '  }' . "\n";
+        }
+        return $js;
     }
 
     public function selection(): array
     {
+        global $order;
+        
         unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
+        $_SESSION['PayPalRestful']['ppr_type'] = 'card';
 
-        $buttonContainer = '<div id="paypalr-googlepay-button" class="paypalr-googlepay-button"></div>';
-        $hiddenFields =
-            zen_draw_hidden_field('ppr_type', 'google_pay') .
-            zen_draw_hidden_field('paypalr_googlepay_payload', '', 'id="paypalr-googlepay-payload"') .
-            zen_draw_hidden_field('paypalr_googlepay_status', '', 'id="paypalr-googlepay-status"');
+        // Create dropdowns for expiry date
+        $expires_month = [];
+        $expires_year = [];
+        for ($month = 1; $month < 13; $month++) {
+            $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => date('F - (m)', mktime(0, 0, 0, $month, 1))];
+        }
+        $this_year = date('Y');
+        for ($year = $this_year; $year < (int)$this_year + 15; $year++) {
+            $expires_year[] = ['id' => $year, 'text' => $year];
+        }
 
-        $script = '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js') . '</script>';
+        // Get vaulted cards if enabled
+        $vaultEnabled = (defined('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT') && MODULE_PAYMENT_PAYPALR_ENABLE_VAULT === 'True');
+        $vaultedCards = [];
+        if ($vaultEnabled && isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0) {
+            $vaultedCards = $this->paypalCommon->getVaultedCardsForCustomer($_SESSION['customer_id'], true);
+        }
+
+        $savedCardSelection = $_POST['paypalr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new');
+        if ($savedCardSelection === '' && !empty($vaultedCards)) {
+            $savedCardSelection = $vaultedCards[0]['vault_id'];
+        }
+        if ($savedCardSelection !== 'new' && !empty($vaultedCards)) {
+            $validSavedCard = false;
+            foreach ($vaultedCards as $card) {
+                if ($card['vault_id'] === $savedCardSelection) {
+                    $validSavedCard = true;
+                    break;
+                }
+            }
+            if ($validSavedCard === false) {
+                $savedCardSelection = 'new';
+            }
+        }
+
+        $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
+        $saveCardChecked = $allowSaveCard && (!empty($_POST['paypalr_cc_save_card']) || (!empty($_SESSION['PayPalRestful']['save_card'])));
+        if ($savedCardSelection !== 'new') {
+            $saveCardChecked = false;
+        }
+
+        $billing_name = zen_output_string_protected($order->billing['firstname'] . ' ' . $order->billing['lastname']);
+
+        // Check if bootstrap template
+        $is_bootstrap_template = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true);
+
+        // Build fields array
+        $fields = [];
+        
+        // Add saved cards dropdown if available
+        if ($vaultEnabled && !empty($vaultedCards)) {
+            $fields[] = [
+                'title' => MODULE_PAYMENT_PAYPALR_SAVED_CARDS ?? 'Saved Cards',
+                'field' => $this->buildSavedCardOptions($vaultedCards, $savedCardSelection),
+                'tag' => 'paypalr-saved-card',
+            ];
+        }
+
+        // Card owner name
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER ?? 'Cardholder Name',
+            'field' => zen_draw_input_field('paypalr_cc_owner', $billing_name, 'class="ppr-cc ppr-card-section ppr-card-new" id="paypalr-cc-owner" autocomplete="cc-name"'),
+            'tag' => 'paypalr-cc-owner',
+        ];
+
+        // Card number
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER ?? 'Card Number',
+            'field' => zen_draw_input_field('paypalr_cc_number', '', 'class="ppr-cc ppr-card-section ppr-card-new" id="paypalr-cc-number" autocomplete="cc-number"'),
+            'tag' => 'paypalr-cc-number',
+        ];
+
+        // Expiry date
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES ?? 'Expiration Date',
+            'field' =>
+                zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-cc ppr-card-section ppr-card-new" id="paypalr-cc-expires-month"') .
+                '&nbsp;' .
+                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-cc ppr-card-section ppr-card-new" id="paypalr-cc-expires-year"'),
+            'tag' => 'paypalr-cc-expires-month',
+        ];
+
+        // CVV
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALR_CC_CVV ?? 'CVV',
+            'field' => zen_draw_input_field('paypalr_cc_cvv', '', 'class="ppr-cc ppr-card-section ppr-card-new" id="paypalr-cc-cvv" size="4" maxlength="4" autocomplete="cc-csc"'),
+            'tag' => 'paypalr-cc-cvv',
+        ];
+
+        // Save card checkbox
+        if ($vaultEnabled && $allowSaveCard) {
+            if ($is_bootstrap_template === false) {
+                $fields[] = [
+                    'title' => MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use',
+                    'field' => zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'class="ppr-cc ppr-card-section ppr-card-new" id="ppr-cc-save-card"'),
+                    'tag' => 'ppr-cc-save-card',
+                ];
+            } else {
+                $fields[] = [
+                    'title' => '&nbsp;',
+                    'field' =>
+                        '<div class="custom-control custom-checkbox ppr-cc ppr-card-section ppr-card-new">' .
+                            zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'id="ppr-cc-save-card" class="custom-control-input"') .
+                            '<label class="custom-control-label checkboxLabel" for="ppr-cc-save-card">' . (MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use') . '</label>' .
+                        '</div>',
+                ];
+            }
+        }
 
         return [
             'id' => $this->code,
-            'module' => MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_SELECTION ?? 'Google Pay',
-            'fields' => [
-                [
-                    'title' => $buttonContainer,
-                    'field' => $hiddenFields . $script,
-                ],
-            ],
+            'module' => $this->buildCardsAccepted() . zen_draw_hidden_field('ppr_type', 'card'),
+            'fields' => $fields,
         ];
+    }
+
+    protected function buildSavedCardOptions(array $vaultedCards, string $selectedVaultId): string
+    {
+        $html = '<select name="paypalr_saved_card" id="paypalr-saved-card" class="ppr-saved-card-select">';
+        $html .= '<option value="new"' . ($selectedVaultId === 'new' ? ' selected="selected"' : '') . '>' . 
+                 (MODULE_PAYMENT_PAYPALR_NEW_CARD ?? 'Use a new card') . '</option>';
+        
+        foreach ($vaultedCards as $card) {
+            $card_label = ($card['card_type'] ?? 'Card') . ' ending in ' . $card['last_digits'];
+            if (!empty($card['expiry'])) {
+                $card_label .= ' (Exp: ' . $card['expiry'] . ')';
+            }
+            $selected = ($card['vault_id'] === $selectedVaultId) ? ' selected="selected"' : '';
+            $html .= '<option value="' . zen_output_string($card['vault_id']) . '"' . $selected . '>' . 
+                     zen_output_string($card_label) . '</option>';
+        }
+        
+        $html .= '</select>';
+        return $html;
+    }
+
+    protected function buildCardsAccepted(): string
+    {
+        $cards_accepted = '';
+        if (defined('ACCEPTED_CC_TYPES') && strlen(ACCEPTED_CC_TYPES) > 0) {
+            $accepted_types = explode(',', ACCEPTED_CC_TYPES);
+            foreach ($accepted_types as $type) {
+                $cards_accepted .= zen_image(DIR_WS_TEMPLATE_IMAGES . 'cc_' . strtolower($type) . '.png', $type) . '&nbsp;';
+            }
+        }
+        return $cards_accepted;
     }
 
     public function pre_confirmation_check()
     {
-        $this->paypalCommon->processWalletConfirmation(
-            'google_pay',
-            'paypalr_googlepay_payload',
-            [
-                'title' => MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_TITLE ?? 'Google Pay',
-                'payload_missing' => MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_PAYLOAD_MISSING ?? 'Payload missing',
-                'payload_invalid' => MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_PAYLOAD_INVALID ?? 'Invalid payload',
-                'confirm_failed' => MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_CONFIRM_FAILED ?? 'Confirmation failed',
-                'payer_action' => MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_PAYER_ACTION ?? 'Payer action required',
-            ]
-        );
+        // Set payment type
+        $_SESSION['PayPalRestful']['ppr_type'] = 'card';
+        $_POST['ppr_type'] = 'card';
+        
+        // Store saved card selection if provided
+        if (isset($_POST['paypalr_saved_card'])) {
+            $_SESSION['PayPalRestful']['saved_card'] = $_POST['paypalr_saved_card'];
+        }
+        
+        // Store save card preference
+        if (isset($_POST['paypalr_cc_save_card'])) {
+            $_SESSION['PayPalRestful']['save_card'] = $_POST['paypalr_cc_save_card'];
+        }
+        
+        // Validate card information
+        if (!$this->validateCardInformation(true)) {
+            // Validation failed, redirect back to payment page
+            // Error messages will already be set by validateCardInformation
+            return;
+        }
+        
+        // Create PayPal order for credit card payment
+        $paypal_order_created = $this->createPayPalOrder('card');
+        if ($paypal_order_created === false) {
+            $error_info = $this->ppr->getErrorInfo();
+            $this->sendAlertEmail(
+                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
+                MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
+            );
+            $this->setMessageAndRedirect(
+                MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE ?? 'Unable to create payment order',
+                FILENAME_CHECKOUT_PAYMENT
+            );
+        }
+    }
+
+    protected function validateCardInformation(bool $is_preconfirmation): bool
+    {
+        global $messageStack;
+
+        $saved_card = $_POST['paypalr_saved_card'] ?? $_SESSION['PayPalRestful']['saved_card'] ?? 'new';
+        
+        // If using a saved card, minimal validation needed
+        if ($saved_card !== 'new') {
+            $_SESSION['PayPalRestful']['saved_card'] = $saved_card;
+            return true;
+        }
+
+        // Validate new card entry
+        $cc_owner = $_POST['paypalr_cc_owner'] ?? '';
+        $cc_number = $_POST['paypalr_cc_number'] ?? '';
+        $cc_cvv = $_POST['paypalr_cc_cvv'] ?? '';
+
+        $error = false;
+
+        if (defined('CC_OWNER_MIN_LENGTH') && strlen($cc_owner) < CC_OWNER_MIN_LENGTH) {
+            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_OWNER_TOO_SHORT ?? 'Cardholder name is too short';
+            $messageStack->add_session('checkout_payment', $error_message, 'error');
+            $error = true;
+        }
+
+        if (defined('CC_NUMBER_MIN_LENGTH') && strlen(preg_replace('/[^0-9]/', '', $cc_number)) < CC_NUMBER_MIN_LENGTH) {
+            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_NUMBER_TOO_SHORT ?? 'Card number is too short';
+            $messageStack->add_session('checkout_payment', $error_message, 'error');
+            $error = true;
+        }
+
+        if (strlen($cc_cvv) < 3 || strlen($cc_cvv) > 4) {
+            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_CVV_INVALID ?? 'CVV must be 3 or 4 digits';
+            $messageStack->add_session('checkout_payment', $error_message, 'error');
+            $error = true;
+        }
+
+        if ($error) {
+            if ($is_preconfirmation) {
+                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
+            }
+            return false;
+        }
+
+        return true;
     }
 
     protected function isOpcAjaxRequest(): bool
@@ -409,7 +634,7 @@ class paypalr_googlepay extends base
         $order_info = $zcObserverPaypalrestful->getOrderInfo();
 
         if ($order_info === false) {
-            $this->log->write('Google Pay: Missing order_total modifications; getOrderInfo returned false.');
+            $this->log->write('Credit Cards: Missing order_total modifications; getOrderInfo returned false.');
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
         }
 
@@ -425,7 +650,7 @@ class paypalr_googlepay extends base
     {
         global $messageStack;
 
-        $this->log->write('Google Pay redirect: ' . $error_message);
+        $this->log->write('Credit Cards redirect: ' . $error_message);
 
         if ($log_only === false) {
             $messageStack->add_session('checkout_payment', $error_message, 'error');
@@ -472,12 +697,12 @@ class paypalr_googlepay extends base
         $payer_action_fast_path = ($wallet_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
         
         if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false) {
-            $this->log->write('Google Pay::before_process, cannot capture/authorize; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));
+            $this->log->write('Credit Cards::before_process, cannot capture/authorize; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));
             unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
         }
         
-        $response = $this->captureOrAuthorizePayment('google_pay');
+        $response = $this->captureOrAuthorizePayment('card');
 
         $_SESSION['PayPalRestful']['Order']['status'] = $response['status'];
         unset($response['links']);
@@ -511,14 +736,37 @@ class paypalr_googlepay extends base
         } else {
             $this->orderInfo['admin_alert_needed'] = false;
         }
+
+        // Store vault card data in session if present
+        if (isset($payment['payment_source']['card'])) {
+            $this->storeVaultCardDataInSession($this->orderInfo);
+        }
+    }
+
+    protected function storeVaultCardDataInSession(array $response): void
+    {
+        $card_source = $response['purchase_units'][0]['payments']['captures'][0]['payment_source']['card'] ?? 
+                      $response['purchase_units'][0]['payments']['authorizations'][0]['payment_source']['card'] ?? 
+                      null;
+
+        if ($card_source === null) {
+            return;
+        }
+
+        $_SESSION['PayPalRestful']['vault_card'] = $card_source;
     }
 
     protected function captureOrAuthorizePayment(string $payment_source): array
     {
-        $response = $this->paypalCommon->captureWalletPayment($this->ppr, $this->log, 'Google Pay');
+        $response = $this->paypalCommon->processCreditCardPayment(
+            $this->ppr, 
+            $this->log, 
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE,
+            'card'
+        );
         
         if ($response === false) {
-            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_CAPTURE_FAILED ?? 'Capture failed', FILENAME_CHECKOUT_PAYMENT);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_CAPTURE_FAILED ?? 'Payment processing failed', FILENAME_CHECKOUT_PAYMENT);
         }
 
         return $response;
@@ -526,20 +774,27 @@ class paypalr_googlepay extends base
 
     public function after_order_create($orders_id)
     {
-        // Placeholder for future functionality
+        // Store vaulted card data if present in the response
+        $card_source = $this->orderInfo['purchase_units'][0]['payments']['captures'][0]['payment_source']['card'] ?? 
+                      $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0]['payment_source']['card'] ?? 
+                      null;
+        
+        if ($card_source !== null) {
+            $this->paypalCommon->storeVaultCardData($orders_id, $card_source, $this->orderCustomerCache);
+        }
     }
 
     public function after_process()
     {
         $this->paypalCommon->processAfterOrder($this->orderInfo);
-        $this->paypalCommon->updateOrderHistory($this->orderInfo, 'google_pay');
+        $this->paypalCommon->updateOrderHistory($this->orderInfo, 'card');
         $this->paypalCommon->resetOrder();
     }
 
     protected function recordPayPalOrderDetails(int $orders_id): void
     {
         // Delegate to common class - but for googlepay we have specific handling
-        // Implementation similar to paypalr but adapted for Google Pay
+        // Implementation similar to paypalr but adapted for Credit Cards
         if ($orders_id <= 0) {
             return;
         }
@@ -556,7 +811,7 @@ class paypalr_googlepay extends base
         $purchase_unit = $this->orderInfo['purchase_units'][0];
         $payment = $purchase_unit['payments']['captures'][0] ?? $purchase_unit['payments']['authorizations'][0];
         
-        $payment_type = 'google_pay';
+        $payment_type = 'card';
         $payment_source = $this->orderInfo['payment_source'][$payment_type] ?? [];
         
         $card_source = $payment_source['card'] ?? [];
@@ -567,7 +822,7 @@ class paypalr_googlepay extends base
         $email_address = $payment_source['email_address'] ?? '';
         
         $memo = [
-            'source' => 'google_pay',
+            'source' => 'card',
             'card_info' => $card_source,
         ];
 
@@ -634,7 +889,7 @@ class paypalr_googlepay extends base
     {
         global $db;
         if (!isset($this->_check)) {
-            $check_query = $db->Execute("SELECT configuration_value FROM " . TABLE_CONFIGURATION . " WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS'");
+            $check_query = $db->Execute("SELECT configuration_value FROM " . TABLE_CONFIGURATION . " WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS'");
             $this->_check = !$check_query->EOF;
         }
         return $this->_check;
@@ -649,31 +904,31 @@ class paypalr_googlepay extends base
             "INSERT INTO " . TABLE_CONFIGURATION . "
                 (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
              VALUES
-                ('Module Version', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
-                ('Enable PayPal Google Pay?', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS', 'False', 'Do you want to enable PayPal Google Pay payments?', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
-                ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
-                ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())"
+                ('Module Version', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
+                ('Enable PayPal Credit Cards?', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS', 'False', 'Do you want to enable PayPal Credit Cards payments?', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
+                ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
+                ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())"
         );
         
         // Define the module's current version so that the tableCheckup method will apply all changes
-        define('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION', '0.0.0');
+        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION', '0.0.0');
         $this->tableCheckup();
     }
 
     public function keys(): array
     {
         return [
-            'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION',
-            'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS',
-            'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER',
-            'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE',
+            'MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION',
+            'MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS',
+            'MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER',
+            'MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE',
         ];
     }
 
     public function remove()
     {
         global $db;
-        $db->Execute("DELETE FROM " . TABLE_CONFIGURATION . " WHERE configuration_key LIKE 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_%'");
+        $db->Execute("DELETE FROM " . TABLE_CONFIGURATION . " WHERE configuration_key LIKE 'MODULE_PAYMENT_PAYPALR_CREDITCARD_%'");
     }
 
     public function sendAlertEmail(string $subject_detail, string $message, bool $force_send = false)
