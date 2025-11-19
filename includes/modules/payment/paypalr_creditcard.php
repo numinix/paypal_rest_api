@@ -175,9 +175,8 @@ class paypalr_creditcard extends base
             // Don't validate when simply listing modules
         } else {
             $this->enabled = ($this->enabled === true && $this->validateConfiguration($curl_installed));
-            if ($this->enabled && IS_ADMIN_FLAG === true && (!isset($current_page) || $current_page !== FILENAME_MODULES)) {
-                $this->ppr->registerAndUpdateSubscribedWebhooks();
-            }
+            // Note: Webhook registration is handled by the main paypalr module since
+            // webhooks are shared across all PayPal payment modules
         }
         if ($this->enabled === false || IS_ADMIN_FLAG === true || $loaderPrefix === 'webhook') {
             return;
