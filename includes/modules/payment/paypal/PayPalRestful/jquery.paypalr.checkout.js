@@ -23,7 +23,9 @@ jQuery(document).ready(function() {
 
     function toggleNewCardFields(show)
     {
-        jQuery('.ppr-card-new').each(function() {
+        // Only toggle fields that belong to the main paypalr module (not paypalr_creditcard)
+        // The main paypalr module uses 'ppr-cc' class in addition to 'ppr-card-new'
+        jQuery('.ppr-card-new.ppr-cc').each(function() {
             if (show) {
                 jQuery(this).show();
                 jQuery(this).prev('label').show();
@@ -188,8 +190,9 @@ jQuery(document).ready(function() {
         }
     });
 
-    // When user clicks on any credit card input field, select the PayPal payment method and card option
-    jQuery(document).on('focus click', '.ppr-card-new input, .ppr-card-new select', function(event) {
+    // When user clicks on any credit card input field (from main paypalr module), 
+    // select the PayPal payment method and card option
+    jQuery(document).on('focus click', '.ppr-card-new.ppr-cc input, .ppr-card-new.ppr-cc select', function(event) {
         // First, ensure the parent payment module is selected
         if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
             jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
@@ -203,7 +206,7 @@ jQuery(document).ready(function() {
 
     // Handle browser autofill events which trigger 'change' and 'input' events
     // This ensures the parent radio stays checked when autofill populates credit card fields
-    jQuery(document).on('change input', '.ppr-card-new input, .ppr-card-new select', function(event) {
+    jQuery(document).on('change input', '.ppr-card-new.ppr-cc input, .ppr-card-new.ppr-cc select', function(event) {
         // Only proceed if this field has a value (autofill happened)
         if (jQuery(this).val()) {
             // Ensure the parent payment module is selected
