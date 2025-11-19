@@ -165,11 +165,11 @@ class paypalr_applepay extends base
         }
 
         // Validate the configuration
-        if (IS_ADMIN_FLAG === true && $current_page === FILENAME_MODULES) {
+        if (IS_ADMIN_FLAG === true && isset($current_page) && $current_page === FILENAME_MODULES) {
             // Don't validate when simply listing modules
         } else {
             $this->enabled = ($this->enabled === true && $this->validateConfiguration($curl_installed));
-            if ($this->enabled && IS_ADMIN_FLAG === true && $current_page !== FILENAME_MODULES) {
+            if ($this->enabled && IS_ADMIN_FLAG === true && (!isset($current_page) || $current_page !== FILENAME_MODULES)) {
                 $this->ppr->registerAndUpdateSubscribedWebhooks();
             }
         }

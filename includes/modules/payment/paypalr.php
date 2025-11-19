@@ -343,12 +343,12 @@ class paypalr extends base
         // If the configuration's invalid (admin/storefront)
         // or if we're processing for the admin or a webhook, all finished here!
         //
-        if (IS_ADMIN_FLAG === true && $current_page === FILENAME_MODULES) {
+        if (IS_ADMIN_FLAG === true && isset($current_page) && $current_page === FILENAME_MODULES) {
             // Don�t validate (no network) when simply listing modules
             // Leave $this->enabled as-is so the row renders quickly.
         } else {
             $this->enabled = ($this->enabled === true && $this->validateConfiguration($curl_installed));
-            if ($this->enabled && IS_ADMIN_FLAG === true && $current_page !== FILENAME_MODULES) {
+            if ($this->enabled && IS_ADMIN_FLAG === true && (!isset($current_page) || $current_page !== FILENAME_MODULES)) {
                 $this->ppr->registerAndUpdateSubscribedWebhooks();
             }
         }
@@ -664,7 +664,7 @@ class paypalr extends base
             $this->ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret);
 
             global $current_page;
-            $use_saved_credentials = (IS_ADMIN_FLAG === false || $current_page === FILENAME_MODULES);
+            $use_saved_credentials = (IS_ADMIN_FLAG === false || (isset($current_page) && $current_page === FILENAME_MODULES));
             $this->log->write("validateCredentials: Checking ($use_saved_credentials).", true, 'before');
             if ($this->ppr->validatePayPalCredentials($use_saved_credentials) === false) {
                 $error_message = sprintf(MODULE_PAYMENT_PAYPALR_ERROR_INVALID_CREDS, MODULE_PAYMENT_PAYPALR_SERVER);
