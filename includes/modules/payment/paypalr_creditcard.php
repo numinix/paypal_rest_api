@@ -102,8 +102,9 @@ class paypalr_creditcard extends base
             $this->description = sprintf(MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_DESCRIPTION ?? 'Accept credit card payments via PayPal Advanced Checkout (v%s)', self::CURRENT_VERSION);
             
             // Add upgrade button if current version is less than latest version
+            // Only show upgrade link if the module is actually installed (version > 0.0.0)
             $installed_version = defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION') ? MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION : '0.0.0';
-            if (version_compare($installed_version, self::CURRENT_VERSION, '<')) {
+            if ($installed_version !== '0.0.0' && version_compare($installed_version, self::CURRENT_VERSION, '<')) {
                 $this->description .= sprintf(
                     MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_UPGRADE_AVAILABLE ?? 
                     '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="paypalr-upgrade-button" href="%3$s">Upgrade to %2$s</a></p>',
@@ -230,8 +231,10 @@ class paypalr_creditcard extends base
     {
         global $db;
         
-        // First, let the paypalCommon handle its tableCheckup
-        $this->paypalCommon->tableCheckup();
+        // First, let the paypalCommon handle its tableCheckup if it's initialized
+        if (isset($this->paypalCommon) && $this->paypalCommon instanceof PayPalCommon) {
+            $this->paypalCommon->tableCheckup();
+        }
         
         // If the payment module is installed and at the current version, nothing to be done.
         $current_version = self::CURRENT_VERSION;
@@ -437,14 +440,14 @@ class paypalr_creditcard extends base
         // Card owner name
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER ?? 'Cardholder Name',
-            'field' => zen_draw_input_field('paypalr_cc_owner', $billing_name, 'class="ppr-cc ppr-card-section ppr-card-new" id="paypalr-cc-owner" autocomplete="cc-name"'),
+            'field' => zen_draw_input_field('paypalr_cc_owner', $billing_name, 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-owner" autocomplete="cc-name"'),
             'tag' => 'paypalr-cc-owner',
         ];
 
         // Card number
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER ?? 'Card Number',
-            'field' => zen_draw_input_field('paypalr_cc_number', '', 'class="ppr-cc ppr-card-section ppr-card-new" id="paypalr-cc-number" autocomplete="cc-number"'),
+            'field' => zen_draw_input_field('paypalr_cc_number', '', 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-number" autocomplete="cc-number"'),
             'tag' => 'paypalr-cc-number',
         ];
 
@@ -452,16 +455,16 @@ class paypalr_creditcard extends base
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES ?? 'Expiration Date',
             'field' =>
-                zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-cc ppr-card-section ppr-card-new" id="paypalr-cc-expires-month"') .
+                zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-month"') .
                 '&nbsp;' .
-                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-cc ppr-card-section ppr-card-new" id="paypalr-cc-expires-year"'),
+                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-year"'),
             'tag' => 'paypalr-cc-expires-month',
         ];
 
         // CVV
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALR_CC_CVV ?? 'CVV',
-            'field' => zen_draw_input_field('paypalr_cc_cvv', '', 'class="ppr-cc ppr-card-section ppr-card-new" id="paypalr-cc-cvv" size="4" maxlength="4" autocomplete="cc-csc"'),
+            'field' => zen_draw_input_field('paypalr_cc_cvv', '', 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-cvv" size="4" maxlength="4" autocomplete="cc-csc"'),
             'tag' => 'paypalr-cc-cvv',
         ];
 
@@ -470,14 +473,14 @@ class paypalr_creditcard extends base
             if ($is_bootstrap_template === false) {
                 $fields[] = [
                     'title' => MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use',
-                    'field' => zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'class="ppr-cc ppr-card-section ppr-card-new" id="ppr-cc-save-card"'),
+                    'field' => zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'class="ppr-creditcard-field ppr-card-new" id="ppr-cc-save-card"'),
                     'tag' => 'ppr-cc-save-card',
                 ];
             } else {
                 $fields[] = [
                     'title' => '&nbsp;',
                     'field' =>
-                        '<div class="custom-control custom-checkbox ppr-cc ppr-card-section ppr-card-new">' .
+                        '<div class="custom-control custom-checkbox ppr-creditcard-field ppr-card-new">' .
                             zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'id="ppr-cc-save-card" class="custom-control-input"') .
                             '<label class="custom-control-label checkboxLabel" for="ppr-cc-save-card">' . (MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use') . '</label>' .
                         '</div>',
@@ -933,7 +936,9 @@ class paypalr_creditcard extends base
 
     public function sendAlertEmail(string $subject_detail, string $message, bool $force_send = false)
     {
-        $this->paypalCommon->sendAlertEmail($subject_detail, $message, $force_send);
+        if (isset($this->paypalCommon) && $this->paypalCommon instanceof PayPalCommon) {
+            $this->paypalCommon->sendAlertEmail($subject_detail, $message, $force_send);
+        }
     }
 
     public function getCurrentVersion(): string
