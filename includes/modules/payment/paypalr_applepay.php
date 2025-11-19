@@ -89,7 +89,7 @@ class paypalr_applepay extends base
      */
     public function __construct()
     {
-        global $order, $messageStack, $loaderPrefix;
+        global $order, $messageStack, $loaderPrefix, $current_page;
 
         $this->code = 'paypalr_applepay';
 
