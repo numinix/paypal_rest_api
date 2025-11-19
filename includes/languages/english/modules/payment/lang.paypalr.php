@@ -119,10 +119,10 @@ $define = [
     // $5%u: $_SESSION['customer_id']
     //
     'MODULE_PAYMENT_PAYPALR_ALERT_LOST_STOLEN_CARD' =>
-        'A credit-card payment was attempted with a %1$s card from IP address %2$s.' . "\n\n" .
-        'The payment was attempted by %3$s %4$s (customer id %5$u). Formatted card-details follow:' . "\n\n",
+        'PayPal declined a credit-card payment with a %1$s card from IP address %2$s.' . "\n\n" .
+        'This is a PayPal processor response (not module fraud detection). The payment was attempted by %3$s %4$s (customer id %5$u). Formatted card-details follow:' . "\n\n",
     'MODULE_PAYMENT_PAYPALR_CARD_LOST' => 'lost or stolen',
-    'MODULE_PAYMENT_PAYPALR_CARD_FRAUDULENT' => 'fraudulent',
+    'MODULE_PAYMENT_PAYPALR_CARD_FRAUDULENT' => 'potentially fraudulent',
 
     // -----
     // For these messages, %1$s is the card-type and %2$s is the last-4 of the card-number.

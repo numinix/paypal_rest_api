@@ -2337,7 +2337,7 @@ class paypalr extends base
                         $response_message = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CARD_DECLINED, $last_digits);
 
                         // -----
-                        // Note: An alert-email is forced for these conditions!
+                        // Note: An alert-email is sent for these conditions when debug mode is enabled.
                         //
                         $this->sendAlertEmail(
                             MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_LOST_STOLEN_CARD,
@@ -2348,8 +2348,7 @@ class paypalr extends base
                                 $_SESSION['customer_last_name'],
                                 $_SESSION['customer_id']
                             ) . "\n" .
-                            json_encode($card_payment_source, JSON_PRETTY_PRINT),
-                            true
+                            json_encode($card_payment_source, JSON_PRETTY_PRINT)
                         );
                         break;
 
