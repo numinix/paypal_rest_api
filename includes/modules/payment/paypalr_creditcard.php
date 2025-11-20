@@ -625,10 +625,11 @@ class paypalr_creditcard extends base
         }
 
         // Validate new card entry
-        $cc_owner = $_POST['paypalr_cc_owner'] ?? '';
-        $cc_number_raw = $_POST['paypalr_cc_number'] ?? '';
+        // Support fallback field names that might be forwarded from the checkout confirmation page
+        $cc_owner = $_POST['paypalr_cc_owner'] ?? ($_POST['ppr_cc_owner'] ?? '');
+        $cc_number_raw = $_POST['paypalr_cc_number'] ?? ($_POST['ppr_cc_number'] ?? '');
         $cc_number = preg_replace('/[^0-9]/', '', $cc_number_raw);
-        $cc_cvv = $_POST['paypalr_cc_cvv'] ?? '';
+        $cc_cvv = $_POST['paypalr_cc_cvv'] ?? ($_POST['ppr_cc_cvv'] ?? '');
 
         $error = false;
 
@@ -651,8 +652,8 @@ class paypalr_creditcard extends base
         }
 
         // Validate expiry month and year
-        $expiry_month = $_POST['paypalr_cc_expires_month'] ?? '';
-        $expiry_year = $_POST['paypalr_cc_expires_year'] ?? '';
+        $expiry_month = $_POST['paypalr_cc_expires_month'] ?? ($_POST['ppr_cc_expires_month'] ?? '');
+        $expiry_year = $_POST['paypalr_cc_expires_year'] ?? ($_POST['ppr_cc_expires_year'] ?? '');
         if (empty($expiry_month) || empty($expiry_year)) {
             $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRY_REQUIRED ?? 'Card expiration date is required';
             $messageStack->add_session('checkout_payment', $error_message, 'error');
