@@ -358,24 +358,28 @@ class paypalr_creditcard extends base
         $js = '';
         if (defined('CC_OWNER_MIN_LENGTH') && defined('CC_NUMBER_MIN_LENGTH')) {
             $js = '  if (payment_value == "' . $this->code . '") {' . "\n" .
-                  '    var cc_owner = document.checkout_payment.paypalr_cc_owner.value;' . "\n" .
-                  '    var cc_number = document.checkout_payment.paypalr_cc_number.value;' . "\n";
+                  '    var cc_owner_field = document.checkout_payment.paypalr_cc_owner;' . "\n" .
+                  '    var cc_number_field = document.checkout_payment.paypalr_cc_number;' . "\n" .
+                  '    if (cc_owner_field && cc_number_field) {' . "\n" .
+                  '      var cc_owner = cc_owner_field.value;' . "\n" .
+                  '      var cc_number = cc_number_field.value;' . "\n";
             
             if (CC_OWNER_MIN_LENGTH > 0) {
-                $js .= '    if (cc_owner == "" || cc_owner.length < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
-                       '      error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
-                       '      error = 1;' . "\n" .
-                       '    }' . "\n";
+                $js .= '      if (cc_owner == "" || cc_owner.length < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
+                       '        error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
+                       '        error = 1;' . "\n" .
+                       '      }' . "\n";
             }
             
             if (CC_NUMBER_MIN_LENGTH > 0) {
-                $js .= '    if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
-                       '      error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
-                       '      error = 1;' . "\n" .
-                       '    }' . "\n";
+                $js .= '      if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
+                       '        error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
+                       '        error = 1;' . "\n" .
+                       '      }' . "\n";
             }
             
-            $js .= '  }' . "\n";
+            $js .= '    }' . "\n" .
+                   '  }' . "\n";
         }
         return $js;
     }
