@@ -957,7 +957,6 @@ class paypalr extends base
             'id' => $this->code,
             'module' =>
                 '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
-                zen_draw_hidden_field('ppr_type', 'paypal') .
                 $checkoutScript,
         ];
 
@@ -1028,14 +1027,11 @@ class paypalr extends base
         }
 
         // -----
-        // Since this module is wallet-only, the payment type must be 'paypal'.
-        // If it's not, redirect back to payment selection.
+        // Since this module is wallet-only, the payment type is always 'paypal'.
+        // Set it here rather than relying on a hidden field that might conflict
+        // with other PayPal payment modules.
         //
-        if (!isset($_POST['ppr_type']) || $_POST['ppr_type'] !== 'paypal') {
-            zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
-        }
-
-        $ppr_type = $_POST['ppr_type']; // Always 'paypal' due to validation above
+        $ppr_type = 'paypal';
         $_SESSION['PayPalRestful']['ppr_type'] = $ppr_type;
 
         // -----

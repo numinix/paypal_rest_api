@@ -518,11 +518,35 @@ class CreatePayPalOrderRequest extends ErrorInfo
             return $payment_source;
         }
 
+        // Build expiry field - ensure both month and year are present
+        $expiry_month = $cc_info['expiry_month'] ?? '';
+        $expiry_year = $cc_info['expiry_year'] ?? '';
+        
+        // Validate expiry data before building the string
+        if (empty($expiry_month) || empty($expiry_year)) {
+            $this->log->write("ERROR: Missing credit card expiry data");
+            throw new \Exception('Credit card expiry information is required');
+        }
+        
+        // Validate other required fields
+        if (empty($cc_info['name'])) {
+            $this->log->write("ERROR: Missing card holder name");
+            throw new \Exception('Card holder name is required');
+        }
+        if (empty($cc_info['number'])) {
+            $this->log->write("ERROR: Missing card number");
+            throw new \Exception('Card number is required');
+        }
+        if (empty($cc_info['security_code'])) {
+            $this->log->write("ERROR: Missing card security code");
+            throw new \Exception('Card security code (CVV) is required');
+        }
+        
         $payment_source = [
             'name' => $cc_info['name'],
             'number' => $cc_info['number'],
             'security_code' => $cc_info['security_code'],
-            'expiry' => $cc_info['expiry_year'] . '-' . $cc_info['expiry_month'],
+            'expiry' => $expiry_year . '-' . $expiry_month,
             'billing_address' => Address::get($order->billing),
             'store_in_vault' => 'ON_SUCCESS',  // Always vault cards for security and recurring billing
             'experience_context' => [

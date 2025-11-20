@@ -390,13 +390,6 @@ class paypalr_creditcard extends base
         
         unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
 
-        // Only mark the checkout as a card-based flow when this module is the current selection,
-        // so that other payment modules (e.g. PayPal wallet) aren't affected by the credit-card
-        // validation requirements.
-        if (($_SESSION['payment'] ?? '') === $this->code) {
-            $_SESSION['PayPalRestful']['ppr_type'] = 'card';
-        }
-
         // Create dropdowns for expiry date
         $expires_month = [];
         $expires_year = [];
@@ -514,7 +507,7 @@ class paypalr_creditcard extends base
         
         return [
             'id' => $this->code,
-            'module' => $this->buildCardsAccepted() . zen_draw_hidden_field('ppr_type', 'card') . $checkoutScript,
+            'module' => $this->buildCardsAccepted() . $checkoutScript,
             'fields' => $fields,
         ];
     }
@@ -553,9 +546,8 @@ class paypalr_creditcard extends base
 
     public function pre_confirmation_check()
     {
-        // Set payment type
+        // Set payment type - this module always uses card payments
         $_SESSION['PayPalRestful']['ppr_type'] = 'card';
-        $_POST['ppr_type'] = 'card';
         
         // Store saved card selection if provided
         if (isset($_POST['paypalr_saved_card'])) {
@@ -658,6 +650,15 @@ class paypalr_creditcard extends base
             $error = true;
         }
 
+        // Validate expiry month and year
+        $expiry_month = $_POST['paypalr_cc_expires_month'] ?? '';
+        $expiry_year = $_POST['paypalr_cc_expires_year'] ?? '';
+        if (empty($expiry_month) || empty($expiry_year)) {
+            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRY_REQUIRED ?? 'Card expiration date is required';
+            $messageStack->add_session('checkout_payment', $error_message, 'error');
+            $error = true;
+        }
+
         if ($error) {
             if ($is_preconfirmation) {
                 zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
@@ -676,8 +677,8 @@ class paypalr_creditcard extends base
         $this->ccInfo = [
             'type' => MODULE_PAYMENT_PAYPALR_TEXT_CC_TYPE_GENERIC ?? 'Card',
             'number' => $cc_number,
-            'expiry_month' => $_POST['paypalr_cc_expires_month'] ?? '',
-            'expiry_year' => $_POST['paypalr_cc_expires_year'] ?? '',
+            'expiry_month' => $expiry_month,
+            'expiry_year' => $expiry_year,
             'name' => $cc_owner,
             'security_code' => $cc_cvv,
             'redirect' => $this->getListenerEndpoint(),
