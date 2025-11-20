@@ -282,7 +282,7 @@ class paypalr_creditcard extends base
 
     protected function getPayPalRestfulApi(): ?PayPalRestfulApi
     {
-        if ($this->ppr instanceof PayPalRestfulApi) {
+        if (isset($this->ppr) && $this->ppr instanceof PayPalRestfulApi) {
             return $this->ppr;
         }
 
