@@ -71,7 +71,7 @@ class paypalr_creditcard extends base
     public bool $cardsAccepted = true;
     public bool $collectsCardDataOnsite = true;
 
-    protected PayPalRestfulApi $ppr;
+    public PayPalRestfulApi $ppr;
     protected ErrorInfo $errorInfo;
     protected Logger $log;
     protected bool $emailAlerts = false;

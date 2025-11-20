@@ -71,7 +71,7 @@ class paypalr_applepay extends base
     public bool $cardsAccepted = false;
     public bool $collectsCardDataOnsite = false;
 
-    protected PayPalRestfulApi $ppr;
+    public PayPalRestfulApi $ppr;
     protected ErrorInfo $errorInfo;
     protected Logger $log;
     protected bool $emailAlerts = false;
