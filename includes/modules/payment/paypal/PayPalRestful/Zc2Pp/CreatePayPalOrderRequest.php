@@ -505,6 +505,9 @@ class CreatePayPalOrderRequest extends ErrorInfo
             ];
             if (!empty($cc_info['expiry'])) {
                 $payment_source['expiry'] = $cc_info['expiry'];
+            } elseif (!empty($cc_info['expiry_month']) && !empty($cc_info['expiry_year'])) {
+                // Build expiry from component parts if not already set
+                $payment_source['expiry'] = $cc_info['expiry_year'] . '-' . $cc_info['expiry_month'];
             }
             if (!empty($cc_info['last_digits'])) {
                 $payment_source['last_digits'] = $cc_info['last_digits'];
