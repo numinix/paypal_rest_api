@@ -166,7 +166,7 @@ class paypalr extends base
     /**
      * An instance of the PayPalRestfulApi class.
      */
-    protected ?PayPalRestfulApi $ppr = null;
+    public ?PayPalRestfulApi $ppr = null;
 
     /**
      * An array (set by before_process) containing the captured/authorized order's
