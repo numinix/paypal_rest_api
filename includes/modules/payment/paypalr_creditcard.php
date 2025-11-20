@@ -650,6 +650,15 @@ class paypalr_creditcard extends base
             $error = true;
         }
 
+        // Validate expiry month and year
+        $expiry_month = $_POST['paypalr_cc_expires_month'] ?? '';
+        $expiry_year = $_POST['paypalr_cc_expires_year'] ?? '';
+        if (empty($expiry_month) || empty($expiry_year)) {
+            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRY_REQUIRED ?? 'Card expiration date is required';
+            $messageStack->add_session('checkout_payment', $error_message, 'error');
+            $error = true;
+        }
+
         if ($error) {
             if ($is_preconfirmation) {
                 zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
@@ -668,8 +677,8 @@ class paypalr_creditcard extends base
         $this->ccInfo = [
             'type' => MODULE_PAYMENT_PAYPALR_TEXT_CC_TYPE_GENERIC ?? 'Card',
             'number' => $cc_number,
-            'expiry_month' => $_POST['paypalr_cc_expires_month'] ?? '',
-            'expiry_year' => $_POST['paypalr_cc_expires_year'] ?? '',
+            'expiry_month' => $expiry_month,
+            'expiry_year' => $expiry_year,
             'name' => $cc_owner,
             'security_code' => $cc_cvv,
             'redirect' => $this->getListenerEndpoint(),
