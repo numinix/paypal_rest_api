@@ -524,7 +524,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
         
         // Validate expiry data before building the string
         if (empty($expiry_month) || empty($expiry_year)) {
-            $this->log->write("ERROR: Missing expiry data - month: '$expiry_month', year: '$expiry_year'");
+            $this->log->write("ERROR: Missing credit card expiry data");
             throw new \Exception('Credit card expiry information is required');
         }
         
