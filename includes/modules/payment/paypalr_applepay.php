@@ -285,10 +285,9 @@ class paypalr_applepay extends base
 
         try {
             $ppr = new PayPalRestfulApi(
-                $client_id,
-                $secret,
                 MODULE_PAYMENT_PAYPALR_SERVER,
-                $this->log
+                $client_id,
+                $secret
             );
             return $ppr;
         } catch (\Exception $e) {
