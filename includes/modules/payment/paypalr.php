@@ -817,46 +817,8 @@ class paypalr extends base
      */
     public function javascript_validation(): string
     {
-        if ($this->cardsAccepted === false) {
-            return '';
-        }
-
-        return
-            'if (payment_value == "' . $this->code . '") {' . "\n" .
-                'if (document.checkout_payment.ppr_type.value === "card") {' . "\n" .
-                    'var savedCard = document.checkout_payment.paypalr_saved_card;' . "\n" .
-                    'var useSavedCard = false;' . "\n" .
-                    'if (typeof savedCard !== "undefined") {' . "\n" .
-                        'if (savedCard.length) {' . "\n" .
-                            'for (var i = 0; i < savedCard.length; i++) {' . "\n" .
-                                'if (savedCard[i].checked && savedCard[i].value !== "new") {' . "\n" .
-                                    'useSavedCard = true;' . "\n" .
-                                    'break;' . "\n" .
-                                '}' . "\n" .
-                            '}' . "\n" .
-                        '} else if (savedCard.checked && savedCard.value !== "new") {' . "\n" .
-                            'useSavedCard = true;' . "\n" .
-                        '}' . "\n" .
-                    '}' . "\n" .
-                    'if (!useSavedCard) {' . "\n" .
-                        'var cc_owner = document.checkout_payment.paypalr_cc_owner.value;' . "\n" .
-                        'var cc_number = document.checkout_payment.paypalr_cc_number.value;' . "\n" .
-                        'var cc_cvv = document.checkout_payment.paypalr_cc_cvv.value;' . "\n" .
-                        'if (cc_owner == "" || eval(cc_owner.length) < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
-                            'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
-                            'error = 1;' . "\n" .
-                        '}' . "\n" .
-                        'if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
-                            'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
-                            'error = 1;' . "\n" .
-                        '}' . "\n" .
-                        'if (cc_cvv == "" || cc_cvv.length < 3 || cc_cvv.length > 4) {' . "\n" .
-                            'error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_CVV . '";' . "\n" .
-                            'error = 1;' . "\n" .
-                        '}' . "\n" .
-                    '}' . "\n" .
-                '}' . "\n" .
-            '}' . "\n";
+        // Wallet-only module, no credit card validation needed
+        return '';
     }
 
     protected function getActiveVaultedCardsForCustomer(): array
@@ -1019,229 +981,17 @@ class paypalr extends base
         }
 
         // -----
-        // If cards *can* be selected, but the billing country isn't supported by PayPal,
-        // add a 'field' to the PayPal Advanced Checkout payment's display, noting the condition.
-        //
-        if ($this->billingCountryIsSupported === false) {
-            $selection['fields'] = [
-                [
-                    'title' => '<b>' . MODULE_PAYMENT_PAYPALR_TEXT_PLEASE_NOTE . '</b>',
-                    'field' =>
-                        '<small>' . MODULE_PAYMENT_PAYPALR_UNSUPPORTED_BILLING_COUNTRY . '</small>',
-                    ],
-            ];
-            return $selection;
-        }
-
+        // Note: Since paypalr now only handles PayPal wallet payments (cardsAccepted = false),
+        // all credit card field building code has been removed. Credit card payments are handled
+        // by the separate paypalr_creditcard module.
         // -----
-        // Create dropdowns for the credit-card's expiry year and month
-        //
-        $expires_month = [];
-        $expires_year = [];
-        for ($month = 1; $month < 13; $month++) {
-            $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => date('F - (m)', mktime(0, 0, 0, $month, 1))];
-        }
-        $this_year = date('Y');
-        for ($year = $this_year; $year < (int)$this_year + 15; $year++) {
-            $expires_year[] = ['id' => $year, 'text' => $year];
-        }
-
-        // -----
-        // Determine which of the payment methods is currently selected, noting
-        // that if this module is not the one currently selected that the
-        // customer needs to choose one to select the payment module!
-        //
-        $selected_payment_module = $_SESSION['payment'] ?? '';
-        if ($selected_payment_module !== $this->code) {
-            $paypal_selected = false;
-            $card_selected = false;
-            $this->resetOrder();
-        } else {
-            $ppr_type = $_SESSION['PayPalRestful']['ppr_type'] ?? 'paypal';
-            $paypal_selected = ($ppr_type === 'paypal');
-            $card_selected = !$paypal_selected;
-        }
-
-        // -----
-        // If the site's active template has overridden the styling for the button-choices,
-        // load that version instead of the default.
-        //
-        // Note: CSS 'inspired' by: https://codepen.io/phusum/pen/VQrQqy
-        //
-        global $template, $current_page_base;
-
-        $is_bootstrap_template = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true);
-        $css_file = ($is_bootstrap_template === true) ? 'paypalr_bootstrap.css' : 'paypalr.css';
-        $css_file_name = $template->get_template_dir("^$css_file", DIR_WS_TEMPLATE, $current_page_base, 'css') . '/' . $css_file;
-        if (!file_exists($css_file_name)) {
-            $css_file_name = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/' . $css_file;
-        }
-
-        // -----
-        // Set 'id' attribute values, shared between input/label for credit-card entry
-        // fields.
-        //
-        $ppr_cc_owner_id = $this->code . '-cc-owner';
-        $ppr_cc_number_id = $this->code . '-cc-number';
-        $ppr_cc_expires_year_id = $this->code . '-cc-expires-year';
-        $ppr_cc_expires_month_id = $this->code . '-cc-expires-month';
-        $ppr_cc_cvv_id = $this->code . '-cc-cvv';
-
-        $vaultedCards = $this->getActiveVaultedCardsForCustomer();
-        $savedCardSelection = $_POST['paypalr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? '');
-        if ($savedCardSelection === '' && !empty($vaultedCards)) {
-            $savedCardSelection = $vaultedCards[0]['vault_id'];
-        }
-        if ($savedCardSelection !== '' && $savedCardSelection !== 'new') {
-            $validSavedCard = false;
-            foreach ($vaultedCards as $card) {
-                if ($card['vault_id'] === $savedCardSelection) {
-                    $validSavedCard = true;
-                    break;
-                }
-            }
-            if ($validSavedCard === false) {
-                $savedCardSelection = 'new';
-            }
-        }
-        if ($savedCardSelection === '' || $savedCardSelection === null) {
-            $savedCardSelection = 'new';
-        }
-        $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
-        $saveCardChecked = $allowSaveCard === true && (!empty($_POST['paypalr_cc_save_card']) || (!empty($_SESSION['PayPalRestful']['save_card'])));
-        if ($savedCardSelection !== 'new') {
-            $saveCardChecked = false;
-        }
-
-        $billing_name = zen_output_string_protected($order->billing['firstname'] . ' ' . $order->billing['lastname']);
-
-        $fields = [
-            [
-                'title' =>
-                    '<style nonce="">' . file_get_contents($css_file_name) . '</style>' .
-                    '<span class="ppr-choice-label">' . MODULE_PAYMENT_PAYPALR_CHOOSE_PAYPAL . '</span>',
-                'field' =>
-                    $checkoutScript .
-                    '<div id="paypal-message-container"></div>' .
-                    '<div id="ppr-choice-paypal" class="ppr-button-choice">' .
-                        zen_draw_radio_field('ppr_type', 'paypal', $paypal_selected, 'id="ppr-paypal" class="ppr-choice"') .
-                        '<label for="ppr-paypal" class="ppr-choice-label">' .
-                            '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
-                        '</label>' .
-                    '</div>',
-                'tag' => 'ppr-paypal',
-            ],
-            [
-                'title' => '<span class="ppr-choice-label">' . MODULE_PAYMENT_PALPALR_CHOOSE_CARD . '</span>',
-                'field' =>
-                    '<div id="ppr-choice-card" class="ppr-button-choice">' .
-                        zen_draw_radio_field('ppr_type', 'card', $card_selected, 'id="ppr-card" class="ppr-choice"') .
-                        '<label for="ppr-card" class="ppr-choice-label">' .
-                            $this->buildCardsAccepted() .
-                        '</label>' .
-                    '</div>',
-                'tag' => 'ppr-card',
-            ],
-        ];
-
-        $vaultEnabled = (defined('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT') && MODULE_PAYMENT_PAYPALR_ENABLE_VAULT === 'True');
-        if ($vaultEnabled && !empty($vaultedCards)) {
-            $fields[] = [
-                'title' => MODULE_PAYMENT_PAYPALR_SAVED_CARDS,
-                'field' =>
-                    '<div class="ppr-cc ppr-card-section ppr-card-saved">' .
-                        $this->buildSavedCardOptions($vaultedCards, $savedCardSelection, $is_bootstrap_template) .
-                    '</div>',
-                'tag' => 'ppr-saved-card',
-            ];
-        }
-
-        $fields[] = [
-            'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER,
-            'field' =>
-                zen_draw_input_field('paypalr_cc_owner', $billing_name, 'class="ppr-cc ppr-card-section ppr-card-new" id="' . $ppr_cc_owner_id . '" autocomplete="off"'),
-            'tag' => $ppr_cc_owner_id,
-        ];
-        $fields[] = [
-            'title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER,
-            'field' => zen_draw_input_field('paypalr_cc_number', '', 'class="ppr-cc ppr-card-section ppr-card-new" id="' . $ppr_cc_number_id . '" autocomplete="off"'),
-            'tag' => $ppr_cc_number_id,
-        ];
-        $fields[] = [
-            'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES,
-            'field' =>
-                zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-cc ppr-card-section ppr-card-new" id="' . $ppr_cc_expires_month_id . '"') .
-                '&nbsp;' .
-                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-cc ppr-card-section ppr-card-new" id="' . $ppr_cc_expires_year_id . '"'),
-            'tag' => $ppr_cc_expires_month_id,
-        ];
-        $fields[] = [
-            'title' => MODULE_PAYMENT_PAYPALR_CC_CVV,
-            'field' => zen_draw_input_field('paypalr_cc_cvv', '', 'class="ppr-cc ppr-card-section ppr-card-new" id="' . $ppr_cc_cvv_id . '" autocomplete="off"'),
-            'tag' => $ppr_cc_cvv_id,
-        ];
-        $fields[] = [
-            'title' => '&nbsp;',
-            'field' =>
-                '<small class="ppr-cc ppr-card-section ppr-card-new">' .
-                    sprintf(MODULE_PAYMENT_PAYPALR_CARD_PROCESSING, '<a href="' . MODULE_PAYMENT_PAYPALR_PAYPAL_PRIVACY_LINK . '" target="_blank">' . MODULE_PAYMENT_PAYPALR_PAYPAL_PRIVACY_STMT . '</a>') .
-                '</small>',
-        ];
-
-        if ($vaultEnabled && $allowSaveCard === true) {
-            if ($is_bootstrap_template === false) {
-                $fields[] = [
-                    'title' => MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT,
-                    'field' => zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'class="ppr-cc ppr-card-section ppr-card-new" id="ppr-cc-save-card"'),
-                    'tag' => 'ppr-cc-save-card',
-                ];
-            } else {
-                $fields[] = [
-                    'title' => '&nbsp;',
-                    'field' =>
-                        '<div class="custom-control custom-checkbox ppr-cc ppr-card-section ppr-card-new">' .
-                            zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'id="ppr-cc-save-card" class="custom-control-input"') .
-                            '<label class="custom-control-label checkboxLabel" for="ppr-cc-save-card">' . MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT . '</label>' .
-                        '</div>',
-                ];
-            }
-        }
-
-        if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
-            if ($is_bootstrap_template === false) {
-                $fields[] = [
-                    'title' => 'Enable SCA Always?',
-                    'field' => zen_draw_checkbox_field('paypalr_cc_sca_always', 'on', false, 'class="ppr-cc ppr-card-section ppr-card-new" id="ppr-cc-sca-always"'),
-                    'tag' => 'ppr-cc-sca-always',
-                ];
-            } else {
-                $fields[] = [
-                    'title' => '&nbsp;',
-                    'field' =>
-                        '<div class="custom-control custom-checkbox ppr-cc ppr-card-section ppr-card-new">' .
-                            zen_draw_checkbox_field('paypalr_cc_sca_always', 'on', false, 'id="ppr-cc-sca-always" class="custom-control-input"') .
-                            '<label class="custom-control-label checkboxLabel" for="ppr-cc-sca-always">Enable SCA Always</label>' .
-                        '</div>',
-                ];
-            }
-        }
-
-        $selection = [
-            'id' => $this->code,
-            'module' => MODULE_PAYMENT_PAYPALR_TEXT_TITLE . ' <span id="ppr-subtitle" class="small">' . MODULE_PAYMENT_PAYPALR_SUBTITLE . '</span>',
-            'fields' => $fields,
-        ];
-
-        return $selection;
     }
+
     protected function buildCardsAccepted(): string
     {
-        $cards_accepted = '';
-        $card_image_directory = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/images/';
-        foreach ($this->cardImages as $card_name => $card_image) {
-            $cards_accepted .= '<img src="' . $card_image_directory . $card_image . '" alt="' . $card_name . '" title="' . $card_name . '"> ';
-        }
-        return $cards_accepted;
+        // This method is no longer used by paypalr (wallet-only) but kept for
+        // backward compatibility in case extensions reference it.
+        return '';
     }
 
     protected function getListenerEndpoint(): string
@@ -1278,37 +1028,18 @@ class paypalr extends base
         }
 
         // -----
-        // If the PayPal Advanced Checkout payment-type isn't included in the posted data,
-        // send the customer back to the payment phase of checkout to ensure that
-        // the selection is made.
+        // Since this module is wallet-only, the payment type must be 'paypal'.
+        // If it's not, redirect back to payment selection.
         //
-        // Noting that this "shouldn't" happen unless someone's fussing with the form,
-        // so no message!
-        //
-        if (!isset($_POST['ppr_type']) || !in_array($_POST['ppr_type'], ['paypal', 'card'], true)) {
+        if (!isset($_POST['ppr_type']) || $_POST['ppr_type'] !== 'paypal') {
             zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
         }
 
-        // -----
-        // If a card-payment was selected, validate the information entered.  Any
-        // errors detected, the called method will have set the appropriate messages
-        // on the messageStack.
-        //
-        $ppr_type = $_POST['ppr_type'];
+        $ppr_type = 'paypal';
         $_SESSION['PayPalRestful']['ppr_type'] = $ppr_type;
-
-        if ($ppr_type === 'card' && $this->validateCardInformation(true) === false) {
-            $log_only = true;
-            $this->setMessageAndRedirect("pre_confirmation_check, card failed initial validation.", FILENAME_CHECKOUT_PAYMENT, $log_only);
-        }
 
         // -----
         // Build the *inital* request for the PayPal order's "Create" and send to off to PayPal.
-        //
-        // This extra step for credit-card payments ensures that the order's content is acceptable
-        // to PayPal (e.g. the order-totals sum up properly), so that corrective action can be taken
-        // during this checkout phase rather than having a PayPal 'unacceptance' count against the
-        // customer as a slamming count.
         //
         $paypal_order_created = $this->createPayPalOrder('paypal');
         if ($paypal_order_created === false) {
@@ -1962,31 +1693,25 @@ class paypalr extends base
         $this->paymentIsPending = false;
 
         // -----
-        // Determine the 'payment_source' for the order (either 'paypal' or 'card'). If
-        // the customer's paying with a card, call an additional method to deal with
-        // those complications.
-        //
-        // Note: That method won't return here if an issue was found with the
-        // credit-card or if a 3DS verification is required.
+        // Since this module is wallet-only, the payment source must be 'paypal'.
+        // Process the PayPal wallet payment.
         //
         $payment_source = $_SESSION['PayPalRestful']['Order']['payment_source'];
-        if ($payment_source === 'card') {
-            $response = $this->createCreditCardOrder($order, $order_info);
-
-        // -----
-        // Otherwise, the customer's paying with their PayPal Wallet.
-        //
-        } else {
-            $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
-            $wallet_user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';
-            $payer_action_fast_path = ($wallet_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
-            if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false) {
-                $this->log->write('paypalr::before_process, cannot capture/authorize paypal order; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));
-                unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
-                $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
-            }
-            $response = $this->captureOrAuthorizePayment('paypal');
+        if ($payment_source !== 'paypal') {
+            $this->log->write('paypalr::before_process, invalid payment source: ' . $payment_source);
+            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH, FILENAME_CHECKOUT_PAYMENT);
         }
+
+        $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
+        $wallet_user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';
+        $payer_action_fast_path = ($wallet_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
+        if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false) {
+            $this->log->write('paypalr::before_process, cannot capture/authorize paypal order; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));
+            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
+        }
+        $response = $this->captureOrAuthorizePayment('paypal');
 
         // -----
         // If we've gotten this far, the order has been created at PayPal.  Save
@@ -1998,10 +1723,8 @@ class paypalr extends base
         $this->orderInfo = $response;
 
         // -----
-        // Store vault card data in session for the observer to save after order creation.
-        // This ensures vault cards are saved across all checkout systems (3-page, OPC, etc.).
-        //
-        $this->storeVaultCardDataInSession($response);
+        // Note: Vault card storage removed - wallet-only module doesn't process credit cards.
+        // -----
 
         // -----
         // If the payment is pending (e.g. under-review), set the payment module's order
