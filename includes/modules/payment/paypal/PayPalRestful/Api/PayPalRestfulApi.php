@@ -172,7 +172,7 @@ class PayPalRestfulApi extends ErrorInfo
         }
 
         $this->log = new Logger();
-        $this->tokenCache = new TokenCache($client_secret);
+        $this->tokenCache = new TokenCache($client_secret, $this->environmentType);
 
         if ($client_id === '' || $client_secret === '') {
             $this->log->write(
