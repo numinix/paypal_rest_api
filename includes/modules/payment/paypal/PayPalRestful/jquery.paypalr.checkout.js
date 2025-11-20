@@ -97,8 +97,14 @@ jQuery(document).ready(function() {
 
     // When user interacts with credit card fields, ensure parent module is selected
     jQuery(document).on('focus click', '.ppr-card-new input, .ppr-card-new select, .ppr-creditcard-field input, .ppr-creditcard-field select', function(event) {
+        // Check for main paypalr module radio
         if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
             jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
+        }
+        
+        // Check for standalone credit card module radio
+        if (jQuery('#pmt-paypalr_creditcard').is(':radio') && jQuery('#pmt-paypalr_creditcard').is(':not(:checked)')) {
+            jQuery('#pmt-paypalr_creditcard').prop('checked', true).trigger('change');
         }
         
         // For main module, also select the card option if present
@@ -112,8 +118,14 @@ jQuery(document).ready(function() {
     // Handle browser autofill
     jQuery(document).on('change input', '.ppr-card-new input, .ppr-card-new select', function(event) {
         if (jQuery(this).val()) {
+            // Check for main paypalr module radio
             if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
                 jQuery('#pmt-paypalr').prop('checked', true);
+            }
+            
+            // Check for standalone credit card module radio
+            if (jQuery('#pmt-paypalr_creditcard').is(':radio') && jQuery('#pmt-paypalr_creditcard').is(':not(:checked)')) {
+                jQuery('#pmt-paypalr_creditcard').prop('checked', true);
             }
             
             if (jQuery(this).hasClass('ppr-cc') && jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
