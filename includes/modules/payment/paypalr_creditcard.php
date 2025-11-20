@@ -282,6 +282,10 @@ class paypalr_creditcard extends base
 
     protected function getPayPalRestfulApi(): ?PayPalRestfulApi
     {
+        if ($this->ppr instanceof PayPalRestfulApi) {
+            return $this->ppr;
+        }
+
         $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
         $secret = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_SECRET_L : MODULE_PAYMENT_PAYPALR_SECRET_S;
 
@@ -295,12 +299,12 @@ class paypalr_creditcard extends base
         }
 
         try {
-            $ppr = new PayPalRestfulApi(
+            $this->ppr = new PayPalRestfulApi(
                 MODULE_PAYMENT_PAYPALR_SERVER,
                 $client_id,
                 $secret
             );
-            return $ppr;
+            return $this->ppr;
         } catch (\Exception $e) {
             $this->log->write('Credit Cards: Error creating PayPalRestfulApi: ' . $e->getMessage());
             $this->setConfigurationDisabled($e->getMessage());
