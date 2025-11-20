@@ -29,17 +29,20 @@ class TokenCache
     private $encryptionAlgoIvLen;
     /** @var string */
     private $clientSecret; // -----
+    /** @var string */
+    private $environmentType;
     // Contains an instance of the common Logger class.
     //
     /** @var Logger */
     protected $log;
-    public function __construct(string $client_secret)
+    public function __construct(string $client_secret, string $environment)
     {
         $this->log = new Logger();
 
         $this->encryptionAlgorithm = $this->setEncryptionAlgorithm();
         $this->encryptionAlgoIvLen = openssl_cipher_iv_length($this->encryptionAlgorithm);
         $this->clientSecret = $client_secret;
+        $this->environmentType = $environment;
     }
     protected function setEncryptionAlgorithm(): string
     {
@@ -48,6 +51,13 @@ class TokenCache
 
     public function get(): string
     {
+        $token_environment = $_SESSION['PayPalRestful']['TokenCache']['environment'] ?? '';
+        if ($token_environment !== $this->environmentType) {
+            $this->log->write("\nTokenCache::get, cached token environment mismatch ({$token_environment}); clearing.\n");
+            $this->clear();
+            return '';
+        }
+
         $seconds_to_expiration = ($_SESSION['PayPalRestful']['TokenCache']['token_expires_ts'] ?? 0) - time();
         if ($seconds_to_expiration <= 0) {
             $this->clear();
@@ -74,6 +84,7 @@ class TokenCache
         $_SESSION['PayPalRestful']['TokenCache'] = [
             'saved_token' => $iv . openssl_encrypt($access_token, $this->encryptionAlgorithm, $this->clientSecret, 0, $iv),
             'token_expires_ts' => time() + $seconds_to_expiration,
+            'environment' => $this->environmentType,
         ];
     }
 

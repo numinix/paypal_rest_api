@@ -381,7 +381,13 @@ class paypalr_creditcard extends base
         global $order;
         
         unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
-        $_SESSION['PayPalRestful']['ppr_type'] = 'card';
+
+        // Only mark the checkout as a card-based flow when this module is the current selection,
+        // so that other payment modules (e.g. PayPal wallet) aren't affected by the credit-card
+        // validation requirements.
+        if (($_SESSION['payment'] ?? '') === $this->code) {
+            $_SESSION['PayPalRestful']['ppr_type'] = 'card';
+        }
 
         // Create dropdowns for expiry date
         $expires_month = [];
