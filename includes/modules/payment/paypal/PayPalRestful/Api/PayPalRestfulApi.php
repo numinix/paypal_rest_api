@@ -1161,8 +1161,12 @@ class PayPalRestfulApi extends ErrorInfo
                 return $response;
             }
 
+            // -----
+            // Don't retry on 401 errors if this is a token request itself.
+            // A 401 on v1/oauth2/token means invalid credentials, not an expired token.
+            //
             $error_info = $this->getErrorInfo();
-            if ($retry_on_expired_token === true && ($error_info['errNum'] ?? 0) === 401) {
+            if ($retry_on_expired_token === true && ($error_info['errNum'] ?? 0) === 401 && $option !== 'v1/oauth2/token') {
                 $retry_on_expired_token = false;
                 $curl_options = $this->setAuthorizationHeader($curl_options);
                 if (count($curl_options) === 0) {
@@ -1230,12 +1234,17 @@ class PayPalRestfulApi extends ErrorInfo
         $errMsg = '';
         switch ($httpCode) {
             // -----
-            // 401: The access token has expired, noting that this "shouldn't" happen.
+            // 401: Authentication error. Could be expired token (for API requests) or invalid credentials (for token requests).
             //
             case 401:
                 $this->tokenCache->clear();
-                $errMsg = 'An expired-token error was received.';
-                $this->log->write("The $method ($option) request returned an expired-token error.");
+                if ($option === 'v1/oauth2/token') {
+                    $errMsg = 'Invalid PayPal API credentials.';
+                    $this->log->write("The $method ($option) request failed with invalid credentials.");
+                } else {
+                    $errMsg = 'An expired-token error was received.';
+                    $this->log->write("The $method ($option) request returned an expired-token error.");
+                }
                 break;
 
             // -----
