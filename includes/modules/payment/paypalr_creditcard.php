@@ -67,9 +67,10 @@ class paypalr_creditcard extends base
     public int $zone = 0;
     public int $order_status = 0;
     
-    // Credit Cards DOES use on-site card entry
+    // Credit Cards uses on-site card entry but doesn't use AJAX pre-confirmation
     public bool $cardsAccepted = true;
-    public bool $collectsCardDataOnsite = true;
+    public bool $collectsCardDataOnsite = false;
+
 
     public PayPalRestfulApi $ppr;
     protected ErrorInfo $errorInfo;
