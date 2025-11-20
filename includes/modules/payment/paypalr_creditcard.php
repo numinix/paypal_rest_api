@@ -76,6 +76,7 @@ class paypalr_creditcard extends base
     protected Logger $log;
     protected bool $emailAlerts = false;
     protected PayPalCommon $paypalCommon;
+    protected array $ccInfo = [];
     protected array $orderInfo = [];
     protected bool $paymentIsPending = false;
     protected bool $billingCountryIsSupported = true;
@@ -569,19 +570,50 @@ class paypalr_creditcard extends base
 
     protected function validateCardInformation(bool $is_preconfirmation): bool
     {
-        global $messageStack;
+        global $messageStack, $order;
 
         $saved_card = $_POST['paypalr_saved_card'] ?? $_SESSION['PayPalRestful']['saved_card'] ?? 'new';
-        
+
         // If using a saved card, minimal validation needed
         if ($saved_card !== 'new') {
             $_SESSION['PayPalRestful']['saved_card'] = $saved_card;
+
+            $vaultCards = $this->paypalCommon->getVaultedCardsForCustomer($_SESSION['customer_id'] ?? 0, true);
+            foreach ($vaultCards as $card) {
+                if ($card['vault_id'] === $saved_card) {
+                    $expiryMonth = '';
+                    $expiryYear = '';
+                    if (!empty($card['expiry']) && preg_match('/^(\d{4})-(\d{2})/', $card['expiry'], $matches) === 1) {
+                        $expiryYear = $matches[1];
+                        $expiryMonth = $matches[2];
+                    }
+
+                    $billingName = trim($order->billing['firstname'] . ' ' . $order->billing['lastname']);
+                    $this->ccInfo = [
+                        'type' => $card['card_type'] ?? MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC ?? 'Card',
+                        'number' => '0000' . ($card['last_digits'] ?? ''),
+                        'last_digits' => $card['last_digits'] ?? '',
+                        'expiry_month' => $expiryMonth,
+                        'expiry_year' => $expiryYear,
+                        'expiry' => $card['expiry'] ?? '',
+                        'name' => $billingName,
+                        'redirect' => $this->getListenerEndpoint(),
+                        'vault_id' => $card['vault_id'],
+                        'billing_address' => $card['billing_address'] ?? [],
+                        'store_card' => false,
+                        'use_vault' => true,
+                    ];
+                    break;
+                }
+            }
+
             return true;
         }
 
         // Validate new card entry
         $cc_owner = $_POST['paypalr_cc_owner'] ?? '';
-        $cc_number = $_POST['paypalr_cc_number'] ?? '';
+        $cc_number_raw = $_POST['paypalr_cc_number'] ?? '';
+        $cc_number = preg_replace('/[^0-9]/', '', $cc_number_raw);
         $cc_cvv = $_POST['paypalr_cc_cvv'] ?? '';
 
         $error = false;
@@ -592,7 +624,7 @@ class paypalr_creditcard extends base
             $error = true;
         }
 
-        if (defined('CC_NUMBER_MIN_LENGTH') && strlen(preg_replace('/[^0-9]/', '', $cc_number)) < CC_NUMBER_MIN_LENGTH) {
+        if (defined('CC_NUMBER_MIN_LENGTH') && strlen($cc_number) < CC_NUMBER_MIN_LENGTH) {
             $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_NUMBER_TOO_SHORT ?? 'Card number is too short';
             $messageStack->add_session('checkout_payment', $error_message, 'error');
             $error = true;
@@ -611,7 +643,38 @@ class paypalr_creditcard extends base
             return false;
         }
 
+        $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
+        $storeCard = $allowSaveCard && !empty($_POST['paypalr_cc_save_card']);
+        if ($storeCard === true) {
+            $_SESSION['PayPalRestful']['save_card'] = true;
+        } else {
+            unset($_SESSION['PayPalRestful']['save_card']);
+        }
+
+        $this->ccInfo = [
+            'type' => MODULE_PAYMENT_PAYPALR_TEXT_CC_TYPE_GENERIC ?? 'Card',
+            'number' => $cc_number,
+            'expiry_month' => $_POST['paypalr_cc_expires_month'] ?? '',
+            'expiry_year' => $_POST['paypalr_cc_expires_year'] ?? '',
+            'name' => $cc_owner,
+            'security_code' => $cc_cvv,
+            'redirect' => $this->getListenerEndpoint(),
+            'last_digits' => substr($cc_number, -4),
+            'store_card' => $storeCard,
+        ];
+
+        $_SESSION['PayPalRestful']['saved_card'] = 'new';
+
         return true;
+    }
+
+    protected function getListenerEndpoint(): string
+    {
+        if (defined('REDIRECT_LISTENER')) {
+            return REDIRECT_LISTENER;
+        }
+
+        return HTTP_SERVER . DIR_WS_CATALOG . 'ppr_listener.php';
     }
 
     protected function isOpcAjaxRequest(): bool

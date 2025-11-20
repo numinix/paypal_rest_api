@@ -678,25 +678,67 @@ class PayPalCommon {
      */
     public function createPayPalOrder($paymentModule, $order, array $order_info, string $ppr_type, $currencies): bool
     {
+        /** @var zcObserverPaypalrestful $zcObserverPaypalrestful */
+        global $zcObserverPaypalrestful;
+
+        // Create a GUID (Globally Unique IDentifier) for the order's current 'state'.
+        $order_guid = $this->createOrderGuid($order, $ppr_type);
+
+        // If a PayPal order already exists in the session for this GUID, reuse it.
+        if (isset($_SESSION['PayPalRestful']['Order']['guid']) && $_SESSION['PayPalRestful']['Order']['guid'] === $order_guid) {
+            return true;
+        }
+
+        $cc_info = property_exists($paymentModule, 'ccInfo') ? ($paymentModule->ccInfo ?? []) : [];
+        $order_total_differences = (isset($zcObserverPaypalrestful) && is_object($zcObserverPaypalrestful))
+            ? $zcObserverPaypalrestful->getOrderTotalChanges()
+            : [];
+
         $create_order_request = new \PayPalRestful\Zc2Pp\CreatePayPalOrderRequest(
-            $order,
-            $order_info,
             $ppr_type,
-            $this->createOrderGuid($order, $ppr_type),
-            $currencies
+            $order,
+            $cc_info,
+            $order_info,
+            $order_total_differences
         );
 
-        $paypal_order = $paymentModule->ppr->createOrder($create_order_request);
+        $order_amount_mismatch = $create_order_request->getBreakdownMismatch();
+        if (count($order_amount_mismatch) !== 0) {
+            $paymentModule->sendAlertEmail(
+                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_TOTAL_MISMATCH,
+                MODULE_PAYMENT_PAYPALR_ALERT_TOTAL_MISMATCH . "\n\n" . Logger::logJSON($order_amount_mismatch)
+            );
+        }
+
+        $paymentModule->ppr->setPayPalRequestId($order_guid);
+        $order_request = $create_order_request->get();
+        $paypal_order = $paymentModule->ppr->createOrder($order_request);
 
         if ($paypal_order === false) {
+            if (isset($paymentModule->errorInfo)) {
+                $paymentModule->errorInfo->copyErrorInfo($paymentModule->ppr->getErrorInfo());
+            }
             return false;
         }
 
+        $paypal_id = $paypal_order['id'];
+        $status = $paypal_order['status'];
+        unset(
+            $paypal_order['id'],
+            $paypal_order['status'],
+            $paypal_order['create_time'],
+            $paypal_order['links'],
+            $paypal_order['purchase_units'][0]['reference_id'],
+            $paypal_order['purchase_units'][0]['payee']
+        );
+
         $_SESSION['PayPalRestful']['Order'] = [
-            'id' => $paypal_order['id'],
-            'status' => $paypal_order['status'],
+            'current' => $paypal_order,
+            'id' => $paypal_id,
+            'status' => $status,
+            'guid' => $order_guid,
             'payment_source' => $ppr_type,
-            'amount_mismatch' => false,
+            'amount_mismatch' => $order_amount_mismatch,
         ];
 
         return true;
