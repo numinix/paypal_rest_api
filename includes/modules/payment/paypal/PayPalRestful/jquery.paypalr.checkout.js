@@ -1,44 +1,11 @@
 jQuery(document).ready(function() {
-    // Flag to prevent interference when selecting sub-radios
-    var selectingSubRadio = false;
+    // No toggling needed - both PayPal and Credit Card fields are always visible
+    // Only handle saved card selection logic
     
-    function hidePprCcFields()
-    {
-        jQuery('.ppr-cc').each(function() {
-            jQuery(this).hide();
-            jQuery(this).prev('label').hide();
-            jQuery(this).next('br, div.p-2').hide();
-        });
-        jQuery('#paypalr_collects_onsite').val('');
-    }
-    function showPprCcFields()
-    {
-        jQuery('.ppr-cc').each(function() {
-            jQuery(this).show();
-            jQuery(this).prev('label').show();
-            jQuery(this).next('br, div.p-2').show();
-        });
-        jQuery('#paypalr_collects_onsite').val(1);
-    }
-
     function toggleNewCardFields(show)
     {
+        // Toggle between new card entry fields and saved card selection
         jQuery('.ppr-card-new').each(function() {
-            if (show) {
-                jQuery(this).show();
-                jQuery(this).prev('label').show();
-                jQuery(this).next('br, div.p-2').show();
-            } else {
-                jQuery(this).hide();
-                jQuery(this).prev('label').hide();
-                jQuery(this).next('br, div.p-2').hide();
-            }
-        });
-    }
-
-    function toggleSavedCardFields(show)
-    {
-        jQuery('.ppr-card-saved').each(function() {
             if (show) {
                 jQuery(this).show();
                 jQuery(this).prev('label').show();
@@ -66,24 +33,16 @@ jQuery(document).ready(function() {
 
     function updateSavedCardVisibility()
     {
-        var cardSelected = jQuery('#ppr-card').is(':checked');
-        toggleSavedCardFields(cardSelected);
-        if (cardSelected) {
-            var savedChoice = getSavedCardSelection();
-            if (savedChoice !== 'new') {
-                toggleNewCardFields(false);
-                jQuery('#paypalr_collects_onsite').val('');
-                jQuery('#ppr-cc-save-card').prop('disabled', true);
-                jQuery('#ppr-cc-sca-always').prop('disabled', true);
-            } else {
-                toggleNewCardFields(true);
-                jQuery('#paypalr_collects_onsite').val(1);
-                jQuery('#ppr-cc-save-card').prop('disabled', false);
-                jQuery('#ppr-cc-sca-always').prop('disabled', false);
-            }
-        } else {
+        // Only toggle between new card fields and saved card selection
+        var savedChoice = getSavedCardSelection();
+        if (savedChoice !== 'new') {
             toggleNewCardFields(false);
             jQuery('#paypalr_collects_onsite').val('');
+            jQuery('#ppr-cc-save-card').prop('disabled', true);
+            jQuery('#ppr-cc-sca-always').prop('disabled', true);
+        } else {
+            toggleNewCardFields(true);
+            jQuery('#paypalr_collects_onsite').val(1);
             jQuery('#ppr-cc-save-card').prop('disabled', false);
             jQuery('#ppr-cc-sca-always').prop('disabled', false);
         }
@@ -104,126 +63,64 @@ jQuery(document).ready(function() {
         jQuery('#ppr-paypal').prop('checked', true);
     }
     
-    // Handle initial credit card field visibility
-    if (jQuery('#ppr-card').is(':checked')) {
-        showPprCcFields();
-    } else {
-        hidePprCcFields();
-    }
+    // Initialize saved card visibility
     updateSavedCardVisibility();
 
+    // Ensure parent module radio is selected when payment method changes
     jQuery('input[name=payment]').on('change', function() {
         if (jQuery('#pmt-paypalr').is(':not(:checked)')) {
             jQuery('#ppr-paypal, #ppr-card').prop('checked', false);
-        } else if (!selectingSubRadio && jQuery('#ppr-paypal').is(':not(:checked)') && jQuery('#ppr-card').is(':not(:checked)')) {
-            // Only auto-select ppr-paypal if we're not in the middle of selecting a sub-radio
+        } else if (jQuery('#ppr-paypal').is(':not(:checked)') && jQuery('#ppr-card').is(':not(:checked)')) {
+            // Default to PayPal if neither is selected
             jQuery('#ppr-paypal').prop('checked', true);
         }
-        if (jQuery('#ppr-card').is(':checked')) {
-            showPprCcFields();
-            updateSavedCardVisibility();
-        } else {
-            hidePprCcFields();
-            updateSavedCardVisibility();
-        }
     });
 
-    // Handle mousedown events to ensure parent radio is selected BEFORE the sub-radio changes
-    // This ensures the main payment radio is selected before any validation occurs
-    jQuery('#ppr-paypal, #ppr-card').on('mousedown', function() {
-        selectingSubRadio = true;
-        if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
-            jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
-        }
-        // Clear the flag after a short delay to allow the click to complete
-        setTimeout(function() {
-            selectingSubRadio = false;
-        }, 50);
-    });
-
-    // Handle mousedown on labels as well to cover all click scenarios
-    jQuery('label[for="ppr-paypal"], label[for="ppr-card"]').on('mousedown', function() {
-        selectingSubRadio = true;
-        if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
-            jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
-        }
-        // Clear the flag after a short delay to allow the click to complete
-        setTimeout(function() {
-            selectingSubRadio = false;
-        }, 50);
-    });
-
-    jQuery('#ppr-paypal, #ppr-card').on('change', function() {
-        // When a sub-radio (PayPal Wallet or Credit Card) is selected,
-        // ensure the parent payment module radio is also selected
-        if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
-            jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
-        }
-        if (jQuery('#ppr-card').is(':checked')) {
-            showPprCcFields();
-            updateSavedCardVisibility();
-        } else {
-            hidePprCcFields();
-            updateSavedCardVisibility();
-        }
-    });
-
-    // Also handle click events to ensure parent radio is selected when user clicks sub-radios
-    jQuery('#ppr-paypal, #ppr-card').on('click', function() {
+    // Handle sub-radio selection to ensure parent module is selected
+    jQuery('#ppr-paypal, #ppr-card').on('change click', function() {
         if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
             jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
         }
     });
 
-    // Handle clicks on the labels for the sub-radios as well
+    // Handle clicks on labels for sub-radios
     jQuery('label[for="ppr-paypal"], label[for="ppr-card"]').on('click', function() {
         if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
             jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
         }
     });
 
+    // Handle saved card selection changes
     jQuery(document).on('change', 'input[name="paypalr_saved_card"]', function() {
-        if (jQuery('#ppr-card').is(':checked')) {
-            updateSavedCardVisibility();
-        }
+        updateSavedCardVisibility();
     });
 
-    // When user clicks on any credit card input field, select the PayPal payment method and card option
-    jQuery(document).on('focus click', '.ppr-card-new input, .ppr-card-new select', function(event) {
-        // First, ensure the parent payment module is selected
+    // When user interacts with credit card fields, ensure parent module is selected
+    jQuery(document).on('focus click', '.ppr-card-new input, .ppr-card-new select, .ppr-creditcard-field input, .ppr-creditcard-field select', function(event) {
         if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
             jQuery('#pmt-paypalr').prop('checked', true).trigger('change');
         }
         
-        // Then, ensure the card option is selected
-        if (jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
-            jQuery('#ppr-card').prop('checked', true).trigger('change');
+        // For main module, also select the card option if present
+        if (jQuery(this).hasClass('ppr-cc') || jQuery(this).closest('.ppr-cc').length) {
+            if (jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
+                jQuery('#ppr-card').prop('checked', true).trigger('change');
+            }
         }
     });
 
-    // Handle browser autofill events which trigger 'change' and 'input' events
-    // This ensures the parent radio stays checked when autofill populates credit card fields
+    // Handle browser autofill
     jQuery(document).on('change input', '.ppr-card-new input, .ppr-card-new select', function(event) {
-        // Only proceed if this field has a value (autofill happened)
         if (jQuery(this).val()) {
-            // Ensure the parent payment module is selected
-            // Don't trigger change to avoid cascading events that could uncheck the radio
             if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
                 jQuery('#pmt-paypalr').prop('checked', true);
             }
             
-            // Ensure the card option is selected
-            // Don't trigger change to avoid cascading events that could uncheck the parent radio
-            if (jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
+            if (jQuery(this).hasClass('ppr-cc') && jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
                 jQuery('#ppr-card').prop('checked', true);
-                // Manually update visibility since we're not triggering change
-                showPprCcFields();
-                updateSavedCardVisibility();
             }
         }
     });
-
-    updateSavedCardVisibility();
 
     var $checkoutForm = jQuery('form[name="checkout_payment"]');
     var $paypalButton = jQuery('#ppr-choice-paypal .ppr-choice-label');
