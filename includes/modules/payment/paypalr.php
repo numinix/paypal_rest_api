@@ -966,6 +966,8 @@ class paypalr extends base
         // shipping to a country unsupported by PayPal, add some jQuery to disable the associated payment-module
         // selection and display a note to the customer.
         //
+        // Note: Since paypalr is now wallet-only (cardsAccepted = false), this condition is always true.
+        //
         if ($this->cardsAccepted === false || $this->shippingCountryIsSupported === false) {
             if ($this->shippingCountryIsSupported === false) {
                 $selection['fields'] = [
@@ -980,11 +982,9 @@ class paypalr extends base
             return $selection;
         }
 
-        // -----
-        // Note: Since paypalr now only handles PayPal wallet payments (cardsAccepted = false),
-        // all credit card field building code has been removed. Credit card payments are handled
-        // by the separate paypalr_creditcard module.
-        // -----
+        // This code is unreachable since cardsAccepted = false (wallet-only module)
+        // but included for safety/clarity
+        return $selection;
     }
 
     protected function buildCardsAccepted(): string
@@ -1035,7 +1035,7 @@ class paypalr extends base
             zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
         }
 
-        $ppr_type = 'paypal';
+        $ppr_type = $_POST['ppr_type']; // Always 'paypal' due to validation above
         $_SESSION['PayPalRestful']['ppr_type'] = $ppr_type;
 
         // -----
