@@ -528,10 +528,24 @@ class CreatePayPalOrderRequest extends ErrorInfo
             throw new \Exception('Credit card expiry information is required');
         }
         
+        // Validate other required fields
+        if (empty($cc_info['name'])) {
+            $this->log->write("ERROR: Missing card holder name");
+            throw new \Exception('Card holder name is required');
+        }
+        if (empty($cc_info['number'])) {
+            $this->log->write("ERROR: Missing card number");
+            throw new \Exception('Card number is required');
+        }
+        if (empty($cc_info['security_code'])) {
+            $this->log->write("ERROR: Missing card security code");
+            throw new \Exception('Card security code (CVV) is required');
+        }
+        
         $payment_source = [
-            'name' => $cc_info['name'] ?? null,
-            'number' => $cc_info['number'] ?? null,
-            'security_code' => $cc_info['security_code'] ?? null,
+            'name' => $cc_info['name'],
+            'number' => $cc_info['number'],
+            'security_code' => $cc_info['security_code'],
             'expiry' => $expiry_year . '-' . $expiry_month,
             'billing_address' => Address::get($order->billing),
             'store_in_vault' => 'ON_SUCCESS',  // Always vault cards for security and recurring billing
