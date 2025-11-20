@@ -425,6 +425,9 @@ class paypalr_creditcard extends base
         // Check if bootstrap template
         $is_bootstrap_template = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true);
 
+        // Build onfocus attribute for radio button selection (compatibility with Zen Cart's methodSelect function)
+        $onFocus = ' onfocus="methodSelect(\'pmt-' . $this->code . '\')"';
+
         // Build fields array
         $fields = [];
         
@@ -432,7 +435,7 @@ class paypalr_creditcard extends base
         if ($vaultEnabled && !empty($vaultedCards)) {
             $fields[] = [
                 'title' => MODULE_PAYMENT_PAYPALR_SAVED_CARDS ?? 'Saved Cards',
-                'field' => $this->buildSavedCardOptions($vaultedCards, $savedCardSelection),
+                'field' => $this->buildSavedCardOptions($vaultedCards, $savedCardSelection, $onFocus),
                 'tag' => 'paypalr-saved-card',
             ];
         }
@@ -440,14 +443,14 @@ class paypalr_creditcard extends base
         // Card owner name
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALR_CC_OWNER ?? 'Cardholder Name',
-            'field' => zen_draw_input_field('paypalr_cc_owner', $billing_name, 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-owner" autocomplete="cc-name"'),
+            'field' => zen_draw_input_field('paypalr_cc_owner', $billing_name, 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-owner" autocomplete="cc-name"' . $onFocus),
             'tag' => 'paypalr-cc-owner',
         ];
 
         // Card number
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALR_CC_NUMBER ?? 'Card Number',
-            'field' => zen_draw_input_field('paypalr_cc_number', '', 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-number" autocomplete="cc-number"'),
+            'field' => zen_draw_input_field('paypalr_cc_number', '', 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-number" autocomplete="cc-number"' . $onFocus),
             'tag' => 'paypalr-cc-number',
         ];
 
@@ -455,16 +458,16 @@ class paypalr_creditcard extends base
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES ?? 'Expiration Date',
             'field' =>
-                zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-month"') .
+                zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-month"' . $onFocus) .
                 '&nbsp;' .
-                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-year"'),
+                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-year"' . $onFocus),
             'tag' => 'paypalr-cc-expires-month',
         ];
 
         // CVV
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALR_CC_CVV ?? 'CVV',
-            'field' => zen_draw_input_field('paypalr_cc_cvv', '', 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-cvv" size="4" maxlength="4" autocomplete="cc-csc"'),
+            'field' => zen_draw_input_field('paypalr_cc_cvv', '', 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-cvv" size="4" maxlength="4" autocomplete="cc-csc"' . $onFocus),
             'tag' => 'paypalr-cc-cvv',
         ];
 
@@ -498,9 +501,9 @@ class paypalr_creditcard extends base
         ];
     }
 
-    protected function buildSavedCardOptions(array $vaultedCards, string $selectedVaultId): string
+    protected function buildSavedCardOptions(array $vaultedCards, string $selectedVaultId, string $onFocus = ''): string
     {
-        $html = '<select name="paypalr_saved_card" id="paypalr-saved-card" class="ppr-saved-card-select">';
+        $html = '<select name="paypalr_saved_card" id="paypalr-saved-card" class="ppr-saved-card-select"' . $onFocus . '>';
         $html .= '<option value="new"' . ($selectedVaultId === 'new' ? ' selected="selected"' : '') . '>' . 
                  (MODULE_PAYMENT_PAYPALR_NEW_CARD ?? 'Use a new card') . '</option>';
         
