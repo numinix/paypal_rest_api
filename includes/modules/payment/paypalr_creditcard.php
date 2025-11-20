@@ -487,9 +487,12 @@ class paypalr_creditcard extends base
             }
         }
 
+        // Load the checkout script to handle radio button selection when focusing on fields
+        $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+        
         return [
             'id' => $this->code,
-            'module' => $this->buildCardsAccepted() . zen_draw_hidden_field('ppr_type', 'card'),
+            'module' => $this->buildCardsAccepted() . zen_draw_hidden_field('ppr_type', 'card') . $checkoutScript,
             'fields' => $fields,
         ];
     }
