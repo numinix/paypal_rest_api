@@ -278,6 +278,10 @@ class paypalr_googlepay extends base
         $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
         $secret = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_SECRET_L : MODULE_PAYMENT_PAYPALR_SECRET_S;
 
+        // Trim credentials to match PayPalRestfulApi::getConfiguredCredentials behavior
+        $client_id = trim($client_id);
+        $secret = trim($secret);
+
         if (empty($client_id) || empty($secret)) {
             $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALR_ALERT_INVALID_CONFIGURATION ?? 'Invalid configuration');
             return null;

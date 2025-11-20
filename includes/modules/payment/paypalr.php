@@ -612,6 +612,7 @@ class paypalr extends base
     {
         // -----
         // Determine and return which (live vs. sandbox) credentials are in use.
+        // Trim credentials to match PayPalRestfulApi::getConfiguredCredentials behavior.
         //
         if (MODULE_PAYMENT_PAYPALR_SERVER === 'live') {
             $client_id = MODULE_PAYMENT_PAYPALR_CLIENTID_L;
@@ -622,8 +623,8 @@ class paypalr extends base
         }
 
         return [
-            $client_id,
-            $secret,
+            trim($client_id),
+            trim($secret),
         ];
     }
 
