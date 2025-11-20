@@ -676,7 +676,27 @@ class paypalr_creditcard extends base
 
     public function process_button_ajax()
     {
-        return [];
+        // Credit card module always uses card payment source
+        $savedCardSelection = $_POST['paypalr_saved_card'] ?? 'new';
+        $ccFields = [
+            'ccFields' => [
+                'ppr_saved_card' => 'paypalr_saved_card',
+            ],
+        ];
+        if ($savedCardSelection === 'new') {
+            $ccFields['ccFields']['ppr_cc_owner'] = 'paypalr_cc_owner';
+            $ccFields['ccFields']['ppr_cc_expires_month'] = 'paypalr_cc_expires_month';
+            $ccFields['ccFields']['ppr_cc_expires_year'] = 'paypalr_cc_expires_year';
+            $ccFields['ccFields']['ppr_cc_number'] = 'paypalr_cc_number';
+            $ccFields['ccFields']['ppr_cc_cvv'] = 'paypalr_cc_cvv';
+            if (!empty($_POST['paypalr_cc_save_card'])) {
+                $ccFields['ccFields']['ppr_cc_save_card'] = 'paypalr_cc_save_card';
+            }
+            if (isset($_POST['paypalr_cc_sca_always'])) {
+                $ccFields['ccFields']['ppr_cc_sca_always'] = 'paypalr_cc_sca_always';
+            }
+        }
+        return $ccFields;
     }
 
     public function alterShippingEditButton()
