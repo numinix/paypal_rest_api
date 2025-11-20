@@ -390,13 +390,6 @@ class paypalr_creditcard extends base
         
         unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
 
-        // Only mark the checkout as a card-based flow when this module is the current selection,
-        // so that other payment modules (e.g. PayPal wallet) aren't affected by the credit-card
-        // validation requirements.
-        if (($_SESSION['payment'] ?? '') === $this->code) {
-            $_SESSION['PayPalRestful']['ppr_type'] = 'card';
-        }
-
         // Create dropdowns for expiry date
         $expires_month = [];
         $expires_year = [];
@@ -514,7 +507,7 @@ class paypalr_creditcard extends base
         
         return [
             'id' => $this->code,
-            'module' => $this->buildCardsAccepted() . zen_draw_hidden_field('ppr_type', 'card') . $checkoutScript,
+            'module' => $this->buildCardsAccepted() . $checkoutScript,
             'fields' => $fields,
         ];
     }
@@ -553,9 +546,8 @@ class paypalr_creditcard extends base
 
     public function pre_confirmation_check()
     {
-        // Set payment type
+        // Set payment type - this module always uses card payments
         $_SESSION['PayPalRestful']['ppr_type'] = 'card';
-        $_POST['ppr_type'] = 'card';
         
         // Store saved card selection if provided
         if (isset($_POST['paypalr_saved_card'])) {
