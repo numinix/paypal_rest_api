@@ -282,6 +282,10 @@ class paypalr_creditcard extends base
 
     protected function getPayPalRestfulApi(): ?PayPalRestfulApi
     {
+        if ($this->ppr instanceof PayPalRestfulApi) {
+            return $this->ppr;
+        }
+
         $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
         $secret = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_SECRET_L : MODULE_PAYMENT_PAYPALR_SECRET_S;
 
@@ -295,12 +299,12 @@ class paypalr_creditcard extends base
         }
 
         try {
-            $ppr = new PayPalRestfulApi(
+            $this->ppr = new PayPalRestfulApi(
                 MODULE_PAYMENT_PAYPALR_SERVER,
                 $client_id,
                 $secret
             );
-            return $ppr;
+            return $this->ppr;
         } catch (\Exception $e) {
             $this->log->write('Credit Cards: Error creating PayPalRestfulApi: ' . $e->getMessage());
             $this->setConfigurationDisabled($e->getMessage());
@@ -570,12 +574,13 @@ class paypalr_creditcard extends base
         $paypal_order_created = $this->createPayPalOrder('card');
         if ($paypal_order_created === false) {
             $error_info = $this->ppr->getErrorInfo();
+            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
             $this->sendAlertEmail(
                 MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
                 MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
             );
             $this->setMessageAndRedirect(
-                MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE ?? 'Unable to create payment order',
+                sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE, $error_code),
                 FILENAME_CHECKOUT_PAYMENT
             );
         }
