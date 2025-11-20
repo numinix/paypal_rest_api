@@ -636,12 +636,14 @@ class paypalr_creditcard extends base
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
         }
 
-        $order_info = $zcObserverPaypalrestful->getOrderInfo();
+        $order_info = $zcObserverPaypalrestful->getLastOrderValues();
 
-        if ($order_info === false) {
-            $this->log->write('Credit Cards: Missing order_total modifications; getOrderInfo returned false.');
+        if (count($order_info) === 0) {
+            $this->log->write('Credit Cards: Missing order_total modifications; getLastOrderValues returned empty array.');
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
         }
+
+        $order_info['free_shipping_coupon'] = $zcObserverPaypalrestful->orderHasFreeShippingCoupon();
 
         return $order_info;
     }
