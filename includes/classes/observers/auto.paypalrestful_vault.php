@@ -26,7 +26,26 @@ class zcObserverPaypalrestfulVault
 
     public function __construct()
     {
-        if (!defined('MODULE_PAYMENT_PAYPALR_STATUS') || MODULE_PAYMENT_PAYPALR_STATUS !== 'True') {
+        // -----
+        // If the base paypalr payment-module isn't installed, nothing further to do here.
+        // The observer is needed as long as any PayPal payment module is enabled.
+        //
+        if (!defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
+            return;
+        }
+
+        // -----
+        // Check if at least one PayPal payment module is enabled
+        //
+        $anyModuleEnabled = (
+            (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS') && MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True')
+        );
+
+        if (!$anyModuleEnabled) {
             return;
         }
 

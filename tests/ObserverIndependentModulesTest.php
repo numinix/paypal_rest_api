@@ -17,57 +17,65 @@ if (!defined('DIR_FS_CATALOG')) {
  */
 function testObserverChecksAnyModuleEnabled(): bool
 {
-    $observerFile = DIR_FS_CATALOG . 'includes/classes/observers/auto.paypalrestful.php';
-    $content = file_get_contents($observerFile);
+    $observers = [
+        'includes/classes/observers/auto.paypalrestful.php',
+        'includes/classes/observers/auto.paypalrestful_recurring.php',
+        'includes/classes/observers/auto.paypalrestful_vault.php',
+    ];
     
-    // Check that the code first checks for MODULE_PAYMENT_PAYPALR_VERSION (base module installed)
-    if (strpos($content, 'MODULE_PAYMENT_PAYPALR_VERSION') === false) {
-        fwrite(STDERR, "FAIL: Observer doesn't check if base module is installed\n");
-        return false;
+    foreach ($observers as $observerPath) {
+        $observerFile = DIR_FS_CATALOG . $observerPath;
+        $content = file_get_contents($observerFile);
+        
+        // Check that the code first checks for MODULE_PAYMENT_PAYPALR_VERSION (base module installed)
+        if (strpos($content, 'MODULE_PAYMENT_PAYPALR_VERSION') === false) {
+            fwrite(STDERR, "FAIL: $observerPath doesn't check if base module is installed\n");
+            return false;
+        }
+        
+        // Check that the code checks for each module's status being 'True' with OR logic
+        // This ensures any enabled module will allow the observer to initialize
+        $hasBaseCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_STATUS === 'True'") !== false;
+        $hasCreditCardCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS === 'True'") !== false;
+        $hasApplePayCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True'") !== false;
+        $hasGooglePayCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True'") !== false;
+        $hasVenmoCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True'") !== false;
+        
+        if (!$hasBaseCheck) {
+            fwrite(STDERR, "FAIL: $observerPath doesn't check base module status\n");
+            return false;
+        }
+        if (!$hasCreditCardCheck) {
+            fwrite(STDERR, "FAIL: $observerPath doesn't check credit card module status\n");
+            return false;
+        }
+        if (!$hasApplePayCheck) {
+            fwrite(STDERR, "FAIL: $observerPath doesn't check Apple Pay module status\n");
+            return false;
+        }
+        if (!$hasGooglePayCheck) {
+            fwrite(STDERR, "FAIL: $observerPath doesn't check Google Pay module status\n");
+            return false;
+        }
+        if (!$hasVenmoCheck) {
+            fwrite(STDERR, "FAIL: $observerPath doesn't check Venmo module status\n");
+            return false;
+        }
+        
+        // Check that there's a variable storing the result (anyModuleEnabled or similar)
+        if (strpos($content, '$anyModuleEnabled') === false) {
+            fwrite(STDERR, "FAIL: $observerPath doesn't use anyModuleEnabled variable pattern\n");
+            return false;
+        }
+        
+        // Check for OR operator between status checks
+        if (strpos($content, '||') === false) {
+            fwrite(STDERR, "FAIL: $observerPath doesn't use OR logic between module status checks\n");
+            return false;
+        }
     }
     
-    // Check that the code checks for each module's status being 'True' with OR logic
-    // This ensures any enabled module will allow the observer to initialize
-    $hasBaseCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_STATUS === 'True'") !== false;
-    $hasCreditCardCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS === 'True'") !== false;
-    $hasApplePayCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True'") !== false;
-    $hasGooglePayCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True'") !== false;
-    $hasVenmoCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True'") !== false;
-    
-    if (!$hasBaseCheck) {
-        fwrite(STDERR, "FAIL: Observer doesn't check base module status\n");
-        return false;
-    }
-    if (!$hasCreditCardCheck) {
-        fwrite(STDERR, "FAIL: Observer doesn't check credit card module status\n");
-        return false;
-    }
-    if (!$hasApplePayCheck) {
-        fwrite(STDERR, "FAIL: Observer doesn't check Apple Pay module status\n");
-        return false;
-    }
-    if (!$hasGooglePayCheck) {
-        fwrite(STDERR, "FAIL: Observer doesn't check Google Pay module status\n");
-        return false;
-    }
-    if (!$hasVenmoCheck) {
-        fwrite(STDERR, "FAIL: Observer doesn't check Venmo module status\n");
-        return false;
-    }
-    
-    // Check that there's a variable storing the result (anyModuleEnabled or similar)
-    if (strpos($content, '$anyModuleEnabled') === false) {
-        fwrite(STDERR, "FAIL: Observer doesn't use anyModuleEnabled variable pattern\n");
-        return false;
-    }
-    
-    // Check for OR operator between status checks
-    if (strpos($content, '||') === false) {
-        fwrite(STDERR, "FAIL: Observer doesn't use OR logic between module status checks\n");
-        return false;
-    }
-    
-    fwrite(STDOUT, "  ✓ Observer properly checks if any PayPal module is enabled\n");
+    fwrite(STDOUT, "  ✓ All observers properly check if any PayPal module is enabled\n");
     return true;
 }
 
@@ -76,18 +84,26 @@ function testObserverChecksAnyModuleEnabled(): bool
  */
 function testObserverRequiresBaseModuleInstalled(): bool
 {
-    $observerFile = DIR_FS_CATALOG . 'includes/classes/observers/auto.paypalrestful.php';
-    $content = file_get_contents($observerFile);
+    $observers = [
+        'includes/classes/observers/auto.paypalrestful.php',
+        'includes/classes/observers/auto.paypalrestful_recurring.php',
+        'includes/classes/observers/auto.paypalrestful_vault.php',
+    ];
     
-    // The observer should check MODULE_PAYMENT_PAYPALR_VERSION first
-    // and return early if not defined
-    $pattern = '/if\s*\(\s*!defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALR_VERSION[\'"]\s*\)\s*\)\s*\{/';
-    if (!preg_match($pattern, $content)) {
-        fwrite(STDERR, "FAIL: Observer doesn't check if base module is installed before checking statuses\n");
-        return false;
+    foreach ($observers as $observerPath) {
+        $observerFile = DIR_FS_CATALOG . $observerPath;
+        $content = file_get_contents($observerFile);
+        
+        // The observer should check MODULE_PAYMENT_PAYPALR_VERSION first
+        // and return early if not defined
+        $pattern = '/if\s*\(\s*!defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALR_VERSION[\'"]\s*\)\s*\)\s*\{/';
+        if (!preg_match($pattern, $content)) {
+            fwrite(STDERR, "FAIL: $observerPath doesn't check if base module is installed before checking statuses\n");
+            return false;
+        }
     }
     
-    fwrite(STDOUT, "  ✓ Observer requires base module to be installed\n");
+    fwrite(STDOUT, "  ✓ All observers require base module to be installed\n");
     return true;
 }
 
@@ -96,20 +112,28 @@ function testObserverRequiresBaseModuleInstalled(): bool
  */
 function testOldPatternRemoved(): bool
 {
-    $observerFile = DIR_FS_CATALOG . 'includes/classes/observers/auto.paypalrestful.php';
-    $content = file_get_contents($observerFile);
+    $observers = [
+        'includes/classes/observers/auto.paypalrestful.php',
+        'includes/classes/observers/auto.paypalrestful_recurring.php',
+        'includes/classes/observers/auto.paypalrestful_vault.php',
+    ];
     
-    // The old pattern that caused the bug:
-    // if (!defined('MODULE_PAYMENT_PAYPALR_STATUS') || MODULE_PAYMENT_PAYPALR_STATUS !== 'True')
-    // This should NOT exist anymore (it should only check VERSION, not STATUS alone)
-    $oldPattern = '/if\s*\(\s*!defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALR_STATUS[\'"]\s*\)\s*\|\|\s*MODULE_PAYMENT_PAYPALR_STATUS\s*!==\s*[\'"]True[\'"]\s*\)/';
-    
-    if (preg_match($oldPattern, $content)) {
-        fwrite(STDERR, "FAIL: Observer still has old pattern that checks only base module status\n");
-        return false;
+    foreach ($observers as $observerPath) {
+        $observerFile = DIR_FS_CATALOG . $observerPath;
+        $content = file_get_contents($observerFile);
+        
+        // The old pattern that caused the bug:
+        // if (!defined('MODULE_PAYMENT_PAYPALR_STATUS') || MODULE_PAYMENT_PAYPALR_STATUS !== 'True')
+        // This should NOT exist anymore (it should only check VERSION, not STATUS alone)
+        $oldPattern = '/if\s*\(\s*!defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALR_STATUS[\'"]\s*\)\s*\|\|\s*MODULE_PAYMENT_PAYPALR_STATUS\s*!==\s*[\'"]True[\'"]\s*\)/';
+        
+        if (preg_match($oldPattern, $content)) {
+            fwrite(STDERR, "FAIL: $observerPath still has old pattern that checks only base module status\n");
+            return false;
+        }
     }
     
-    fwrite(STDOUT, "  ✓ Old problematic pattern has been removed\n");
+    fwrite(STDOUT, "  ✓ Old problematic pattern has been removed from all observers\n");
     return true;
 }
 
