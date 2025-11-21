@@ -194,7 +194,7 @@ class PayPalCommon {
         if (isset($payment['seller_receivable_breakdown'])) {
             $seller_receivable = $payment['seller_receivable_breakdown'];
             $payment_info = [
-                'payment_date' => Helpers::convertPayPalDatePay2Db($payment['create_time']),
+                'payment_date' => 'now()',
                 'payment_gross' => $seller_receivable['gross_amount']['value'],
                 'payment_fee' => $seller_receivable['paypal_fee']['value'],
                 'settle_amount' => $seller_receivable['receivable_amount']['value'] ?? $seller_receivable['net_amount']['value'],
@@ -280,8 +280,8 @@ class PayPalCommon {
             'txn_id' => $orderInfo['id'],
             'num_cart_items' => $num_cart_items,
             'mc_gross' => $payment['amount']['value'],
-            'date_added' => Helpers::convertPayPalDatePay2Db($orderInfo['create_time']),
-            'last_modified' => Helpers::convertPayPalDatePay2Db($orderInfo['update_time']),
+            'date_added' => 'now()',
+            'last_modified' => 'now()',
             'notify_version' => $this->paymentModule->getCurrentVersion(),
             'expiration_time' => $expiration_time,
             'memo' => json_encode($memo),
@@ -305,8 +305,8 @@ class PayPalCommon {
             'num_cart_items' => $num_cart_items,
             'mc_gross' => $payment['amount']['value'],
             'notify_version' => $this->paymentModule->getCurrentVersion(),
-            'date_added' => Helpers::convertPayPalDatePay2Db($payment['create_time']),
-            'last_modified' => Helpers::convertPayPalDatePay2Db($payment['update_time']),
+            'date_added' => 'now()',
+            'last_modified' => 'now()',
             'expiration_time' => $expiration_time,
         ];
         $sql_data_array = array_merge($sql_data_array, $payment_info);
