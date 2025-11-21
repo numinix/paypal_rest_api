@@ -1,128 +1,148 @@
 <?php
 /**
  * Test to verify that Helpers::convertPayPalDatePay2Db handles null values correctly.
+ * 
+ * This test verifies the type signature change that allows null values to be passed
+ * to convertPayPalDatePay2Db without causing a TypeError.
  */
 declare(strict_types=1);
 
-namespace PayPalRestful\Common {
-    // Mock the Helpers class for testing
-    class Helpers
-    {
-        public static function convertPayPalDatePay2Db(?string $paypal_date): ?string
-        {
-            if ($paypal_date === null || $paypal_date === '') {
-                return null;
-            }
-            // Simulate the conversion logic
-            $cleaned = trim(preg_replace('/[^0-9-:]/', ' ', $paypal_date));
-            // Simple mock conversion - in real code this goes through convertToLocalTimeZone
-            return date('Y-m-d H:i:s', strtotime($cleaned));
-        }
-    }
+// Set up minimal constants required by the autoloader
+if (!defined('DIR_FS_CATALOG')) {
+    define('DIR_FS_CATALOG', dirname(__DIR__) . '/');
+}
+if (!defined('DIR_WS_MODULES')) {
+    define('DIR_WS_MODULES', 'includes/modules/');
 }
 
-namespace {
-    use PayPalRestful\Common\Helpers;
-
-    /**
-     * Test null input handling
-     */
-    function testConvertPayPalDatePay2DbWithNull(): bool
-    {
-        $result = Helpers::convertPayPalDatePay2Db(null);
-        
-        if ($result !== null) {
-            echo "FAIL: convertPayPalDatePay2Db(null) should return null, got: " . var_export($result, true) . "\n";
-            return false;
-        }
-        
-        echo "PASS: convertPayPalDatePay2Db(null) returns null\n";
-        return true;
-    }
-
-    /**
-     * Test empty string input handling
-     */
-    function testConvertPayPalDatePay2DbWithEmptyString(): bool
-    {
-        $result = Helpers::convertPayPalDatePay2Db('');
-        
-        if ($result !== null) {
-            echo "FAIL: convertPayPalDatePay2Db('') should return null, got: " . var_export($result, true) . "\n";
-            return false;
-        }
-        
-        echo "PASS: convertPayPalDatePay2Db('') returns null\n";
-        return true;
-    }
-
-    /**
-     * Test valid date input handling
-     */
-    function testConvertPayPalDatePay2DbWithValidDate(): bool
-    {
-        // PayPal uses ISO 8601 format: 2024-11-21T17:30:45Z
-        $paypalDate = '2024-11-21T17:30:45Z';
-        $result = Helpers::convertPayPalDatePay2Db($paypalDate);
-        
-        if ($result === null) {
-            echo "FAIL: convertPayPalDatePay2Db with valid date should not return null\n";
-            return false;
-        }
-        
-        // Result should be a valid datetime string in Y-m-d H:i:s format
-        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $result)) {
-            echo "FAIL: convertPayPalDatePay2Db result should be in 'Y-m-d H:i:s' format, got: $result\n";
-            return false;
-        }
-        
-        echo "PASS: convertPayPalDatePay2Db('$paypalDate') returns valid datetime: $result\n";
-        return true;
-    }
-
-    /**
-     * Test with various PayPal date formats
-     */
-    function testConvertPayPalDatePay2DbWithVariousFormats(): bool
-    {
-        $testDates = [
-            '2024-11-21T17:30:45Z',
-            '2024-01-01T00:00:00Z',
-            '2025-12-31T23:59:59Z',
-        ];
-        
-        foreach ($testDates as $date) {
-            $result = Helpers::convertPayPalDatePay2Db($date);
-            if ($result === null) {
-                echo "FAIL: convertPayPalDatePay2Db('$date') should not return null\n";
-                return false;
-            }
-            if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $result)) {
-                echo "FAIL: convertPayPalDatePay2Db('$date') should return valid datetime format, got: $result\n";
-                return false;
-            }
-        }
-        
-        echo "PASS: convertPayPalDatePay2Db handles various date formats correctly\n";
-        return true;
-    }
-
-    // Run all tests
-    $allPassed = true;
+// Create a minimal PSR-4 autoloader for PayPalRestful namespace
+spl_autoload_register(function ($class) {
+    $prefix = 'PayPalRestful\\';
+    $base_dir = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/';
     
-    echo "\n=== Testing Helpers::convertPayPalDatePay2Db ===\n\n";
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) {
+        return;
+    }
     
-    $allPassed = testConvertPayPalDatePay2DbWithNull() && $allPassed;
-    $allPassed = testConvertPayPalDatePay2DbWithEmptyString() && $allPassed;
-    $allPassed = testConvertPayPalDatePay2DbWithValidDate() && $allPassed;
-    $allPassed = testConvertPayPalDatePay2DbWithVariousFormats() && $allPassed;
+    $relative_class = substr($class, $len);
+    $file = $base_dir . str_replace('\\', '/', $relative_class) . '.php';
     
-    echo "\n=== Test Summary ===\n";
-    if ($allPassed) {
-        echo "All tests PASSED\n";
-        exit(0);
-    } else {
-        echo "Some tests FAILED\n";
+    if (file_exists($file)) {
+        require $file;
+    }
+});
+
+echo "\n=== Testing Helpers::convertPayPalDatePay2Db Type Signature ===\n\n";
+
+// Test 1: Verify the method signature accepts nullable string
+echo "Test 1: Verify method signature accepts nullable string parameter\n";
+$reflectionClass = new ReflectionClass('PayPalRestful\Common\Helpers');
+$reflectionMethod = $reflectionClass->getMethod('convertPayPalDatePay2Db');
+$parameters = $reflectionMethod->getParameters();
+
+if (count($parameters) !== 1) {
+    echo "✗ FAIL: Expected 1 parameter, got " . count($parameters) . "\n";
+    exit(1);
+}
+
+$param = $parameters[0];
+$paramType = $param->getType();
+
+if ($paramType === null) {
+    echo "✗ FAIL: Parameter should have a type hint\n";
+    exit(1);
+}
+
+if (!$paramType->allowsNull()) {
+    echo "✗ FAIL: Parameter type should allow null\n";
+    exit(1);
+}
+
+if ($paramType->getName() !== 'string') {
+    echo "✗ FAIL: Parameter type should be string, got " . $paramType->getName() . "\n";
+    exit(1);
+}
+
+echo "✓ PASS: Method signature is convertPayPalDatePay2Db(?string)\n\n";
+
+// Test 2: Verify the return type allows null
+echo "Test 2: Verify return type allows null\n";
+$returnType = $reflectionMethod->getReturnType();
+
+if ($returnType === null) {
+    echo "✗ FAIL: Method should have a return type hint\n";
+    exit(1);
+}
+
+if (!$returnType->allowsNull()) {
+    echo "✗ FAIL: Return type should allow null\n";
+    exit(1);
+}
+
+if ($returnType->getName() !== 'string') {
+    echo "✗ FAIL: Return type should be string, got " . $returnType->getName() . "\n";
+    exit(1);
+}
+
+echo "✓ PASS: Return type is ?string\n\n";
+
+// Test 3: Verify the method can be called with null without TypeError
+echo "Test 3: Verify method can be called with null without TypeError\n";
+try {
+    $result = \PayPalRestful\Common\Helpers::convertPayPalDatePay2Db(null);
+    echo "✓ PASS: Method accepts null parameter without TypeError\n";
+    
+    if ($result !== null) {
+        echo "✗ FAIL: Expected null return value for null input, got: " . var_export($result, true) . "\n";
         exit(1);
     }
+    echo "✓ PASS: Method returns null for null input\n\n";
+} catch (TypeError $e) {
+    echo "✗ FAIL: TypeError thrown when calling with null: " . $e->getMessage() . "\n";
+    exit(1);
 }
+
+// Test 4: Verify the method can be called with empty string
+echo "Test 4: Verify method handles empty string correctly\n";
+try {
+    $result = \PayPalRestful\Common\Helpers::convertPayPalDatePay2Db('');
+    echo "✓ PASS: Method accepts empty string without error\n";
+    
+    if ($result !== null) {
+        echo "✗ FAIL: Expected null return value for empty string, got: " . var_export($result, true) . "\n";
+        exit(1);
+    }
+    echo "✓ PASS: Method returns null for empty string\n\n";
+} catch (Exception $e) {
+    echo "✗ FAIL: Exception thrown: " . $e->getMessage() . "\n";
+    exit(1);
+}
+
+// Test 5: Verify the method still works with valid date strings
+echo "Test 5: Verify method still works with valid date strings\n";
+try {
+    $result = \PayPalRestful\Common\Helpers::convertPayPalDatePay2Db('2024-11-21T17:30:45Z');
+    
+    if ($result === null) {
+        echo "✗ FAIL: Expected non-null return value for valid date string\n";
+        exit(1);
+    }
+    
+    // Verify result is a valid datetime string
+    if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $result)) {
+        echo "✗ FAIL: Return value should be in 'Y-m-d H:i:s' format, got: $result\n";
+        exit(1);
+    }
+    
+    echo "✓ PASS: Method returns valid datetime string: $result\n\n";
+} catch (Exception $e) {
+    echo "✗ FAIL: Exception thrown: " . $e->getMessage() . "\n";
+    exit(1);
+}
+
+echo "=== Test Summary ===\n";
+echo "All tests PASSED ✓\n";
+echo "\nThe fix successfully allows null values to be passed to convertPayPalDatePay2Db\n";
+echo "without causing a TypeError, which resolves the reported issue.\n";
+exit(0);
