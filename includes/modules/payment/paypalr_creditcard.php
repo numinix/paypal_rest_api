@@ -550,13 +550,18 @@ class paypalr_creditcard extends base
         $_SESSION['PayPalRestful']['ppr_type'] = 'card';
         
         // Store saved card selection if provided
+        // Check both direct and forwarded field names
         if (isset($_POST['paypalr_saved_card'])) {
             $_SESSION['PayPalRestful']['saved_card'] = $_POST['paypalr_saved_card'];
+        } elseif (isset($_POST['ppr_saved_card'])) {
+            $_SESSION['PayPalRestful']['saved_card'] = $_POST['ppr_saved_card'];
         }
         
         // Store save card preference
         if (isset($_POST['paypalr_cc_save_card'])) {
             $_SESSION['PayPalRestful']['save_card'] = $_POST['paypalr_cc_save_card'];
+        } elseif (isset($_POST['ppr_cc_save_card'])) {
+            $_SESSION['PayPalRestful']['save_card'] = $_POST['ppr_cc_save_card'];
         }
         
         // Validate card information
@@ -680,7 +685,7 @@ class paypalr_creditcard extends base
         }
 
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
-        $storeCard = $allowSaveCard && !empty($_POST['paypalr_cc_save_card']);
+        $storeCard = $allowSaveCard && (!empty($_POST['paypalr_cc_save_card']) || !empty($_POST['ppr_cc_save_card']));
         if ($storeCard === true) {
             $_SESSION['PayPalRestful']['save_card'] = true;
         } else {
