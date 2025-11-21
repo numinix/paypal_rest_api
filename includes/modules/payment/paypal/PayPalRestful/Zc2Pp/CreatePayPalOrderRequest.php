@@ -540,14 +540,24 @@ class CreatePayPalOrderRequest extends ErrorInfo
             throw new \Exception('Credit card expiry information is required');
         }
         
-        // Validate other required fields
+        // Validate other required fields (with POST fallbacks for confirmation page)
+        if (empty($cc_info['name'])) {
+            $cc_info['name'] = $_POST['paypalr_cc_owner'] ?? ($_POST['ppr_cc_owner'] ?? '');
+        }
         if (empty($cc_info['name'])) {
             $this->log->write("ERROR: Missing card holder name");
             throw new \Exception('Card holder name is required');
         }
         if (empty($cc_info['number'])) {
+            $posted_number = $_POST['paypalr_cc_number'] ?? ($_POST['ppr_cc_number'] ?? '');
+            $cc_info['number'] = preg_replace('/[^0-9]/', '', $posted_number);
+        }
+        if (empty($cc_info['number'])) {
             $this->log->write("ERROR: Missing card number");
             throw new \Exception('Card number is required');
+        }
+        if (empty($cc_info['security_code'])) {
+            $cc_info['security_code'] = $_POST['paypalr_cc_cvv'] ?? ($_POST['ppr_cc_cvv'] ?? '');
         }
         if (empty($cc_info['security_code'])) {
             $this->log->write("ERROR: Missing card security code");
