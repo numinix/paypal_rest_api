@@ -616,22 +616,22 @@ class paypalr_googlepay extends base
 
     public function _doRefund($oID)
     {
-        return $this->paypalCommon->processRefund($oID, $this->getPayPalRestfulApi(), $this->code);
+        return $this->paypalCommon->processRefund($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION);
     }
 
     public function _doAuth($oID, $order_amt, $currency = 'USD')
     {
-        return $this->paypalCommon->processAuthorization($oID, $this->getPayPalRestfulApi(), $this->code, $order_amt, $currency, false);
+        return $this->paypalCommon->processAuthorization($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION, $order_amt, $currency, false);
     }
 
     public function _doCapt($oID, $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
     {
-        return $this->paypalCommon->processCapture($oID, $this->getPayPalRestfulApi(), $this->code, $captureType, $order_amt, $order_currency);
+        return $this->paypalCommon->processCapture($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION, $captureType, $order_amt, $order_currency);
     }
 
     public function _doVoid($oID)
     {
-        return $this->paypalCommon->processVoid($oID, $this->getPayPalRestfulApi(), $this->code);
+        return $this->paypalCommon->processVoid($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION);
     }
 
     public function check(): bool
