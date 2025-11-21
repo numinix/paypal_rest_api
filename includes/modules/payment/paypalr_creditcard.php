@@ -591,6 +591,16 @@ class paypalr_creditcard extends base
     {
         global $messageStack, $order;
 
+        // If this is pre-confirmation and we have card info in session but no POST data,
+        // use the session data (happens when POST data isn't forwarded)
+        if ($is_preconfirmation && 
+            !isset($_POST['paypalr_cc_owner']) && !isset($_POST['ppr_cc_owner']) && 
+            !isset($_POST['paypalr_saved_card']) && !isset($_POST['ppr_saved_card']) &&
+            isset($_SESSION['PayPalRestful']['ccInfo'])) {
+            $this->ccInfo = $_SESSION['PayPalRestful']['ccInfo'];
+            return true;
+        }
+
         $saved_card = $_POST['paypalr_saved_card'] ?? ($_POST['ppr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
 
         // If using a saved card, minimal validation needed
@@ -624,6 +634,8 @@ class paypalr_creditcard extends base
                         'store_card' => false,
                         'use_vault' => true,
                     ];
+                    // Store card info in session for pre_confirmation_check to access
+                    $_SESSION['PayPalRestful']['ccInfo'] = $this->ccInfo;
                     break;
                 }
             }
@@ -704,6 +716,9 @@ class paypalr_creditcard extends base
             'store_card' => $storeCard,
         ];
 
+        // Store card info in session for pre_confirmation_check to access
+        // This ensures data persists even if POST data is not forwarded
+        $_SESSION['PayPalRestful']['ccInfo'] = $this->ccInfo;
         $_SESSION['PayPalRestful']['saved_card'] = 'new';
 
         return true;
