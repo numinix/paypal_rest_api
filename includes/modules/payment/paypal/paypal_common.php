@@ -250,45 +250,73 @@ class PayPalCommon {
             $this->storeVaultCardData($orders_id, $card_source, $orderCustomerCache);
         }
 
-        // Build and insert the database record
+        // Build and insert the database records
+        // Insert two records like the base paypalr module:
+        // 1. CREATE record (the PayPal order creation)
+        // 2. CAPTURE/AUTHORIZE record (the payment transaction)
         global $db;
         
-        $sql_data_array = array_merge(
-            [
-                'order_id' => $orders_id,
-                'txn_type' => $orderInfo['txn_type'],
-                'module_name' => $this->paymentModule->title,
-                'module_mode' => MODULE_PAYMENT_PAYPALR_SERVER,
-                'reason_code' => null,
-                'payment_type' => $payment_type,
-                'payment_status' => $orderInfo['payment_status'],
-                'pending_reason' => $payment['status_details']['reason'] ?? null,
-                'invoice' => $orderInfo['purchase_units'][0]['invoice_id'] ?? null,
-                'first_name' => substr($first_name, 0, 32),
-                'last_name' => substr($last_name, 0, 32),
-                'payer_business_name' => null,
-                'payer_email' => substr($email_address, 0, 127),
-                'payer_id' => substr($payer_id, 0, 32),
-                'payer_status' => null,
-                'mc_currency' => $payment['amount']['currency_code'],
-                'mc_gross' => $payment['amount']['value'],
-                'mc_fee' => $payment_info['payment_fee'] ?? 0,
-                'txn_id' => substr($payment['id'], 0, 20),
-                'parent_txn_id' => null,
-                'memo' => (count($memo) === 0) ? null : json_encode($memo),
-                'notify_version' => $this->paymentModule->getCurrentVersion(),
-                'date_added' => 'now()',
-            ],
-            $payment_info,
-            $address_info
-        );
-
-        // Add expiration time if present
-        if (isset($orderInfo['expiration_time'])) {
-            $sql_data_array['expiration_time'] = $orderInfo['expiration_time'];
-        }
-
+        $expiration_time = (isset($orderInfo['expiration_time'])) ? Helpers::convertPayPalDatePay2Db($orderInfo['expiration_time']) : 'null';
+        $num_cart_items = $_SESSION['cart']->count_contents();
+        
+        // First record: CREATE
+        $sql_data_array = [
+            'order_id' => $orders_id,
+            'txn_type' => 'CREATE',
+            'module_name' => $this->paymentModule->code,
+            'module_mode' => $orderInfo['txn_type'],
+            'reason_code' => $payment['status_details']['reason'] ?? '',
+            'payment_type' => $payment_type,
+            'payment_status' => $orderInfo['payment_status'],
+            'invoice' => $purchase_unit['invoice_id'] ?? $purchase_unit['custom_id'] ?? '',
+            'mc_currency' => $payment['amount']['currency_code'],
+            'first_name' => substr($first_name, 0, 32),
+            'last_name' => substr($last_name, 0, 32),
+            'payer_email' => $email_address,
+            'payer_id' => $payer_id,
+            'payer_status' => $orderInfo['payment_source'][$payment_type]['account_status'] ?? 'UNKNOWN',
+            'receiver_email' => $purchase_unit['payee']['email_address'] ?? '',
+            'receiver_id' => $purchase_unit['payee']['merchant_id'] ?? '',
+            'txn_id' => $orderInfo['id'],
+            'num_cart_items' => $num_cart_items,
+            'mc_gross' => $payment['amount']['value'],
+            'date_added' => Helpers::convertPayPalDatePay2Db($orderInfo['create_time']),
+            'last_modified' => Helpers::convertPayPalDatePay2Db($orderInfo['update_time']),
+            'notify_version' => $this->paymentModule->getCurrentVersion(),
+            'expiration_time' => $expiration_time,
+            'memo' => json_encode($memo),
+        ];
+        $sql_data_array = array_merge($sql_data_array, $address_info, $payment_info);
         zen_db_perform(TABLE_PAYPAL, $sql_data_array);
+        
+        // Second record: CAPTURE or AUTHORIZE
+        $sql_data_array = [
+            'order_id' => $orders_id,
+            'txn_type' => $orderInfo['txn_type'],
+            'final_capture' => (int)($orderInfo['txn_type'] === 'CAPTURE'),
+            'module_name' => $this->paymentModule->code,
+            'module_mode' => '',
+            'reason_code' => $payment['status_details']['reason'] ?? '',
+            'payment_type' => $payment_type,
+            'payment_status' => $payment['status'],
+            'mc_currency' => $payment['amount']['currency_code'],
+            'txn_id' => $payment['id'],
+            'parent_txn_id' => $orderInfo['id'],
+            'num_cart_items' => $num_cart_items,
+            'mc_gross' => $payment['amount']['value'],
+            'notify_version' => $this->paymentModule->getCurrentVersion(),
+            'date_added' => Helpers::convertPayPalDatePay2Db($payment['create_time']),
+            'last_modified' => Helpers::convertPayPalDatePay2Db($payment['update_time']),
+            'expiration_time' => $expiration_time,
+        ];
+        $sql_data_array = array_merge($sql_data_array, $payment_info);
+        zen_db_perform(TABLE_PAYPAL, $sql_data_array);
+        
+        if ($orderInfo['txn_type'] === 'CAPTURE') {
+            global $zco_notifier;
+            $zco_notifier->notify('NOTIFY_PAYPALR_FUNDS_CAPTURED', $sql_data_array);
+        }
+        
         $orderInfo['admin_alert_needed'] = ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED);
     }
 
