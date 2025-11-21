@@ -586,7 +586,7 @@ class paypalr_creditcard extends base
     {
         global $messageStack, $order;
 
-        $saved_card = $_POST['paypalr_saved_card'] ?? $_SESSION['PayPalRestful']['saved_card'] ?? 'new';
+        $saved_card = $_POST['paypalr_saved_card'] ?? ($_POST['ppr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
 
         // If using a saved card, minimal validation needed
         if ($saved_card !== 'new') {
