@@ -593,8 +593,10 @@ class paypalr_creditcard extends base
             $_SESSION['PayPalRestful']['saved_card'] = $saved_card;
 
             $vaultCards = $this->paypalCommon->getVaultedCardsForCustomer($_SESSION['customer_id'] ?? 0, true);
+            $cardFound = false;
             foreach ($vaultCards as $card) {
                 if ($card['vault_id'] === $saved_card) {
+                    $cardFound = true;
                     $expiryMonth = '';
                     $expiryYear = '';
                     if (!empty($card['expiry']) && preg_match('/^(\d{4})-(\d{2})/', $card['expiry'], $matches) === 1) {
@@ -619,6 +621,16 @@ class paypalr_creditcard extends base
                     ];
                     break;
                 }
+            }
+
+            // If the selected card wasn't found in the vault, show an error
+            if (!$cardFound) {
+                $error_message = MODULE_PAYMENT_PAYPALR_TEXT_SAVED_CARD_NOT_FOUND ?? 'The selected card is no longer available. Please select a different card or enter a new one.';
+                $messageStack->add_session('checkout_payment', $error_message, 'error');
+                if ($is_preconfirmation) {
+                    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
+                }
+                return false;
             }
 
             return true;
