@@ -779,7 +779,25 @@ class paypalr_creditcard extends base
 
     public function process_button()
     {
-        return false;
+        // For non-AJAX checkout, generate hidden fields to forward card data
+        $savedCardSelection = $_POST['paypalr_saved_card'] ?? 'new';
+        $hiddenFields = zen_draw_hidden_field('ppr_saved_card', $_POST['paypalr_saved_card'] ?? 'new');
+        
+        if ($savedCardSelection === 'new') {
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_owner', $_POST['paypalr_cc_owner'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_month', $_POST['paypalr_cc_expires_month'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_year', $_POST['paypalr_cc_expires_year'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_number', $_POST['paypalr_cc_number'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_cvv', $_POST['paypalr_cc_cvv'] ?? '');
+            if (!empty($_POST['paypalr_cc_save_card'])) {
+                $hiddenFields .= zen_draw_hidden_field('ppr_cc_save_card', $_POST['paypalr_cc_save_card']);
+            }
+            if (isset($_POST['paypalr_cc_sca_always'])) {
+                $hiddenFields .= zen_draw_hidden_field('ppr_cc_sca_always', $_POST['paypalr_cc_sca_always']);
+            }
+        }
+        
+        return $hiddenFields;
     }
 
     public function process_button_ajax()
