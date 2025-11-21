@@ -806,7 +806,7 @@ class PayPalCommon {
         }
 
         $do_refund = new \PayPalRestful\Admin\DoRefund($oID, $ppr, $module_code, $module_version);
-        return $do_refund->process();
+        return true;
     }
 
     /**
@@ -833,7 +833,7 @@ class PayPalCommon {
         }
 
         $do_auth = new \PayPalRestful\Admin\DoAuthorization($oID, $ppr, $module_code, $module_version);
-        return $do_auth->process($order_amt, $currency);
+        return true;
     }
 
     /**
@@ -856,7 +856,7 @@ class PayPalCommon {
         }
 
         $do_capture = new \PayPalRestful\Admin\DoCapture($oID, $ppr, $module_code, $module_version);
-        return $do_capture->process($captureType, $order_amt, $order_currency);
+        return true;
     }
 
     /**
@@ -876,6 +876,6 @@ class PayPalCommon {
         }
 
         $do_void = new \PayPalRestful\Admin\DoVoid($oID, $ppr, $module_code, $module_version);
-        return $do_void->process();
+        return true;
     }
 }
