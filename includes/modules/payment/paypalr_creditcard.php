@@ -781,7 +781,7 @@ class paypalr_creditcard extends base
     {
         // For non-AJAX checkout, generate hidden fields to forward card data
         $savedCardSelection = $_POST['paypalr_saved_card'] ?? 'new';
-        $hiddenFields = zen_draw_hidden_field('ppr_saved_card', $_POST['paypalr_saved_card'] ?? 'new');
+        $hiddenFields = zen_draw_hidden_field('ppr_saved_card', $savedCardSelection);
         
         if ($savedCardSelection === 'new') {
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_owner', $_POST['paypalr_cc_owner'] ?? '');
@@ -792,7 +792,7 @@ class paypalr_creditcard extends base
             if (!empty($_POST['paypalr_cc_save_card'])) {
                 $hiddenFields .= zen_draw_hidden_field('ppr_cc_save_card', $_POST['paypalr_cc_save_card']);
             }
-            if (isset($_POST['paypalr_cc_sca_always'])) {
+            if (!empty($_POST['paypalr_cc_sca_always'])) {
                 $hiddenFields .= zen_draw_hidden_field('ppr_cc_sca_always', $_POST['paypalr_cc_sca_always']);
             }
         }
