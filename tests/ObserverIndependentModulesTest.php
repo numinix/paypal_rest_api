@@ -122,10 +122,15 @@ function testOldPatternRemoved(): bool
         $observerFile = DIR_FS_CATALOG . $observerPath;
         $content = file_get_contents($observerFile);
         
-        // The old pattern that caused the bug:
+        // The old pattern that caused the bug was:
         // if (!defined('MODULE_PAYMENT_PAYPALR_STATUS') || MODULE_PAYMENT_PAYPALR_STATUS !== 'True')
-        // This should NOT exist anymore (it should only check VERSION, not STATUS alone)
-        $oldPattern = '/if\s*\(\s*!defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALR_STATUS[\'"]\s*\)\s*\|\|\s*MODULE_PAYMENT_PAYPALR_STATUS\s*!==\s*[\'"]True[\'"]\s*\)/';
+        // This should NOT exist anymore - observers should check VERSION first, then check
+        // if ANY module is enabled (not just STATUS alone with OR for undefined check)
+        
+        // Build regex pattern to detect the problematic pattern
+        $definedCheck = '!defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALR_STATUS[\'"]\s*\)';
+        $statusCheck = 'MODULE_PAYMENT_PAYPALR_STATUS\s*!==\s*[\'"]True[\'"]';
+        $oldPattern = '/if\s*\(\s*' . $definedCheck . '\s*\|\|\s*' . $statusCheck . '\s*\)/';
         
         if (preg_match($oldPattern, $content)) {
             fwrite(STDERR, "FAIL: $observerPath still has old pattern that checks only base module status\n");
