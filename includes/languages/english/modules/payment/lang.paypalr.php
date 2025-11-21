@@ -64,6 +64,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC' => 'Card',
     'MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT' => 'Save this card for future checkouts?',
     'MODULE_PAYMENT_PAYPALR_TEXT_SAVED_CARD_INVALID' => 'The saved card you selected is no longer available. Please choose another payment option.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_SAVED_CARD_NOT_FOUND' => 'The selected card is no longer available. Please select a different card or enter a new one.',
 
     'MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH' => 'The <em>CVV Number</em> for your %1$s card ending in <var>%2$s</var> must be %3$u digits in length.',  //- %1$s is the card type, , %2$s is the last-r, %3$u is the CVV length
     'MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD' => 'We apologize for the inconvenience, but the credit card type you entered is not one that we accept. Please use a different credit card.',
