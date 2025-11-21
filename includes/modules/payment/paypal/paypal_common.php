@@ -796,15 +796,16 @@ class PayPalCommon {
      * @param int $oID Order ID
      * @param object $ppr PayPal API instance
      * @param string $module_code Module code for logging
+     * @param string $module_version Module version
      * @return mixed Refund result
      */
-    public function processRefund($oID, $ppr, string $module_code)
+    public function processRefund($oID, $ppr, string $module_code, string $module_version)
     {
         if ($ppr === null) {
             return false;
         }
 
-        $do_refund = new \PayPalRestful\Admin\DoRefund($oID, $ppr, $module_code);
+        $do_refund = new \PayPalRestful\Admin\DoRefund($oID, $ppr, $module_code, $module_version);
         return $do_refund->process();
     }
 
@@ -815,12 +816,13 @@ class PayPalCommon {
      * @param int $oID Order ID
      * @param object|null $ppr PayPal API instance
      * @param string $module_code Module code for logging
+     * @param string $module_version Module version
      * @param float $order_amt Order amount
      * @param string $currency Currency code
      * @param bool $supports_auth Whether this module supports separate authorization
      * @return mixed Authorization result or false
      */
-    public function processAuthorization($oID, $ppr, string $module_code, $order_amt, $currency, bool $supports_auth = false)
+    public function processAuthorization($oID, $ppr, string $module_code, string $module_version, $order_amt, $currency, bool $supports_auth = false)
     {
         if (!$supports_auth) {
             return false;
@@ -830,7 +832,7 @@ class PayPalCommon {
             return false;
         }
 
-        $do_auth = new \PayPalRestful\Admin\DoAuthorization($oID, $ppr, $module_code);
+        $do_auth = new \PayPalRestful\Admin\DoAuthorization($oID, $ppr, $module_code, $module_version);
         return $do_auth->process($order_amt, $currency);
     }
 
@@ -841,18 +843,19 @@ class PayPalCommon {
      * @param int $oID Order ID
      * @param object|null $ppr PayPal API instance
      * @param string $module_code Module code for logging
+     * @param string $module_version Module version
      * @param string $captureType Capture type (Complete, etc.)
      * @param float $order_amt Order amount
      * @param string $order_currency Currency code
      * @return mixed Capture result
      */
-    public function processCapture($oID, $ppr, string $module_code, string $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
+    public function processCapture($oID, $ppr, string $module_code, string $module_version, string $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
     {
         if ($ppr === null) {
             return false;
         }
 
-        $do_capture = new \PayPalRestful\Admin\DoCapture($oID, $ppr, $module_code);
+        $do_capture = new \PayPalRestful\Admin\DoCapture($oID, $ppr, $module_code, $module_version);
         return $do_capture->process($captureType, $order_amt, $order_currency);
     }
 
@@ -863,15 +866,16 @@ class PayPalCommon {
      * @param int $oID Order ID
      * @param object|null $ppr PayPal API instance
      * @param string $module_code Module code for logging
+     * @param string $module_version Module version
      * @return mixed Void result
      */
-    public function processVoid($oID, $ppr, string $module_code)
+    public function processVoid($oID, $ppr, string $module_code, string $module_version)
     {
         if ($ppr === null) {
             return false;
         }
 
-        $do_void = new \PayPalRestful\Admin\DoVoid($oID, $ppr, $module_code);
+        $do_void = new \PayPalRestful\Admin\DoVoid($oID, $ppr, $module_code, $module_version);
         return $do_void->process();
     }
 }
