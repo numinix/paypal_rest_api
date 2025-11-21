@@ -246,7 +246,8 @@ class PayPalCommon {
             }
 
             // Store vault card data if present
-            $this->storeVaultCardData($orders_id, $card_source, $this->paymentModule->orderCustomerCache ?? []);
+            $orderCustomerCache = $this->paymentModule->orderCustomerCache ?? [];
+            $this->storeVaultCardData($orders_id, $card_source, $orderCustomerCache);
         }
 
         // Build and insert the database record
