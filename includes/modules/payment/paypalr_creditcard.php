@@ -550,13 +550,18 @@ class paypalr_creditcard extends base
         $_SESSION['PayPalRestful']['ppr_type'] = 'card';
         
         // Store saved card selection if provided
+        // Check both direct and forwarded field names
         if (isset($_POST['paypalr_saved_card'])) {
             $_SESSION['PayPalRestful']['saved_card'] = $_POST['paypalr_saved_card'];
+        } elseif (isset($_POST['ppr_saved_card'])) {
+            $_SESSION['PayPalRestful']['saved_card'] = $_POST['ppr_saved_card'];
         }
         
         // Store save card preference
         if (isset($_POST['paypalr_cc_save_card'])) {
             $_SESSION['PayPalRestful']['save_card'] = $_POST['paypalr_cc_save_card'];
+        } elseif (isset($_POST['ppr_cc_save_card'])) {
+            $_SESSION['PayPalRestful']['save_card'] = $_POST['ppr_cc_save_card'];
         }
         
         // Validate card information
@@ -586,15 +591,17 @@ class paypalr_creditcard extends base
     {
         global $messageStack, $order;
 
-        $saved_card = $_POST['paypalr_saved_card'] ?? $_SESSION['PayPalRestful']['saved_card'] ?? 'new';
+        $saved_card = $_POST['paypalr_saved_card'] ?? ($_POST['ppr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
 
         // If using a saved card, minimal validation needed
         if ($saved_card !== 'new') {
             $_SESSION['PayPalRestful']['saved_card'] = $saved_card;
 
             $vaultCards = $this->paypalCommon->getVaultedCardsForCustomer($_SESSION['customer_id'] ?? 0, true);
+            $cardFound = false;
             foreach ($vaultCards as $card) {
                 if ($card['vault_id'] === $saved_card) {
+                    $cardFound = true;
                     $expiryMonth = '';
                     $expiryYear = '';
                     if (!empty($card['expiry']) && preg_match('/^(\d{4})-(\d{2})/', $card['expiry'], $matches) === 1) {
@@ -619,6 +626,16 @@ class paypalr_creditcard extends base
                     ];
                     break;
                 }
+            }
+
+            // If the selected card wasn't found in the vault, show an error
+            if (!$cardFound) {
+                $error_message = MODULE_PAYMENT_PAYPALR_TEXT_SAVED_CARD_NOT_FOUND ?? 'The selected card is no longer available. Please select a different card or enter a new one.';
+                $messageStack->add_session('checkout_payment', $error_message, 'error');
+                if ($is_preconfirmation) {
+                    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
+                }
+                return false;
             }
 
             return true;
@@ -668,7 +685,7 @@ class paypalr_creditcard extends base
         }
 
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
-        $storeCard = $allowSaveCard && !empty($_POST['paypalr_cc_save_card']);
+        $storeCard = $allowSaveCard && (!empty($_POST['paypalr_cc_save_card']) || !empty($_POST['ppr_cc_save_card']));
         if ($storeCard === true) {
             $_SESSION['PayPalRestful']['save_card'] = true;
         } else {
@@ -687,6 +704,8 @@ class paypalr_creditcard extends base
             'store_card' => $storeCard,
         ];
 
+        // Do NOT store card data in session for security/PCI compliance
+        // The card data must be re-entered or re-submitted if POST data is lost
         $_SESSION['PayPalRestful']['saved_card'] = 'new';
 
         return true;
@@ -760,7 +779,25 @@ class paypalr_creditcard extends base
 
     public function process_button()
     {
-        return false;
+        // For non-AJAX checkout, generate hidden fields to forward card data
+        $savedCardSelection = $_POST['paypalr_saved_card'] ?? 'new';
+        $hiddenFields = zen_draw_hidden_field('ppr_saved_card', $savedCardSelection);
+        
+        if ($savedCardSelection === 'new') {
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_owner', $_POST['paypalr_cc_owner'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_month', $_POST['paypalr_cc_expires_month'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_year', $_POST['paypalr_cc_expires_year'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_number', $_POST['paypalr_cc_number'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_cvv', $_POST['paypalr_cc_cvv'] ?? '');
+            if (!empty($_POST['paypalr_cc_save_card'])) {
+                $hiddenFields .= zen_draw_hidden_field('ppr_cc_save_card', $_POST['paypalr_cc_save_card']);
+            }
+            if (!empty($_POST['paypalr_cc_sca_always'])) {
+                $hiddenFields .= zen_draw_hidden_field('ppr_cc_sca_always', $_POST['paypalr_cc_sca_always']);
+            }
+        }
+        
+        return $hiddenFields;
     }
 
     public function process_button_ajax()
