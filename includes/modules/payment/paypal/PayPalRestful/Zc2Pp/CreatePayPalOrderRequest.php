@@ -524,7 +524,16 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // Build expiry field - ensure both month and year are present
         $expiry_month = $cc_info['expiry_month'] ?? '';
         $expiry_year = $cc_info['expiry_year'] ?? '';
-        
+
+        // If the payment module didn't forward the expiry values (e.g. due to a missing
+        // ccInfo population), fall back to the POSTed checkout fields so the confirmation
+        // page can still build the PayPal request without fatally erroring.
+        if ($expiry_month === '' || $expiry_year === '') {
+            $expiry_month = $_POST['paypalr_cc_expires_month'] ?? ($_POST['ppr_cc_expires_month'] ?? $expiry_month);
+            $expiry_year = $_POST['paypalr_cc_expires_year'] ?? ($_POST['ppr_cc_expires_year'] ?? $expiry_year);
+            $expiry_month = str_pad((string)$expiry_month, 2, '0', STR_PAD_LEFT);
+        }
+
         // Validate expiry data before building the string
         if (empty($expiry_month) || empty($expiry_year)) {
             $this->log->write("ERROR: Missing credit card expiry data");
