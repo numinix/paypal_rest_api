@@ -30,7 +30,7 @@ use PayPalRestful\Zc2Pp\Amount;
 use PayPalRestful\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
 use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
 
-LanguageCompatibility::load();
+LanguageCompatibility::load('paypalr_googlepay');
 
 /**
  * The PayPal Google Pay payment module using PayPal's REST APIs (v2)
