@@ -12,18 +12,18 @@ namespace PayPalRestful\Compatibility;
 
 class Language
 {
-    /** @var bool */
-    protected static $loaded = false;
-    public static function load(): void
+    /** @var array */
+    protected static $loadedModules = [];
+    public static function load(string $moduleCode = 'paypalr'): void
     {
-        if (self::$loaded === true) {
+        if (isset(self::$loadedModules[$moduleCode])) {
             return;
         }
-        self::$loaded = true;
+        self::$loadedModules[$moduleCode] = true;
 
         $language = self::determineLanguage();
         foreach (self::getLanguageDirectories($language) as $languageBase) {
-            self::includeLanguageFiles($languageBase);
+            self::includeLanguageFiles($languageBase, $moduleCode);
         }
     }
 
@@ -54,11 +54,11 @@ class Language
         return array_values(array_unique($directories));
     }
 
-    protected static function includeLanguageFiles(string $languageBase): void
+    protected static function includeLanguageFiles(string $languageBase, string $moduleCode): void
     {
         $moduleDirectory = $languageBase . 'modules/payment/';
         if (is_dir($moduleDirectory)) {
-            foreach (self::getModuleLanguagePaths($moduleDirectory) as $moduleFile) {
+            foreach (self::getModuleLanguagePaths($moduleDirectory, $moduleCode) as $moduleFile) {
                 self::includeAndDefine($moduleFile);
             }
         }
@@ -71,14 +71,23 @@ class Language
         }
     }
 
-    protected static function getModuleLanguagePaths(string $directory): array
+    protected static function getModuleLanguagePaths(string $directory, string $moduleCode): array
     {
         $paths = [];
         $templateDirectory = self::getTemplateOverrideDirectory();
-        if ($templateDirectory !== null) {
-            $paths[] = $directory . $templateDirectory . '/lang.paypalr.php';
+
+        $filenames = [
+            "lang.$moduleCode.php",
+            'lang.paypalr_shared.php',
+            'lang.paypalr.php',
+        ];
+
+        foreach ($filenames as $filename) {
+            if ($templateDirectory !== null) {
+                $paths[] = $directory . $templateDirectory . '/' . $filename;
+            }
+            $paths[] = $directory . $filename;
         }
-        $paths[] = $directory . 'lang.paypalr.php';
 
         return array_filter($paths, static function ($file) {
             return is_file($file);

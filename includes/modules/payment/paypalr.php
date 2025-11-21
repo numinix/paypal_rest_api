@@ -31,7 +31,7 @@ use PayPalRestful\Zc2Pp\Amount;
 use PayPalRestful\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
 use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
 
-LanguageCompatibility::load();
+LanguageCompatibility::load('paypalr');
 
 /**
  * The PayPal payment module using PayPal's REST APIs (v2)

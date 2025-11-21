@@ -584,14 +584,22 @@ class PayPalCommon {
     public function processCreditCardPayment(PayPalRestfulApi $ppr, Logger $log, string $transaction_mode, string $ppr_type)
     {
         $paypal_order_id = $_SESSION['PayPalRestful']['Order']['id'] ?? '';
-        
+
         if (empty($paypal_order_id)) {
             $log->write('Credit Card: No PayPal order ID found in session');
             return false;
         }
 
+        $order_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
+        $captures = $_SESSION['PayPalRestful']['Order']['purchase_units'][0]['payments']['captures'] ?? [];
+
+        if ($order_status === PayPalRestfulApi::STATUS_COMPLETED && $captures !== []) {
+            $log->write('Credit Card: capture skipped; order was already completed during createOrder.');
+            return $_SESSION['PayPalRestful']['Order'];
+        }
+
         // Determine if we should capture or authorize based on transaction mode
-        $should_capture = ($transaction_mode === 'Final Sale' || 
+        $should_capture = ($transaction_mode === 'Final Sale' ||
                           ($ppr_type !== 'card' && $transaction_mode === 'Auth Only (Card-Only)'));
 
         if ($should_capture) {
