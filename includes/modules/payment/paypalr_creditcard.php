@@ -597,8 +597,14 @@ class paypalr_creditcard extends base
             !isset($_POST['paypalr_cc_owner']) && !isset($_POST['ppr_cc_owner']) && 
             !isset($_POST['paypalr_saved_card']) && !isset($_POST['ppr_saved_card']) &&
             isset($_SESSION['PayPalRestful']['ccInfo'])) {
-            $this->ccInfo = $_SESSION['PayPalRestful']['ccInfo'];
-            return true;
+            // Validate that session data contains required fields
+            $sessionInfo = $_SESSION['PayPalRestful']['ccInfo'];
+            if (isset($sessionInfo['expiry_month']) && isset($sessionInfo['expiry_year']) && 
+                !empty($sessionInfo['expiry_month']) && !empty($sessionInfo['expiry_year'])) {
+                $this->ccInfo = $sessionInfo;
+                return true;
+            }
+            // If session data is incomplete, fall through to normal validation
         }
 
         $saved_card = $_POST['paypalr_saved_card'] ?? ($_POST['ppr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
