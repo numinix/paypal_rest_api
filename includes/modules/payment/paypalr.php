@@ -526,7 +526,7 @@ class paypalr extends base
                         "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
                             (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
                          VALUES
-                            ('Enable PayPal Vault?', 'MODULE_PAYMENT_PAYPALR_ENABLE_VAULT', 'False', 'Choose <var>True</var> to allow customers to save credit cards for future checkouts using PayPal Vault. This capability requires your PayPal <em>Advanced Credit and Debit Cards</em> integration to have the <em>Store customer payment methods</em> feature enabled for the associated REST API credentials. When disabled, saved card options will not be displayed. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now())"
+                            ('Enable PayPal Vault?', 'MODULE_PAYMENT_PAYPALR_ENABLE_VAULT', 'False', 'Choose <var>True</var> to allow customers to save payment methods for future checkouts using PayPal Vault. This capability requires your PayPal <em>Advanced Credit and Debit Cards</em> integration to have the <em>Store customer payment methods</em> feature enabled for the associated REST API credentials. When disabled, saved payment method options will not be displayed. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now())"
                     );
 
                 case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.4', '<'): //- Fall through from above
@@ -2623,7 +2623,7 @@ class paypalr extends base
 
                 ('Fall-back Currency', 'MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK', 'USD', 'If the <b>Transaction Currency</b> is set to <em>Selected Currency</em>, what currency should be used as a fall-back when the customer\'s selected currency is not supported by PayPal?<br><b>Default: USD</b>', 6, 0, 'zen_cfg_select_option([\'USD\', \'GBP\'], ', NULL, now()),
 
-                ('Enable PayPal Vault?', 'MODULE_PAYMENT_PAYPALR_ENABLE_VAULT', 'False', 'Choose <var>True</var> to allow customers to save credit cards for future checkouts using PayPal Vault. This capability requires your PayPal <em>Advanced Credit and Debit Cards</em> integration to have the <em>Store customer payment methods</em> feature enabled for the associated REST API credentials. When disabled, saved card options will not be displayed. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now()),
+                ('Enable PayPal Vault?', 'MODULE_PAYMENT_PAYPALR_ENABLE_VAULT', 'False', 'Choose <var>True</var> to allow customers to save payment methods for future checkouts using PayPal Vault. This capability requires your PayPal <em>Advanced Credit and Debit Cards</em> integration to have the <em>Store customer payment methods</em> feature enabled for the associated REST API credentials. When disabled, saved payment method options will not be displayed. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now()),
 
                 ('List <var>handling-fee</var> Order-Totals', 'MODULE_PAYMENT_PAYPALR_HANDLING_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_loworderfee</code> &mdash; that add a <em>handling-fee</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
