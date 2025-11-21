@@ -32,8 +32,11 @@ class Helpers
         return $difference;
     }
 
-    public static function convertPayPalDatePay2Db(string $paypal_date): string
+    public static function convertPayPalDatePay2Db(?string $paypal_date): ?string
     {
+        if ($paypal_date === null || $paypal_date === '') {
+            return null;
+        }
         if (!function_exists('convertToLocalTimeZone')) {
             return self::convertToLocalTimeZone(trim(preg_replace('/[^0-9-:]/', ' ', $paypal_date)));
         } else {
