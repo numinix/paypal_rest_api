@@ -63,7 +63,7 @@ class paypalr extends base
         return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.3';
+    protected const CURRENT_VERSION = '1.3.4';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -535,6 +535,15 @@ class paypalr extends base
                     $db->Execute(
                         "DELETE FROM " . TABLE_CONFIGURATION . "
                           WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS'
+                          LIMIT 1"
+                    );
+                    
+                    // Update the ENABLE_VAULT configuration description to reflect that it saves
+                    // payment methods (not just credit cards) for future checkouts
+                    $db->Execute(
+                        "UPDATE " . TABLE_CONFIGURATION . "
+                            SET configuration_description = 'Choose <var>True</var> to allow customers to save payment methods for future checkouts using PayPal Vault. This capability requires your PayPal <em>Advanced Credit and Debit Cards</em> integration to have the <em>Store customer payment methods</em> feature enabled for the associated REST API credentials. When disabled, saved payment method options will not be displayed. <b>Default</b>: <var>False</var>'
+                          WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_ENABLE_VAULT'
                           LIMIT 1"
                     );
 
