@@ -524,21 +524,40 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // Build expiry field - ensure both month and year are present
         $expiry_month = $cc_info['expiry_month'] ?? '';
         $expiry_year = $cc_info['expiry_year'] ?? '';
-        
+
+        // If the payment module didn't forward the expiry values (e.g. due to a missing
+        // ccInfo population), fall back to the POSTed checkout fields so the confirmation
+        // page can still build the PayPal request without fatally erroring.
+        if ($expiry_month === '' || $expiry_year === '') {
+            $expiry_month = $_POST['paypalr_cc_expires_month'] ?? ($_POST['ppr_cc_expires_month'] ?? $expiry_month);
+            $expiry_year = $_POST['paypalr_cc_expires_year'] ?? ($_POST['ppr_cc_expires_year'] ?? $expiry_year);
+            $expiry_month = str_pad((string)$expiry_month, 2, '0', STR_PAD_LEFT);
+        }
+
         // Validate expiry data before building the string
         if (empty($expiry_month) || empty($expiry_year)) {
             $this->log->write("ERROR: Missing credit card expiry data");
             throw new \Exception('Credit card expiry information is required');
         }
         
-        // Validate other required fields
+        // Validate other required fields (with POST fallbacks for confirmation page)
+        if (empty($cc_info['name'])) {
+            $cc_info['name'] = $_POST['paypalr_cc_owner'] ?? ($_POST['ppr_cc_owner'] ?? '');
+        }
         if (empty($cc_info['name'])) {
             $this->log->write("ERROR: Missing card holder name");
             throw new \Exception('Card holder name is required');
         }
         if (empty($cc_info['number'])) {
+            $posted_number = $_POST['paypalr_cc_number'] ?? ($_POST['ppr_cc_number'] ?? '');
+            $cc_info['number'] = preg_replace('/[^0-9]/', '', $posted_number);
+        }
+        if (empty($cc_info['number'])) {
             $this->log->write("ERROR: Missing card number");
             throw new \Exception('Card number is required');
+        }
+        if (empty($cc_info['security_code'])) {
+            $cc_info['security_code'] = $_POST['paypalr_cc_cvv'] ?? ($_POST['ppr_cc_cvv'] ?? '');
         }
         if (empty($cc_info['security_code'])) {
             $this->log->write("ERROR: Missing card security code");
