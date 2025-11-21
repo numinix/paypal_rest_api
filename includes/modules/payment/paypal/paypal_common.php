@@ -591,11 +591,19 @@ class PayPalCommon {
         }
 
         $order_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
-        $captures = $_SESSION['PayPalRestful']['Order']['purchase_units'][0]['payments']['captures'] ?? [];
+        // Check for captures in the correct location - they're stored in the 'current' subkey
+        $captures = $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['captures'] ?? [];
 
         if ($order_status === PayPalRestfulApi::STATUS_COMPLETED && $captures !== []) {
             $log->write('Credit Card: capture skipped; order was already completed during createOrder.');
-            return $_SESSION['PayPalRestful']['Order'];
+            // Fetch the full order details from PayPal since we need the complete response structure
+            // with all fields that the calling code expects
+            $response = $ppr->getOrderStatus($paypal_order_id);
+            if ($response === false) {
+                $log->write('Credit Card: failed to fetch completed order details. ' . Logger::logJSON($ppr->getErrorInfo()));
+                return false;
+            }
+            return $response;
         }
 
         // Determine if we should capture or authorize based on transaction mode
