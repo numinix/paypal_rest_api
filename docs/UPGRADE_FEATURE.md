@@ -89,7 +89,11 @@ Each module must:
 
 ## Version History
 
-### 1.3.3 (Current)
+### 1.3.4 (Current)
+- Updated PayPal Vault configuration description via upgrade action
+- Removed legacy ACCEPT_CARDS configuration (credit card module is now separate)
+
+### 1.3.3
 - Added upgrade button functionality
 - Implemented version tracking for wallet modules
 - Enhanced `tableCheckup()` for incremental upgrades
