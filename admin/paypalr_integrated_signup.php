@@ -37,10 +37,29 @@ $action = strtolower(trim((string)($_GET['action'] ?? 'start')));
 
 switch ($action) {
     case 'return':
-        paypalr_onboarding_message(
-            MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_RETURN_MESSAGE ?? 'PayPal onboarding completed. Review and store the credentials that were provided on the Numinix portal.',
-            'success'
-        );
+        // Check if credentials were passed back from the onboarding process
+        $client_id = trim((string)($_GET['client_id'] ?? ''));
+        $client_secret = trim((string)($_GET['client_secret'] ?? ''));
+        $environment = paypalr_detect_environment();
+        
+        $credentials_saved = false;
+        if ($client_id !== '' && $client_secret !== '') {
+            // Save the credentials to the configuration
+            $credentials_saved = paypalr_save_credentials($client_id, $client_secret, $environment);
+        }
+        
+        if ($credentials_saved) {
+            paypalr_onboarding_message(
+                MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_SUCCESS_AUTO ?? 'PayPal onboarding completed successfully! Your API credentials have been automatically configured.',
+                'success'
+            );
+        } else {
+            // Credentials weren't passed or couldn't be saved - show manual instructions
+            paypalr_onboarding_message(
+                MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_RETURN_MESSAGE ?? 'PayPal onboarding completed. Please check your PayPal account to retrieve and enter your Client ID and Secret in the configuration below.',
+                'success'
+            );
+        }
         paypalr_redirect_to_modules();
         break;
 
@@ -288,4 +307,56 @@ function paypalr_self_url(array $params = []): string
     }
 
     return $url;
+}
+
+/**
+ * Saves PayPal API credentials to the configuration database.
+ *
+ * @param string $client_id The PayPal Client ID
+ * @param string $client_secret The PayPal Client Secret
+ * @param string $environment Either 'live' or 'sandbox'
+ * @return bool True if credentials were saved successfully, false otherwise
+ */
+function paypalr_save_credentials(string $client_id, string $client_secret, string $environment): bool
+{
+    global $db;
+    
+    if ($client_id === '' || $client_secret === '') {
+        return false;
+    }
+    
+    // Determine which configuration keys to update based on environment
+    if ($environment === 'live') {
+        $client_id_key = 'MODULE_PAYMENT_PAYPALR_CLIENTID_L';
+        $client_secret_key = 'MODULE_PAYMENT_PAYPALR_SECRET_L';
+    } else {
+        $client_id_key = 'MODULE_PAYMENT_PAYPALR_CLIENTID_S';
+        $client_secret_key = 'MODULE_PAYMENT_PAYPALR_SECRET_S';
+    }
+    
+    try {
+        // Update Client ID
+        $db->Execute(
+            "UPDATE " . TABLE_CONFIGURATION . "
+                SET configuration_value = '" . zen_db_input($client_id) . "',
+                    last_modified = now()
+              WHERE configuration_key = '" . zen_db_input($client_id_key) . "'
+              LIMIT 1"
+        );
+        
+        // Update Client Secret
+        $db->Execute(
+            "UPDATE " . TABLE_CONFIGURATION . "
+                SET configuration_value = '" . zen_db_input($client_secret) . "',
+                    last_modified = now()
+              WHERE configuration_key = '" . zen_db_input($client_secret_key) . "'
+              LIMIT 1"
+        );
+        
+        return true;
+    } catch (Exception $e) {
+        // Log error but don't expose details to user
+        trigger_error('Failed to save PayPal credentials: ' . $e->getMessage(), E_USER_WARNING);
+        return false;
+    }
 }

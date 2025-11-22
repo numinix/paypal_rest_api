@@ -12,6 +12,18 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_TEXT_TYPE' => 'PayPal Advanced Checkout',
 
     // -----
+    // Admin Integrated Sign-Up (ISU) messages
+    //
+    'MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON' => 'Complete PayPal Setup',
+    'MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_HEADING' => 'PayPal Account Setup',
+    'MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_INTRO' => '<p>To accept payments with PayPal Advanced Checkout, you need to connect your PayPal account and obtain API credentials.</p><p>Click the button below to begin the secure onboarding process through Numinix.com. This will guide you through connecting your PayPal account and automatically configure the necessary credentials.</p>',
+    'MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_MANUAL_FALLBACK' => '<p><strong>Alternative:</strong> If you prefer to obtain credentials manually or if the onboarding process fails, you can:</p><ol><li>Log in to your <a href="https://www.paypal.com/" target="_blank">PayPal account</a></li><li>Navigate to <strong>Apps &amp; Credentials</strong></li><li>Create REST API credentials or retrieve existing ones</li><li>Copy the Client ID and Secret and paste them into the configuration fields below</li></ol>',
+    'MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_SUCCESS_AUTO' => 'PayPal onboarding completed successfully! Your API credentials have been automatically configured. The module is now ready to accept payments.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_RETURN_MESSAGE' => 'PayPal onboarding completed. Please check your PayPal account to retrieve and enter your Client ID and Secret in the configuration below.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_CANCEL_MESSAGE' => 'PayPal onboarding was cancelled. You can restart the process at any time by clicking the "Complete PayPal Setup" button, or enter your credentials manually using the instructions above.',
+    'MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_ERROR_MESSAGE' => 'Unable to launch the PayPal onboarding process. Please verify your store URL and try again, or enter your credentials manually using the instructions above.',
+
+    // -----
     // Configuration-related errors displayed during the payment module's admin configuration.
     //
     'MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL' => 'CURL not installed, cannot use.',
