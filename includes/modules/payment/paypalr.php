@@ -457,7 +457,13 @@ class paypalr extends base
     protected function getIsuButton(): string
     {
         // Determine current environment and check if credentials are populated
-        $environment = MODULE_PAYMENT_PAYPALR_SERVER ?? 'live';
+        $environment = 'live';
+        if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
+            $value = strtolower((string)MODULE_PAYMENT_PAYPALR_SERVER);
+            if ($value === 'sandbox') {
+                $environment = 'sandbox';
+            }
+        }
         
         if ($environment === 'live') {
             $client_id = trim(MODULE_PAYMENT_PAYPALR_CLIENTID_L ?? '');

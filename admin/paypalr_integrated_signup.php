@@ -38,6 +38,9 @@ $action = strtolower(trim((string)($_GET['action'] ?? 'start')));
 switch ($action) {
     case 'return':
         // Check if credentials were passed back from the onboarding process
+        // Note: Credentials are passed via GET parameters by the Numinix.com portal.
+        // This is the established ISU flow. The credentials are transmitted once over HTTPS
+        // and immediately saved to the database, minimizing exposure time.
         $client_id = trim((string)($_GET['client_id'] ?? ''));
         $client_secret = trim((string)($_GET['client_secret'] ?? ''));
         $environment = paypalr_detect_environment();
@@ -324,6 +327,10 @@ function paypalr_save_credentials(string $client_id, string $client_secret, stri
     if ($client_id === '' || $client_secret === '') {
         return false;
     }
+    
+    // Sanitize inputs to prevent any potential SQL injection
+    $client_id = zen_db_input($client_id);
+    $client_secret = zen_db_input($client_secret);
     
     // Determine which configuration keys to update based on environment
     if ($environment === 'live') {
