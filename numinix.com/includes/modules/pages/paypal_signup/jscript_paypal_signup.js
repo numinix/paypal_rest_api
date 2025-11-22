@@ -1,0 +1,677 @@
+(function (window, document) {
+    'use strict';
+
+    function ready(callback) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', callback, { once: true });
+        } else {
+            callback();
+        }
+    }
+
+    function prefersReducedMotion() {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function smoothScrollTo(target) {
+        if (!target) {
+            return;
+        }
+
+        var behavior = prefersReducedMotion() ? 'auto' : 'smooth';
+        try {
+            target.scrollIntoView({ behavior: behavior, block: 'start' });
+        } catch (error) {
+            target.scrollIntoView(true);
+        }
+    }
+
+    function emitAnalytics(eventName, payload) {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push(Object.assign({ event: eventName }, payload || {}));
+    }
+
+    ready(function () {
+        var page = document.querySelector('.nxp-ps-page');
+        if (!page) {
+            return;
+        }
+
+        emitAnalytics('view_item', {
+            item_id: 'paypal_signup',
+            item_name: 'PayPal Setup for Zen Cart',
+            page_location: window.location.href
+        });
+
+        emitAnalytics('heatmap_enable', {
+            page: 'paypal_signup',
+            retention_days: 14
+        });
+
+        var stickyHeader = document.querySelector('.nxp-ps-header');
+        function updateHeaderState() {
+            if (!stickyHeader) {
+                return;
+            }
+            var threshold = window.scrollY || window.pageYOffset || 0;
+            if (threshold > 32) {
+                stickyHeader.classList.add('is-condensed');
+            } else {
+                stickyHeader.classList.remove('is-condensed');
+            }
+        }
+        window.addEventListener('scroll', updateHeaderState, { passive: true });
+        updateHeaderState();
+
+        document.querySelectorAll('[data-scroll-target]').forEach(function (trigger) {
+            trigger.addEventListener('click', function (event) {
+                var selector = trigger.getAttribute('data-scroll-target');
+                if (!selector) {
+                    return;
+                }
+                var target = document.querySelector(selector);
+                if (!target) {
+                    return;
+                }
+                event.preventDefault();
+                smoothScrollTo(target);
+            });
+        });
+
+        if (window.location.hash) {
+            try {
+                var hashTarget = document.querySelector(window.location.hash);
+                if (hashTarget) {
+                    window.setTimeout(function () {
+                        smoothScrollTo(hashTarget);
+                    }, 0);
+                }
+            } catch (error) {
+                // Ignore invalid selectors from hash
+            }
+        }
+
+        var urlParams;
+        try {
+            urlParams = new URLSearchParams(window.location.search);
+        } catch (error) {
+            urlParams = null;
+        }
+        if (urlParams) {
+            var variantKey = urlParams.get('v');
+            var variants = {
+                alt: {
+                    headline: 'Fast, Compliant PayPal Setup for Zen Cart Stores.',
+                    subhead: 'Reduce disputes, launch faster, and sync PayPal with Zen Cart without the guesswork.',
+                    'primary-cta': 'Get My Setup Plan'
+                }
+            };
+            if (variantKey && variants[variantKey]) {
+                var variant = variants[variantKey];
+                Object.keys(variant).forEach(function (key) {
+                    var node = document.querySelector('[data-variant="' + key + '"]');
+                    if (node) {
+                        node.textContent = variant[key];
+                    }
+                    if (key === 'primary-cta') {
+                        var stickyCta = document.querySelector('.nxp-ps-header [data-scroll-target]');
+                        if (stickyCta) {
+                            stickyCta.textContent = variant[key];
+                        }
+                    }
+                });
+            }
+        }
+
+        document.querySelectorAll('[data-analytics-id]').forEach(function (element) {
+            element.addEventListener('click', function () {
+                var id = element.getAttribute('data-analytics-id');
+                emitAnalytics('cta_click', {
+                    id: id,
+                    cta_text: (element.textContent || '').trim(),
+                    page_location: window.location.href
+                });
+            });
+        });
+
+        var toggleButtons = document.querySelectorAll('.nxp-ps-toggle__button');
+        var comparisonPanels = document.querySelectorAll('.nxp-ps-comparison__panel');
+        function activateComparison(view) {
+            toggleButtons.forEach(function (button) {
+                var isActive = button.getAttribute('data-view') === view;
+                button.classList.toggle('is-active', isActive);
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+            comparisonPanels.forEach(function (panel) {
+                var show = panel.getAttribute('data-view') === view;
+                panel.classList.toggle('is-active', show);
+                panel.setAttribute('aria-hidden', show ? 'false' : 'true');
+            });
+        }
+        toggleButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                activateComparison(button.getAttribute('data-view'));
+            });
+        });
+        activateComparison('numinix');
+
+        document.querySelectorAll('[data-component="cases-carousel"], [data-component="carousel"]').forEach(function (carousel) {
+            var viewportSelector = carousel.getAttribute('data-carousel-viewport') || '.nxp-ps-cases__viewport';
+            var trackSelector = carousel.getAttribute('data-carousel-track') || '.nxp-ps-cases__track';
+            var controlSelector = carousel.getAttribute('data-carousel-control') || '.nxp-ps-cases__control';
+
+            var viewport = viewportSelector ? carousel.querySelector(viewportSelector) : null;
+            var track = trackSelector ? carousel.querySelector(trackSelector) : null;
+            if (!viewport || !track) {
+                return;
+            }
+
+            var controls = controlSelector
+                ? Array.prototype.slice.call(carousel.querySelectorAll(controlSelector))
+                : [];
+            var items = Array.prototype.slice.call(track.children);
+
+            function parseGap() {
+                var style = window.getComputedStyle(track);
+                var gapValue = style.columnGap || style.gap || '0';
+                var parsed = parseFloat(gapValue);
+                return Number.isNaN(parsed) ? 0 : parsed;
+            }
+
+            function getScrollAmount() {
+                var firstItem = items[0];
+                if (!firstItem) {
+                    return viewport.clientWidth;
+                }
+                return firstItem.getBoundingClientRect().width + parseGap();
+            }
+
+            function updateControls() {
+                var maxScroll = Math.max(track.scrollWidth - viewport.clientWidth, 0);
+                var position = viewport.scrollLeft;
+                controls.forEach(function (control) {
+                    if (!control) {
+                        return;
+                    }
+                    var direction = control.getAttribute('data-direction');
+                    if (direction === 'prev') {
+                        control.disabled = position <= 4;
+                    } else if (direction === 'next') {
+                        control.disabled = position >= (maxScroll - 4);
+                    }
+                });
+            }
+
+            controls.forEach(function (control) {
+                if (!control) {
+                    return;
+                }
+                control.addEventListener('click', function () {
+                    var direction = control.getAttribute('data-direction') === 'prev' ? -1 : 1;
+                    var distance = getScrollAmount() * direction;
+                    viewport.scrollBy({
+                        left: distance,
+                        behavior: prefersReducedMotion() ? 'auto' : 'smooth'
+                    });
+                    scheduleUpdate();
+                });
+            });
+
+            var scrollHandlerId = null;
+            function scheduleUpdate() {
+                if (scrollHandlerId) {
+                    window.cancelAnimationFrame(scrollHandlerId);
+                }
+                scrollHandlerId = window.requestAnimationFrame(updateControls);
+            }
+
+            viewport.addEventListener('scroll', scheduleUpdate, { passive: true });
+            window.addEventListener('resize', scheduleUpdate);
+            updateControls();
+        });
+
+        document.querySelectorAll('.nxp-ps-accordion__trigger').forEach(function (trigger) {
+            trigger.addEventListener('click', function () {
+                var expanded = trigger.getAttribute('aria-expanded') === 'true';
+                var panelId = trigger.getAttribute('aria-controls');
+                var panel = panelId ? document.getElementById(panelId) : null;
+                if (!panel) {
+                    return;
+                }
+                trigger.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                if (expanded) {
+                    panel.hidden = true;
+                } else {
+                    panel.hidden = false;
+                }
+            });
+        });
+
+        var onboardingRoot = document.querySelector('[data-component="onboarding"]');
+        if (!onboardingRoot) {
+            return;
+        }
+
+        var actionUrl = page.getAttribute('data-action-url') || window.location.href;
+        var sessionNode = document.getElementById('nxp-paypal-session');
+        var initialSession = {};
+        if (sessionNode && sessionNode.textContent) {
+            try {
+                initialSession = JSON.parse(sessionNode.textContent);
+            } catch (error) {
+                initialSession = {};
+            }
+        }
+
+        if (!initialSession || typeof initialSession !== 'object') {
+            initialSession = {};
+        }
+
+        var sessionDefaults = {
+            env: 'sandbox',
+            nonce: '',
+            tracking_id: '',
+            step: 'start',
+            code: ''
+        };
+
+        var session = Object.assign({}, sessionDefaults, initialSession);
+
+        var state = {
+            session: session,
+            loading: false,
+            popup: null,
+            popupMonitor: null,
+            pollTimer: null,
+            pollInterval: 4000
+        };
+
+        var startButtons = document.querySelectorAll('[data-onboarding-start]');
+        var statusNode = onboardingRoot.querySelector('[data-onboarding-status]');
+
+        function disableStartButtons(disabled) {
+            startButtons.forEach(function (button) {
+                if (button instanceof HTMLButtonElement) {
+                    button.disabled = disabled;
+                } else if (button instanceof HTMLAnchorElement) {
+                    if (disabled) {
+                        button.classList.add('is-disabled');
+                        button.setAttribute('aria-disabled', 'true');
+                    } else {
+                        button.classList.remove('is-disabled');
+                        button.removeAttribute('aria-disabled');
+                    }
+                }
+            });
+        }
+
+        function setStatus(text, tone) {
+            if (!statusNode) {
+                return;
+            }
+            statusNode.textContent = text || '';
+            if (tone) {
+                statusNode.setAttribute('data-tone', tone);
+            } else {
+                statusNode.removeAttribute('data-tone');
+            }
+        }
+
+        function postAction(action, extra) {
+            var payload = new URLSearchParams();
+            payload.append('nxp_paypal_action', action);
+            payload.append('nonce', state.session.nonce || '');
+            if (extra && typeof extra === 'object') {
+                Object.keys(extra).forEach(function (key) {
+                    var value = extra[key];
+                    if (value === undefined || value === null || value === '') {
+                        return;
+                    }
+                    payload.append(key, value);
+                });
+            }
+
+            return fetch(actionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: payload.toString(),
+                credentials: 'same-origin'
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('Network error');
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (!data || typeof data !== 'object') {
+                        throw new Error('Invalid response from server.');
+                    }
+                    if (!data.success) {
+                        throw new Error(data.message || 'Unable to complete the request.');
+                    }
+                    return data;
+                });
+        }
+
+        function sendTelemetry(event, context) {
+            var payload = new URLSearchParams();
+            payload.append('nxp_paypal_action', 'telemetry');
+            payload.append('nonce', state.session.nonce || '');
+            payload.append('event', event);
+            if (context && typeof context === 'object') {
+                try {
+                    payload.append('context', JSON.stringify(context));
+                } catch (error) {
+                    // Ignore serialization errors.
+                }
+            }
+
+            fetch(actionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: payload.toString(),
+                credentials: 'same-origin'
+            }).catch(function () {
+                // Telemetry failures should not surface to the UI.
+            });
+        }
+
+        function formatEnvironment(value) {
+            var normalized = String(value || '').toLowerCase();
+            if (normalized === 'live') {
+                return 'Live';
+            }
+            if (normalized === 'sandbox') {
+                return 'Sandbox';
+            }
+            return value || '';
+        }
+
+        function cleanUrl() {
+            if (!window.history || !window.history.replaceState) {
+                return;
+            }
+            try {
+                var url = new URL(window.location.href);
+                ['code', 'step', 'tracking_id'].forEach(function (key) {
+                    url.searchParams.delete(key);
+                });
+                window.history.replaceState({}, document.title, url.toString());
+            } catch (error) {
+                // Ignore malformed URLs.
+            }
+        }
+
+        var completionSteps = ['finalized', 'completed', 'ready', 'active', 'linked'];
+
+        function isCompletedStep(step) {
+            var normalized = String(step || '').toLowerCase();
+            return completionSteps.indexOf(normalized) !== -1;
+        }
+
+        function openOnboardingWindow(url) {
+            if (!url) {
+                setStatus('PayPal did not return a signup link. Please try again.', 'error');
+                disableStartButtons(false);
+                return;
+            }
+
+            var width = 960;
+            var height = 720;
+            var left = window.screenX + Math.max((window.outerWidth - width) / 2, 0);
+            var top = window.screenY + Math.max((window.outerHeight - height) / 2, 0);
+            var features = [
+                'width=' + width,
+                'height=' + height,
+                'left=' + left,
+                'top=' + top,
+                'resizable=yes',
+                'scrollbars=yes'
+            ].join(',');
+
+            state.popup = window.open(url, 'paypalOnboarding', features);
+
+            if (!state.popup || state.popup.closed) {
+                setStatus('Allow popups for this site to continue with PayPal onboarding.', 'error');
+                sendTelemetry('popup_blocked', {
+                    tracking_id: state.session.tracking_id || undefined
+                });
+                disableStartButtons(false);
+                return;
+            }
+
+            try {
+                state.popup.focus();
+            } catch (error) {
+                // Ignore focus errors.
+            }
+
+            sendTelemetry('popup_opened', {
+                tracking_id: state.session.tracking_id || undefined,
+                method: 'window.open'
+            });
+
+            if (state.popupMonitor) {
+                window.clearInterval(state.popupMonitor);
+            }
+            state.popupMonitor = window.setInterval(function () {
+                if (!state.popup || state.popup.closed) {
+                    window.clearInterval(state.popupMonitor);
+                    state.popupMonitor = null;
+                    state.popup = null;
+                    if (state.session.step === 'waiting') {
+                        setStatus('The PayPal window closed before finishing. Start PayPal Signup again when you are ready.', 'error');
+                        sendTelemetry('cancelled', {
+                            tracking_id: state.session.tracking_id || undefined,
+                            reason: 'popup_closed'
+                        });
+                        disableStartButtons(false);
+                    }
+                }
+            }, 1000);
+
+            setStatus('Follow the steps in the PayPal window to finish connecting your account.', 'info');
+        }
+
+        function handleFinalizeResponse(data) {
+            if (data.environment) {
+                state.session.env = data.environment;
+            }
+            if (data.step) {
+                state.session.step = data.step;
+            }
+            if (typeof data.polling_interval === 'number' && !Number.isNaN(data.polling_interval)) {
+                state.pollInterval = Math.max(data.polling_interval, 2000);
+            }
+
+            if (isCompletedStep(state.session.step)) {
+                setStatus('PayPal account connected. You\'re all set.', 'success');
+                disableStartButtons(false);
+                cleanUrl();
+                return;
+            }
+
+            setStatus('Processing your PayPal account details…', 'info');
+            pollStatus(state.pollInterval);
+        }
+
+        function handleStatusResponse(data) {
+            if (data.environment) {
+                state.session.env = data.environment;
+            }
+            if (data.step) {
+                state.session.step = data.step;
+            }
+            if (typeof data.polling_interval === 'number' && !Number.isNaN(data.polling_interval)) {
+                state.pollInterval = Math.max(data.polling_interval, 2000);
+            }
+
+            if (isCompletedStep(state.session.step)) {
+                setStatus('PayPal account connected. You\'re all set.', 'success');
+                disableStartButtons(false);
+                cleanUrl();
+                if (state.pollTimer) {
+                    window.clearTimeout(state.pollTimer);
+                    state.pollTimer = null;
+                }
+                return;
+            }
+
+            setStatus('Still waiting on PayPal…', 'info');
+            pollStatus(state.pollInterval);
+        }
+
+        function pollStatus(delay) {
+            if (state.pollTimer) {
+                window.clearTimeout(state.pollTimer);
+            }
+            var wait = Math.max(delay || state.pollInterval, 2000);
+            state.pollTimer = window.setTimeout(function () {
+                postAction('status', {
+                    tracking_id: state.session.tracking_id || ''
+                })
+                    .then(function (response) {
+                        handleStatusResponse(response.data || {});
+                        sendTelemetry('status_success', {
+                            tracking_id: state.session.tracking_id || undefined,
+                            step: state.session.step,
+                            polling_interval: state.pollInterval
+                        });
+                    })
+                    .catch(function (error) {
+                        setStatus(error && error.message ? error.message : 'We could not check your PayPal status. Please try again.', 'error');
+                        disableStartButtons(false);
+                        sendTelemetry('status_failed', {
+                            tracking_id: state.session.tracking_id || undefined,
+                            error: error && error.message ? error.message : 'unknown'
+                        });
+                    });
+            }, wait);
+        }
+
+        function startOnboarding(event) {
+            if (event) {
+                event.preventDefault();
+            }
+            if (state.loading) {
+                return;
+            }
+            state.loading = true;
+            disableStartButtons(true);
+            setStatus('Starting secure PayPal signup…', 'info');
+
+            sendTelemetry('start', {
+                tracking_id: state.session.tracking_id || undefined
+            });
+
+            postAction('start')
+                .then(function (response) {
+                    var data = response.data || {};
+                    if (data.tracking_id) {
+                        state.session.tracking_id = data.tracking_id;
+                    }
+                    if (data.step) {
+                        state.session.step = data.step;
+                    }
+                    state.session.code = '';
+
+                    sendTelemetry('start_success', {
+                        tracking_id: state.session.tracking_id || undefined,
+                        redirect_url: data.redirect_url || data.action_url,
+                        step: state.session.step
+                    });
+
+                    var redirectUrl = data.redirect_url || data.action_url || '';
+                    if (!redirectUrl && Array.isArray(data.links)) {
+                        data.links.forEach(function (link) {
+                            if (link && link.rel === 'action_url' && link.href) {
+                                redirectUrl = link.href;
+                            }
+                        });
+                    }
+
+                    state.loading = false;
+                    openOnboardingWindow(redirectUrl);
+                })
+                .catch(function (error) {
+                    state.loading = false;
+                    setStatus(error && error.message ? error.message : 'We could not start the PayPal signup. Please try again.', 'error');
+                    disableStartButtons(false);
+                    sendTelemetry('start_failed', {
+                        tracking_id: state.session.tracking_id || undefined,
+                        error: error && error.message ? error.message : 'unknown'
+                    });
+                });
+        }
+
+        function finalizeOnboarding() {
+            var payload = {};
+            if (state.session.code) {
+                payload.code = state.session.code;
+            }
+            if (state.session.tracking_id) {
+                payload.tracking_id = state.session.tracking_id;
+            }
+
+            if (!payload.code && !payload.tracking_id) {
+                return;
+            }
+
+            postAction('finalize', payload)
+                .then(function (response) {
+                    handleFinalizeResponse(response.data || {});
+                    sendTelemetry('finalize_success', {
+                        tracking_id: state.session.tracking_id || undefined,
+                        step: state.session.step,
+                        polling_interval: state.pollInterval
+                    });
+                })
+                .catch(function (error) {
+                    setStatus(error && error.message ? error.message : 'We could not finalize your PayPal signup. Please try again.', 'error');
+                    disableStartButtons(false);
+                    sendTelemetry('finalize_failed', {
+                        tracking_id: state.session.tracking_id || undefined,
+                        error: error && error.message ? error.message : 'unknown'
+                    });
+                })
+                .finally(function () {
+                    state.session.code = '';
+                });
+        }
+
+        startButtons.forEach(function (button) {
+            button.addEventListener('click', startOnboarding);
+        });
+
+        disableStartButtons(false);
+
+        if (isCompletedStep(state.session.step)) {
+            setStatus('PayPal account connected. You\'re all set.', 'success');
+        } else if (state.session.step && state.session.step !== 'start') {
+            if (state.session.step === 'waiting') {
+                setStatus('Resume your PayPal signup to finish connecting your account.', 'info');
+            } else if (state.session.step === 'cancelled') {
+                setStatus('You left before finishing. Start PayPal Signup to continue.', 'info');
+            } else {
+                setStatus('Start PayPal Signup to continue your onboarding.', 'info');
+            }
+        } else {
+            setStatus('Start PayPal Signup to connect your PayPal account.', 'info');
+        }
+
+        if (state.session.code) {
+            sendTelemetry('returned_from_paypal', {
+                tracking_id: state.session.tracking_id || undefined,
+                method: 'redirect'
+            });
+            finalizeOnboarding();
+        }
+    });
+})(window, document);

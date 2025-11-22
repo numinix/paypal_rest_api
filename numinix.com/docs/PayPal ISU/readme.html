@@ -1,0 +1,545 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width">
+  <title>PayPal Integrated Sign-up (ISU) Implementation Guide</title>
+
+  <!-- FONTS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- FONTS -->
+
+  <link href="css/stylesheet.css" rel="stylesheet" type="text/css" />
+  <link href="css/sh_style.css" rel="stylesheet" type="text/css" />
+  <script type="text/javascript" src="js/jquery-1.6.1.min.js"></script>
+  <script type="text/javascript" src="js/sh_main.min.js"></script>
+  <script type="text/javascript" src="js/sh_html.min.js"></script>
+  <script type="text/javascript" src="js/sh_php.min.js"></script>
+  <script type="text/javascript" src="js/sh_javascript.min.js"></script>
+  <script type="text/javascript" src="js/sh_sql.min.js"></script>
+  <script type="text/javascript" src="js/sh_css.min.js"></script>
+  <script type="text/javascript" src="js/documentation.js"></script>
+  
+  <style>
+    code {
+			font-family: 'Courier New', monospace; 
+			color: #4e4e4e;
+			background-color: #f6f6f6;
+		}
+		
+		code.php {
+			white-space: pre;
+			display: block;
+			overflow: auto;
+			padding: 5px;
+			font-size: 75%;
+      background-color: #002131;
+      border: 0;
+      padding: 15px 21px 15px;
+      margin: 10px 0 20px;
+      -webkit-border-radius: 3px;
+      -moz-border-radius: 3px;
+      border-radius: 8px;
+      color:#fff;
+      border: 1px solid #cccccc;
+		}
+		
+		samp {
+			font-family: 'Courier New', monospace;
+		}
+		
+		p.important_note {
+			border: 2px dotted #b4633b;
+			padding: 1em;
+		}
+  </style>
+</head>
+<body>
+  <!--[if lt IE 8]> <div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative; margin: auto; text-align: center;'> <a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://www.theie6countdown.com/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div> <![endif]--> 
+<div id="wrapper" class="tk-museo-slab">
+  <!--BOF Header-->
+  <div id="headerContainer">
+    <div id="mainMenu" class="headerWrapper">
+
+      <div class="logoWrapper">
+        <a href="https://www.numinix.com/"><img src="images/logo.png" alt="Numinix.com" title="Numinix" id="logo" class="headerLogo" /></a>
+        <span class="nav-icon" id="js-nav-icon">
+          <img src="images/nav-icon.png" alt="nav icon">
+        </span>
+      </div>
+
+    <!--BOF Links-->
+    <div class="contentMenu">
+      <ul>
+        <li><a href="javascript:void(0)" id="btnInstallation" class="btn" title="Installation">Installation</a></li>
+        <li><a href="javascript:void(0)" id="btnInstallationTips" class="btn" title="Configuration &amp; Notes">Configuration</a></li>
+        <li><a href="javascript:void(0)" id="btnUninstall" class="btn" title="Uninstall">Uninstall</a></li>
+        <li><a href="javascript:void(0)" id="btnAbout" class="btn" title="Release Notes">Release Notes</a></li>
+        <li><a href="javascript:void(0)" id="btnLicense" class="btn" title="License">License</a></li>
+        <li><a href="javascript:void(0)" id="btnDisclaimer" class="btn" title="Disclaimer">Disclaimer</a></li>
+        <li><a href="javascript:void(0)" id="btnHelp" class="btn" title="Help">Help</a></li>
+      </ul>
+    </div>
+    <!--EOF Links-->
+
+  </div>
+</div>
+  <div id="headerTitle">
+   <h1 class="clearBoth">PayPal Integrated Sign-up (ISU)</h1>
+   <p>Embedded PayPal onboarding for Zen Cart by <span>Numinix</span></p>
+  </div>
+        <br class="clearBoth" />
+  <!--EOF Header-->
+  <div class="contentWrapper">
+
+    <!--BOF INSTALLATION-->
+      <div class="bodyHeaderContainer" id="Installation" >
+        <div class="bodyWrapper">
+          <div class="numHeader bodyHeader">
+            <span class="bodyHeaderTxt">Installation</span>
+          </div>
+        </div>
+        <br><br>
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Introduction</span>
+          <div class="bodyWrapper">
+            <p>PayPal Integrated Sign-up (ISU) delivers a modern, white-labeled onboarding flow that connects Zen Cart merchants to PayPal Complete Payments without leaving the admin area. The module communicates directly with the PayPal Partner APIs, relays onboarding status to the storefront, and directs merchants to retrieve credentials directly from PayPal once approval is complete.</p>
+            <p>The ISU experience aligns with PayPal brand standards, enforces HTTPS-only callbacks, and guides merchants from initial eligibility checks through go-live readiness. Built on native Zen Cart patterns, it avoids encrypted loaders and keeps all logic transparent for compliance reviews.</p>
+            <p>This document explains how to deploy the onboarding tools, configure environment-specific settings, monitor events, and support merchants as they complete the PayPal activation journey.</p>
+          </div>
+
+          <span class="bodyHeaderTxt">Requirements</span>
+          <div class="bodyWrapper">
+            <p>Before launching PayPal onboarding from your Zen Cart admin, confirm the following prerequisites:</p>
+            <ul>
+              <li>Zen Cart 1.5.7 or newer with the admin auto-installer enabled so configuration groups and menu entries can be registered.</li>
+              <li>PHP 7.4+ or PHP 8.x with <code>curl</code>, <code>openssl</code>, and <code>json</code> extensions active to support secure API calls.</li>
+              <li>HTTPS enabled for the admin area; ISU refuses to run over insecure HTTP when <code>NUMINIX_PPCP_FORCE_SSL</code> is set to <code>true</code> (recommended).</li>
+              <li>Access to PayPal partner credentials (sandbox and live client IDs and secrets) that are issued to your PayPal partner account.</li>
+              <li>Outbound connectivity from the server to PayPal API domains (for example <code>https://api-m.sandbox.paypal.com</code> and <code>https://api-m.paypal.com</code>) so onboarding sessions can be created and polled.</li>
+            </ul>
+          </div>
+        </div>
+
+        <span class="bodyHeaderTxt">Installation</span>
+        <div class="bodyWrapper">
+          <ol>
+          <li>Back up your storefront files and database, paying special attention to the admin configuration tables.</li>
+          <li>Upload the module's files to your Zen Cart installation, preserving the directory structure under <code>includes/</code>, <code>management/</code>, and <code>docs/</code>.</li>
+          <li>Log into the Zen Cart admin to trigger the auto-installer. A success message confirms that the <em>Numinix PayPal Integrated Sign-up</em> configuration group and admin tools were created.</li>
+          <li>Navigate to <em>Admin &gt; Configuration &gt; Numinix PayPal Integrated Sign-up</em> and review each setting before merchants begin onboarding.</li>
+          <li>Populate the sandbox and live partner credentials supplied by PayPal. Save the values directly in the configuration panel so signup links and status checks authenticate correctly.</li>
+          <li>Launch the onboarding wizard from <em>Modules &gt; Payment &gt; PayPal (Complete Payments)</em> or the <em>Tools &gt; PayPal Signup Link Generator</em> page to validate connectivity in sandbox before inviting merchants.</li>
+          </ol>
+
+          <span class="bodyHeaderTxt">Upgrade from manual PayPal onboarding flows</span>
+          <div class="bodyWrapper">
+            <p>Stores migrating from email-based credential exchanges or custom partner flows can adopt ISU with minimal downtime:</p>
+            <ol>
+              <li>Back up your current PayPal credentials and remove any hard-coded keys from templates or configuration overrides.</li>
+              <li>Deploy the latest ISU files and log into the admin so database migrations 1.0.0 through 1.0.2 can run.</li>
+              <li>Confirm that the configuration group displays the environment selector, SSL enforcement toggle, and partner credential fields with accurate values.</li>
+              <li>Update your merchant-facing instructions to direct them to the embedded onboarding button inside the PayPal Restful payment module configuration.</li>
+            </ol>
+            <p>When these steps are complete, you can deprecate any legacy partner forms or manual credential storage processes in favour of the streamlined ISU workflow.</p>
+          </div>
+
+          </div>
+        </div>
+      </div>
+      <!--EOF INSTALLATION-->
+
+      <!--BOF TIPS-->
+      <div class="bodyHeaderContainer" id="InstallationTips">
+          <div class="bodyWrapper">
+          <div class="numHeader bodyHeader">
+            <span class="bodyHeaderTxt">Configuration Overview</span>
+          </div>
+          <br><br>
+          <p>The installer registers a configuration group inside <em>Admin &gt; Configuration &gt; Numinix PayPal Integrated Sign-up</em>. Review these keys whenever the PayPal partner program updates requirements:</p>
+          <ul>
+            <li><strong>Numinix PPCP Environment</strong>: Choose <code>sandbox</code> while testing merchant flows; switch to <code>live</code> when production-ready.</li>
+            <li><strong>Numinix PPCP Force SSL</strong>: Enforces HTTPS-only onboarding requests. Leave enabled unless debugging in a secure staging tunnel.</li>
+            <li><strong>Partner Client IDs and Secrets</strong>: Supply sandbox and live pairs issued by PayPal so the onboarding widget can authenticate against the correct environment.</li>
+            <li><strong>Numinix PayPal ISU Version</strong>: Tracks the installed schema version and should not be edited manually.</li>
+          </ul>
+          <p>Future upgrades adjust descriptions and add new settings automatically while retaining partner credential values.</p>
+          <br><br><br>
+
+          <div class="numHeader bodyHeader">
+            <span class="bodyHeaderTxt">Onboarding session lifecycle</span>
+          </div>
+          <p>The <code>paypal_signup</code> page coordinates each onboarding session and automatically manages state:</p>
+          <ul>
+            <li>Merchants launch the flow by clicking the onboarding button. The module requests a tracking ID from PayPal via the partner-referrals API and stores it in the session.</li>
+            <li>The wizard polls <code>/status</code> until PayPal signals completion or cancellation. Admins can review progress via AJAX responses.</li>
+            <li>When onboarding finishes successfully, PayPal confirms completion through the merchant-integrations API and distributes API credentials directly to the merchant account owner via the PayPal dashboard.</li>
+            <li>Telemetry pings record errors and key events through <code>NOTIFY_NUMINIX_PAYPAL_ISU_EVENT</code>, enabling observers to audit or extend the workflow.</li>
+          </ul>
+          <p>If a merchant closes the window prematurely, they can relaunch the flow and the module will resume with the existing tracking ID when available.</p>
+          <br><br><br>
+
+          <div class="numHeader bodyHeader">
+            <span class="bodyHeaderTxt">Operational Notes</span>
+          </div>
+          <h4>Credential handling</h4>
+          <p>Beginning with v1.0.5 the storefront no longer persists API credentials. PayPal issues secrets directly to the merchant after approval, so no credential payloads are stored in Zen Cart.</p>
+          <h4>API connectivity</h4>
+          <p>Firewalls must permit outbound HTTPS traffic to PayPal partner endpoints such as <code>https://api-m.sandbox.paypal.com</code> and <code>https://api-m.paypal.com</code>. Failures surface in the onboarding modal and are also written to the PayPal ISU log file at <code>logs/numinix_paypal_signup.log</code>.</p>
+          <h4>Extensibility</h4>
+          <p>Listen for <code>NOTIFY_NUMINIX_PAYPAL_ISU_EVENT</code> notifications to add custom analytics, send webhooks, or integrate third-party CRMs when merchants reach specific milestones.</p>
+        </div>
+      </div>
+      <!--BOF UNINSTALL-->
+      <div class="bodyHeaderContainer" id="Uninstall">
+        <div class="bodyWrapper">
+          <div class="numHeader bodyHeader">
+            <span class="bodyHeaderTxt">Uninstall</span>
+          </div>
+          <br><br>
+                    <ol>
+             <li>Review the <code>NUMINIX_PPCP_&lt;ENV&gt;_*</code> partner credential entries and clear them if you no longer require access before removing files.</li>
+            <li>Delete the configuration group entries from <em>Admin &gt; Configuration &gt; Numinix PayPal Integrated Sign-up</em> or run the provided uninstall SQL to drop related keys.</li>
+            <li>Remove the admin menu entries (<code>configNuminixPayPalIsu</code>, <code>customerNuminixPaypalIsuSaveCreds</code>, <code>toolsNuminixPaypalIsuSignupLink</code>) via the Admin Access Management page if they are no longer needed.</li>
+            <li>Delete the module files under <code>includes/modules/pages/paypal_signup/</code>, <code>includes/classes/observers/</code>, and <code>management/</code>.</li>
+          </ol>
+        </div>
+      </div>
+      <!--EOF UNINSTALL-->
+
+    <!--BOF About Us-->
+    <div class="bodyHeaderContainer" id="About">
+      <div class="bodyWrapper">
+        <div class="numHeader bodyHeader">
+          <span class="bodyHeaderTxt">Release Notes</span>
+        </div>
+        <br><br>
+        <h4>Version 1.0.6 – Direct PayPal API onboarding</h4>
+        <p>This release removes the dependency on the hosted proxy and moves storefront flows to PayPal's Partner APIs.</p>
+        <ul>
+          <li>Issues partner referrals directly against PayPal and surfaces the referral identifier to the storefront session.</li>
+          <li>Polls merchant integration status via PayPal endpoints to determine waiting, cancelled, or completed steps.</li>
+          <li>Refreshes deployment, troubleshooting, and FAQ guidance to emphasise PayPal connectivity.</li>
+        </ul>
+        <br>
+        <h4>Version 1.0.5 – Hosted proxy alignment</h4>
+        <p>This release simplifies the ISU footprint for numinix.com by removing storefront credential storage.</p>
+        <ul>
+          <li>Streamlines storefront storage by relying on PayPal for credential distribution.</li>
+          <li>Retires plugin/standalone mode selection and the credential persistence service.</li>
+          <li>Updates storefront UI, telemetry, and documentation to direct merchants to PayPal for credential retrieval.</li>
+        </ul>
+        <br>
+        <h4>Version 1.0.2 – Operational hardening</h4>
+        <p>This maintenance release focuses on reliability ahead of expanded merchant onboarding.</p>
+        <ul>
+          <li>Normalises admin menu entries across Zen Cart versions and honours the optional <code>menu_display</code> column.</li>
+          <li>Updates credential configuration labels and descriptions to clarify sandbox versus live usage.</li>
+          <li>Ensures the plugin mode and SSL enforcement defaults remain in place when upgrading from earlier builds.</li>
+        </ul>
+        <br>
+        <h4>Version 1.0.1 – Admin tooling updates</h4>
+        <p>This release polishes the initial ISU roll-out for partner-managed stores.</p>
+        <ul>
+          <li>Adds dedicated admin menu items for the credential synchronisation and signup link utilities.</li>
+          <li>Introduces the <em>Numinix PayPal Integrated Sign-up</em> configuration group with environment, SSL, and mode settings.</li>
+          <li>Stores partner credential placeholders and a version key to simplify future migrations.</li>
+        </ul>
+        <br>
+        <h4>Version 1.0.0 – Initial release</h4>
+        <p>The inaugural PayPal ISU package embeds the partner onboarding journey inside Zen Cart.</p>
+        <ul>
+          <li>Delivers the <code>paypal_signup</code> controller with AJAX orchestration for start, status, and finalisation steps.</li>
+          <li>Persists PayPal credentials via the credential persistence service when plugin mode is enabled.</li>
+          <li>Provides admin tools for regenerating signup links and confirming stored credentials.</li>
+        </ul>
+        <br>
+        <h4>Migrating from legacy onboarding</h4>
+        <p>When transitioning from manual partner enrollment or legacy PayPal modules:</p>
+        <ol>
+          <li>Audit existing PayPal credentials and determine whether they should be rotated after the ISU cut-over.</li>
+          <li>Disable any storefront links that pointed merchants to external forms and replace them with the embedded onboarding button.</li>
+          <li>Verify that the PayPal Restful payment module exposes the integrated signup button for merchants.</li>
+        </ol>
+        <p>These steps align your merchant support team with the new PayPal-branded onboarding journey and reduce time-to-live for new accounts.</p>
+        <br><br><br>
+
+        <div class="numHeader bodyHeader">
+          <span class="bodyHeaderTxt">Troubleshooting</span>
+        </div>
+
+        <div class="trouble-module">
+          <h4>The onboarding modal does not launch</h4>
+          <p>Verify outbound access to the PayPal API endpoints from the server and confirm that your browser allows pop-ups for the admin domain. Errors encountered before launch are recorded in <code>logs/numinix_paypal_signup.log</code>.</p>
+        </div>
+
+        <div class="trouble-module">
+          <h4>Merchants finished onboarding but still need credentials</h4>
+          <p>Beginning with v1.0.5 the storefront no longer persists API credentials. Ask the merchant to log into PayPal &gt; Apps &amp; Credentials to retrieve the keys issued during onboarding, or contact PayPal Partner Support if the account is still pending review.</p>
+        </div>
+
+        <div class="trouble-module">
+          <h4>Status polling never completes</h4>
+          <p>Long-running <em>waiting</em> states typically mean outbound requests to PayPal were blocked. Confirm port 443 access for the web server and review PayPal Partner dashboard telemetry for the recorded tracking ID.</p>
+        </div>
+
+        <div class="trouble-module">
+          <h4>How do I temporarily disable onboarding?</h4>
+          <p>Hide the onboarding call-to-action in your storefront templates or restrict access to the signup page via admin tools. Existing merchants remain active while the entry point is disabled.</p>
+        </div>
+
+        <div class="numHeader bodyHeader">
+          <span class="bodyHeaderTxt">FAQ</span>
+        </div>
+
+        <h4>How can I restart onboarding for a merchant?</h4>
+        <ol>
+          <li>Open the PayPal Restful payment module in the Zen Cart admin and click <em>Launch PayPal onboarding</em>.</li>
+          <li>If the merchant previously started onboarding, confirm whether a tracking ID appears in <code>logs/numinix_paypal_signup.log</code>.</li>
+          <li>Use the <em>PayPal Signup Link Generator</em> tool to email a fresh link if the merchant is working outside the admin.</li>
+        </ol>
+
+        <h4>Where are credentials and logs stored?</h4>
+        <p>API credentials are delivered directly by PayPal after onboarding—this module no longer stores them. Operational logs continue to live inside <code>logs/numinix_paypal_signup.log</code>. Purge sensitive data according to your organisation's retention policy.</p>
+
+        <h4>Can I point ISU at a custom onboarding endpoint?</h4>
+        <p>No. The onboarding flow now connects directly to PayPal's Partner APIs and does not support alternate proxies or self-hosted endpoints.</p>
+      </div>
+    </div>
+    <!--EOF About Us-->
+
+    <!--BOF License-->
+    <div class="bodyHeaderContainer" id="License">
+      <div class="bodyWrapper">
+        <div class="numHeader bodyHeader">
+          <span class="bodyHeaderTxt">License</span>
+        </div>
+        <br><br>
+        <div class="spacer">
+          <iframe src="LICENSE#page=1&zoom=100" width="100%" height="500px" scrolling="scroll"></iframe>
+        </div>
+      </div>
+    </div>
+    <!--EOF License-->
+
+    <!--BOF Disclalimer-->
+    <div class="bodyHeaderContainer" id="Disclaimer">
+      <div class="bodyWrapper">
+        <div class="numHeader bodyHeader">
+          <span class="bodyHeaderTxt">Disclaimer</span>
+        </div>
+        <br><br>
+        <div class="spacer">
+          <p>Use this guide in accordance with your organisation's PayPal Partner agreement and Zen Cart best practices. Test every release in a staging environment before inviting merchants to onboard. Neither PayPal nor Numinix is responsible for data loss arising from improper installation or unsupported customisations.</p>
+        </div>
+      </div>
+    </div>
+    <!--EOF Disclaimer-->
+      
+    <!--BOF HELP-->
+    <div class="bodyHeaderContainer" id="Help">
+      <div class="bodyWrapper">
+        <div class="numHeader bodyHeader">
+          <span class="bodyHeaderTxt">Help</span>
+        </div>
+        <br><br>
+        <div class="spacer">
+          <div class="bodyRow"><span class="bodyStrong">Contact Us:</span><span class="content"><a href="https://www.numinix.com/support/" target="_blank">PayPal ISU Partner Support</a> or reach PayPal Merchant Technical Support via your Partner Portal.</span></div>
+        </div>
+      </div>
+    </div>
+    <!--EOF HELP-->
+  </div>
+</div>
+
+<footer class="readme-footer">
+  <div class="readme-footer-container">
+    <div class="footer-column footer-column-1">
+      <h3 class="title">Ready to launch PayPal Complete Payments?</h3>
+      <p class="paragraph">Connect with the Numinix PayPal partner team to plan your onboarding rollout, validate test accounts, and review compliance requirements.</p>
+      <a class="connect-link" href="https://www.numinix.com/support/">Talk to the PayPal ISU team</a>
+      <div class="details">
+        <img src="images/numinix-emblem.png" alt="numinix-emblem">
+        <ul>
+          <li>
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="16" viewBox="0 0 11 16" fill="none">
+                <path d="M5.5 0C2.46728 0 0 2.46728 0 5.49997C0 9.26363 4.92196 14.7889 5.13152 15.0223C5.32835 15.2415 5.67201 15.2411 5.86848 15.0223C6.07804 14.7889 11 9.26363 11 5.49997C10.9999 2.46728 8.53269 0 5.5 0ZM5.5 8.26716C3.97416 8.26716 2.73284 7.02581 2.73284 5.49997C2.73284 3.97414 3.97419 2.73281 5.5 2.73281C7.02581 2.73281 8.26713 3.97417 8.26713 5.5C8.26713 7.02584 7.02581 8.26716 5.5 8.26716Z" fill="#171717"/>
+              </svg>
+            </span>
+            805-510 West Hastings Street, Vancouver, BC, Canada V6B 1L8
+          </li>
+          <li>
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="10" viewBox="0 0 13 10" fill="none">
+                <path d="M12.9908 1.09647C12.9908 1.0808 13.001 1.06554 13.0004 1.05005L9.0332 5.08304L12.9956 8.98719C12.9979 8.9593 12.9908 8.93118 12.9908 8.90269V1.09647Z" fill="#171717"/>
+                <path d="M8.42744 5.70435L6.80793 7.34829C6.72598 7.43147 6.62014 7.47319 6.51424 7.47319C6.41054 7.47319 6.30684 7.43326 6.22546 7.35323L4.61035 5.76537L0.62207 9.82123C0.719047 9.858 0.823139 9.88654 0.932146 9.88654H12.0964C12.2583 9.88654 12.4101 9.83452 12.5421 9.75694L8.42744 5.70435Z" fill="#171717"/>
+                <path d="M6.50984 6.41042L12.5643 0.257195C12.4272 0.171208 12.2676 0.113525 12.0966 0.113525H0.932378C0.709677 0.113525 0.505615 0.204756 0.34668 0.343897L6.50984 6.41042Z" fill="#171717"/>
+                <path d="M0 1.24634V8.90258C0 8.99047 0.0191467 9.07521 0.0399314 9.15619L3.97874 5.15443L0 1.24634Z" fill="#171717"/>
+              </svg>
+            </span>
+            paypal@numinix.com
+          </li>
+          <li>
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16" fill="none">
+                <path d="M13.5051 11.4327L11.5656 9.38463C10.8729 8.65316 9.69536 8.94578 9.41829 9.89666C9.21049 10.555 8.51781 10.9207 7.8944 10.7744C6.50904 10.4087 4.63881 8.50687 4.29247 6.97079C4.08466 6.31243 4.50027 5.58097 5.12368 5.36155C6.02416 5.06897 6.30124 3.82547 5.60856 3.094L3.66906 1.04589C3.11491 0.533858 2.2837 0.533858 1.79882 1.04589L0.482733 2.43568C-0.833357 3.89862 0.621269 7.7754 3.87686 11.2133C7.13245 14.6512 10.8036 16.2605 12.189 14.7975L13.5051 13.4077C13.99 12.8225 13.99 11.9448 13.5051 11.4327Z" fill="#171717"/>
+              </svg>
+            </span>
+            1.855.686.4649 ext. 2
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-column footer-column-2">
+      <div class="links-group">
+        <div class="links">
+          <h4>Documentation</h4>
+          <div class="links-list">
+            <a href="../project_foundations.md">Project Foundations</a>
+            <a href="../deployment_and_support.md">Deployment &amp; Support</a>
+            <a href="../qa_testing.md">QA &amp; Testing</a>
+            <a href="../PayPal ISU/readme.html">PayPal ISU Guide</a>
+            <a href="https://developer.paypal.com/docs/checkout/">PayPal Checkout Docs</a>
+            <a href="https://developer.paypal.com/api/rest/">PayPal REST API Reference</a>
+          </div>
+        </div>
+
+        <div class="links">
+          <h4>PayPal Resources</h4>
+          <div class="links-list">
+            <a href="https://www.paypal.com/merchantapps/appcenter/accept-payments">PayPal AppCenter</a>
+            <a href="https://www.paypal.com/us/business/complete-payments">Complete Payments Overview</a>
+            <a href="https://www.paypal.com/us/business/platforms-and-marketplaces">Platforms &amp; Marketplaces</a>
+            <a href="https://www.paypal.com/us/business/resources">Business Resource Center</a>
+            <a href="https://www.paypal.com/us/cshelp/contact-us">Contact PayPal Support</a>
+          </div>
+        </div>
+
+        <div class="links">
+          <h4>Numinix Services</h4>
+          <div class="links-list">
+            <a href="https://www.numinix.com/services_apis">API Development</a>
+            <a href="https://www.numinix.com/services_installs_upgrades">Installs &amp; Upgrades</a>
+            <a href="https://www.numinix.com/services_security_support">Security &amp; Support</a>
+            <a href="https://www.numinix.com/services_plugins">Custom Plugins</a>
+            <a href="https://www.numinix.com/plugin_updates">Plugin Updates</a>
+            <a href="https://www.numinix.com/open_bug_reports">Open Bug Reports</a>
+          </div>
+        </div>
+
+        <div class="links">
+          <h4>Company</h4>
+          <div class="links-list">
+            <a href="https://www.numinix.com/about_us">About Numinix</a>
+            <a href="https://www.numinix.com/blog/">News &amp; Blog</a>
+            <a href="https://www.numinix.com/clients">Client Stories</a>
+            <a href="https://www.numinix.com/privacy.html">Privacy Policy</a>
+            <a href="https://www.numinix.com/partners">Partner Program</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="socials">
+        <a href="https://www.facebook.com/numinix">
+          <svg xmlns="http://www.w3.org/2000/svg" width="39" height="39" viewBox="0 0 39 39" fill="none">
+            <path d="M21.6331 13.1031H23.338V10.1336C23.0438 10.0931 22.0323 10.0021 20.8543 10.0021C18.3963 10.0021 16.7125 11.5483 16.7125 14.3901V17.0055H14V20.3252H16.7125V28.678H20.038V20.326H22.6408L23.054 17.0063H20.0373V14.7193C20.038 13.7598 20.2964 13.1031 21.6331 13.1031Z" fill="#171717"/>
+          </svg>
+        </a>
+
+        <a href="https://twitter.com/numinix">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="39" viewBox="0 0 40 39" fill="none">
+            <path d="M29.633 13.1387C28.9284 13.4478 28.1776 13.6526 27.3948 13.7521C28.2001 13.2713 28.8147 12.5158 29.1036 11.6051C28.3528 12.0528 27.5239 12.369 26.6405 12.5454C25.9276 11.7863 24.9115 11.3162 23.8031 11.3162C21.6526 11.3162 19.9212 13.0617 19.9212 15.2016C19.9212 15.5095 19.9473 15.8055 20.0112 16.0874C16.7819 15.9299 13.9244 14.3821 12.0048 12.0244C11.6696 12.6058 11.473 13.2713 11.473 13.9878C11.473 15.333 12.1658 16.5256 13.1984 17.2159C12.5744 17.2041 11.9621 17.0229 11.4434 16.7375C11.4434 16.7494 11.4434 16.7648 11.4434 16.7802C11.4434 18.6678 12.7899 20.2357 14.5556 20.5969C14.2394 20.6833 13.8948 20.7248 13.5371 20.7248C13.2885 20.7248 13.0374 20.7106 12.8017 20.6585C13.305 22.1968 14.7332 23.3277 16.4314 23.3644C15.1098 24.3982 13.4317 25.0211 11.6152 25.0211C11.2966 25.0211 10.9911 25.0069 10.6855 24.9678C12.4062 26.0774 14.4454 26.711 16.6445 26.711C23.7924 26.711 27.7003 20.7899 27.7003 15.6575C27.7003 15.4858 27.6944 15.32 27.6861 15.1554C28.4571 14.6083 29.1048 13.925 29.633 13.1387Z" fill="#171717"/>
+          </svg>
+        </a>
+
+        <a href="https://www.linkedin.com/company/numinix-web-development-ltd">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="39" viewBox="0 0 40 39" fill="none">
+            <path d="M27.2595 26.519V21.0666C27.2595 18.3869 26.6826 16.34 23.5563 16.34C22.049 16.34 21.0441 17.1588 20.6347 17.9403H20.5975V16.5819H17.6387V26.519H20.7278V21.5877C20.7278 20.2851 20.9697 19.0383 22.57 19.0383C24.1518 19.0383 24.1704 20.5084 24.1704 21.6621V26.5004H27.2595V26.519Z" fill="#171717"/>
+            <path d="M12.6172 16.5812H15.7063V26.5183H12.6172V16.5812Z" fill="#171717"/>
+            <path d="M14.1575 11.6305C13.1713 11.6305 12.3711 12.4307 12.3711 13.4169C12.3711 14.4032 13.1713 15.222 14.1575 15.222C15.1438 15.222 15.944 14.4032 15.944 13.4169C15.944 12.4307 15.1438 11.6305 14.1575 11.6305Z" fill="#171717"/>
+          </svg>
+        </a>
+
+        <a href="https://www.youtube.com/@numinix7766">
+          <svg xmlns="http://www.w3.org/2000/svg" width="39" height="39" viewBox="0 0 39 39" fill="none">
+            <path d="M29.0345 16.8714C29.0747 15.5922 28.8035 14.323 28.2455 13.1807C27.8727 12.704 27.347 12.3815 26.7639 12.2716C24.3698 12.0566 21.9665 11.9691 19.5635 12.0098C17.1608 11.9689 14.7576 12.0563 12.3635 12.2716C11.8893 12.3633 11.4501 12.5931 11.0977 12.9341C10.325 13.6753 10.2686 14.9458 10.1522 16.016C10.0248 17.9451 10.0248 19.881 10.1522 21.8101C10.1733 22.4142 10.2607 23.0138 10.4128 23.5975C10.5158 24.0493 10.7256 24.4677 11.0233 24.8151C11.3758 25.1745 11.8246 25.416 12.3114 25.5081C14.1734 25.7468 16.0497 25.8447 17.9255 25.801V25.8011C20.9433 25.851 23.6023 25.7981 26.7336 25.5545C27.234 25.4656 27.6964 25.2211 28.059 24.8534C28.2946 24.611 28.473 24.3157 28.5804 23.9903C28.8927 23.0114 29.0461 21.9858 29.0345 20.9551C29.064 20.4232 29.064 17.4033 29.0345 16.8714ZM22.7206 18.7128C22.7195 18.7122 22.7185 18.7116 22.7174 18.711C22.0013 19.1215 21.1735 19.5567 20.3008 20.015C19.424 20.4754 18.5025 20.9588 17.6054 21.4635V15.9314V15.9314C18.4579 16.3937 19.3012 16.8483 20.1492 17.3076C20.996 17.7664 21.8475 18.2299 22.7174 18.711C22.7207 18.7091 22.7247 18.7071 22.728 18.7051L22.7206 18.7128Z" fill="#171717"/>
+          </svg>
+        </a>
+      </div>
+
+      <div class="payment-methods">
+        <a href="javascript:void(0)"><img src="images/paypal.png" alt="paypal"></a>
+        <a href="javascript:void(0)"><img src="images/visa.png" alt="visa"></a>
+        <a href="javascript:void(0)"><img src="images/maestro.png" alt="maestro"></a>
+        <a href="javascript:void(0)"><img src="images/discover.png" alt="discover"></a>
+        <a href="javascript:void(0)"><img src="images/american-express.png" alt="american-express"></a>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="readme-footer-bottom">
+    <p class="copyright">© 2000-<span id="current-year">2023</span> Numinix Web Development Ltd. All rights reserved.</p>
+    <p class="madewith">
+      Made with
+      <span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="14" viewBox="0 0 16 14" fill="none">
+          <path d="M11.75 0.5C9.85484 0.5 8.63722 1.71578 8 2.80811C7.36278 1.71578 6.14516 0.5 4.25 0.5C1.84491 0.5 0 2.30591 0 4.70109C0 7.29824 2.31137 9.06689 5.76291 11.7448C7.45297 13.0549 7.56156 13.1544 8 13.5C8.35781 13.218 8.55584 13.0481 10.2371 11.7448C13.6886 9.06689 16 7.29824 16 4.70109C16 2.30594 14.1551 0.5 11.75 0.5Z" fill="#171717"/>
+        </svg>
+      </span>
+      in Canada
+    </p>
+  </div>
+</footer>
+
+<script>
+  function selectText(node) {
+
+    if (document.body.createTextRange) {
+        const range = document.body.createTextRange();
+        range.moveToElementText(node);
+        range.select();
+    } else if (window.getSelection) {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    } else {
+        console.warn("Could not select text in node: Unsupported browser.");
+    }
+}
+
+function highlightSelect(){
+  const elem = this.parentElement.parentElement.querySelector('.sh_sourceCode');
+  selectText(elem);
+
+}
+const selectList = document.querySelectorAll('.select');
+
+selectList.forEach(s => {
+  s.addEventListener('click', highlightSelect);
+});
+
+  // Mobile Menu dropdown
+  jQuery(document).ready(function() {
+    $('#js-nav-icon').click(function() {
+      $('.contentMenu').toggleClass('active');
+    });
+
+    $('.contentMenu li').click(function() {
+      $('.contentMenu').removeClass('active');
+    });
+  });
+
+  // Update current year
+  let date = new Date();
+  jQuery('#current-year').text(date.getFullYear());
+
+</script>
+
+</body>
+</html>

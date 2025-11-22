@@ -1,0 +1,626 @@
+<?php
+/**
+ * Direct PayPal onboarding integration for the storefront flow.
+ */
+
+declare(strict_types=1);
+
+$signupServicePath = dirname(__DIR__, 4) . '/management/includes/classes/Numinix/PaypalIsu/SignupLinkService.php';
+if (file_exists($signupServicePath) && !class_exists('NuminixPaypalIsuSignupLinkService')) {
+    require_once $signupServicePath;
+}
+
+if (!class_exists('NuminixPaypalIsuSignupLinkService')) {
+    throw new RuntimeException('PayPal onboarding dependency missing.');
+}
+
+class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
+{
+    private const DEFAULT_POLLING_INTERVAL_MS = 5000;
+
+    /**
+     * Initiates onboarding by creating a PayPal partner referral.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function start(array $payload): array
+    {
+        try {
+            $options = [
+                'environment' => $payload['environment'] ?? null,
+                'tracking_id' => $payload['tracking_id'] ?? null,
+                'return_url' => $payload['return_url'] ?? null,
+            ];
+
+            if (!empty($payload['origin'])) {
+                $options['website_urls'] = [$payload['origin']];
+            }
+
+            $result = $this->request($options);
+            $trackingId = (string)($result['tracking_id'] ?? ($payload['tracking_id'] ?? ''));
+
+            $actionUrl = (string)($result['action_url'] ?? '');
+            if ($actionUrl === '' && !empty($result['links']) && is_array($result['links'])) {
+                foreach ($result['links'] as $link) {
+                    if (is_array($link) && ($link['rel'] ?? '') === 'action_url' && !empty($link['href'])) {
+                        $actionUrl = (string)$link['href'];
+                        break;
+                    }
+                }
+            }
+
+            return [
+                'success' => true,
+                'message' => 'PayPal onboarding started.',
+                'data' => [
+                    'environment' => (string)($result['environment'] ?? $payload['environment'] ?? 'sandbox'),
+                    'tracking_id' => $trackingId,
+                    'partner_referral_id' => (string)($result['partner_referral_id'] ?? ''),
+                    'redirect_url' => $actionUrl,
+                    'action_url' => $actionUrl,
+                    'links' => is_array($result['links'] ?? null) ? $result['links'] : [],
+                    'step' => 'waiting',
+                    'polling_interval' => self::DEFAULT_POLLING_INTERVAL_MS,
+                ],
+            ];
+        } catch (Throwable $exception) {
+            return $this->formatExceptionResponse($exception, 'Unable to initiate PayPal onboarding.');
+        }
+    }
+
+    /**
+     * Finalizes onboarding after the merchant returns from PayPal.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function finalize(array $payload): array
+    {
+        return $this->resolveStatus($payload, true);
+    }
+
+    /**
+     * Polls the PayPal APIs for onboarding progress.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function status(array $payload): array
+    {
+        return $this->resolveStatus($payload, false);
+    }
+
+    /**
+     * Normalizes status handling for finalize/status actions.
+     *
+     * @param array<string, mixed> $payload
+     * @param bool                 $fromFinalize
+     * @return array<string, mixed>
+     */
+    private function resolveStatus(array $payload, bool $fromFinalize): array
+    {
+        try {
+            $environment = $this->normalizeEnvironment($payload['environment'] ?? null);
+            $trackingId = $this->sanitizeTrackingId($payload['tracking_id'] ?? null);
+            $partnerReferralId = $this->sanitizePartnerReferralId($payload['partner_referral_id'] ?? null);
+
+            [$clientId, $clientSecret] = $this->resolveCredentials($environment, $payload);
+            if ($clientId === '' || $clientSecret === '') {
+                throw new RuntimeException('PayPal partner API credentials are required.');
+            }
+
+            $apiBase = $this->resolveApiBase($environment);
+            $accessToken = $this->obtainAccessToken($apiBase, $clientId, $clientSecret);
+
+            $integration = $this->fetchMerchantIntegration($apiBase, $accessToken, $trackingId, $partnerReferralId);
+            if ($integration === null) {
+                return $this->waitingResponse($environment, $trackingId, $partnerReferralId);
+            }
+
+            $step = $this->mapIntegrationToStep($integration);
+            $data = [
+                'environment' => $environment,
+                'tracking_id' => $trackingId,
+                'partner_referral_id' => $partnerReferralId,
+                'merchant_id' => (string)($integration['merchant_id'] ?? ''),
+                'merchant_id_in_paypal' => (string)($integration['merchant_id_in_paypal'] ?? ($integration['merchant_id'] ?? '')),
+                'payments_receivable' => (bool)($integration['payments_receivable'] ?? false),
+                'primary_email_confirmed' => (bool)($integration['primary_email_confirmed'] ?? false),
+                'capabilities' => $this->extractCapabilities($integration),
+                'step' => $step,
+                'polling_interval' => self::DEFAULT_POLLING_INTERVAL_MS,
+            ];
+
+            if (!empty($integration['links']) && is_array($integration['links'])) {
+                $data['links'] = $integration['links'];
+            }
+
+            return [
+                'success' => true,
+                'message' => $fromFinalize
+                    ? 'PayPal onboarding progress updated.'
+                    : 'PayPal onboarding status retrieved.',
+                'data' => $data,
+            ];
+        } catch (Throwable $exception) {
+            return $this->formatExceptionResponse(
+                $exception,
+                $fromFinalize
+                    ? 'Unable to finalize PayPal onboarding.'
+                    : 'Unable to retrieve PayPal onboarding status.'
+            );
+        }
+    }
+
+    /**
+     * Returns a waiting response when PayPal has not yet provisioned the account.
+     *
+     * @param string $environment
+     * @param string $trackingId
+     * @param string $partnerReferralId
+     * @return array<string, mixed>
+     */
+    private function waitingResponse(string $environment, string $trackingId, string $partnerReferralId): array
+    {
+        return [
+            'success' => true,
+            'message' => 'Waiting for PayPal to finish provisioning the merchant account.',
+            'data' => [
+                'environment' => $environment,
+                'tracking_id' => $trackingId,
+                'partner_referral_id' => $partnerReferralId,
+                'step' => 'waiting',
+                'polling_interval' => self::DEFAULT_POLLING_INTERVAL_MS,
+            ],
+        ];
+    }
+
+    /**
+     * Formats an exception into a response payload.
+     *
+     * @param Throwable $exception
+     * @param string    $fallback
+     * @return array<string, mixed>
+     */
+    private function formatExceptionResponse(Throwable $exception, string $fallback): array
+    {
+        $message = trim($exception->getMessage()) ?: $fallback;
+
+        return [
+            'success' => false,
+            'message' => $message,
+            'data' => [],
+        ];
+    }
+
+    /**
+     * Validates the tracking identifier.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function sanitizeTrackingId($value): string
+    {
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ($trimmed !== '') {
+                return $trimmed;
+            }
+        }
+
+        throw new RuntimeException('Tracking reference is required.');
+    }
+
+    /**
+     * Normalizes the partner referral identifier.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function sanitizePartnerReferralId($value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        return $trimmed;
+    }
+
+    /**
+     * Resolves merchant integration details from PayPal.
+     *
+     * @param string $apiBase
+     * @param string $accessToken
+     * @param string $trackingId
+     * @param string $partnerReferralId
+     * @return array<string, mixed>|null
+     */
+    private function fetchMerchantIntegration(string $apiBase, string $accessToken, string $trackingId, string $partnerReferralId): ?array
+    {
+        if ($partnerReferralId !== '') {
+            $referral = $this->fetchPartnerReferral($apiBase, $accessToken, $partnerReferralId);
+            $integration = $this->extractMerchantIntegrationFromReferral($apiBase, $accessToken, $referral);
+            if ($integration !== null) {
+                return $integration;
+            }
+        }
+
+        return $this->fetchMerchantIntegrationByTrackingId($apiBase, $accessToken, $trackingId);
+    }
+
+    /**
+     * Retrieves partner referral details from PayPal.
+     *
+     * @param string $apiBase
+     * @param string $accessToken
+     * @param string $partnerReferralId
+     * @return array<string, mixed>|null
+     */
+    private function fetchPartnerReferral(string $apiBase, string $accessToken, string $partnerReferralId): ?array
+    {
+        $url = rtrim($apiBase, '/') . '/v2/customer/partner-referrals/' . rawurlencode($partnerReferralId);
+        $headers = [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $accessToken,
+        ];
+
+        $response = $this->performHttpCall('GET', $url, $headers);
+        $decoded = $this->decodeJson($response['body']);
+
+        if ($response['status'] === 404) {
+            return null;
+        }
+
+        if ($response['status'] >= 200 && $response['status'] < 300) {
+            return $decoded;
+        }
+
+        $message = $this->resolveErrorMessage($decoded, 'Unable to retrieve PayPal referral status.');
+        throw new RuntimeException($message);
+    }
+
+    /**
+     * Derives merchant integration details using referral metadata when possible.
+     *
+     * @param string                     $apiBase
+     * @param string                     $accessToken
+     * @param array<string, mixed>|null  $referral
+     * @return array<string, mixed>|null
+     */
+    private function extractMerchantIntegrationFromReferral(string $apiBase, string $accessToken, ?array $referral): ?array
+    {
+        if (empty($referral)) {
+            return null;
+        }
+
+        $merchantId = '';
+        if (!empty($referral['merchant_id'])) {
+            $merchantId = (string)$referral['merchant_id'];
+        }
+
+        if ($merchantId === '' && !empty($referral['links']) && is_array($referral['links'])) {
+            foreach ($referral['links'] as $link) {
+                if (!is_array($link)) {
+                    continue;
+                }
+
+                if (($link['rel'] ?? '') === 'merchant_integration_details' && !empty($link['href'])) {
+                    return $this->fetchIntegrationByUrl((string)$link['href'], $accessToken);
+                }
+
+                if ($merchantId === '' && ($link['rel'] ?? '') === 'self' && !empty($link['href'])) {
+                    $query = parse_url((string)$link['href'], PHP_URL_QUERY);
+                    if (is_string($query)) {
+                        parse_str($query, $parts);
+                        if (!empty($parts['merchant_id'])) {
+                            $merchantId = (string)$parts['merchant_id'];
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($merchantId !== '') {
+            return $this->fetchMerchantIntegrationByMerchantId($apiBase, $accessToken, $merchantId);
+        }
+
+        return null;
+    }
+
+    /**
+     * Performs an integration lookup using an absolute URL provided by PayPal.
+     *
+     * @param string $url
+     * @param string $accessToken
+     * @return array<string, mixed>|null
+     */
+    private function fetchIntegrationByUrl(string $url, string $accessToken): ?array
+    {
+        $headers = [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $accessToken,
+        ];
+
+        $response = $this->performHttpCall('GET', $url, $headers);
+        $decoded = $this->decodeJson($response['body']);
+
+        if ($response['status'] === 404) {
+            return null;
+        }
+
+        if ($response['status'] >= 200 && $response['status'] < 300) {
+            return $decoded;
+        }
+
+        $message = $this->resolveErrorMessage($decoded, 'Unable to retrieve PayPal merchant integration details.');
+        throw new RuntimeException($message);
+    }
+
+    /**
+     * Fetches merchant integration details for a specific merchant identifier.
+     *
+     * @param string $apiBase
+     * @param string $accessToken
+     * @param string $merchantId
+     * @return array<string, mixed>|null
+     */
+    private function fetchMerchantIntegrationByMerchantId(string $apiBase, string $accessToken, string $merchantId): ?array
+    {
+        $url = rtrim($apiBase, '/') . '/v1/customer/partners/merchant-integrations/' . rawurlencode($merchantId);
+        $headers = [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $accessToken,
+        ];
+
+        $response = $this->performHttpCall('GET', $url, $headers);
+        $decoded = $this->decodeJson($response['body']);
+
+        if ($response['status'] === 404) {
+            return null;
+        }
+
+        if ($response['status'] >= 200 && $response['status'] < 300) {
+            return $decoded;
+        }
+
+        $message = $this->resolveErrorMessage($decoded, 'Unable to retrieve PayPal merchant integration details.');
+        throw new RuntimeException($message);
+    }
+
+    /**
+     * Fetches merchant integration details using the tracking identifier.
+     *
+     * @param string $apiBase
+     * @param string $accessToken
+     * @param string $trackingId
+     * @return array<string, mixed>|null
+     */
+    private function fetchMerchantIntegrationByTrackingId(string $apiBase, string $accessToken, string $trackingId): ?array
+    {
+        $url = rtrim($apiBase, '/') . '/v1/customer/partners/merchant-integrations?tracking_id=' . rawurlencode($trackingId);
+        $headers = [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $accessToken,
+        ];
+
+        $response = $this->performHttpCall('GET', $url, $headers);
+        $decoded = $this->decodeJson($response['body']);
+
+        if ($response['status'] === 404) {
+            return null;
+        }
+
+        if ($response['status'] >= 200 && $response['status'] < 300) {
+            if (isset($decoded['items']) && is_array($decoded['items'])) {
+                foreach ($decoded['items'] as $item) {
+                    if (!is_array($item)) {
+                        continue;
+                    }
+                    $itemTracking = (string)($item['tracking_id'] ?? '');
+                    if ($itemTracking !== '' && strcasecmp($itemTracking, $trackingId) === 0) {
+                        return $item;
+                    }
+                }
+
+                $first = $decoded['items'][0] ?? null;
+                if (is_array($first)) {
+                    return $first;
+                }
+            }
+
+            return null;
+        }
+
+        $message = $this->resolveErrorMessage($decoded, 'Unable to retrieve PayPal merchant integration details.');
+        throw new RuntimeException($message);
+    }
+
+    /**
+     * Derives a human-readable error message from a PayPal response.
+     *
+     * @param array<string, mixed> $response
+     * @param string               $fallback
+     * @return string
+     */
+    private function resolveErrorMessage(array $response, string $fallback): string
+    {
+        if (!empty($response['message'])) {
+            return (string)$response['message'];
+        }
+        if (!empty($response['error_description'])) {
+            return (string)$response['error_description'];
+        }
+        if (!empty($response['name'])) {
+            return (string)$response['name'];
+        }
+
+        if (!empty($response['details']) && is_array($response['details'])) {
+            $messages = [];
+            foreach ($response['details'] as $detail) {
+                if (!is_array($detail)) {
+                    continue;
+                }
+                if (!empty($detail['issue'])) {
+                    $messages[] = (string)$detail['issue'];
+                } elseif (!empty($detail['description'])) {
+                    $messages[] = (string)$detail['description'];
+                }
+            }
+            if (!empty($messages)) {
+                return implode(' ', $messages);
+            }
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * Normalizes capability values returned by PayPal.
+     *
+     * @param array<string, mixed> $integration
+     * @return array<int, string>
+     */
+    private function extractCapabilities(array $integration): array
+    {
+        if (empty($integration['capabilities']) || !is_array($integration['capabilities'])) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($integration['capabilities'] as $capability) {
+            if (is_string($capability) && $capability !== '') {
+                $result[] = $capability;
+            } elseif (is_array($capability) && !empty($capability['name'])) {
+                $result[] = (string)$capability['name'];
+            }
+        }
+
+        return array_values(array_unique($result));
+    }
+
+    /**
+     * Maps PayPal integration status fields into storefront onboarding steps.
+     *
+     * @param array<string, mixed> $integration
+     * @return string
+     */
+    private function mapIntegrationToStep(array $integration): string
+    {
+        $status = strtolower((string)($integration['status'] ?? ''));
+        $paymentsReceivable = !empty($integration['payments_receivable']);
+        $permissionsGranted = !empty($integration['oauth_integrations'][0]['permissions_granted'] ?? false);
+
+        if ($paymentsReceivable || in_array($status, ['active', 'approved', 'completed', 'ready'], true)) {
+            return 'completed';
+        }
+
+        if (in_array($status, ['declined', 'denied', 'terminated', 'suspended'], true)) {
+            return 'cancelled';
+        }
+
+        if ($permissionsGranted || in_array($status, ['in_review', 'under_review', 'pending_merchant_action'], true)) {
+            return 'finalized';
+        }
+
+        return 'waiting';
+    }
+
+    /**
+     * Performs an HTTP call supporting GET/POST semantics.
+     *
+     * @param string               $method
+     * @param string               $url
+     * @param array<int, string>   $headers
+     * @param array<string, mixed> $options
+     * @param string               $body
+     * @return array{status: int, body: string}
+     */
+    private function performHttpCall(string $method, string $url, array $headers, array $options = [], string $body = ''): array
+    {
+        $headers = array_values(array_filter($headers, 'is_string'));
+        $headers[] = 'Connection: close';
+
+        $timeout = isset($options['timeout']) ? (int)$options['timeout'] : 30;
+        $method = strtoupper($method);
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+            curl_setopt($ch, CURLOPT_HEADER, true);
+
+            if (!empty($options['basic_auth']) && is_string($options['basic_auth'])) {
+                curl_setopt($ch, CURLOPT_USERPWD, $options['basic_auth']);
+                curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+            }
+
+            if ($method !== 'GET' && $method !== 'HEAD') {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+            }
+
+            $response = curl_exec($ch);
+            if ($response === false) {
+                $error = curl_error($ch) ?: 'cURL error';
+                curl_close($ch);
+                throw new RuntimeException('Unable to contact PayPal: ' . $error);
+            }
+
+            $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $headerSize = (int)curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+            curl_close($ch);
+
+            $bodyContent = substr($response, $headerSize);
+
+            return [
+                'status' => $status,
+                'body' => $bodyContent === false ? '' : $bodyContent,
+            ];
+        }
+
+        $context = [
+            'http' => [
+                'method' => $method,
+                'header' => implode("\r\n", $headers) . "\r\n",
+                'timeout' => $timeout,
+            ],
+        ];
+
+        if (!empty($options['basic_auth']) && is_string($options['basic_auth'])) {
+            $context['http']['header'] .= 'Authorization: Basic ' . base64_encode($options['basic_auth']) . "\r\n";
+        }
+
+        if ($method !== 'GET' && $method !== 'HEAD') {
+            $context['http']['content'] = $body;
+        }
+
+        $resource = stream_context_create($context);
+        $responseBody = @file_get_contents($url, false, $resource);
+        if ($responseBody === false) {
+            $error = error_get_last();
+            throw new RuntimeException('Unable to contact PayPal: ' . ($error['message'] ?? 'HTTP request failed'));
+        }
+
+        $status = 200;
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $headerLine) {
+                if (preg_match('#^HTTP/\S+\s+(\d{3})#', $headerLine, $matches)) {
+                    $status = (int)$matches[1];
+                    break;
+                }
+            }
+        }
+
+        return [
+            'status' => $status,
+            'body' => $responseBody,
+        ];
+    }
+}
