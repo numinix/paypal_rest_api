@@ -336,21 +336,27 @@ function paypalr_save_credentials(string $client_id, string $client_secret, stri
     
     try {
         // Update Client ID
-        $db->Execute(
-            "UPDATE " . TABLE_CONFIGURATION . "
-                SET configuration_value = '" . zen_db_input($client_id) . "',
-                    last_modified = now()
-              WHERE configuration_key = '" . zen_db_input($client_id_key) . "'
-              LIMIT 1"
+        $sql_data_array = [
+            'configuration_value' => $client_id,
+            'last_modified' => 'now()'
+        ];
+        zen_db_perform(
+            TABLE_CONFIGURATION,
+            $sql_data_array,
+            'update',
+            "configuration_key = '" . zen_db_input($client_id_key) . "'"
         );
         
         // Update Client Secret
-        $db->Execute(
-            "UPDATE " . TABLE_CONFIGURATION . "
-                SET configuration_value = '" . zen_db_input($client_secret) . "',
-                    last_modified = now()
-              WHERE configuration_key = '" . zen_db_input($client_secret_key) . "'
-              LIMIT 1"
+        $sql_data_array = [
+            'configuration_value' => $client_secret,
+            'last_modified' => 'now()'
+        ];
+        zen_db_perform(
+            TABLE_CONFIGURATION,
+            $sql_data_array,
+            'update',
+            "configuration_key = '" . zen_db_input($client_secret_key) . "'"
         );
         
         return true;
