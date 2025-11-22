@@ -343,7 +343,7 @@ function paypalr_save_credentials(string $client_id, string $client_secret, stri
         zen_db_perform(
             TABLE_CONFIGURATION,
             $sql_data_array,
-            'update',
+            'UPDATE',
             "configuration_key = '" . zen_db_input($client_id_key) . "'"
         );
         
@@ -355,7 +355,7 @@ function paypalr_save_credentials(string $client_id, string $client_secret, stri
         zen_db_perform(
             TABLE_CONFIGURATION,
             $sql_data_array,
-            'update',
+            'UPDATE',
             "configuration_key = '" . zen_db_input($client_secret_key) . "'"
         );
         
