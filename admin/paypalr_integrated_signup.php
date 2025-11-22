@@ -368,8 +368,9 @@ function paypalr_save_credentials(string $client_id, string $client_secret, stri
         
         return true;
     } catch (Exception $e) {
-        // Log error but don't expose details to user
-        trigger_error('Failed to save PayPal credentials: ' . $e->getMessage(), E_USER_WARNING);
+        // Log error but don't expose sensitive details to user
+        // Only log the error type, not the message which might contain credentials
+        trigger_error('Failed to save PayPal credentials: Database error occurred', E_USER_WARNING);
         return false;
     }
 }
