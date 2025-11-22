@@ -246,6 +246,9 @@ class paypalr extends base
             $this->title = MODULE_PAYMENT_PAYPALR_TEXT_TITLE_ADMIN . (($curl_installed === true) ? '' : $this->alertMsg(MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL));
             $this->description = sprintf(MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION, self::CURRENT_VERSION);
             
+            // Add ISU button if credentials are not populated for the current environment
+            $this->description .= $this->getIsuButton();
+            
             // Add upgrade button if current version is less than latest version
             $installed_version = defined('MODULE_PAYMENT_PAYPALR_VERSION') ? MODULE_PAYMENT_PAYPALR_VERSION : '0.0.0';
             if (version_compare($installed_version, self::CURRENT_VERSION, '<')) {
@@ -442,6 +445,65 @@ class paypalr extends base
     protected function alertMsg(string $msg)
     {
         return '<b class="text-danger">' . $msg . '</b>';
+    }
+
+    /**
+     * Generate the ISU (Integrated Sign-Up) button HTML for the admin description.
+     * This button only appears when the Client ID and Secret are not populated for
+     * the current environment (live or sandbox).
+     *
+     * @return string HTML for ISU button and instructions, or empty string if credentials exist
+     */
+    protected function getIsuButton(): string
+    {
+        // Determine current environment and check if credentials are populated
+        $environment = 'live';
+        if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
+            $value = strtolower((string)MODULE_PAYMENT_PAYPALR_SERVER);
+            if ($value === 'sandbox') {
+                $environment = 'sandbox';
+            }
+        }
+        
+        if ($environment === 'live') {
+            $client_id = trim(MODULE_PAYMENT_PAYPALR_CLIENTID_L ?? '');
+            $secret = trim(MODULE_PAYMENT_PAYPALR_SECRET_L ?? '');
+            $env_label = 'Production';
+        } else {
+            $client_id = trim(MODULE_PAYMENT_PAYPALR_CLIENTID_S ?? '');
+            $secret = trim(MODULE_PAYMENT_PAYPALR_SECRET_S ?? '');
+            $env_label = 'Sandbox';
+        }
+        
+        // Only show ISU button if either Client ID or Secret is missing
+        if ($client_id !== '' && $secret !== '') {
+            return '';
+        }
+        
+        // Build the ISU signup URL
+        $isu_url = zen_href_link('paypalr_integrated_signup.php', 'action=start', 'NONSSL');
+        
+        // Build the HTML for the ISU section
+        $isu_html = '<div class="paypalr-isu-section" style="margin-top: 20px; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9;">';
+        $isu_html .= '<h3 style="margin-top: 0;">' . (defined('MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_HEADING') ? MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_HEADING : 'PayPal Account Setup') . '</h3>';
+        
+        // Add intro text
+        if (defined('MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_INTRO')) {
+            $isu_html .= MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_INTRO;
+        }
+        
+        // Add the button
+        $button_text = defined('MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON') ? MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON : 'Complete PayPal Setup';
+        $isu_html .= '<p style="margin: 15px 0;"><a href="' . $isu_url . '" class="button" style="display: inline-block; padding: 10px 20px; background-color: #0070ba; color: white; text-decoration: none; border-radius: 3px; font-weight: bold;">' . $button_text . ' (' . $env_label . ')</a></p>';
+        
+        // Add manual fallback instructions
+        if (defined('MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_MANUAL_FALLBACK')) {
+            $isu_html .= MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_MANUAL_FALLBACK;
+        }
+        
+        $isu_html .= '</div>';
+        
+        return $isu_html;
     }
 
     // -----

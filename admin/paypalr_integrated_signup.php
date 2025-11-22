@@ -37,10 +37,32 @@ $action = strtolower(trim((string)($_GET['action'] ?? 'start')));
 
 switch ($action) {
     case 'return':
-        paypalr_onboarding_message(
-            MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_RETURN_MESSAGE ?? 'PayPal onboarding completed. Review and store the credentials that were provided on the Numinix portal.',
-            'success'
-        );
+        // Check if credentials were passed back from the onboarding process
+        // Note: Credentials are passed via GET parameters by the Numinix.com portal.
+        // This is the established ISU flow. The credentials are transmitted once over HTTPS
+        // and immediately saved to the database, minimizing exposure time.
+        $client_id = trim((string)($_GET['client_id'] ?? ''));
+        $client_secret = trim((string)($_GET['client_secret'] ?? ''));
+        $environment = paypalr_detect_environment();
+        
+        $credentials_saved = false;
+        if ($client_id !== '' && $client_secret !== '') {
+            // Save the credentials to the configuration
+            $credentials_saved = paypalr_save_credentials($client_id, $client_secret, $environment);
+        }
+        
+        if ($credentials_saved) {
+            paypalr_onboarding_message(
+                MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_SUCCESS_AUTO ?? 'PayPal onboarding completed successfully! Your API credentials have been automatically configured.',
+                'success'
+            );
+        } else {
+            // Credentials weren't passed or couldn't be saved - show manual instructions
+            paypalr_onboarding_message(
+                MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_RETURN_MESSAGE ?? 'PayPal onboarding completed. Please check your PayPal account to retrieve and enter your Client ID and Secret in the configuration below.',
+                'success'
+            );
+        }
         paypalr_redirect_to_modules();
         break;
 
@@ -288,4 +310,67 @@ function paypalr_self_url(array $params = []): string
     }
 
     return $url;
+}
+
+/**
+ * Saves PayPal API credentials to the configuration database.
+ *
+ * @param string $client_id The PayPal Client ID
+ * @param string $client_secret The PayPal Client Secret
+ * @param string $environment Either 'live' or 'sandbox'
+ * @return bool True if credentials were saved successfully, false otherwise
+ */
+function paypalr_save_credentials(string $client_id, string $client_secret, string $environment): bool
+{
+    global $db;
+    
+    if ($client_id === '' || $client_secret === '') {
+        return false;
+    }
+    
+    // Sanitize inputs to prevent any potential SQL injection
+    $client_id = zen_db_input($client_id);
+    $client_secret = zen_db_input($client_secret);
+    
+    // Determine which configuration keys to update based on environment
+    if ($environment === 'live') {
+        $client_id_key = 'MODULE_PAYMENT_PAYPALR_CLIENTID_L';
+        $client_secret_key = 'MODULE_PAYMENT_PAYPALR_SECRET_L';
+    } else {
+        $client_id_key = 'MODULE_PAYMENT_PAYPALR_CLIENTID_S';
+        $client_secret_key = 'MODULE_PAYMENT_PAYPALR_SECRET_S';
+    }
+    
+    try {
+        // Update Client ID
+        $sql_data_array = [
+            'configuration_value' => $client_id,
+            'last_modified' => 'now()'
+        ];
+        zen_db_perform(
+            TABLE_CONFIGURATION,
+            $sql_data_array,
+            'UPDATE',
+            "configuration_key = '" . zen_db_input($client_id_key) . "'"
+        );
+        
+        // Update Client Secret
+        $sql_data_array = [
+            'configuration_value' => $client_secret,
+            'last_modified' => 'now()'
+        ];
+        zen_db_perform(
+            TABLE_CONFIGURATION,
+            $sql_data_array,
+            'UPDATE',
+            "configuration_key = '" . zen_db_input($client_secret_key) . "'"
+        );
+        
+        return true;
+    } catch (Exception $e) {
+        // Log error but don't expose sensitive details to user
+        // Only log the error type, not the message which might contain credentials
+        trigger_error('Failed to save PayPal credentials: Database error occurred', E_USER_WARNING);
+        return false;
+    }
 }
