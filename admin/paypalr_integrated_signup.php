@@ -21,7 +21,16 @@ if (function_exists('zen_admin_check_login')) {
     $paypalrAdminLoggedIn = (int)($_SESSION['admin_id'] ?? 0) > 0;
 }
 
+$action = strtolower(trim((string)($_REQUEST['action'] ?? '')));
+
+// Check for AJAX requests before redirect - must return JSON, not HTML
+$isAjaxRequest = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
 if (!$paypalrAdminLoggedIn) {
+    // For AJAX requests, return JSON error instead of HTML redirect
+    if ($isAjaxRequest) {
+        paypalr_json_error('Session expired. Please refresh the page and log in again.');
+    }
     zen_redirect(zen_href_link(FILENAME_LOGIN, '', 'SSL'));
 }
 
@@ -30,10 +39,8 @@ if (file_exists($languageFile)) {
     include $languageFile;
 }
 
-$action = strtolower(trim((string)($_REQUEST['action'] ?? '')));
-
 // Handle AJAX requests for the new in-admin flow
-if ($action === 'proxy' && !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+if ($action === 'proxy' && $isAjaxRequest) {
     paypalr_handle_proxy_request();
     exit;
 }
@@ -502,6 +509,7 @@ function paypalr_render_onboarding_page(): void
 
 function paypalr_json_error(string $message): void
 {
+    header('Content-Type: application/json');
     echo json_encode(['success' => false, 'message' => $message]);
     exit;
 }
