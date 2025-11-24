@@ -117,7 +117,7 @@ function paypalr_proxy_to_numinix(string $baseUrl, string $action, array $data):
     curl_close($ch);
     
     if ($response === false || $httpCode !== 200) {
-        throw new RuntimeException('Failed to contact Numinix API: ' . ($error ?: 'HTTP ' . $httpCode));
+        throw new RuntimeException('Failed to contact Numinix API. Please try again or contact support.');
     }
     
     return $response;
@@ -455,11 +455,17 @@ function paypalr_render_onboarding_page(): void
                     startButton.disabled = true;
                     setStatus('Starting PayPal signup...', 'info');
                     
-                    proxyRequest('start', {})
+                    proxyRequest('start', {nonce: state.nonce || ''})
                         .then(function(response) {
                             var data = response.data || {};
                             state.trackingId = data.tracking_id;
-                            state.nonce = data.nonce || Date.now().toString();
+                            // Use nonce from server response, or generate a cryptographically secure one
+                            state.nonce = data.nonce;
+                            if (!state.nonce) {
+                                setStatus('Session error. Please refresh and try again.', 'error');
+                                startButton.disabled = false;
+                                return;
+                            }
                             
                             var redirectUrl = data.redirect_url || data.action_url;
                             if (!redirectUrl && data.links) {

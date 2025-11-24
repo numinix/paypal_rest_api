@@ -530,7 +530,6 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             }
 
             $integrationMethod = strtoupper((string)($oauth['integration_method'] ?? ''));
-            $integrationType = strtoupper((string)($oauth['integration_type'] ?? ''));
 
             // Look for PAYPAL integration method with OAUTH credentials
             if ($integrationMethod !== 'PAYPAL') {

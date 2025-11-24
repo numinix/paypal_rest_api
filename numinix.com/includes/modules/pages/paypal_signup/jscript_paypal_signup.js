@@ -530,7 +530,7 @@
 
         function displayCredentialsIfAvailable(data) {
             if (data.credentials && data.credentials.client_id && data.credentials.client_secret) {
-                var env = formatEnvironment(data.environment || state.session.env);
+                var env = formatEnvironment(data.environment || (state.session && state.session.env) || 'sandbox');
                 
                 // Create credentials display in the status area
                 if (statusNode) {
