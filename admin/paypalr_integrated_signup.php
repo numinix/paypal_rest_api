@@ -166,6 +166,17 @@ function paypalr_render_onboarding_page(): void
     $environment = paypalr_detect_environment();
     $modulesPageUrl = paypalr_modules_page_url();
     $proxyUrl = paypalr_self_url(['action' => 'proxy']);
+    $securityToken = $_SESSION['securityToken'] ?? '';
+    
+    // Security token should exist if admin is properly logged in
+    if ($securityToken === '') {
+        paypalr_onboarding_message(
+            'Security token missing. Please log in again.',
+            'error'
+        );
+        paypalr_redirect_to_modules();
+        return;
+    }
     
     ?>
     <!DOCTYPE html>
@@ -280,6 +291,7 @@ function paypalr_render_onboarding_page(): void
                 var proxyUrl = <?php echo json_encode($proxyUrl); ?>;
                 var environment = <?php echo json_encode($environment); ?>;
                 var modulesPageUrl = <?php echo json_encode($modulesPageUrl); ?>;
+                var securityToken = <?php echo json_encode($securityToken); ?>;
                 
                 var state = {
                     trackingId: null,
@@ -302,7 +314,8 @@ function paypalr_render_onboarding_page(): void
                 function proxyRequest(action, data) {
                     var payload = Object.assign({}, data || {}, {
                         proxy_action: action,
-                        action: 'proxy'
+                        action: 'proxy',
+                        securityToken: securityToken
                     });
                     
                     return fetch(proxyUrl, {
