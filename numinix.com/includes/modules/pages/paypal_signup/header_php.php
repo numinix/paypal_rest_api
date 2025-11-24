@@ -353,6 +353,8 @@ function nxp_paypal_handle_start(array $session): void
     nxp_paypal_dispatch_event('start_success', $context);
 
     $responseData = is_array($response['data'] ?? null) ? $response['data'] : [];
+    // Include the nonce in the response for the client
+    $responseData['nonce'] = $session['nonce'];
     nxp_paypal_json_success([
         'data' => $responseData,
     ]);
@@ -410,16 +412,28 @@ function nxp_paypal_handle_finalize(array $session): void
     }
     $_SESSION['nxp_paypal']['updated_at'] = time();
 
-    if (isset($response['data']['credentials'])) {
-        unset($response['data']['credentials']);
+    // Store credentials in session if available, but redact from event logs
+    $credentials = null;
+    if (isset($response['data']['credentials']) && is_array($response['data']['credentials'])) {
+        $credentials = $response['data']['credentials'];
+        $_SESSION['nxp_paypal']['credentials'] = $credentials;
     }
 
     $context = is_array($response['data']) ? $response['data'] : [];
     $context['request'] = $payload;
     $context['response'] = $response;
 
+    // Remove credentials from event logging context for security
+    if (isset($context['credentials'])) {
+        unset($context['credentials']);
+    }
+    if (isset($context['response']['data']['credentials'])) {
+        unset($context['response']['data']['credentials']);
+    }
+
     nxp_paypal_dispatch_event('finalize_success', $context);
 
+    // Return full response including credentials to the client
     $responseData = is_array($response['data'] ?? null) ? $response['data'] : [];
     nxp_paypal_json_success([
         'data' => $responseData,
@@ -479,16 +493,26 @@ function nxp_paypal_handle_status(array $session): void
 
     $_SESSION['nxp_paypal']['updated_at'] = time();
 
-    if (isset($response['data']['credentials'])) {
-        unset($response['data']['credentials']);
+    // Store credentials in session if available, but redact from event logs
+    if (isset($response['data']['credentials']) && is_array($response['data']['credentials'])) {
+        $_SESSION['nxp_paypal']['credentials'] = $response['data']['credentials'];
     }
 
     $context = is_array($response['data']) ? $response['data'] : [];
     $context['request'] = $payload;
     $context['response'] = $response;
 
+    // Remove credentials from event logging context for security
+    if (isset($context['credentials'])) {
+        unset($context['credentials']);
+    }
+    if (isset($context['response']['data']['credentials'])) {
+        unset($context['response']['data']['credentials']);
+    }
+
     nxp_paypal_dispatch_event('status_success', $context);
 
+    // Return full response including credentials to the client
     $responseData = is_array($response['data'] ?? null) ? $response['data'] : [];
     nxp_paypal_json_success([
         'data' => $responseData,

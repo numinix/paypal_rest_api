@@ -136,6 +136,14 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 $data['links'] = $integration['links'];
             }
 
+            // Extract merchant credentials from oauth_integrations when onboarding is complete
+            if ($step === 'completed') {
+                $credentials = $this->extractMerchantCredentials($integration);
+                if ($credentials !== null) {
+                    $data['credentials'] = $credentials;
+                }
+            }
+
             return [
                 'success' => true,
                 'message' => $fromFinalize
@@ -502,6 +510,50 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         }
 
         return array_values(array_unique($result));
+    }
+
+    /**
+     * Extracts merchant REST API credentials from the integration response.
+     *
+     * @param array<string, mixed> $integration
+     * @return array{client_id: string, client_secret: string}|null
+     */
+    private function extractMerchantCredentials(array $integration): ?array
+    {
+        if (empty($integration['oauth_integrations']) || !is_array($integration['oauth_integrations'])) {
+            return null;
+        }
+
+        foreach ($integration['oauth_integrations'] as $oauth) {
+            if (!is_array($oauth)) {
+                continue;
+            }
+
+            $integrationMethod = strtoupper((string)($oauth['integration_method'] ?? ''));
+
+            // Look for PAYPAL integration method with OAUTH credentials
+            if ($integrationMethod !== 'PAYPAL') {
+                continue;
+            }
+
+            // Extract credentials from oauth_third_party_details
+            $thirdPartyDetails = $oauth['oauth_third_party_details'] ?? [];
+            if (!is_array($thirdPartyDetails)) {
+                continue;
+            }
+
+            $clientId = trim((string)($thirdPartyDetails['partner_client_id'] ?? ''));
+            $clientSecret = trim((string)($thirdPartyDetails['partner_client_secret'] ?? ''));
+
+            if ($clientId !== '' && $clientSecret !== '') {
+                return [
+                    'client_id' => $clientId,
+                    'client_secret' => $clientSecret,
+                ];
+            }
+        }
+
+        return null;
     }
 
     /**

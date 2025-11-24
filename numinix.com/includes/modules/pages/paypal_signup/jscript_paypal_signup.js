@@ -492,7 +492,7 @@
             }
 
             if (isCompletedStep(state.session.step)) {
-                setStatus('PayPal account connected. You\'re all set.', 'success');
+                displayCredentialsIfAvailable(data);
                 disableStartButtons(false);
                 cleanUrl();
                 return;
@@ -514,7 +514,7 @@
             }
 
             if (isCompletedStep(state.session.step)) {
-                setStatus('PayPal account connected. You\'re all set.', 'success');
+                displayCredentialsIfAvailable(data);
                 disableStartButtons(false);
                 cleanUrl();
                 if (state.pollTimer) {
@@ -526,6 +526,36 @@
 
             setStatus('Still waiting on PayPal…', 'info');
             pollStatus(state.pollInterval);
+        }
+
+        function displayCredentialsIfAvailable(data) {
+            if (data.credentials && data.credentials.client_id && data.credentials.client_secret) {
+                var env = formatEnvironment(data.environment || (state.session && state.session.env) || 'sandbox');
+                
+                // Create credentials display in the status area
+                if (statusNode) {
+                    var credentialsHtml = '<div class="nxp-ps-credentials">';
+                    credentialsHtml += '<h3>✓ PayPal Onboarding Complete</h3>';
+                    credentialsHtml += '<p class="nxp-ps-credentials__intro">Save these credentials in your PayPal module configuration:</p>';
+                    credentialsHtml += '<dl class="nxp-ps-credentials__list">';
+                    credentialsHtml += '<dt>Environment:</dt><dd>' + env + '</dd>';
+                    credentialsHtml += '<dt>Client ID:</dt><dd><code>' + htmlEscape(data.credentials.client_id) + '</code></dd>';
+                    credentialsHtml += '<dt>Client Secret:</dt><dd><code>' + htmlEscape(data.credentials.client_secret) + '</code></dd>';
+                    credentialsHtml += '</dl>';
+                    credentialsHtml += '<p class="nxp-ps-credentials__warning">⚠️ Store these credentials securely. Do not share them publicly.</p>';
+                    credentialsHtml += '</div>';
+                    statusNode.innerHTML = credentialsHtml;
+                    statusNode.setAttribute('data-tone', 'success');
+                }
+            } else {
+                setStatus('PayPal account connected. You\'re all set.', 'success');
+            }
+        }
+
+        function htmlEscape(str) {
+            var div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
         }
 
         function pollStatus(delay) {
