@@ -976,3 +976,75 @@ ul {
         scroll-behavior: auto !important;
     }
 }
+
+/* Credentials Display */
+.nxp-ps-credentials {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 24px;
+    margin-top: 16px;
+}
+
+.nxp-ps-credentials h3 {
+    color: #059669;
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+}
+
+.nxp-ps-credentials__intro {
+    color: #374151;
+    margin: 0 0 16px 0;
+}
+
+.nxp-ps-credentials__list {
+    display: grid;
+    gap: 12px;
+    margin: 0 0 16px 0;
+}
+
+.nxp-ps-credentials__list dt {
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+}
+
+.nxp-ps-credentials__list dd {
+    margin: 0;
+    padding: 0;
+}
+
+.nxp-ps-credentials__list code {
+    display: block;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    color: #1f2937;
+    word-break: break-all;
+    user-select: all;
+}
+
+.nxp-ps-credentials__warning {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    padding: 12px;
+    border-radius: 4px;
+    color: #92400e;
+    font-size: 14px;
+    margin: 16px 0 0 0;
+}
+
+@media (max-width: 768px) {
+    .nxp-ps-credentials {
+        padding: 16px;
+    }
+    
+    .nxp-ps-credentials__list code {
+        font-size: 11px;
+        padding: 6px 8px;
+    }
+}

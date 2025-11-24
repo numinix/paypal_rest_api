@@ -353,6 +353,8 @@ function nxp_paypal_handle_start(array $session): void
     nxp_paypal_dispatch_event('start_success', $context);
 
     $responseData = is_array($response['data'] ?? null) ? $response['data'] : [];
+    // Include the nonce in the response for the client
+    $responseData['nonce'] = $session['nonce'];
     nxp_paypal_json_success([
         'data' => $responseData,
     ]);
