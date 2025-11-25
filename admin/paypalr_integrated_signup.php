@@ -87,7 +87,7 @@ function paypalr_handle_proxy_request(): void
     
     $allowedActions = ['start', 'status', 'finalize'];
     if (!in_array($proxyAction, $allowedActions, true)) {
-        paypalr_json_error('Invalid proxy action: ' . $proxyAction);
+        paypalr_json_error('Invalid proxy action.');
         return;
     }
     
@@ -854,11 +854,17 @@ function paypalr_resolve_log_file(): ?string
  */
 function paypalr_redact_sensitive($value)
 {
+    // Sensitive keys to redact from logs - keep in sync with nxp_paypal_redact_log_context
+    static $sensitiveKeys = [
+        'client_secret', 'secret', 'access_token', 'refresh_token',
+        'authorization', 'password', 'securitytoken', 'nonce', 'credentials'
+    ];
+    
     if (is_array($value)) {
         $redacted = [];
         foreach ($value as $key => $item) {
             $lowerKey = is_string($key) ? strtolower($key) : '';
-            if (in_array($lowerKey, ['client_secret', 'secret', 'access_token', 'refresh_token', 'authorization', 'password', 'securitytoken'], true)) {
+            if (in_array($lowerKey, $sensitiveKeys, true)) {
                 $redacted[$key] = '[REDACTED]';
                 continue;
             }
