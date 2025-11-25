@@ -190,6 +190,24 @@ namespace {
                 fwrite(STDERR, "FAIL: API endpoint should chdir to DIR_FS_CATALOG\n");
                 $passed = false;
             }
+            
+            // Verify IS_ADMIN_FLAG is set before application_top
+            $isAdminPos = strpos($content, 'IS_ADMIN_FLAG');
+            $appTopPos = strpos($content, 'application_top.php');
+            if ($isAdminPos !== false && $appTopPos !== false && $isAdminPos < $appTopPos) {
+                fwrite(STDOUT, "✓ IS_ADMIN_FLAG is defined before application_top.php\n");
+            } else {
+                fwrite(STDERR, "FAIL: IS_ADMIN_FLAG should be defined before application_top.php\n");
+                $passed = false;
+            }
+            
+            // Verify error handling for missing files
+            if (strpos($content, 'missingFiles') !== false && strpos($content, 'http_response_code(500)') !== false) {
+                fwrite(STDOUT, "✓ API endpoint has error handling for missing dependencies\n");
+            } else {
+                fwrite(STDERR, "FAIL: API endpoint should handle missing dependencies gracefully\n");
+                $passed = false;
+            }
         } else {
             fwrite(STDERR, "FAIL: Standalone API endpoint file does not exist at $apiFile\n");
             $passed = false;

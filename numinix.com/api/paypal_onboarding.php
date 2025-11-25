@@ -11,6 +11,11 @@
 
 declare(strict_types=1);
 
+// Ensure we're not in admin mode for this API endpoint - must be set before application_top
+if (!defined('IS_ADMIN_FLAG')) {
+    define('IS_ADMIN_FLAG', false);
+}
+
 // Bootstrap Zen Cart without triggering page-based action/security handling
 require '../includes/configure.php';
 ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'));
@@ -24,21 +29,30 @@ if (session_status() === PHP_SESSION_NONE) {
 // Load application without page-specific processing
 require_once 'includes/application_top.php';
 
-// Ensure we're not in admin mode for this API endpoint
-if (!defined('IS_ADMIN_FLAG')) {
-    define('IS_ADMIN_FLAG', false);
-}
-
 // Load the onboarding service and helpers
 $servicePath = DIR_WS_MODULES . 'pages/paypal_signup/class.numinix_paypal_onboarding_service.php';
-if (file_exists($servicePath)) {
-    require_once $servicePath;
+$helpersPath = DIR_WS_MODULES . 'pages/paypal_signup/includes/nxp_paypal_helpers.php';
+
+$missingFiles = [];
+if (!file_exists($servicePath)) {
+    $missingFiles[] = 'onboarding service';
+}
+if (!file_exists($helpersPath)) {
+    $missingFiles[] = 'helper functions';
 }
 
-$helpersPath = DIR_WS_MODULES . 'pages/paypal_signup/includes/nxp_paypal_helpers.php';
-if (file_exists($helpersPath)) {
-    require_once $helpersPath;
+if (!empty($missingFiles)) {
+    header('Content-Type: application/json');
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'PayPal onboarding API is not properly configured. Missing: ' . implode(', ', $missingFiles),
+    ]);
+    exit;
 }
+
+require_once $servicePath;
+require_once $helpersPath;
 
 // Log incoming API request
 if (function_exists('nxp_paypal_log_debug')) {
@@ -51,6 +65,16 @@ if (function_exists('nxp_paypal_log_debug')) {
         'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
         'origin' => $_SERVER['HTTP_ORIGIN'] ?? 'none',
     ]);
+}
+
+if (!function_exists('nxp_paypal_bootstrap_session') || !function_exists('nxp_paypal_detect_action') || !function_exists('nxp_paypal_handle_ajax_action')) {
+    header('Content-Type: application/json');
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'PayPal onboarding API helper functions are not available.',
+    ]);
+    exit;
 }
 
 $nxpPayPalSession = nxp_paypal_bootstrap_session();
