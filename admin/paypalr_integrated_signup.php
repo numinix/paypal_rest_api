@@ -121,6 +121,14 @@ function paypalr_proxy_to_numinix(string $baseUrl, string $action, array $data):
     $url = rtrim($baseUrl, '/');
     $environment = paypalr_detect_environment();
     
+    // Remove local Zen Cart admin parameters that could confuse the remote Zen Cart.
+    // These parameters are used for local session validation and should not be forwarded
+    // to numinix.com, where they could trigger security redirects or unexpected behavior.
+    $localOnlyParams = ['action', 'securityToken', 'proxy_action'];
+    foreach ($localOnlyParams as $param) {
+        unset($data[$param]);
+    }
+    
     // For 'start' action, pass empty nonce; numinix.com will generate one.
     // For 'status' and 'finalize', use the nonce returned from the start call.
     $payload = array_merge($data, [
@@ -630,7 +638,9 @@ function paypalr_modules_page_url(): string
 
 function paypalr_get_numinix_portal_base(): string
 {
-    $baseUrl = 'https://www.numinix.com/index.php?main_page=paypal_api';
+    // Use the standalone API endpoint to avoid Zen Cart's action/securityToken handling
+    // which can cause 302 redirects when the remote Zen Cart interprets POST parameters.
+    $baseUrl = 'https://www.numinix.com/api/paypal_onboarding.php';
     if (defined('MODULE_PAYMENT_PAYPALR_NUMINIX_PORTAL') && MODULE_PAYMENT_PAYPALR_NUMINIX_PORTAL !== '') {
         $baseUrl = trim((string)MODULE_PAYMENT_PAYPALR_NUMINIX_PORTAL);
     }
@@ -644,18 +654,11 @@ function paypalr_get_numinix_portal_base(): string
         return '';
     }
 
-    $path = $parsed['path'] ?? '/index.php';
+    // Use the configured path, or default to the API endpoint
+    $path = $parsed['path'] ?? '/api/paypal_onboarding.php';
     if ($path === '' || $path === '/') {
-        $path = '/index.php';
+        $path = '/api/paypal_onboarding.php';
     }
-
-    $queryParams = [];
-    if (!empty($parsed['query'])) {
-        parse_str($parsed['query'], $queryParams);
-    }
-
-    $queryParams['main_page'] = 'paypal_api';
-    $queryString = http_build_query($queryParams, '', '&', PHP_QUERY_RFC3986);
 
     $normalized = ($parsed['scheme'] ?? 'https') . '://' . $parsed['host'];
     if (isset($parsed['port'])) {
@@ -663,8 +666,9 @@ function paypalr_get_numinix_portal_base(): string
     }
     $normalized .= $path;
 
-    if ($queryString !== '') {
-        $normalized .= '?' . $queryString;
+    // Preserve any query string from the configured URL
+    if (!empty($parsed['query'])) {
+        $normalized .= '?' . $parsed['query'];
     }
 
     if (!empty($parsed['fragment'])) {
