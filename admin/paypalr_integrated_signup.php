@@ -153,6 +153,7 @@ function paypalr_proxy_to_numinix(string $baseUrl, string $action, array $data):
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $redirectUrl = curl_getinfo($ch, CURLINFO_REDIRECT_URL);
     $curlError = curl_error($ch);
     $curlErrno = curl_errno($ch);
     curl_close($ch);
@@ -191,6 +192,7 @@ function paypalr_proxy_to_numinix(string $baseUrl, string $action, array $data):
         paypalr_log_debug('Numinix API returned non-200 status', [
             'action' => $action,
             'http_code' => $httpCode,
+            'redirect_url' => $redirectUrl,
             'response' => $response,
             'url' => $url,
         ]);
