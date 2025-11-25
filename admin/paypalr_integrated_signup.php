@@ -74,6 +74,12 @@ function paypalr_handle_proxy_request(): void
     $proxyAction = strtolower(trim((string)($_REQUEST['proxy_action'] ?? '')));
     $numinixUrl = paypalr_get_numinix_portal_base();
     
+    paypalr_log_debug('Handling proxy request', [
+        'proxy_action' => $proxyAction,
+        'numinix_url' => $numinixUrl,
+        'post_keys' => array_keys($_POST),
+    ]);
+    
     if ($numinixUrl === '') {
         paypalr_json_error('Numinix portal URL not configured.');
         return;
@@ -81,14 +87,28 @@ function paypalr_handle_proxy_request(): void
     
     $allowedActions = ['start', 'status', 'finalize'];
     if (!in_array($proxyAction, $allowedActions, true)) {
-        paypalr_json_error('Invalid proxy action.');
+        paypalr_json_error('Invalid proxy action: ' . $proxyAction);
         return;
     }
     
     try {
         $response = paypalr_proxy_to_numinix($numinixUrl, $proxyAction, $_POST);
+        
+        // Log the successful response (redacted)
+        $decoded = json_decode($response, true);
+        paypalr_log_debug('Proxy request completed', [
+            'proxy_action' => $proxyAction,
+            'success' => $decoded['success'] ?? 'unknown',
+            'has_data' => !empty($decoded['data']),
+        ]);
+        
         echo $response;
     } catch (Exception $e) {
+        paypalr_log_debug('Proxy request failed with exception', [
+            'proxy_action' => $proxyAction,
+            'exception' => get_class($e),
+            'message' => $e->getMessage(),
+        ]);
         paypalr_json_error($e->getMessage());
     }
 }
@@ -101,12 +121,24 @@ function paypalr_proxy_to_numinix(string $baseUrl, string $action, array $data):
     $url = rtrim($baseUrl, '/');
     $environment = paypalr_detect_environment();
     
+    // For 'start' action, pass empty nonce; numinix.com will generate one.
+    // For 'status' and 'finalize', use the nonce returned from the start call.
     $payload = array_merge($data, [
         'nxp_paypal_action' => $action,
         'env' => $environment,
     ]);
     
+    // Build origin header from current request for CORS validation
+    $origin = paypalr_get_origin();
+    
     $postData = http_build_query($payload, '', '&', PHP_QUERY_RFC3986);
+    
+    paypalr_log_debug('Proxy request to Numinix API', [
+        'action' => $action,
+        'url' => $url,
+        'environment' => $environment,
+        'payload_keys' => array_keys($payload),
+    ]);
     
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -116,16 +148,60 @@ function paypalr_proxy_to_numinix(string $baseUrl, string $action, array $data):
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/x-www-form-urlencoded',
         'X-Requested-With: XMLHttpRequest',
+        'Origin: ' . $origin,
     ]);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
+    $curlError = curl_error($ch);
+    $curlErrno = curl_errno($ch);
     curl_close($ch);
     
-    if ($response === false || $httpCode !== 200) {
-        throw new RuntimeException('Failed to contact Numinix API. Please try again or contact support.');
+    if ($response === false) {
+        $errorMsg = sprintf(
+            'cURL error %d: %s (URL: %s)',
+            $curlErrno,
+            $curlError ?: 'Unknown error',
+            $url
+        );
+        paypalr_log_debug('Numinix API request failed', [
+            'action' => $action,
+            'curl_errno' => $curlErrno,
+            'curl_error' => $curlError,
+            'url' => $url,
+        ]);
+        throw new RuntimeException('Failed to contact Numinix API: ' . $errorMsg);
     }
+    
+    if ($httpCode !== 200) {
+        // Try to decode JSON response for more specific error message
+        $decoded = json_decode($response, true);
+        $serverMessage = '';
+        if (is_array($decoded) && !empty($decoded['message'])) {
+            $serverMessage = (string) $decoded['message'];
+        }
+        
+        $errorMsg = sprintf(
+            'HTTP %d from Numinix API (action: %s)%s',
+            $httpCode,
+            $action,
+            $serverMessage !== '' ? ': ' . $serverMessage : ''
+        );
+        
+        paypalr_log_debug('Numinix API returned non-200 status', [
+            'action' => $action,
+            'http_code' => $httpCode,
+            'response' => $response,
+            'url' => $url,
+        ]);
+        throw new RuntimeException('Failed to contact Numinix API: ' . $errorMsg);
+    }
+    
+    paypalr_log_debug('Numinix API response received', [
+        'action' => $action,
+        'http_code' => $httpCode,
+        'response_length' => strlen($response),
+    ]);
     
     return $response;
 }
@@ -522,6 +598,7 @@ function paypalr_render_onboarding_page(): void
 
 function paypalr_json_error(string $message): void
 {
+    paypalr_log_debug('Returning JSON error to client', ['message' => $message]);
     header('Content-Type: application/json');
     echo json_encode(['success' => false, 'message' => $message]);
     exit;
@@ -688,4 +765,111 @@ function paypalr_save_credentials(string $client_id, string $client_secret, stri
         trigger_error('Failed to save PayPal credentials: Database error occurred', E_USER_WARNING);
         return false;
     }
+}
+
+/**
+ * Returns the origin (scheme + host) for the current request.
+ *
+ * @return string
+ */
+function paypalr_get_origin(): string
+{
+    $scheme = 'http';
+    if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
+        $scheme = 'https';
+    } elseif (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+        $scheme = strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']);
+    } elseif (isset($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] !== '') {
+        $scheme = (string) $_SERVER['REQUEST_SCHEME'];
+    }
+    
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    return $scheme . '://' . $host;
+}
+
+/**
+ * Logs debug information to the Zen Cart logs directory.
+ *
+ * @param string               $message
+ * @param array<string, mixed> $context
+ * @return void
+ */
+function paypalr_log_debug(string $message, array $context = []): void
+{
+    $logFile = paypalr_resolve_log_file();
+    if ($logFile === null) {
+        return;
+    }
+    
+    $timestamp = date('c');
+    $logEntry = '[' . $timestamp . '] ' . $message;
+    
+    if (!empty($context)) {
+        // Redact sensitive values
+        $sanitized = paypalr_redact_sensitive($context);
+        $encoded = json_encode($sanitized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if (is_string($encoded)) {
+            $logEntry .= ' ' . $encoded;
+        }
+    }
+    
+    $directory = dirname($logFile);
+    if (!is_dir($directory)) {
+        if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
+            return;
+        }
+    }
+    
+    @file_put_contents($logFile, $logEntry . PHP_EOL, FILE_APPEND | LOCK_EX);
+}
+
+/**
+ * Determines the debug log file path within the Zen Cart logs directory.
+ *
+ * @return string|null
+ */
+function paypalr_resolve_log_file(): ?string
+{
+    $baseDir = null;
+    
+    if (defined('DIR_FS_LOGS') && DIR_FS_LOGS !== '') {
+        $baseDir = DIR_FS_LOGS;
+    } elseif (defined('DIR_FS_CATALOG') && DIR_FS_CATALOG !== '') {
+        $baseDir = rtrim(DIR_FS_CATALOG, '\\/') . '/logs';
+    }
+    
+    if ($baseDir === null) {
+        return null;
+    }
+    
+    $baseDir = rtrim($baseDir, '\\/');
+    return $baseDir . '/paypalr_isu_debug.log';
+}
+
+/**
+ * Recursively redacts sensitive values before logging.
+ *
+ * @param mixed $value
+ * @return mixed
+ */
+function paypalr_redact_sensitive($value)
+{
+    if (is_array($value)) {
+        $redacted = [];
+        foreach ($value as $key => $item) {
+            $lowerKey = is_string($key) ? strtolower($key) : '';
+            if (in_array($lowerKey, ['client_secret', 'secret', 'access_token', 'refresh_token', 'authorization', 'password', 'securitytoken'], true)) {
+                $redacted[$key] = '[REDACTED]';
+                continue;
+            }
+            $redacted[$key] = paypalr_redact_sensitive($item);
+        }
+        return $redacted;
+    }
+    
+    if (is_scalar($value) || $value === null) {
+        return $value;
+    }
+    
+    return (string) $value;
 }
