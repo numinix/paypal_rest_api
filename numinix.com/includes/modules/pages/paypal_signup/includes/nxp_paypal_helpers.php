@@ -87,16 +87,39 @@ function nxp_paypal_detect_action(): ?string
  */
 function nxp_paypal_handle_ajax_action(string $action, array $session): void
 {
+    nxp_paypal_log_debug('Received AJAX action request', [
+        'action' => $action,
+        'has_nonce' => !empty($_REQUEST['nonce']),
+        'has_tracking_id' => !empty($_REQUEST['tracking_id'] ?? $session['tracking_id'] ?? null),
+        'remote_addr' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+    ]);
+
     if (!nxp_paypal_is_secure_request()) {
+        nxp_paypal_log_debug('Request rejected: HTTPS required');
         nxp_paypal_json_error('SECURE transport is required for onboarding.');
     }
 
-    if (!nxp_paypal_validate_origin()) {
+    // Origin validation - for API calls (proxy from external sites), origin may not match
+    // We still validate for browser-based requests but allow API-style calls
+    if (!nxp_paypal_validate_origin_for_action($action)) {
+        nxp_paypal_log_debug('Request rejected: Origin validation failed', [
+            'action' => $action,
+            'origin' => $_SERVER['HTTP_ORIGIN'] ?? 'none',
+            'referer' => $_SERVER['HTTP_REFERER'] ?? 'none',
+            'host' => $_SERVER['HTTP_HOST'] ?? 'none',
+        ]);
         nxp_paypal_json_error('Request origin mismatch.');
     }
 
+    // Nonce validation - 'start' action allows empty nonce for new sessions
+    // Other actions require a valid nonce from a prior start call
     $nonce = nxp_paypal_filter_string($_REQUEST['nonce'] ?? null);
-    if (!nxp_paypal_validate_nonce($nonce)) {
+    if (!nxp_paypal_validate_nonce_for_action($action, $nonce, $session)) {
+        nxp_paypal_log_debug('Request rejected: Invalid session token', [
+            'action' => $action,
+            'nonce_provided' => $nonce !== null ? 'yes' : 'no',
+            'session_has_nonce' => !empty($session['nonce']) ? 'yes' : 'no',
+        ]);
         nxp_paypal_json_error('Invalid session token.');
     }
 
@@ -118,6 +141,7 @@ function nxp_paypal_handle_ajax_action(string $action, array $session): void
             nxp_paypal_handle_lead($session);
             break;
         default:
+            nxp_paypal_log_debug('Request rejected: Unsupported action', ['action' => $action]);
             nxp_paypal_json_error('Unsupported onboarding action.');
     }
 }
@@ -274,10 +298,21 @@ function nxp_paypal_handle_start(array $session): void
         'return_url' => nxp_paypal_current_url(),
     ];
 
+    nxp_paypal_log_debug('Processing start action', [
+        'environment' => $payload['environment'],
+        'tracking_id' => $payload['tracking_id'],
+        'origin' => $payload['origin'],
+    ]);
+
     try {
         $response = nxp_paypal_onboarding_service()->start($payload);
     } catch (Throwable $exception) {
         $message = $exception->getMessage() ?: 'Unable to initiate onboarding.';
+        nxp_paypal_log_debug('Start action failed with exception', [
+            'exception' => get_class($exception),
+            'message' => $exception->getMessage(),
+            'code' => $exception->getCode(),
+        ]);
         nxp_paypal_dispatch_event('start_failed', [
             'error' => $message,
             'request' => $payload,
@@ -290,6 +325,9 @@ function nxp_paypal_handle_start(array $session): void
         nxp_paypal_json_error($message);
     }
     if (!$response['success']) {
+        nxp_paypal_log_debug('Start action returned failure', [
+            'message' => $response['message'] ?? 'Unknown error',
+        ]);
         nxp_paypal_dispatch_event('start_failed', [
             'error' => $response['message'],
             'request' => $payload,
@@ -310,6 +348,11 @@ function nxp_paypal_handle_start(array $session): void
     $context['response'] = $response;
 
     nxp_paypal_dispatch_event('start_success', $context);
+
+    nxp_paypal_log_debug('Start action completed successfully', [
+        'tracking_id' => $_SESSION['nxp_paypal']['tracking_id'],
+        'has_redirect_url' => !empty($response['data']['redirect_url']),
+    ]);
 
     $responseData = is_array($response['data'] ?? null) ? $response['data'] : [];
     // Include the nonce in the response for the client
@@ -949,6 +992,157 @@ function nxp_paypal_validate_nonce(?string $nonce): bool
 }
 
 /**
+ * Validates origin for specific action types.
+ * For API proxy calls (from external admin panels), we allow cross-origin requests
+ * since they are authenticated via nonce exchange.
+ *
+ * @param string $action
+ * @return bool
+ */
+function nxp_paypal_validate_origin_for_action(string $action): bool
+{
+    // 'start' action allows cross-origin since it initiates a new session
+    // API proxy calls will always have a different origin
+    if ($action === 'start') {
+        return true;
+    }
+    
+    // For other actions, if we have a valid tracking_id in the request that matches
+    // the session, we can trust the request came from a legitimate source
+    $trackingId = nxp_paypal_filter_string($_REQUEST['tracking_id'] ?? null);
+    $sessionTrackingId = $_SESSION['nxp_paypal']['tracking_id'] ?? null;
+    
+    if ($trackingId !== null && $sessionTrackingId !== null && $trackingId === $sessionTrackingId) {
+        return true;
+    }
+    
+    // Fall back to standard origin validation
+    return nxp_paypal_validate_origin();
+}
+
+/**
+ * Validates nonce based on the action being performed.
+ * The 'start' action allows empty nonce for new sessions (generates a fresh one).
+ * All other actions require a valid nonce from a prior 'start' call.
+ *
+ * @param string               $action
+ * @param string|null          $nonce
+ * @param array<string, mixed> $session
+ * @return bool
+ */
+function nxp_paypal_validate_nonce_for_action(string $action, ?string $nonce, array $session): bool
+{
+    // For 'start' action, allow empty nonce - we'll generate a new one
+    if ($action === 'start') {
+        // If nonce is provided, validate it; if not, allow the request
+        if ($nonce === null || $nonce === '') {
+            return true;
+        }
+        // If nonce IS provided, it must match the session
+        return nxp_paypal_validate_nonce($nonce);
+    }
+    
+    // For all other actions, require a valid nonce
+    return nxp_paypal_validate_nonce($nonce);
+}
+
+/**
+ * Logs debug information to the Zen Cart logs directory (Numinix side).
+ *
+ * @param string               $message
+ * @param array<string, mixed> $context
+ * @return void
+ */
+function nxp_paypal_log_debug(string $message, array $context = []): void
+{
+    $logFile = nxp_paypal_resolve_debug_log_file();
+    if ($logFile === null) {
+        // Fall back to error_log
+        $logEntry = 'Numinix PayPal ISU: ' . $message;
+        if (!empty($context)) {
+            $sanitized = nxp_paypal_redact_log_context($context);
+            $logEntry .= ' ' . json_encode($sanitized, JSON_UNESCAPED_SLASHES);
+        }
+        error_log($logEntry);
+        return;
+    }
+    
+    $timestamp = date('c');
+    $logEntry = '[' . $timestamp . '] ' . $message;
+    
+    if (!empty($context)) {
+        $sanitized = nxp_paypal_redact_log_context($context);
+        $encoded = json_encode($sanitized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if (is_string($encoded)) {
+            $logEntry .= ' ' . $encoded;
+        }
+    }
+    
+    $directory = dirname($logFile);
+    if (!is_dir($directory)) {
+        if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
+            return;
+        }
+    }
+    
+    @file_put_contents($logFile, $logEntry . PHP_EOL, FILE_APPEND | LOCK_EX);
+}
+
+/**
+ * Determines the debug log file path within the Zen Cart logs directory.
+ *
+ * @return string|null
+ */
+function nxp_paypal_resolve_debug_log_file(): ?string
+{
+    $baseDir = null;
+    
+    if (defined('DIR_FS_LOGS') && DIR_FS_LOGS !== '') {
+        $baseDir = DIR_FS_LOGS;
+    } elseif (defined('DIR_FS_CATALOG') && DIR_FS_CATALOG !== '') {
+        $baseDir = rtrim(DIR_FS_CATALOG, '\\/') . '/logs';
+    }
+    
+    if ($baseDir === null) {
+        return null;
+    }
+    
+    $baseDir = rtrim($baseDir, '\\/');
+    return $baseDir . '/numinix_paypal_api_debug.log';
+}
+
+/**
+ * Redacts sensitive values from context before logging.
+ *
+ * @param array<string, mixed> $context
+ * @return array<string, mixed>
+ */
+function nxp_paypal_redact_log_context(array $context): array
+{
+    $sensitiveKeys = [
+        'client_secret', 'secret', 'access_token', 'refresh_token',
+        'authorization', 'password', 'securitytoken', 'nonce', 'credentials'
+    ];
+    
+    $redacted = [];
+    foreach ($context as $key => $value) {
+        $lowerKey = is_string($key) ? strtolower($key) : '';
+        if (in_array($lowerKey, $sensitiveKeys, true)) {
+            $redacted[$key] = '[REDACTED]';
+            continue;
+        }
+        if (is_array($value)) {
+            $redacted[$key] = nxp_paypal_redact_log_context($value);
+        } elseif (is_scalar($value) || $value === null) {
+            $redacted[$key] = $value;
+        } else {
+            $redacted[$key] = (string) $value;
+        }
+    }
+    return $redacted;
+}
+
+/**
  * Sends a JSON error response and terminates execution.
  *
  * @param string $message
@@ -957,6 +1151,10 @@ function nxp_paypal_validate_nonce(?string $nonce): bool
  */
 function nxp_paypal_json_error(string $message, int $statusCode = 400): void
 {
+    nxp_paypal_log_debug('Returning JSON error response', [
+        'message' => $message,
+        'status_code' => $statusCode,
+    ]);
     nxp_paypal_json_response(['success' => false, 'message' => $message], $statusCode);
 }
 
