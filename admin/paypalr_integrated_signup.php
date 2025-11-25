@@ -623,7 +623,11 @@ function paypalr_redirect_to_modules(): void
 
 function paypalr_modules_page_url(): string
 {
-    return zen_href_link(FILENAME_MODULES, 'set=payment&module=paypalr', 'SSL', false);
+    return html_entity_decode(
+        zen_href_link(FILENAME_MODULES, 'set=payment&module=paypalr', 'SSL', false),
+        ENT_QUOTES,
+        'UTF-8'
+    );
 }
 
 function paypalr_get_numinix_portal_base(): string
