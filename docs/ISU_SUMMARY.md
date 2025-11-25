@@ -112,7 +112,7 @@ Implemented a new AJAX-based architecture where:
 
 ### API Endpoints
 
-All endpoints are on `numinix.com/index.php?main_page=paypal_signup`:
+All endpoints are on `numinix.com/index.php?main_page=paypal_signup`, with a companion API surface for partner/plugin calls at `https://www.numinix.com/index.php?main_page=paypal_api`:
 
 **POST /start** - Initiates onboarding
 - Returns PayPal signup URL
