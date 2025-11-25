@@ -551,12 +551,48 @@ function paypalr_modules_page_url(): string
 
 function paypalr_get_numinix_portal_base(): string
 {
-    $baseUrl = 'https://www.numinix.com/index.php';
+    $baseUrl = 'https://www.numinix.com/index.php?main_page=paypal_api';
     if (defined('MODULE_PAYMENT_PAYPALR_NUMINIX_PORTAL') && MODULE_PAYMENT_PAYPALR_NUMINIX_PORTAL !== '') {
         $baseUrl = trim((string)MODULE_PAYMENT_PAYPALR_NUMINIX_PORTAL);
     }
 
-    return $baseUrl !== '' ? $baseUrl : '';
+    if ($baseUrl === '') {
+        return '';
+    }
+
+    $parsed = parse_url($baseUrl);
+    if ($parsed === false || empty($parsed['scheme']) || empty($parsed['host'])) {
+        return '';
+    }
+
+    $path = $parsed['path'] ?? '/index.php';
+    if ($path === '' || $path === '/') {
+        $path = '/index.php';
+    }
+
+    $queryParams = [];
+    if (!empty($parsed['query'])) {
+        parse_str($parsed['query'], $queryParams);
+    }
+
+    $queryParams['main_page'] = 'paypal_api';
+    $queryString = http_build_query($queryParams, '', '&', PHP_QUERY_RFC3986);
+
+    $normalized = ($parsed['scheme'] ?? 'https') . '://' . $parsed['host'];
+    if (isset($parsed['port'])) {
+        $normalized .= ':' . $parsed['port'];
+    }
+    $normalized .= $path;
+
+    if ($queryString !== '') {
+        $normalized .= '?' . $queryString;
+    }
+
+    if (!empty($parsed['fragment'])) {
+        $normalized .= '#' . $parsed['fragment'];
+    }
+
+    return $normalized;
 }
 
 function paypalr_detect_environment(): string
