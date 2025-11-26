@@ -58,12 +58,10 @@ if (version_compare($zcVersionMajor . '.' . $zcVersionMinor, '2.0.0', '>=')) {
             'loadFile' => 'currencies.php',
         ];
     }
-    if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'message_stack.php')) {
-        $autoLoadConfig[0][] = [
-            'autoType' => 'class',
-            'loadFile' => 'message_stack.php',
-        ];
-    }
+    // NOTE: messageStack is intentionally not loaded here. The standalone API endpoint
+    // (paypal_onboarding.php) does not use messageStack, and loading it causes a fatal
+    // error because messageStack depends on $template->get_template_dir() which is not
+    // initialized in this minimal bootstrap context.
     if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'zcDate.php')) {
         $autoLoadConfig[0][] = [
             'autoType' => 'class',
@@ -131,11 +129,8 @@ if (version_compare($zcVersionMajor . '.' . $zcVersionMinor, '2.0.0', '>=')) {
             'loadFile' => 'init_currencies.php',
         ];
     }
-    $autoLoadConfig[130][] = [
-        'autoType' => 'classInstantiate',
-        'className' => 'messageStack',
-        'objectName' => 'messageStack',
-    ];
+    // NOTE: messageStack instantiation is intentionally omitted here. See comment above
+    // regarding messageStack class loading - it's not needed by the API endpoint.
     if (file_exists(DIR_FS_CATALOG . DIR_WS_INCLUDES . 'init_includes/init_customer_auth.php')) {
         $autoLoadConfig[135][] = [
             'autoType' => 'init_script',
