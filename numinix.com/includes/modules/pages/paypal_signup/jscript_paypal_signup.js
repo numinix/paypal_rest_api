@@ -136,6 +136,8 @@
 
         var toggleButtons = document.querySelectorAll('.nxp-ps-toggle__button');
         var comparisonPanels = document.querySelectorAll('.nxp-ps-comparison__panel');
+        var MAX_POLL_ATTEMPTS = 30;
+        var MAX_POLL_DURATION_MS = 2 * 60 * 1000; // 2 minutes
         function activateComparison(view) {
             toggleButtons.forEach(function (button) {
                 var isActive = button.getAttribute('data-view') === view;
@@ -283,7 +285,9 @@
             popup: null,
             popupMonitor: null,
             pollTimer: null,
-            pollInterval: 4000
+            pollInterval: 4000,
+            pollAttempts: 0,
+            pollStartTime: null
         };
 
         var startButtons = document.querySelectorAll('[data-onboarding-start]');
@@ -509,6 +513,9 @@
             if (data.step) {
                 state.session.step = data.step;
             }
+            if (!state.pollStartTime) {
+                state.pollStartTime = Date.now();
+            }
             if (typeof data.polling_interval === 'number' && !Number.isNaN(data.polling_interval)) {
                 state.pollInterval = Math.max(data.polling_interval, 2000);
             }
@@ -521,6 +528,30 @@
                     window.clearTimeout(state.pollTimer);
                     state.pollTimer = null;
                 }
+                state.pollAttempts = 0;
+                state.pollStartTime = null;
+                return;
+            }
+
+            state.pollAttempts += 1;
+            var elapsed = Date.now() - state.pollStartTime;
+            var exceededAttempts = state.pollAttempts >= MAX_POLL_ATTEMPTS;
+            var exceededDuration = elapsed >= MAX_POLL_DURATION_MS;
+
+            if (exceededAttempts || exceededDuration) {
+                if (state.pollTimer) {
+                    window.clearTimeout(state.pollTimer);
+                    state.pollTimer = null;
+                }
+                var timeoutMessage = 'We were unable to finish connecting to PayPal. Please close this window and start the signup again.';
+                setStatus(timeoutMessage, 'error');
+                disableStartButtons(false);
+                sendTelemetry('status_timeout', {
+                    tracking_id: state.session.tracking_id || undefined,
+                    attempts: state.pollAttempts,
+                    elapsed_ms: elapsed,
+                    last_step: state.session.step
+                });
                 return;
             }
 
@@ -593,6 +624,8 @@
             if (state.loading) {
                 return;
             }
+            state.pollAttempts = 0;
+            state.pollStartTime = null;
             state.loading = true;
             disableStartButtons(true);
             setStatus('Starting secure PayPal signup…', 'info');
