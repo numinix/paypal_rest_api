@@ -1466,11 +1466,15 @@ function nxp_paypal_is_paypal_return_redirect(): bool
  */
 function nxp_paypal_show_completion_page(): void
 {
-    $permissionsGranted = strtolower(trim($_GET['permissionsGranted'] ?? ''));
-    $consentStatus = strtolower(trim($_GET['consentStatus'] ?? ''));
+    // Sanitize and validate PayPal return parameters
+    // These are only used to determine success status, not displayed to user
+    $permissionsGranted = nxp_paypal_filter_string($_GET['permissionsGranted'] ?? null);
+    $consentStatus = nxp_paypal_filter_string($_GET['consentStatus'] ?? null);
 
-    $success = ($permissionsGranted === 'true') || ($consentStatus === 'true');
+    $success = ($permissionsGranted !== null && strtolower($permissionsGranted) === 'true')
+            || ($consentStatus !== null && strtolower($consentStatus) === 'true');
 
+    // All output variables are hardcoded strings - not user-controlled
     if ($success) {
         $title = 'PayPal Setup Complete';
         $heading = '✓ PayPal Onboarding Complete';

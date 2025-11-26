@@ -246,7 +246,7 @@ namespace {
 
         // Check 2: Verify API proxy requests just require non-empty nonce
         // Looking for pattern where it checks nonce is not null/empty for proxy requests
-        if (preg_match('/nxp_paypal_is_api_proxy_request\s*\(\s*\)\s*\).*\$nonce\s*!==\s*null.*\$nonce\s*!==\s*[\'\"]{2}/s', $content)) {
+        if (preg_match('/nxp_paypal_is_api_proxy_request\s*\(\s*\)\s*\).*\$nonce\s*!==\s*null.*\$nonce\s*!==\s*[\'\"][\'\"]/s', $content)) {
             fwrite(STDOUT, "✓ API proxy requests require non-empty nonce\n");
         } else {
             fwrite(STDERR, "FAIL: API proxy requests should require non-empty nonce\n");
