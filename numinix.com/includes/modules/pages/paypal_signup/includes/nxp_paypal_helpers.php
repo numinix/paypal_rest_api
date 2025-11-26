@@ -414,23 +414,25 @@ function nxp_paypal_handle_finalize(array $session): void
     }
     $_SESSION['nxp_paypal']['updated_at'] = time();
 
-    // Store credentials in session if available, but redact from event logs
+    // Store credentials in session if available
     $credentials = null;
     if (isset($response['data']['credentials']) && is_array($response['data']['credentials'])) {
         $credentials = $response['data']['credentials'];
         $_SESSION['nxp_paypal']['credentials'] = $credentials;
     }
 
+    $redactedCredentials = nxp_paypal_redact_credentials($credentials);
+
     $context = is_array($response['data']) ? $response['data'] : [];
     $context['request'] = $payload;
     $context['response'] = $response;
 
-    // Remove credentials from event logging context for security
-    if (isset($context['credentials'])) {
-        unset($context['credentials']);
+    if ($redactedCredentials !== null) {
+        $context['credentials'] = $redactedCredentials;
     }
+
     if (isset($context['response']['data']['credentials'])) {
-        unset($context['response']['data']['credentials']);
+        $context['response']['data']['credentials'] = $redactedCredentials;
     }
 
     nxp_paypal_dispatch_event('finalize_success', $context);
@@ -579,6 +581,30 @@ function nxp_paypal_dispatch_event(string $event, array $context = []): void
 }
 
 /**
+ * Returns a redacted version of the credentials for logging.
+ *
+ * @param array<string, mixed>|null $credentials
+ * @return array<string, string>|null
+ */
+function nxp_paypal_redact_credentials(?array $credentials): ?array
+{
+    if (empty($credentials)) {
+        return null;
+    }
+
+    $masked = [];
+    foreach ($credentials as $key => $value) {
+        if (!is_string($key) || !is_scalar($value)) {
+            continue;
+        }
+
+        $masked[$key] = nxp_paypal_mask_sensitive_string((string)$value);
+    }
+
+    return !empty($masked) ? $masked : null;
+}
+
+/**
  * Returns the event schema used for telemetry logging.
  *
  * @return array<string, array<string, mixed>>
@@ -608,7 +634,7 @@ function nxp_paypal_event_schema(): array
         ],
         'finalize_success' => [
             'description' => 'Finalize call succeeded.',
-            'context_fields' => ['tracking_id', 'step', 'polling_interval', 'request', 'response'],
+            'context_fields' => ['tracking_id', 'step', 'polling_interval', 'request', 'response', 'credentials'],
         ],
         'finalize_failed' => [
             'description' => 'Finalize call failed.',
