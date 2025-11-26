@@ -391,7 +391,8 @@ function paypalr_render_onboarding_page(): void
                     nonce: null,
                     popup: null,
                     pollTimer: null,
-                    pollInterval: 4000
+                    pollInterval: 4000,
+                    finalizing: false
                 };
                 
                 var startButton = document.getElementById('start-button');
@@ -453,7 +454,7 @@ function paypalr_render_onboarding_page(): void
                     monitorPopup();
                     return true;
                 }
-                
+
                 function monitorPopup() {
                     var checkInterval = setInterval(function() {
                         if (!state.popup || state.popup.closed) {
@@ -462,10 +463,56 @@ function paypalr_render_onboarding_page(): void
                             // Don't change status if credentials are already shown
                             if (!credentialsDiv.innerHTML) {
                                 setStatus('PayPal window closed. Click Start to try again.', 'info');
+                                // If the popup closed after completion, finalize using the tracking ID
+                                if (state.trackingId) {
+                                    finalizeOnboarding();
+                                }
                                 startButton.disabled = false;
                             }
                         }
                     }, 1000);
+                }
+
+                function handlePopupMessage(event) {
+                    if (!state.popup || (event && event.source && event.source !== state.popup)) {
+                        return;
+                    }
+
+                    var payload = event && event.data;
+                    if (!payload) {
+                        return;
+                    }
+
+                    if (typeof payload === 'string') {
+                        try {
+                            payload = JSON.parse(payload);
+                        } catch (e) {
+                            payload = { event: payload };
+                        }
+                    }
+
+                    if (!payload || typeof payload !== 'object') {
+                        return;
+                    }
+
+                    var eventName = '';
+                    if (typeof payload.event === 'string') {
+                        eventName = payload.event;
+                    } else if (typeof payload.type === 'string') {
+                        eventName = payload.type;
+                    }
+
+                    var normalized = eventName.toLowerCase();
+                    var completionEvent = normalized === 'paypal_onboarding_complete'
+                        || normalized === 'paypal_partner_onboarding_complete'
+                        || payload.paypal_onboarding_complete === true
+                        || payload.paypalOnboardingComplete === true;
+
+                    if (!completionEvent) {
+                        return;
+                    }
+
+                    finalizeOnboarding();
                 }
                 
                 function pollStatus() {
@@ -485,7 +532,7 @@ function paypalr_render_onboarding_page(): void
                         });
                     }, state.pollInterval);
                 }
-                
+
                 function handleStatusResponse(data) {
                     var step = (data.step || '').toLowerCase();
                     
@@ -510,6 +557,30 @@ function paypalr_render_onboarding_page(): void
                         setStatus('Waiting for PayPal to complete setup...', 'info');
                         pollStatus();
                     }
+                }
+
+                function finalizeOnboarding() {
+                    if (!state.trackingId || state.finalizing) {
+                        return;
+                    }
+
+                    state.finalizing = true;
+                    setStatus('Processing your PayPal account details…', 'info');
+
+                    proxyRequest('finalize', {
+                        tracking_id: state.trackingId,
+                        nonce: state.nonce
+                    })
+                        .then(function(response) {
+                            handleStatusResponse(response.data || {});
+                        })
+                        .catch(function(error) {
+                            setStatus(error.message || 'Failed to finalize onboarding', 'error');
+                            startButton.disabled = false;
+                        })
+                        .finally(function() {
+                            state.finalizing = false;
+                        });
                 }
                 
                 function displayCredentials(credentials) {
@@ -618,8 +689,9 @@ function paypalr_render_onboarding_page(): void
                             startButton.disabled = false;
                         });
                 }
-                
+
                 startButton.addEventListener('click', startOnboarding);
+                window.addEventListener('message', handlePopupMessage);
             })();
         </script>
     </body>
