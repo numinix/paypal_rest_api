@@ -26,7 +26,7 @@ if (file_exists($versionFile)) {
 //   - message_stack.php - causes fatal error (requires $template->get_template_dir())
 //
 // Init scripts not needed:
-//   - init_non_db_settings.php, init_sanitize.php - not required for API
+//   - init_sanitize.php - not required for API
 //   - init_languages.php, init_currencies.php - not used by API
 //   - init_customer_auth.php - not required for this API endpoint
 //
@@ -51,6 +51,14 @@ if (file_exists(DIR_FS_CATALOG . DIR_WS_INCLUDES . 'init_includes/init_db_config
     $autoLoadConfig[40][] = [
         'autoType' => 'init_script',
         'loadFile' => 'init_db_config_read.php',
+    ];
+}
+
+// Load non-DB settings (defines constants like TOPMOST_CATEGORY_PARENT_ID required by init_category_path.php)
+if (file_exists(DIR_FS_CATALOG . DIR_WS_INCLUDES . 'init_includes/init_non_db_settings.php')) {
+    $autoLoadConfig[45][] = [
+        'autoType' => 'init_script',
+        'loadFile' => 'init_non_db_settings.php',
     ];
 }
 
