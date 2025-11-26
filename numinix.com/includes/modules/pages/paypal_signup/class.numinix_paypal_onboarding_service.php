@@ -132,6 +132,10 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 'polling_interval' => self::DEFAULT_POLLING_INTERVAL_MS,
             ];
 
+            if ($step === 'waiting') {
+                $data['status_hint'] = 'provisioning';
+            }
+
             if (!empty($integration['links']) && is_array($integration['links'])) {
                 $data['links'] = $integration['links'];
             }
@@ -179,6 +183,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 'tracking_id' => $trackingId,
                 'partner_referral_id' => $partnerReferralId,
                 'step' => 'waiting',
+                'status_hint' => 'provisioning',
                 'polling_interval' => self::DEFAULT_POLLING_INTERVAL_MS,
             ],
         ];
