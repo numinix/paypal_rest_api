@@ -283,7 +283,8 @@
             popup: null,
             popupMonitor: null,
             pollTimer: null,
-            pollInterval: 4000
+            pollInterval: 4000,
+            finalizing: false
         };
 
         var startButtons = document.querySelectorAll('[data-onboarding-start]');
@@ -466,7 +467,10 @@
                     window.clearInterval(state.popupMonitor);
                     state.popupMonitor = null;
                     state.popup = null;
-                    if (state.session.step === 'waiting') {
+                    if (state.session.step === 'waiting' && state.session.tracking_id) {
+                        setStatus('Processing your PayPal account details…', 'info');
+                        finalizeOnboarding();
+                    } else {
                         setStatus('The PayPal window closed before finishing. Start PayPal Signup again when you are ready.', 'error');
                         sendTelemetry('cancelled', {
                             tracking_id: state.session.tracking_id || undefined,
@@ -642,6 +646,9 @@
         }
 
         function finalizeOnboarding() {
+            if (state.finalizing) {
+                return;
+            }
             var payload = {};
             if (state.session.code) {
                 payload.code = state.session.code;
@@ -654,6 +661,7 @@
                 return;
             }
 
+            state.finalizing = true;
             postAction('finalize', payload)
                 .then(function (response) {
                     handleFinalizeResponse(response.data || {});
@@ -673,12 +681,59 @@
                 })
                 .finally(function () {
                     state.session.code = '';
+                    state.finalizing = false;
                 });
+        }
+
+        function handlePopupMessage(event) {
+            if (!state.popup || (event && event.source && event.source !== state.popup)) {
+                return;
+            }
+
+            var rawData = event && event.data;
+            if (!rawData) {
+                return;
+            }
+
+            var payload = rawData;
+            if (typeof rawData === 'string') {
+                try {
+                    payload = JSON.parse(rawData);
+                } catch (error) {
+                    payload = { event: rawData };
+                }
+            }
+
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+
+            var eventName = '';
+            if (typeof payload.event === 'string') {
+                eventName = payload.event;
+            } else if (typeof payload.type === 'string') {
+                eventName = payload.type;
+            }
+
+            var normalized = eventName.toLowerCase();
+            var completionEvent = normalized === 'paypal_onboarding_complete'
+                || normalized === 'paypal_partner_onboarding_complete'
+                || payload.paypal_onboarding_complete === true
+                || payload.paypalOnboardingComplete === true;
+
+            if (!completionEvent || !state.session.tracking_id) {
+                return;
+            }
+
+            setStatus('Processing your PayPal account details…', 'info');
+            finalizeOnboarding();
         }
 
         startButtons.forEach(function (button) {
             button.addEventListener('click', startOnboarding);
         });
+
+        window.addEventListener('message', handlePopupMessage);
 
         disableStartButtons(false);
 
