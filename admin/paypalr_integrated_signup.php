@@ -388,6 +388,7 @@ function paypalr_render_onboarding_page(): void
                 
                 var state = {
                     trackingId: null,
+                    partnerReferralId: null,
                     nonce: null,
                     popup: null,
                     pollTimer: null,
@@ -521,6 +522,7 @@ function paypalr_render_onboarding_page(): void
                     state.pollTimer = setTimeout(function() {
                         proxyRequest('status', {
                             tracking_id: state.trackingId,
+                            partner_referral_id: state.partnerReferralId || '',
                             nonce: state.nonce
                         })
                         .then(function(response) {
@@ -535,6 +537,10 @@ function paypalr_render_onboarding_page(): void
 
                 function handleStatusResponse(data) {
                     var step = (data.step || '').toLowerCase();
+
+                    if (data.partner_referral_id) {
+                        state.partnerReferralId = data.partner_referral_id;
+                    }
                     
                     if (data.polling_interval) {
                         state.pollInterval = Math.max(data.polling_interval, 2000);
@@ -569,6 +575,7 @@ function paypalr_render_onboarding_page(): void
 
                     proxyRequest('finalize', {
                         tracking_id: state.trackingId,
+                        partner_referral_id: state.partnerReferralId || '',
                         nonce: state.nonce
                     })
                         .then(function(response) {
@@ -657,6 +664,7 @@ function paypalr_render_onboarding_page(): void
                         .then(function(response) {
                             var data = response.data || {};
                             state.trackingId = data.tracking_id;
+                            state.partnerReferralId = data.partner_referral_id || null;
                             // Use nonce from server response, or generate a cryptographically secure one
                             state.nonce = data.nonce;
                             if (!state.nonce) {
