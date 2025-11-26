@@ -21,13 +21,15 @@ require '../includes/configure.php';
 ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'));
 chdir(DIR_FS_CATALOG);
 
-// Start session before application_top to ensure consistent session handling
+// Load application without page-specific processing. Let Zen Cart bootstrap the
+// session so that any objects stored in the session (e.g., navigationHistory)
+// are unserialized only after their class definitions are available.
+require_once 'includes/application_top.php';
+
+// Ensure a session exists in case the environment has not started one yet.
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-
-// Load application without page-specific processing
-require_once 'includes/application_top.php';
 
 // Load the onboarding service and helpers
 $servicePath = DIR_WS_MODULES . 'pages/paypal_signup/class.numinix_paypal_onboarding_service.php';
