@@ -45,6 +45,11 @@ if ($action === 'proxy' && $isAjaxRequest) {
     exit;
 }
 
+if ($action === 'save_credentials' && $isAjaxRequest) {
+    paypalr_handle_save_credentials();
+    exit;
+}
+
 // Handle legacy redirect-based flow for backwards compatibility
 if ($action === 'return') {
     paypalr_handle_legacy_return();
@@ -252,6 +257,7 @@ function paypalr_render_onboarding_page(): void
     $environment = paypalr_detect_environment();
     $modulesPageUrl = paypalr_modules_page_url();
     $proxyUrl = paypalr_self_url(['action' => 'proxy']);
+    $saveUrl = paypalr_self_url(['action' => 'save_credentials']);
     $securityToken = $_SESSION['securityToken'] ?? '';
     
     // Security token should exist if admin is properly logged in
@@ -375,6 +381,7 @@ function paypalr_render_onboarding_page(): void
         <script>
             (function() {
                 var proxyUrl = <?php echo json_encode($proxyUrl); ?>;
+                var saveUrl = <?php echo json_encode($saveUrl); ?>;
                 var environment = <?php echo json_encode($environment); ?>;
                 var modulesPageUrl = <?php echo json_encode($modulesPageUrl); ?>;
                 var securityToken = <?php echo json_encode($securityToken); ?>;
@@ -528,27 +535,41 @@ function paypalr_render_onboarding_page(): void
                 }
                 
                 function autoSaveCredentials(credentials) {
-                    // Make AJAX call to save credentials
-                    var form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = modulesPageUrl;
-                    
-                    var fields = {
+                    setStatus('Saving credentials...', 'info');
+
+                    var payload = {
+                        action: 'save_credentials',
+                        securityToken: securityToken,
                         client_id: credentials.client_id,
-                        client_secret: credentials.client_secret,
-                        auto_save: '1'
+                        client_secret: credentials.client_secret
                     };
-                    
-                    for (var key in fields) {
-                        var input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = key;
-                        input.value = fields[key];
-                        form.appendChild(input);
-                    }
-                    
-                    // Note: Actual saving will be handled by the modules page
-                    // For now, we just display them for manual entry
+
+                    fetch(saveUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: new URLSearchParams(payload).toString()
+                    })
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('Network error while saving credentials');
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        if (!data || !data.success) {
+                            throw new Error(data && data.message || 'Failed to save credentials');
+                        }
+
+                        setStatus('Credentials saved! Redirecting...', 'success');
+                        setTimeout(function() {
+                            window.location.href = modulesPageUrl;
+                        }, 1500);
+                    })
+                    .catch(function(error) {
+                        setStatus(error.message || 'Failed to save credentials', 'error');
+                        startButton.disabled = false;
+                    });
                 }
                 
                 function escapeHtml(text) {
@@ -775,6 +796,44 @@ function paypalr_save_credentials(string $client_id, string $client_secret, stri
         trigger_error('Failed to save PayPal credentials: Database error occurred', E_USER_WARNING);
         return false;
     }
+}
+
+/**
+ * Handles AJAX credential saving from the in-admin flow.
+ */
+function paypalr_handle_save_credentials(): void
+{
+    header('Content-Type: application/json');
+
+    $token = (string)($_POST['securityToken'] ?? '');
+    if ($token === '' || $token !== (string)($_SESSION['securityToken'] ?? '')) {
+        paypalr_json_error('Invalid security token. Please refresh and try again.');
+    }
+
+    $clientId = trim((string)($_POST['client_id'] ?? ''));
+    $clientSecret = trim((string)($_POST['client_secret'] ?? ''));
+
+    if ($clientId === '' || $clientSecret === '') {
+        paypalr_json_error('Client ID and Secret are required.');
+    }
+
+    $environment = paypalr_detect_environment();
+    $saved = paypalr_save_credentials($clientId, $clientSecret, $environment);
+
+    if (!$saved) {
+        paypalr_json_error('Unable to save PayPal credentials.');
+    }
+
+    paypalr_log_debug('PayPal ISU credentials saved', [
+        'environment' => $environment,
+    ]);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Credentials saved.',
+        'environment' => $environment,
+    ]);
+    exit;
 }
 
 /**
