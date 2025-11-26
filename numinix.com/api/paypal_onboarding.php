@@ -21,6 +21,9 @@ require '../includes/configure.php';
 ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'));
 chdir(DIR_FS_CATALOG);
 
+// override Zen Cart core to load only essential functions
+$loaderPrefix = 'paypal_isu';
+
 // Load application without page-specific processing. Let Zen Cart bootstrap the
 // session so that any objects stored in the session (e.g., navigationHistory)
 // are unserialized only after their class definitions are available.
