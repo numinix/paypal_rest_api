@@ -80,6 +80,20 @@ if (!function_exists('nxp_paypal_bootstrap_session') || !function_exists('nxp_pa
 $nxpPayPalSession = nxp_paypal_bootstrap_session();
 
 $requestedAction = nxp_paypal_detect_action();
+
+// Handle PayPal return redirect (GET request after modal completion)
+// PayPal sends parameters like merchantIdInPayPal, merchantId, permissionsGranted, consentStatus
+if ($requestedAction === null && nxp_paypal_is_paypal_return_redirect()) {
+    if (function_exists('nxp_paypal_log_debug')) {
+        nxp_paypal_log_debug('PayPal return redirect detected, showing completion page', [
+            'merchantIdInPayPal' => $_GET['merchantIdInPayPal'] ?? 'not provided',
+            'permissionsGranted' => $_GET['permissionsGranted'] ?? 'not provided',
+        ]);
+    }
+    nxp_paypal_show_completion_page();
+    exit;
+}
+
 if ($requestedAction === null) {
     if (function_exists('nxp_paypal_log_debug')) {
         nxp_paypal_log_debug('API request rejected: Missing nxp_paypal_action parameter', [
