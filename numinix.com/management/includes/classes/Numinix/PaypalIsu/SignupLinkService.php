@@ -37,7 +37,7 @@ class NuminixPaypalIsuSignupLinkService
         $apiBase = $this->resolveApiBase($environment);
         $accessToken = $this->obtainAccessToken($apiBase, $clientId, $clientSecret);
 
-        $payload = $this->buildPayload($environment, $options);
+        $payload = $this->buildPayload($environment, $options, $clientId);
         $response = $this->createPartnerReferral($apiBase, $accessToken, $payload);
 
         $links = isset($response['links']) && is_array($response['links']) ? $response['links'] : [];
@@ -307,8 +307,9 @@ class NuminixPaypalIsuSignupLinkService
      */
     protected function createPartnerReferral(string $apiBase, string $accessToken, array $payload): array
     {
-        $url = rtrim($apiBase, '/') . '/v2/customer/partner-referrals';
+        $url = rtrim($apiBase, '/') . '/v1/customer/partner-referrals';
         $trackingId = (string) ($payload['tracking_id'] ?? '');
+        $requestId = $trackingId !== '' ? $trackingId : $this->resolveTrackingId(null);
 
         $headers = [
             'Content-Type: application/json',
@@ -317,9 +318,7 @@ class NuminixPaypalIsuSignupLinkService
             'PayPal-Partner-Attribution-Id: ' . self::ATTRIBUTION_ID,
         ];
 
-        if ($trackingId !== '') {
-            $headers[] = 'PayPal-Request-Id: ' . $trackingId;
-        }
+        $headers[] = 'PayPal-Request-Id: ' . $requestId;
 
         $response = $this->performHttpRequest($url, $headers, json_encode($payload) ?: '{}');
         $decoded = $this->decodeJson($response['body']);
@@ -395,15 +394,19 @@ class NuminixPaypalIsuSignupLinkService
      *
      * @param string               $environment
      * @param array<string, mixed> $options
+     * @param string               $partnerClientId
      * @return array<string, mixed>
      */
-    protected function buildPayload(string $environment, array $options): array
+    protected function buildPayload(string $environment, array $options, string $partnerClientId): array
     {
         $storeName = $this->sanitizeString($options['display_name'] ?? $this->getStoreName(), 128, 'Storefront');
         $businessName = $this->sanitizeString($options['business_name'] ?? $storeName, 128, $storeName);
         $ownerEmail = $this->sanitizeEmail($options['email'] ?? $this->getStoreOwnerEmail());
         [$givenName, $surname] = $this->parseOwnerName($options['given_name'] ?? null, $options['surname'] ?? null);
         $trackingId = $this->resolveTrackingId($options['tracking_id'] ?? null);
+
+        $capabilities = $this->resolveCapabilities($options['capabilities'] ?? null);
+        $products = $this->resolveProducts($options['products'] ?? null);
 
         $returnUrl = $this->sanitizeUrl($options['return_url'] ?? $this->getOnboardingUrl('return'));
         $websiteUrls = $this->resolveWebsiteUrls($options['website_urls'] ?? null);
@@ -412,13 +415,18 @@ class NuminixPaypalIsuSignupLinkService
             'integration_method' => 'PAYPAL',
             'integration_type' => 'THIRD_PARTY',
             'third_party_details' => [
-                'features' => ['PAYMENT', 'REFUND'],
+                'features' => $capabilities,
             ],
         ];
 
+        if ($partnerClientId !== '') {
+            $restIntegration['third_party_details']['partner_client_id'] = $partnerClientId;
+        }
+
         $payload = [
             'tracking_id' => $trackingId,
-            'products' => ['PPCP'],
+            'products' => $products,
+            'capabilities' => $capabilities,
             'operations' => [
                 [
                     'operation' => 'API_INTEGRATION',
@@ -933,6 +941,64 @@ class NuminixPaypalIsuSignupLinkService
         }
 
         return $fallback;
+    }
+
+    /**
+     * Resolves capabilities for the referral payload.
+     *
+     * @param mixed $value
+     * @return array<int, string>
+     */
+    protected function resolveCapabilities($value): array
+    {
+        return $this->sanitizeStringList($value, ['PAYMENT', 'REFUND', 'PARTNER_FEE']);
+    }
+
+    /**
+     * Resolves requested PayPal products for the referral payload.
+     *
+     * @param mixed $value
+     * @return array<int, string>
+     */
+    protected function resolveProducts($value): array
+    {
+        return $this->sanitizeStringList($value, ['PPCP', 'VAULT']);
+    }
+
+    /**
+     * Normalizes a list of string values.
+     *
+     * @param mixed                 $value
+     * @param array<int, string>    $default
+     * @return array<int, string>
+     */
+    protected function sanitizeStringList($value, array $default): array
+    {
+        if (is_array($value)) {
+            $list = [];
+            foreach ($value as $entry) {
+                if (!is_string($entry)) {
+                    continue;
+                }
+
+                $normalized = strtoupper(trim($entry));
+                if ($normalized !== '') {
+                    $list[] = $normalized;
+                }
+            }
+
+            $list = array_values(array_unique($list));
+            if (!empty($list)) {
+                return $list;
+            }
+        } elseif (is_string($value)) {
+            $normalized = strtoupper(trim($value));
+            if ($normalized !== '') {
+                return [$normalized];
+            }
+        }
+
+        return $default;
     }
 
     /**
