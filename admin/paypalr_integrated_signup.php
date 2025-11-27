@@ -92,7 +92,15 @@ function paypalr_handle_proxy_request(): void
         return;
     }
     
-    $allowedActions = ['start', 'status', 'finalize'];
+    $allowedActions = [
+        'start',
+        'status',
+        'finalize',
+        // Marketplace-specific actions
+        'create_referral',
+        'marketplace_status',
+        'managed_integration_status',
+    ];
     if (!in_array($proxyAction, $allowedActions, true)) {
         paypalr_json_error('Invalid proxy action.');
         return;
@@ -441,7 +449,6 @@ function paypalr_render_onboarding_page(): void
                     pollInterval: 4000,
                     pollAttempts: 0,
                     maxCredentialPolls: 15,
-                    finalizing: false,
                     environment: null
                 };
 
@@ -535,9 +542,8 @@ function paypalr_render_onboarding_page(): void
                             // Don't change status if credentials are already shown
                             if (!credentialsDiv.innerHTML) {
                                 setStatus('PayPal window closed. Click Start to try again.', 'info');
-                                // If the popup closed after completion, finalize using the tracking ID
                                 if (state.trackingId) {
-                                    finalizeOnboarding();
+                                    pollStatus(true);
                                 }
                                 startButton.disabled = false;
                             }
@@ -584,17 +590,18 @@ function paypalr_render_onboarding_page(): void
                         return;
                     }
 
-                    finalizeOnboarding();
+                    setStatus('Processing your PayPal account details…', 'info');
+                    pollStatus(true);
                 }
-                
-                function pollStatus() {
+
+                function pollStatus(immediate) {
                     if (!state.trackingId) return;
 
                     if (state.pollTimer) {
                         clearTimeout(state.pollTimer);
                     }
 
-                    state.pollTimer = setTimeout(function() {
+                    var performPoll = function() {
                         state.pollAttempts += 1;
 
                         if (state.pollAttempts > state.maxCredentialPolls) {
@@ -616,13 +623,28 @@ function paypalr_render_onboarding_page(): void
                             setStatus(error.message || 'Failed to check status', 'error');
                             startButton.disabled = false;
                         });
-                    }, state.pollInterval);
+                    };
+
+                    if (immediate) {
+                        performPoll();
+                    } else {
+                        state.pollTimer = setTimeout(performPoll, state.pollInterval);
+                    }
                 }
 
                 function handleStatusResponse(data) {
                     var step = (data.step || '').toLowerCase();
                     var hasCredentials = data.credentials && data.credentials.client_id && data.credentials.client_secret;
+                    var statusHint = (data.status_hint || '').toLowerCase();
+                    var statusText = (data.status || '').toLowerCase();
                     var completedStep = step === 'completed' || step === 'ready' || step === 'active';
+                    if (!hasCredentials && data.client_id && data.client_secret) {
+                        data.credentials = {
+                            client_id: data.client_id,
+                            client_secret: data.client_secret
+                        };
+                        hasCredentials = true;
+                    }
                     // Use environment from API response if available, fallback to local setting
                     var remoteEnvironment = data.environment || state.environment || environment;
 
@@ -649,46 +671,26 @@ function paypalr_render_onboarding_page(): void
                         if (hasCredentials) {
                             // Credentials are now available: show them, save them, and stop polling.
                             state.pollAttempts = 0;
+                            setStatus('PayPal account connected. Saving your API credentials…', 'success');
                             displayCredentials(data.credentials, remoteEnvironment);
                             autoSaveCredentials(data.credentials, remoteEnvironment);
                         } else {
-                            // The account is active but credentials are not yet returned by the API.
-                            setStatus('Your PayPal account is active. Waiting for API credentials...', 'info');
-                            pollStatus();
+                            setStatus('PayPal returned an incomplete credential payload. Please try again or contact support.', 'error');
+                            startButton.disabled = false;
                         }
                     } else if (step === 'cancelled' || step === 'declined') {
-                        setStatus('Onboarding was cancelled.', 'error');
+                        setStatus(data.message || 'Onboarding was cancelled.', 'error');
                         startButton.disabled = false;
+                    } else if (step === 'finalized') {
+                        setStatus('Your PayPal connection is being provisioned. We’ll save your credentials as soon as they’re ready.', 'info');
+                        pollStatus();
                     } else {
-                        setStatus('Waiting for PayPal to complete setup...', 'info');
+                        var waitingMessage = data.message
+                            || (statusHint === 'provisioning' ? 'PayPal is provisioning your merchant account. This may take a moment…' : '')
+                            || (statusText ? 'PayPal status: ' + statusText : 'Waiting for PayPal to complete setup...');
+                        setStatus(waitingMessage, 'info');
                         pollStatus();
                     }
-                }
-
-                function finalizeOnboarding() {
-                    if (!state.trackingId || state.finalizing) {
-                        return;
-                    }
-
-                    state.finalizing = true;
-                    setStatus('Processing your PayPal account details…', 'info');
-
-                    proxyRequest('finalize', {
-                        tracking_id: state.trackingId,
-                        partner_referral_id: state.partnerReferralId || '',
-                        merchant_id: state.merchantId || '',
-                        nonce: state.nonce
-                    })
-                        .then(function(response) {
-                            handleStatusResponse(response.data || {});
-                        })
-                        .catch(function(error) {
-                            setStatus(error.message || 'Failed to finalize onboarding', 'error');
-                            startButton.disabled = false;
-                        })
-                        .finally(function() {
-                            state.finalizing = false;
-                        });
                 }
                 
                 function displayCredentials(credentials, credentialEnvironment) {
