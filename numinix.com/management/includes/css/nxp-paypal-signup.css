@@ -328,6 +328,29 @@ body.nxp-signup-page {
     margin-bottom: 24px;
 }
 
+.nxp-form-group {
+    margin-bottom: 20px;
+}
+
+.nxp-form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.nxp-form-group select {
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: 200px;
+    border: 1px solid var(--nxp-ps-border);
+    border-radius: var(--nxp-ps-radius-sm);
+}
+
+.nxp-form-group .nxp-muted {
+    margin-top: 8px;
+    font-size: 13px;
+}
+
 .nxp-primary-btn.btn,
 .nxp-primary-btn {
     display: inline-flex;

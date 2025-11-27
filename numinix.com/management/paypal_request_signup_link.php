@@ -112,8 +112,17 @@ function nxp_resolve_stored_referral_link(string $environment): string
 $messages = [];
 $result = [];
 $debugSnapshot = null;
-$environment = defined('NUMINIX_PPCP_ENVIRONMENT') ? (string) NUMINIX_PPCP_ENVIRONMENT : 'sandbox';
-$environment = strtolower($environment) === 'live' ? 'live' : 'sandbox';
+$defaultEnvironment = defined('NUMINIX_PPCP_ENVIRONMENT') ? (string) NUMINIX_PPCP_ENVIRONMENT : 'sandbox';
+$defaultEnvironment = strtolower($defaultEnvironment) === 'live' ? 'live' : 'sandbox';
+
+// Use POST-submitted environment if valid, otherwise fall back to configured default
+$environment = $defaultEnvironment;
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $submittedEnv = strtolower(trim((string) ($_POST['environment'] ?? '')));
+    if (in_array($submittedEnv, ['sandbox', 'live'], true)) {
+        $environment = $submittedEnv;
+    }
+}
 
 $storedReferralLink = nxp_resolve_stored_referral_link($environment);
 
@@ -267,20 +276,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php if ($storedReferralLink !== ''): ?>
                     <div class="nxp-current-link" aria-live="polite">
                         <div class="nxp-current-link__body">
-                            <span class="nxp-current-link__eyebrow">Current referral link</span>
+                            <span class="nxp-current-link__eyebrow">Current referral link (<?php echo ($environment === 'live') ? 'Live' : 'Sandbox'; ?>)</span>
                             <a class="nxp-current-link__url" href="<?php echo zen_output_string($storedReferralLink); ?>" target="_blank" rel="noopener noreferrer"><?php echo zen_output_string($storedReferralLink); ?></a>
                         </div>
                         <button type="button" class="btn nxp-copy-button" data-copy-text="<?php echo htmlspecialchars($storedReferralLink, ENT_QUOTES, 'UTF-8'); ?>" data-copy-feedback="Copied!" data-copy-error="Copy failed" data-copy-label="Copy">Copy</button>
                     </div>
                 <?php endif; ?>
 
-                <p class="nxp-muted">
-                    The generator uses the <strong><?php echo ($environment === 'live') ? 'Live' : 'Sandbox'; ?></strong> partner credentials
-                    configured for this store. Click the button below to confirm the credentials and retrieve the reusable onboarding URL.
-                </p>
-
                 <form class="nxp-form" method="post" action="<?php echo zen_href_link(FILENAME_PAYPAL_REQUEST_SIGNUP_LINK); ?>">
                     <input type="hidden" name="securityToken" value="<?php echo zen_output_string($_SESSION['securityToken'] ?? ''); ?>" />
+
+                    <div class="nxp-form-group">
+                        <label for="environment">Select Environment</label>
+                        <select id="environment" name="environment" class="form-control">
+                            <option value="sandbox"<?php echo ($environment === 'sandbox') ? ' selected' : ''; ?>>Sandbox (Testing)</option>
+                            <option value="live"<?php echo ($environment === 'live') ? ' selected' : ''; ?>>Production (Live)</option>
+                        </select>
+                        <p class="nxp-muted">
+                            Choose whether to generate a signup link for the sandbox or production environment.
+                        </p>
+                    </div>
 
                     <button type="submit" class="btn nxp-primary-btn">Generate Signup Link</button>
                 </form>
