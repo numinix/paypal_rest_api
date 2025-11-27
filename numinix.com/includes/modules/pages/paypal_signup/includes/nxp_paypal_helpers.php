@@ -575,9 +575,7 @@ function nxp_paypal_dispatch_event(string $event, array $context = []): void
         $zco_notifier->notify('NOTIFY_NUMINIX_PAYPAL_ISU_EVENT', $payload);
     }
 
-    if (function_exists('error_log')) {
-        error_log('Numinix PayPal ISU event: ' . json_encode($payload));
-    }
+    nxp_paypal_log_debug('Numinix PayPal ISU event: ' . ($payload['event'] ?? 'event_type_missing'), $payload);
 }
 
 /**
