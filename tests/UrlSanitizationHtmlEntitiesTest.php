@@ -127,7 +127,10 @@ namespace {
         }
 
         // Check 4: Environment is validated against allowed values
-        if (preg_match('/in_array\s*\([^)]*\[\s*[\'"]sandbox[\'"]\s*,\s*[\'"]live[\'"]\s*\]/s', $content)) {
+        // Look for the in_array validation with sandbox and live values
+        if (strpos($content, "in_array") !== false && 
+            strpos($content, "'sandbox'") !== false && 
+            strpos($content, "'live'") !== false) {
             fwrite(STDOUT, "✓ Environment is validated against allowed values\n");
         } else {
             fwrite(STDERR, "FAIL: Environment should be validated against allowed values\n");

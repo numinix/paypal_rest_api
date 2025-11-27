@@ -286,13 +286,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <form class="nxp-form" method="post" action="<?php echo zen_href_link(FILENAME_PAYPAL_REQUEST_SIGNUP_LINK); ?>">
                     <input type="hidden" name="securityToken" value="<?php echo zen_output_string($_SESSION['securityToken'] ?? ''); ?>" />
 
-                    <div class="nxp-form-group" style="margin-bottom: 20px;">
-                        <label for="environment" style="display: block; font-weight: bold; margin-bottom: 8px;">Select Environment</label>
-                        <select id="environment" name="environment" class="form-control" style="padding: 8px 12px; font-size: 14px; min-width: 200px;">
+                    <div class="nxp-form-group">
+                        <label for="environment">Select Environment</label>
+                        <select id="environment" name="environment" class="form-control">
                             <option value="sandbox"<?php echo ($environment === 'sandbox') ? ' selected' : ''; ?>>Sandbox (Testing)</option>
                             <option value="live"<?php echo ($environment === 'live') ? ' selected' : ''; ?>>Production (Live)</option>
                         </select>
-                        <p class="nxp-muted" style="margin-top: 8px; font-size: 13px;">
+                        <p class="nxp-muted">
                             Choose whether to generate a signup link for the sandbox or production environment.
                         </p>
                     </div>
