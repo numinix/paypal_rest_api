@@ -8,6 +8,7 @@ global $db, $messageStack, $configuration_group_id;
 $obsoleteKeys = [
     'NUMINIX_PPCP_BACKEND_URL' => 'Removed configurable proxy endpoint; onboarding now targets the hosted Numinix proxy automatically.',
     'NUMINIX_PPCP_PLUGIN_MODE' => 'Removed credential transfer mode; onboarding no longer persists API credentials to remote stores.',
+    'NUMINIX_PPCP_PARTNER_REFERRAL_LINK' => 'Replaced by environment-specific partner referral link keys (sandbox and live).',
 ];
 
 foreach ($obsoleteKeys as $configKey => $notice) {
@@ -31,8 +32,17 @@ foreach ($obsoleteKeys as $configKey => $notice) {
 }
 
 $configuration_group_id = (int) ($configuration_group_id ?? 0);
-if ($configuration_group_id <= 0 && $versionEntry && !$versionEntry->EOF) {
-    $configuration_group_id = (int) $versionEntry->fields['configuration_group_id'];
+if ($configuration_group_id <= 0) {
+    $groupLookup = $db->Execute(
+        "SELECT configuration_group_id"
+        . " FROM " . TABLE_CONFIGURATION
+        . " WHERE configuration_key = '" . zen_db_input('NUMINIX_PPCP_ENVIRONMENT') . "'"
+        . " LIMIT 1"
+    );
+
+    if ($groupLookup && !$groupLookup->EOF) {
+        $configuration_group_id = (int) $groupLookup->fields['configuration_group_id'];
+    }
 }
 
 if ($configuration_group_id > 0) {
@@ -80,8 +90,4 @@ if ($configuration_group_id > 0) {
             );
         }
     }
-}
-
-if (isset($messageStack) && is_object($messageStack)) {
-    $messageStack->add('Numinix PayPal onboarding updated to version ' . $targetVersion . '.', 'success');
 }
