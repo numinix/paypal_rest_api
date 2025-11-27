@@ -36,7 +36,7 @@ if ($configuration_group_id <= 0) {
     $groupLookup = $db->Execute(
         "SELECT configuration_group_id"
         . " FROM " . TABLE_CONFIGURATION
-        . " WHERE configuration_key = 'NUMINIX_PPCP_ENVIRONMENT'"
+        . " WHERE configuration_key = '" . zen_db_input('NUMINIX_PPCP_ENVIRONMENT') . "'"
         . " LIMIT 1"
     );
 
