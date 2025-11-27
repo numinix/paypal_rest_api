@@ -307,7 +307,7 @@ class NuminixPaypalIsuSignupLinkService
      */
     protected function createPartnerReferral(string $apiBase, string $accessToken, array $payload): array
     {
-        $url = rtrim($apiBase, '/') . '/v1/customer/partner-referrals';
+        $url = rtrim($apiBase, '/') . '/v2/customer/partner-referrals';
         $trackingId = (string) ($payload['tracking_id'] ?? '');
         $requestId = $trackingId !== '' ? $trackingId : $this->resolveTrackingId(null);
 
