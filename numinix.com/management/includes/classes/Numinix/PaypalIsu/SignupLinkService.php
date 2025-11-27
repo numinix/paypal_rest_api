@@ -1020,30 +1020,6 @@ class NuminixPaypalIsuSignupLinkService
     }
 
     /**
-     * Sanitizes a URL value.
-     *
-     * @param mixed $value
-     * @return string
-     */
-    protected function sanitizeUrl($value): string
-    {
-        if (!is_string($value)) {
-            return '';
-        }
-
-        $url = trim($value);
-        if ($url === '') {
-            return '';
-        }
-
-        if (!preg_match('#^https?://#i', $url)) {
-            return '';
-        }
-
-        return $url;
-    }
-
-    /**
      * Logs additional debugging information to the admin activity log when available.
      *
      * @param string               $message
