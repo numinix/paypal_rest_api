@@ -59,25 +59,63 @@ function nxp_normalize_referral_link($value): string
     return $value;
 }
 
+/**
+ * Resolves the configuration key used to store the referral link for the requested environment.
+ *
+ * @param string $environment
+ * @return string
+ */
+function nxp_referral_link_key(string $environment): string
+{
+    return $environment === 'live'
+        ? 'NUMINIX_PPCP_LIVE_PARTNER_REFERRAL_LINK'
+        : 'NUMINIX_PPCP_SANDBOX_PARTNER_REFERRAL_LINK';
+}
+
+/**
+ * Retrieves the stored referral link for the given environment, falling back to the legacy key.
+ *
+ * @param string $environment
+ * @return string
+ */
+function nxp_resolve_stored_referral_link(string $environment): string
+{
+    $referralLinkKey = nxp_referral_link_key($environment);
+    $legacyKey = 'NUMINIX_PPCP_PARTNER_REFERRAL_LINK';
+    $storedReferralLink = '';
+
+    if (defined($referralLinkKey)) {
+        $storedReferralLink = nxp_normalize_referral_link(constant($referralLinkKey));
+    }
+
+    if ($storedReferralLink === '' && function_exists('zen_get_configuration_key_value')) {
+        $configured = zen_get_configuration_key_value($referralLinkKey);
+        if ($configured !== false && $configured !== null) {
+            $storedReferralLink = nxp_normalize_referral_link($configured);
+        }
+    }
+
+    if ($storedReferralLink === '' && defined($legacyKey)) {
+        $storedReferralLink = nxp_normalize_referral_link(constant($legacyKey));
+    }
+
+    if ($storedReferralLink === '' && function_exists('zen_get_configuration_key_value')) {
+        $configured = zen_get_configuration_key_value($legacyKey);
+        if ($configured !== false && $configured !== null) {
+            $storedReferralLink = nxp_normalize_referral_link($configured);
+        }
+    }
+
+    return $storedReferralLink;
+}
+
 $messages = [];
 $result = [];
 $debugSnapshot = null;
 $environment = defined('NUMINIX_PPCP_ENVIRONMENT') ? (string) NUMINIX_PPCP_ENVIRONMENT : 'sandbox';
 $environment = strtolower($environment) === 'live' ? 'live' : 'sandbox';
 
-$referralLinkKey = 'NUMINIX_PPCP_PARTNER_REFERRAL_LINK';
-$storedReferralLink = '';
-
-if (defined($referralLinkKey)) {
-    $storedReferralLink = nxp_normalize_referral_link(constant($referralLinkKey));
-}
-
-if ($storedReferralLink === '' && function_exists('zen_get_configuration_key_value')) {
-    $configured = zen_get_configuration_key_value($referralLinkKey);
-    if ($configured !== false && $configured !== null) {
-        $storedReferralLink = nxp_normalize_referral_link($configured);
-    }
-}
+$storedReferralLink = nxp_resolve_stored_referral_link($environment);
 
 $servicePath = DIR_WS_INCLUDES . 'classes/Numinix/PaypalIsu/SignupLinkService.php';
 if (file_exists($servicePath)) {
@@ -99,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'environment' => $environment,
                 ]);
                 $environment = strtolower((string) ($result['environment'] ?? $environment)) === 'live' ? 'live' : 'sandbox';
-                $storedReferralLink = nxp_normalize_referral_link($result['action_url'] ?? '');
+                $storedReferralLink = nxp_resolve_stored_referral_link($environment);
                 $messages[] = ['type' => 'success', 'text' => 'Signup link generated successfully.'];
             } catch (Throwable $exception) {
                 if (function_exists('zen_record_admin_activity')) {

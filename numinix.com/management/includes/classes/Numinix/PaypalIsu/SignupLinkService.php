@@ -7,7 +7,11 @@ declare(strict_types=1);
 class NuminixPaypalIsuSignupLinkService
 {
     private const ATTRIBUTION_ID = 'NuminixPPCP_SP';
-    private const REFERRAL_LINK_CONFIGURATION_KEY = 'NUMINIX_PPCP_PARTNER_REFERRAL_LINK';
+    private const LEGACY_REFERRAL_LINK_CONFIGURATION_KEY = 'NUMINIX_PPCP_PARTNER_REFERRAL_LINK';
+    private const REFERRAL_LINK_CONFIGURATION_KEYS = [
+        'sandbox' => 'NUMINIX_PPCP_SANDBOX_PARTNER_REFERRAL_LINK',
+        'live' => 'NUMINIX_PPCP_LIVE_PARTNER_REFERRAL_LINK',
+    ];
 
     /**
      * @var array<string, mixed>|null
@@ -57,7 +61,7 @@ class NuminixPaypalIsuSignupLinkService
             'raw_response' => $response,
         ];
 
-        $this->persistReferralLink($actionUrl);
+        $this->persistReferralLink($environment, $actionUrl);
         $this->logActivity('PayPal signup link generated for environment ' . $environment . '.');
 
         return $result;
@@ -76,10 +80,11 @@ class NuminixPaypalIsuSignupLinkService
     /**
      * Saves the generated referral link to configuration for future retrieval.
      *
+     * @param string $environment
      * @param string $url
      * @return void
      */
-    protected function persistReferralLink(string $url): void
+    protected function persistReferralLink(string $environment, string $url): void
     {
         $url = trim($url);
         if ($url === '' || !defined('TABLE_CONFIGURATION') || !function_exists('zen_db_input')) {
@@ -91,7 +96,28 @@ class NuminixPaypalIsuSignupLinkService
             return;
         }
 
-        $key = self::REFERRAL_LINK_CONFIGURATION_KEY;
+        $key = $this->getReferralLinkConfigurationKey($environment);
+        $existingValue = $this->sanitizeUrl($this->getConfigurationValue($key));
+
+        // If a value is already stored for this environment, keep it unless the merchant clears it manually.
+        if ($existingValue !== '') {
+            $this->defineConfigurationConstant($key, $existingValue);
+            return;
+        }
+
+        // Migrate a legacy value if present before falling back to the newly generated URL.
+        $valueToPersist = $existingValue;
+        if ($valueToPersist === '') {
+            $legacy = $this->sanitizeUrl($this->getConfigurationValue(self::LEGACY_REFERRAL_LINK_CONFIGURATION_KEY));
+            if ($legacy !== '') {
+                $valueToPersist = $legacy;
+            }
+        }
+
+        if ($valueToPersist === '') {
+            $valueToPersist = $url;
+        }
+
         $escapedKey = zen_db_input($key);
         $query = $db->Execute(
             "SELECT configuration_id"
@@ -103,17 +129,20 @@ class NuminixPaypalIsuSignupLinkService
         if ($query && !$query->EOF) {
             $db->Execute(
                 "UPDATE " . TABLE_CONFIGURATION
-                . " SET configuration_value = '" . zen_db_input($url) . "', last_modified = NOW()"
+                . " SET configuration_value = '" . zen_db_input($valueToPersist) . "', last_modified = NOW()"
                 . " WHERE configuration_id = " . (int) $query->fields['configuration_id']
                 . " LIMIT 1"
             );
+        } else {
+            $groupId = $this->detectConfigurationGroupId();
+            $db->Execute(
+                "INSERT INTO " . TABLE_CONFIGURATION
+                . " (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, date_added)"
+                . " VALUES ('Stored PayPal partner referral link', '" . zen_db_input($key) . "', '" . zen_db_input($valueToPersist) . "', 'Caches the reusable PayPal onboarding link for this environment.', " . (int) $groupId . ", 100, NOW())"
+            );
         }
 
-        if (function_exists('zen_define_default')) {
-            zen_define_default($key, $url);
-        } elseif (!defined($key)) {
-            define($key, $url);
-        }
+        $this->defineConfigurationConstant($key, $valueToPersist);
     }
 
     /**
@@ -603,6 +632,78 @@ class NuminixPaypalIsuSignupLinkService
         }
 
         return (string) $value;
+    }
+
+    /**
+     * Resolves the configuration key used to store a referral link for the requested environment.
+     *
+     * @param string $environment
+     * @return string
+     */
+    protected function getReferralLinkConfigurationKey(string $environment): string
+    {
+        if (isset(self::REFERRAL_LINK_CONFIGURATION_KEYS[$environment])) {
+            return self::REFERRAL_LINK_CONFIGURATION_KEYS[$environment];
+        }
+
+        return self::LEGACY_REFERRAL_LINK_CONFIGURATION_KEY;
+    }
+
+    /**
+     * Defines a configuration constant when possible while avoiding duplicate definitions.
+     *
+     * @param string $key
+     * @param string $value
+     * @return void
+     */
+    protected function defineConfigurationConstant(string $key, string $value): void
+    {
+        if (function_exists('zen_define_default')) {
+            zen_define_default($key, $value);
+        } elseif (!defined($key)) {
+            define($key, $value);
+        }
+    }
+
+    /**
+     * Sanitizes a URL value for safe storage.
+     *
+     * @param string|null $value
+     * @return string
+     */
+    protected function sanitizeUrl(?string $value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL) === false) {
+            return '';
+        }
+
+        return $value;
+    }
+
+    /**
+     * Attempts to detect the configuration group id for inserting new keys.
+     *
+     * @return int
+     */
+    protected function detectConfigurationGroupId(): int
+    {
+        if (function_exists('zen_get_configuration_group_id')) {
+            $groupId = zen_get_configuration_group_id('NUMINIX_PPCP_ENVIRONMENT');
+            if (is_numeric($groupId) && (int) $groupId > 0) {
+                return (int) $groupId;
+            }
+        }
+
+        return 0;
     }
 
     /**
