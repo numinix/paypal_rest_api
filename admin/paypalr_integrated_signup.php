@@ -144,7 +144,7 @@ function paypalr_handle_proxy_request(): void
 function paypalr_proxy_to_numinix(string $baseUrl, string $action, array $data): string
 {
     $url = rtrim($baseUrl, '/');
-    $environment = paypalr_detect_environment();
+    [$environment, $environmentSource] = paypalr_resolve_environment_from_request($data);
     
     // Remove local Zen Cart admin parameters that could confuse the remote Zen Cart.
     // These parameters are used for local session validation and should not be forwarded
@@ -170,6 +170,7 @@ function paypalr_proxy_to_numinix(string $baseUrl, string $action, array $data):
         'action' => $action,
         'url' => $url,
         'environment' => $environment,
+        'environment_source' => $environmentSource,
         'payload_keys' => array_keys($payload),
     ]);
     
@@ -374,6 +375,18 @@ function paypalr_render_onboarding_page(): void
             .actions {
                 margin-top: 20px;
             }
+            .environment-select {
+                margin: 20px 0;
+            }
+            .environment-select label {
+                display: block;
+                font-weight: bold;
+                margin-bottom: 8px;
+            }
+            .environment-select select {
+                padding: 8px 10px;
+                font-size: 14px;
+            }
             .actions a {
                 color: #0066cc;
                 text-decoration: none;
@@ -391,7 +404,16 @@ function paypalr_render_onboarding_page(): void
             
             <div id="status" class="status"></div>
             <div id="credentials-display"></div>
-            
+
+            <div class="environment-select">
+                <label for="environment">Select onboarding mode</label>
+                <select id="environment" name="environment">
+                    <option value="live">Production</option>
+                    <option value="sandbox">Sandbox</option>
+                </select>
+                <p style="margin: 8px 0 0 0; color: #555;">Choose which PayPal environment to onboard. If you leave this unchanged, the default from your store configuration will be used.</p>
+            </div>
+
             <div class="actions">
                 <button id="start-button" type="button">Start PayPal Signup</button>
                 <a href="<?php echo htmlspecialchars($modulesPageUrl, ENT_QUOTES, 'UTF-8'); ?>">Cancel and return to modules</a>
@@ -405,19 +427,24 @@ function paypalr_render_onboarding_page(): void
                 var environment = <?php echo json_encode($environment); ?>;
                 var modulesPageUrl = <?php echo json_encode($modulesPageUrl); ?>;
                 var securityToken = <?php echo json_encode($securityToken); ?>;
-                
+
+                var environmentSelect = document.getElementById('environment');
+                var allowedEnvironments = ['sandbox', 'live'];
+
                 var state = {
                     trackingId: null,
                     partnerReferralId: null,
+                    merchantId: null,
                     nonce: null,
                     popup: null,
                     pollTimer: null,
                     pollInterval: 4000,
                     pollAttempts: 0,
                     maxCredentialPolls: 15,
-                    finalizing: false
+                    finalizing: false,
+                    environment: null
                 };
-                
+
                 var startButton = document.getElementById('start-button');
                 var statusDiv = document.getElementById('status');
                 var credentialsDiv = document.getElementById('credentials-display');
@@ -427,12 +454,34 @@ function paypalr_render_onboarding_page(): void
                     statusDiv.className = 'status ' + (type || 'info');
                     statusDiv.style.display = message ? 'block' : 'none';
                 }
+
+                function resolveEnvironmentSelection() {
+                    var selected = (environmentSelect && environmentSelect.value || '').toLowerCase();
+                    if (allowedEnvironments.indexOf(selected) !== -1) {
+                        return selected;
+                    }
+
+                    if (allowedEnvironments.indexOf(environment) !== -1) {
+                        return environment;
+                    }
+
+                    return 'sandbox';
+                }
+
+                // Initialize select with current environment
+                state.environment = resolveEnvironmentSelection();
+                if (environmentSelect) {
+                    environmentSelect.value = state.environment;
+                }
                 
                 function proxyRequest(action, data) {
+                    state.environment = resolveEnvironmentSelection();
+
                     var payload = Object.assign({}, data || {}, {
                         proxy_action: action,
                         action: 'proxy',
-                        securityToken: securityToken
+                        securityToken: securityToken,
+                        env: state.environment
                     });
                     
                     return fetch(proxyUrl, {
@@ -557,6 +606,7 @@ function paypalr_render_onboarding_page(): void
                         proxyRequest('status', {
                             tracking_id: state.trackingId,
                             partner_referral_id: state.partnerReferralId || '',
+                            merchant_id: state.merchantId || '',
                             nonce: state.nonce
                         })
                         .then(function(response) {
@@ -574,10 +624,21 @@ function paypalr_render_onboarding_page(): void
                     var hasCredentials = data.credentials && data.credentials.client_id && data.credentials.client_secret;
                     var completedStep = step === 'completed' || step === 'ready' || step === 'active';
                     // Use environment from API response if available, fallback to local setting
-                    var remoteEnvironment = data.environment || environment;
+                    var remoteEnvironment = data.environment || state.environment || environment;
+
+                    if (data.environment && allowedEnvironments.indexOf(data.environment.toLowerCase()) !== -1) {
+                        state.environment = data.environment.toLowerCase();
+                        if (environmentSelect) {
+                            environmentSelect.value = state.environment;
+                        }
+                    }
 
                     if (data.partner_referral_id) {
                         state.partnerReferralId = data.partner_referral_id;
+                    }
+
+                    if (data.merchant_id) {
+                        state.merchantId = data.merchant_id;
                     }
 
                     if (data.polling_interval) {
@@ -615,6 +676,7 @@ function paypalr_render_onboarding_page(): void
                     proxyRequest('finalize', {
                         tracking_id: state.trackingId,
                         partner_referral_id: state.partnerReferralId || '',
+                        merchant_id: state.merchantId || '',
                         nonce: state.nonce
                     })
                         .then(function(response) {
@@ -699,13 +761,23 @@ function paypalr_render_onboarding_page(): void
                 function startOnboarding() {
                     startButton.disabled = true;
                     state.pollAttempts = 0;
+                    state.environment = resolveEnvironmentSelection();
+                    state.partnerReferralId = null;
+                    state.merchantId = null;
                     setStatus('Starting PayPal signup...', 'info');
-                    
+
                     proxyRequest('start', {nonce: state.nonce || ''})
                         .then(function(response) {
                             var data = response.data || {};
                             state.trackingId = data.tracking_id;
                             state.partnerReferralId = data.partner_referral_id || null;
+                            state.merchantId = data.merchant_id || null;
+                            if (data.environment && allowedEnvironments.indexOf(data.environment.toLowerCase()) !== -1) {
+                                state.environment = data.environment.toLowerCase();
+                                if (environmentSelect) {
+                                    environmentSelect.value = state.environment;
+                                }
+                            }
                             // Use nonce from server response, or generate a cryptographically secure one
                             state.nonce = data.nonce;
                             if (!state.nonce) {
@@ -740,6 +812,11 @@ function paypalr_render_onboarding_page(): void
                 }
 
                 startButton.addEventListener('click', startOnboarding);
+                if (environmentSelect) {
+                    environmentSelect.addEventListener('change', function() {
+                        state.environment = resolveEnvironmentSelection();
+                    });
+                }
                 window.addEventListener('message', handlePopupMessage);
             })();
         </script>
@@ -824,17 +901,45 @@ function paypalr_get_numinix_portal_base(): string
     return $normalized;
 }
 
+/**
+ * Resolves environment preference using client request when provided.
+ *
+ * @param array<string, mixed> $data
+ * @return array{0: string, 1: string}
+ */
+function paypalr_resolve_environment_from_request(array $data): array
+{
+    $allowed = ['sandbox', 'live'];
+    $requested = strtolower((string)($data['env'] ?? ''));
+
+    if (in_array($requested, $allowed, true)) {
+        return [$requested, 'client'];
+    }
+
+    return [paypalr_detect_environment(), 'config'];
+}
+
 function paypalr_detect_environment(): string
 {
-    $environment = 'live';
-    if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-        $value = strtolower((string)MODULE_PAYMENT_PAYPALR_SERVER);
-        if ($value === 'sandbox') {
-            $environment = 'sandbox';
+    $allowed = ['sandbox', 'live'];
+
+    // Prefer the ISU configuration toggle when available
+    if (defined('NUMINIX_PPCP_ENVIRONMENT')) {
+        $value = strtolower((string) NUMINIX_PPCP_ENVIRONMENT);
+        if (in_array($value, $allowed, true)) {
+            return $value;
         }
     }
 
-    return $environment;
+    if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
+        $value = strtolower((string) MODULE_PAYMENT_PAYPALR_SERVER);
+        if (in_array($value, $allowed, true)) {
+            return $value;
+        }
+    }
+
+    // Default to sandbox to avoid inadvertently creating live accounts
+    return 'sandbox';
 }
 
 function paypalr_self_url(array $params = []): string
