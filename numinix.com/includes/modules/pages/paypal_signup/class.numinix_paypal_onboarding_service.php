@@ -256,15 +256,37 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      */
     private function fetchMerchantIntegration(string $apiBase, string $accessToken, string $trackingId, string $partnerReferralId): ?array
     {
+        $integration = null;
+        $referral = null;
+
         if ($partnerReferralId !== '') {
             $referral = $this->fetchPartnerReferral($apiBase, $accessToken, $partnerReferralId);
             $integration = $this->extractMerchantIntegrationFromReferral($apiBase, $accessToken, $referral);
-            if ($integration !== null) {
-                return $integration;
+        }
+
+        if ($integration === null) {
+            $integration = $this->fetchMerchantIntegrationByTrackingId($apiBase, $accessToken, $trackingId);
+        }
+
+        // Sandbox flows sometimes omit oauth_integrations on the initial merchant integration lookup,
+        // even though the account is already active. If we have a merchant identifier but no OAuth
+        // details, perform a direct lookup to enrich the payload so credentials can be surfaced.
+        if ($integration !== null
+            && empty($integration['oauth_integrations'])
+            && !empty($integration['merchant_id'])
+        ) {
+            $enriched = $this->fetchMerchantIntegrationByMerchantId(
+                $apiBase,
+                $accessToken,
+                (string) $integration['merchant_id']
+            );
+
+            if ($enriched !== null) {
+                $integration = $enriched;
             }
         }
 
-        return $this->fetchMerchantIntegrationByTrackingId($apiBase, $accessToken, $trackingId);
+        return $integration;
     }
 
     /**
