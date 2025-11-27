@@ -541,14 +541,14 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 continue;
             }
 
-            // Extract credentials from oauth_third_party_details
-            $thirdPartyDetails = $oauth['oauth_third_party_details'] ?? [];
+            // Extract credentials from oauth_third_party_details (primary) or oauth_third_party (legacy)
+            $thirdPartyDetails = $oauth['oauth_third_party_details'] ?? $oauth['oauth_third_party'] ?? [];
             if (!is_array($thirdPartyDetails)) {
                 continue;
             }
 
-            $clientId = trim((string)($thirdPartyDetails['partner_client_id'] ?? ''));
-            $clientSecret = trim((string)($thirdPartyDetails['partner_client_secret'] ?? ''));
+            $clientId = trim((string)($thirdPartyDetails['partner_client_id'] ?? ($thirdPartyDetails['client_id'] ?? '')));
+            $clientSecret = trim((string)($thirdPartyDetails['partner_client_secret'] ?? ($thirdPartyDetails['client_secret'] ?? '')));
 
             if ($clientId !== '' && $clientSecret !== '') {
                 return [
