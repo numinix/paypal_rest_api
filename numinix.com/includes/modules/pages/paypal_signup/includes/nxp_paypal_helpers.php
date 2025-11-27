@@ -23,7 +23,7 @@ function nxp_paypal_bootstrap_session(): array
     }
 
     $input = [
-        'env' => nxp_paypal_filter_string($_GET['env'] ?? null),
+        'env' => nxp_paypal_filter_string($_REQUEST['env'] ?? null),
         'step' => nxp_paypal_filter_string($_GET['step'] ?? null),
         'code' => nxp_paypal_filter_string($_GET['code'] ?? null),
         'tracking_id' => nxp_paypal_filter_string($_GET['tracking_id'] ?? null),
