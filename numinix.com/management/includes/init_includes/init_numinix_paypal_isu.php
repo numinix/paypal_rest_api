@@ -9,9 +9,16 @@ if (!defined('IS_ADMIN_FLAG')) {
 global $db, $messageStack;
 
 $versionKey = 'NUMINIX_PPCP_VERSION';
-$installersPath = realpath(__DIR__ . '/../../installers/numinix_paypal_isu');
 
-if ($installersPath === false || !is_dir($installersPath)) {
+// Use Zen Cart's admin directory constant to locate installers
+if (defined('DIR_FS_ADMIN')) {
+    $installersPath = DIR_FS_ADMIN . 'includes/installers/numinix_paypal_isu';
+} else {
+    // Fallback for environments where DIR_FS_ADMIN is not defined
+    $installersPath = __DIR__ . '/../installers/numinix_paypal_isu';
+}
+
+if (!is_dir($installersPath)) {
     return;
 }
 
