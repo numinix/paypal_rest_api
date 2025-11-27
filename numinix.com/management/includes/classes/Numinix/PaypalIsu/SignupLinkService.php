@@ -950,7 +950,8 @@ class NuminixPaypalIsuSignupLinkService
      * Resolves features for the third_party_details in the referral payload.
      *
      * Features specify the permissions that the partner can use in PayPal on behalf of the seller.
-     * Valid values: PAYMENT, REFUND, PARTNER_FEE, VAULT, etc.
+     * Valid values include: PAYMENT, REFUND, PARTNER_FEE, VAULT, BILLING_AGREEMENT, etc.
+     * Default features are PAYMENT, REFUND, PARTNER_FEE (core commerce features).
      *
      * @param mixed $value
      * @return array<int, string>
