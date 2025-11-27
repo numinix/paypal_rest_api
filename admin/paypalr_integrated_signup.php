@@ -393,6 +393,8 @@ function paypalr_render_onboarding_page(): void
                     popup: null,
                     pollTimer: null,
                     pollInterval: 4000,
+                    pollAttempts: 0,
+                    maxCredentialPolls: 15,
                     finalizing: false
                 };
                 
@@ -518,8 +520,20 @@ function paypalr_render_onboarding_page(): void
                 
                 function pollStatus() {
                     if (!state.trackingId) return;
-                    
+
+                    if (state.pollTimer) {
+                        clearTimeout(state.pollTimer);
+                    }
+
                     state.pollTimer = setTimeout(function() {
+                        state.pollAttempts += 1;
+
+                        if (state.pollAttempts > state.maxCredentialPolls) {
+                            setStatus('We couldn’t retrieve your PayPal API credentials automatically. Please try again later or contact support.', 'error');
+                            startButton.disabled = false;
+                            return;
+                        }
+
                         proxyRequest('status', {
                             tracking_id: state.trackingId,
                             partner_referral_id: state.partnerReferralId || '',
@@ -537,24 +551,27 @@ function paypalr_render_onboarding_page(): void
 
                 function handleStatusResponse(data) {
                     var step = (data.step || '').toLowerCase();
+                    var hasCredentials = data.credentials && data.credentials.client_id && data.credentials.client_secret;
+                    var completedStep = step === 'completed' || step === 'ready' || step === 'active';
 
                     if (data.partner_referral_id) {
                         state.partnerReferralId = data.partner_referral_id;
                     }
-                    
+
                     if (data.polling_interval) {
                         state.pollInterval = Math.max(data.polling_interval, 2000);
                     }
-                    
-                    if (step === 'completed' || step === 'ready' || step === 'active') {
-                        if (data.credentials && data.credentials.client_id && data.credentials.client_secret) {
+
+                    if (completedStep) {
+                        if (hasCredentials) {
+                            // Credentials are now available: show them, save them, and stop polling.
+                            state.pollAttempts = 0;
                             displayCredentials(data.credentials);
                             autoSaveCredentials(data.credentials);
                         } else {
-                            setStatus('Onboarding complete! Redirecting...', 'success');
-                            setTimeout(function() {
-                                window.location.href = modulesPageUrl;
-                            }, 2000);
+                            // The account is active but credentials are not yet returned by the API.
+                            setStatus('Your PayPal account is active. Waiting for API credentials...', 'info');
+                            pollStatus();
                         }
                     } else if (step === 'cancelled' || step === 'declined') {
                         setStatus('Onboarding was cancelled.', 'error');
@@ -658,6 +675,7 @@ function paypalr_render_onboarding_page(): void
                 
                 function startOnboarding() {
                     startButton.disabled = true;
+                    state.pollAttempts = 0;
                     setStatus('Starting PayPal signup...', 'info');
                     
                     proxyRequest('start', {nonce: state.nonce || ''})
