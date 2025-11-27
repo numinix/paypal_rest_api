@@ -939,8 +939,10 @@ function paypalr_handle_save_credentials(): void
     }
 
     // Use environment from the API response if provided, otherwise fall back to local setting
+    // Validate against explicit whitelist of allowed environment values
+    $allowedEnvironments = ['sandbox', 'live'];
     $requestedEnvironment = trim(strtolower((string)($_POST['environment'] ?? '')));
-    if ($requestedEnvironment === 'sandbox' || $requestedEnvironment === 'live') {
+    if (in_array($requestedEnvironment, $allowedEnvironments, true)) {
         $environment = $requestedEnvironment;
     } else {
         $environment = paypalr_detect_environment();

@@ -26,9 +26,7 @@ namespace {
     if (session_status() === PHP_SESSION_NONE) {
         $_SESSION = [];
     }
-}
 
-namespace {
     /**
      * Test that verifies the save_credentials handler accepts environment parameter
      */
