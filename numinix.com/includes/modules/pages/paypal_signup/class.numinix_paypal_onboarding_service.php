@@ -114,7 +114,14 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $apiBase = $this->resolveApiBase($environment);
             $accessToken = $this->obtainAccessToken($apiBase, $clientId, $clientSecret);
 
-            $integration = $this->fetchMerchantIntegration($apiBase, $accessToken, $trackingId, $partnerReferralId, $merchantId);
+            $integration = $this->fetchMerchantIntegration(
+                $apiBase,
+                $accessToken,
+                $trackingId,
+                $partnerReferralId,
+                $merchantId,
+                $environment
+            );
             if ($integration === null) {
                 return $this->waitingResponse($environment, $trackingId, $partnerReferralId, $merchantId);
             }
@@ -275,24 +282,40 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @param string $trackingId
      * @param string $partnerReferralId
      * @param string $merchantId
+     * @param string $environment
      * @return array<string, mixed>|null
      */
-    private function fetchMerchantIntegration(string $apiBase, string $accessToken, string $trackingId, string $partnerReferralId, string $merchantId): ?array
+    private function fetchMerchantIntegration(
+        string $apiBase,
+        string $accessToken,
+        string $trackingId,
+        string $partnerReferralId,
+        string $merchantId,
+        string $environment
+    ): ?array
     {
         $integration = null;
         $referral = null;
 
-        if ($partnerReferralId !== '') {
-            $referral = $this->fetchPartnerReferral($apiBase, $accessToken, $partnerReferralId);
-            $integration = $this->extractMerchantIntegrationFromReferral($apiBase, $accessToken, $referral);
-        }
-
-        if ($integration === null) {
-            $integration = $this->fetchMerchantIntegrationByTrackingId($apiBase, $accessToken, $trackingId);
-        }
+        $integration = $this->fetchMerchantIntegrationByTrackingId(
+            $apiBase,
+            $accessToken,
+            $trackingId,
+            $merchantId,
+            $environment
+        );
 
         if ($integration === null && $merchantId !== '') {
-            $integration = $this->fetchMerchantIntegrationByMerchantId($apiBase, $accessToken, $merchantId);
+            $integration = $this->fetchMerchantIntegrationByMerchantId($apiBase, $accessToken, $merchantId, $environment);
+        }
+
+        if ($integration === null && $partnerReferralId !== '') {
+            $referral = $this->fetchPartnerReferral($apiBase, $accessToken, $partnerReferralId);
+            $integration = $this->extractMerchantIntegrationFromReferral($apiBase, $accessToken, $referral, $environment);
+        }
+
+        if ($integration !== null && empty($integration['environment'])) {
+            $integration['environment'] = $environment;
         }
 
         // Sandbox flows sometimes omit oauth_integrations on the initial merchant integration lookup,
@@ -305,7 +328,8 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $enriched = $this->fetchMerchantIntegrationByMerchantId(
                 $apiBase,
                 $accessToken,
-                (string) (!empty($integration['merchant_id']) ? $integration['merchant_id'] : $merchantId)
+                (string) (!empty($integration['merchant_id']) ? $integration['merchant_id'] : $merchantId),
+                $environment
             );
 
             if ($enriched !== null) {
@@ -353,9 +377,15 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @param string                     $apiBase
      * @param string                     $accessToken
      * @param array<string, mixed>|null  $referral
+     * @param string                     $environment
      * @return array<string, mixed>|null
      */
-    private function extractMerchantIntegrationFromReferral(string $apiBase, string $accessToken, ?array $referral): ?array
+    private function extractMerchantIntegrationFromReferral(
+        string $apiBase,
+        string $accessToken,
+        ?array $referral,
+        string $environment
+    ): ?array
     {
         if (empty($referral)) {
             return null;
@@ -389,7 +419,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         }
 
         if ($merchantId !== '') {
-            return $this->fetchMerchantIntegrationByMerchantId($apiBase, $accessToken, $merchantId);
+            return $this->fetchMerchantIntegrationByMerchantId($apiBase, $accessToken, $merchantId, $environment);
         }
 
         return null;
@@ -430,29 +460,46 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @param string $apiBase
      * @param string $accessToken
      * @param string $merchantId
+     * @param string $environment
      * @return array<string, mixed>|null
      */
-    private function fetchMerchantIntegrationByMerchantId(string $apiBase, string $accessToken, string $merchantId): ?array
+    private function fetchMerchantIntegrationByMerchantId(
+        string $apiBase,
+        string $accessToken,
+        string $merchantId,
+        string $environment
+    ): ?array
     {
-        $url = rtrim($apiBase, '/') . '/v1/customer/partners/merchant-integrations/' . rawurlencode($merchantId);
-        $headers = [
-            'Accept: application/json',
-            'Authorization: Bearer ' . $accessToken,
-        ];
+        $query = http_build_query([
+            'include_products' => 'true',
+            'partner_merchant_id' => $merchantId,
+        ]);
 
-        $response = $this->performHttpCall('GET', $url, $headers);
-        $decoded = $this->decodeJson($response['body']);
+        $url = rtrim($apiBase, '/') . '/v1/customer/partners/marketplace/merchant-integrations?' . $query;
 
-        if ($response['status'] === 404) {
-            return null;
+        $items = $this->fetchMarketplaceManagedIntegrations($url, $accessToken);
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $partnerMerchantId = (string)($item['partner_merchant_id'] ?? '');
+            $merchantMatch = ($partnerMerchantId !== '') && strcasecmp($partnerMerchantId, $merchantId) === 0;
+            $merchantIdMatch = !$merchantMatch
+                && !empty($item['merchant_id_in_paypal'])
+                && strcasecmp((string)$item['merchant_id_in_paypal'], $merchantId) === 0;
+
+            if ($merchantMatch || $merchantIdMatch) {
+                return $this->normalizeMarketplaceIntegration($item, $environment);
+            }
         }
 
-        if ($response['status'] >= 200 && $response['status'] < 300) {
-            return $decoded;
+        if (!empty($items[0]) && is_array($items[0])) {
+            return $this->normalizeMarketplaceIntegration($items[0], $environment);
         }
 
-        $message = $this->resolveErrorMessage($decoded, 'Unable to retrieve PayPal merchant integration details.');
-        throw new RuntimeException($message);
+        return null;
     }
 
     /**
@@ -461,11 +508,59 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @param string $apiBase
      * @param string $accessToken
      * @param string $trackingId
+     * @param string $merchantId
+     * @param string $environment
      * @return array<string, mixed>|null
      */
-    private function fetchMerchantIntegrationByTrackingId(string $apiBase, string $accessToken, string $trackingId): ?array
+    private function fetchMerchantIntegrationByTrackingId(
+        string $apiBase,
+        string $accessToken,
+        string $trackingId,
+        string $merchantId,
+        string $environment
+    ): ?array
     {
-        $url = rtrim($apiBase, '/') . '/v1/customer/partners/merchant-integrations?tracking_id=' . rawurlencode($trackingId);
+        $query = http_build_query(array_filter([
+            'include_products' => 'true',
+            'tracking_id' => $trackingId,
+            'partner_merchant_id' => $merchantId,
+        ], static function ($value) {
+            return $value !== '' && $value !== null;
+        }));
+
+        $url = rtrim($apiBase, '/') . '/v1/customer/partners/marketplace/merchant-integrations?' . $query;
+
+        $items = $this->fetchMarketplaceManagedIntegrations($url, $accessToken);
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $itemTracking = (string)($item['tracking_id'] ?? '');
+            if ($itemTracking !== '' && strcasecmp($itemTracking, $trackingId) !== 0) {
+                continue;
+            }
+
+            return $this->normalizeMarketplaceIntegration($item, $environment);
+        }
+
+        if (!empty($items[0]) && is_array($items[0])) {
+            return $this->normalizeMarketplaceIntegration($items[0], $environment);
+        }
+
+        return null;
+    }
+
+    /**
+     * Retrieves Marketplace-managed merchant integrations.
+     *
+     * @param string $url
+     * @param string $accessToken
+     * @return array<int, mixed>
+     */
+    private function fetchMarketplaceManagedIntegrations(string $url, string $accessToken): array
+    {
         $headers = [
             'Accept: application/json',
             'Authorization: Bearer ' . $accessToken,
@@ -475,32 +570,143 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         $decoded = $this->decodeJson($response['body']);
 
         if ($response['status'] === 404) {
-            return null;
+            return [];
         }
 
         if ($response['status'] >= 200 && $response['status'] < 300) {
             if (isset($decoded['items']) && is_array($decoded['items'])) {
-                foreach ($decoded['items'] as $item) {
-                    if (!is_array($item)) {
-                        continue;
-                    }
-                    $itemTracking = (string)($item['tracking_id'] ?? '');
-                    if ($itemTracking !== '' && strcasecmp($itemTracking, $trackingId) === 0) {
-                        return $item;
-                    }
-                }
-
-                $first = $decoded['items'][0] ?? null;
-                if (is_array($first)) {
-                    return $first;
-                }
+                return $decoded['items'];
             }
 
-            return null;
+            return [];
         }
 
         $message = $this->resolveErrorMessage($decoded, 'Unable to retrieve PayPal merchant integration details.');
         throw new RuntimeException($message);
+    }
+
+    /**
+     * Normalizes Marketplace-managed merchant integration responses into a credential payload.
+     *
+     * @param array<string, mixed> $integration
+     * @param string               $environment
+     * @return array<string, mixed>
+     */
+    private function normalizeMarketplaceIntegration(array $integration, string $environment): array
+    {
+        $credentialPayload = is_array($integration['credential_payload'] ?? null)
+            ? $integration['credential_payload']
+            : [];
+
+        $status = (string)($integration['status'] ?? '');
+        $paymentsReceivable = (bool)($integration['payments_receivable'] ?? false);
+        $primaryEmailConfirmed = (bool)($integration['primary_email_confirmed'] ?? false);
+
+        if (!empty($integration['integration_status']) && is_array($integration['integration_status'])) {
+            $status = $status !== '' ? $status : (string)($integration['integration_status']['status'] ?? '');
+            $paymentsReceivable = $paymentsReceivable || !empty($integration['integration_status']['payments_receivable']);
+            $primaryEmailConfirmed = $primaryEmailConfirmed || !empty($integration['integration_status']['primary_email_confirmed']);
+        }
+
+        $thirdPartyDetails = $this->extractThirdPartyDetailsFromIntegration($integration);
+
+        $normalized = array_merge(
+            [
+                'merchant_id' => (string)($integration['merchant_id'] ?? ''),
+                'merchant_id_in_paypal' => (string)($integration['merchant_id_in_paypal'] ?? ($integration['merchant_id'] ?? '')),
+                'status' => $status,
+                'payments_receivable' => $paymentsReceivable,
+                'primary_email_confirmed' => $primaryEmailConfirmed,
+                'capabilities' => is_array($integration['capabilities'] ?? null) ? $integration['capabilities'] : [],
+                'oauth_integrations' => is_array($integration['oauth_integrations'] ?? null) ? $integration['oauth_integrations'] : [],
+                'third_party_details' => $thirdPartyDetails,
+                'links' => is_array($integration['links'] ?? null) ? $integration['links'] : [],
+                'products' => is_array($integration['products'] ?? null) ? $integration['products'] : [],
+                'environment' => (string)($credentialPayload['environment'] ?? $environment),
+            ],
+            $credentialPayload
+        );
+
+        $thirdPartyCredentials = $this->extractCredentialsFromThirdPartyDetails($thirdPartyDetails);
+        if (!empty($thirdPartyCredentials)) {
+            $normalized = array_merge($normalized, $thirdPartyCredentials);
+        }
+
+        if (empty($normalized['status']) && !empty($credentialPayload['status'])) {
+            $normalized['status'] = (string)$credentialPayload['status'];
+        }
+
+        if (empty($normalized['client_id']) || empty($normalized['client_secret'])) {
+            $oauthCredentials = $this->extractMerchantCredentials($normalized);
+            if ($oauthCredentials !== null) {
+                $normalized['client_id'] = $normalized['client_id'] ?? $oauthCredentials['client_id'];
+                $normalized['client_secret'] = $normalized['client_secret'] ?? $oauthCredentials['client_secret'];
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Extracts credential hints from third party details.
+     *
+     * @param array<string, mixed> $thirdPartyDetails
+     * @return array<string, string>
+     */
+    private function extractCredentialsFromThirdPartyDetails(array $thirdPartyDetails): array
+    {
+        if (empty($thirdPartyDetails)) {
+            return [];
+        }
+
+        $clientId = trim((string)($thirdPartyDetails['partner_client_id'] ?? ''));
+        $clientSecret = trim((string)($thirdPartyDetails['partner_client_secret'] ?? ''));
+
+        $credentials = [];
+
+        if ($clientId !== '') {
+            $credentials['client_id'] = $clientId;
+        }
+
+        if ($clientSecret !== '') {
+            $credentials['client_secret'] = $clientSecret;
+        }
+
+        return $credentials;
+    }
+
+    /**
+     * Attempts to discover third party details from the marketplace response.
+     *
+     * @param array<string, mixed> $integration
+     * @return array<string, mixed>
+     */
+    private function extractThirdPartyDetailsFromIntegration(array $integration): array
+    {
+        if (!empty($integration['third_party_details']) && is_array($integration['third_party_details'])) {
+            return $integration['third_party_details'];
+        }
+
+        if (!empty($integration['products']) && is_array($integration['products'])) {
+            foreach ($integration['products'] as $product) {
+                if (!is_array($product)) {
+                    continue;
+                }
+
+                if (!empty($product['third_party_details']) && is_array($product['third_party_details'])) {
+                    return $product['third_party_details'];
+                }
+
+                if (!empty($product['rest_api_integration']) && is_array($product['rest_api_integration'])) {
+                    $restIntegration = $product['rest_api_integration'];
+                    if (!empty($restIntegration['third_party_details']) && is_array($restIntegration['third_party_details'])) {
+                        return $restIntegration['third_party_details'];
+                    }
+                }
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -574,6 +780,16 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      */
     private function extractMerchantCredentials(array $integration): ?array
     {
+        $directClientId = trim((string)($integration['client_id'] ?? ''));
+        $directClientSecret = trim((string)($integration['client_secret'] ?? ''));
+
+        if ($directClientId !== '' && $directClientSecret !== '') {
+            return [
+                'client_id' => $directClientId,
+                'client_secret' => $directClientSecret,
+            ];
+        }
+
         if (empty($integration['oauth_integrations']) || !is_array($integration['oauth_integrations'])) {
             return null;
         }
