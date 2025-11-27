@@ -676,6 +676,9 @@ class NuminixPaypalIsuSignupLinkService
     /**
      * Sanitizes a URL value for safe storage.
      *
+     * Decodes HTML entities (e.g., &amp; to &) to ensure URLs are valid
+     * when sent to external APIs like PayPal's partner referrals endpoint.
+     *
      * @param string|null $value
      * @return string
      */
@@ -689,6 +692,11 @@ class NuminixPaypalIsuSignupLinkService
         if ($value === '') {
             return '';
         }
+
+        // Decode HTML entities to ensure URLs are not malformed when sent as JSON.
+        // This is necessary because functions like zen_href_link may HTML-encode
+        // ampersands as &amp; which causes PayPal to reject the payload.
+        $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         if (filter_var($value, FILTER_VALIDATE_URL) === false) {
             return '';
