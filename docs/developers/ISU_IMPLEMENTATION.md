@@ -113,8 +113,13 @@ The PayPal ISU feature has been redesigned to provide a seamless experience wher
 
 ### POST /index.php?main_page=paypal_signup
 
-All requests require:
-- `nxp_paypal_action`: Action to perform (start, finalize, status)
+All requests are proxies into the Marketplace-managed PPCP flow:
+
+- Partner referrals are created with the Commerce Platform endpoint (`/v1/customer/partner-referrals`).
+- Status polling and credential retrieval call the Marketplace-managed integrations endpoint (`/v1/customer/partners/marketplace/merchant-integrations?include_products=true`).
+
+Required parameters:
+- `nxp_paypal_action`: Action to perform (start or status)
 - `nonce`: Session-based CSRF token
 - `env`: Environment (sandbox or live)
 
