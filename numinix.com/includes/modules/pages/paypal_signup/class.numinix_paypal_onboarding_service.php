@@ -104,6 +104,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $environment = $this->normalizeEnvironment($payload['environment'] ?? null);
             $trackingId = $this->sanitizeTrackingId($payload['tracking_id'] ?? null);
             $partnerReferralId = $this->sanitizePartnerReferralId($payload['partner_referral_id'] ?? null);
+            $merchantId = $this->sanitizeMerchantId($payload['merchant_id'] ?? null);
 
             [$clientId, $clientSecret] = $this->resolveCredentials($environment, $payload);
             if ($clientId === '' || $clientSecret === '') {
@@ -113,9 +114,9 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $apiBase = $this->resolveApiBase($environment);
             $accessToken = $this->obtainAccessToken($apiBase, $clientId, $clientSecret);
 
-            $integration = $this->fetchMerchantIntegration($apiBase, $accessToken, $trackingId, $partnerReferralId);
+            $integration = $this->fetchMerchantIntegration($apiBase, $accessToken, $trackingId, $partnerReferralId, $merchantId);
             if ($integration === null) {
-                return $this->waitingResponse($environment, $trackingId, $partnerReferralId);
+                return $this->waitingResponse($environment, $trackingId, $partnerReferralId, $merchantId);
             }
 
             $step = $this->mapIntegrationToStep($integration);
@@ -173,7 +174,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @param string $partnerReferralId
      * @return array<string, mixed>
      */
-    private function waitingResponse(string $environment, string $trackingId, string $partnerReferralId): array
+    private function waitingResponse(string $environment, string $trackingId, string $partnerReferralId, string $merchantId): array
     {
         return [
             'success' => true,
@@ -182,6 +183,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 'environment' => $environment,
                 'tracking_id' => $trackingId,
                 'partner_referral_id' => $partnerReferralId,
+                'merchant_id' => $merchantId,
                 'step' => 'waiting',
                 'status_hint' => 'provisioning',
                 'polling_interval' => self::DEFAULT_POLLING_INTERVAL_MS,
@@ -246,15 +248,36 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
     }
 
     /**
+     * Normalizes the merchant identifier supplied by PayPal.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function sanitizeMerchantId($value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        return $trimmed;
+    }
+
+    /**
      * Resolves merchant integration details from PayPal.
      *
      * @param string $apiBase
      * @param string $accessToken
      * @param string $trackingId
      * @param string $partnerReferralId
+     * @param string $merchantId
      * @return array<string, mixed>|null
      */
-    private function fetchMerchantIntegration(string $apiBase, string $accessToken, string $trackingId, string $partnerReferralId): ?array
+    private function fetchMerchantIntegration(string $apiBase, string $accessToken, string $trackingId, string $partnerReferralId, string $merchantId): ?array
     {
         $integration = null;
         $referral = null;
@@ -268,17 +291,21 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $integration = $this->fetchMerchantIntegrationByTrackingId($apiBase, $accessToken, $trackingId);
         }
 
+        if ($integration === null && $merchantId !== '') {
+            $integration = $this->fetchMerchantIntegrationByMerchantId($apiBase, $accessToken, $merchantId);
+        }
+
         // Sandbox flows sometimes omit oauth_integrations on the initial merchant integration lookup,
         // even though the account is already active. If we have a merchant identifier but no OAuth
         // details, perform a direct lookup to enrich the payload so credentials can be surfaced.
         if ($integration !== null
             && empty($integration['oauth_integrations'])
-            && !empty($integration['merchant_id'])
+            && (!empty($integration['merchant_id']) || $merchantId !== '')
         ) {
             $enriched = $this->fetchMerchantIntegrationByMerchantId(
                 $apiBase,
                 $accessToken,
-                (string) $integration['merchant_id']
+                (string) (!empty($integration['merchant_id']) ? $integration['merchant_id'] : $merchantId)
             );
 
             if ($enriched !== null) {

@@ -13,6 +13,7 @@ function nxp_paypal_bootstrap_session(): array
         'code' => null,
         'tracking_id' => null,
         'partner_referral_id' => null,
+        'merchant_id' => null,
         'nonce' => nxp_paypal_generate_nonce(),
         'updated_at' => time(),
     ];
@@ -28,6 +29,12 @@ function nxp_paypal_bootstrap_session(): array
         'code' => nxp_paypal_filter_string($_GET['code'] ?? null),
         'tracking_id' => nxp_paypal_filter_string($_GET['tracking_id'] ?? null),
         'partner_referral_id' => nxp_paypal_filter_string($_GET['partner_referral_id'] ?? null),
+        'merchant_id' => nxp_paypal_filter_string(
+            $_GET['merchant_id']
+            ?? $_GET['merchantIdInPayPal']
+            ?? $_GET['merchantId']
+            ?? null
+        ),
     ];
 
     $allowedEnvironments = ['sandbox', 'live'];
@@ -49,6 +56,10 @@ function nxp_paypal_bootstrap_session(): array
 
     if (!empty($input['partner_referral_id'])) {
         $state['partner_referral_id'] = $input['partner_referral_id'];
+    }
+
+    if (!empty($input['merchant_id'])) {
+        $state['merchant_id'] = $input['merchant_id'];
     }
 
     $state = array_merge($defaults, $state);
@@ -372,6 +383,12 @@ function nxp_paypal_handle_finalize(array $session): void
 {
     $code = nxp_paypal_filter_string($_REQUEST['code'] ?? ($session['code'] ?? null));
     $trackingId = $session['tracking_id'] ?? nxp_paypal_filter_string($_REQUEST['tracking_id'] ?? null);
+    $merchantId = nxp_paypal_filter_string(
+        $_REQUEST['merchant_id']
+        ?? $_REQUEST['merchantIdInPayPal']
+        ?? $_REQUEST['merchantId']
+        ?? ($session['merchant_id'] ?? null)
+    );
 
     if (empty($trackingId)) {
         nxp_paypal_json_error('Missing tracking reference.');
@@ -382,6 +399,7 @@ function nxp_paypal_handle_finalize(array $session): void
         'tracking_id' => $trackingId,
         'environment' => $session['env'],
         'partner_referral_id' => $session['partner_referral_id'] ?? nxp_paypal_filter_string($_REQUEST['partner_referral_id'] ?? null),
+        'merchant_id' => $merchantId,
     ];
 
     try {
@@ -411,6 +429,11 @@ function nxp_paypal_handle_finalize(array $session): void
     $_SESSION['nxp_paypal']['step'] = !empty($response['data']['step']) ? $response['data']['step'] : 'finalized';
     if (!empty($response['data']['partner_referral_id'])) {
         $_SESSION['nxp_paypal']['partner_referral_id'] = $response['data']['partner_referral_id'];
+    }
+    if (!empty($response['data']['merchant_id'])) {
+        $_SESSION['nxp_paypal']['merchant_id'] = $response['data']['merchant_id'];
+    } elseif (!empty($payload['merchant_id'])) {
+        $_SESSION['nxp_paypal']['merchant_id'] = $payload['merchant_id'];
     }
     $_SESSION['nxp_paypal']['updated_at'] = time();
 
@@ -457,10 +480,18 @@ function nxp_paypal_handle_status(array $session): void
         nxp_paypal_json_error('Missing tracking reference.');
     }
 
+    $merchantId = nxp_paypal_filter_string(
+        $_REQUEST['merchant_id']
+        ?? $_REQUEST['merchantIdInPayPal']
+        ?? $_REQUEST['merchantId']
+        ?? ($session['merchant_id'] ?? null)
+    );
+
     $payload = [
         'tracking_id' => $trackingId,
         'environment' => $session['env'],
         'partner_referral_id' => $session['partner_referral_id'] ?? nxp_paypal_filter_string($_REQUEST['partner_referral_id'] ?? null),
+        'merchant_id' => $merchantId,
     ];
 
     try {
@@ -493,6 +524,12 @@ function nxp_paypal_handle_status(array $session): void
 
     if (!empty($response['data']['partner_referral_id'])) {
         $_SESSION['nxp_paypal']['partner_referral_id'] = $response['data']['partner_referral_id'];
+    }
+
+    if (!empty($response['data']['merchant_id'])) {
+        $_SESSION['nxp_paypal']['merchant_id'] = $response['data']['merchant_id'];
+    } elseif (!empty($payload['merchant_id'])) {
+        $_SESSION['nxp_paypal']['merchant_id'] = $payload['merchant_id'];
     }
 
     $_SESSION['nxp_paypal']['updated_at'] = time();
