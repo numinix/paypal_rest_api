@@ -75,14 +75,16 @@ exit;
 function paypalr_handle_proxy_request(): void
 {
     header('Content-Type: application/json');
-    
+
     $proxyAction = strtolower(trim((string)($_REQUEST['proxy_action'] ?? '')));
     $numinixUrl = paypalr_get_numinix_portal_base();
-    
+    $storeEnvironment = paypalr_detect_environment();
+
     paypalr_log_debug('Handling proxy request', [
         'proxy_action' => $proxyAction,
         'numinix_url' => $numinixUrl,
         'post_keys' => array_keys($_POST),
+        'store_environment' => $storeEnvironment,
     ]);
     
     if ($numinixUrl === '') {
@@ -101,11 +103,29 @@ function paypalr_handle_proxy_request(): void
         
         // Log the successful response (redacted)
         $decoded = json_decode($response, true);
-        paypalr_log_debug('Proxy request completed', [
+        $data = is_array($decoded['data'] ?? null) ? $decoded['data'] : [];
+        $remoteEnvironment = $data['environment'] ?? null;
+        $logContext = [
             'proxy_action' => $proxyAction,
             'success' => $decoded['success'] ?? 'unknown',
-            'has_data' => !empty($decoded['data']),
-        ]);
+            'has_data' => $data !== [],
+            'store_environment' => $storeEnvironment,
+            'remote_environment' => $remoteEnvironment,
+            'environment_mismatch' => $remoteEnvironment !== null && $remoteEnvironment !== $storeEnvironment,
+            'step' => $data['step'] ?? ($data['status'] ?? null),
+            'tracking_id' => $data['tracking_id'] ?? null,
+            'partner_referral_id' => $data['partner_referral_id'] ?? null,
+            'has_credentials' => isset($data['credentials']),
+            'message' => $decoded['message'] ?? null,
+            'data_keys' => array_keys($data),
+        ];
+
+        // Provide a sanitized view of the full response for debugging when polling/finalizing
+        if (in_array($proxyAction, ['status', 'finalize'], true)) {
+            $logContext['sanitized_data'] = paypalr_redact_sensitive($data);
+        }
+
+        paypalr_log_debug('Proxy request completed', $logContext);
         
         echo $response;
     } catch (Exception $e) {
