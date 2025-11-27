@@ -48,6 +48,13 @@ if ($configuration_group_id <= 0) {
 if ($configuration_group_id > 0) {
     $configurationValues = [
         [
+            'key' => 'NUMINIX_PPCP_VERSION',
+            'title' => 'Numinix PayPal ISU Version',
+            'value' => '1.0.5',
+            'description' => 'Tracks the installed version of the Numinix PayPal onboarding plugin.',
+            'sort_order' => 50,
+        ],
+        [
             'key' => 'NUMINIX_PPCP_SANDBOX_PARTNER_REFERRAL_LINK',
             'title' => 'Stored Sandbox Partner Referral Link',
             'value' => '',
@@ -73,20 +80,26 @@ if ($configuration_group_id > 0) {
         );
 
         if ($check && !$check->EOF) {
-            $db->Execute(
-                "UPDATE " . TABLE_CONFIGURATION
-                . " SET configuration_title = '" . zen_db_input($config['title']) . "',"
+            $updateFields = "configuration_title = '" . zen_db_input($config['title']) . "',"
                 . " configuration_description = '" . zen_db_input($config['description']) . "',"
                 . " configuration_group_id = " . (int) $configuration_group_id . ","
-                . " sort_order = " . (int) $config['sort_order']
+                . " sort_order = " . (int) $config['sort_order'];
+
+            if ($key === 'NUMINIX_PPCP_VERSION') {
+                $updateFields .= ", configuration_value = '" . zen_db_input($config['value']) . "'";
+            }
+
+            $db->Execute(
+                "UPDATE " . TABLE_CONFIGURATION
+                . " SET " . $updateFields
                 . " WHERE configuration_key = '" . zen_db_input($key) . "'"
                 . " LIMIT 1"
             );
         } else {
             $db->Execute(
                 "INSERT INTO " . TABLE_CONFIGURATION
-                . " (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, date_added)"
-                . " VALUES ('" . zen_db_input($config['title']) . "', '" . zen_db_input($key) . "', '" . zen_db_input($config['value']) . "', '" . zen_db_input($config['description']) . "', " . (int) $configuration_group_id . ", " . (int) $config['sort_order'] . ", NOW())"
+                . " (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, date_added, set_function)"
+                . " VALUES ('" . zen_db_input($config['title']) . "', '" . zen_db_input($key) . "', '" . zen_db_input($config['value']) . "', '" . zen_db_input($config['description']) . "', " . (int) $configuration_group_id . ", " . (int) $config['sort_order'] . ", NOW(), '" . zen_db_input($config['set_function'] ?? '') . "')"
             );
         }
     }
