@@ -573,6 +573,8 @@ function paypalr_render_onboarding_page(): void
                     var step = (data.step || '').toLowerCase();
                     var hasCredentials = data.credentials && data.credentials.client_id && data.credentials.client_secret;
                     var completedStep = step === 'completed' || step === 'ready' || step === 'active';
+                    // Use environment from API response if available, fallback to local setting
+                    var remoteEnvironment = data.environment || environment;
 
                     if (data.partner_referral_id) {
                         state.partnerReferralId = data.partner_referral_id;
@@ -586,8 +588,8 @@ function paypalr_render_onboarding_page(): void
                         if (hasCredentials) {
                             // Credentials are now available: show them, save them, and stop polling.
                             state.pollAttempts = 0;
-                            displayCredentials(data.credentials);
-                            autoSaveCredentials(data.credentials);
+                            displayCredentials(data.credentials, remoteEnvironment);
+                            autoSaveCredentials(data.credentials, remoteEnvironment);
                         } else {
                             // The account is active but credentials are not yet returned by the API.
                             setStatus('Your PayPal account is active. Waiting for API credentials...', 'info');
@@ -627,12 +629,12 @@ function paypalr_render_onboarding_page(): void
                         });
                 }
                 
-                function displayCredentials(credentials) {
+                function displayCredentials(credentials, credentialEnvironment) {
                     var html = '<div class="credentials">';
                     html += '<h3>✓ Credentials Retrieved Successfully</h3>';
                     html += '<p>Your PayPal API credentials have been retrieved and saved:</p>';
                     html += '<dl>';
-                    html += '<dt>Environment:</dt><dd>' + environment + '</dd>';
+                    html += '<dt>Environment:</dt><dd>' + escapeHtml(credentialEnvironment) + '</dd>';
                     html += '<dt>Client ID:</dt><dd>' + escapeHtml(credentials.client_id) + '</dd>';
                     html += '<dt>Client Secret:</dt><dd>' + escapeHtml(credentials.client_secret) + '</dd>';
                     html += '</dl>';
@@ -649,14 +651,15 @@ function paypalr_render_onboarding_page(): void
                     }
                 }
                 
-                function autoSaveCredentials(credentials) {
+                function autoSaveCredentials(credentials, credentialEnvironment) {
                     setStatus('Saving credentials...', 'info');
 
                     var payload = {
                         action: 'save_credentials',
                         securityToken: securityToken,
                         client_id: credentials.client_id,
-                        client_secret: credentials.client_secret
+                        client_secret: credentials.client_secret,
+                        environment: credentialEnvironment
                     };
 
                     fetch(saveUrl, {
@@ -935,7 +938,14 @@ function paypalr_handle_save_credentials(): void
         paypalr_json_error('Client ID and Secret are required.');
     }
 
-    $environment = paypalr_detect_environment();
+    // Use environment from the API response if provided, otherwise fall back to local setting
+    $requestedEnvironment = trim(strtolower((string)($_POST['environment'] ?? '')));
+    if ($requestedEnvironment === 'sandbox' || $requestedEnvironment === 'live') {
+        $environment = $requestedEnvironment;
+    } else {
+        $environment = paypalr_detect_environment();
+    }
+    
     $saved = paypalr_save_credentials($clientId, $clientSecret, $environment);
 
     if (!$saved) {
@@ -944,6 +954,7 @@ function paypalr_handle_save_credentials(): void
 
     paypalr_log_debug('PayPal ISU credentials saved', [
         'environment' => $environment,
+        'environment_source' => $requestedEnvironment !== '' ? 'api_response' : 'local_setting',
     ]);
 
     echo json_encode([
