@@ -105,6 +105,10 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $trackingId = $this->sanitizeTrackingId($payload['tracking_id'] ?? null);
             $partnerReferralId = $this->sanitizePartnerReferralId($payload['partner_referral_id'] ?? null);
             $merchantId = $this->sanitizeMerchantId($payload['merchant_id'] ?? null);
+            
+            // Extract authCode and sharedId for credential exchange per PayPal docs
+            $authCode = $this->sanitizeAuthCode($payload['auth_code'] ?? null);
+            $sharedId = $this->sanitizeSharedId($payload['shared_id'] ?? null);
 
             [$clientId, $clientSecret] = $this->resolveCredentials($environment, $payload);
             if ($clientId === '' || $clientSecret === '') {
@@ -148,9 +152,29 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 $data['links'] = $integration['links'];
             }
 
-            // Extract merchant credentials from oauth_integrations when onboarding is complete
+            // Extract merchant credentials - try multiple methods:
+            // 1. First, try to use authCode and sharedId to exchange for seller credentials (PayPal recommended flow)
+            // 2. Fall back to extracting from oauth_integrations in the merchant integration response
             if ($step === 'completed') {
-                $credentials = $this->extractMerchantCredentials($integration);
+                $credentials = null;
+                
+                // Method 1: Exchange authCode + sharedId for seller credentials (PayPal docs recommended)
+                // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+                if ($authCode !== '' && $sharedId !== '') {
+                    $credentials = $this->exchangeAuthCodeForCredentials(
+                        $apiBase,
+                        $clientId,
+                        $clientSecret,
+                        $authCode,
+                        $sharedId
+                    );
+                }
+                
+                // Method 2: Fall back to extracting from merchant integration response
+                if ($credentials === null) {
+                    $credentials = $this->extractMerchantCredentials($integration);
+                }
+                
                 if ($credentials !== null) {
                     $data['credentials'] = $credentials;
                 }
@@ -171,6 +195,155 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                     : 'Unable to retrieve PayPal onboarding status.'
             );
         }
+    }
+
+    /**
+     * Exchanges authCode and sharedId for seller REST API credentials.
+     *
+     * Per PayPal docs: "When your seller completes the sign-up flow, PayPal returns an authCode
+     * and sharedId to your seller's browser. Use the authCode and sharedId to get the seller's
+     * access token. Then, use this access token to get the seller's REST API credentials."
+     * See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+     *
+     * @param string $apiBase
+     * @param string $partnerClientId
+     * @param string $partnerClientSecret
+     * @param string $authCode
+     * @param string $sharedId
+     * @return array{client_id: string, client_secret: string}|null
+     */
+    private function exchangeAuthCodeForCredentials(
+        string $apiBase,
+        string $partnerClientId,
+        string $partnerClientSecret,
+        string $authCode,
+        string $sharedId
+    ): ?array {
+        if ($authCode === '' || $sharedId === '') {
+            return null;
+        }
+
+        try {
+            // Step 1: Exchange authCode for seller access token
+            // Per PayPal Partner Referrals API, after onboarding completes, the seller's browser
+            // receives authCode and sharedId. The sharedId acts as the code_verifier for PKCE flow
+            // or can be passed as a separate parameter depending on PayPal's integration type.
+            $tokenUrl = rtrim($apiBase, '/') . '/v1/oauth2/token';
+            $tokenHeaders = [
+                'Accept: application/json',
+                'Accept-Language: en_US',
+                'Content-Type: application/x-www-form-urlencoded',
+            ];
+            
+            // PayPal's third-party integration uses authorization_code grant with shared_id
+            // The exact parameter name may vary based on PayPal's documentation updates
+            $tokenBody = http_build_query([
+                'grant_type' => 'authorization_code',
+                'code' => $authCode,
+                'code_verifier' => $sharedId,
+            ], '', '&', PHP_QUERY_RFC3986);
+
+            $tokenResponse = $this->performHttpCall(
+                'POST',
+                $tokenUrl,
+                $tokenHeaders,
+                ['basic_auth' => $partnerClientId . ':' . $partnerClientSecret],
+                $tokenBody
+            );
+
+            $tokenDecoded = $this->decodeJson($tokenResponse['body']);
+
+            if ($tokenResponse['status'] < 200 || $tokenResponse['status'] >= 300) {
+                // Log the error details for debugging
+                $this->logDebug('Auth code exchange failed', [
+                    'status' => $tokenResponse['status'],
+                    'error' => $tokenDecoded['error'] ?? 'unknown',
+                    'error_description' => $tokenDecoded['error_description'] ?? '',
+                ]);
+                return null;
+            }
+
+            $sellerAccessToken = (string)($tokenDecoded['access_token'] ?? '');
+            if ($sellerAccessToken === '') {
+                $this->logDebug('Auth code exchange response missing access_token', [
+                    'response_keys' => array_keys($tokenDecoded),
+                ]);
+                return null;
+            }
+
+            // Step 2: Use seller access token to get REST API credentials
+            // The seller's credentials are returned in the token response for third-party integrations
+            $clientId = (string)($tokenDecoded['client_id'] ?? '');
+            $clientSecret = (string)($tokenDecoded['client_secret'] ?? '');
+            
+            // If credentials weren't in the token response, try to get them via the credentials endpoint
+            if ($clientId === '' || $clientSecret === '') {
+                $credentialsUrl = rtrim($apiBase, '/') . '/v1/customer/partners/' . rawurlencode($partnerClientId) . '/merchant-integrations/credentials';
+                $credentialsHeaders = [
+                    'Accept: application/json',
+                    'Authorization: Bearer ' . $sellerAccessToken,
+                ];
+
+                $credentialsResponse = $this->performHttpCall('GET', $credentialsUrl, $credentialsHeaders);
+                $credentialsDecoded = $this->decodeJson($credentialsResponse['body']);
+
+                if ($credentialsResponse['status'] >= 200 && $credentialsResponse['status'] < 300) {
+                    $clientId = (string)($credentialsDecoded['client_id'] ?? '');
+                    $clientSecret = (string)($credentialsDecoded['client_secret'] ?? '');
+                } else {
+                    $this->logDebug('Credentials endpoint request failed', [
+                        'status' => $credentialsResponse['status'],
+                    ]);
+                }
+            }
+
+            if ($clientId !== '' && $clientSecret !== '') {
+                return [
+                    'client_id' => $clientId,
+                    'client_secret' => $clientSecret,
+                ];
+            }
+
+            $this->logDebug('Auth code exchange completed but no credentials returned');
+            return null;
+        } catch (Throwable $e) {
+            // Log the exception for debugging
+            $this->logDebug('Auth code exchange threw exception', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Sanitizes the authorization code.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function sanitizeAuthCode($value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        return trim($value);
+    }
+
+    /**
+     * Sanitizes the shared ID.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function sanitizeSharedId($value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        return trim($value);
     }
 
     /**

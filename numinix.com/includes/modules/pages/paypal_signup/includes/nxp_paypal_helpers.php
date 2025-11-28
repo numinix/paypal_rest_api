@@ -487,6 +487,18 @@ function nxp_paypal_handle_status(array $session): void
         ?? ($session['merchant_id'] ?? null)
     );
 
+    // Extract authCode and sharedId from request (may come from postMessage)
+    $authCode = nxp_paypal_filter_string(
+        $_REQUEST['authCode']
+        ?? $_REQUEST['auth_code']
+        ?? ($session['auth_code'] ?? null)
+    );
+    $sharedId = nxp_paypal_filter_string(
+        $_REQUEST['sharedId']
+        ?? $_REQUEST['shared_id']
+        ?? ($session['shared_id'] ?? null)
+    );
+
     // If merchant_id is not provided in the request or session, try to retrieve it
     // from the database. This handles the cross-session case where the PayPal redirect
     // (in the popup) stored the merchant_id but the status poll comes from a different session.
@@ -501,11 +513,26 @@ function nxp_paypal_handle_status(array $session): void
         }
     }
 
+    // If authCode and sharedId are not provided in the request, try to retrieve them
+    // from the database. Per PayPal docs, these are needed to exchange for seller credentials.
+    if ((empty($authCode) || empty($sharedId)) && !empty($trackingId)) {
+        $persistedAuthData = nxp_paypal_retrieve_auth_code($trackingId);
+        if ($persistedAuthData !== null) {
+            $authCode = $persistedAuthData['auth_code'];
+            $sharedId = $persistedAuthData['shared_id'];
+            nxp_paypal_log_debug('Retrieved authCode and sharedId from database for credential exchange', [
+                'tracking_id' => $trackingId,
+            ]);
+        }
+    }
+
     $payload = [
         'tracking_id' => $trackingId,
         'environment' => $session['env'],
         'partner_referral_id' => $session['partner_referral_id'] ?? nxp_paypal_filter_string($_REQUEST['partner_referral_id'] ?? null),
         'merchant_id' => $merchantId,
+        'auth_code' => $authCode,
+        'shared_id' => $sharedId,
     ];
 
     try {
@@ -1352,6 +1379,175 @@ function nxp_paypal_persist_merchant_id(string $trackingId, string $merchantId, 
 }
 
 /**
+ * Persists authCode and sharedId keyed by tracking_id for credential exchange.
+ *
+ * Per PayPal docs: "When your seller completes the sign-up flow, PayPal returns an authCode
+ * and sharedId to your seller's browser. Use the authCode and sharedId to get the seller's
+ * access token. Then, use this access token to get the seller's REST API credentials."
+ * See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+ *
+ * This function stores these values so the status polling endpoint can retrieve and use
+ * them to exchange for the seller's credentials via the PayPal OAuth2 token endpoint.
+ *
+ * Records expire after 1 hour and are cleaned up automatically.
+ * Records are deleted after successful credential retrieval for security.
+ *
+ * @param string $trackingId
+ * @param string $authCode
+ * @param string $sharedId
+ * @param string $environment
+ * @return bool
+ */
+function nxp_paypal_persist_auth_code(string $trackingId, string $authCode, string $sharedId, string $environment = 'sandbox'): bool
+{
+    if ($trackingId === '' || $authCode === '' || $sharedId === '') {
+        return false;
+    }
+
+    // Validate tracking_id format (alphanumeric and dash only, max 64 chars)
+    if (!preg_match('/^[a-zA-Z0-9-]{1,64}$/', $trackingId)) {
+        nxp_paypal_log_debug('Invalid tracking_id format for auth code persistence', [
+            'tracking_id_length' => strlen($trackingId),
+        ]);
+        return false;
+    }
+
+    global $db;
+    if (!isset($db) || !is_object($db) || !method_exists($db, 'Execute')) {
+        nxp_paypal_log_debug('Unable to persist auth code: database unavailable');
+        return false;
+    }
+
+    if (!defined('TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING')) {
+        nxp_paypal_log_debug('Unable to persist auth code: tracking table not defined');
+        return false;
+    }
+
+    $tableName = TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING;
+    $expiresAt = date('Y-m-d H:i:s', time() + 3600); // 1 hour expiry
+
+    try {
+        // Check if record already exists for this tracking_id
+        $checkSql = "SELECT id FROM " . $tableName . " WHERE tracking_id = :trackingId LIMIT 1";
+        $checkSql = $db->bindVars($checkSql, ':trackingId', $trackingId, 'string');
+        $result = $db->Execute($checkSql);
+
+        if ($result && !$result->EOF) {
+            // Update existing record
+            $updateSql = "UPDATE " . $tableName . " SET "
+                . "auth_code = :authCode, "
+                . "shared_id = :sharedId, "
+                . "environment = :environment, "
+                . "expires_at = :expiresAt, "
+                . "updated_at = NOW() "
+                . "WHERE tracking_id = :trackingId";
+            $updateSql = $db->bindVars($updateSql, ':authCode', $authCode, 'string');
+            $updateSql = $db->bindVars($updateSql, ':sharedId', $sharedId, 'string');
+            $updateSql = $db->bindVars($updateSql, ':environment', $environment, 'string');
+            $updateSql = $db->bindVars($updateSql, ':expiresAt', $expiresAt, 'string');
+            $updateSql = $db->bindVars($updateSql, ':trackingId', $trackingId, 'string');
+            $db->Execute($updateSql);
+        } else {
+            // Insert new record
+            $insertSql = "INSERT INTO " . $tableName . " "
+                . "(tracking_id, auth_code, shared_id, environment, expires_at, created_at, updated_at) "
+                . "VALUES (:trackingId, :authCode, :sharedId, :environment, :expiresAt, NOW(), NOW())";
+            $insertSql = $db->bindVars($insertSql, ':trackingId', $trackingId, 'string');
+            $insertSql = $db->bindVars($insertSql, ':authCode', $authCode, 'string');
+            $insertSql = $db->bindVars($insertSql, ':sharedId', $sharedId, 'string');
+            $insertSql = $db->bindVars($insertSql, ':environment', $environment, 'string');
+            $insertSql = $db->bindVars($insertSql, ':expiresAt', $expiresAt, 'string');
+            $db->Execute($insertSql);
+        }
+
+        nxp_paypal_log_debug('Persisted authCode and sharedId to database for credential exchange', [
+            'tracking_id' => $trackingId,
+            'environment' => $environment,
+            'expires_at' => $expiresAt,
+        ]);
+
+        return true;
+    } catch (Throwable $e) {
+        nxp_paypal_log_debug('Failed to persist auth code to database', [
+            'tracking_id' => $trackingId,
+            'error' => $e->getMessage(),
+        ]);
+        return false;
+    }
+}
+
+/**
+ * Retrieves persisted authCode and sharedId by tracking_id from the database.
+ *
+ * @param string $trackingId
+ * @return array{auth_code: string, shared_id: string}|null
+ */
+function nxp_paypal_retrieve_auth_code(string $trackingId): ?array
+{
+    if ($trackingId === '') {
+        return null;
+    }
+
+    // Validate tracking_id format
+    if (!preg_match('/^[a-zA-Z0-9-]{1,64}$/', $trackingId)) {
+        return null;
+    }
+
+    global $db;
+    if (!isset($db) || !is_object($db) || !method_exists($db, 'Execute')) {
+        return null;
+    }
+
+    if (!defined('TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING')) {
+        return null;
+    }
+
+    $tableName = TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING;
+
+    try {
+        $sql = "SELECT auth_code, shared_id, expires_at FROM " . $tableName 
+            . " WHERE tracking_id = :trackingId LIMIT 1";
+        $sql = $db->bindVars($sql, ':trackingId', $trackingId, 'string');
+        $result = $db->Execute($sql);
+
+        if (!$result || $result->EOF) {
+            return null;
+        }
+
+        // Check expiry
+        $currentTime = time();
+        $expiresAt = strtotime($result->fields['expires_at']);
+        if ($expiresAt !== false && $expiresAt < $currentTime) {
+            // Expired - delete the record
+            nxp_paypal_delete_tracking_record($trackingId);
+            return null;
+        }
+
+        $authCode = (string)($result->fields['auth_code'] ?? '');
+        $sharedId = (string)($result->fields['shared_id'] ?? '');
+        
+        if ($authCode === '' || $sharedId === '') {
+            return null;
+        }
+
+        nxp_paypal_log_debug('Retrieved persisted authCode and sharedId from database', [
+            'tracking_id' => $trackingId,
+        ]);
+
+        return [
+            'auth_code' => $authCode,
+            'shared_id' => $sharedId,
+        ];
+    } catch (Throwable $e) {
+        nxp_paypal_log_debug('Failed to retrieve auth code from database', [
+            'tracking_id' => $trackingId,
+            'error' => $e->getMessage(),
+        ]);
+        return null;
+    }
+}
+
+/**
  * Retrieves a persisted merchant_id by tracking_id from the database.
  *
  * @param string $trackingId
@@ -1662,6 +1858,13 @@ function nxp_paypal_get_origin(): string
 /**
  * Builds the current request URL preserving whitelisted onboarding parameters.
  *
+ * When building the return URL for PayPal onboarding, this function includes
+ * the tracking_id and environment from the session if they're not already in
+ * the URL query parameters. This is critical for cross-session merchant_id
+ * persistence: when PayPal redirects back to this URL, the completion page
+ * needs the tracking_id to associate the returned merchant_id with the
+ * correct onboarding flow.
+ *
  * @return string
  */
 function nxp_paypal_current_url(): string
@@ -1732,6 +1935,30 @@ function nxp_paypal_current_url(): string
         }
     }
 
+    // Include tracking_id from session if not already in query parameters.
+    // This is critical for the PayPal return redirect: when PayPal redirects back
+    // to the completion page, we need the tracking_id in the URL so that the
+    // merchant_id returned by PayPal can be associated with the correct flow
+    // and persisted to the database for cross-session retrieval.
+    if (!isset($filtered['tracking_id'])) {
+        $sessionTrackingId = $_SESSION['nxp_paypal']['tracking_id'] ?? null;
+        if (is_string($sessionTrackingId) && $sessionTrackingId !== '') {
+            $sanitized = nxp_paypal_filter_string($sessionTrackingId);
+            if ($sanitized !== null) {
+                $filtered['tracking_id'] = $sanitized;
+            }
+        }
+    }
+
+    // Include environment from session if not already in query parameters.
+    // This ensures the completion page knows which environment's credentials to persist.
+    if (!isset($filtered['env'])) {
+        $sessionEnv = $_SESSION['nxp_paypal']['env'] ?? null;
+        if (is_string($sessionEnv) && in_array($sessionEnv, ['sandbox', 'live'], true)) {
+            $filtered['env'] = $sessionEnv;
+        }
+    }
+
     $queryString = http_build_query($filtered, '', '&', PHP_QUERY_RFC3986);
 
     return $origin . $path . ($queryString !== '' ? '?' . $queryString : '');
@@ -1798,7 +2025,11 @@ function nxp_paypal_is_paypal_return_redirect(): bool
     // PayPal may include isEmailConfirmed or accountStatus
     $hasAccountInfo = !empty($_GET['isEmailConfirmed']) || !empty($_GET['accountStatus']);
 
-    return $hasMerchantId || $hasConsentInfo || $hasAccountInfo;
+    // Per PayPal docs, authCode and sharedId are returned for credential exchange
+    // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+    $hasAuthCode = !empty($_GET['authCode']) && !empty($_GET['sharedId']);
+
+    return $hasMerchantId || $hasConsentInfo || $hasAccountInfo || $hasAuthCode;
 }
 
 /**
@@ -1827,6 +2058,14 @@ function nxp_paypal_show_completion_page(): void
         ?? null
     );
 
+    // Extract authCode and sharedId from PayPal return parameters
+    // Per PayPal docs: "When your seller completes the sign-up flow, PayPal returns an authCode
+    // and sharedId to your seller's browser. Use the authCode and sharedId to get the seller's
+    // access token. Then, use this access token to get the seller's REST API credentials."
+    // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+    $authCode = nxp_paypal_filter_string($_GET['authCode'] ?? null);
+    $sharedId = nxp_paypal_filter_string($_GET['sharedId'] ?? null);
+
     // Extract tracking_id from session or URL parameters
     $trackingId = nxp_paypal_filter_string(
         $_GET['tracking_id']
@@ -1851,6 +2090,19 @@ function nxp_paypal_show_completion_page(): void
             'merchant_id_prefix' => substr($merchantId, 0, 4) . '...',
             'environment' => $environment,
             'persisted' => $persisted ? 'yes' : 'no',
+        ]);
+    }
+
+    // If we have authCode and sharedId, persist them for credential exchange
+    // The status polling endpoint will use these to obtain the seller's REST API credentials
+    if ($authCode !== null && $sharedId !== null && $trackingId !== null) {
+        $persistedAuth = nxp_paypal_persist_auth_code($trackingId, $authCode, $sharedId, $environment);
+        nxp_paypal_log_debug('Completion page persisting authCode and sharedId', [
+            'tracking_id' => $trackingId,
+            'has_auth_code' => 'yes',
+            'shared_id_prefix' => substr($sharedId, 0, 4) . '...',
+            'environment' => $environment,
+            'persisted' => $persistedAuth ? 'yes' : 'no',
         ]);
     }
 
@@ -1879,6 +2131,13 @@ function nxp_paypal_show_completion_page(): void
     ];
     if ($merchantId !== null) {
         $postMessageData['merchantId'] = $merchantId;
+    }
+    // Include authCode and sharedId for the parent window to use in credential exchange
+    if ($authCode !== null) {
+        $postMessageData['authCode'] = $authCode;
+    }
+    if ($sharedId !== null) {
+        $postMessageData['sharedId'] = $sharedId;
     }
     $postMessageJson = json_encode($postMessageData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
