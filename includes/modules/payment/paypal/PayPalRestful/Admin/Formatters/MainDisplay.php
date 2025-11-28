@@ -742,8 +742,29 @@ class MainDisplay
                     <button type="button" class="btn btn-info" data-toggle="collapse" data-target="#' . $submit_button_id . '">' . $toggle_button_name . '</button>
                 </div>
                 <div class="btn-group">
-                    <button type="submit" class="btn btn-danger collapse" id="' . $submit_button_id . '">' . $submit_button_name . '</button>
-                    <script>document.getElementById("' . $submit_button_id . '").addEventListener("click", event => setTimeout(() => {if (event.target.form.checkValidity()) {event.target.disabled = true; event.target.innerHTML="' . TEXT_PLEASE_WAIT . '";}}, 0)); </script>
+                    <button type="submit" class="btn btn-danger collapse" id="' . $submit_button_id . '" data-original-text="' . $submit_button_name . '">' . $submit_button_name . '</button>
+                    <script>
+                    (function() {
+                        var btn = document.getElementById("' . $submit_button_id . '");
+                        btn.addEventListener("click", function(event) {
+                            setTimeout(function() {
+                                if (event.target.form.checkValidity()) {
+                                    event.target.disabled = true;
+                                    event.target.innerHTML = "' . TEXT_PLEASE_WAIT . '";
+                                }
+                            }, 0);
+                        });
+                        var modal = btn.closest(".modal");
+                        if (modal) {
+                            $(modal).on("show.bs.modal", function() {
+                                btn.disabled = false;
+                                btn.innerHTML = btn.getAttribute("data-original-text");
+                                btn.classList.remove("in");
+                                btn.setAttribute("aria-expanded", "false");
+                            });
+                        }
+                    })();
+                    </script>
                 </div>
             </div>';
     }

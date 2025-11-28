@@ -1,13 +1,15 @@
 <?php
 /**
- * Test to verify that the void submit button only disables when form is valid.
+ * Test to verify that the void submit button resets when the modal is reopened.
  *
  * This test validates the fix for the issue where clicking the CONFIRM button
  * on the void modal without entering the authorization ID would leave the button
- * in a permanent "Please wait..." disabled state.
+ * in a permanent "Please wait..." disabled state, even after closing and reopening
+ * the modal.
  *
- * The fix adds a form.checkValidity() check before disabling the button,
- * so users can re-enter the authorization ID and click the button again.
+ * The fix:
+ * 1. Adds a form.checkValidity() check before disabling the button
+ * 2. Resets the button state when the modal is opened (show.bs.modal event)
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -100,7 +102,7 @@ namespace {
         $mainDisplayFile = DIR_FS_CATALOG . DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalRestful/Admin/Formatters/MainDisplay.php';
         $content = file_get_contents($mainDisplayFile);
 
-        // Check 1: Verify addEventListener is used
+        // Check 1: Verify addEventListener is used for click
         if (strpos($content, 'addEventListener("click"') !== false) {
             fwrite(STDOUT, "✓ Submit button has click event listener\n");
         } else {
@@ -109,19 +111,63 @@ namespace {
         }
 
         // Check 2: Verify setTimeout is used (to allow form processing)
-        if (strpos($content, 'setTimeout(() =>') !== false) {
+        if (strpos($content, 'setTimeout(function()') !== false) {
             fwrite(STDOUT, "✓ Event handler uses setTimeout for proper event timing\n");
         } else {
             fwrite(STDERR, "FAIL: Event handler should use setTimeout\n");
             $passed = false;
         }
 
-        // Check 3: Verify the complete structure exists (use regex to be whitespace-tolerant)
-        $pattern = '/addEventListener\s*\(\s*["\']click["\']\s*,\s*event\s*=>\s*setTimeout\s*\(\s*\(\s*\)\s*=>\s*\{if\s*\(event\.target\.form\.checkValidity\(\)\)/';
-        if (preg_match($pattern, $content)) {
-            fwrite(STDOUT, "✓ Complete validation structure is correct\n");
+        // Check 3: Verify checkValidity is used before disabling
+        if (preg_match('/checkValidity\(\).*disabled\s*=\s*true/s', $content)) {
+            fwrite(STDOUT, "✓ Validity check happens before disabling\n");
         } else {
-            fwrite(STDERR, "FAIL: Complete validation structure is missing or incorrect\n");
+            fwrite(STDERR, "FAIL: Validity check should happen before disabling\n");
+            $passed = false;
+        }
+
+        return $passed;
+    }
+
+    /**
+     * Test that modal button resets when modal is shown
+     */
+    function testModalButtonResetsOnShow(): bool
+    {
+        $passed = true;
+
+        $mainDisplayFile = DIR_FS_CATALOG . DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalRestful/Admin/Formatters/MainDisplay.php';
+        $content = file_get_contents($mainDisplayFile);
+
+        // Check 1: Verify show.bs.modal event is used
+        if (strpos($content, 'show.bs.modal') !== false) {
+            fwrite(STDOUT, "✓ Modal show event listener is present\n");
+        } else {
+            fwrite(STDERR, "FAIL: Should listen for show.bs.modal event\n");
+            $passed = false;
+        }
+
+        // Check 2: Verify button is re-enabled on modal show
+        if (strpos($content, 'btn.disabled = false') !== false) {
+            fwrite(STDOUT, "✓ Button is re-enabled when modal opens\n");
+        } else {
+            fwrite(STDERR, "FAIL: Button should be re-enabled when modal opens\n");
+            $passed = false;
+        }
+
+        // Check 3: Verify button text is restored on modal show
+        if (strpos($content, 'data-original-text') !== false) {
+            fwrite(STDOUT, "✓ Original button text is stored for restoration\n");
+        } else {
+            fwrite(STDERR, "FAIL: Original button text should be stored for restoration\n");
+            $passed = false;
+        }
+
+        // Check 4: Verify collapse state is reset
+        if (strpos($content, 'btn.classList.remove("in")') !== false) {
+            fwrite(STDOUT, "✓ Button collapse state is reset on modal open\n");
+        } else {
+            fwrite(STDERR, "FAIL: Button collapse state should be reset on modal open\n");
             $passed = false;
         }
 
@@ -155,6 +201,14 @@ namespace {
         $failures++;
     }
 
+    fwrite(STDOUT, "Test 4: Verifying modal button resets when modal is shown...\n");
+    if (testModalButtonResetsOnShow()) {
+        fwrite(STDOUT, "  ✓ Test passed\n\n");
+    } else {
+        fwrite(STDERR, "  ✗ Test failed\n\n");
+        $failures++;
+    }
+
     // Summary
     if ($failures > 0) {
         fwrite(STDERR, "\n✗ FAILED: $failures test(s) failed\n");
@@ -165,7 +219,8 @@ namespace {
         fwrite(STDOUT, "1. The modal submit button now checks form.checkValidity() before disabling.\n");
         fwrite(STDOUT, "2. If form validation fails (e.g., missing required authorization ID),\n");
         fwrite(STDOUT, "   the button remains enabled so the user can correct and resubmit.\n");
-        fwrite(STDOUT, "3. Only when the form is valid will the button be disabled and show 'Please wait...'.\n");
+        fwrite(STDOUT, "3. When the modal is reopened (clicking VOID button again), the CONFIRM\n");
+        fwrite(STDOUT, "   button is reset to its initial clickable state.\n");
         exit(0);
     }
 }
