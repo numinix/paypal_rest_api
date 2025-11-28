@@ -12,6 +12,9 @@ $nonce = isset($nxpPayPalSession['nonce']) ? (string)$nxpPayPalSession['nonce'] 
 $trackingId = isset($nxpPayPalSession['tracking_id']) ? (string)$nxpPayPalSession['tracking_id'] : '';
 $step = isset($nxpPayPalSession['step']) ? (string)$nxpPayPalSession['step'] : 'start';
 $authCode = isset($nxpPayPalSession['code']) ? (string)$nxpPayPalSession['code'] : '';
+$merchantId = isset($nxpPayPalSession['merchant_id']) ? (string)$nxpPayPalSession['merchant_id'] : '';
+$authCodeExchange = isset($nxpPayPalSession['auth_code']) ? (string)$nxpPayPalSession['auth_code'] : '';
+$sharedId = isset($nxpPayPalSession['shared_id']) ? (string)$nxpPayPalSession['shared_id'] : '';
 
 $pageName = defined('FILENAME_PAYPAL_SIGNUP') ? FILENAME_PAYPAL_SIGNUP : 'paypal_signup';
 $actionUrl = zen_href_link($pageName, '', 'SSL');
@@ -24,6 +27,9 @@ $sessionPayload = json_encode([
     'tracking_id' => $trackingId,
     'step' => $step,
     'code' => $authCode,
+    'merchant_id' => $merchantId,
+    'authCode' => $authCodeExchange,
+    'sharedId' => $sharedId,
 ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
 $faqItems = [
