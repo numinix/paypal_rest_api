@@ -27,18 +27,18 @@ function nxp_paypal_bootstrap_session(): array
 
     $input = [
         'env' => nxp_paypal_filter_string($_REQUEST['env'] ?? null),
-        'step' => nxp_paypal_filter_string($_GET['step'] ?? null),
-        'code' => nxp_paypal_filter_string($_GET['code'] ?? null),
-        'tracking_id' => nxp_paypal_filter_string($_GET['tracking_id'] ?? null),
-        'partner_referral_id' => nxp_paypal_filter_string($_GET['partner_referral_id'] ?? null),
+        'step' => nxp_paypal_filter_string($_REQUEST['step'] ?? null),
+        'code' => nxp_paypal_filter_string($_REQUEST['code'] ?? null),
+        'tracking_id' => nxp_paypal_filter_string($_REQUEST['tracking_id'] ?? null),
+        'partner_referral_id' => nxp_paypal_filter_string($_REQUEST['partner_referral_id'] ?? null),
         'merchant_id' => nxp_paypal_filter_string(
-            $_GET['merchant_id']
-            ?? $_GET['merchantIdInPayPal']
-            ?? $_GET['merchantId']
+            $_REQUEST['merchant_id']
+            ?? $_REQUEST['merchantIdInPayPal']
+            ?? $_REQUEST['merchantId']
             ?? null
         ),
-        'auth_code' => nxp_paypal_filter_string($_GET['authCode'] ?? $_GET['auth_code'] ?? null),
-        'shared_id' => nxp_paypal_filter_string($_GET['sharedId'] ?? $_GET['shared_id'] ?? null),
+        'auth_code' => nxp_paypal_filter_string($_REQUEST['authCode'] ?? $_REQUEST['auth_code'] ?? null),
+        'shared_id' => nxp_paypal_filter_string($_REQUEST['sharedId'] ?? $_REQUEST['shared_id'] ?? null),
     ];
 
     $allowedEnvironments = ['sandbox', 'live'];
@@ -2193,24 +2193,28 @@ function nxp_paypal_filter_string($value): ?string
  */
 function nxp_paypal_is_paypal_return_redirect(): bool
 {
-    // Only GET requests can be PayPal redirects
+    // PayPal typically performs a GET redirect, but some browsers/extensions may
+    // convert the redirect into a POST. Accept both methods so we don't miss
+    // the completion payload and lose authCode/sharedId.
     $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? '');
-    if ($method !== 'GET') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
         return false;
     }
 
+    $params = $_REQUEST;
+
     // PayPal includes merchantIdInPayPal or merchantId in the return redirect
-    $hasMerchantId = !empty($_GET['merchantIdInPayPal']) || !empty($_GET['merchantId']);
+    $hasMerchantId = !empty($params['merchantIdInPayPal']) || !empty($params['merchantId']);
 
     // PayPal may also include permissionsGranted or consentStatus
-    $hasConsentInfo = !empty($_GET['permissionsGranted']) || !empty($_GET['consentStatus']);
+    $hasConsentInfo = !empty($params['permissionsGranted']) || !empty($params['consentStatus']);
 
     // PayPal may include isEmailConfirmed or accountStatus
-    $hasAccountInfo = !empty($_GET['isEmailConfirmed']) || !empty($_GET['accountStatus']);
+    $hasAccountInfo = !empty($params['isEmailConfirmed']) || !empty($params['accountStatus']);
 
     // Per PayPal docs, authCode and sharedId are returned for credential exchange
     // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
-    $hasAuthCode = !empty($_GET['authCode']) && !empty($_GET['sharedId']);
+    $hasAuthCode = !empty($params['authCode']) && !empty($params['sharedId']);
 
     return $hasMerchantId || $hasConsentInfo || $hasAccountInfo || $hasAuthCode;
 }
@@ -2230,14 +2234,14 @@ function nxp_paypal_show_completion_page(): void
 {
     // Sanitize and validate PayPal return parameters
     // These are only used to determine success status, not displayed to user
-    $permissionsGranted = nxp_paypal_filter_string($_GET['permissionsGranted'] ?? null);
-    $consentStatus = nxp_paypal_filter_string($_GET['consentStatus'] ?? null);
+    $permissionsGranted = nxp_paypal_filter_string($_REQUEST['permissionsGranted'] ?? null);
+    $consentStatus = nxp_paypal_filter_string($_REQUEST['consentStatus'] ?? null);
 
     // Extract merchant_id from PayPal return parameters - this is critical for credential retrieval
     $merchantId = nxp_paypal_filter_string(
-        $_GET['merchantIdInPayPal']
-        ?? $_GET['merchantId']
-        ?? $_GET['merchant_id']
+        $_REQUEST['merchantIdInPayPal']
+        ?? $_REQUEST['merchantId']
+        ?? $_REQUEST['merchant_id']
         ?? null
     );
 
@@ -2246,23 +2250,33 @@ function nxp_paypal_show_completion_page(): void
     // and sharedId to your seller's browser. Use the authCode and sharedId to get the seller's
     // access token. Then, use this access token to get the seller's REST API credentials."
     // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
-    $authCode = nxp_paypal_filter_string($_GET['authCode'] ?? null);
-    $sharedId = nxp_paypal_filter_string($_GET['sharedId'] ?? null);
+    $authCode = nxp_paypal_filter_string($_REQUEST['authCode'] ?? null);
+    $sharedId = nxp_paypal_filter_string($_REQUEST['sharedId'] ?? null);
 
     // Extract tracking_id from session or URL parameters
     $trackingId = nxp_paypal_filter_string(
-        $_GET['tracking_id']
+        $_REQUEST['tracking_id']
         ?? ($_SESSION['nxp_paypal']['tracking_id'] ?? null)
     );
 
     // Extract environment from session or URL parameters
     $environment = nxp_paypal_filter_string(
-        $_GET['env']
+        $_REQUEST['env']
         ?? ($_SESSION['nxp_paypal']['env'] ?? null)
     );
     if ($environment === null || !in_array($environment, ['sandbox', 'live'], true)) {
         $environment = 'sandbox';
     }
+
+    nxp_paypal_log_debug('PayPal return payload received', [
+        'tracking_id' => $trackingId,
+        'environment' => $environment,
+        'has_merchant_id' => $merchantId !== null ? 'yes' : 'no',
+        'has_auth_code' => $authCode !== null ? 'yes' : 'no',
+        'has_shared_id' => $sharedId !== null ? 'yes' : 'no',
+        'permissions_granted' => $permissionsGranted,
+        'consent_status' => $consentStatus,
+    ]);
 
     // Persist merchant_id to database for cross-session retrieval
     // This is critical because the status polling requests come from a different session

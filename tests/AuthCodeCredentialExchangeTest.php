@@ -37,19 +37,23 @@ function testCompletionPageCapturesAuthCode(): bool
     $helpersFile = DIR_FS_CATALOG . 'numinix.com/includes/modules/pages/paypal_signup/includes/nxp_paypal_helpers.php';
     $content = file_get_contents($helpersFile);
 
-    // Check 1: Verify the completion page extracts authCode from GET params
-    if (strpos($content, "\$_GET['authCode']") !== false) {
-        fwrite(STDOUT, "✓ Completion page extracts authCode from GET parameters\n");
+    // Check 1: Verify the completion page extracts authCode from request params
+    $capturesAuthCode = strpos($content, "\$_REQUEST['authCode']") !== false
+        || strpos($content, "\$_GET['authCode']") !== false;
+    if ($capturesAuthCode) {
+        fwrite(STDOUT, "✓ Completion page extracts authCode from request parameters\n");
     } else {
-        fwrite(STDERR, "FAIL: Completion page should extract authCode from GET parameters\n");
+        fwrite(STDERR, "FAIL: Completion page should extract authCode from request parameters\n");
         $passed = false;
     }
 
-    // Check 2: Verify the completion page extracts sharedId from GET params
-    if (strpos($content, "\$_GET['sharedId']") !== false) {
-        fwrite(STDOUT, "✓ Completion page extracts sharedId from GET parameters\n");
+    // Check 2: Verify the completion page extracts sharedId from request params
+    $capturesSharedId = strpos($content, "\$_REQUEST['sharedId']") !== false
+        || strpos($content, "\$_GET['sharedId']") !== false;
+    if ($capturesSharedId) {
+        fwrite(STDOUT, "✓ Completion page extracts sharedId from request parameters\n");
     } else {
-        fwrite(STDERR, "FAIL: Completion page should extract sharedId from GET parameters\n");
+        fwrite(STDERR, "FAIL: Completion page should extract sharedId from request parameters\n");
         $passed = false;
     }
 
@@ -237,9 +241,12 @@ function testPayPalReturnDetectsAuthCode(): bool
     $content = file_get_contents($helpersFile);
 
     // Check that nxp_paypal_is_paypal_return_redirect checks for authCode
-    if (strpos($content, "\$_GET['authCode']") !== false &&
-        strpos($content, "\$_GET['sharedId']") !== false &&
-        strpos($content, '$hasAuthCode') !== false) {
+    $detectsAuthCode = (strpos($content, "\$_REQUEST['authCode']") !== false
+        || strpos($content, "\$_GET['authCode']") !== false)
+        && (strpos($content, "\$_REQUEST['sharedId']") !== false
+            || strpos($content, "\$_GET['sharedId']") !== false)
+        && strpos($content, '$hasAuthCode') !== false;
+    if ($detectsAuthCode) {
         fwrite(STDOUT, "✓ PayPal return redirect detection checks for authCode and sharedId\n");
     } else {
         fwrite(STDERR, "FAIL: PayPal return redirect detection should check for authCode and sharedId\n");
