@@ -951,14 +951,19 @@ class NuminixPaypalIsuSignupLinkService
      *
      * Features specify the permissions that the partner can use in PayPal on behalf of the seller.
      * Valid values include: PAYMENT, REFUND, PARTNER_FEE, VAULT, BILLING_AGREEMENT, etc.
-     * Default features are PAYMENT, REFUND, PARTNER_FEE (core commerce features).
+     *
+     * Default features are PAYMENT and REFUND (core commerce features). PARTNER_FEE is
+     * intentionally excluded from the default because it requires special PayPal partner
+     * account configuration that is not universally available - particularly on production
+     * accounts. Attempting to use PARTNER_FEE without the proper account setup results in
+     * a FEATURES_UNAUTHORIZED error from PayPal's Partner Referrals API.
      *
      * @param mixed $value
      * @return array<int, string>
      */
     protected function resolveFeatures($value): array
     {
-        return $this->sanitizeStringList($value, ['PAYMENT', 'REFUND', 'PARTNER_FEE']);
+        return $this->sanitizeStringList($value, ['PAYMENT', 'REFUND']);
     }
 
     /**

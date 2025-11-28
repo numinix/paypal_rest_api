@@ -85,7 +85,8 @@ namespace {
 
         // Check for v2 API fields in the buildPayload method
         // Note: 'capabilities' is optional and only accepts specific values (APPLE_PAY, GOOGLE_PAY, etc.)
-        // The 'features' field inside 'third_party_details' is where PAYMENT, REFUND, PARTNER_FEE belong
+        // The 'features' field inside 'third_party_details' is where PAYMENT, REFUND, etc. belong
+        // Note: PARTNER_FEE is excluded from defaults as it requires special PayPal partner account configuration
         $v2Fields = [
             'features' => "API payload includes 'features' field in third_party_details (v2 schema)",
             'legal_consents' => "API payload includes 'legal_consents' field (v2 schema)",
