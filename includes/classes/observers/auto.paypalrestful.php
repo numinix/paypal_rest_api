@@ -193,11 +193,14 @@ class zcObserverPaypalrestful
             'oprc_checkout_process',
             'oprc_checkout_payment',
             'oprc_checkout_confirmation',
+            'oprc_confirmation'
         ];
 
         $potentialConstants = [
             'FILENAME_ONE_PAGE_CHECKOUT',
             'FILENAME_ONE_PAGE_CONFIRMATION',
+            'FILENAME_OPRC_CONFIRMATION',
+            'FILENAME_CHECKOUT'
         ];
 
         foreach ($potentialConstants as $constantName) {
