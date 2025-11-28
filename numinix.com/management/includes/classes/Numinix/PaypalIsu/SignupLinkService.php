@@ -405,7 +405,7 @@ class NuminixPaypalIsuSignupLinkService
         [$givenName, $surname] = $this->parseOwnerName($options['given_name'] ?? null, $options['surname'] ?? null);
         $trackingId = $this->resolveTrackingId($options['tracking_id'] ?? null);
 
-        $capabilities = $this->resolveCapabilities($options['capabilities'] ?? null);
+        $features = $this->resolveFeatures($options['features'] ?? null);
         $products = $this->resolveProducts($options['products'] ?? null);
 
         $returnUrl = $this->sanitizeUrl($options['return_url'] ?? $this->getOnboardingUrl('return'));
@@ -415,18 +415,13 @@ class NuminixPaypalIsuSignupLinkService
             'integration_method' => 'PAYPAL',
             'integration_type' => 'THIRD_PARTY',
             'third_party_details' => [
-                'features' => $capabilities,
+                'features' => $features,
             ],
         ];
-
-        if ($partnerClientId !== '') {
-            $restIntegration['third_party_details']['partner_client_id'] = $partnerClientId;
-        }
 
         $payload = [
             'tracking_id' => $trackingId,
             'products' => $products,
-            'capabilities' => $capabilities,
             'operations' => [
                 [
                     'operation' => 'API_INTEGRATION',
@@ -952,12 +947,16 @@ class NuminixPaypalIsuSignupLinkService
     }
 
     /**
-     * Resolves capabilities for the referral payload.
+     * Resolves features for the third_party_details in the referral payload.
+     *
+     * Features specify the permissions that the partner can use in PayPal on behalf of the seller.
+     * Valid values include: PAYMENT, REFUND, PARTNER_FEE, VAULT, BILLING_AGREEMENT, etc.
+     * Default features are PAYMENT, REFUND, PARTNER_FEE (core commerce features).
      *
      * @param mixed $value
      * @return array<int, string>
      */
-    protected function resolveCapabilities($value): array
+    protected function resolveFeatures($value): array
     {
         return $this->sanitizeStringList($value, ['PAYMENT', 'REFUND', 'PARTNER_FEE']);
     }
@@ -965,12 +964,15 @@ class NuminixPaypalIsuSignupLinkService
     /**
      * Resolves requested PayPal products for the referral payload.
      *
+     * Valid products: PPCP, EXPRESS_CHECKOUT, PAYMENT_METHODS, ADVANCED_VAULTING, etc.
+     * Note: VAULT is not a valid product - use ADVANCED_VAULTING for vaulting capabilities.
+     *
      * @param mixed $value
      * @return array<int, string>
      */
     protected function resolveProducts($value): array
     {
-        return $this->sanitizeStringList($value, ['PPCP', 'VAULT']);
+        return $this->sanitizeStringList($value, ['PPCP']);
     }
 
     /**

@@ -84,8 +84,10 @@ namespace {
         $content = file_get_contents($serviceFile);
 
         // Check for v2 API fields in the buildPayload method
+        // Note: 'capabilities' is optional and only accepts specific values (APPLE_PAY, GOOGLE_PAY, etc.)
+        // The 'features' field inside 'third_party_details' is where PAYMENT, REFUND, PARTNER_FEE belong
         $v2Fields = [
-            'capabilities' => "API payload includes 'capabilities' field (v2 schema)",
+            'features' => "API payload includes 'features' field in third_party_details (v2 schema)",
             'legal_consents' => "API payload includes 'legal_consents' field (v2 schema)",
             'contact_information' => "API payload includes 'contact_information' field (v2 schema)",
             'business_entity' => "API payload includes 'business_entity' field (v2 schema)",
