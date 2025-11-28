@@ -1271,7 +1271,7 @@ function nxp_paypal_persist_merchant_id(string $trackingId, string $merchantId, 
     }
 
     // Validate tracking_id format (alphanumeric and dash only, max 64 chars)
-    if (!preg_match('/^[a-zA-Z0-9\-]{1,64}$/', $trackingId)) {
+    if (!preg_match('/^[a-zA-Z0-9-]{1,64}$/', $trackingId)) {
         nxp_paypal_log_debug('Invalid tracking_id format for persistence', [
             'tracking_id_length' => strlen($trackingId),
         ]);
@@ -1364,7 +1364,7 @@ function nxp_paypal_retrieve_merchant_id(string $trackingId): ?string
     }
 
     // Validate tracking_id format
-    if (!preg_match('/^[a-zA-Z0-9\-]{1,64}$/', $trackingId)) {
+    if (!preg_match('/^[a-zA-Z0-9-]{1,64}$/', $trackingId)) {
         return null;
     }
 
@@ -1389,9 +1389,10 @@ function nxp_paypal_retrieve_merchant_id(string $trackingId): ?string
             return null;
         }
 
-        // Check expiry
+        // Check expiry - cache current time for consistent comparison
+        $currentTime = time();
         $expiresAt = strtotime($result->fields['expires_at']);
-        if ($expiresAt !== false && $expiresAt < time()) {
+        if ($expiresAt !== false && $expiresAt < $currentTime) {
             // Expired - delete the record
             nxp_paypal_delete_tracking_record($trackingId);
             return null;

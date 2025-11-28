@@ -130,7 +130,7 @@ namespace {
         $content = file_get_contents($helpersFile);
 
         // Check 1: Verify tracking_id format validation
-        if (strpos($content, "preg_match('/^[a-zA-Z0-9\\-]{1,64}\$/'") !== false) {
+        if (strpos($content, "preg_match('/^[a-zA-Z0-9-]{1,64}\$/'") !== false) {
             fwrite(STDOUT, "✓ Validates tracking_id format (alphanumeric + dash, max 64 chars)\n");
         } else {
             fwrite(STDERR, "FAIL: Should validate tracking_id format\n");
