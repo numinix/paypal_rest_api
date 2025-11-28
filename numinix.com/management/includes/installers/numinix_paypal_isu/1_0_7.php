@@ -69,6 +69,82 @@ try {
     }
 }
 
+// Add seller_access_token column if it doesn't exist
+try {
+    $checkColumnSql = "SHOW COLUMNS FROM " . $tableName . " LIKE 'seller_access_token'";
+    $result = $db->Execute($checkColumnSql);
+
+    if ($result->EOF) {
+        $alterSql = "ALTER TABLE " . $tableName . " ADD COLUMN seller_access_token TEXT NULL AFTER shared_id";
+        $db->Execute($alterSql);
+
+        if (isset($messageStack) && is_object($messageStack)) {
+            $messageStack->add('Added seller_access_token column to PayPal onboarding tracking table.', 'success');
+        }
+    }
+} catch (Throwable $e) {
+    if (isset($messageStack) && is_object($messageStack)) {
+        $messageStack->add('Failed to add seller_access_token column: ' . $e->getMessage(), 'error');
+    }
+}
+
+// Add seller_access_token_expires_at column if it doesn't exist
+try {
+    $checkColumnSql = "SHOW COLUMNS FROM " . $tableName . " LIKE 'seller_access_token_expires_at'";
+    $result = $db->Execute($checkColumnSql);
+
+    if ($result->EOF) {
+        $alterSql = "ALTER TABLE " . $tableName . " ADD COLUMN seller_access_token_expires_at DATETIME NULL AFTER seller_access_token";
+        $db->Execute($alterSql);
+
+        if (isset($messageStack) && is_object($messageStack)) {
+            $messageStack->add('Added seller_access_token_expires_at column to PayPal onboarding tracking table.', 'success');
+        }
+    }
+} catch (Throwable $e) {
+    if (isset($messageStack) && is_object($messageStack)) {
+        $messageStack->add('Failed to add seller_access_token_expires_at column: ' . $e->getMessage(), 'error');
+    }
+}
+
+// Add seller_client_id column if it doesn't exist
+try {
+    $checkColumnSql = "SHOW COLUMNS FROM " . $tableName . " LIKE 'seller_client_id'";
+    $result = $db->Execute($checkColumnSql);
+
+    if ($result->EOF) {
+        $alterSql = "ALTER TABLE " . $tableName . " ADD COLUMN seller_client_id VARCHAR(255) NULL AFTER seller_access_token_expires_at";
+        $db->Execute($alterSql);
+
+        if (isset($messageStack) && is_object($messageStack)) {
+            $messageStack->add('Added seller_client_id column to PayPal onboarding tracking table.', 'success');
+        }
+    }
+} catch (Throwable $e) {
+    if (isset($messageStack) && is_object($messageStack)) {
+        $messageStack->add('Failed to add seller_client_id column: ' . $e->getMessage(), 'error');
+    }
+}
+
+// Add seller_client_secret column if it doesn't exist
+try {
+    $checkColumnSql = "SHOW COLUMNS FROM " . $tableName . " LIKE 'seller_client_secret'";
+    $result = $db->Execute($checkColumnSql);
+
+    if ($result->EOF) {
+        $alterSql = "ALTER TABLE " . $tableName . " ADD COLUMN seller_client_secret TEXT NULL AFTER seller_client_id";
+        $db->Execute($alterSql);
+
+        if (isset($messageStack) && is_object($messageStack)) {
+            $messageStack->add('Added seller_client_secret column to PayPal onboarding tracking table.', 'success');
+        }
+    }
+} catch (Throwable $e) {
+    if (isset($messageStack) && is_object($messageStack)) {
+        $messageStack->add('Failed to add seller_client_secret column: ' . $e->getMessage(), 'error');
+    }
+}
+
 // Also make merchant_id nullable since we might have auth_code without merchant_id initially
 try {
     $alterSql = "ALTER TABLE " . $tableName . " MODIFY COLUMN merchant_id VARCHAR(32) NULL";
