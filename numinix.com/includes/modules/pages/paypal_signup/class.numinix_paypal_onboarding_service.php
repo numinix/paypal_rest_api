@@ -698,6 +698,22 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         string $environment
     ): ?array
     {
+        // Validate partnerClientId - should only contain alphanumeric, underscore, dash (PayPal client IDs)
+        if ($partnerClientId === '' || !preg_match('/^[A-Za-z0-9_-]+$/', $partnerClientId)) {
+            $this->logDebug('Invalid partnerClientId format for merchant integration lookup', [
+                'partnerClientId_length' => strlen($partnerClientId),
+            ]);
+            return null;
+        }
+
+        // Validate merchantId - should only contain alphanumeric characters (PayPal merchant IDs are typically 13 uppercase chars)
+        if ($merchantId === '' || !preg_match('/^[A-Za-z0-9]+$/', $merchantId)) {
+            $this->logDebug('Invalid merchantId format for merchant integration lookup', [
+                'merchantId_length' => strlen($merchantId),
+            ]);
+            return null;
+        }
+
         // Use the standard partner endpoint with the partner's client ID in the path
         // This is the correct endpoint for Partner Referrals API integrations
         // Endpoint: GET /v1/customer/partners/{partner_id}/merchant-integrations/{merchant_id}
@@ -755,6 +771,14 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         string $environment
     ): ?array
     {
+        // Validate partnerClientId - should only contain alphanumeric, underscore, dash (PayPal client IDs)
+        if ($partnerClientId === '' || !preg_match('/^[A-Za-z0-9_-]+$/', $partnerClientId)) {
+            $this->logDebug('Invalid partnerClientId format for tracking_id lookup', [
+                'partnerClientId_length' => strlen($partnerClientId),
+            ]);
+            return null;
+        }
+
         // Use the standard partner endpoint with tracking_id as a query parameter
         // Endpoint: GET /v1/customer/partners/{partner_id}/merchant-integrations?tracking_id={tracking_id}
         $query = http_build_query(array_filter([
@@ -790,7 +814,22 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             }
 
             // List response - look for matching tracking_id
-            $items = $decoded['merchant_integrations'] ?? $decoded['items'] ?? [$decoded];
+            // Try known response formats first, then fall back to treating decoded as the items array
+            $items = null;
+            if (isset($decoded['merchant_integrations']) && is_array($decoded['merchant_integrations'])) {
+                $items = $decoded['merchant_integrations'];
+            } elseif (isset($decoded['items']) && is_array($decoded['items'])) {
+                $items = $decoded['items'];
+            } else {
+                // Fallback: the response may be a direct array or have an unexpected structure
+                // Log this case to help identify API response format changes
+                $this->logDebug('Merchant integrations response used fallback parsing', [
+                    'tracking_id' => $trackingId,
+                    'response_keys' => array_keys($decoded),
+                ]);
+                $items = [$decoded];
+            }
+
             if (!is_array($items)) {
                 return null;
             }
