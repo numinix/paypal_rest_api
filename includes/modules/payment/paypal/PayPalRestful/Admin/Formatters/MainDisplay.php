@@ -743,7 +743,7 @@ class MainDisplay
                 </div>
                 <div class="btn-group">
                     <button type="submit" class="btn btn-danger collapse" id="' . $submit_button_id . '">' . $submit_button_name . '</button>
-                    <script>document.getElementById("' . $submit_button_id . '").addEventListener("click", event => setTimeout(() => {event.target.disabled = true; event.target.innerHTML="' . TEXT_PLEASE_WAIT . '";}, 0)); </script>
+                    <script>document.getElementById("' . $submit_button_id . '").addEventListener("click", event => setTimeout(() => {if (event.target.form.checkValidity()) {event.target.disabled = true; event.target.innerHTML="' . TEXT_PLEASE_WAIT . '";}}, 0)); </script>
                 </div>
             </div>';
     }
