@@ -1662,6 +1662,13 @@ function nxp_paypal_get_origin(): string
 /**
  * Builds the current request URL preserving whitelisted onboarding parameters.
  *
+ * When building the return URL for PayPal onboarding, this function includes
+ * the tracking_id and environment from the session if they're not already in
+ * the URL query parameters. This is critical for cross-session merchant_id
+ * persistence: when PayPal redirects back to this URL, the completion page
+ * needs the tracking_id to associate the returned merchant_id with the
+ * correct onboarding flow.
+ *
  * @return string
  */
 function nxp_paypal_current_url(): string
@@ -1729,6 +1736,30 @@ function nxp_paypal_current_url(): string
         $sanitized = nxp_paypal_filter_string($value);
         if ($sanitized !== null) {
             $filtered[$key] = $sanitized;
+        }
+    }
+
+    // Include tracking_id from session if not already in query parameters.
+    // This is critical for the PayPal return redirect: when PayPal redirects back
+    // to the completion page, we need the tracking_id in the URL so that the
+    // merchant_id returned by PayPal can be associated with the correct flow
+    // and persisted to the database for cross-session retrieval.
+    if (!isset($filtered['tracking_id'])) {
+        $sessionTrackingId = $_SESSION['nxp_paypal']['tracking_id'] ?? null;
+        if (is_string($sessionTrackingId) && $sessionTrackingId !== '') {
+            $sanitized = nxp_paypal_filter_string($sessionTrackingId);
+            if ($sanitized !== null) {
+                $filtered['tracking_id'] = $sanitized;
+            }
+        }
+    }
+
+    // Include environment from session if not already in query parameters.
+    // This ensures the completion page knows which environment's credentials to persist.
+    if (!isset($filtered['env'])) {
+        $sessionEnv = $_SESSION['nxp_paypal']['env'] ?? null;
+        if (is_string($sessionEnv) && in_array($sessionEnv, ['sandbox', 'live'], true)) {
+            $filtered['env'] = $sessionEnv;
         }
     }
 
