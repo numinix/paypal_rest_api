@@ -52,37 +52,6 @@ try {
     }
 }
 
-// Update version number
-$configuration_group_id = (int) ($configuration_group_id ?? 0);
-if ($configuration_group_id <= 0) {
-    $groupLookup = $db->Execute(
-        "SELECT configuration_group_id"
-        . " FROM " . TABLE_CONFIGURATION
-        . " WHERE configuration_key = '" . zen_db_input('NUMINIX_PPCP_ENVIRONMENT') . "'"
-        . " LIMIT 1"
-    );
-
-    if ($groupLookup && !$groupLookup->EOF) {
-        $configuration_group_id = (int) $groupLookup->fields['configuration_group_id'];
-    }
-}
-
-if ($configuration_group_id > 0) {
-    $versionKey = 'NUMINIX_PPCP_VERSION';
-    $newVersion = '1.0.6';
-    
-    $check = $db->Execute(
-        "SELECT configuration_id FROM " . TABLE_CONFIGURATION
-        . " WHERE configuration_key = '" . zen_db_input($versionKey) . "'"
-        . " LIMIT 1"
-    );
-
-    if ($check && !$check->EOF) {
-        $db->Execute(
-            "UPDATE " . TABLE_CONFIGURATION
-            . " SET configuration_value = '" . zen_db_input($newVersion) . "'"
-            . " WHERE configuration_key = '" . zen_db_input($versionKey) . "'"
-            . " LIMIT 1"
-        );
-    }
-}
+// Note: Version number updates are handled automatically by init_numinix_paypal_isu.php
+// after each installer file runs. Updating the version here would cause the installer
+// to be skipped on subsequent runs even if the table creation above fails.
