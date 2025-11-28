@@ -687,7 +687,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
     {
         $query = http_build_query([
             'include_products' => 'true',
-            'partner_merchant_id' => $merchantId,
+            'seller_merchant_id' => $merchantId,
         ]);
 
         $url = rtrim($apiBase, '/') . '/v1/customer/partners/marketplace/merchant-integrations?' . $query;
@@ -738,7 +738,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         $query = http_build_query(array_filter([
             'include_products' => 'true',
             'tracking_id' => $trackingId,
-            'partner_merchant_id' => $merchantId,
+            'seller_merchant_id' => $merchantId,
         ], static function ($value) {
             return $value !== '' && $value !== null;
         }));
