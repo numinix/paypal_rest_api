@@ -274,7 +274,10 @@
             nonce: '',
             tracking_id: '',
             step: 'start',
-            code: ''
+            code: '',
+            merchant_id: '',
+            authCode: '',
+            sharedId: ''
         };
 
         var session = Object.assign({}, sessionDefaults, initialSession);
@@ -495,6 +498,15 @@
             if (data.step) {
                 state.session.step = data.step;
             }
+            if (data.merchant_id) {
+                state.session.merchant_id = data.merchant_id;
+            }
+            if (data.auth_code || data.authCode) {
+                state.session.authCode = data.auth_code || data.authCode;
+            }
+            if (data.shared_id || data.sharedId) {
+                state.session.sharedId = data.shared_id || data.sharedId;
+            }
             if (typeof data.polling_interval === 'number' && !Number.isNaN(data.polling_interval)) {
                 state.pollInterval = Math.max(data.polling_interval, 2000);
             }
@@ -516,6 +528,15 @@
             }
             if (data.step) {
                 state.session.step = data.step;
+            }
+            if (data.merchant_id) {
+                state.session.merchant_id = data.merchant_id;
+            }
+            if (data.auth_code || data.authCode) {
+                state.session.authCode = data.auth_code || data.authCode;
+            }
+            if (data.shared_id || data.sharedId) {
+                state.session.sharedId = data.shared_id || data.sharedId;
             }
             if (!state.pollStartTime) {
                 state.pollStartTime = Date.now();
@@ -600,7 +621,10 @@
             var wait = Math.max(delay || state.pollInterval, 2000);
             state.pollTimer = window.setTimeout(function () {
                 postAction('status', {
-                    tracking_id: state.session.tracking_id || ''
+                    tracking_id: state.session.tracking_id || '',
+                    merchant_id: state.session.merchant_id || '',
+                    authCode: state.session.authCode || '',
+                    sharedId: state.session.sharedId || ''
                 })
                     .then(function (response) {
                         handleStatusResponse(response.data || {});
@@ -648,6 +672,9 @@
                         state.session.step = data.step;
                     }
                     state.session.code = '';
+                    state.session.merchant_id = '';
+                    state.session.authCode = '';
+                    state.session.sharedId = '';
 
                     sendTelemetry('start_success', {
                         tracking_id: state.session.tracking_id || undefined,
@@ -688,6 +715,15 @@
             }
             if (state.session.tracking_id) {
                 payload.tracking_id = state.session.tracking_id;
+            }
+            if (state.session.merchant_id) {
+                payload.merchant_id = state.session.merchant_id;
+            }
+            if (state.session.authCode) {
+                payload.authCode = state.session.authCode;
+            }
+            if (state.session.sharedId) {
+                payload.sharedId = state.session.sharedId;
             }
 
             if (!payload.code && !payload.tracking_id) {
@@ -756,6 +792,17 @@
 
             if (!completionEvent || !state.session.tracking_id) {
                 return;
+            }
+
+            // Capture authCode/sharedId/merchantId from PayPal postMessage for credential exchange
+            if (payload.merchantId) {
+                state.session.merchant_id = payload.merchantId;
+            }
+            if (payload.authCode) {
+                state.session.authCode = payload.authCode;
+            }
+            if (payload.sharedId) {
+                state.session.sharedId = payload.sharedId;
             }
 
             setStatus('Processing your PayPal account details…', 'info');
