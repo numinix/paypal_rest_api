@@ -443,6 +443,8 @@ function paypalr_render_onboarding_page(): void
                     trackingId: null,
                     partnerReferralId: null,
                     merchantId: null,
+                    authCode: null,
+                    sharedId: null,
                     nonce: null,
                     popup: null,
                     pollTimer: null,
@@ -601,6 +603,22 @@ function paypalr_render_onboarding_page(): void
                         state.merchantId = payload.merchantIdInPayPal;
                     }
 
+                    // Extract authCode and sharedId from the completion message
+                    // Per PayPal docs: "When your seller completes the sign-up flow, PayPal returns
+                    // an authCode and sharedId to your seller's browser. Use the authCode and sharedId
+                    // to get the seller's access token."
+                    // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+                    if (payload.authCode) {
+                        state.authCode = payload.authCode;
+                    } else if (payload.auth_code) {
+                        state.authCode = payload.auth_code;
+                    }
+                    if (payload.sharedId) {
+                        state.sharedId = payload.sharedId;
+                    } else if (payload.shared_id) {
+                        state.sharedId = payload.shared_id;
+                    }
+
                     setStatus('Processing your PayPal account details…', 'info');
                     pollStatus(true);
                 }
@@ -625,6 +643,8 @@ function paypalr_render_onboarding_page(): void
                             tracking_id: state.trackingId,
                             partner_referral_id: state.partnerReferralId || '',
                             merchant_id: state.merchantId || '',
+                            authCode: state.authCode || '',
+                            sharedId: state.sharedId || '',
                             nonce: state.nonce
                         })
                         .then(function(response) {
