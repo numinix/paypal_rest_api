@@ -390,6 +390,18 @@ function nxp_paypal_handle_finalize(array $session): void
         ?? ($session['merchant_id'] ?? null)
     );
 
+    $authCode = nxp_paypal_filter_string(
+        $_REQUEST['authCode']
+        ?? $_REQUEST['auth_code']
+        ?? ($session['auth_code'] ?? null)
+    );
+
+    $sharedId = nxp_paypal_filter_string(
+        $_REQUEST['sharedId']
+        ?? $_REQUEST['shared_id']
+        ?? ($session['shared_id'] ?? null)
+    );
+
     if (empty($trackingId)) {
         nxp_paypal_json_error('Missing tracking reference.');
     }
@@ -400,7 +412,23 @@ function nxp_paypal_handle_finalize(array $session): void
         'environment' => $session['env'],
         'partner_referral_id' => $session['partner_referral_id'] ?? nxp_paypal_filter_string($_REQUEST['partner_referral_id'] ?? null),
         'merchant_id' => $merchantId,
+        'auth_code' => $authCode,
+        'shared_id' => $sharedId,
     ];
+
+    // Persist identifiers that arrive via finalize to make credential exchange resilient
+    if ($merchantId !== null) {
+        $_SESSION['nxp_paypal']['merchant_id'] = $merchantId;
+        if (!empty($trackingId)) {
+            nxp_paypal_persist_merchant_id($trackingId, $merchantId, $session['env'] ?? 'sandbox');
+        }
+    }
+
+    if ($authCode !== null && $sharedId !== null && $trackingId !== null) {
+        $_SESSION['nxp_paypal']['auth_code'] = $authCode;
+        $_SESSION['nxp_paypal']['shared_id'] = $sharedId;
+        nxp_paypal_persist_auth_code($trackingId, $authCode, $sharedId, $session['env'] ?? 'sandbox');
+    }
 
     try {
         $response = nxp_paypal_onboarding_service()->finalize($payload);
@@ -511,6 +539,20 @@ function nxp_paypal_handle_status(array $session): void
                 'merchant_id_prefix' => substr($merchantId, 0, 4) . '...',
             ]);
         }
+    }
+
+    // Persist merchant/authCode/sharedId data from the status request into the session and DB
+    if (!empty($merchantId)) {
+        $_SESSION['nxp_paypal']['merchant_id'] = $merchantId;
+        if (!empty($trackingId)) {
+            nxp_paypal_persist_merchant_id($trackingId, $merchantId, $session['env'] ?? 'sandbox');
+        }
+    }
+
+    if (!empty($authCode) && !empty($sharedId) && !empty($trackingId)) {
+        $_SESSION['nxp_paypal']['auth_code'] = $authCode;
+        $_SESSION['nxp_paypal']['shared_id'] = $sharedId;
+        nxp_paypal_persist_auth_code($trackingId, $authCode, $sharedId, $session['env'] ?? 'sandbox');
     }
 
     // If authCode and sharedId are not provided in the request, try to retrieve them
