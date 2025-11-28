@@ -1532,6 +1532,14 @@ function nxp_paypal_show_completion_page(): void
     $permissionsGranted = nxp_paypal_filter_string($_GET['permissionsGranted'] ?? null);
     $consentStatus = nxp_paypal_filter_string($_GET['consentStatus'] ?? null);
 
+    // Extract merchant_id from PayPal return parameters - this is critical for credential retrieval
+    $merchantId = nxp_paypal_filter_string(
+        $_GET['merchantIdInPayPal']
+        ?? $_GET['merchantId']
+        ?? $_GET['merchant_id']
+        ?? null
+    );
+
     $success = ($permissionsGranted !== null && strtolower($permissionsGranted) === 'true')
             || ($consentStatus !== null && strtolower($consentStatus) === 'true');
 
@@ -1547,6 +1555,18 @@ function nxp_paypal_show_completion_page(): void
         $message = 'Please return to your admin panel to check the onboarding status. This window will close automatically.';
         $messageClass = 'info';
     }
+
+    // Prepare data for postMessage to parent window
+    // Only include sanitized, validated values
+    $postMessageData = [
+        'event' => 'paypal_onboarding_complete',
+        'success' => $success,
+        'permissionsGranted' => $permissionsGranted === 'true',
+    ];
+    if ($merchantId !== null) {
+        $postMessageData['merchantId'] = $merchantId;
+    }
+    $postMessageJson = json_encode($postMessageData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
     header('Content-Type: text/html; charset=UTF-8');
     ?>
@@ -1624,6 +1644,18 @@ function nxp_paypal_show_completion_page(): void
     </div>
     <script>
         (function() {
+            // Send completion message to parent window (admin panel) with merchant ID
+            // This allows the parent to include the merchant_id in subsequent status polls
+            var messageData = <?php echo $postMessageJson; ?>;
+            if (window.opener && !window.opener.closed) {
+                try {
+                    // Send to all origins since admin panel may be on different domain
+                    window.opener.postMessage(messageData, '*');
+                } catch(e) {
+                    // Ignore cross-origin errors - parent will detect popup close
+                }
+            }
+
             var seconds = 5;
             var timer = document.getElementById('timer');
             var interval = setInterval(function() {
