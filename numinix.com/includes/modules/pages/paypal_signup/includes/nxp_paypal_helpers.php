@@ -487,6 +487,20 @@ function nxp_paypal_handle_status(array $session): void
         ?? ($session['merchant_id'] ?? null)
     );
 
+    // If merchant_id is not provided in the request or session, try to retrieve it
+    // from the database. This handles the cross-session case where the PayPal redirect
+    // (in the popup) stored the merchant_id but the status poll comes from a different session.
+    if (empty($merchantId) && !empty($trackingId)) {
+        $persistedMerchantId = nxp_paypal_retrieve_merchant_id($trackingId);
+        if ($persistedMerchantId !== null) {
+            $merchantId = $persistedMerchantId;
+            nxp_paypal_log_debug('Retrieved merchant_id from database for status poll', [
+                'tracking_id' => $trackingId,
+                'merchant_id_prefix' => substr($merchantId, 0, 4) . '...',
+            ]);
+        }
+    }
+
     $payload = [
         'tracking_id' => $trackingId,
         'environment' => $session['env'],
@@ -537,6 +551,15 @@ function nxp_paypal_handle_status(array $session): void
     // Store credentials in session if available, but redact from event logs
     if (isset($response['data']['credentials']) && is_array($response['data']['credentials'])) {
         $_SESSION['nxp_paypal']['credentials'] = $response['data']['credentials'];
+
+        // Clean up the tracking record after successful credential retrieval for security
+        // This ensures sensitive data is not retained longer than necessary
+        if (!empty($trackingId)) {
+            nxp_paypal_delete_tracking_record($trackingId);
+            nxp_paypal_log_debug('Deleted tracking record after successful credential retrieval', [
+                'tracking_id' => $trackingId,
+            ]);
+        }
     }
 
     $context = is_array($response['data']) ? $response['data'] : [];
@@ -1225,6 +1248,267 @@ function nxp_paypal_resolve_debug_log_file(): ?string
 }
 
 /**
+ * Persists merchant_id keyed by tracking_id for cross-session retrieval.
+ *
+ * When PayPal redirects back to the completion page (in a popup), the merchant_id
+ * is passed as a URL parameter. However, subsequent status polls come from the
+ * store admin panel via proxy, which has a different PHP session. This function
+ * persists the merchant_id to the database so it can be retrieved by the
+ * tracking_id in subsequent status polls.
+ *
+ * Records expire after 1 hour and are cleaned up automatically.
+ * Records are deleted after successful credential retrieval for security.
+ *
+ * @param string $trackingId
+ * @param string $merchantId
+ * @param string $environment
+ * @return bool
+ */
+function nxp_paypal_persist_merchant_id(string $trackingId, string $merchantId, string $environment = 'sandbox'): bool
+{
+    if ($trackingId === '' || $merchantId === '') {
+        return false;
+    }
+
+    // Validate tracking_id format (alphanumeric and dash only, max 64 chars)
+    if (!preg_match('/^[a-zA-Z0-9-]{1,64}$/', $trackingId)) {
+        nxp_paypal_log_debug('Invalid tracking_id format for persistence', [
+            'tracking_id_length' => strlen($trackingId),
+        ]);
+        return false;
+    }
+
+    // Validate merchant_id format (alphanumeric only, max 32 chars - PayPal merchant IDs are typically 13 chars)
+    if (!preg_match('/^[A-Z0-9]{1,32}$/i', $merchantId)) {
+        nxp_paypal_log_debug('Invalid merchant_id format for persistence', [
+            'merchant_id_length' => strlen($merchantId),
+        ]);
+        return false;
+    }
+
+    global $db;
+    if (!isset($db) || !is_object($db) || !method_exists($db, 'Execute')) {
+        nxp_paypal_log_debug('Unable to persist merchant_id: database unavailable');
+        return false;
+    }
+
+    if (!defined('TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING')) {
+        nxp_paypal_log_debug('Unable to persist merchant_id: tracking table not defined');
+        return false;
+    }
+
+    // Clean up expired records first (older than 1 hour)
+    nxp_paypal_cleanup_expired_tracking();
+
+    $tableName = TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING;
+    $expiresAt = date('Y-m-d H:i:s', time() + 3600); // 1 hour expiry
+
+    try {
+        // Check if record already exists for this tracking_id
+        $checkSql = "SELECT id FROM " . $tableName . " WHERE tracking_id = :trackingId LIMIT 1";
+        $checkSql = $db->bindVars($checkSql, ':trackingId', $trackingId, 'string');
+        $result = $db->Execute($checkSql);
+
+        if ($result && !$result->EOF) {
+            // Update existing record
+            $updateSql = "UPDATE " . $tableName . " SET "
+                . "merchant_id = :merchantId, "
+                . "environment = :environment, "
+                . "expires_at = :expiresAt, "
+                . "updated_at = NOW() "
+                . "WHERE tracking_id = :trackingId";
+            $updateSql = $db->bindVars($updateSql, ':merchantId', $merchantId, 'string');
+            $updateSql = $db->bindVars($updateSql, ':environment', $environment, 'string');
+            $updateSql = $db->bindVars($updateSql, ':expiresAt', $expiresAt, 'string');
+            $updateSql = $db->bindVars($updateSql, ':trackingId', $trackingId, 'string');
+            $db->Execute($updateSql);
+        } else {
+            // Insert new record
+            $insertSql = "INSERT INTO " . $tableName . " "
+                . "(tracking_id, merchant_id, environment, expires_at, created_at, updated_at) "
+                . "VALUES (:trackingId, :merchantId, :environment, :expiresAt, NOW(), NOW())";
+            $insertSql = $db->bindVars($insertSql, ':trackingId', $trackingId, 'string');
+            $insertSql = $db->bindVars($insertSql, ':merchantId', $merchantId, 'string');
+            $insertSql = $db->bindVars($insertSql, ':environment', $environment, 'string');
+            $insertSql = $db->bindVars($insertSql, ':expiresAt', $expiresAt, 'string');
+            $db->Execute($insertSql);
+        }
+
+        nxp_paypal_log_debug('Persisted merchant_id to database for cross-session retrieval', [
+            'tracking_id' => $trackingId,
+            'merchant_id_prefix' => substr($merchantId, 0, 4) . '...',
+            'environment' => $environment,
+            'expires_at' => $expiresAt,
+        ]);
+
+        return true;
+    } catch (Throwable $e) {
+        nxp_paypal_log_debug('Failed to persist merchant_id to database', [
+            'tracking_id' => $trackingId,
+            'error' => $e->getMessage(),
+        ]);
+        return false;
+    }
+}
+
+/**
+ * Retrieves a persisted merchant_id by tracking_id from the database.
+ *
+ * @param string $trackingId
+ * @return string|null The merchant_id if found and not expired, null otherwise
+ */
+function nxp_paypal_retrieve_merchant_id(string $trackingId): ?string
+{
+    if ($trackingId === '') {
+        return null;
+    }
+
+    // Validate tracking_id format
+    if (!preg_match('/^[a-zA-Z0-9-]{1,64}$/', $trackingId)) {
+        return null;
+    }
+
+    global $db;
+    if (!isset($db) || !is_object($db) || !method_exists($db, 'Execute')) {
+        return null;
+    }
+
+    if (!defined('TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING')) {
+        return null;
+    }
+
+    $tableName = TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING;
+
+    try {
+        $sql = "SELECT merchant_id, expires_at FROM " . $tableName 
+            . " WHERE tracking_id = :trackingId LIMIT 1";
+        $sql = $db->bindVars($sql, ':trackingId', $trackingId, 'string');
+        $result = $db->Execute($sql);
+
+        if (!$result || $result->EOF) {
+            return null;
+        }
+
+        // Check expiry - cache current time for consistent comparison
+        $currentTime = time();
+        $expiresAt = strtotime($result->fields['expires_at']);
+        if ($expiresAt !== false && $expiresAt < $currentTime) {
+            // Expired - delete the record
+            nxp_paypal_delete_tracking_record($trackingId);
+            return null;
+        }
+
+        $merchantId = (string)$result->fields['merchant_id'];
+        if ($merchantId === '') {
+            return null;
+        }
+
+        nxp_paypal_log_debug('Retrieved persisted merchant_id from database', [
+            'tracking_id' => $trackingId,
+            'merchant_id_prefix' => substr($merchantId, 0, 4) . '...',
+        ]);
+
+        return $merchantId;
+    } catch (Throwable $e) {
+        nxp_paypal_log_debug('Failed to retrieve merchant_id from database', [
+            'tracking_id' => $trackingId,
+            'error' => $e->getMessage(),
+        ]);
+        return null;
+    }
+}
+
+/**
+ * Deletes a tracking record after successful credential retrieval.
+ *
+ * This should be called after credentials have been successfully retrieved
+ * and saved to ensure sensitive data is not retained longer than necessary.
+ *
+ * @param string $trackingId
+ * @return bool
+ */
+function nxp_paypal_delete_tracking_record(string $trackingId): bool
+{
+    if ($trackingId === '') {
+        return false;
+    }
+
+    global $db;
+    if (!isset($db) || !is_object($db) || !method_exists($db, 'Execute')) {
+        return false;
+    }
+
+    if (!defined('TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING')) {
+        return false;
+    }
+
+    $tableName = TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING;
+
+    try {
+        $sql = "DELETE FROM " . $tableName . " WHERE tracking_id = :trackingId";
+        $sql = $db->bindVars($sql, ':trackingId', $trackingId, 'string');
+        $db->Execute($sql);
+
+        nxp_paypal_log_debug('Deleted tracking record after completion', [
+            'tracking_id' => $trackingId,
+        ]);
+
+        return true;
+    } catch (Throwable $e) {
+        nxp_paypal_log_debug('Failed to delete tracking record', [
+            'tracking_id' => $trackingId,
+            'error' => $e->getMessage(),
+        ]);
+        return false;
+    }
+}
+
+/**
+ * Cleans up expired tracking records from the database.
+ *
+ * This is called automatically during persist operations to prevent
+ * accumulation of stale data. Records older than 1 hour are removed.
+ *
+ * @return int Number of records deleted
+ */
+function nxp_paypal_cleanup_expired_tracking(): int
+{
+    global $db;
+    if (!isset($db) || !is_object($db) || !method_exists($db, 'Execute')) {
+        return 0;
+    }
+
+    if (!defined('TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING')) {
+        return 0;
+    }
+
+    $tableName = TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING;
+
+    try {
+        $sql = "DELETE FROM " . $tableName . " WHERE expires_at < NOW()";
+        $db->Execute($sql);
+
+        // Get affected rows if available
+        if (method_exists($db, 'affectedRows')) {
+            $deleted = (int)$db->affectedRows();
+            if ($deleted > 0) {
+                nxp_paypal_log_debug('Cleaned up expired tracking records', [
+                    'deleted_count' => $deleted,
+                ]);
+            }
+            return $deleted;
+        }
+
+        return 0;
+    } catch (Throwable $e) {
+        nxp_paypal_log_debug('Failed to cleanup expired tracking records', [
+            'error' => $e->getMessage(),
+        ]);
+        return 0;
+    }
+}
+
+/**
  * Redacts sensitive values from context before logging.
  *
  * @param array<string, mixed> $context
@@ -1523,6 +1807,9 @@ function nxp_paypal_is_paypal_return_redirect(): bool
  * This page is shown in the popup window after PayPal onboarding completes. It instructs
  * the user that the popup will close automatically, or provides a manual close button.
  *
+ * When the merchant_id is received from PayPal, it is persisted to the database so that
+ * subsequent status polling requests (from a different session) can retrieve it.
+ *
  * @return void
  */
 function nxp_paypal_show_completion_page(): void
@@ -1539,6 +1826,33 @@ function nxp_paypal_show_completion_page(): void
         ?? $_GET['merchant_id']
         ?? null
     );
+
+    // Extract tracking_id from session or URL parameters
+    $trackingId = nxp_paypal_filter_string(
+        $_GET['tracking_id']
+        ?? ($_SESSION['nxp_paypal']['tracking_id'] ?? null)
+    );
+
+    // Extract environment from session or URL parameters
+    $environment = nxp_paypal_filter_string(
+        $_GET['env']
+        ?? ($_SESSION['nxp_paypal']['env'] ?? null)
+    );
+    if ($environment === null || !in_array($environment, ['sandbox', 'live'], true)) {
+        $environment = 'sandbox';
+    }
+
+    // Persist merchant_id to database for cross-session retrieval
+    // This is critical because the status polling requests come from a different session
+    if ($merchantId !== null && $trackingId !== null) {
+        $persisted = nxp_paypal_persist_merchant_id($trackingId, $merchantId, $environment);
+        nxp_paypal_log_debug('Completion page persisting merchant_id', [
+            'tracking_id' => $trackingId,
+            'merchant_id_prefix' => substr($merchantId, 0, 4) . '...',
+            'environment' => $environment,
+            'persisted' => $persisted ? 'yes' : 'no',
+        ]);
+    }
 
     $success = ($permissionsGranted !== null && strtolower($permissionsGranted) === 'true')
             || ($consentStatus !== null && strtolower($consentStatus) === 'true');
