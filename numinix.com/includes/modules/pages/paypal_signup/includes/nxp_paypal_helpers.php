@@ -476,6 +476,23 @@ function nxp_paypal_handle_finalize(array $session): void
         nxp_paypal_json_error($response['message']);
     }
 
+    // Persist credentials and seller token before exposing data to the client
+    $sellerToken = $response['data']['seller_token'] ?? null;
+    $credentials = $response['data']['credentials'] ?? null;
+    if (is_array($credentials) && !empty($trackingId)) {
+        nxp_paypal_persist_credentials(
+            $trackingId,
+            $credentials,
+            is_array($sellerToken) ? $sellerToken : [],
+            $session['env'] ?? 'sandbox'
+        );
+    }
+
+    // Ensure seller_token is not returned to the browser
+    if (isset($response['data']['seller_token'])) {
+        unset($response['data']['seller_token']);
+    }
+
     $_SESSION['nxp_paypal']['step'] = !empty($response['data']['step']) ? $response['data']['step'] : 'finalized';
     if (!empty($response['data']['partner_referral_id'])) {
         $_SESSION['nxp_paypal']['partner_referral_id'] = $response['data']['partner_referral_id'];
@@ -621,6 +638,23 @@ function nxp_paypal_handle_status(array $session): void
             'response' => $response,
         ]);
         nxp_paypal_json_error($response['message']);
+    }
+
+    // Persist credentials and seller token before exposing data to the client
+    $sellerToken = $response['data']['seller_token'] ?? null;
+    $credentials = $response['data']['credentials'] ?? null;
+    if (is_array($credentials) && !empty($trackingId)) {
+        nxp_paypal_persist_credentials(
+            $trackingId,
+            $credentials,
+            is_array($sellerToken) ? $sellerToken : [],
+            $session['env'] ?? 'sandbox'
+        );
+    }
+
+    // Ensure seller_token is not returned to the browser
+    if (isset($response['data']['seller_token'])) {
+        unset($response['data']['seller_token']);
     }
 
     if (!empty($response['data']['step'])) {
@@ -1533,6 +1567,91 @@ function nxp_paypal_persist_auth_code(string $trackingId, string $authCode, stri
         return true;
     } catch (Throwable $e) {
         nxp_paypal_log_debug('Failed to persist auth code to database', [
+            'tracking_id' => $trackingId,
+            'error' => $e->getMessage(),
+        ]);
+        return false;
+    }
+}
+
+/**
+ * Persists seller access token and REST credentials so they can be forwarded to the store config.
+ *
+ * @param string               $trackingId
+ * @param array<string, mixed> $credentials
+ * @param array<string, mixed> $sellerToken
+ * @param string               $environment
+ * @return bool
+ */
+function nxp_paypal_persist_credentials(
+    string $trackingId,
+    array $credentials,
+    array $sellerToken = [],
+    string $environment = 'sandbox'
+): bool {
+    $clientId = isset($credentials['client_id']) ? (string)$credentials['client_id'] : '';
+    $clientSecret = isset($credentials['client_secret']) ? (string)$credentials['client_secret'] : '';
+    if ($trackingId === '' || $clientId === '' || $clientSecret === '') {
+        return false;
+    }
+
+    if (!preg_match('/^[a-zA-Z0-9-]{1,64}$/', $trackingId)) {
+        nxp_paypal_log_debug('Invalid tracking_id format for credential persistence', [
+            'tracking_id_length' => strlen($trackingId),
+        ]);
+        return false;
+    }
+
+    $accessToken = isset($sellerToken['access_token']) ? (string)$sellerToken['access_token'] : '';
+    $tokenExpiryTs = isset($sellerToken['access_token_expires_at'])
+        ? (int)$sellerToken['access_token_expires_at']
+        : 0;
+    $tokenExpiresAt = $tokenExpiryTs > 0 ? date('Y-m-d H:i:s', $tokenExpiryTs) : null;
+
+    global $db;
+    if (!isset($db) || !is_object($db) || !method_exists($db, 'Execute')) {
+        nxp_paypal_log_debug('Unable to persist seller credentials: database unavailable');
+        return false;
+    }
+
+    if (!defined('TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING')) {
+        nxp_paypal_log_debug('Unable to persist seller credentials: tracking table not defined');
+        return false;
+    }
+
+    $tableName = TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING;
+    $expiresAt = date('Y-m-d H:i:s', time() + 3600);
+
+    try {
+        $updateSql = "UPDATE " . $tableName . " SET "
+            . "seller_client_id = :clientId, "
+            . "seller_client_secret = :clientSecret, "
+            . "seller_access_token = :accessToken, "
+            . "seller_access_token_expires_at = :tokenExpiresAt, "
+            . "environment = :environment, "
+            . "expires_at = :expiresAt, "
+            . "updated_at = NOW() "
+            . "WHERE tracking_id = :trackingId";
+
+        $updateSql = $db->bindVars($updateSql, ':clientId', $clientId, 'string');
+        $updateSql = $db->bindVars($updateSql, ':clientSecret', $clientSecret, 'string');
+        $updateSql = $db->bindVars($updateSql, ':accessToken', $accessToken, 'string');
+        $updateSql = $db->bindVars($updateSql, ':tokenExpiresAt', $tokenExpiresAt, 'string');
+        $updateSql = $db->bindVars($updateSql, ':environment', $environment, 'string');
+        $updateSql = $db->bindVars($updateSql, ':expiresAt', $expiresAt, 'string');
+        $updateSql = $db->bindVars($updateSql, ':trackingId', $trackingId, 'string');
+        $db->Execute($updateSql);
+
+        nxp_paypal_log_debug('Persisted seller credentials for transmission', [
+            'tracking_id' => $trackingId,
+            'environment' => $environment,
+            'client_id_prefix' => substr($clientId, 0, 6) . '...',
+            'has_access_token' => $accessToken !== '' ? 'yes' : 'no',
+        ]);
+
+        return true;
+    } catch (Throwable $e) {
+        nxp_paypal_log_debug('Failed to persist seller credentials', [
             'tracking_id' => $trackingId,
             'error' => $e->getMessage(),
         ]);

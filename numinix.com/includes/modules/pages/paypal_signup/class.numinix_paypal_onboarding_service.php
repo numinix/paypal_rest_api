@@ -155,39 +155,55 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             // Extract merchant credentials - try multiple methods:
             // 1. First, try to use authCode and sharedId to exchange for seller credentials (PayPal recommended flow)
             // 2. Fall back to extracting from oauth_integrations in the merchant integration response
-            if ($step === 'completed') {
-                $credentials = null;
+            $credentials = null;
+            $sellerToken = [];
 
-                // Method 1: Exchange authCode + sharedId for seller credentials (PayPal docs recommended)
-                // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
-                if ($authCode !== '' && $sharedId !== '') {
-                    $this->logDebug('Attempting authCode/sharedId credential exchange', [
-                        'tracking_id' => $trackingId,
-                        'has_auth_code' => 'yes',
-                        'has_shared_id' => 'yes',
-                    ]);
-                    $credentials = $this->exchangeAuthCodeForCredentials(
-                        $apiBase,
-                        $clientId,
-                        $clientSecret,
-                        $authCode,
-                        $sharedId
-                    );
-                } else {
-                    $this->logDebug('AuthCode/sharedId missing; skipping credential exchange', [
-                        'tracking_id' => $trackingId,
-                        'has_auth_code' => $authCode !== '' ? 'yes' : 'no',
-                        'has_shared_id' => $sharedId !== '' ? 'yes' : 'no',
-                    ]);
+            // Method 1: Exchange authCode + sharedId for seller credentials (PayPal recommended flow)
+            // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+            if ($authCode !== '' && $sharedId !== '') {
+                $this->logDebug('Attempting authCode/sharedId credential exchange', [
+                    'tracking_id' => $trackingId,
+                    'has_auth_code' => 'yes',
+                    'has_shared_id' => 'yes',
+                ]);
+                $credentials = $this->exchangeAuthCodeForCredentials(
+                    $apiBase,
+                    $clientId,
+                    $clientSecret,
+                    $authCode,
+                    $sharedId
+                );
+
+                if (is_array($credentials) && isset($credentials['access_token'])) {
+                    $sellerToken['access_token'] = (string)$credentials['access_token'];
+                    unset($credentials['access_token']);
+                }
+                if (is_array($credentials) && isset($credentials['access_token_expires_at'])) {
+                    $sellerToken['access_token_expires_at'] = (int)$credentials['access_token_expires_at'];
+                    unset($credentials['access_token_expires_at']);
+                }
+            } else {
+                $this->logDebug('AuthCode/sharedId missing; skipping credential exchange', [
+                    'tracking_id' => $trackingId,
+                    'has_auth_code' => $authCode !== '' ? 'yes' : 'no',
+                    'has_shared_id' => $sharedId !== '' ? 'yes' : 'no',
+                ]);
+            }
+
+            // Method 2: Fall back to extracting from merchant integration response
+            if ($credentials === null && $step === 'completed') {
+                $credentials = $this->extractMerchantCredentials($integration);
+            }
+
+            if ($credentials !== null) {
+                $data['credentials'] = $credentials;
+                if (!empty($sellerToken)) {
+                    $data['seller_token'] = $sellerToken;
                 }
 
-                // Method 2: Fall back to extracting from merchant integration response
-                if ($credentials === null) {
-                    $credentials = $this->extractMerchantCredentials($integration);
-                }
-                
-                if ($credentials !== null) {
-                    $data['credentials'] = $credentials;
+                // If credentials are present, we can mark the flow as completed to unlock auto-save
+                if ($data['step'] !== 'completed') {
+                    $data['step'] = 'completed';
                 }
             }
 
@@ -221,7 +237,12 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @param string $partnerClientSecret
      * @param string $authCode
      * @param string $sharedId
-     * @return array{client_id: string, client_secret: string}|null
+     * @return array{
+     *   client_id: string,
+     *   client_secret: string,
+     *   access_token?: string,
+     *   access_token_expires_at?: int
+     * }|null
      */
     private function exchangeAuthCodeForCredentials(
         string $apiBase,
@@ -275,6 +296,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             }
 
             $sellerAccessToken = (string)($tokenDecoded['access_token'] ?? '');
+            $sellerAccessTokenTtl = (int)($tokenDecoded['expires_in'] ?? 0);
             if ($sellerAccessToken === '') {
                 $this->logDebug('Auth code exchange response missing access_token', [
                     'response_keys' => array_keys($tokenDecoded),
@@ -309,10 +331,19 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             }
 
             if ($clientId !== '' && $clientSecret !== '') {
-                return [
+                $payload = [
                     'client_id' => $clientId,
                     'client_secret' => $clientSecret,
                 ];
+
+                if ($sellerAccessToken !== '') {
+                    $payload['access_token'] = $sellerAccessToken;
+                    if ($sellerAccessTokenTtl > 0) {
+                        $payload['access_token_expires_at'] = time() + $sellerAccessTokenTtl;
+                    }
+                }
+
+                return $payload;
             }
 
             $this->logDebug('Auth code exchange completed but no credentials returned');
