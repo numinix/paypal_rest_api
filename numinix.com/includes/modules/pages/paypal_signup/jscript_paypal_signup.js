@@ -286,7 +286,7 @@
             popupMonitor: null,
             pollTimer: null,
             pollInterval: 4000,
-            finalizing: false
+            finalizing: false,
             pollAttempts: 0,
             pollStartTime: null
         };
