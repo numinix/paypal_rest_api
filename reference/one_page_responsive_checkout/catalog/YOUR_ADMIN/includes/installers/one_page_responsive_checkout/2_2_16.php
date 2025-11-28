@@ -1,0 +1,2 @@
+<?php
+// Improved cowoa check
