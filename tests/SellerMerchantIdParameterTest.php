@@ -32,41 +32,129 @@ namespace {
         $_SESSION = [];
     }
 
+    // Service file path constant - centralized for maintainability
+    define('ONBOARDING_SERVICE_FILE', DIR_FS_CATALOG . 'numinix.com/includes/modules/pages/paypal_signup/class.numinix_paypal_onboarding_service.php');
+
+    /**
+     * Helper function to check if a line contains http_build_query with partner_merchant_id.
+     * This is used to verify that API query parameters don't use the wrong parameter name.
+     *
+     * @param string $line Line of code to check
+     * @return bool
+     */
+    function lineContainsPartnerMerchantIdInQuery(string $line): bool
+    {
+        // Look for http_build_query calls that include partner_merchant_id
+        // Skip comment lines
+        $trimmedLine = trim($line);
+        if (str_starts_with($trimmedLine, '//') || str_starts_with($trimmedLine, '*') || str_starts_with($trimmedLine, '/*')) {
+            return false;
+        }
+        return strpos($line, 'http_build_query') !== false && strpos($line, "'partner_merchant_id'") !== false;
+    }
+
+    /**
+     * Helper function to find http_build_query blocks and check for parameter usage.
+     * Uses a line-based approach instead of complex regex to be more reliable.
+     *
+     * @param string $content File content
+     * @param string $methodName Method name to search within
+     * @param string $expectedParam Parameter expected to be used
+     * @param string $forbiddenParam Parameter that should NOT be used in queries
+     * @return array{found: bool, usesExpected: bool, usesForbidden: bool}
+     */
+    function checkMethodQueryParameters(string $content, string $methodName, string $expectedParam, string $forbiddenParam): array
+    {
+        $result = [
+            'found' => false,
+            'usesExpected' => false,
+            'usesForbidden' => false,
+        ];
+
+        $lines = explode("\n", $content);
+        $inMethod = false;
+        $braceCount = 0;
+        $inHttpBuildQuery = false;
+
+        foreach ($lines as $line) {
+            // Check if we're entering the target method
+            if (!$inMethod && strpos($line, "function $methodName") !== false) {
+                $inMethod = true;
+                $result['found'] = true;
+                $braceCount = 0;
+            }
+
+            if ($inMethod) {
+                // Count braces to track method scope
+                $braceCount += substr_count($line, '{');
+                $braceCount -= substr_count($line, '}');
+
+                // Check for http_build_query call
+                if (strpos($line, 'http_build_query') !== false) {
+                    $inHttpBuildQuery = true;
+                }
+
+                // When inside http_build_query, check for parameter names
+                if ($inHttpBuildQuery) {
+                    // Skip comment lines
+                    $trimmedLine = trim($line);
+                    if (!str_starts_with($trimmedLine, '//') && !str_starts_with($trimmedLine, '*')) {
+                        if (strpos($line, "'$expectedParam'") !== false) {
+                            $result['usesExpected'] = true;
+                        }
+                        if (strpos($line, "'$forbiddenParam'") !== false) {
+                            $result['usesForbidden'] = true;
+                        }
+                    }
+
+                    // End of http_build_query array (closing parenthesis or semicolon)
+                    if (strpos($line, ']);') !== false || strpos($line, ');') !== false) {
+                        $inHttpBuildQuery = false;
+                    }
+                }
+
+                // Exit when method ends
+                if ($braceCount <= 0 && strpos($line, '}') !== false) {
+                    break;
+                }
+            }
+        }
+
+        return $result;
+    }
+
     /**
      * Test that fetchMerchantIntegrationByMerchantId uses seller_merchant_id parameter
      */
     function testMerchantIntegrationByMerchantIdUsesSellerMerchantId(): bool
     {
         $passed = true;
+        $content = file_get_contents(ONBOARDING_SERVICE_FILE);
 
-        $serviceFile = DIR_FS_CATALOG . 'numinix.com/includes/modules/pages/paypal_signup/class.numinix_paypal_onboarding_service.php';
-        $content = file_get_contents($serviceFile);
+        $result = checkMethodQueryParameters(
+            $content,
+            'fetchMerchantIntegrationByMerchantId',
+            'seller_merchant_id',
+            'partner_merchant_id'
+        );
 
-        // Find the fetchMerchantIntegrationByMerchantId method and check its query parameters
-        $pattern = '/function\s+fetchMerchantIntegrationByMerchantId[^{]*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/s';
-        
-        if (preg_match($pattern, $content, $matches)) {
-            $methodBody = $matches[1];
-            
-            // Check 1: Uses seller_merchant_id in the query
-            if (strpos($methodBody, "'seller_merchant_id'") !== false) {
-                fwrite(STDOUT, "✓ fetchMerchantIntegrationByMerchantId uses 'seller_merchant_id' parameter\n");
-            } else {
-                fwrite(STDERR, "FAIL: fetchMerchantIntegrationByMerchantId should use 'seller_merchant_id' parameter\n");
-                $passed = false;
-            }
-            
-            // Check 2: Does NOT use partner_merchant_id in the query (for the request param)
-            // Note: 'partner_merchant_id' may still appear in response handling code
-            if (preg_match('/http_build_query[^;]*partner_merchant_id/s', $methodBody)) {
-                fwrite(STDERR, "FAIL: fetchMerchantIntegrationByMerchantId should NOT use 'partner_merchant_id' in API query\n");
-                $passed = false;
-            } else {
-                fwrite(STDOUT, "✓ fetchMerchantIntegrationByMerchantId does not use 'partner_merchant_id' in API query\n");
-            }
-        } else {
+        if (!$result['found']) {
             fwrite(STDERR, "FAIL: Could not find fetchMerchantIntegrationByMerchantId method\n");
+            return false;
+        }
+
+        if ($result['usesExpected']) {
+            fwrite(STDOUT, "✓ fetchMerchantIntegrationByMerchantId uses 'seller_merchant_id' parameter\n");
+        } else {
+            fwrite(STDERR, "FAIL: fetchMerchantIntegrationByMerchantId should use 'seller_merchant_id' parameter\n");
             $passed = false;
+        }
+
+        if ($result['usesForbidden']) {
+            fwrite(STDERR, "FAIL: fetchMerchantIntegrationByMerchantId should NOT use 'partner_merchant_id' in API query\n");
+            $passed = false;
+        } else {
+            fwrite(STDOUT, "✓ fetchMerchantIntegrationByMerchantId does not use 'partner_merchant_id' in API query\n");
         }
 
         return $passed;
@@ -78,34 +166,32 @@ namespace {
     function testMerchantIntegrationByTrackingIdUsesSellerMerchantId(): bool
     {
         $passed = true;
+        $content = file_get_contents(ONBOARDING_SERVICE_FILE);
 
-        $serviceFile = DIR_FS_CATALOG . 'numinix.com/includes/modules/pages/paypal_signup/class.numinix_paypal_onboarding_service.php';
-        $content = file_get_contents($serviceFile);
+        $result = checkMethodQueryParameters(
+            $content,
+            'fetchMerchantIntegrationByTrackingId',
+            'seller_merchant_id',
+            'partner_merchant_id'
+        );
 
-        // Find the fetchMerchantIntegrationByTrackingId method and check its query parameters
-        $pattern = '/function\s+fetchMerchantIntegrationByTrackingId[^{]*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/s';
-        
-        if (preg_match($pattern, $content, $matches)) {
-            $methodBody = $matches[1];
-            
-            // Check 1: Uses seller_merchant_id in the query
-            if (strpos($methodBody, "'seller_merchant_id'") !== false) {
-                fwrite(STDOUT, "✓ fetchMerchantIntegrationByTrackingId uses 'seller_merchant_id' parameter\n");
-            } else {
-                fwrite(STDERR, "FAIL: fetchMerchantIntegrationByTrackingId should use 'seller_merchant_id' parameter\n");
-                $passed = false;
-            }
-            
-            // Check 2: Does NOT use partner_merchant_id in the query (for the request param)
-            if (preg_match('/http_build_query[^;]*partner_merchant_id/s', $methodBody)) {
-                fwrite(STDERR, "FAIL: fetchMerchantIntegrationByTrackingId should NOT use 'partner_merchant_id' in API query\n");
-                $passed = false;
-            } else {
-                fwrite(STDOUT, "✓ fetchMerchantIntegrationByTrackingId does not use 'partner_merchant_id' in API query\n");
-            }
-        } else {
+        if (!$result['found']) {
             fwrite(STDERR, "FAIL: Could not find fetchMerchantIntegrationByTrackingId method\n");
+            return false;
+        }
+
+        if ($result['usesExpected']) {
+            fwrite(STDOUT, "✓ fetchMerchantIntegrationByTrackingId uses 'seller_merchant_id' parameter\n");
+        } else {
+            fwrite(STDERR, "FAIL: fetchMerchantIntegrationByTrackingId should use 'seller_merchant_id' parameter\n");
             $passed = false;
+        }
+
+        if ($result['usesForbidden']) {
+            fwrite(STDERR, "FAIL: fetchMerchantIntegrationByTrackingId should NOT use 'partner_merchant_id' in API query\n");
+            $passed = false;
+        } else {
+            fwrite(STDOUT, "✓ fetchMerchantIntegrationByTrackingId does not use 'partner_merchant_id' in API query\n");
         }
 
         return $passed;
@@ -117,9 +203,7 @@ namespace {
     function testResponseHandlingUsesPartnerMerchantId(): bool
     {
         $passed = true;
-
-        $serviceFile = DIR_FS_CATALOG . 'numinix.com/includes/modules/pages/paypal_signup/class.numinix_paypal_onboarding_service.php';
-        $content = file_get_contents($serviceFile);
+        $content = file_get_contents(ONBOARDING_SERVICE_FILE);
 
         // The response from PayPal includes partner_merchant_id in the items,
         // so we should still be checking for it when processing the response
@@ -139,9 +223,7 @@ namespace {
     function testCorrectApiEndpoint(): bool
     {
         $passed = true;
-
-        $serviceFile = DIR_FS_CATALOG . 'numinix.com/includes/modules/pages/paypal_signup/class.numinix_paypal_onboarding_service.php';
-        $content = file_get_contents($serviceFile);
+        $content = file_get_contents(ONBOARDING_SERVICE_FILE);
 
         // Check that the marketplace merchant-integrations endpoint is used
         if (strpos($content, "/v1/customer/partners/marketplace/merchant-integrations") !== false) {
