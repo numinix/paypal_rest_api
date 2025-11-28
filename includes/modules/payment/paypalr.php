@@ -1261,27 +1261,11 @@ class paypalr extends base
     protected function isOpcAjaxRequest(): bool
     {
         // -----
-        // Only consider this an OPC AJAX request if One-Page Checkout is actually installed.
-        // Without this check, standard 3-page Zen Cart checkout could incorrectly output JSON
-        // instead of performing a proper HTTP redirect.
+        // Check for Zen Cart's IS_AJAX_REQUEST constant which is set by the AJAX handler.
+        // This reliably detects actual AJAX requests regardless of which OPC plugin is used
+        // or whether OPC is enabled/disabled. Standard 3-page checkout won't have this set.
         //
-        if (!defined('FILENAME_CHECKOUT_ONE_CONFIRMATION')) {
-            return false;
-        }
-
-        if (isset($_SESSION['request']) && $_SESSION['request'] === 'ajax') {
-            return true;
-        }
-
-        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
-            return true;
-        }
-
-        if (isset($_REQUEST['request']) && $_REQUEST['request'] === 'ajax') {
-            return true;
-        }
-
-        return false;
+        return (defined('IS_AJAX_REQUEST') && IS_AJAX_REQUEST === true);
     }
     protected function validateCardInformation(bool $is_preconfirmation): bool
     {

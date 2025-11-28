@@ -1,11 +1,11 @@
 <?php
 /**
- * Test for isOpcAjaxRequest() method to ensure it correctly identifies OPC AJAX requests
- * and does not incorrectly return true for standard 3-page checkout.
+ * Test for isOpcAjaxRequest() method to ensure it correctly identifies AJAX requests
+ * using Zen Cart's IS_AJAX_REQUEST constant.
  *
  * This test addresses the issue where JSON was being output instead of proper HTTP redirects
- * in Zen Cart v1.5.7c standard checkout because isOpcAjaxRequest() was returning true
- * when it should return false.
+ * in Zen Cart v1.5.7c standard checkout because isOpcAjaxRequest() was incorrectly
+ * detecting AJAX requests.
  */
 declare(strict_types=1);
 
@@ -134,58 +134,35 @@ namespace {
     $tester = new PaypalrOpcAjaxTestDouble();
 
     // -----
-    // Test 1: Without OPC installed (FILENAME_CHECKOUT_ONE_CONFIRMATION not defined),
-    // isOpcAjaxRequest should return false even if AJAX indicators are present
+    // Test 1: Without IS_AJAX_REQUEST defined, method should return false
+    // even if other AJAX indicators are present (session, headers, etc.)
     // -----
-    fwrite(STDOUT, "Test 1: Without OPC installed, method should return false\n");
+    fwrite(STDOUT, "Test 1: Without IS_AJAX_REQUEST defined, method should return false\n");
 
-    // Note: We cannot undefine constants in PHP, so we rely on the fact that
-    // FILENAME_CHECKOUT_ONE_CONFIRMATION is not defined in our test environment
-
-    if (!defined('FILENAME_CHECKOUT_ONE_CONFIRMATION')) {
-        // Simulate AJAX request indicators
-        $_SESSION['request'] = 'ajax';
-        $_REQUEST['request'] = 'ajax';
-        $_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
-
-        $result = $tester->callIsOpcAjaxRequest();
-
-        if ($result !== false) {
-            fwrite(STDERR, "FAIL: Expected false when OPC is not installed, got true\n");
-            $failures++;
-        } else {
-            fwrite(STDOUT, "  PASS: Returns false when OPC is not installed\n");
-        }
-
-        // Clean up
-        unset($_SESSION['request'], $_REQUEST['request'], $_SERVER['HTTP_X_REQUESTED_WITH']);
-    } else {
-        fwrite(STDERR, "SKIP: Cannot test without OPC because FILENAME_CHECKOUT_ONE_CONFIRMATION is defined\n");
-    }
-
-    // -----
-    // Test 2: Without any AJAX indicators, method should return false
-    // -----
-    fwrite(STDOUT, "Test 2: Without AJAX indicators, method should return false\n");
-
-    // Clear any AJAX indicators
-    unset($_SESSION['request'], $_REQUEST['request'], $_SERVER['HTTP_X_REQUESTED_WITH']);
+    // Note: IS_AJAX_REQUEST is not defined in our test environment
+    // Simulate various AJAX indicators that should be ignored
+    $_SESSION['request'] = 'ajax';
+    $_REQUEST['request'] = 'ajax';
+    $_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
 
     $result = $tester->callIsOpcAjaxRequest();
 
     if ($result !== false) {
-        fwrite(STDERR, "FAIL: Expected false without AJAX indicators, got true\n");
+        fwrite(STDERR, "FAIL: Expected false when IS_AJAX_REQUEST is not defined, got true\n");
         $failures++;
     } else {
-        fwrite(STDOUT, "  PASS: Returns false without AJAX indicators\n");
+        fwrite(STDOUT, "  PASS: Returns false when IS_AJAX_REQUEST is not defined\n");
     }
 
-    // -----
-    // Test 3: Standard form POST (no AJAX indicators) should return false
-    // -----
-    fwrite(STDOUT, "Test 3: Standard form POST should return false\n");
+    // Clean up
+    unset($_SESSION['request'], $_REQUEST['request'], $_SERVER['HTTP_X_REQUESTED_WITH']);
 
-    // Simulate a standard form POST
+    // -----
+    // Test 2: Standard form POST should return false
+    // -----
+    fwrite(STDOUT, "Test 2: Standard form POST should return false\n");
+
+    // Simulate a standard form POST (no IS_AJAX_REQUEST defined)
     $_POST = ['payment' => 'paypalr', 'submit' => 'Continue'];
     $_REQUEST = $_POST;
 
@@ -201,6 +178,24 @@ namespace {
     // Clean up
     $_POST = [];
     $_REQUEST = [];
+
+    // -----
+    // Test 3: Method uses IS_AJAX_REQUEST constant pattern
+    // (We can't actually set IS_AJAX_REQUEST in tests since constants can't be redefined,
+    // but we verify the method exists and returns false when constant is not set)
+    // -----
+    fwrite(STDOUT, "Test 3: Method correctly checks IS_AJAX_REQUEST constant\n");
+
+    // The method should check: defined('IS_AJAX_REQUEST') && IS_AJAX_REQUEST === true
+    // Since IS_AJAX_REQUEST is not defined, this should return false
+    $result = $tester->callIsOpcAjaxRequest();
+
+    if ($result !== false) {
+        fwrite(STDERR, "FAIL: Expected false when IS_AJAX_REQUEST is not defined, got true\n");
+        $failures++;
+    } else {
+        fwrite(STDOUT, "  PASS: Returns false when IS_AJAX_REQUEST constant is not defined\n");
+    }
 
     // -----
     // Summary
