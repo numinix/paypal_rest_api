@@ -116,9 +116,9 @@ namespace {
             $passed = false;
         }
 
-        // Check 3: Verify the complete structure exists
-        $expectedPattern = 'addEventListener("click", event => setTimeout(() => {if (event.target.form.checkValidity())';
-        if (strpos($content, $expectedPattern) !== false) {
+        // Check 3: Verify the complete structure exists (use regex to be whitespace-tolerant)
+        $pattern = '/addEventListener\s*\(\s*["\']click["\']\s*,\s*event\s*=>\s*setTimeout\s*\(\s*\(\s*\)\s*=>\s*\{if\s*\(event\.target\.form\.checkValidity\(\)\)/';
+        if (preg_match($pattern, $content)) {
             fwrite(STDOUT, "✓ Complete validation structure is correct\n");
         } else {
             fwrite(STDERR, "FAIL: Complete validation structure is missing or incorrect\n");
