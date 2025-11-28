@@ -1177,8 +1177,6 @@ class NuminixPaypalIsuSignupLinkService
     {
         if (function_exists('zen_record_admin_activity')) {
             zen_record_admin_activity($message, 'info');
-        } else {
-            trigger_error($message, E_USER_NOTICE);
         }
     }
 }
