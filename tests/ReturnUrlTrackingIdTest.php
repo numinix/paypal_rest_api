@@ -12,23 +12,22 @@
  */
 declare(strict_types=1);
 
-namespace {
-    if (!defined('DIR_FS_CATALOG')) {
-        define('DIR_FS_CATALOG', dirname(__DIR__) . '/');
-    }
-    if (!defined('DIR_FS_LOGS')) {
-        define('DIR_FS_LOGS', sys_get_temp_dir());
-    }
-    if (!defined('IS_ADMIN_FLAG')) {
-        define('IS_ADMIN_FLAG', false);
-    }
-
-    if (session_status() === PHP_SESSION_NONE) {
-        $_SESSION = [];
-    }
+// Global setup
+if (!defined('DIR_FS_CATALOG')) {
+    define('DIR_FS_CATALOG', dirname(__DIR__) . '/');
+}
+if (!defined('DIR_FS_LOGS')) {
+    define('DIR_FS_LOGS', sys_get_temp_dir());
+}
+if (!defined('IS_ADMIN_FLAG')) {
+    define('IS_ADMIN_FLAG', false);
 }
 
-namespace {
+if (session_status() === PHP_SESSION_NONE) {
+    $_SESSION = [];
+}
+
+// Test functions
     /**
      * Test that nxp_paypal_current_url includes tracking_id from session
      */
@@ -57,7 +56,10 @@ namespace {
         }
 
         // Check 3: Verify the session tracking_id is sanitized before use
-        if (preg_match('/\$sessionTrackingId\s*=\s*\$_SESSION\[[^\]]+\]\[[^\]]+\].*nxp_paypal_filter_string\(\$sessionTrackingId\)/s', $content)) {
+        // Use multiple simple string searches instead of a complex regex
+        $hasSessionAccess = strpos($content, '$sessionTrackingId = $_SESSION') !== false;
+        $hasSanitization = strpos($content, 'nxp_paypal_filter_string($sessionTrackingId)') !== false;
+        if ($hasSessionAccess && $hasSanitization) {
             fwrite(STDOUT, "✓ Session tracking_id is sanitized before use\n");
         } else {
             fwrite(STDERR, "FAIL: Session tracking_id should be sanitized before use\n");
@@ -186,4 +188,3 @@ namespace {
         fwrite(STDOUT, "4. This enables cross-session credential retrieval for the onboarding flow.\n");
         exit(0);
     }
-}
