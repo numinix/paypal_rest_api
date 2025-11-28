@@ -40,7 +40,7 @@ namespace {
 
         // Check 1: Verify the completion page extracts merchantIdInPayPal
         if (strpos($content, "merchantIdInPayPal") !== false && 
-            preg_match('/\$merchantId\s*=\s*nxp_paypal_filter_string\s*\(/', $content)) {
+            strpos($content, '$merchantId = nxp_paypal_filter_string') !== false) {
             fwrite(STDOUT, "✓ Completion page extracts merchantIdInPayPal from GET params\n");
         } else {
             fwrite(STDERR, "FAIL: Completion page should extract merchantIdInPayPal from GET params\n");
@@ -85,7 +85,7 @@ namespace {
         }
 
         // Check 3: Verify merchantId is included in the postMessage data
-        if (preg_match("/postMessageData\['merchantId'\]\s*=\s*\\\$merchantId/", $content)) {
+        if (strpos($content, "\$postMessageData['merchantId'] = \$merchantId") !== false) {
             fwrite(STDOUT, "✓ PostMessage data includes merchantId\n");
         } else {
             fwrite(STDERR, "FAIL: PostMessage data should include merchantId\n");
@@ -130,7 +130,7 @@ namespace {
         }
 
         // Check 3: Verify state.merchantId is set from the message
-        if (preg_match('/state\.merchantId\s*=\s*payload\.merchant/', $content)) {
+        if (strpos($content, 'state.merchantId = payload.merchantId') !== false) {
             fwrite(STDOUT, "✓ Admin JS sets state.merchantId from message\n");
         } else {
             fwrite(STDERR, "FAIL: Admin JS should set state.merchantId from message\n");
@@ -151,7 +151,7 @@ namespace {
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify pollStatus sends merchant_id
-        if (preg_match("/merchant_id:\s*state\.merchantId/", $content)) {
+        if (strpos($content, 'merchant_id: state.merchantId') !== false) {
             fwrite(STDOUT, "✓ Status polling includes merchant_id from state\n");
         } else {
             fwrite(STDERR, "FAIL: Status polling should include merchant_id from state\n");
