@@ -590,6 +590,17 @@ function paypalr_render_onboarding_page(): void
                         return;
                     }
 
+                    // Extract merchant_id from the completion message if provided
+                    // This is critical for credential retrieval - PayPal returns this
+                    // in the redirect URL and the completion page forwards it via postMessage
+                    if (payload.merchantId) {
+                        state.merchantId = payload.merchantId;
+                    } else if (payload.merchant_id) {
+                        state.merchantId = payload.merchant_id;
+                    } else if (payload.merchantIdInPayPal) {
+                        state.merchantId = payload.merchantIdInPayPal;
+                    }
+
                     setStatus('Processing your PayPal account details…', 'info');
                     pollStatus(true);
                 }
