@@ -302,10 +302,37 @@ class zcObserverPaypalrestful
     //
     // Note: If getLastOrderValues returns an empty array, the implication is that
     // the required notifications have not been added to the order_total.php class.
+    // In that case, we fall back to getting the values directly from the global
+    // $order object, which provides compatibility with older checkouts like OPRC.
     //
     public function getLastOrderValues(): array
     {
-        return $this->lastOrderValues;
+        // -----
+        // If we have values from the notifications, return them.
+        //
+        if (count($this->lastOrderValues) !== 0) {
+            return $this->lastOrderValues;
+        }
+
+        // -----
+        // Fallback: If notifications weren't received (e.g., older order_total.php
+        // class without the required notifications, or one-page checkout modules
+        // like OPRC that call process() on confirmation pages), get values directly
+        // from the global $order object.
+        //
+        global $order;
+        if (isset($order) && is_object($order) && isset($order->info)) {
+            return [
+                'total' => $order->info['total'] ?? 0,
+                'tax' => $order->info['tax'] ?? 0,
+                'subtotal' => $order->info['subtotal'] ?? 0,
+                'shipping_cost' => $order->info['shipping_cost'] ?? 0,
+                'shipping_tax' => $order->info['shipping_tax'] ?? 0,
+                'tax_groups' => $order->info['tax_groups'] ?? [],
+            ];
+        }
+
+        return [];
     }
     public function getOrderTotalChanges(): array
     {
