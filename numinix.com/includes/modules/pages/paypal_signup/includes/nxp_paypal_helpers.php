@@ -14,6 +14,8 @@ function nxp_paypal_bootstrap_session(): array
         'tracking_id' => null,
         'partner_referral_id' => null,
         'merchant_id' => null,
+        'auth_code' => null,
+        'shared_id' => null,
         'nonce' => nxp_paypal_generate_nonce(),
         'updated_at' => time(),
     ];
@@ -35,6 +37,8 @@ function nxp_paypal_bootstrap_session(): array
             ?? $_GET['merchantId']
             ?? null
         ),
+        'auth_code' => nxp_paypal_filter_string($_GET['authCode'] ?? $_GET['auth_code'] ?? null),
+        'shared_id' => nxp_paypal_filter_string($_GET['sharedId'] ?? $_GET['shared_id'] ?? null),
     ];
 
     $allowedEnvironments = ['sandbox', 'live'];
@@ -60,6 +64,14 @@ function nxp_paypal_bootstrap_session(): array
 
     if (!empty($input['merchant_id'])) {
         $state['merchant_id'] = $input['merchant_id'];
+    }
+
+    if (!empty($input['auth_code'])) {
+        $state['auth_code'] = $input['auth_code'];
+    }
+
+    if (!empty($input['shared_id'])) {
+        $state['shared_id'] = $input['shared_id'];
     }
 
     $state = array_merge($defaults, $state);
@@ -302,9 +314,19 @@ function nxp_paypal_handle_lead(array $session): void
  */
 function nxp_paypal_handle_start(array $session): void
 {
+    // Ensure the generated tracking ID and environment are stored before building the return URL.
+    // The completion page relies on these query parameters to persist merchant/auth codes when
+    // the popup session is isolated from the admin session (e.g., cross-domain flows).
+    if (empty($_SESSION['nxp_paypal']['tracking_id'])) {
+        $_SESSION['nxp_paypal']['tracking_id'] = $session['tracking_id'] ?: nxp_paypal_generate_tracking_id();
+    }
+    if (empty($_SESSION['nxp_paypal']['env'])) {
+        $_SESSION['nxp_paypal']['env'] = $session['env'];
+    }
+
     $payload = [
         'environment' => $session['env'],
-        'tracking_id' => $session['tracking_id'] ?: nxp_paypal_generate_tracking_id(),
+        'tracking_id' => $_SESSION['nxp_paypal']['tracking_id'],
         'origin' => nxp_paypal_get_origin(),
         'return_url' => nxp_paypal_current_url(),
     ];

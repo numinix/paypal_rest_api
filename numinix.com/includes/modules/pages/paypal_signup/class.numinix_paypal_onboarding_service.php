@@ -157,10 +157,15 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             // 2. Fall back to extracting from oauth_integrations in the merchant integration response
             if ($step === 'completed') {
                 $credentials = null;
-                
+
                 // Method 1: Exchange authCode + sharedId for seller credentials (PayPal docs recommended)
                 // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
                 if ($authCode !== '' && $sharedId !== '') {
+                    $this->logDebug('Attempting authCode/sharedId credential exchange', [
+                        'tracking_id' => $trackingId,
+                        'has_auth_code' => 'yes',
+                        'has_shared_id' => 'yes',
+                    ]);
                     $credentials = $this->exchangeAuthCodeForCredentials(
                         $apiBase,
                         $clientId,
@@ -168,8 +173,14 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                         $authCode,
                         $sharedId
                     );
+                } else {
+                    $this->logDebug('AuthCode/sharedId missing; skipping credential exchange', [
+                        'tracking_id' => $trackingId,
+                        'has_auth_code' => $authCode !== '' ? 'yes' : 'no',
+                        'has_shared_id' => $sharedId !== '' ? 'yes' : 'no',
+                    ]);
                 }
-                
+
                 // Method 2: Fall back to extracting from merchant integration response
                 if ($credentials === null) {
                     $credentials = $this->extractMerchantCredentials($integration);
