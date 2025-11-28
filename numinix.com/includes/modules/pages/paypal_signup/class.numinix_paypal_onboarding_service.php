@@ -121,6 +121,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $integration = $this->fetchMerchantIntegration(
                 $apiBase,
                 $accessToken,
+                $clientId,
                 $trackingId,
                 $partnerReferralId,
                 $merchantId,
@@ -494,6 +495,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      *
      * @param string $apiBase
      * @param string $accessToken
+     * @param string $partnerClientId
      * @param string $trackingId
      * @param string $partnerReferralId
      * @param string $merchantId
@@ -503,6 +505,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
     private function fetchMerchantIntegration(
         string $apiBase,
         string $accessToken,
+        string $partnerClientId,
         string $trackingId,
         string $partnerReferralId,
         string $merchantId,
@@ -515,18 +518,19 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         $integration = $this->fetchMerchantIntegrationByTrackingId(
             $apiBase,
             $accessToken,
+            $partnerClientId,
             $trackingId,
             $merchantId,
             $environment
         );
 
         if ($integration === null && $merchantId !== '') {
-            $integration = $this->fetchMerchantIntegrationByMerchantId($apiBase, $accessToken, $merchantId, $environment);
+            $integration = $this->fetchMerchantIntegrationByMerchantId($apiBase, $accessToken, $partnerClientId, $merchantId, $environment);
         }
 
         if ($integration === null && $partnerReferralId !== '') {
             $referral = $this->fetchPartnerReferral($apiBase, $accessToken, $partnerReferralId);
-            $integration = $this->extractMerchantIntegrationFromReferral($apiBase, $accessToken, $referral, $environment);
+            $integration = $this->extractMerchantIntegrationFromReferral($apiBase, $accessToken, $partnerClientId, $referral, $environment);
         }
 
         if ($integration !== null && empty($integration['environment'])) {
@@ -543,6 +547,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $enriched = $this->fetchMerchantIntegrationByMerchantId(
                 $apiBase,
                 $accessToken,
+                $partnerClientId,
                 (string) (!empty($integration['merchant_id']) ? $integration['merchant_id'] : $merchantId),
                 $environment
             );
@@ -591,6 +596,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      *
      * @param string                     $apiBase
      * @param string                     $accessToken
+     * @param string                     $partnerClientId
      * @param array<string, mixed>|null  $referral
      * @param string                     $environment
      * @return array<string, mixed>|null
@@ -598,6 +604,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
     private function extractMerchantIntegrationFromReferral(
         string $apiBase,
         string $accessToken,
+        string $partnerClientId,
         ?array $referral,
         string $environment
     ): ?array
@@ -634,7 +641,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         }
 
         if ($merchantId !== '') {
-            return $this->fetchMerchantIntegrationByMerchantId($apiBase, $accessToken, $merchantId, $environment);
+            return $this->fetchMerchantIntegrationByMerchantId($apiBase, $accessToken, $partnerClientId, $merchantId, $environment);
         }
 
         return null;
@@ -672,8 +679,13 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
     /**
      * Fetches merchant integration details for a specific merchant identifier.
      *
+     * Uses the standard partner merchant-integrations endpoint which requires
+     * the partner's client ID in the URL path:
+     * GET /v1/customer/partners/{partner_id}/merchant-integrations/{merchant_id}
+     *
      * @param string $apiBase
      * @param string $accessToken
+     * @param string $partnerClientId
      * @param string $merchantId
      * @param string $environment
      * @return array<string, mixed>|null
@@ -681,101 +693,16 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
     private function fetchMerchantIntegrationByMerchantId(
         string $apiBase,
         string $accessToken,
+        string $partnerClientId,
         string $merchantId,
         string $environment
     ): ?array
     {
-        $query = http_build_query([
-            'include_products' => 'true',
-            'seller_merchant_id' => $merchantId,
-        ]);
+        // Use the standard partner endpoint with the partner's client ID in the path
+        // This is the correct endpoint for Partner Referrals API integrations
+        // Endpoint: GET /v1/customer/partners/{partner_id}/merchant-integrations/{merchant_id}
+        $url = rtrim($apiBase, '/') . '/v1/customer/partners/' . rawurlencode($partnerClientId) . '/merchant-integrations/' . rawurlencode($merchantId);
 
-        $url = rtrim($apiBase, '/') . '/v1/customer/partners/marketplace/merchant-integrations?' . $query;
-
-        $items = $this->fetchMarketplaceManagedIntegrations($url, $accessToken);
-
-        foreach ($items as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-
-            $partnerMerchantId = (string)($item['partner_merchant_id'] ?? '');
-            $merchantMatch = ($partnerMerchantId !== '') && strcasecmp($partnerMerchantId, $merchantId) === 0;
-            $merchantIdMatch = !$merchantMatch
-                && !empty($item['merchant_id_in_paypal'])
-                && strcasecmp((string)$item['merchant_id_in_paypal'], $merchantId) === 0;
-
-            if ($merchantMatch || $merchantIdMatch) {
-                return $this->normalizeMarketplaceIntegration($item, $environment);
-            }
-        }
-
-        if (!empty($items[0]) && is_array($items[0])) {
-            return $this->normalizeMarketplaceIntegration($items[0], $environment);
-        }
-
-        return null;
-    }
-
-    /**
-     * Fetches merchant integration details using the tracking identifier.
-     *
-     * @param string $apiBase
-     * @param string $accessToken
-     * @param string $trackingId
-     * @param string $merchantId
-     * @param string $environment
-     * @return array<string, mixed>|null
-     */
-    private function fetchMerchantIntegrationByTrackingId(
-        string $apiBase,
-        string $accessToken,
-        string $trackingId,
-        string $merchantId,
-        string $environment
-    ): ?array
-    {
-        $query = http_build_query(array_filter([
-            'include_products' => 'true',
-            'tracking_id' => $trackingId,
-            'seller_merchant_id' => $merchantId,
-        ], static function ($value) {
-            return $value !== '' && $value !== null;
-        }));
-
-        $url = rtrim($apiBase, '/') . '/v1/customer/partners/marketplace/merchant-integrations?' . $query;
-
-        $items = $this->fetchMarketplaceManagedIntegrations($url, $accessToken);
-
-        foreach ($items as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-
-            $itemTracking = (string)($item['tracking_id'] ?? '');
-            if ($itemTracking !== '' && strcasecmp($itemTracking, $trackingId) !== 0) {
-                continue;
-            }
-
-            return $this->normalizeMarketplaceIntegration($item, $environment);
-        }
-
-        if (!empty($items[0]) && is_array($items[0])) {
-            return $this->normalizeMarketplaceIntegration($items[0], $environment);
-        }
-
-        return null;
-    }
-
-    /**
-     * Retrieves Marketplace-managed merchant integrations.
-     *
-     * @param string $url
-     * @param string $accessToken
-     * @return array<int, mixed>
-     */
-    private function fetchMarketplaceManagedIntegrations(string $url, string $accessToken): array
-    {
         $headers = [
             'Accept: application/json',
             'Authorization: Bearer ' . $accessToken,
@@ -785,19 +712,117 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         $decoded = $this->decodeJson($response['body']);
 
         if ($response['status'] === 404) {
-            return [];
+            // Merchant not found - return null so caller can try alternative methods
+            return null;
         }
 
         if ($response['status'] >= 200 && $response['status'] < 300) {
-            if (isset($decoded['items']) && is_array($decoded['items'])) {
-                return $decoded['items'];
-            }
-
-            return [];
+            // Direct lookup returns a single merchant integration object, not a list
+            return $this->normalizeMarketplaceIntegration($decoded, $environment);
         }
 
+        // For errors, log and throw an exception with the PayPal error message
         $message = $this->resolveErrorMessage($decoded, 'Unable to retrieve PayPal merchant integration details.');
+        $this->logDebug('Merchant integration lookup by merchant_id failed', [
+            'merchant_id_prefix' => substr($merchantId, 0, 4) . '...',
+            'status' => $response['status'],
+            'error' => $message,
+        ]);
+
         throw new RuntimeException($message);
+    }
+
+    /**
+     * Fetches merchant integration details using the tracking identifier.
+     *
+     * Uses the standard partner merchant-integrations endpoint with tracking_id query parameter:
+     * GET /v1/customer/partners/{partner_id}/merchant-integrations?tracking_id={tracking_id}
+     *
+     * @param string $apiBase
+     * @param string $accessToken
+     * @param string $partnerClientId
+     * @param string $trackingId
+     * @param string $merchantId
+     * @param string $environment
+     * @return array<string, mixed>|null
+     */
+    private function fetchMerchantIntegrationByTrackingId(
+        string $apiBase,
+        string $accessToken,
+        string $partnerClientId,
+        string $trackingId,
+        string $merchantId,
+        string $environment
+    ): ?array
+    {
+        // Use the standard partner endpoint with tracking_id as a query parameter
+        // Endpoint: GET /v1/customer/partners/{partner_id}/merchant-integrations?tracking_id={tracking_id}
+        $query = http_build_query(array_filter([
+            'tracking_id' => $trackingId,
+        ], static function ($value) {
+            return $value !== '' && $value !== null;
+        }));
+
+        $url = rtrim($apiBase, '/') . '/v1/customer/partners/' . rawurlencode($partnerClientId) . '/merchant-integrations';
+        if ($query !== '') {
+            $url .= '?' . $query;
+        }
+
+        $headers = [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $accessToken,
+        ];
+
+        $response = $this->performHttpCall('GET', $url, $headers);
+        $decoded = $this->decodeJson($response['body']);
+
+        if ($response['status'] === 404) {
+            // Merchant not found - return null so caller can try alternative methods
+            return null;
+        }
+
+        if ($response['status'] >= 200 && $response['status'] < 300) {
+            // The response may be a list of integrations or a single integration
+            // Handle both cases for compatibility
+            if (isset($decoded['merchant_id']) || isset($decoded['merchant_id_in_paypal'])) {
+                // Single integration object
+                return $this->normalizeMarketplaceIntegration($decoded, $environment);
+            }
+
+            // List response - look for matching tracking_id
+            $items = $decoded['merchant_integrations'] ?? $decoded['items'] ?? [$decoded];
+            if (!is_array($items)) {
+                return null;
+            }
+
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $itemTracking = (string)($item['tracking_id'] ?? '');
+                if ($itemTracking !== '' && strcasecmp($itemTracking, $trackingId) !== 0) {
+                    continue;
+                }
+
+                return $this->normalizeMarketplaceIntegration($item, $environment);
+            }
+
+            // If no exact match, return the first item if available
+            if (!empty($items[0]) && is_array($items[0])) {
+                return $this->normalizeMarketplaceIntegration($items[0], $environment);
+            }
+        }
+
+        // For non-404 errors, log but don't throw - let caller try other methods
+        $message = $this->resolveErrorMessage($decoded, 'Unable to retrieve PayPal merchant integration details.');
+        $this->logDebug('Merchant integration lookup by tracking_id returned error', [
+            'tracking_id' => $trackingId,
+            'status' => $response['status'],
+            'error' => $message,
+        ]);
+
+        return null;
     }
 
     /**
