@@ -1,0 +1,84 @@
+.sccr-migration {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sccr-intro {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 72ch;
+}
+
+.sccr-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.sccr-stats li {
+  background: var(--nmx-muted);
+  border: 1px solid var(--nmx-border);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sccr-stats .label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--nmx-secondary);
+}
+
+.sccr-stats .value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--nmx-dark);
+}
+
+.sccr-messages .nmx-alert {
+  margin-bottom: 12px;
+}
+
+.sccr-issues {
+  margin-top: 12px;
+}
+
+.sccr-issues h3 {
+  margin-top: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 16px;
+  color: var(--nmx-primary);
+}
+
+.sccr-issues ul {
+  margin: 0 0 12px 18px;
+  padding: 0;
+}
+
+.sccr-issues li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.sccr-issues code {
+  word-break: break-word;
+}
+
+@media (max-width: 767px) {
+  .sccr-migration {
+    gap: 18px;
+  }
+
+  .sccr-stats {
+    grid-template-columns: 1fr;
+  }
+}
