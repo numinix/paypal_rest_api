@@ -2,11 +2,14 @@
 declare(strict_types=1);
 
 /**
- * Test to verify that TABLE_PAYPAL_VAULT constant is defined before use
- * in PayPalCommon::getVaultedCardsForCustomer()
+ * Test to verify that TABLE_PAYPAL_VAULT constant is loaded from extra_datafiles
+ * and used correctly in PayPalCommon::getVaultedCardsForCustomer()
  *
  * This test addresses the issue:
  * "PHP Fatal error: Uncaught Error: Undefined constant TABLE_PAYPAL_VAULT"
+ *
+ * The fix adds the constant definition to includes/extra_datafiles/ppr_database_tables.php
+ * which Zen Cart loads site-wide automatically.
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -25,8 +28,9 @@ namespace {
     if (!defined('DB_PREFIX')) {
         define('DB_PREFIX', 'test_');
     }
-    // Note: TABLE_PAYPAL_VAULT is intentionally NOT defined here to test that
-    // the getVaultedCardsForCustomer method defines it itself
+
+    // Load the extra_datafiles that defines table constants (simulating Zen Cart's auto-load behavior)
+    require_once DIR_FS_CATALOG . 'includes/extra_datafiles/ppr_database_tables.php';
 
     require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
     require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Logger.php';
@@ -103,8 +107,43 @@ namespace {
 
     $failures = 0;
 
-    // Test: Verify that getVaultedCardsForCustomer doesn't cause an undefined constant error
-    // even when TABLE_PAYPAL_VAULT is not pre-defined
+    // Test 1: Verify the extra_datafiles properly defines TABLE_PAYPAL_VAULT
+    if (!defined('TABLE_PAYPAL_VAULT')) {
+        fwrite(STDERR, "CRITICAL: TABLE_PAYPAL_VAULT not defined by extra_datafiles\n");
+        $failures++;
+    } else {
+        fwrite(STDOUT, "✓ TABLE_PAYPAL_VAULT is defined by extra_datafiles\n");
+    }
+
+    // Test 2: Verify the constant has the correct value
+    if (defined('TABLE_PAYPAL_VAULT') && TABLE_PAYPAL_VAULT !== DB_PREFIX . 'paypal_vault') {
+        fwrite(STDERR, sprintf(
+            "Expected TABLE_PAYPAL_VAULT to be '%s', got '%s'\n",
+            DB_PREFIX . 'paypal_vault',
+            TABLE_PAYPAL_VAULT
+        ));
+        $failures++;
+    } else {
+        fwrite(STDOUT, "✓ TABLE_PAYPAL_VAULT has correct value: " . TABLE_PAYPAL_VAULT . "\n");
+    }
+
+    // Test 3: Verify all PayPal table constants are defined
+    $required_constants = [
+        'TABLE_PAYPAL',
+        'TABLE_PAYPAL_VAULT',
+        'TABLE_PAYPAL_SUBSCRIPTIONS',
+        'TABLE_PAYPAL_WEBHOOKS',
+    ];
+    foreach ($required_constants as $const) {
+        if (!defined($const)) {
+            fwrite(STDERR, "CRITICAL: $const not defined by extra_datafiles\n");
+            $failures++;
+        } else {
+            fwrite(STDOUT, "✓ $const is defined\n");
+        }
+    }
+
+    // Test 4: Verify that getVaultedCardsForCustomer works with the constant
     try {
         $paymentModule = new MockPaymentModule();
         $paypalCommon = new PayPalCommon($paymentModule);
@@ -119,26 +158,6 @@ namespace {
             fwrite(STDOUT, "✓ getVaultedCardsForCustomer returns array without undefined constant error\n");
         }
         
-        // Verify the constant is now defined
-        if (!defined('TABLE_PAYPAL_VAULT')) {
-            fwrite(STDERR, "Expected TABLE_PAYPAL_VAULT to be defined after method call\n");
-            $failures++;
-        } else {
-            fwrite(STDOUT, "✓ TABLE_PAYPAL_VAULT constant is properly defined\n");
-        }
-        
-        // Verify the constant has the correct value
-        if (TABLE_PAYPAL_VAULT !== DB_PREFIX . 'paypal_vault') {
-            fwrite(STDERR, sprintf(
-                "Expected TABLE_PAYPAL_VAULT to be '%s', got '%s'\n",
-                DB_PREFIX . 'paypal_vault',
-                TABLE_PAYPAL_VAULT
-            ));
-            $failures++;
-        } else {
-            fwrite(STDOUT, "✓ TABLE_PAYPAL_VAULT has correct value: " . TABLE_PAYPAL_VAULT . "\n");
-        }
-        
     } catch (Error $e) {
         if (strpos($e->getMessage(), 'Undefined constant') !== false) {
             fwrite(STDERR, "CRITICAL: Undefined constant error: " . $e->getMessage() . "\n");
@@ -149,7 +168,7 @@ namespace {
         }
     }
 
-    // Test: Verify method returns empty array for invalid customer ID
+    // Test 5: Verify method returns empty array for invalid customer ID
     try {
         $paymentModule = new MockPaymentModule();
         $paypalCommon = new PayPalCommon($paymentModule);

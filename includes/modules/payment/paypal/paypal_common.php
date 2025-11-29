@@ -671,8 +671,6 @@ class PayPalCommon {
 
         global $db;
         
-        defined('TABLE_PAYPAL_VAULT') or define('TABLE_PAYPAL_VAULT', DB_PREFIX . 'paypal_vault');
-        
         $active_clause = $activeOnly ? ' AND visible = 1' : '';
         $vault_query = $db->Execute(
             "SELECT vault_id, status, last_digits, card_type, expiry, billing_name, 
