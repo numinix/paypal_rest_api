@@ -1,26 +1,38 @@
 <?php
-require_once (DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalsavedcard.php');
 require_once (DIR_FS_CATALOG . DIR_WS_CLASSES . 'order.php');
 require_once (DIR_FS_CATALOG . DIR_WS_CLASSES . 'order_total.php');
 require_once (DIR_FS_CATALOG . DIR_WS_CLASSES . 'shipping.php');
 require_once (DIR_FS_CATALOG . DIR_WS_CLASSES . 'payment.php');
 require_once (DIR_FS_CATALOG . DIR_WS_CLASSES . 'shopping_cart.php');
 class paypalSavedCardRecurring {
-       var $PayPal, $PayPalRestful, $paypalsavedcard;
-       function __construct($paypalsavedcard = null) {
-               $this->PayPal = null;
-               $this->PayPalRestful = null;
-               if ($paypalsavedcard == NULL) {
-                       $this->paypalsavedcard = new paypalsavedcard($this);
-               }
-               else {
-                       $this->paypalsavedcard = $paypalsavedcard;
-               }
-       }
-       function get_paypal_legacy_client() {
-               if ($this->PayPal instanceof PayPal) {
-                       return $this->PayPal;
-               }
+var $PayPal, $PayPalRestful, $paypalsavedcard, $paymentModuleCode;
+function __construct($paypalsavedcard = null) {
+$this->PayPal = null;
+$this->PayPalRestful = null;
+$this->paymentModuleCode = 'paypalsavedcard';
+if ($paypalsavedcard == NULL) {
+$legacyModulePath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalsavedcard.php';
+if (file_exists($legacyModulePath)) {
+require_once ($legacyModulePath);
+$this->paypalsavedcard = new paypalsavedcard($this);
+}
+else {
+$restCardModule = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr_creditcard.php';
+$this->paymentModuleCode = file_exists($restCardModule) ? 'paypalr_creditcard' : 'paypalr';
+$this->paypalsavedcard = null;
+}
+}
+else {
+$this->paypalsavedcard = $paypalsavedcard;
+if (!is_object($this->paypalsavedcard)) {
+$this->paymentModuleCode = 'paypalr_creditcard';
+}
+}
+}
+function get_paypal_legacy_client() {
+if ($this->PayPal instanceof PayPal) {
+return $this->PayPal;
+                }
                $PayPalConfig = array('Sandbox' => (MODULE_PAYMENT_PAYPALWPP_SERVER == 'sandbox' ? true : false), 'APIUsername' => MODULE_PAYMENT_PAYPALWPP_APIUSERNAME, 'APIPassword' => MODULE_PAYMENT_PAYPALWPP_APIPASSWORD, 'APISignature' => MODULE_PAYMENT_PAYPALWPP_APISIGNATURE);
                if (!class_exists('PayPal')) {
                        require_once (DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/class.paypal_wpp_recurring.php');
@@ -32,13 +44,13 @@ class paypalSavedCardRecurring {
                if ($this->PayPalRestful) {
                        return $this->PayPalRestful;
                }
-               if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'initiate_paypalr')) {
-                       $client = $this->paypalsavedcard->initiate_paypalr();
-                       if ($client) {
-                               $this->PayPalRestful = isset($this->paypalsavedcard->PayPalRestful) ? $this->paypalsavedcard->PayPalRestful : $client;
-                               return $this->PayPalRestful;
-                       }
-               }
+if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'initiate_paypalr')) {
+$client = $this->paypalsavedcard->initiate_paypalr();
+if ($client) {
+$this->PayPalRestful = isset($this->paypalsavedcard->PayPalRestful) ? $this->paypalsavedcard->PayPalRestful : $client;
+return $this->PayPalRestful;
+}
+}
                $autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
                if (!class_exists('PayPalRestful\\Api\\PayPalRestfulApi') && file_exists($autoload)) {
                        require_once ($autoload);
@@ -179,15 +191,205 @@ class paypalSavedCardRecurring {
               $columns[$column] = ($result && $result->RecordCount() > 0);
               return $columns[$column];
       }
-      protected function ensure_vault_manager_loaded() {
-               if (!class_exists('PayPalRestful\\Common\\VaultManager')) {
-                       $autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
-                       if (file_exists($autoload)) {
-                               require_once ($autoload);
-                       }
-               }
-               return class_exists('PayPalRestful\\Common\\VaultManager');
-       }
+protected function ensure_vault_manager_loaded() {
+if (!class_exists('PayPalRestful\\Common\\VaultManager')) {
+$autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+if (file_exists($autoload)) {
+require_once ($autoload);
+}
+}
+return class_exists('PayPalRestful\\Common\\VaultManager');
+}
+public function get_saved_card_details($saved_card_id, $customer_id = null) {
+if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'get_card_details')) {
+return $this->paypalsavedcard->get_card_details($saved_card_id, $customer_id);
+}
+global $db;
+$sql = "SELECT * FROM " . TABLE_SAVED_CREDIT_CARDS . " WHERE saved_credit_card_id = " . (int) $saved_card_id;
+if ($customer_id) {
+$sql .= ' AND customers_id = ' . (int) $customer_id;
+}
+$result = $db->Execute($sql);
+return $result ? $result->fields : array();
+}
+protected function extract_vault_id_from_card(array $cardDetails) {
+$candidates = array();
+if (isset($cardDetails['paypal_vault_card']['vault_id'])) {
+$candidates[] = $cardDetails['paypal_vault_card']['vault_id'];
+}
+if (isset($cardDetails['vault_id'])) {
+$candidates[] = $cardDetails['vault_id'];
+}
+if (isset($cardDetails['paypal_transaction_id'])) {
+$candidates[] = $cardDetails['paypal_transaction_id'];
+}
+if (isset($cardDetails['paypal_stored_credential_id'])) {
+$candidates[] = $cardDetails['paypal_stored_credential_id'];
+}
+foreach ($candidates as $candidate) {
+$candidate = trim((string) $candidate);
+if (strlen($candidate) > 0) {
+return substr($candidate, 0, 64);
+}
+}
+return '';
+}
+protected function determineCardCustomerId(array $cardDetails) {
+if (isset($cardDetails['customers_id'])) {
+return (int) $cardDetails['customers_id'];
+}
+if (isset($cardDetails['customer_id'])) {
+return (int) $cardDetails['customer_id'];
+}
+if (isset($cardDetails['customersID'])) {
+return (int) $cardDetails['customersID'];
+}
+if (isset($_SESSION['customer_id'])) {
+return (int) $_SESSION['customer_id'];
+}
+return 0;
+}
+protected function normalize_vault_expiry_value($expiry) {
+$expiry = trim((string) $expiry);
+if ($expiry === '') {
+return '';
+}
+if (preg_match('/^\d{4}-\d{2}$/', $expiry)) {
+return $expiry;
+}
+if (preg_match('/^\d{6}$/', $expiry)) {
+$year = substr($expiry, 0, 4);
+$month = substr($expiry, - 2);
+return $year . '-' . $month;
+}
+$digits = preg_replace('/[^0-9]/', '', $expiry);
+if (strlen($digits) === 4) {
+$month = substr($digits, 0, 2);
+$year = substr($digits, - 2);
+return '20' . $year . '-' . $month;
+}
+if (strlen($digits) === 6) {
+$month = substr($digits, 0, 2);
+$year = substr($digits, 2, 4);
+return $year . '-' . $month;
+}
+return '';
+}
+protected function build_billing_address_from_card(array $cardDetails, array $vaultCard = array()) {
+if (isset($vaultCard['billing_address']) && is_array($vaultCard['billing_address']) && count($vaultCard['billing_address']) > 0) {
+return $vaultCard['billing_address'];
+}
+global $db;
+$customers_id = $this->determineCardCustomerId($cardDetails);
+$addressId = isset($cardDetails['address_id']) ? (int) $cardDetails['address_id'] : 0;
+if ($addressId <= 0 && $customers_id > 0) {
+$customerLookup = $db->Execute("SELECT customers_default_address_id FROM " . TABLE_CUSTOMERS . " WHERE customers_id = " . (int) $customers_id . " LIMIT 1");
+if (!$customerLookup->EOF) {
+$addressId = (int) $customerLookup->fields['customers_default_address_id'];
+}
+}
+if ($addressId <= 0) {
+return array();
+}
+$address = $db->Execute("SELECT * FROM " . TABLE_ADDRESS_BOOK . " WHERE address_book_id = " . (int) $addressId . " LIMIT 1");
+if ($address->EOF) {
+return array();
+}
+$countryCode = '';
+if (isset($address->fields['entry_country_id']) && (int) $address->fields['entry_country_id'] > 0) {
+$country = zen_get_countries($address->fields['entry_country_id']);
+if (isset($country['countries_iso_code_2'])) {
+$countryCode = $country['countries_iso_code_2'];
+}
+}
+$billing = array(
+'address_line_1' => trim($address->fields['entry_street_address']),
+'postal_code' => trim($address->fields['entry_postcode']),
+'country_code' => $countryCode
+);
+if (isset($address->fields['entry_suburb']) && strlen($address->fields['entry_suburb']) > 0) {
+$billing['address_line_2'] = trim($address->fields['entry_suburb']);
+}
+if (isset($address->fields['entry_city']) && strlen($address->fields['entry_city']) > 0) {
+$billing['admin_area_2'] = trim($address->fields['entry_city']);
+}
+$state = '';
+if (isset($address->fields['entry_state']) && strlen($address->fields['entry_state']) > 0) {
+$state = trim($address->fields['entry_state']);
+}
+if ($state === '' && isset($address->fields['entry_zone_id']) && (int) $address->fields['entry_zone_id'] > 0) {
+$state = zen_get_zone_code($address->fields['entry_country_id'], $address->fields['entry_zone_id'], '');
+}
+if ($state !== '') {
+$billing['admin_area_1'] = $state;
+}
+return array_filter($billing, function ($value) {
+return $value !== '' && $value !== null;
+});
+}
+protected function build_vault_payment_source(array $cardDetails, array $options = array()) {
+if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'buildVaultPaymentSource')) {
+return $this->paypalsavedcard->buildVaultPaymentSource($cardDetails, $options);
+}
+$vaultId = $this->extract_vault_id_from_card($cardDetails);
+if ($vaultId === '') {
+return array();
+}
+$vaultCard = $this->find_vault_card_for_payment($cardDetails);
+$cardPayload = array('vault_id' => $vaultId);
+$expiry = '';
+if (isset($vaultCard['expiry'])) {
+$expiry = $vaultCard['expiry'];
+}
+if ($expiry === '' && isset($cardDetails['expiry'])) {
+$expiry = $cardDetails['expiry'];
+}
+$expiry = $this->normalize_vault_expiry_value($expiry);
+if ($expiry !== '') {
+$cardPayload['expiry'] = $expiry;
+}
+$lastDigits = '';
+if (isset($vaultCard['last_digits'])) {
+$lastDigits = $vaultCard['last_digits'];
+}
+if ($lastDigits === '' && isset($cardDetails['last_digits'])) {
+$lastDigits = substr($cardDetails['last_digits'], - 4);
+}
+$lastDigits = preg_replace('/[^0-9]/', '', $lastDigits);
+if ($lastDigits !== '') {
+$cardPayload['last_digits'] = substr($lastDigits, - 4);
+}
+$brand = '';
+if (isset($vaultCard['brand'])) {
+$brand = $vaultCard['brand'];
+}
+if ($brand === '' && isset($cardDetails['type'])) {
+$brand = strtoupper($cardDetails['type']);
+}
+if ($brand !== '') {
+$cardPayload['brand'] = strtoupper(trim($brand));
+}
+$name = '';
+if (isset($vaultCard['cardholder_name'])) {
+$name = $vaultCard['cardholder_name'];
+}
+if ($name === '' && isset($cardDetails['name_on_card'])) {
+$name = $cardDetails['name_on_card'];
+}
+if ($name !== '') {
+$cardPayload['name'] = trim($name);
+}
+$billing = $this->build_billing_address_from_card($cardDetails, $vaultCard);
+if (!empty($billing)) {
+$cardPayload['billing_address'] = $billing;
+}
+$storedDefaults = array('payment_initiator' => 'MERCHANT', 'payment_type' => 'UNSCHEDULED', 'usage' => 'SUBSEQUENT');
+if (isset($options['stored_credential']) && is_array($options['stored_credential'])) {
+$storedDefaults = array_merge($storedDefaults, $options['stored_credential']);
+}
+$cardPayload['attributes']['stored_credential'] = $storedDefaults;
+return $cardPayload;
+}
        protected function find_vault_card_for_payment(array $payment_details) {
                if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'getVaultCardForSavedCard')) {
                        $vaultCard = $this->paypalsavedcard->getVaultCardForSavedCard($payment_details, false);
@@ -195,13 +397,7 @@ class paypalSavedCardRecurring {
                                return $vaultCard;
                        }
                }
-               $vaultId = '';
-               if (isset($payment_details['paypal_transaction_id']) && strlen($payment_details['paypal_transaction_id']) > 0) {
-                       $vaultId = $payment_details['paypal_transaction_id'];
-               }
-               if (isset($payment_details['paypal_stored_credential_id']) && strlen($payment_details['paypal_stored_credential_id']) > 0) {
-                       $vaultId = $payment_details['paypal_stored_credential_id'];
-               }
+$vaultId = $this->extract_vault_id_from_card($payment_details);
                if ($vaultId === '') {
                        return array();
                }
@@ -261,10 +457,7 @@ class paypalSavedCardRecurring {
                $currency = $this->get_payment_currency($payment_details);
                $amount = number_format((float) $total_to_bill, 2, '.', '');
                $request = array('intent' => $intent, 'purchase_units' => array(array('amount' => array('currency_code' => $currency, 'value' => $amount))));
-               $cardPayload = array();
-               if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'buildVaultPaymentSource')) {
-                       $cardPayload = $this->paypalsavedcard->buildVaultPaymentSource($payment_details, array('stored_credential' => array('payment_type' => 'RECURRING')));
-               }
+$cardPayload = $this->build_vault_payment_source($payment_details, array('stored_credential' => array('payment_type' => 'RECURRING')));
                if (!empty($cardPayload) && isset($cardPayload['vault_id'])) {
                        $request['payment_source'] = array('card' => $cardPayload);
                        $credential_id = $cardPayload['vault_id'];
@@ -936,10 +1129,14 @@ class paypalSavedCardRecurring {
                                 $this->update_payment_status($paypal_saved_card_recurring_id, 'complete', 'Transaction id: ' . $transaction_id);
                                 return $result;
                         }
-                        $this->update_payment_status($paypal_saved_card_recurring_id, 'failed', 'Paypal error: ' . $result['error']);
-                        return $result;
-                }
-                $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transaction_id'], $total_to_bill);
+$this->update_payment_status($paypal_saved_card_recurring_id, 'failed', 'Paypal error: ' . $result['error']);
+return $result;
+}
+if (!is_object($this->paypalsavedcard) || !method_exists($this->paypalsavedcard, 'process')) {
+$this->update_payment_status($paypal_saved_card_recurring_id, 'failed', 'Paypal error: Legacy module unavailable');
+return array('success' => false, 'error' => 'Legacy saved card module unavailable');
+}
+$error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transaction_id'], $total_to_bill);
                 if (!$error) {
                         $payment_status = 'Completed';
                         $transaction_id = $this->paypalsavedcard->transaction_id;
@@ -1415,8 +1612,8 @@ class paypalSavedCardRecurring {
 //print_r($products);
 //die();
 // process payment
-		$_SESSION['payment'] = 'paypalsavedcard'; //always this payment module for the recurring payments
-		$payment_modules = new payment($_SESSION['payment']);
+$_SESSION['payment'] = $this->paymentModuleCode; //use available payment module for recurring payments
+$payment_modules = new payment($_SESSION['payment']);
 //set shipping
 //    $_SESSION['shipping'] = 'free'; //always this method for recurring subscription orders
 		$_SESSION['shipping'] = array('id' => 'free');
@@ -1474,11 +1671,11 @@ $db->Execute("UPDATE " . TABLE_ORDERS . " SET orders_status = " . (int) MODULE_P
 // $order_total_modules->apply_credit();
 // reset the shopping cart session
 		$_SESSION['cart']->reset(true);
-		if ($_SESSION['payment'] == 'paypalsavedcard') {
-			$this->paypalsavedcard->action = 'Sale';
-			$this->paypalsavedcard->saved_card_id = $saved_credit_card_id;
-			$this->paypalsavedcard->after_process();
-		}
+if ($_SESSION['payment'] == 'paypalsavedcard' && is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'after_process')) {
+$this->paypalsavedcard->action = 'Sale';
+$this->paypalsavedcard->saved_card_id = $saved_credit_card_id;
+$this->paypalsavedcard->after_process();
+}
 // unset the customer ID
 		unset($_SESSION['customer_id']);
 		unset($_SESSION['payment']);
@@ -1702,9 +1899,9 @@ $db->Execute("UPDATE " . TABLE_ORDERS . " SET orders_status = " . (int) MODULE_P
 		global $db;
 //find another card
 		$new_card = $this->get_customers_saved_card($customers_id);
-		if ($new_card) {
-			$new_card_details = $this->paypalsavedcard->get_card_details($new_card);
-		}
+if ($new_card) {
+$new_card_details = $this->get_saved_card_details($new_card);
+}
 		$message = '';
 		$sql = 'SELECT * FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr LEFT JOIN ' . TABLE_ORDERS_PRODUCTS . ' op ON op.orders_products_id = sccr.original_orders_products_id WHERE status = \'scheduled\' and saved_credit_card_id = ' . $card_id;
 		$subscriptions = $db->Execute($sql);
@@ -1766,7 +1963,7 @@ $db->Execute("UPDATE " . TABLE_ORDERS . " SET orders_status = " . (int) MODULE_P
                 }
 //If the subscription is being re-activated (new status scheduled), verify that the card associated with the subscription is still valid.  If not, find another one
 		if ($status == 'scheduled') {
-			$saved_card = $this->paypalsavedcard->get_card_details($details['saved_credit_card_id']);
+$saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 			if ($saved_card['is_deleted'] == '1') {
 				$new_card = $this->get_customers_saved_card($details['customers_id']);
 				if ($new_card > 0) {

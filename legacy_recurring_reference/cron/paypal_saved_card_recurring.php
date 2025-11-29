@@ -383,7 +383,7 @@ foreach ($todays_payments as $payment_id) {
     // deleted), attempt to swap in another non-expired card.  When no valid
     // card exists for the customer, skip processing this subscription.
     // -------------------------------------------------------------------
-    $card_details = $paypalSavedCardRecurring->paypalsavedcard->get_card_details($payment_details['saved_credit_card_id']);
+    $card_details = $paypalSavedCardRecurring->get_saved_card_details($payment_details['saved_credit_card_id']);
 
     $expiry = isset($card_details['expiry']) ? $card_details['expiry'] : '';
     $deleted = isset($card_details['is_deleted']) && $card_details['is_deleted'] == '1';
