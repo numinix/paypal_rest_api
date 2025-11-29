@@ -620,11 +620,17 @@ class PayPalCommon {
         }
 
         $order_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
-        // Check for captures in the correct location - they're stored in the 'current' subkey
+        // Check for captures and authorizations in the correct location - they're stored in the 'current' subkey
         $captures = $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['captures'] ?? [];
+        $authorizations = $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['authorizations'] ?? [];
 
-        if ($order_status === PayPalRestfulApi::STATUS_COMPLETED && $captures !== []) {
-            $log->write('Credit Card: capture skipped; order was already completed during createOrder.');
+        // If the order was already completed (captured or authorized) during createOrder,
+        // skip the duplicate capture/authorize call and fetch the order details instead.
+        // This can happen with vault-enabled credit cards where PayPal completes the
+        // authorization during createOrder.
+        if ($order_status === PayPalRestfulApi::STATUS_COMPLETED && ($captures !== [] || $authorizations !== [])) {
+            $skip_reason = ($captures !== []) ? 'already captured' : 'already authorized';
+            $log->write("Credit Card: capture/authorize skipped; order was $skip_reason during createOrder.");
             // Fetch the full order details from PayPal since we need the complete response structure
             // with all fields that the calling code expects
             $response = $ppr->getOrderStatus($paypal_order_id);
