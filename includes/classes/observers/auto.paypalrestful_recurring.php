@@ -29,14 +29,14 @@ class zcObserverPaypalrestfulRecurring
      * Normalized attribute keys mapped to the values this observer understands.
      */
     protected const ATTRIBUTE_KEY_MAP = [
-        'plan_id' => 'paypal_subscription_plan_id',
-        'billing_period' => 'paypal_subscription_billing_period',
-        'billing_frequency' => 'paypal_subscription_billing_frequency',
-        'total_billing_cycles' => 'paypal_subscription_total_billing_cycles',
-        'trial_period' => 'paypal_subscription_trial_period',
-        'trial_frequency' => 'paypal_subscription_trial_frequency',
-        'trial_total_cycles' => 'paypal_subscription_trial_total_cycles',
-        'setup_fee' => 'paypal_subscription_setup_fee',
+        'plan_id' => ['paypal_subscription_plan_id'],
+        'billing_period' => ['paypal_subscription_billing_period', 'billing_period'],
+        'billing_frequency' => ['paypal_subscription_billing_frequency', 'billing_frequency'],
+        'total_billing_cycles' => ['paypal_subscription_total_billing_cycles', 'total_billing_cycles'],
+        'trial_period' => ['paypal_subscription_trial_period'],
+        'trial_frequency' => ['paypal_subscription_trial_frequency'],
+        'trial_total_cycles' => ['paypal_subscription_trial_total_cycles'],
+        'setup_fee' => ['paypal_subscription_setup_fee'],
     ];
 
     protected const REQUIRED_FIELDS = ['plan_id', 'billing_period', 'billing_frequency'];
@@ -214,9 +214,12 @@ class zcObserverPaypalrestfulRecurring
     protected function extractSubscriptionAttributes(array $attributeMap): ?array
     {
         $normalized = [];
-        foreach (self::ATTRIBUTE_KEY_MAP as $field => $key) {
-            if (isset($attributeMap[$key])) {
-                $normalized[$field] = $attributeMap[$key];
+        foreach (self::ATTRIBUTE_KEY_MAP as $field => $keys) {
+            foreach ($keys as $key) {
+                if (isset($attributeMap[$key])) {
+                    $normalized[$field] = $attributeMap[$key];
+                    break;
+                }
             }
         }
 
