@@ -665,49 +665,7 @@ class PayPalCommon {
      */
     public function getVaultedCardsForCustomer(int $customers_id, bool $activeOnly = true): array
     {
-        if ($customers_id <= 0) {
-            return [];
-        }
-
-        global $db;
-        
-        $active_clause = $activeOnly ? ' AND visible = 1' : '';
-        $vault_query = $db->Execute(
-            "SELECT vault_id, status, last_digits, card_type, expiry, billing_name, 
-                    billing_address_line_1, billing_address_line_2, billing_admin_area_2,
-                    billing_admin_area_1, billing_postal_code, billing_country_code,
-                    last_used, created_at, visible
-             FROM " . TABLE_PAYPAL_VAULT . "
-             WHERE customers_id = " . (int)$customers_id . 
-             $active_clause . "
-             ORDER BY last_used DESC, created_at DESC"
-        );
-
-        $cards = [];
-        while (!$vault_query->EOF) {
-            $cards[] = [
-                'vault_id' => $vault_query->fields['vault_id'],
-                'status' => $vault_query->fields['status'],
-                'last_digits' => $vault_query->fields['last_digits'],
-                'card_type' => $vault_query->fields['card_type'],
-                'expiry' => $vault_query->fields['expiry'],
-                'billing_address' => [
-                    'name' => $vault_query->fields['billing_name'],
-                    'address_line_1' => $vault_query->fields['billing_address_line_1'],
-                    'address_line_2' => $vault_query->fields['billing_address_line_2'],
-                    'admin_area_2' => $vault_query->fields['billing_admin_area_2'],
-                    'admin_area_1' => $vault_query->fields['billing_admin_area_1'],
-                    'postal_code' => $vault_query->fields['billing_postal_code'],
-                    'country_code' => $vault_query->fields['billing_country_code'],
-                ],
-                'last_used' => $vault_query->fields['last_used'],
-                'created_at' => $vault_query->fields['created_at'],
-                'visible' => $vault_query->fields['visible'],
-            ];
-            $vault_query->MoveNext();
-        }
-
-        return $cards;
+        return VaultManager::getCustomerVaultedCards($customers_id, $activeOnly);
     }
 
     /**

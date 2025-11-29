@@ -64,7 +64,14 @@ namespace {
     // Manually include PayPalCommon since it needs special handling
     // We need to mock the use statements
     class MockPayPalRestfulApi {}
-    class MockVaultManager {}
+    class MockVaultManager {
+        public static function getCustomerVaultedCards(int $customers_id, bool $activeOnly = true): array {
+            if ($customers_id <= 0) {
+                return [];
+            }
+            return [];
+        }
+    }
     
     // Define classes that might be referenced
     if (!class_exists('PayPalRestful\Api\PayPalRestfulApi')) {
