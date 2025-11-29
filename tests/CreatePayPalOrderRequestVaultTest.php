@@ -157,10 +157,10 @@ namespace {
     $payload_save = $request_save->get();
     $card_source_save = $payload_save['payment_source']['card'] ?? [];
 
-    if (($card_source_save['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
+    if (($card_source_save['attributes']['vault']['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
         fwrite(STDERR, sprintf(
-            "Expected store_in_vault ON_SUCCESS for saved card request, got %s.\n",
-            json_encode($card_source_save['store_in_vault'] ?? null)
+            "Expected attributes.vault.store_in_vault ON_SUCCESS for saved card request, got %s.\n",
+            json_encode($card_source_save['attributes']['vault']['store_in_vault'] ?? null)
         ));
         $failures++;
     }
@@ -173,10 +173,10 @@ namespace {
     $payload_nosave = $request_nosave->get();
     $card_source_nosave = $payload_nosave['payment_source']['card'] ?? [];
 
-    if (($card_source_nosave['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
+    if (($card_source_nosave['attributes']['vault']['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
         fwrite(STDERR, sprintf(
-            "Expected store_in_vault ON_SUCCESS (all cards are now vaulted), got %s.\n",
-            json_encode($card_source_nosave['store_in_vault'] ?? null)
+            "Expected attributes.vault.store_in_vault ON_SUCCESS (all cards are now vaulted), got %s.\n",
+            json_encode($card_source_nosave['attributes']['vault']['store_in_vault'] ?? null)
         ));
         $failures++;
     }
@@ -213,8 +213,8 @@ namespace {
         $failures++;
     }
 
-    if (isset($card_source_vault['store_in_vault'])) {
-        fwrite(STDERR, 'store_in_vault should not be present when using a vaulted card.' . "\n");
+    if (isset($card_source_vault['attributes']['vault']['store_in_vault'])) {
+        fwrite(STDERR, 'attributes.vault.store_in_vault should not be present when using a vaulted card.' . "\n");
         $failures++;
     }
 

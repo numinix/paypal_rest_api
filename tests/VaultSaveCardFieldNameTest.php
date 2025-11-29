@@ -170,14 +170,14 @@ namespace {
     $payload_preconf = $request_preconf->get();
     $card_source_preconf = $payload_preconf['payment_source']['card'] ?? [];
 
-    if (($card_source_preconf['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
+    if (($card_source_preconf['attributes']['vault']['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
         fwrite(STDERR, sprintf(
-            "Test 1 FAILED: Expected store_in_vault ON_SUCCESS in pre-confirmation flow, got %s.\n",
-            json_encode($card_source_preconf['store_in_vault'] ?? null)
+            "Test 1 FAILED: Expected attributes.vault.store_in_vault ON_SUCCESS in pre-confirmation flow, got %s.\n",
+            json_encode($card_source_preconf['attributes']['vault']['store_in_vault'] ?? null)
         ));
         $failures++;
     } else {
-        echo "  ✓ Pre-confirmation flow correctly sets store_in_vault to ON_SUCCESS\n";
+        echo "  ✓ Pre-confirmation flow correctly sets attributes.vault.store_in_vault to ON_SUCCESS\n";
     }
 
     // Test 2: Regular 3-page checkout flow (is_preconfirmation = false)
@@ -199,14 +199,14 @@ namespace {
     $payload_regular = $request_regular->get();
     $card_source_regular = $payload_regular['payment_source']['card'] ?? [];
 
-    if (($card_source_regular['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
+    if (($card_source_regular['attributes']['vault']['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
         fwrite(STDERR, sprintf(
-            "Test 2 FAILED: Expected store_in_vault ON_SUCCESS in regular flow, got %s.\n",
-            json_encode($card_source_regular['store_in_vault'] ?? null)
+            "Test 2 FAILED: Expected attributes.vault.store_in_vault ON_SUCCESS in regular flow, got %s.\n",
+            json_encode($card_source_regular['attributes']['vault']['store_in_vault'] ?? null)
         ));
         $failures++;
     } else {
-        echo "  ✓ Regular checkout flow correctly sets store_in_vault to ON_SUCCESS\n";
+        echo "  ✓ Regular checkout flow correctly sets attributes.vault.store_in_vault to ON_SUCCESS\n";
     }
 
     // Test 3: Verify all cards are vaulted (the visibility is controlled separately)
@@ -227,14 +227,14 @@ namespace {
     $payload_nosave = $request_nosave->get();
     $card_source_nosave = $payload_nosave['payment_source']['card'] ?? [];
 
-    if (($card_source_nosave['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
+    if (($card_source_nosave['attributes']['vault']['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
         fwrite(STDERR, sprintf(
-            "Test 3 FAILED: Expected store_in_vault ON_SUCCESS (all cards are vaulted), got %s.\n",
-            json_encode($card_source_nosave['store_in_vault'] ?? null)
+            "Test 3 FAILED: Expected attributes.vault.store_in_vault ON_SUCCESS (all cards are vaulted), got %s.\n",
+            json_encode($card_source_nosave['attributes']['vault']['store_in_vault'] ?? null)
         ));
         $failures++;
     } else {
-        echo "  ✓ Correctly sets store_in_vault to ON_SUCCESS (all cards are vaulted)\n";
+        echo "  ✓ Correctly sets attributes.vault.store_in_vault to ON_SUCCESS (all cards are vaulted)\n";
         echo "     (visibility is controlled separately in the database)\n";
     }
 
