@@ -889,22 +889,47 @@ class paypalr_creditcard extends base
         }
 
         // Store vault card data in session if present
-        if (isset($payment['payment_source']['card'])) {
-            $this->storeVaultCardDataInSession($this->orderInfo);
-        }
+        $this->storeVaultCardDataInSession($this->orderInfo);
     }
 
     protected function storeVaultCardDataInSession(array $response): void
     {
-        $card_source = $response['purchase_units'][0]['payments']['captures'][0]['payment_source']['card'] ?? 
-                      $response['purchase_units'][0]['payments']['authorizations'][0]['payment_source']['card'] ?? 
-                      null;
+        $card_source = $this->extractCardSource($response);
 
-        if ($card_source === null) {
+        if ($card_source === null || ($card_source['vault']['id'] ?? '') === '') {
             return;
         }
 
+        $visible = !empty($_SESSION['PayPalRestful']['save_card']);
+
+        $_SESSION['PayPalRestful']['VaultCardData'] = [
+            'card_source' => $card_source,
+            'visible' => $visible,
+        ];
+
+        // Backward compatibility for any legacy consumers
         $_SESSION['PayPalRestful']['vault_card'] = $card_source;
+    }
+
+    protected function extractCardSource(array $response): ?array
+    {
+        $card_source = $response['payment_source']['card'] ??
+            ($response['purchase_units'][0]['payments']['captures'][0]['payment_source']['card'] ?? null);
+
+        if ($card_source === null) {
+            $card_source = $response['purchase_units'][0]['payments']['authorizations'][0]['payment_source']['card'] ?? null;
+        }
+
+        if ($card_source === null) {
+            return null;
+        }
+
+        // Normalize vault information when returned under attributes.vault
+        if (!isset($card_source['vault']) && isset($card_source['attributes']['vault'])) {
+            $card_source['vault'] = $card_source['attributes']['vault'];
+        }
+
+        return $card_source;
     }
 
     protected function captureOrAuthorizePayment(string $payment_source): array
@@ -926,10 +951,8 @@ class paypalr_creditcard extends base
     public function after_order_create($orders_id)
     {
         // Store vaulted card data if present in the response
-        $card_source = $this->orderInfo['purchase_units'][0]['payments']['captures'][0]['payment_source']['card'] ?? 
-                      $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0]['payment_source']['card'] ?? 
-                      null;
-        
+        $card_source = $this->extractCardSource($this->orderInfo);
+
         if ($card_source !== null) {
             $this->paypalCommon->storeVaultCardData($orders_id, $card_source, $this->orderCustomerCache);
         }
