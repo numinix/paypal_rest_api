@@ -19,9 +19,11 @@ require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
 use PayPalRestful\Common\SubscriptionManager;
 use PayPalRestful\Common\VaultManager;
+use PayPalRestful\Common\LegacySubscriptionMigrator;
 
 SubscriptionManager::ensureSchema();
 VaultManager::ensureSchema();
+LegacySubscriptionMigrator::syncLegacySubscriptions();
 
 define('FILENAME_PAYPALR_SUBSCRIPTIONS', basename(__FILE__));
 

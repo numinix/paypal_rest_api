@@ -12,6 +12,7 @@ use function date;
 use function defined;
 use function is_array;
 use function json_encode;
+use function zen_db_input;
 
 class SubscriptionManager
 {
@@ -61,6 +62,67 @@ class SubscriptionManager
                 KEY idx_vault_id (vault_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+
+        self::ensureLegacyColumns();
+    }
+
+    private static function ensureLegacyColumns(): void
+    {
+        global $db;
+
+        $columns = [
+            'legacy_subscription_id' => "INT UNSIGNED NOT NULL DEFAULT 0",
+            'profile_id' => "VARCHAR(64) NOT NULL DEFAULT ''",
+            'next_payment_date' => "DATE DEFAULT NULL",
+            'next_payment_due' => "DATE DEFAULT NULL",
+            'next_payment_due_date' => "DATE DEFAULT NULL",
+            'next_billing_date' => "DATE DEFAULT NULL",
+            'expiration_date' => "DATE DEFAULT NULL",
+            'domain' => "VARCHAR(255) NOT NULL DEFAULT ''",
+        ];
+
+        foreach ($columns as $column => $definition) {
+            if (!self::columnExists($column)) {
+                $db->Execute(
+                    'ALTER TABLE ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ADD ' . $column . ' ' . $definition
+                );
+            }
+        }
+
+        $indexes = [
+            'idx_profile_id' => ['profile_id'],
+            'idx_legacy_subscription' => ['legacy_subscription_id'],
+        ];
+
+        foreach ($indexes as $index => $columns) {
+            if (!self::indexExists($index)) {
+                $db->Execute(
+                    'ALTER TABLE ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ADD INDEX ' . $index . ' (' . implode(',', $columns) . ')'
+                );
+            }
+        }
+    }
+
+    private static function columnExists(string $column): bool
+    {
+        global $db;
+
+        $result = $db->Execute(
+            "SHOW COLUMNS FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " LIKE '" . zen_db_input($column) . "'"
+        );
+
+        return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+    }
+
+    private static function indexExists(string $index): bool
+    {
+        global $db;
+
+        $result = $db->Execute(
+            "SHOW INDEX FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE Key_name = '" . zen_db_input($index) . "'"
+        );
+
+        return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
     }
 
     /**
