@@ -5,6 +5,13 @@
  * Lists the normalized subscription records captured by the recurring observer and
  * lets administrators adjust billing metadata, update vault assignments, and manage
  * statuses for any saved payment instrument (cards, wallets, etc.).
+ * 
+ * Compatible with:
+ * - paypalwpp.php (Website Payments Pro)
+ * - paypal.php (PayPal Standard)
+ * - paypaldp.php (Direct Payments)
+ * - paypalr.php (REST API)
+ * - payflow.php (Payflow)
  */
 
 require 'includes/application_top.php';
@@ -16,6 +23,16 @@ if (is_file($autoloaderPath)) {
 }
 
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+
+// Load PayPalProfileManager for legacy profile operations
+if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.php')) {
+    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.php';
+}
+
+// Load saved card recurring class
+if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php')) {
+    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+}
 
 use PayPalRestful\Common\SubscriptionManager;
 use PayPalRestful\Common\VaultManager;
@@ -44,10 +61,62 @@ function paypalr_known_status_labels()
         'scheduled' => 'Scheduled',
         'active' => 'Active',
         'paused' => 'Paused',
+        'suspended' => 'Suspended',
         'cancelled' => 'Cancelled',
         'complete' => 'Complete',
         'failed' => 'Failed',
     ];
+}
+
+/**
+ * Get PayPalProfileManager instance for API operations
+ * @return PayPalProfileManager|null
+ */
+function paypalr_get_profile_manager()
+{
+    static $profileManager = null;
+    static $initialized = false;
+    
+    if ($initialized) {
+        return $profileManager;
+    }
+    $initialized = true;
+    
+    if (!class_exists('PayPalProfileManager')) {
+        return null;
+    }
+    
+    try {
+        $PayPal = null;
+        
+        // Initialize legacy PayPal API if available
+        if (defined('MODULE_PAYMENT_PAYPALWPP_STATUS') && MODULE_PAYMENT_PAYPALWPP_STATUS === 'True') {
+            if (file_exists(DIR_WS_MODULES . 'payment/paypal/class.paypal_wpp_recurring.php')) {
+                require_once DIR_WS_MODULES . 'payment/paypal/class.paypal_wpp_recurring.php';
+                $PayPalConfig = [
+                    'Sandbox' => (MODULE_PAYMENT_PAYPALWPP_SERVER == 'sandbox'),
+                    'APIUsername' => MODULE_PAYMENT_PAYPALWPP_APIUSERNAME,
+                    'APIPassword' => MODULE_PAYMENT_PAYPALWPP_APIPASSWORD,
+                    'APISignature' => MODULE_PAYMENT_PAYPALWPP_APISIGNATURE
+                ];
+                if (class_exists('PayPal')) {
+                    $PayPal = new PayPal($PayPalConfig);
+                }
+            }
+        }
+        
+        $PayPalRestClient = null;
+        if (class_exists('paypalSavedCardRecurring')) {
+            $paypalSavedCardRecurring = new paypalSavedCardRecurring();
+            $PayPalRestClient = $paypalSavedCardRecurring->get_paypal_rest_client();
+        }
+        
+        $profileManager = PayPalProfileManager::create($PayPalRestClient, $PayPal);
+    } catch (Exception $e) {
+        error_log('PayPalProfileManager initialization failed: ' . $e->getMessage());
+    }
+    
+    return $profileManager;
 }
 
 $action = strtolower(trim((string) ($_POST['action'] ?? $_GET['action'] ?? '')));
@@ -153,6 +222,224 @@ if ($action === 'update_subscription') {
     );
 
     zen_redirect($redirectUrl);
+}
+
+// Cancel subscription action
+if ($action === 'cancel_subscription') {
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session($messageStackKey, 'Unable to cancel subscription. Missing identifier.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update local status
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        ['status' => 'cancelled', 'last_modified' => date('Y-m-d H:i:s')],
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+    
+    // Try to cancel via PayPal API if profile_id exists
+    $subscription = $db->Execute(
+        "SELECT plan_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+    );
+    
+    if ($subscription->RecordCount() > 0 && !empty($subscription->fields['plan_id'])) {
+        $profileManager = paypalr_get_profile_manager();
+        if ($profileManager !== null) {
+            try {
+                $profileManager->cancelProfile(['profile_id' => $subscription->fields['plan_id']]);
+            } catch (Exception $e) {
+                // Log but don't fail - local status is already updated
+                error_log('Failed to cancel PayPal profile: ' . $e->getMessage());
+            }
+        }
+    }
+    
+    $messageStack->add_session($messageStackKey, sprintf('Subscription #%d has been cancelled.', $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// Suspend subscription action
+if ($action === 'suspend_subscription') {
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session($messageStackKey, 'Unable to suspend subscription. Missing identifier.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update local status
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        ['status' => 'suspended', 'last_modified' => date('Y-m-d H:i:s')],
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+    
+    // Try to suspend via PayPal API if profile_id exists
+    $subscription = $db->Execute(
+        "SELECT plan_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+    );
+    
+    if ($subscription->RecordCount() > 0 && !empty($subscription->fields['plan_id'])) {
+        $profileManager = paypalr_get_profile_manager();
+        if ($profileManager !== null) {
+            try {
+                $profileManager->suspendProfile(['profile_id' => $subscription->fields['plan_id']]);
+            } catch (Exception $e) {
+                error_log('Failed to suspend PayPal profile: ' . $e->getMessage());
+            }
+        }
+    }
+    
+    $messageStack->add_session($messageStackKey, sprintf('Subscription #%d has been suspended.', $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// Reactivate subscription action
+if ($action === 'reactivate_subscription') {
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session($messageStackKey, 'Unable to reactivate subscription. Missing identifier.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update local status
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        ['status' => 'active', 'last_modified' => date('Y-m-d H:i:s')],
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+    
+    // Try to reactivate via PayPal API if profile_id exists
+    $subscription = $db->Execute(
+        "SELECT plan_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+    );
+    
+    if ($subscription->RecordCount() > 0 && !empty($subscription->fields['plan_id'])) {
+        $profileManager = paypalr_get_profile_manager();
+        if ($profileManager !== null) {
+            try {
+                $profileManager->reactivateProfile(['profile_id' => $subscription->fields['plan_id']]);
+            } catch (Exception $e) {
+                error_log('Failed to reactivate PayPal profile: ' . $e->getMessage());
+            }
+        }
+    }
+    
+    $messageStack->add_session($messageStackKey, sprintf('Subscription #%d has been reactivated.', $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// CSV Export action
+if ($action === 'export_csv') {
+    $exportFilters = [
+        'customers_id' => (int) ($_GET['customers_id'] ?? 0),
+        'products_id' => (int) ($_GET['products_id'] ?? 0),
+        'status' => trim((string) ($_GET['status'] ?? '')),
+        'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
+    ];
+    
+    $exportWhere = [];
+    if ($exportFilters['customers_id'] > 0) {
+        $exportWhere[] = 'ps.customers_id = ' . (int) $exportFilters['customers_id'];
+    }
+    if ($exportFilters['products_id'] > 0) {
+        $exportWhere[] = 'ps.products_id = ' . (int) $exportFilters['products_id'];
+    }
+    if ($exportFilters['status'] !== '') {
+        $exportWhere[] = "ps.status = '" . zen_db_input($exportFilters['status']) . "'";
+    }
+    if ($exportFilters['payment_module'] !== '') {
+        $exportWhere[] = "o.payment_module_code = '" . zen_db_input($exportFilters['payment_module']) . "'";
+    }
+    
+    $exportSql = 'SELECT ps.*, c.customers_firstname, c.customers_lastname, c.customers_email_address,'
+        . ' o.payment_module_code, o.payment_method,'
+        . ' pv.brand AS vault_brand, pv.last_digits AS vault_last_digits, pv.card_type AS vault_card_type'
+        . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
+        . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = ps.customers_id'
+        . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = ps.orders_id'
+        . ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.paypal_vault_id = ps.paypal_vault_id';
+    
+    if (!empty($exportWhere)) {
+        $exportSql .= ' WHERE ' . implode(' AND ', $exportWhere);
+    }
+    
+    $exportSql .= ' ORDER BY ps.date_added DESC';
+    
+    $exportResults = $db->Execute($exportSql);
+    
+    // Generate CSV
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename=subscriptions_export_' . date('Y-m-d_His') . '.csv');
+    
+    $output = fopen('php://output', 'w');
+    
+    // CSV Headers
+    fputcsv($output, [
+        'Subscription ID',
+        'Customer ID',
+        'Customer Name',
+        'Customer Email',
+        'Order ID',
+        'Product ID',
+        'Product Name',
+        'Quantity',
+        'Amount',
+        'Currency',
+        'Billing Period',
+        'Billing Frequency',
+        'Total Cycles',
+        'Status',
+        'Payment Method',
+        'Vault Card Type',
+        'Vault Last 4',
+        'Date Added',
+        'Last Modified'
+    ]);
+    
+    if ($exportResults instanceof queryFactoryResult && $exportResults->RecordCount() > 0) {
+        while (!$exportResults->EOF) {
+            $row = $exportResults->fields;
+            fputcsv($output, [
+                $row['paypal_subscription_id'],
+                $row['customers_id'],
+                trim(($row['customers_firstname'] ?? '') . ' ' . ($row['customers_lastname'] ?? '')),
+                $row['customers_email_address'] ?? '',
+                $row['orders_id'] ?? '',
+                $row['products_id'] ?? '',
+                $row['products_name'] ?? '',
+                $row['products_quantity'] ?? 1,
+                $row['amount'] ?? 0,
+                $row['currency_code'] ?? '',
+                $row['billing_period'] ?? '',
+                $row['billing_frequency'] ?? '',
+                $row['total_billing_cycles'] ?? '',
+                $row['status'] ?? '',
+                trim(($row['payment_module_code'] ?? '') . ' ' . ($row['payment_method'] ?? '')),
+                trim(($row['vault_card_type'] ?? '') . ' ' . ($row['vault_brand'] ?? '')),
+                $row['vault_last_digits'] ?? '',
+                $row['date_added'] ?? '',
+                $row['last_modified'] ?? ''
+            ]);
+            $exportResults->MoveNext();
+        }
+    }
+    
+    fclose($output);
+    exit;
 }
 
 $filters = [
@@ -398,6 +685,10 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                 <label>&nbsp;</label>
                 <button type="submit">Apply Filters</button>
             </div>
+            <div class="form-group">
+                <label>&nbsp;</label>
+                <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, 'action=export_csv' . ($activeQuery !== '' ? '&' . $activeQuery : '')); ?>" class="btn btn-default" style="display: inline-block; padding: 5px 15px; background: #f0f0f0; border: 1px solid #ccc; text-decoration: none; color: #333;">Export CSV</a>
+            </div>
         </form>
 
         <table class="paypalr-subscriptions-table">
@@ -546,6 +837,29 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                 <button type="submit" name="set_status" value="cancelled" form="<?php echo $formId; ?>">Mark Cancelled</button>
                                 <button type="submit" name="set_status" value="active" form="<?php echo $formId; ?>">Mark Active</button>
                                 <button type="submit" name="set_status" value="pending" form="<?php echo $formId; ?>">Mark Pending</button>
+                            </div>
+                            <div class="paypalr-subscription-actions" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+                                <?php 
+                                $currentStatus = strtolower($row['status'] ?? '');
+                                $actionParams = $activeQuery !== '' ? $activeQuery . '&' : '';
+                                ?>
+                                <?php if ($currentStatus === 'active' || $currentStatus === 'scheduled') { ?>
+                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=suspend_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                       onclick="return confirm('Are you sure you want to suspend this subscription?');"
+                                       style="padding: 3px 8px; background: #f0ad4e; color: #fff; text-decoration: none; border-radius: 3px; font-size: 12px;">Suspend</a>
+                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=cancel_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                       onclick="return confirm('Are you sure you want to cancel this subscription? This action cannot be undone.');"
+                                       style="padding: 3px 8px; background: #d9534f; color: #fff; text-decoration: none; border-radius: 3px; font-size: 12px;">Cancel</a>
+                                <?php } elseif ($currentStatus === 'suspended' || $currentStatus === 'paused') { ?>
+                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=reactivate_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                       onclick="return confirm('Are you sure you want to reactivate this subscription?');"
+                                       style="padding: 3px 8px; background: #5cb85c; color: #fff; text-decoration: none; border-radius: 3px; font-size: 12px;">Reactivate</a>
+                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=cancel_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                       onclick="return confirm('Are you sure you want to cancel this subscription? This action cannot be undone.');"
+                                       style="padding: 3px 8px; background: #d9534f; color: #fff; text-decoration: none; border-radius: 3px; font-size: 12px;">Cancel</a>
+                                <?php } elseif ($currentStatus === 'cancelled') { ?>
+                                    <span style="color: #999; font-size: 12px;">Subscription cancelled</span>
+                                <?php } ?>
                             </div>
                         </td>
                     </tr>
