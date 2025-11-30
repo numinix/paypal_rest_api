@@ -100,7 +100,12 @@ Both versions include:
 - Marks expired saved cards as deleted
 - Uses SQL to check expiry date against current date
 
-**Task:** This is a simple utility script. Verify if needed or if handled elsewhere.
+**Verification Steps:**
+1. Check if `cron/paypal_saved_card_recurring.php` handles expired card detection (it does - see line 389-398)
+2. Determine if a separate cleanup cron is still needed for cards not attached to subscriptions
+3. If needed, port as a standalone cron or integrate into existing maintenance scripts
+
+**Decision Criteria:** Port if there are saved cards that expire but have no associated subscriptions.
 
 ---
 
@@ -116,7 +121,12 @@ Both versions include:
 - `TABLE_SUBSCRIPTION_CANCELLATIONS`
 - `TABLE_CUSTOMERS` (updates `customers_group_pricing`)
 
-**Task:** Verify if this logic exists in current implementation or needs porting.
+**Verification Steps:**
+1. Search current codebase for `TABLE_SUBSCRIPTION_CANCELLATIONS` usage
+2. Check if `create_group_pricing()` method already handles cancellation scheduling
+3. Verify `cron/paypal_saved_card_recurring.php` failure handling creates cancellation records
+
+**Decision Criteria:** Port if cancellation records exist but are not being processed by any current cron job.
 
 ---
 
@@ -358,7 +368,7 @@ Before removing `legacy_recurring_reference/`:
 
 ## Notes
 
-- The current `cron/paypal_saved_card_recurring.php` appears to be a direct copy from the legacy implementation with REST API integration added via `LegacySubscriptionMigrator::syncLegacySubscriptions()`
+- The current `cron/paypal_saved_card_recurring.php` shares significant code structure with the legacy implementation but includes REST API integration via `LegacySubscriptionMigrator::syncLegacySubscriptions()` at line 7. Both files handle the same core functionality (scheduled payment processing, card expiration handling, order creation) with minor implementation differences.
 - The `PayPalProfileManager` class provides abstraction for both REST and Legacy APIs
 - Admin pages need significant work to match legacy functionality
 - Language files in `legacy_recurring_reference/includes/languages/` should be reviewed for any missing constants
