@@ -12,6 +12,13 @@ if (!defined('TABLE_PAYPAL_VAULT')) {
 if (!defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
     define('TABLE_PAYPAL_SUBSCRIPTIONS', DB_PREFIX . 'paypal_subscriptions');
 }
+if (!defined('TABLE_PAYPAL_RECURRING')) {
+    /**
+     * Keep legacy recurring scripts pointed at the REST-managed subscription table
+     * to prevent duplicate schemas and ensure data stays centralized.
+     */
+    define('TABLE_PAYPAL_RECURRING', DB_PREFIX . 'paypal_subscriptions');
+}
 if (!defined('TABLE_PAYPAL_WEBHOOKS')) {
     define('TABLE_PAYPAL_WEBHOOKS', DB_PREFIX . 'paypal_webhooks');
 }
