@@ -476,8 +476,8 @@ $statuses_recurring = [
 <?php require DIR_WS_INCLUDES . 'footer.php'; ?>
 
 <script>
-var baseUrl = '<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING); ?>';
-var queryString = '<?php echo $query_string; ?>';
+var baseUrl = <?php echo json_encode(zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING)); ?>;
+var queryString = <?php echo json_encode($query_string); ?>;
 
 function toggleEdit(el) {
     var parent = el.parentNode;
