@@ -52,6 +52,9 @@ if (!defined('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL')) {
 if (!defined('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_SUBJECT')) {
     define('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_SUBJECT', 'Upcoming Subscription Payment - %s');
 }
+if (!defined('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_INVALID_PRODUCT')) {
+    define('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_INVALID_PRODUCT', "Dear %s,\n\nThis is a reminder that your subscription payment will be processed in %d days on %s.\n\nPlease contact us for details.\n\nThank you for your business.");
+}
 if (!defined('PAYPAL_WPP_RECURRING_EXPIRED_NOTICE')) {
     define('PAYPAL_WPP_RECURRING_EXPIRED_NOTICE', "Dear %s,\n\nYour subscription for %s has expired today.\n\nTo renew your subscription, please visit: %s\n\nThank you for your business.");
 }
@@ -205,7 +208,7 @@ if (defined('TABLE_PAYPAL_RECURRING')) {
                                 date('m-d-Y', $next_date), 
                                 zen_href_link(zen_get_info_page($products_id), 'products_id=' . $products_id));
                         } else {
-                            $email_msg = sprintf(PAYPAL_WPP_RECURRING_RENEWAL_REMINDER_EMAIL_INVALID_PRODUCT, 
+                            $email_msg = sprintf(PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_INVALID_PRODUCT, 
                                 $customer->fields['customers_firstname'], 
                                 (int)PAYPAL_WPP_RECURRING_PAYMENT_REMINDER, 
                                 date('m-d-Y', $next_date));
@@ -328,17 +331,16 @@ if (defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
 }
 
 // Output results
-echo "<p>PayPal Recurring Payment Reminders Cron Executed Successfully.</p>\n";
-echo "<p>Renewal reminders sent: " . $remindersProcessed . "</p>\n";
-echo "<p>Payment reminders sent: " . $paymentsReminded . "</p>\n";
-echo "<p>Expiration notices sent: " . $expiredNotices . "</p>\n";
+echo "PayPal Recurring Payment Reminders Cron Executed Successfully\n";
+echo "Renewal reminders sent: " . $remindersProcessed . "\n";
+echo "Payment reminders sent: " . $paymentsReminded . "\n";
+echo "Expiration notices sent: " . $expiredNotices . "\n";
 
 if (!empty($log)) {
-    echo "<h3>Log:</h3>\n<ul>\n";
+    echo "\nLog:\n";
     foreach ($log as $entry) {
-        echo "<li>" . htmlspecialchars($entry) . "</li>\n";
+        echo "- " . $entry . "\n";
     }
-    echo "</ul>\n";
 }
 
 require_once 'includes/application_bottom.php';
