@@ -107,6 +107,8 @@ class paypalr_savedcard extends base
 
         $curl_installed = (function_exists('curl_init'));
 
+        // For storefront, the title will be dynamically set to show card details in selection()
+        // For admin, show a descriptive title
         if (IS_ADMIN_FLAG === false) {
             $this->title = MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_ADMIN ?? 'Saved Card';
         } else {
@@ -412,22 +414,8 @@ class paypalr_savedcard extends base
         // Build separate payment selection for each saved card
         $selections = [];
         foreach ($vaultedCards as $index => $card) {
-            $brand = $card['brand'] ?: ($card['card_type'] ?: (MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD ?? 'Card'));
-            $lastDigits = $card['last_digits'] ?? '****';
-
-            // Build card label
-            $cardTitle = sprintf(
-                MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE ?? '%s ending in %s',
-                zen_output_string_protected($brand),
-                zen_output_string_protected($lastDigits)
-            );
-
-            if (!empty($card['expiry'])) {
-                $cardTitle .= sprintf(
-                    MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY ?? ' (Exp: %s)',
-                    zen_output_string_protected($this->formatExpiry($card['expiry']))
-                );
-            }
+            $brand = $this->getCardDisplayBrand($card);
+            $cardTitle = $this->buildCardTitle($card);
 
             // Get card brand image if available
             $brandImage = $this->getCardBrandImage($brand);
@@ -473,22 +461,8 @@ class paypalr_savedcard extends base
 
         $selections = [];
         foreach ($vaultedCards as $index => $card) {
-            $brand = $card['brand'] ?: ($card['card_type'] ?: (MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD ?? 'Card'));
-            $lastDigits = $card['last_digits'] ?? '****';
-
-            // Build card label
-            $cardTitle = sprintf(
-                MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE ?? '%s ending in %s',
-                zen_output_string_protected($brand),
-                zen_output_string_protected($lastDigits)
-            );
-
-            if (!empty($card['expiry'])) {
-                $cardTitle .= sprintf(
-                    MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY ?? ' (Exp: %s)',
-                    zen_output_string_protected($this->formatExpiry($card['expiry']))
-                );
-            }
+            $brand = $this->getCardDisplayBrand($card);
+            $cardTitle = $this->buildCardTitle($card);
 
             // Get card brand image if available
             $brandImage = $this->getCardBrandImage($brand);
@@ -518,6 +492,44 @@ class paypalr_savedcard extends base
             return $matches[2] . '/' . $matches[1];
         }
         return $expiry;
+    }
+
+    /**
+     * Get the display brand for a card.
+     *
+     * @param array $card Card data array
+     * @return string The brand to display
+     */
+    protected function getCardDisplayBrand(array $card): string
+    {
+        return $card['brand'] ?: ($card['card_type'] ?: (MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD ?? 'Card'));
+    }
+
+    /**
+     * Build the title label for a saved card.
+     *
+     * @param array $card Card data array
+     * @return string The formatted card title
+     */
+    protected function buildCardTitle(array $card): string
+    {
+        $brand = $this->getCardDisplayBrand($card);
+        $lastDigits = $card['last_digits'] ?? '****';
+
+        $cardTitle = sprintf(
+            MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE ?? '%s ending in %s',
+            zen_output_string_protected($brand),
+            zen_output_string_protected($lastDigits)
+        );
+
+        if (!empty($card['expiry'])) {
+            $cardTitle .= sprintf(
+                MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY ?? ' (Exp: %s)',
+                zen_output_string_protected($this->formatExpiry($card['expiry']))
+            );
+        }
+
+        return $cardTitle;
     }
 
     /**
