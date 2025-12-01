@@ -156,7 +156,28 @@ class VaultManager
 
         if ($existing->EOF) {
             $sqlData['date_added'] = $now;
-            zen_db_perform(TABLE_PAYPAL_VAULT, $sqlData);
+            try {
+                zen_db_perform(TABLE_PAYPAL_VAULT, $sqlData);
+            } catch (\mysqli_sql_exception $e) {
+                // Handle race condition: another process may have inserted the same vault_id
+                // between our SELECT check and this INSERT. MySQL error 1062 = duplicate key.
+                if ($e->getCode() === 1062) {
+                    // Re-fetch the record and perform an update instead
+                    $existing = $db->Execute(
+                        "SELECT paypal_vault_id, date_added
+                           FROM " . TABLE_PAYPAL_VAULT . "
+                          WHERE vault_id = '" . zen_db_input($vaultId) . "'
+                          LIMIT 1"
+                    );
+                    if (!$existing->EOF) {
+                        $paypalVaultId = (int)$existing->fields['paypal_vault_id'];
+                        unset($sqlData['date_added']);
+                        zen_db_perform(TABLE_PAYPAL_VAULT, $sqlData, 'update', 'paypal_vault_id = ' . $paypalVaultId);
+                    }
+                } else {
+                    throw $e;
+                }
+            }
         } else {
             $paypalVaultId = (int)$existing->fields['paypal_vault_id'];
             // Do not overwrite the original creation time of the database record.
