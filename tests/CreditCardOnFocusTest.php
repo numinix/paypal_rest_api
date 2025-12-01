@@ -40,28 +40,32 @@ if (strpos($onFocus, 'methodSelect(') === false || strpos($onFocus, 'pmt-paypalr
     echo "✓ JavaScript function call properly formatted\n";
 }
 
-// Test 4: Mock buildSavedCardOptions to verify it accepts the parameter
-function mockBuildSavedCardOptions(array $vaultedCards, string $selectedVaultId, string $onFocus = ''): string
+// Test 4: Mock buildSavedCardInlineOptions to verify it accepts the parameter
+function mockBuildSavedCardInlineOptions(array $vaultedCards, string $selectedVaultId, string $onFocus = ''): string
 {
-    $html = '<select name="paypalr_saved_card" id="paypalr-saved-card" class="ppr-saved-card-select"' . $onFocus . '>';
-    $html .= '</select>';
+    $html = '<div class="ppr-saved-card-inline">';
+    $html .= '<label>';
+    $html .= '<input type="radio" name="paypalr_saved_card" value="new"' . $onFocus . ' />';
+    $html .= '<span>Use a new card</span>';
+    $html .= '</label>';
+    $html .= '</div>';
     return $html;
 }
 
-$mockResult = mockBuildSavedCardOptions([], 'new', $onFocus);
+$mockResult = mockBuildSavedCardInlineOptions([], 'new', $onFocus);
 if (strpos($mockResult, 'onfocus="methodSelect(\'pmt-paypalr_creditcard\')"') === false) {
     $testPassed = false;
-    $errors[] = "buildSavedCardOptions does not include onfocus attribute";
+    $errors[] = "buildSavedCardInlineOptions does not include onfocus attribute";
 } else {
-    echo "✓ buildSavedCardOptions includes onfocus attribute\n";
+    echo "✓ buildSavedCardInlineOptions includes onfocus attribute\n";
 }
 
 // Test 5: Verify HTML is properly formed
-if (strpos($mockResult, '<select') === false || strpos($mockResult, '</select>') === false) {
+if (strpos($mockResult, '<div') === false || strpos($mockResult, '</div>') === false || strpos($mockResult, '<input') === false) {
     $testPassed = false;
-    $errors[] = "buildSavedCardOptions does not generate proper HTML";
+    $errors[] = "buildSavedCardInlineOptions does not generate proper HTML";
 } else {
-    echo "✓ buildSavedCardOptions generates proper HTML\n";
+    echo "✓ buildSavedCardInlineOptions generates proper HTML\n";
 }
 
 // Summary
