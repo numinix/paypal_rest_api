@@ -359,7 +359,20 @@ class paypalr_creditcard extends base
         if (defined('CC_OWNER_MIN_LENGTH') && defined('CC_NUMBER_MIN_LENGTH')) {
             $js = '  if (payment_value == "' . $this->code . '") {' . "\n" .
                   '    var saved_card_field = document.checkout_payment.paypalr_saved_card;' . "\n" .
-                  '    var using_saved_card = saved_card_field && saved_card_field.value && saved_card_field.value !== "new";' . "\n" .
+                  '    var saved_card_value = "";' . "\n" .
+                  '    if (saved_card_field) {' . "\n" .
+                  '      if (saved_card_field.length && saved_card_field[0].type === "radio") {' . "\n" .
+                  '        for (var i = 0; i < saved_card_field.length; i++) {' . "\n" .
+                  '          if (saved_card_field[i].checked) {' . "\n" .
+                  '            saved_card_value = saved_card_field[i].value;' . "\n" .
+                  '            break;' . "\n" .
+                  '          }' . "\n" .
+                  '        }' . "\n" .
+                  '      } else {' . "\n" .
+                  '        saved_card_value = saved_card_field.value;' . "\n" .
+                  '      }' . "\n" .
+                  '    }' . "\n" .
+                  '    var using_saved_card = saved_card_value && saved_card_value !== "new";' . "\n" .
                   '    if (!using_saved_card) {' . "\n" .
                   '      var cc_owner_field = document.checkout_payment.paypalr_cc_owner;' . "\n" .
                   '      var cc_number_field = document.checkout_payment.paypalr_cc_number;' . "\n" .
@@ -445,15 +458,6 @@ class paypalr_creditcard extends base
 
         // Build fields array
         $fields = [];
-        
-        // Add saved cards dropdown if available
-        if ($vaultEnabled && !empty($vaultedCards)) {
-            $fields[] = [
-                'title' => MODULE_PAYMENT_PAYPALR_SAVED_CARDS ?? 'Saved Cards',
-                'field' => $this->buildSavedCardOptions($vaultedCards, $savedCardSelection, $onFocus),
-                'tag' => 'paypalr-saved-card',
-            ];
-        }
 
         // Card owner name
         $fields[] = [
@@ -508,10 +512,15 @@ class paypalr_creditcard extends base
 
         // Load the checkout script to handle radio button selection when focusing on fields
         $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
-        
+
+        $moduleDisplay = $this->buildCardsAccepted();
+        if ($vaultEnabled && !empty($vaultedCards)) {
+            $moduleDisplay .= $this->buildSavedCardInlineOptions($vaultedCards, $savedCardSelection, $onFocus);
+        }
+
         return [
             'id' => $this->code,
-            'module' => $this->buildCardsAccepted() . $checkoutScript,
+            'module' => $moduleDisplay . $checkoutScript,
             'fields' => $fields,
         ];
     }
@@ -547,6 +556,36 @@ class paypalr_creditcard extends base
             }
         }
         return $cards_accepted;
+    }
+
+    protected function buildSavedCardInlineOptions(array $vaultedCards, string $selectedVaultId, string $onFocus = ''): string
+    {
+        $html = '<div class="ppr-saved-card-inline">';
+
+        $html .= '<label class="ppr-saved-card-option">' .
+            zen_draw_radio_field('paypalr_saved_card', 'new', $selectedVaultId === 'new', 'class="ppr-saved-card" id="paypalr-saved-card-new"' . $onFocus) .
+            '<span>' . (MODULE_PAYMENT_PAYPALR_NEW_CARD ?? 'Use a new card') . '</span>' .
+            '</label>';
+
+        foreach ($vaultedCards as $card) {
+            $brand = $card['brand'] ?: ($card['card_type'] ?: (MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC ?? 'Card'));
+            $card_label = $brand . ' ending in ' . $card['last_digits'];
+            if (!empty($card['expiry'])) {
+                $card_label .= ' (Exp: ' . $card['expiry'] . ')';
+            }
+            $html .= '<label class="ppr-saved-card-option">' .
+                zen_draw_radio_field(
+                    'paypalr_saved_card',
+                    zen_output_string($card['vault_id']),
+                    $card['vault_id'] === $selectedVaultId,
+                    'class="ppr-saved-card" id="paypalr-saved-card-' . zen_output_string($card['vault_id']) . '"' . $onFocus
+                ) .
+                '<span>' . zen_output_string($card_label) . '</span>' .
+                '</label>';
+        }
+
+        $html .= '</div>';
+        return $html;
     }
 
     public function pre_confirmation_check()
