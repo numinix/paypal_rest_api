@@ -419,9 +419,14 @@ class paypalr_creditcard extends base
         }
 
         // Get vaulted cards if enabled
+        // NOTE: If the paypalr_savedcard module is enabled, saved cards will be displayed
+        // as separate top-level payment options instead of within this module.
         $vaultEnabled = (defined('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT') && MODULE_PAYMENT_PAYPALR_ENABLE_VAULT === 'True');
+        $savedCardModuleEnabled = (defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_STATUS') && MODULE_PAYMENT_PAYPALR_SAVEDCARD_STATUS === 'True');
+        
         $vaultedCards = [];
-        if ($vaultEnabled && isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0) {
+        if ($vaultEnabled && !$savedCardModuleEnabled && isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0) {
+            // Only fetch and display vaulted cards here if the separate saved card module is not enabled
             $vaultedCards = $this->paypalCommon->getVaultedCardsForCustomer($_SESSION['customer_id'], true);
         }
 
