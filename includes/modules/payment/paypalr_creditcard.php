@@ -358,27 +358,31 @@ class paypalr_creditcard extends base
         $js = '';
         if (defined('CC_OWNER_MIN_LENGTH') && defined('CC_NUMBER_MIN_LENGTH')) {
             $js = '  if (payment_value == "' . $this->code . '") {' . "\n" .
-                  '    var cc_owner_field = document.checkout_payment.paypalr_cc_owner;' . "\n" .
-                  '    var cc_number_field = document.checkout_payment.paypalr_cc_number;' . "\n" .
-                  '    if (cc_owner_field && cc_number_field) {' . "\n" .
-                  '      var cc_owner = cc_owner_field.value;' . "\n" .
-                  '      var cc_number = cc_number_field.value;' . "\n";
+                  '    var saved_card_field = document.checkout_payment.paypalr_saved_card;' . "\n" .
+                  '    var using_saved_card = saved_card_field && saved_card_field.value && saved_card_field.value !== "new";' . "\n" .
+                  '    if (!using_saved_card) {' . "\n" .
+                  '      var cc_owner_field = document.checkout_payment.paypalr_cc_owner;' . "\n" .
+                  '      var cc_number_field = document.checkout_payment.paypalr_cc_number;' . "\n" .
+                  '      if (cc_owner_field && cc_number_field) {' . "\n" .
+                  '        var cc_owner = cc_owner_field.value;' . "\n" .
+                  '        var cc_number = cc_number_field.value;' . "\n";
             
             if (CC_OWNER_MIN_LENGTH > 0) {
-                $js .= '      if (cc_owner == "" || cc_owner.length < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
-                       '        error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
-                       '        error = 1;' . "\n" .
-                       '      }' . "\n";
+                $js .= '        if (cc_owner == "" || cc_owner.length < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
+                       '          error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
+                       '          error = 1;' . "\n" .
+                       '        }' . "\n";
             }
             
             if (CC_NUMBER_MIN_LENGTH > 0) {
-                $js .= '      if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
-                       '        error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
-                       '        error = 1;' . "\n" .
-                       '      }' . "\n";
+                $js .= '        if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
+                       '          error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
+                       '          error = 1;' . "\n" .
+                       '        }' . "\n";
             }
             
-            $js .= '    }' . "\n" .
+            $js .= '      }' . "\n" .
+                   '    }' . "\n" .
                    '  }' . "\n";
         }
         return $js;
@@ -519,7 +523,8 @@ class paypalr_creditcard extends base
                  (MODULE_PAYMENT_PAYPALR_NEW_CARD ?? 'Use a new card') . '</option>';
         
         foreach ($vaultedCards as $card) {
-            $card_label = ($card['card_type'] ?? 'Card') . ' ending in ' . $card['last_digits'];
+            $brand = $card['brand'] ?: ($card['card_type'] ?: (MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC ?? 'Card'));
+            $card_label = $brand . ' ending in ' . $card['last_digits'];
             if (!empty($card['expiry'])) {
                 $card_label .= ' (Exp: ' . $card['expiry'] . ')';
             }
