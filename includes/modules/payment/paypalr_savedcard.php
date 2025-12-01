@@ -53,7 +53,7 @@ class paypalr_savedcard extends base
         return defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_SAVEDCARD_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.3';
+    protected const CURRENT_VERSION = '1.3.4';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -780,16 +780,25 @@ class paypalr_savedcard extends base
 
         $this->orderInfo['expiration_time'] = $payment['expiration_time'] ?? null;
 
-        if ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED) {
-            $pending_status = (int)MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID;
-            if ($pending_status > 0) {
-                $this->order_status = $pending_status;
-                $order->info['order_status'] = $pending_status;
-            }
+        // -----
+        // If the order's PayPal status doesn't indicate successful completion, ensure that
+        // the overall order's status is set to this payment-module's PENDING status and set
+        // a processing flag so that the after_process method will alert the store admin if
+        // configured.
+        //
+        // Setting the order's overall status here, since zc158a and earlier don't acknowledge
+        // a payment-module's change in status during the payment processing!
+        //
+        $this->orderInfo['admin_alert_needed'] = false;
+        if ($payment_status !== PayPalRestfulApi::STATUS_CAPTURED && $payment_status !== PayPalRestfulApi::STATUS_CREATED) {
+            $this->order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+            $order->info['order_status'] = $this->order_status;
             $this->orderInfo['admin_alert_needed'] = true;
-        } else {
-            $this->orderInfo['admin_alert_needed'] = false;
+
+            $this->log->write("==> paypalr_savedcard::before_process: Payment status {$payment['status']} received from PayPal; order's status forced to pending.");
         }
+
+        $this->notify('NOTIFY_PAYPALR_BEFORE_PROCESS_FINISHED', $this->orderInfo);
     }
 
     protected function captureOrAuthorizePayment(string $payment_source): array
@@ -830,12 +839,19 @@ class paypalr_savedcard extends base
 
         $admin_main = new AdminMain($this->code, self::CURRENT_VERSION, $zf_order_id, $ppr);
 
+        if ($admin_main->externalTxnAdded() === true) {
+            zen_update_orders_history($zf_order_id, MODULE_PAYMENT_PAYPALR_EXTERNAL_ADDITION);
+            $this->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN, sprintf(MODULE_PAYMENT_PAYPALR_ALERT_EXTERNAL_TXNS, $zf_order_id));
+        }
+
         return $admin_main->get();
     }
 
     public function help()
     {
-        return '';
+        return [
+            'link' => 'https://github.com/lat9/paypalr/wiki'
+        ];
     }
 
     public function _doRefund($oID)
