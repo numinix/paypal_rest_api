@@ -577,6 +577,11 @@ class paypalr_savedcard extends base
             if (isset($vaultedCards[$cardIndex])) {
                 $vaultId = $vaultedCards[$cardIndex]['vault_id'];
             }
+
+            // Normalize the payment session to the base module code.
+            // This ensures Zen Cart can find this payment module and properly set
+            // the payment_method and payment_module_code fields in the orders table.
+            $_SESSION['payment'] = $this->code;
         }
 
         if (empty($vaultId)) {
@@ -594,6 +599,13 @@ class paypalr_savedcard extends base
                 MODULE_PAYMENT_PAYPALR_TEXT_SAVED_CARD_NOT_FOUND ?? 'The selected card is no longer available. Please select a different card or enter a new one.',
                 FILENAME_CHECKOUT_PAYMENT
             );
+        }
+
+        // Update the title to show the selected card details in the order's payment method.
+        // This makes the payment method descriptive (e.g., "VISA ending in 4242")
+        // instead of a generic "Saved Card" label.
+        if ($this->selectedCard !== null) {
+            $this->title = $this->buildCardTitle($this->selectedCard);
         }
 
         // Create PayPal order for saved card payment
