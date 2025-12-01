@@ -99,8 +99,8 @@ trait PayPalRestfulLegacyNotifierTrait
      * Notify listeners that an event has been triggered.
      */
     public function notify(
-        string $eventID,
-        $param1 = [],
+        $eventID,
+        &$param1 = null,
         &$param2 = null,
         &$param3 = null,
         &$param4 = null,
