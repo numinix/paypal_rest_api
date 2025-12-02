@@ -427,33 +427,7 @@ class paypalr_savedcard extends base
         $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
 
         // JavaScript to update the hidden vault_id field when a saved card payment option is selected
-        $savedCardScript = '<script>
-jQuery(document).ready(function() {
-    // Update the hidden vault_id field when a saved card payment option is selected
-    jQuery(\'input[name="payment"]\').on("change", function() {
-        var selectedPayment = jQuery(this).val();
-        if (selectedPayment && selectedPayment.indexOf("paypalr_savedcard_") === 0) {
-            var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
-            var selectedLabel = jQuery("label[for=\"pmt-" + selectedPayment + "\"]");
-            var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
-            if (vaultId && vaultIdField.length) {
-                vaultIdField.val(vaultId);
-            }
-        }
-    });
-    
-    // Initialize on page load - set the vault ID for the initially selected card
-    var initialPayment = jQuery(\'input[name="payment"]:checked\').val();
-    if (initialPayment && initialPayment.indexOf("paypalr_savedcard_") === 0) {
-        var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
-        var selectedLabel = jQuery("label[for=\"pmt-" + initialPayment + "\"]");
-        var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
-        if (vaultId && vaultIdField.length) {
-            vaultIdField.val(vaultId);
-        }
-    }
-});
-</script>';
+        $savedCardScript = $this->getSavedCardSelectionScript();
 
         // Build separate payment selection for each saved card
         $selections = [];
@@ -466,7 +440,7 @@ jQuery(document).ready(function() {
 
             // Store vault_id as a data attribute instead of a hidden field per card
             // This prevents multiple hidden fields with the same name
-            $vaultDataSpan = '<span class="ppr-savedcard-vault-data" data-vault-id="' . zen_output_string($card['vault_id']) . '" style="display:none;"></span>';
+            $vaultDataSpan = '<span class="ppr-savedcard-vault-data" data-vault-id="' . zen_output_string_protected($card['vault_id']) . '" style="display:none;"></span>';
 
             // Add scripts and the single hidden field only to the first selection
             $additionalContent = '';
@@ -514,30 +488,7 @@ jQuery(document).ready(function() {
         $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
 
         // JavaScript to update the hidden vault_id field when a saved card payment option is selected
-        $savedCardScript = '<script>
-jQuery(document).ready(function() {
-    jQuery(\'input[name="payment"]\').on("change", function() {
-        var selectedPayment = jQuery(this).val();
-        if (selectedPayment && selectedPayment.indexOf("paypalr_savedcard_") === 0) {
-            var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
-            var selectedLabel = jQuery("label[for=\"pmt-" + selectedPayment + "\"]");
-            var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
-            if (vaultId && vaultIdField.length) {
-                vaultIdField.val(vaultId);
-            }
-        }
-    });
-    var initialPayment = jQuery(\'input[name="payment"]:checked\').val();
-    if (initialPayment && initialPayment.indexOf("paypalr_savedcard_") === 0) {
-        var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
-        var selectedLabel = jQuery("label[for=\"pmt-" + initialPayment + "\"]");
-        var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
-        if (vaultId && vaultIdField.length) {
-            vaultIdField.val(vaultId);
-        }
-    }
-});
-</script>';
+        $savedCardScript = $this->getSavedCardSelectionScript();
 
         $selections = [];
         foreach ($vaultedCards as $index => $card) {
@@ -548,7 +499,7 @@ jQuery(document).ready(function() {
             $brandImage = $this->getCardBrandImage($brand);
 
             // Store vault_id as a data attribute
-            $vaultDataSpan = '<span class="ppr-savedcard-vault-data" data-vault-id="' . zen_output_string($card['vault_id']) . '" style="display:none;"></span>';
+            $vaultDataSpan = '<span class="ppr-savedcard-vault-data" data-vault-id="' . zen_output_string_protected($card['vault_id']) . '" style="display:none;"></span>';
 
             // Add scripts and the single hidden field only to the first selection
             $additionalContent = '';
@@ -580,6 +531,39 @@ jQuery(document).ready(function() {
             return $matches[2] . '/' . $matches[1];
         }
         return $expiry;
+    }
+
+    /**
+     * Get the JavaScript for updating vault_id when saved card selection changes.
+     *
+     * @return string JavaScript code wrapped in script tags
+     */
+    protected function getSavedCardSelectionScript(): string
+    {
+        return '<script>
+jQuery(document).ready(function() {
+    jQuery(\'input[name="payment"]\').on("change", function() {
+        var selectedPayment = jQuery(this).val();
+        if (selectedPayment && selectedPayment.indexOf("paypalr_savedcard_") === 0) {
+            var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
+            var selectedLabel = jQuery("label[for=\"pmt-" + selectedPayment + "\"]");
+            var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
+            if (vaultId && vaultIdField.length) {
+                vaultIdField.val(vaultId);
+            }
+        }
+    });
+    var initialPayment = jQuery(\'input[name="payment"]:checked\').val();
+    if (initialPayment && initialPayment.indexOf("paypalr_savedcard_") === 0) {
+        var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
+        var selectedLabel = jQuery("label[for=\"pmt-" + initialPayment + "\"]");
+        var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
+        if (vaultId && vaultIdField.length) {
+            vaultIdField.val(vaultId);
+        }
+    }
+});
+</script>';
     }
 
     /**
