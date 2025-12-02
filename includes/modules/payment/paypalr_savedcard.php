@@ -407,10 +407,10 @@ class paypalr_savedcard extends base
     }
 
     /**
-     * Generate selection array for saved cards as separate payment options.
+     * Generate selection array for saved cards displayed in a select box.
      *
-     * This method creates one selection entry per saved card, each appearing as
-     * a top-level payment option.
+     * This method creates a single selection with a dropdown containing all saved cards,
+     * which takes up less vertical space than individual radio buttons.
      *
      * @return array|array[]
      */
@@ -426,53 +426,51 @@ class paypalr_savedcard extends base
         // Load the checkout script to handle radio button selection
         $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
 
-        // Build fields array with radio buttons for each saved card
-        $fields = [];
-        $is_bootstrap_template = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true);
-
+        // Build select box options for saved cards
         $selectedVaultId = $_POST['paypalr_savedcard_vault_id'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? '');
-
-        foreach ($vaultedCards as $index => $card) {
-            $brand = $this->getCardDisplayBrand($card);
-            $cardTitle = $this->buildCardTitle($card);
-            $brandImage = $this->getCardBrandImage($brand);
-            $vaultId = $card['vault_id'];
-            $isChecked = ($vaultId === $selectedVaultId);
-
-            // Build radio button for this card
-            $radioId = 'paypalr-savedcard-' . $index;
-            $radioInput = zen_draw_radio_field(
-                'paypalr_savedcard_vault_id',
-                $vaultId,
-                $isChecked,
-                'id="' . $radioId . '" class="ppr-savedcard-radio"'
-            );
-
-            if ($is_bootstrap_template) {
-                $fields[] = [
-                    'title' => '',
-                    'field' =>
-                        '<div class="custom-control custom-radio ppr-savedcard-option">' .
-                            $radioInput .
-                            '<label class="custom-control-label" for="' . $radioId . '">' .
-                                $brandImage . $cardTitle .
-                            '</label>' .
-                        '</div>',
-                ];
-            } else {
-                $fields[] = [
-                    'title' => '',
-                    'field' =>
-                        '<label class="ppr-savedcard-option" for="' . $radioId . '">' .
-                            $radioInput .
-                            ' ' . $brandImage . $cardTitle .
-                        '</label>',
-                ];
-            }
+        
+        // If no selection made, default to first card
+        if (empty($selectedVaultId) && !empty($vaultedCards)) {
+            $selectedVaultId = $vaultedCards[0]['vault_id'];
         }
 
+        $selectOptions = [];
+        foreach ($vaultedCards as $card) {
+            $cardTitle = $this->buildCardTitle($card);
+            $selectOptions[] = [
+                'id' => $card['vault_id'],
+                'text' => $cardTitle,
+            ];
+        }
+
+        // Build the select box with onchange/onfocus handlers to auto-select parent radio
+        $selectAttributes = 'id="paypalr-savedcard-select" class="ppr-savedcard-select" ' .
+            'onchange="if(typeof methodSelect===\'function\')methodSelect(\'pmt-' . $this->code . '\')" ' .
+            'onfocus="if(typeof methodSelect===\'function\')methodSelect(\'pmt-' . $this->code . '\')"';
+
+        $selectBox = zen_draw_pull_down_menu(
+            'paypalr_savedcard_vault_id',
+            $selectOptions,
+            $selectedVaultId,
+            $selectAttributes
+        );
+
+        $selectLabel = defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL') 
+            ? MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL 
+            : 'Select Card:';
+
+        $fields = [
+            [
+                'title' => $selectLabel,
+                'field' => $selectBox,
+                'tag' => 'paypalr-savedcard-select',
+            ],
+        ];
+
         // Build module display title
-        $moduleTitle = MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT ?? 'Pay with Saved Card';
+        $moduleTitle = defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT') 
+            ? MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT 
+            : 'Pay with Saved Card';
 
         return [
             'id' => $this->code,

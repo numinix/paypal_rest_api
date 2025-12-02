@@ -67,8 +67,16 @@ jQuery(document).ready(function() {
 
     function ensureSavedCardParentMatchesSelection(triggerChange)
     {
+        // Check for saved card radio buttons (legacy)
         var $checkedSavedCard = jQuery('input[name="paypalr_savedcard_vault_id"]:checked');
         if ($checkedSavedCard.length) {
+            selectSavedCardParentModule(triggerChange);
+            return;
+        }
+        
+        // Check for saved card select box (new)
+        var $savedCardSelect = jQuery('#paypalr-savedcard-select');
+        if ($savedCardSelect.length && $savedCardSelect.val()) {
             selectSavedCardParentModule(triggerChange);
         }
     }
@@ -116,12 +124,20 @@ jQuery(document).ready(function() {
         }
     });
 
-    // Handle saved card selection changes
+    // Handle saved card selection changes (for legacy radio buttons)
     jQuery(document).on('change', 'input[name="paypalr_saved_card"]', function() {
         updateSavedCardVisibility();
     });
 
+    // Handle saved card radio button clicks (legacy)
     jQuery(document).on('change click', 'input[name="paypalr_savedcard_vault_id"]', function() {
+        selectSavedCardParentModule(true);
+    });
+
+    // Handle saved card select box changes and focus (new select box implementation)
+    // The onfocus/onchange handlers in the HTML also call methodSelect() for compatibility
+    // with Zen Cart's native payment method selection mechanism
+    jQuery(document).on('change focus', '#paypalr-savedcard-select, select[name="paypalr_savedcard_vault_id"]', function() {
         selectSavedCardParentModule(true);
     });
 

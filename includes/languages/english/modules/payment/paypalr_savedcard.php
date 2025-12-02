@@ -11,3 +11,4 @@ define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_ADMIN', 'Saved Cards via Pay
 define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_DESCRIPTION', 'Accept payments using saved credit cards via PayPal Advanced Checkout (v%s). Requires the main PayPal Advanced Checkout module to be installed and configured with valid API credentials.');
 define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY', ' (Exp: %s)');
 define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD', 'Card');
+define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL', 'Select Card:');
