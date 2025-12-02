@@ -503,7 +503,6 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // Log the incoming cc_info for debugging (mask sensitive data)
         $cc_info_debug = [
             'has_vault_id' => !empty($cc_info['vault_id']),
-            'vault_id_preview' => !empty($cc_info['vault_id']) ? substr($cc_info['vault_id'], 0, 8) . '...' : null,
             'type' => $cc_info['type'] ?? null,
             'last_digits' => $cc_info['last_digits'] ?? null,
             'has_number' => !empty($cc_info['number']),
@@ -538,7 +537,6 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
             $this->log->write(
                 "buildCardPaymentSource: Using VAULT payment source.\n" .
-                "  Vault ID: " . substr($cc_info['vault_id'], 0, 8) . "...\n" .
                 "  Last digits: " . ($cc_info['last_digits'] ?? 'n/a') . "\n" .
                 "  Has expiry: " . (!empty($payment_source['expiry']) ? 'yes' : 'no')
             );

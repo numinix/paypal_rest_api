@@ -103,11 +103,12 @@ class paypalr_savedcard extends base
      * which is needed by PayPalCommon::createPayPalOrder() to build the
      * payment source for vault-based card payments.
      *
-     * @return array The credit card/vault information
+     * @return array A copy of the credit card/vault information
      */
     public function getCcInfo(): array
     {
-        return $this->ccInfo;
+        // Return a copy to prevent external modification of internal state
+        return [...$this->ccInfo];
     }
 
     /**
