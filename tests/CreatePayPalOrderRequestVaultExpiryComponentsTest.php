@@ -144,13 +144,13 @@ namespace {
     $failures = 0;
 
     // Test: Vaulted card with empty 'expiry' field but valid expiry_month and expiry_year
-    // This simulates the scenario from the bug report where the database has the expiry
-    // components but not the combined field
+    // When using vault_id, PayPal already has the card details - no expiry should be sent.
+    // The expiry_month/expiry_year fields should be ignored for vault transactions.
     $cc_info_vault_components = [
         'type' => 'Visa',
         'name' => 'Jane Doe',
         'vault_id' => 'VAULT-456',
-        'expiry' => '',  // Empty expiry field (the bug scenario)
+        'expiry' => '',  // Empty expiry field
         'expiry_month' => '09',
         'expiry_year' => '2030',
         'last_digits' => '1111',
@@ -176,25 +176,27 @@ namespace {
             $failures++;
         }
 
-        // The key test: expiry should be built from expiry_month and expiry_year
-        if (($card_source_vault['expiry'] ?? '') !== '2030-09') {
+        // PayPal does NOT want expiry when vault_id is present - it causes INCOMPATIBLE_PARAMETER_VALUE
+        if (isset($card_source_vault['expiry'])) {
             fwrite(STDERR, sprintf(
-                "Expected expiry 2030-09 (built from components), got %s.\n",
-                json_encode($card_source_vault['expiry'] ?? null)
+                "expiry should NOT be present when using vault_id (causes PayPal error), got %s.\n",
+                json_encode($card_source_vault['expiry'])
             ));
             $failures++;
         }
 
-        if (($card_source_vault['last_digits'] ?? '') !== '1111') {
+        // PayPal does NOT want last_digits when vault_id is present
+        if (isset($card_source_vault['last_digits'])) {
             fwrite(STDERR, sprintf(
-                "Expected last_digits 1111, got %s.\n",
-                json_encode($card_source_vault['last_digits'] ?? null)
+                "last_digits should NOT be present when using vault_id (causes PayPal error), got %s.\n",
+                json_encode($card_source_vault['last_digits'])
             ));
             $failures++;
         }
 
-        if (empty($card_source_vault['billing_address'])) {
-            fwrite(STDERR, "Expected billing_address to be retained for vaulted card." . "\n");
+        // PayPal does NOT want billing_address when vault_id is present
+        if (isset($card_source_vault['billing_address'])) {
+            fwrite(STDERR, "billing_address should NOT be present when using vault_id (causes PayPal error).\n");
             $failures++;
         }
 
@@ -207,7 +209,7 @@ namespace {
     }
 
     // Test: Vaulted card with neither expiry nor components should NOT throw during creation
-    // (PayPal will validate when the order is submitted)
+    // Only vault_id should be sent to PayPal - no other card details
     $cc_info_no_expiry = [
         'type' => 'Visa',
         'name' => 'Jane Doe',
@@ -228,11 +230,20 @@ namespace {
             $failures++;
         }
 
-        // Should not have an expiry field if none was provided
+        // Should not have an expiry field when using vault_id
         if (isset($card_source_no_expiry['expiry'])) {
             fwrite(STDERR, sprintf(
-                "Did not expect expiry field when none provided, got %s.\n",
+                "Did not expect expiry field when using vault_id, got %s.\n",
                 json_encode($card_source_no_expiry['expiry'])
+            ));
+            $failures++;
+        }
+
+        // Should not have last_digits when using vault_id
+        if (isset($card_source_no_expiry['last_digits'])) {
+            fwrite(STDERR, sprintf(
+                "Did not expect last_digits field when using vault_id, got %s.\n",
+                json_encode($card_source_no_expiry['last_digits'])
             ));
             $failures++;
         }
