@@ -182,6 +182,9 @@ namespace {
     }
 
     // Existing vaulted card reuse path.
+    // When using a vault_id, PayPal already has the card details stored.
+    // Only vault_id and optionally stored_credential should be sent.
+    // Sending expiry, last_digits, or billing_address causes INCOMPATIBLE_PARAMETER_VALUE error.
     $cc_info_vault = [
         'type' => 'Visa',
         'name' => 'Jane Doe',
@@ -218,28 +221,32 @@ namespace {
         $failures++;
     }
 
-    if (($card_source_vault['expiry'] ?? '') !== '2030-09') {
+    // PayPal does not want expiry when vault_id is present - it causes INCOMPATIBLE_PARAMETER_VALUE
+    if (isset($card_source_vault['expiry'])) {
         fwrite(STDERR, sprintf(
-            "Expected expiry 2030-09, got %s.\n",
-            json_encode($card_source_vault['expiry'] ?? null)
+            "expiry should NOT be present when using vault_id (causes PayPal error), got %s.\n",
+            json_encode($card_source_vault['expiry'])
         ));
         $failures++;
     }
 
-    if (($card_source_vault['last_digits'] ?? '') !== '1111') {
+    // PayPal does not want last_digits when vault_id is present - it causes INCOMPATIBLE_PARAMETER_VALUE
+    if (isset($card_source_vault['last_digits'])) {
         fwrite(STDERR, sprintf(
-            "Expected last_digits 1111, got %s.\n",
-            json_encode($card_source_vault['last_digits'] ?? null)
+            "last_digits should NOT be present when using vault_id (causes PayPal error), got %s.\n",
+            json_encode($card_source_vault['last_digits'])
         ));
         $failures++;
     }
 
-    if (empty($card_source_vault['billing_address'])) {
-        fwrite(STDERR, "Expected billing_address to be retained for vaulted card." . "\n");
+    // PayPal does not want billing_address when vault_id is present - it causes INCOMPATIBLE_PARAMETER_VALUE
+    if (isset($card_source_vault['billing_address'])) {
+        fwrite(STDERR, "billing_address should NOT be present when using vault_id (causes PayPal error).\n");
         $failures++;
     }
 
-    if (($card_source_vault['attributes']['stored_credential'] ?? []) !== $cc_info_vault['stored_credential']) {
+    // stored_credential should be passed through for vaulted card usage
+    if (($card_source_vault['stored_credential'] ?? []) !== $cc_info_vault['stored_credential']) {
         fwrite(STDERR, 'Stored credential attributes were not passed through for vaulted card usage.' . "\n");
         $failures++;
     }

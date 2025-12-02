@@ -516,29 +516,21 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $this->log->write("buildCardPaymentSource: Input cc_info:\n" . Logger::logJSON($cc_info_debug));
 
         if (!empty($cc_info['vault_id'])) {
+            // When using a vault_id, PayPal already has the card details stored.
+            // Sending additional fields like expiry, last_digits, or billing_address
+            // causes an INCOMPATIBLE_PARAMETER_VALUE error from PayPal.
+            // Only vault_id and optionally stored_credential should be sent.
             $payment_source = [
                 'vault_id' => $cc_info['vault_id'],
             ];
-            if (!empty($cc_info['expiry'])) {
-                $payment_source['expiry'] = $cc_info['expiry'];
-            } elseif (!empty($cc_info['expiry_month']) && !empty($cc_info['expiry_year'])) {
-                // Build expiry from component parts if not already set
-                $payment_source['expiry'] = $cc_info['expiry_year'] . '-' . $cc_info['expiry_month'];
-            }
-            if (!empty($cc_info['last_digits'])) {
-                $payment_source['last_digits'] = $cc_info['last_digits'];
-            }
-            if (!empty($cc_info['billing_address'])) {
-                $payment_source['billing_address'] = $cc_info['billing_address'];
-            }
             if (!empty($cc_info['stored_credential'])) {
-                $payment_source['attributes']['stored_credential'] = $cc_info['stored_credential'];
+                $payment_source['stored_credential'] = $cc_info['stored_credential'];
             }
 
             $this->log->write(
                 "buildCardPaymentSource: Using VAULT payment source.\n" .
-                "  Last digits: " . ($cc_info['last_digits'] ?? 'n/a') . "\n" .
-                "  Has expiry: " . (!empty($payment_source['expiry']) ? 'yes' : 'no')
+                "  Vault ID: " . $cc_info['vault_id'] . "\n" .
+                "  Has stored_credential: " . (!empty($cc_info['stored_credential']) ? 'yes' : 'no')
             );
 
             return $payment_source;
