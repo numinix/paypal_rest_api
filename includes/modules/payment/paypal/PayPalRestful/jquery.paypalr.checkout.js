@@ -67,10 +67,38 @@ jQuery(document).ready(function() {
 
     function ensureSavedCardParentMatchesSelection(triggerChange)
     {
+        // Check for saved card radio buttons (legacy)
         var $checkedSavedCard = jQuery('input[name="paypalr_savedcard_vault_id"]:checked');
         if ($checkedSavedCard.length) {
             selectSavedCardParentModule(triggerChange);
+            return;
         }
+        
+        // Check for saved card select box (new)
+        var $savedCardSelect = jQuery('#paypalr-savedcard-select');
+        if ($savedCardSelect.length && $savedCardSelect.val()) {
+            selectSavedCardParentModule(triggerChange);
+        }
+    }
+
+    /**
+     * Select a wallet module's hidden radio button.
+     * Used by Google Pay, Apple Pay, and Venmo when their buttons are clicked.
+     * 
+     * @param {string} moduleCode - The module code (e.g., 'paypalr_googlepay')
+     */
+    function selectWalletModuleRadio(moduleCode)
+    {
+        var $moduleRadio = jQuery('#pmt-' + moduleCode);
+        if (!$moduleRadio.length || !$moduleRadio.is(':radio')) {
+            return;
+        }
+
+        if ($moduleRadio.is(':checked')) {
+            return;
+        }
+
+        $moduleRadio.prop('checked', true).trigger('change');
     }
 
     // Initialize parent radio selection if sub-radios are checked
@@ -116,12 +144,23 @@ jQuery(document).ready(function() {
         }
     });
 
-    // Handle saved card selection changes
+    // Handle saved card selection changes (for legacy radio buttons)
     jQuery(document).on('change', 'input[name="paypalr_saved_card"]', function() {
         updateSavedCardVisibility();
     });
 
+    // Handle saved card radio button clicks (legacy)
     jQuery(document).on('change click', 'input[name="paypalr_savedcard_vault_id"]', function() {
+        selectSavedCardParentModule(true);
+    });
+
+    // Handle saved card select box changes and focus (new select box implementation)
+    jQuery(document).on('change focus', '#paypalr-savedcard-select, select[name="paypalr_savedcard_vault_id"]', function() {
+        selectSavedCardParentModule(true);
+    });
+    
+    // Handle click on saved card select box container
+    jQuery(document).on('click', '.ppr-savedcard-select', function() {
         selectSavedCardParentModule(true);
     });
 

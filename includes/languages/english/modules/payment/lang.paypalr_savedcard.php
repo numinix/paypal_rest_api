@@ -11,6 +11,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_DESCRIPTION' => 'Accept payments using saved credit cards via PayPal Advanced Checkout (v%s). Requires the main PayPal Advanced Checkout module to be installed and configured with valid API credentials.',
     'MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY' => ' (Exp: %s)',
     'MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD' => 'Card',
+    'MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL' => 'Select Card:',
 ];
 
 return $define;
