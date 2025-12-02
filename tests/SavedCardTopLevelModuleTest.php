@@ -1,7 +1,7 @@
 <?php
 /**
  * Test that verifies the paypalr_savedcard module correctly generates
- * multiple top-level payment options for saved cards.
+ * multiple top-level payment options for saved cards with proper vault ID handling.
  */
 
 // Simple standalone test
@@ -26,6 +26,13 @@ if (!function_exists('zen_output_string_protected')) {
     }
 }
 
+// Mock zen_output_string
+if (!function_exists('zen_output_string')) {
+    function zen_output_string($string) {
+        return htmlspecialchars($string, ENT_QUOTES);
+    }
+}
+
 // Mock zen_draw_hidden_field
 if (!function_exists('zen_draw_hidden_field')) {
     function zen_draw_hidden_field($name, $value, $attrs = '') {
@@ -46,10 +53,12 @@ if (!defined('DIR_FS_CATALOG')) {
 
 /**
  * Simulates the selection generation logic from paypalr_savedcard
+ * Updated to use single hidden field and data attributes for vault_id
  */
 function generateSavedCardSelections(array $vaultedCards): array
 {
     $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+    $savedCardScript = '<script>/* Saved card JavaScript */</script>';
     
     $selections = [];
     foreach ($vaultedCards as $index => $card) {
@@ -70,11 +79,19 @@ function generateSavedCardSelections(array $vaultedCards): array
             );
         }
         
-        $hiddenField = zen_draw_hidden_field('paypalr_savedcard_vault_id', $card['vault_id'], 'id="paypalr-savedcard-vault-id-' . $index . '"');
+        // Store vault_id as data attribute instead of per-card hidden field
+        $vaultDataSpan = '<span class="ppr-savedcard-vault-data" data-vault-id="' . zen_output_string($card['vault_id']) . '" style="display:none;"></span>';
+        
+        // Only first selection gets the single hidden field that will be updated by JavaScript
+        $additionalContent = '';
+        if ($index === 0) {
+            $hiddenField = zen_draw_hidden_field('paypalr_savedcard_vault_id', $card['vault_id'], 'id="paypalr-savedcard-selected-vault-id"');
+            $additionalContent = $checkoutScript . $savedCardScript . $hiddenField;
+        }
         
         $selections[] = [
             'id' => 'paypalr_savedcard_' . $index,
-            'module' => $cardTitle . ($index === 0 ? $checkoutScript : '') . $hiddenField,
+            'module' => $cardTitle . $vaultDataSpan . $additionalContent,
             'vault_id' => $card['vault_id'],
             'sort_order' => $index,
         ];
@@ -162,15 +179,38 @@ if (strpos($selections[1]['module'], 'jquery.paypalr.checkout.js') !== false) {
     echo "✓ Subsequent selections do not duplicate checkout script\n";
 }
 
-// Test 6: Vault ID is included in hidden field
-if (strpos($selections[0]['module'], 'vault_123') === false) {
+// Test 6: Only first selection has hidden vault_id field (single field approach)
+if (strpos($selections[0]['module'], 'paypalr-savedcard-selected-vault-id') === false) {
     $testPassed = false;
-    $errors[] = 'First selection should include vault_id in hidden field';
+    $errors[] = 'First selection should include single hidden vault_id field';
 } else {
-    echo "✓ Vault ID is included in hidden field\n";
+    echo "✓ First selection has single hidden vault_id field\n";
 }
 
-// Test 7: Card brand is displayed
+// Test 7: Subsequent selections do NOT have hidden vault_id fields (prevents duplicates)
+if (strpos($selections[1]['module'], 'input type="hidden"') !== false) {
+    $testPassed = false;
+    $errors[] = 'Subsequent selections should NOT have hidden vault_id fields';
+} else {
+    echo "✓ Subsequent selections do not have hidden fields (prevents duplicates)\n";
+}
+
+// Test 8: All selections have vault_id data attribute for JavaScript
+foreach ($selections as $index => $selection) {
+    if (strpos($selection['module'], 'ppr-savedcard-vault-data') === false) {
+        $testPassed = false;
+        $errors[] = "Selection $index should have vault data span";
+    }
+    if (strpos($selection['module'], 'data-vault-id') === false) {
+        $testPassed = false;
+        $errors[] = "Selection $index should have data-vault-id attribute";
+    }
+}
+if ($testPassed) {
+    echo "✓ All selections have vault_id data attribute for JavaScript\n";
+}
+
+// Test 9: Card brand is displayed
 if (strpos($selections[0]['module'], 'VISA') === false) {
     $testPassed = false;
     $errors[] = 'First selection should display card brand';
@@ -178,7 +218,7 @@ if (strpos($selections[0]['module'], 'VISA') === false) {
     echo "✓ Card brand is displayed in selection\n";
 }
 
-// Test 8: Last digits are displayed
+// Test 10: Last digits are displayed
 if (strpos($selections[0]['module'], '4242') === false) {
     $testPassed = false;
     $errors[] = 'First selection should display last digits';
@@ -186,7 +226,7 @@ if (strpos($selections[0]['module'], '4242') === false) {
     echo "✓ Last digits are displayed in selection\n";
 }
 
-// Test 9: Expiry date is formatted correctly
+// Test 11: Expiry date is formatted correctly
 if (strpos($selections[0]['module'], '12/2025') === false) {
     $testPassed = false;
     $errors[] = 'First selection should display formatted expiry (MM/YYYY)';
@@ -194,7 +234,7 @@ if (strpos($selections[0]['module'], '12/2025') === false) {
     echo "✓ Expiry date is formatted correctly (MM/YYYY)\n";
 }
 
-// Test 10: Empty cards array returns empty selections
+// Test 12: Empty cards array returns empty selections
 $emptySelections = generateSavedCardSelections([]);
 if (count($emptySelections) !== 0) {
     $testPassed = false;
@@ -203,7 +243,7 @@ if (count($emptySelections) !== 0) {
     echo "✓ Empty cards array returns empty selections\n";
 }
 
-// Test 11: Single card still generates proper selection
+// Test 13: Single card still generates proper selection
 $singleCardSelections = generateSavedCardSelections([$testCards[0]]);
 if (count($singleCardSelections) !== 1) {
     $testPassed = false;
@@ -212,7 +252,7 @@ if (count($singleCardSelections) !== 1) {
     echo "✓ Single card generates one selection\n";
 }
 
-// Test 12: Card with no brand uses fallback
+// Test 14: Card with no brand uses fallback
 $noBrandCard = [
     [
         'vault_id' => 'vault_999',
@@ -230,7 +270,7 @@ if (strpos($noBrandSelections[0]['module'], MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNK
     echo "✓ Card with no brand uses fallback\n";
 }
 
-// Test 13: Card with card_type but no brand uses card_type
+// Test 15: Card with card_type but no brand uses card_type
 $cardTypeOnly = [
     [
         'vault_id' => 'vault_888',

@@ -426,6 +426,35 @@ class paypalr_savedcard extends base
         // Load the checkout script to handle radio button selection
         $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
 
+        // JavaScript to update the hidden vault_id field when a saved card payment option is selected
+        $savedCardScript = '<script>
+jQuery(document).ready(function() {
+    // Update the hidden vault_id field when a saved card payment option is selected
+    jQuery(\'input[name="payment"]\').on("change", function() {
+        var selectedPayment = jQuery(this).val();
+        if (selectedPayment && selectedPayment.indexOf("paypalr_savedcard_") === 0) {
+            var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
+            var selectedLabel = jQuery("label[for=\"pmt-" + selectedPayment + "\"]");
+            var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
+            if (vaultId && vaultIdField.length) {
+                vaultIdField.val(vaultId);
+            }
+        }
+    });
+    
+    // Initialize on page load - set the vault ID for the initially selected card
+    var initialPayment = jQuery(\'input[name="payment"]:checked\').val();
+    if (initialPayment && initialPayment.indexOf("paypalr_savedcard_") === 0) {
+        var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
+        var selectedLabel = jQuery("label[for=\"pmt-" + initialPayment + "\"]");
+        var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
+        if (vaultId && vaultIdField.length) {
+            vaultIdField.val(vaultId);
+        }
+    }
+});
+</script>';
+
         // Build separate payment selection for each saved card
         $selections = [];
         foreach ($vaultedCards as $index => $card) {
@@ -435,11 +464,21 @@ class paypalr_savedcard extends base
             // Get card brand image if available
             $brandImage = $this->getCardBrandImage($brand);
 
-            $hiddenField = zen_draw_hidden_field('paypalr_savedcard_vault_id', $card['vault_id'], 'id="paypalr-savedcard-vault-id-' . $index . '"');
+            // Store vault_id as a data attribute instead of a hidden field per card
+            // This prevents multiple hidden fields with the same name
+            $vaultDataSpan = '<span class="ppr-savedcard-vault-data" data-vault-id="' . zen_output_string($card['vault_id']) . '" style="display:none;"></span>';
+
+            // Add scripts and the single hidden field only to the first selection
+            $additionalContent = '';
+            if ($index === 0) {
+                // Single hidden field that will be updated by JavaScript when user selects a card
+                $hiddenField = zen_draw_hidden_field('paypalr_savedcard_vault_id', $card['vault_id'], 'id="paypalr-savedcard-selected-vault-id"');
+                $additionalContent = $checkoutScript . $savedCardScript . $hiddenField;
+            }
 
             $selection = [
                 'id' => $this->code . '_' . $index,
-                'module' => $brandImage . $cardTitle . ($index === 0 ? $checkoutScript : '') . $hiddenField,
+                'module' => $brandImage . $cardTitle . $vaultDataSpan . $additionalContent,
             ];
 
             $selections[] = $selection;
@@ -474,6 +513,32 @@ class paypalr_savedcard extends base
         // Load the checkout script
         $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
 
+        // JavaScript to update the hidden vault_id field when a saved card payment option is selected
+        $savedCardScript = '<script>
+jQuery(document).ready(function() {
+    jQuery(\'input[name="payment"]\').on("change", function() {
+        var selectedPayment = jQuery(this).val();
+        if (selectedPayment && selectedPayment.indexOf("paypalr_savedcard_") === 0) {
+            var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
+            var selectedLabel = jQuery("label[for=\"pmt-" + selectedPayment + "\"]");
+            var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
+            if (vaultId && vaultIdField.length) {
+                vaultIdField.val(vaultId);
+            }
+        }
+    });
+    var initialPayment = jQuery(\'input[name="payment"]:checked\').val();
+    if (initialPayment && initialPayment.indexOf("paypalr_savedcard_") === 0) {
+        var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
+        var selectedLabel = jQuery("label[for=\"pmt-" + initialPayment + "\"]");
+        var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
+        if (vaultId && vaultIdField.length) {
+            vaultIdField.val(vaultId);
+        }
+    }
+});
+</script>';
+
         $selections = [];
         foreach ($vaultedCards as $index => $card) {
             $brand = $this->getCardDisplayBrand($card);
@@ -482,11 +547,19 @@ class paypalr_savedcard extends base
             // Get card brand image if available
             $brandImage = $this->getCardBrandImage($brand);
 
-            $hiddenField = zen_draw_hidden_field('paypalr_savedcard_vault_id', $card['vault_id'], 'id="paypalr-savedcard-vault-id-' . $index . '"');
+            // Store vault_id as a data attribute
+            $vaultDataSpan = '<span class="ppr-savedcard-vault-data" data-vault-id="' . zen_output_string($card['vault_id']) . '" style="display:none;"></span>';
+
+            // Add scripts and the single hidden field only to the first selection
+            $additionalContent = '';
+            if ($index === 0) {
+                $hiddenField = zen_draw_hidden_field('paypalr_savedcard_vault_id', $card['vault_id'], 'id="paypalr-savedcard-selected-vault-id"');
+                $additionalContent = $checkoutScript . $savedCardScript . $hiddenField;
+            }
 
             $selections[] = [
                 'id' => $this->code . '_' . $index,
-                'module' => $brandImage . $cardTitle . ($index === 0 ? $checkoutScript : '') . $hiddenField,
+                'module' => $brandImage . $cardTitle . $vaultDataSpan . $additionalContent,
                 'vault_id' => $card['vault_id'],
                 'sort_order' => $this->sort_order + $index,
             ];
