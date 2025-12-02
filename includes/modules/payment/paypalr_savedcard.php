@@ -430,12 +430,14 @@ class paypalr_savedcard extends base
         $fields = [];
         $is_bootstrap_template = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true);
 
+        $selectedVaultId = $_POST['paypalr_savedcard_vault_id'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? '');
+
         foreach ($vaultedCards as $index => $card) {
             $brand = $this->getCardDisplayBrand($card);
             $cardTitle = $this->buildCardTitle($card);
             $brandImage = $this->getCardBrandImage($brand);
             $vaultId = $card['vault_id'];
-            $isChecked = ($index === 0); // First card is selected by default
+            $isChecked = ($vaultId === $selectedVaultId);
 
             // Build radio button for this card
             $radioId = 'paypalr-savedcard-' . $index;

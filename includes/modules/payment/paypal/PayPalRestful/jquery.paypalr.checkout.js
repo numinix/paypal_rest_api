@@ -48,6 +48,31 @@ jQuery(document).ready(function() {
         }
     }
 
+    function selectSavedCardParentModule(triggerChange)
+    {
+        var $parentSavedCardRadio = jQuery('#pmt-paypalr_savedcard');
+        if (!$parentSavedCardRadio.length || !$parentSavedCardRadio.is(':radio')) {
+            return;
+        }
+
+        if ($parentSavedCardRadio.is(':checked')) {
+            return;
+        }
+
+        $parentSavedCardRadio.prop('checked', true);
+        if (triggerChange) {
+            $parentSavedCardRadio.trigger('change');
+        }
+    }
+
+    function ensureSavedCardParentMatchesSelection(triggerChange)
+    {
+        var $checkedSavedCard = jQuery('input[name="paypalr_savedcard_vault_id"]:checked');
+        if ($checkedSavedCard.length) {
+            selectSavedCardParentModule(triggerChange);
+        }
+    }
+
     // Initialize parent radio selection if sub-radios are checked
     if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
         // Check if any sub-radio is selected
@@ -65,6 +90,7 @@ jQuery(document).ready(function() {
     
     // Initialize saved card visibility
     updateSavedCardVisibility();
+    ensureSavedCardParentMatchesSelection(false);
 
     // Ensure parent module radio is selected when payment method changes
     jQuery('input[name=payment]').on('change', function() {
@@ -93,6 +119,10 @@ jQuery(document).ready(function() {
     // Handle saved card selection changes
     jQuery(document).on('change', 'input[name="paypalr_saved_card"]', function() {
         updateSavedCardVisibility();
+    });
+
+    jQuery(document).on('change click', 'input[name="paypalr_savedcard_vault_id"]', function() {
+        selectSavedCardParentModule(true);
     });
 
     // When user interacts with credit card fields, ensure parent module is selected
