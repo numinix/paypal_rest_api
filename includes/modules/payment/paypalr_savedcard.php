@@ -426,56 +426,63 @@ class paypalr_savedcard extends base
         // Load the checkout script to handle radio button selection
         $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
 
-        // JavaScript to update the hidden vault_id field when a saved card payment option is selected
-        $savedCardScript = $this->getSavedCardSelectionScript();
+        // Build fields array with radio buttons for each saved card
+        $fields = [];
+        $is_bootstrap_template = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true);
 
-        // Build separate payment selection for each saved card
-        $selections = [];
         foreach ($vaultedCards as $index => $card) {
             $brand = $this->getCardDisplayBrand($card);
             $cardTitle = $this->buildCardTitle($card);
-
-            // Get card brand image if available
             $brandImage = $this->getCardBrandImage($brand);
+            $vaultId = $card['vault_id'];
+            $isChecked = ($index === 0); // First card is selected by default
 
-            // Store vault_id as a data attribute instead of a hidden field per card
-            // This prevents multiple hidden fields with the same name
-            $vaultDataSpan = '<span class="ppr-savedcard-vault-data" data-vault-id="' . zen_output_string_protected($card['vault_id']) . '" style="display:none;"></span>';
+            // Build radio button for this card
+            $radioId = 'paypalr-savedcard-' . $index;
+            $radioInput = zen_draw_radio_field(
+                'paypalr_savedcard_vault_id',
+                $vaultId,
+                $isChecked,
+                'id="' . $radioId . '" class="ppr-savedcard-radio"'
+            );
 
-            // Add scripts and the single hidden field only to the first selection
-            $additionalContent = '';
-            if ($index === 0) {
-                // Single hidden field that will be updated by JavaScript when user selects a card
-                $hiddenField = zen_draw_hidden_field('paypalr_savedcard_vault_id', $card['vault_id'], 'id="paypalr-savedcard-selected-vault-id"');
-                $additionalContent = $checkoutScript . $savedCardScript . $hiddenField;
+            if ($is_bootstrap_template) {
+                $fields[] = [
+                    'title' => '',
+                    'field' =>
+                        '<div class="custom-control custom-radio ppr-savedcard-option">' .
+                            $radioInput .
+                            '<label class="custom-control-label" for="' . $radioId . '">' .
+                                $brandImage . $cardTitle .
+                            '</label>' .
+                        '</div>',
+                ];
+            } else {
+                $fields[] = [
+                    'title' => '',
+                    'field' =>
+                        '<label class="ppr-savedcard-option" for="' . $radioId . '">' .
+                            $radioInput .
+                            ' ' . $brandImage . $cardTitle .
+                        '</label>',
+                ];
             }
-
-            $selection = [
-                'id' => $this->code . '_' . $index,
-                'module' => $brandImage . $cardTitle . $vaultDataSpan . $additionalContent,
-            ];
-
-            $selections[] = $selection;
         }
 
-        // Return a special array that indicates multiple payment options
-        // The first element will be returned as the main selection, but we'll
-        // use an observer or hook to inject additional options
-        if (count($selections) === 1) {
-            return $selections[0];
-        }
+        // Build module display title
+        $moduleTitle = MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT ?? 'Pay with Saved Card';
 
-        // Store selections for dynamic injection
-        $_SESSION['PayPalRestful']['savedcard_selections'] = $selections;
-
-        // Return the first selection; others will be injected by the observer
-        return $selections[0];
+        return [
+            'id' => $this->code,
+            'module' => $moduleTitle . $checkoutScript,
+            'fields' => $fields,
+        ];
     }
 
     /**
-     * Get all saved card selections for dynamic module injection.
+     * Get saved card data for external use (e.g., by observers).
      *
-     * @return array[]
+     * @return array[] Array of card data with vault_id, brand, last_digits, expiry
      */
     public function getSelections(): array
     {
@@ -484,35 +491,16 @@ class paypalr_savedcard extends base
             return [];
         }
 
-        // Load the checkout script
-        $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
-
-        // JavaScript to update the hidden vault_id field when a saved card payment option is selected
-        $savedCardScript = $this->getSavedCardSelectionScript();
-
         $selections = [];
         foreach ($vaultedCards as $index => $card) {
-            $brand = $this->getCardDisplayBrand($card);
-            $cardTitle = $this->buildCardTitle($card);
-
-            // Get card brand image if available
-            $brandImage = $this->getCardBrandImage($brand);
-
-            // Store vault_id as a data attribute
-            $vaultDataSpan = '<span class="ppr-savedcard-vault-data" data-vault-id="' . zen_output_string_protected($card['vault_id']) . '" style="display:none;"></span>';
-
-            // Add scripts and the single hidden field only to the first selection
-            $additionalContent = '';
-            if ($index === 0) {
-                $hiddenField = zen_draw_hidden_field('paypalr_savedcard_vault_id', $card['vault_id'], 'id="paypalr-savedcard-selected-vault-id"');
-                $additionalContent = $checkoutScript . $savedCardScript . $hiddenField;
-            }
-
             $selections[] = [
-                'id' => $this->code . '_' . $index,
-                'module' => $brandImage . $cardTitle . $vaultDataSpan . $additionalContent,
+                'id' => $this->code,
                 'vault_id' => $card['vault_id'],
-                'sort_order' => $this->sort_order + $index,
+                'brand' => $this->getCardDisplayBrand($card),
+                'last_digits' => $card['last_digits'] ?? '****',
+                'expiry' => $card['expiry'] ?? '',
+                'title' => $this->buildCardTitle($card),
+                'sort_order' => $this->sort_order,
             ];
         }
 
@@ -531,39 +519,6 @@ class paypalr_savedcard extends base
             return $matches[2] . '/' . $matches[1];
         }
         return $expiry;
-    }
-
-    /**
-     * Get the JavaScript for updating vault_id when saved card selection changes.
-     *
-     * @return string JavaScript code wrapped in script tags
-     */
-    protected function getSavedCardSelectionScript(): string
-    {
-        return '<script>
-jQuery(document).ready(function() {
-    jQuery(\'input[name="payment"]\').on("change", function() {
-        var selectedPayment = jQuery(this).val();
-        if (selectedPayment && selectedPayment.indexOf("paypalr_savedcard_") === 0) {
-            var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
-            var selectedLabel = jQuery("label[for=\"pmt-" + selectedPayment + "\"]");
-            var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
-            if (vaultId && vaultIdField.length) {
-                vaultIdField.val(vaultId);
-            }
-        }
-    });
-    var initialPayment = jQuery(\'input[name="payment"]:checked\').val();
-    if (initialPayment && initialPayment.indexOf("paypalr_savedcard_") === 0) {
-        var vaultIdField = jQuery("#paypalr-savedcard-selected-vault-id");
-        var selectedLabel = jQuery("label[for=\"pmt-" + initialPayment + "\"]");
-        var vaultId = selectedLabel.find(".ppr-savedcard-vault-data").data("vault-id");
-        if (vaultId && vaultIdField.length) {
-            vaultIdField.val(vaultId);
-        }
-    }
-});
-</script>';
     }
 
     /**
@@ -639,22 +594,8 @@ jQuery(document).ready(function() {
         $_SESSION['PayPalRestful']['ppr_type'] = 'card';
 
         // Get the selected vault ID from POST or session
+        // The radio button directly submits the vault_id value
         $vaultId = $_POST['paypalr_savedcard_vault_id'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? '');
-
-        // Also check the payment method string to extract vault ID
-        $payment = $_POST['payment'] ?? ($_SESSION['payment'] ?? '');
-        if (strpos($payment, 'paypalr_savedcard_') === 0) {
-            $cardIndex = (int)str_replace('paypalr_savedcard_', '', $payment);
-            $vaultedCards = $this->getActiveVaultedCards();
-            if (isset($vaultedCards[$cardIndex])) {
-                $vaultId = $vaultedCards[$cardIndex]['vault_id'];
-            }
-
-            // Normalize the payment session to the base module code.
-            // This ensures Zen Cart can find this payment module and properly set
-            // the payment_method and payment_module_code fields in the orders table.
-            $_SESSION['payment'] = $this->code;
-        }
 
         if (empty($vaultId)) {
             $this->setMessageAndRedirect(
