@@ -426,7 +426,48 @@ function paypalr_render_onboarding_page(): void
                 <button id="start-button" type="button">Start PayPal Signup</button>
                 <a href="<?php echo htmlspecialchars($modulesPageUrl, ENT_QUOTES, 'UTF-8'); ?>">Cancel and return to modules</a>
             </div>
+            
+            <!-- PayPal signup link container for mini-browser flow -->
+            <div id="paypal-signup-container" style="display: none; margin-top: 20px;"></div>
         </div>
+        
+        <!-- 
+            PayPal Partner Script for Mini-Browser/Embedded Signup Flow
+            This script enables the embedded mini-browser experience where PayPal
+            signup happens in an overlay without leaving the page.
+            
+            Per PayPal docs: "When your seller completes the sign-up flow, PayPal returns
+            an authCode and sharedId to your seller's browser via the callback function."
+            See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+        -->
+        <script id="paypal-partner-js"
+                src="https://www.paypal.com/webapps/merchantboarding/js/lib/lightbox/partner.js"
+                data-paypal-onboard-complete="paypalOnboardedCallback"
+                async></script>
+        
+        <script>
+            /**
+             * Global callback function for PayPal's embedded signup flow.
+             * 
+             * This function is called by PayPal's partner.js when the seller completes
+             * the signup flow in the mini-browser. PayPal passes the authCode and sharedId
+             * which are needed to exchange for the seller's REST API credentials.
+             *
+             * @param {string} authCode - The authorization code for OAuth2 token exchange
+             * @param {string} sharedId - The shared ID used as code_verifier in PKCE flow
+             */
+            function paypalOnboardedCallback(authCode, sharedId) {
+                // Dispatch a custom event that the main script can listen for
+                var event = new CustomEvent('paypalOnboardingComplete', {
+                    detail: {
+                        authCode: authCode,
+                        sharedId: sharedId,
+                        source: 'partner_js_callback'
+                    }
+                });
+                window.dispatchEvent(event);
+            }
+        </script>
         
         <script>
             (function() {
@@ -833,7 +874,12 @@ function paypalr_render_onboarding_page(): void
                                 throw new Error('No PayPal signup URL received');
                             }
                             
-                            if (openPayPalPopup(redirectUrl)) {
+                            // Try to use PayPal's mini-browser flow first (via partner.js)
+                            // Fall back to popup if mini-browser is not available
+                            if (useMinibrowerFlow(redirectUrl)) {
+                                setStatus('Complete your PayPal setup in the overlay...', 'info');
+                                pollStatus();
+                            } else if (openPayPalPopup(redirectUrl)) {
                                 setStatus('Follow the steps in the PayPal window...', 'info');
                                 pollStatus();
                             }
@@ -843,6 +889,51 @@ function paypalr_render_onboarding_page(): void
                             startButton.disabled = false;
                         });
                 }
+                
+                /**
+                 * Attempts to use PayPal's mini-browser flow via the partner.js script.
+                 * 
+                 * The mini-browser provides a more seamless experience as it displays
+                 * PayPal signup in an overlay without leaving the page. The partner.js
+                 * script handles the overlay and calls our callback when complete.
+                 * 
+                 * Per PayPal docs: When using the mini-browser, add a link element with
+                 * data-paypal-button="true" that the partner.js script will enhance.
+                 * 
+                 * @param {string} signupUrl - The PayPal action_url for signup
+                 * @returns {boolean} True if mini-browser was successfully triggered
+                 */
+                function useMinibrowerFlow(signupUrl) {
+                    // Check if PayPal partner.js has loaded and enhanced PAYPAL.apps
+                    if (typeof PAYPAL !== 'undefined' && PAYPAL.apps && PAYPAL.apps.Signup) {
+                        try {
+                            // Create a temporary link element for PayPal's mini-browser
+                            var container = document.getElementById('paypal-signup-container');
+                            if (container) {
+                                container.innerHTML = '';
+                                
+                                var link = document.createElement('a');
+                                link.href = signupUrl;
+                                link.setAttribute('data-paypal-button', 'true');
+                                link.style.display = 'none';
+                                container.appendChild(link);
+                                
+                                // Trigger PayPal's mini-browser by calling their render method
+                                PAYPAL.apps.Signup.render();
+                                
+                                // Click the link to trigger the mini-browser
+                                link.click();
+                                
+                                return true;
+                            }
+                        } catch (e) {
+                            // Mini-browser failed, fall back to popup
+                            console.log('PayPal mini-browser not available, using popup:', e);
+                        }
+                    }
+                    
+                    return false;
+                }
 
                 startButton.addEventListener('click', startOnboarding);
                 if (environmentSelect) {
@@ -851,6 +942,34 @@ function paypalr_render_onboarding_page(): void
                     });
                 }
                 window.addEventListener('message', handlePopupMessage);
+                
+                /**
+                 * Listen for PayPal partner.js callback event.
+                 * 
+                 * When using the mini-browser flow, PayPal's partner.js calls the global
+                 * paypalOnboardedCallback function with authCode and sharedId. That function
+                 * dispatches a custom event that we handle here.
+                 * 
+                 * Per PayPal docs: "When your seller completes the sign-up flow, PayPal returns
+                 * an authCode and sharedId to your seller's browser."
+                 * See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+                 */
+                window.addEventListener('paypalOnboardingComplete', function(event) {
+                    var detail = event.detail || {};
+                    
+                    if (detail.authCode) {
+                        state.authCode = detail.authCode;
+                    }
+                    if (detail.sharedId) {
+                        state.sharedId = detail.sharedId;
+                    }
+                    
+                    // If we have both authCode and sharedId, proceed with credential exchange
+                    if (state.authCode && state.sharedId) {
+                        setStatus('Processing your PayPal account details…', 'info');
+                        pollStatus(true);
+                    }
+                });
             })();
         </script>
     </body>
