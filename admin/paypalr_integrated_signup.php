@@ -876,7 +876,7 @@ function paypalr_render_onboarding_page(): void
                             
                             // Try to use PayPal's mini-browser flow first (via partner.js)
                             // Fall back to popup if mini-browser is not available
-                            if (useMinibrowerFlow(redirectUrl)) {
+                            if (useMiniBrowserFlow(redirectUrl)) {
                                 setStatus('Complete your PayPal setup in the overlay...', 'info');
                                 pollStatus();
                             } else if (openPayPalPopup(redirectUrl)) {
@@ -903,7 +903,7 @@ function paypalr_render_onboarding_page(): void
                  * @param {string} signupUrl - The PayPal action_url for signup
                  * @returns {boolean} True if mini-browser was successfully triggered
                  */
-                function useMinibrowerFlow(signupUrl) {
+                function useMiniBrowserFlow(signupUrl) {
                     // Check if PayPal partner.js has loaded and enhanced PAYPAL.apps
                     if (typeof PAYPAL !== 'undefined' && PAYPAL.apps && PAYPAL.apps.Signup) {
                         try {

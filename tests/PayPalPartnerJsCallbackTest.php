@@ -134,11 +134,11 @@ namespace {
         $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
-        // Check 1: Verify useMinibrowerFlow function exists
-        if (strpos($content, 'function useMinibrowerFlow') !== false) {
-            fwrite(STDOUT, "✓ useMinibrowerFlow function exists\n");
+        // Check 1: Verify useMiniBrowserFlow function exists
+        if (strpos($content, 'function useMiniBrowserFlow') !== false) {
+            fwrite(STDOUT, "✓ useMiniBrowserFlow function exists\n");
         } else {
-            fwrite(STDERR, "FAIL: useMinibrowerFlow function should exist\n");
+            fwrite(STDERR, "FAIL: useMiniBrowserFlow function should exist\n");
             $passed = false;
         }
 
@@ -180,7 +180,7 @@ namespace {
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify both flows are attempted
-        if (strpos($content, 'useMinibrowerFlow(redirectUrl)') !== false &&
+        if (strpos($content, 'useMiniBrowserFlow(redirectUrl)') !== false &&
             strpos($content, 'openPayPalPopup(redirectUrl)') !== false) {
             fwrite(STDOUT, "✓ Both mini-browser and popup flows are supported\n");
         } else {
@@ -189,7 +189,7 @@ namespace {
         }
 
         // Check 2: Verify mini-browser is tried first with fallback to popup
-        $miniBrowserPos = strpos($content, 'useMinibrowerFlow(redirectUrl)');
+        $miniBrowserPos = strpos($content, 'useMiniBrowserFlow(redirectUrl)');
         $popupPos = strpos($content, 'openPayPalPopup(redirectUrl)');
         if ($miniBrowserPos !== false && $popupPos !== false && $miniBrowserPos < $popupPos) {
             fwrite(STDOUT, "✓ Mini-browser flow is tried before popup fallback\n");
