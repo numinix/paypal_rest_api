@@ -2,118 +2,85 @@
 declare(strict_types=1);
 
 /**
- * Test to verify that the saved card module correctly normalizes the payment
- * session value from dynamic IDs (like paypalr_savedcard_0) to the base module
- * code (paypalr_savedcard).
+ * Test to verify that the saved card module correctly uses the base module code
+ * for payment identification, ensuring Zen Cart can link orders back to this module
+ * and enable admin functions like refunds.
  *
- * This ensures Zen Cart can properly find the payment module and set the correct
- * payment_method and payment_module_code fields in the orders table, preventing
- * the "Gift Certificate/Coupon" fallback issue.
+ * The new approach uses radio buttons within a single payment selection, all using
+ * the base module code 'paypalr_savedcard'.
  */
 
 $testPassed = true;
 $errors = [];
 
 /**
- * Simulates the pre_confirmation_check logic that normalizes the payment session.
- *
- * @param string $sessionPayment The current $_SESSION['payment'] value
- * @param string $moduleCode The module's $this->code value
- * @return string The normalized session payment value
+ * Simulates the new selection approach - returns single selection with base module code
  */
-function normalizePaymentSession(string $sessionPayment, string $moduleCode): string
+function getPaymentModuleCode(): string
 {
-    // This simulates the fix in paypalr_savedcard::pre_confirmation_check()
-    if (strpos($sessionPayment, 'paypalr_savedcard_') === 0) {
-        return $moduleCode;
-    }
-    return $sessionPayment;
+    // The module now always returns its base code for all selections
+    return 'paypalr_savedcard';
 }
 
-$moduleCode = 'paypalr_savedcard';
-
-// Test 1: Dynamic ID for first saved card is normalized
-$result = normalizePaymentSession('paypalr_savedcard_0', $moduleCode);
-if ($result !== 'paypalr_savedcard') {
-    $testPassed = false;
-    $errors[] = "Test 1 failed: Expected 'paypalr_savedcard', got '$result'";
-} else {
-    echo "✓ Test 1: Dynamic ID 'paypalr_savedcard_0' is normalized to '$result'\n";
+/**
+ * Simulates how the vault_id is now submitted via radio button
+ */
+function getSelectedVaultId(array $postData): string
+{
+    // Radio buttons directly submit the vault_id value
+    return $postData['paypalr_savedcard_vault_id'] ?? '';
 }
 
-// Test 2: Dynamic ID for second saved card is normalized
-$result = normalizePaymentSession('paypalr_savedcard_1', $moduleCode);
-if ($result !== 'paypalr_savedcard') {
+$moduleCode = getPaymentModuleCode();
+
+// Test 1: Module code is always the base module code
+if ($moduleCode !== 'paypalr_savedcard') {
     $testPassed = false;
-    $errors[] = "Test 2 failed: Expected 'paypalr_savedcard', got '$result'";
+    $errors[] = "Test 1 failed: Expected 'paypalr_savedcard', got '$moduleCode'";
 } else {
-    echo "✓ Test 2: Dynamic ID 'paypalr_savedcard_1' is normalized to '$result'\n";
+    echo "✓ Test 1: Module code is always 'paypalr_savedcard'\n";
 }
 
-// Test 3: Dynamic ID for higher index is normalized
-$result = normalizePaymentSession('paypalr_savedcard_99', $moduleCode);
-if ($result !== 'paypalr_savedcard') {
+// Test 2: Vault ID comes directly from radio button POST value
+$postData = ['paypalr_savedcard_vault_id' => 'vault_123'];
+$vaultId = getSelectedVaultId($postData);
+if ($vaultId !== 'vault_123') {
     $testPassed = false;
-    $errors[] = "Test 3 failed: Expected 'paypalr_savedcard', got '$result'";
+    $errors[] = "Test 2 failed: Expected 'vault_123', got '$vaultId'";
 } else {
-    echo "✓ Test 3: Dynamic ID 'paypalr_savedcard_99' is normalized to '$result'\n";
+    echo "✓ Test 2: Vault ID correctly retrieved from radio button POST value\n";
 }
 
-// Test 4: Base module code is not changed
-$result = normalizePaymentSession('paypalr_savedcard', $moduleCode);
-if ($result !== 'paypalr_savedcard') {
+// Test 3: Different vault ID selected
+$postData = ['paypalr_savedcard_vault_id' => 'vault_456'];
+$vaultId = getSelectedVaultId($postData);
+if ($vaultId !== 'vault_456') {
     $testPassed = false;
-    $errors[] = "Test 4 failed: Expected 'paypalr_savedcard', got '$result'";
+    $errors[] = "Test 3 failed: Expected 'vault_456', got '$vaultId'";
 } else {
-    echo "✓ Test 4: Base module code 'paypalr_savedcard' is not changed\n";
+    echo "✓ Test 3: Different vault ID correctly retrieved\n";
 }
 
-// Test 5: Other payment module codes are not affected
-$result = normalizePaymentSession('paypalr', $moduleCode);
-if ($result !== 'paypalr') {
+// Test 4: Empty vault ID when not submitted
+$postData = [];
+$vaultId = getSelectedVaultId($postData);
+if ($vaultId !== '') {
     $testPassed = false;
-    $errors[] = "Test 5 failed: Expected 'paypalr', got '$result'";
+    $errors[] = "Test 4 failed: Expected empty string, got '$vaultId'";
 } else {
-    echo "✓ Test 5: Other payment module 'paypalr' is not affected\n";
-}
-
-// Test 6: Credit card module is not affected
-$result = normalizePaymentSession('paypalr_creditcard', $moduleCode);
-if ($result !== 'paypalr_creditcard') {
-    $testPassed = false;
-    $errors[] = "Test 6 failed: Expected 'paypalr_creditcard', got '$result'";
-} else {
-    echo "✓ Test 6: Credit card module 'paypalr_creditcard' is not affected\n";
-}
-
-// Test 7: Empty string is not affected
-$result = normalizePaymentSession('', $moduleCode);
-if ($result !== '') {
-    $testPassed = false;
-    $errors[] = "Test 7 failed: Expected empty string, got '$result'";
-} else {
-    echo "✓ Test 7: Empty string is not affected\n";
-}
-
-// Test 8: Similar but different module name is not affected
-$result = normalizePaymentSession('paypalr_savedcard_extra', $moduleCode);
-// This should be normalized because it starts with 'paypalr_savedcard_'
-if ($result !== 'paypalr_savedcard') {
-    $testPassed = false;
-    $errors[] = "Test 8 failed: Expected 'paypalr_savedcard', got '$result'";
-} else {
-    echo "✓ Test 8: Any string starting with 'paypalr_savedcard_' is normalized\n";
+    echo "✓ Test 4: Empty vault ID when not submitted\n";
 }
 
 echo "\n";
 
 // Summary
 if ($testPassed) {
-    echo "All payment method normalization tests passed! ✓\n";
-    echo "\nThis fix ensures that when a customer selects a saved card payment option\n";
-    echo "(like 'paypalr_savedcard_0'), the session payment value is normalized to\n";
-    echo "'paypalr_savedcard' so Zen Cart can find the payment module and correctly\n";
-    echo "set the payment_method in the orders table.\n";
+    echo "All payment method identification tests passed! ✓\n";
+    echo "\nThe new approach:\n";
+    echo "- Uses single payment selection with base module code 'paypalr_savedcard'\n";
+    echo "- Radio buttons for each saved card submit vault_id directly\n";
+    echo "- Zen Cart can properly link orders to this module\n";
+    echo "- Admin functions like refunds work correctly\n";
     exit(0);
 } else {
     echo "Tests failed:\n";

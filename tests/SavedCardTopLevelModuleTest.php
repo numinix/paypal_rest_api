@@ -1,7 +1,7 @@
 <?php
 /**
  * Test that verifies the paypalr_savedcard module correctly generates
- * multiple top-level payment options for saved cards.
+ * a single payment selection with radio buttons for each saved card.
  */
 
 // Simple standalone test
@@ -15,6 +15,9 @@ if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE')) {
 if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY')) {
     define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY', ' (Exp: %s)');
 }
+if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT')) {
+    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT', 'Pay with Saved Card');
+}
 if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD')) {
     define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD', 'Card');
 }
@@ -26,32 +29,32 @@ if (!function_exists('zen_output_string_protected')) {
     }
 }
 
-// Mock zen_draw_hidden_field
-if (!function_exists('zen_draw_hidden_field')) {
-    function zen_draw_hidden_field($name, $value, $attrs = '') {
-        return '<input type="hidden" name="' . htmlspecialchars($name) . '" value="' . htmlspecialchars($value) . '" ' . $attrs . '>';
+// Mock zen_draw_radio_field
+if (!function_exists('zen_draw_radio_field')) {
+    function zen_draw_radio_field($name, $value, $checked = false, $attrs = '') {
+        $checkedAttr = $checked ? ' checked="checked"' : '';
+        return '<input type="radio" name="' . htmlspecialchars($name) . '" value="' . htmlspecialchars($value) . '"' . $checkedAttr . ' ' . $attrs . '>';
     }
 }
 
-// Mock DIR_WS_MODULES and DIR_WS_TEMPLATE_IMAGES
+// Mock DIR_WS_MODULES
 if (!defined('DIR_WS_MODULES')) {
     define('DIR_WS_MODULES', '/includes/modules/');
 }
-if (!defined('DIR_WS_TEMPLATE_IMAGES')) {
-    define('DIR_WS_TEMPLATE_IMAGES', '/includes/templates/template_default/images/');
-}
-if (!defined('DIR_FS_CATALOG')) {
-    define('DIR_FS_CATALOG', '/nonexistent/');
-}
 
 /**
- * Simulates the selection generation logic from paypalr_savedcard
+ * Simulates the new selection generation logic from paypalr_savedcard
+ * Returns a single selection with radio buttons for each card in fields array
  */
-function generateSavedCardSelections(array $vaultedCards): array
+function generateSavedCardSelection(array $vaultedCards): array
 {
+    if (empty($vaultedCards)) {
+        return [];
+    }
+    
     $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
     
-    $selections = [];
+    $fields = [];
     foreach ($vaultedCards as $index => $card) {
         $brand = $card['brand'] ?: ($card['card_type'] ?: MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD);
         $lastDigits = $card['last_digits'] ?? '****';
@@ -70,17 +73,28 @@ function generateSavedCardSelections(array $vaultedCards): array
             );
         }
         
-        $hiddenField = zen_draw_hidden_field('paypalr_savedcard_vault_id', $card['vault_id'], 'id="paypalr-savedcard-vault-id-' . $index . '"');
+        $vaultId = $card['vault_id'];
+        $isChecked = ($index === 0);
+        $radioId = 'paypalr-savedcard-' . $index;
         
-        $selections[] = [
-            'id' => 'paypalr_savedcard_' . $index,
-            'module' => $cardTitle . ($index === 0 ? $checkoutScript : '') . $hiddenField,
-            'vault_id' => $card['vault_id'],
-            'sort_order' => $index,
+        $radioInput = zen_draw_radio_field(
+            'paypalr_savedcard_vault_id',
+            $vaultId,
+            $isChecked,
+            'id="' . $radioId . '" class="ppr-savedcard-radio"'
+        );
+        
+        $fields[] = [
+            'title' => '',
+            'field' => '<label class="ppr-savedcard-option" for="' . $radioId . '">' . $radioInput . ' ' . $cardTitle . '</label>',
         ];
     }
     
-    return $selections;
+    return [
+        'id' => 'paypalr_savedcard',
+        'module' => MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT . $checkoutScript,
+        'fields' => $fields,
+    ];
 }
 
 function formatTestExpiry(string $expiry): string
@@ -107,112 +121,91 @@ $testCards = [
         'last_digits' => '5555',
         'expiry' => '2026-03',
     ],
-    [
-        'vault_id' => 'vault_789',
-        'brand' => 'AMEX',
-        'card_type' => '',
-        'last_digits' => '3782',
-        'expiry' => '2027-06',
-    ],
 ];
 
-// Test 1: Multiple cards generate multiple selections
-$selections = generateSavedCardSelections($testCards);
-if (count($selections) !== 3) {
+// Test 1: Selection uses base module code
+$selection = generateSavedCardSelection($testCards);
+if ($selection['id'] !== 'paypalr_savedcard') {
     $testPassed = false;
-    $errors[] = 'Expected 3 selections for 3 cards, got: ' . count($selections);
+    $errors[] = "Expected id 'paypalr_savedcard', got: " . $selection['id'];
 } else {
-    echo "✓ Multiple cards generate multiple top-level selections\n";
+    echo "✓ Selection uses base module code 'paypalr_savedcard'\n";
 }
 
-// Test 2: Each selection has a unique ID
-$ids = array_column($selections, 'id');
-if (count($ids) !== count(array_unique($ids))) {
+// Test 2: Multiple cards generate multiple fields (radio buttons)
+if (count($selection['fields']) !== 2) {
     $testPassed = false;
-    $errors[] = 'Selection IDs are not unique';
+    $errors[] = 'Expected 2 fields for 2 cards, got: ' . count($selection['fields']);
 } else {
-    echo "✓ Each selection has a unique ID\n";
+    echo "✓ Multiple cards generate radio button fields\n";
 }
 
-// Test 3: Selection IDs follow expected format
-foreach ($selections as $index => $selection) {
-    $expectedId = 'paypalr_savedcard_' . $index;
-    if ($selection['id'] !== $expectedId) {
+// Test 3: Each field contains a radio button with vault_id as value
+foreach ($selection['fields'] as $index => $field) {
+    if (strpos($field['field'], 'type="radio"') === false) {
         $testPassed = false;
-        $errors[] = "Expected ID '$expectedId', got: " . $selection['id'];
+        $errors[] = "Field $index should contain a radio button";
+    }
+    if (strpos($field['field'], 'paypalr_savedcard_vault_id') === false) {
+        $testPassed = false;
+        $errors[] = "Field $index should have name 'paypalr_savedcard_vault_id'";
     }
 }
 if ($testPassed) {
-    echo "✓ Selection IDs follow expected format (paypalr_savedcard_N)\n";
+    echo "✓ Each field contains a radio button with vault_id name\n";
 }
 
-// Test 4: First selection includes checkout script
-if (strpos($selections[0]['module'], 'jquery.paypalr.checkout.js') === false) {
+// Test 4: First radio button is checked by default
+if (strpos($selection['fields'][0]['field'], 'checked="checked"') === false) {
     $testPassed = false;
-    $errors[] = 'First selection should include checkout script';
+    $errors[] = 'First radio button should be checked by default';
 } else {
-    echo "✓ First selection includes checkout script\n";
+    echo "✓ First radio button is checked by default\n";
 }
 
-// Test 5: Subsequent selections do not include checkout script
-if (strpos($selections[1]['module'], 'jquery.paypalr.checkout.js') !== false) {
+// Test 5: Second radio button is not checked
+if (strpos($selection['fields'][1]['field'], 'checked="checked"') !== false) {
     $testPassed = false;
-    $errors[] = 'Subsequent selections should not include checkout script';
+    $errors[] = 'Second radio button should not be checked';
 } else {
-    echo "✓ Subsequent selections do not duplicate checkout script\n";
+    echo "✓ Second radio button is not checked\n";
 }
 
-// Test 6: Vault ID is included in hidden field
-if (strpos($selections[0]['module'], 'vault_123') === false) {
+// Test 6: Card brand is displayed
+if (strpos($selection['fields'][0]['field'], 'VISA') === false) {
     $testPassed = false;
-    $errors[] = 'First selection should include vault_id in hidden field';
+    $errors[] = 'First field should display card brand';
 } else {
-    echo "✓ Vault ID is included in hidden field\n";
+    echo "✓ Card brand is displayed in field\n";
 }
 
-// Test 7: Card brand is displayed
-if (strpos($selections[0]['module'], 'VISA') === false) {
+// Test 7: Last digits are displayed
+if (strpos($selection['fields'][0]['field'], '4242') === false) {
     $testPassed = false;
-    $errors[] = 'First selection should display card brand';
+    $errors[] = 'First field should display last digits';
 } else {
-    echo "✓ Card brand is displayed in selection\n";
+    echo "✓ Last digits are displayed in field\n";
 }
 
-// Test 8: Last digits are displayed
-if (strpos($selections[0]['module'], '4242') === false) {
+// Test 8: Empty cards array returns empty array
+$emptySelection = generateSavedCardSelection([]);
+if (!empty($emptySelection)) {
     $testPassed = false;
-    $errors[] = 'First selection should display last digits';
+    $errors[] = 'Empty cards should return empty array';
 } else {
-    echo "✓ Last digits are displayed in selection\n";
+    echo "✓ Empty cards array returns empty array\n";
 }
 
-// Test 9: Expiry date is formatted correctly
-if (strpos($selections[0]['module'], '12/2025') === false) {
+// Test 9: Single card generates one field
+$singleCardSelection = generateSavedCardSelection([$testCards[0]]);
+if (count($singleCardSelection['fields']) !== 1) {
     $testPassed = false;
-    $errors[] = 'First selection should display formatted expiry (MM/YYYY)';
+    $errors[] = 'Single card should generate one field';
 } else {
-    echo "✓ Expiry date is formatted correctly (MM/YYYY)\n";
+    echo "✓ Single card generates one field\n";
 }
 
-// Test 10: Empty cards array returns empty selections
-$emptySelections = generateSavedCardSelections([]);
-if (count($emptySelections) !== 0) {
-    $testPassed = false;
-    $errors[] = 'Empty cards should return empty selections';
-} else {
-    echo "✓ Empty cards array returns empty selections\n";
-}
-
-// Test 11: Single card still generates proper selection
-$singleCardSelections = generateSavedCardSelections([$testCards[0]]);
-if (count($singleCardSelections) !== 1) {
-    $testPassed = false;
-    $errors[] = 'Single card should generate one selection';
-} else {
-    echo "✓ Single card generates one selection\n";
-}
-
-// Test 12: Card with no brand uses fallback
+// Test 10: Card with no brand uses fallback
 $noBrandCard = [
     [
         'vault_id' => 'vault_999',
@@ -222,15 +215,15 @@ $noBrandCard = [
         'expiry' => '2028-01',
     ],
 ];
-$noBrandSelections = generateSavedCardSelections($noBrandCard);
-if (strpos($noBrandSelections[0]['module'], MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD) === false) {
+$noBrandSelection = generateSavedCardSelection($noBrandCard);
+if (strpos($noBrandSelection['fields'][0]['field'], MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD) === false) {
     $testPassed = false;
     $errors[] = 'Card with no brand should use fallback';
 } else {
     echo "✓ Card with no brand uses fallback\n";
 }
 
-// Test 13: Card with card_type but no brand uses card_type
+// Test 11: Card with card_type but no brand uses card_type
 $cardTypeOnly = [
     [
         'vault_id' => 'vault_888',
@@ -240,8 +233,8 @@ $cardTypeOnly = [
         'expiry' => '2029-01',
     ],
 ];
-$cardTypeSelections = generateSavedCardSelections($cardTypeOnly);
-if (strpos($cardTypeSelections[0]['module'], 'DISCOVER') === false) {
+$cardTypeSelection = generateSavedCardSelection($cardTypeOnly);
+if (strpos($cardTypeSelection['fields'][0]['field'], 'DISCOVER') === false) {
     $testPassed = false;
     $errors[] = 'Card with card_type but no brand should use card_type';
 } else {

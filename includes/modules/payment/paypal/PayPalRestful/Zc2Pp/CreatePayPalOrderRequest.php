@@ -499,6 +499,22 @@ class CreatePayPalOrderRequest extends ErrorInfo
     protected function buildCardPaymentSource(\order $order, array $cc_info): array
     {
         $listener_endpoint = $this->resolveListenerEndpoint($cc_info['redirect'] ?? '');
+
+        // Log the incoming cc_info for debugging (mask sensitive data)
+        $cc_info_debug = [
+            'has_vault_id' => !empty($cc_info['vault_id']),
+            'type' => $cc_info['type'] ?? null,
+            'last_digits' => $cc_info['last_digits'] ?? null,
+            'has_number' => !empty($cc_info['number']),
+            'has_security_code' => !empty($cc_info['security_code']),
+            'has_expiry' => !empty($cc_info['expiry']),
+            'has_expiry_month' => !empty($cc_info['expiry_month']),
+            'has_expiry_year' => !empty($cc_info['expiry_year']),
+            'use_vault' => $cc_info['use_vault'] ?? false,
+            'store_card' => $cc_info['store_card'] ?? false,
+        ];
+        $this->log->write("buildCardPaymentSource: Input cc_info:\n" . Logger::logJSON($cc_info_debug));
+
         if (!empty($cc_info['vault_id'])) {
             $payment_source = [
                 'vault_id' => $cc_info['vault_id'],
@@ -518,8 +534,17 @@ class CreatePayPalOrderRequest extends ErrorInfo
             if (!empty($cc_info['stored_credential'])) {
                 $payment_source['attributes']['stored_credential'] = $cc_info['stored_credential'];
             }
+
+            $this->log->write(
+                "buildCardPaymentSource: Using VAULT payment source.\n" .
+                "  Last digits: " . ($cc_info['last_digits'] ?? 'n/a') . "\n" .
+                "  Has expiry: " . (!empty($payment_source['expiry']) ? 'yes' : 'no')
+            );
+
             return $payment_source;
         }
+
+        $this->log->write("buildCardPaymentSource: Using NEW CARD payment source (no vault_id provided).");
 
         // Build expiry field - ensure both month and year are present
         $expiry_month = $cc_info['expiry_month'] ?? '';
