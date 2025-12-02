@@ -614,8 +614,15 @@ class PayPalCommon {
     {
         $paypal_order_id = $_SESSION['PayPalRestful']['Order']['id'] ?? '';
 
+        $log->write(
+            "processCreditCardPayment($ppr_type) starting.\n" .
+            "  PayPal Order ID: " . ($paypal_order_id ?: 'NOT SET') . "\n" .
+            "  Transaction Mode: $transaction_mode\n" .
+            "  Session payment source: " . ($_SESSION['PayPalRestful']['Order']['payment_source'] ?? 'not set')
+        );
+
         if (empty($paypal_order_id)) {
-            $log->write('Credit Card: No PayPal order ID found in session');
+            $log->write('processCreditCardPayment: FAILED - No PayPal order ID found in session');
             return false;
         }
 
@@ -624,20 +631,28 @@ class PayPalCommon {
         $captures = $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['captures'] ?? [];
         $authorizations = $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['authorizations'] ?? [];
 
+        $log->write(
+            "processCreditCardPayment: Order status check.\n" .
+            "  Order status: $order_status\n" .
+            "  Has captures: " . (!empty($captures) ? 'yes (' . count($captures) . ')' : 'no') . "\n" .
+            "  Has authorizations: " . (!empty($authorizations) ? 'yes (' . count($authorizations) . ')' : 'no')
+        );
+
         // If the order was already completed (captured or authorized) during createOrder,
         // skip the duplicate capture/authorize call and fetch the order details instead.
         // This can happen with vault-enabled credit cards where PayPal completes the
         // authorization during createOrder.
         if ($order_status === PayPalRestfulApi::STATUS_COMPLETED && ($captures !== [] || $authorizations !== [])) {
             $skip_reason = ($captures !== []) ? 'already captured' : 'already authorized';
-            $log->write("Credit Card: capture/authorize skipped; order was $skip_reason during createOrder.");
+            $log->write("processCreditCardPayment: Capture/authorize skipped; order was $skip_reason during createOrder.");
             // Fetch the full order details from PayPal since we need the complete response structure
             // with all fields that the calling code expects
             $response = $ppr->getOrderStatus($paypal_order_id);
             if ($response === false) {
-                $log->write('Credit Card: failed to fetch completed order details. ' . Logger::logJSON($ppr->getErrorInfo()));
+                $log->write('processCreditCardPayment: FAILED to fetch completed order details. ' . Logger::logJSON($ppr->getErrorInfo()));
                 return false;
             }
+            $log->write("processCreditCardPayment: Successfully fetched existing order details. Status: " . ($response['status'] ?? 'unknown'));
             return $response;
         }
 
@@ -645,18 +660,22 @@ class PayPalCommon {
         $should_capture = ($transaction_mode === 'Final Sale' ||
                           ($ppr_type !== 'card' && $transaction_mode === 'Auth Only (Card-Only)'));
 
+        $log->write("processCreditCardPayment: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
+
         if ($should_capture) {
             $response = $ppr->captureOrder($paypal_order_id);
             if ($response === false) {
-                $log->write('Credit Card: capture failed. ' . Logger::logJSON($ppr->getErrorInfo()));
+                $log->write('processCreditCardPayment: CAPTURE FAILED. ' . Logger::logJSON($ppr->getErrorInfo()));
                 return false;
             }
+            $log->write("processCreditCardPayment: CAPTURE successful. Status: " . ($response['status'] ?? 'unknown'));
         } else {
             $response = $ppr->authorizeOrder($paypal_order_id);
             if ($response === false) {
-                $log->write('Credit Card: authorization failed. ' . Logger::logJSON($ppr->getErrorInfo()));
+                $log->write('processCreditCardPayment: AUTHORIZATION FAILED. ' . Logger::logJSON($ppr->getErrorInfo()));
                 return false;
             }
+            $log->write("processCreditCardPayment: AUTHORIZATION successful. Status: " . ($response['status'] ?? 'unknown'));
         }
 
         return $response;
@@ -690,15 +709,49 @@ class PayPalCommon {
         /** @var zcObserverPaypalrestful $zcObserverPaypalrestful */
         global $zcObserverPaypalrestful;
 
+        $log = new Logger();
+
         // Create a GUID (Globally Unique IDentifier) for the order's current 'state'.
         $order_guid = $this->createOrderGuid($order, $ppr_type);
 
         // If a PayPal order already exists in the session for this GUID, reuse it.
         if (isset($_SESSION['PayPalRestful']['Order']['guid']) && $_SESSION['PayPalRestful']['Order']['guid'] === $order_guid) {
+            $log->write("createPayPalOrder($ppr_type): Reusing existing PayPal order with GUID: $order_guid");
             return true;
         }
 
-        $cc_info = property_exists($paymentModule, 'ccInfo') ? ($paymentModule->ccInfo ?? []) : [];
+        // Get credit card info using the public getter method if available,
+        // otherwise fall back to direct property access (for backward compatibility).
+        // The getter method is required because ccInfo is a protected property
+        // that cannot be accessed directly from this class.
+        if (method_exists($paymentModule, 'getCcInfo')) {
+            $cc_info = $paymentModule->getCcInfo();
+        } else {
+            // Fallback for modules that don't have the getter (e.g., paypalr main module)
+            $cc_info = property_exists($paymentModule, 'ccInfo') ? ($paymentModule->ccInfo ?? []) : [];
+        }
+
+        // Log the cc_info data for debugging (mask sensitive data)
+        $cc_info_debug = [];
+        if (!empty($cc_info)) {
+            $cc_info_debug = [
+                'has_vault_id' => !empty($cc_info['vault_id']),
+                'vault_id' => !empty($cc_info['vault_id']) ? substr($cc_info['vault_id'], 0, 8) . '...' : null,
+                'type' => $cc_info['type'] ?? null,
+                'last_digits' => $cc_info['last_digits'] ?? null,
+                'has_number' => !empty($cc_info['number']),
+                'has_security_code' => !empty($cc_info['security_code']),
+                'use_vault' => $cc_info['use_vault'] ?? false,
+                'store_card' => $cc_info['store_card'] ?? false,
+            ];
+        }
+        $log->write(
+            "createPayPalOrder($ppr_type): Building PayPal order request.\n" .
+            "  GUID: $order_guid\n" .
+            "  Module: " . ($paymentModule->code ?? 'unknown') . "\n" .
+            "  CC Info: " . Logger::logJSON($cc_info_debug)
+        );
+
         $order_total_differences = (isset($zcObserverPaypalrestful) && is_object($zcObserverPaypalrestful))
             ? $zcObserverPaypalrestful->getOrderTotalChanges()
             : [];
@@ -721,17 +774,39 @@ class PayPalCommon {
 
         $paymentModule->ppr->setPayPalRequestId($order_guid);
         $order_request = $create_order_request->get();
+
+        // Log the payment source being sent to PayPal
+        $payment_source = $order_request['payment_source'] ?? [];
+        $payment_source_type = array_key_first($payment_source);
+        $log->write(
+            "createPayPalOrder($ppr_type): Sending order to PayPal.\n" .
+            "  Payment source type: $payment_source_type\n" .
+            "  Has vault_id in source: " . (!empty($payment_source[$payment_source_type]['vault_id']) ? 'yes' : 'no')
+        );
+
         $paypal_order = $paymentModule->ppr->createOrder($order_request);
 
         if ($paypal_order === false) {
+            $error_info = $paymentModule->ppr->getErrorInfo();
+            $log->write(
+                "createPayPalOrder($ppr_type): PayPal order creation FAILED.\n" .
+                "  Error: " . Logger::logJSON($error_info)
+            );
             if (isset($paymentModule->errorInfo)) {
-                $paymentModule->errorInfo->copyErrorInfo($paymentModule->ppr->getErrorInfo());
+                $paymentModule->errorInfo->copyErrorInfo($error_info);
             }
             return false;
         }
 
         $paypal_id = $paypal_order['id'];
         $status = $paypal_order['status'];
+
+        $log->write(
+            "createPayPalOrder($ppr_type): PayPal order created successfully.\n" .
+            "  PayPal Order ID: $paypal_id\n" .
+            "  Status: $status"
+        );
+
         unset(
             $paypal_order['id'],
             $paypal_order['status'],

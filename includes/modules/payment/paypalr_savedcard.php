@@ -97,6 +97,20 @@ class paypalr_savedcard extends base
     protected ?array $vaultedCards = null;
 
     /**
+     * Get the credit card information for PayPal order creation.
+     *
+     * This method provides public access to the protected ccInfo property,
+     * which is needed by PayPalCommon::createPayPalOrder() to build the
+     * payment source for vault-based card payments.
+     *
+     * @return array The credit card/vault information
+     */
+    public function getCcInfo(): array
+    {
+        return $this->ccInfo;
+    }
+
+    /**
      * class constructor
      */
     public function __construct()
