@@ -126,6 +126,14 @@ if (strpos($cssContent, 'position: absolute') === false || strpos($cssContent, '
     echo "✓ Hidden class uses proper CSS for visual hiding\n";
 }
 
+// Test 15: Hidden class uses modern clip-path for better browser support
+if (strpos($cssContent, 'clip-path: inset') === false) {
+    $testPassed = false;
+    $errors[] = "Hidden class should use clip-path for modern browsers";
+} else {
+    echo "✓ Hidden class uses clip-path for modern browsers\n";
+}
+
 // Summary
 echo "\n";
 if ($testPassed) {

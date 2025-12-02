@@ -455,16 +455,22 @@ class paypalr_savedcard extends base
             $selectAttributes
         );
 
+        $selectLabel = defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL') 
+            ? MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL 
+            : 'Select Card:';
+
         $fields = [
             [
-                'title' => MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL ?? 'Select Card',
+                'title' => $selectLabel,
                 'field' => $selectBox,
                 'tag' => 'paypalr-savedcard-select',
             ],
         ];
 
         // Build module display title
-        $moduleTitle = MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT ?? 'Pay with Saved Card';
+        $moduleTitle = defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT') 
+            ? MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT 
+            : 'Pay with Saved Card';
 
         return [
             'id' => $this->code,

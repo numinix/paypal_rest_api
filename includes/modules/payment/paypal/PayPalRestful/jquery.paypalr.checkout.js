@@ -81,26 +81,6 @@ jQuery(document).ready(function() {
         }
     }
 
-    /**
-     * Select a wallet module's hidden radio button.
-     * Used by Google Pay, Apple Pay, and Venmo when their buttons are clicked.
-     * 
-     * @param {string} moduleCode - The module code (e.g., 'paypalr_googlepay')
-     */
-    function selectWalletModuleRadio(moduleCode)
-    {
-        var $moduleRadio = jQuery('#pmt-' + moduleCode);
-        if (!$moduleRadio.length || !$moduleRadio.is(':radio')) {
-            return;
-        }
-
-        if ($moduleRadio.is(':checked')) {
-            return;
-        }
-
-        $moduleRadio.prop('checked', true).trigger('change');
-    }
-
     // Initialize parent radio selection if sub-radios are checked
     if (jQuery('#pmt-paypalr').is(':radio') && jQuery('#pmt-paypalr').is(':not(:checked)')) {
         // Check if any sub-radio is selected
@@ -155,12 +135,9 @@ jQuery(document).ready(function() {
     });
 
     // Handle saved card select box changes and focus (new select box implementation)
+    // The onfocus/onchange handlers in the HTML also call methodSelect() for compatibility
+    // with Zen Cart's native payment method selection mechanism
     jQuery(document).on('change focus', '#paypalr-savedcard-select, select[name="paypalr_savedcard_vault_id"]', function() {
-        selectSavedCardParentModule(true);
-    });
-    
-    // Handle click on saved card select box container
-    jQuery(document).on('click', '.ppr-savedcard-select', function() {
         selectSavedCardParentModule(true);
     });
 
