@@ -520,10 +520,15 @@ class PayPalCommon {
 
         $orders_id = (int)($orderInfo['orders_id'] ?? 0);
         $paypal_records_exist = ($orders_id > 0) ? $this->paypalOrderRecordsExist($orders_id) : false;
-        
+
         if ($orders_id === 0 || $paypal_records_exist === false) {
             $orders_id = (int)($orders_id ?: ($_SESSION['order_number_created'] ?? 0));
             if ($orders_id > 0) {
+                $payment_method = $this->getPaymentMethodDisplayName($orderInfo);
+                if ($payment_method !== '') {
+                    $this->updateOrderPaymentMethod($orders_id, $payment_method);
+                    $orderInfo['payment_method'] = $payment_method;
+                }
                 $this->recordPayPalOrderDetails($orders_id, $orderInfo);
             }
         }
@@ -599,6 +604,113 @@ class PayPalCommon {
                 sprintf(MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION ?? 'Order %d created with status %s', $orderInfo['orders_id'], $orderInfo['paypal_payment_status'])
             );
         }
+    }
+
+    /**
+     * Normalize and save the payment method used for an order.
+     *
+     * @param int $orders_id The order ID
+     * @param string $payment_method The payment method display name
+     * @return void
+     */
+    public function updateOrderPaymentMethod(int $orders_id, string $payment_method): void
+    {
+        $orders_id = (int)$orders_id;
+        $payment_method = trim($payment_method);
+
+        if ($orders_id <= 0 || $payment_method === '') {
+            return;
+        }
+
+        zen_db_perform(
+            TABLE_ORDERS,
+            ['payment_method' => $payment_method],
+            'update',
+            'orders_id = ' . $orders_id
+        );
+    }
+
+    /**
+     * Determine the appropriate payment method label from a PayPal order response.
+     *
+     * @param array $orderInfo PayPal order response array
+     * @return string
+     */
+    public function getPaymentMethodDisplayName(array $orderInfo): string
+    {
+        $payment_source = $orderInfo['payment_source'] ?? [];
+        if (empty($payment_source)) {
+            return '';
+        }
+
+        $payment_type = array_key_first($payment_source);
+        if ($payment_type === null) {
+            return '';
+        }
+
+        $payment_type_lower = strtolower($payment_type);
+        $wallet_map = [
+            'paypal' => 'PayPal',
+            'google_pay' => 'Google Pay',
+            'apple_pay' => 'Apple Pay',
+            'venmo' => 'Venmo',
+        ];
+
+        if (isset($wallet_map[$payment_type_lower])) {
+            return $wallet_map[$payment_type_lower];
+        }
+
+        $payment_details = $payment_source[$payment_type] ?? [];
+
+        if ($payment_type_lower === 'card') {
+            $brand = $payment_details['brand'] ?? ($payment_details['card_type'] ?? ($payment_details['type'] ?? ''));
+            $normalized_brand = $this->normalizeCardBrand($brand);
+            if ($normalized_brand !== '') {
+                return $normalized_brand;
+            }
+        }
+
+        if (isset($payment_details['brand'])) {
+            $normalized_brand = $this->normalizeCardBrand($payment_details['brand']);
+            if ($normalized_brand !== '') {
+                return $normalized_brand;
+            }
+        }
+
+        $fallback_method = str_replace('_', ' ', $payment_type);
+        return ucwords($fallback_method);
+    }
+
+    /**
+     * Normalize card brand names to the desired display labels.
+     *
+     * @param string $brand Raw brand name from PayPal
+     * @return string
+     */
+    protected function normalizeCardBrand(string $brand): string
+    {
+        $brand = trim($brand);
+        if ($brand === '') {
+            return '';
+        }
+
+        $brand_lower = strtolower($brand);
+        $brand_map = [
+            'visa' => 'Visa',
+            'mastercard' => 'MasterCard',
+            'master card' => 'MasterCard',
+            'amex' => 'American Express',
+            'american express' => 'American Express',
+            'diners' => "Diner's Club",
+            'diners club' => "Diner's Club",
+            'dinersclub' => "Diner's Club",
+            'discover' => 'Discover Card',
+            'discover card' => 'Discover Card',
+            'jbl' => 'JBL',
+            'jcb' => 'JCB',
+        ];
+
+        return $brand_map[$brand_lower] ?? ucwords($brand_lower);
     }
 
     /**
