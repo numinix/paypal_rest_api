@@ -1,0 +1,376 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width">
+    <title>Braintree PayPal</title>
+    <!-- FONTS START  -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FONTS END  -->
+
+    <link href="css/stylesheet.css" rel="stylesheet" type="text/css" />
+    <link href="css/sh_style.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.6.1.min.js"></script>
+    <script type="text/javascript" src="js/sh_main.min.js"></script>
+    <script type="text/javascript" src="js/sh_html.min.js"></script>
+    <script type="text/javascript" src="js/sh_php.min.js"></script>
+    <script type="text/javascript" src="js/sh_javascript.min.js"></script>
+    <script type="text/javascript" src="js/sh_sql.min.js"></script>
+    <script type="text/javascript" src="js/sh_css.min.js"></script>
+    <script type="text/javascript" src="js/documentation.js"></script>
+</head>
+<body>
+  <!--[if lt IE 8]> <div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative; margin: auto; text-align: center;'> <a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://www.theie6countdown.com/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div> <![endif]-->
+<div id="wrapper" class="tk-museo-slab">
+  <!--BOF Header-->
+  <div id="headerContainer">
+    <div id="mainMenu" class="headerWrapper">
+
+      <div class="logoWrapper">
+        <a href="https://www.numinix.com/"><img src="images/logo.png" alt="Numinix.com" title="Numinix" id="logo" class="headerLogo" /></a>
+        <span class="nav-icon" id="js-nav-icon">
+          <img src="images/nav-icon.png" alt="nav icon">
+        </span>
+      </div>
+
+    <!--BOF Links-->
+    <div class="contentMenu">
+      <ul>
+        <li><a href="#" id="btnInstallation" class="btn" title="Installation">Installation</a></li>
+        <li><a href="#" id="btnInstallationTips" class="btn" title="Installation Tips">Tips</a></li>
+        <li><a href="#" id="btnUninstall" class="btn" title="Uninstall">Uninstall</a></li>
+        <li><a href="#" id="btnAbout" class="btn" title="About">About</a></li>
+        <li><a href="#" id="btnLicense" class="btn" title="License">License</a></li>
+        <li><a href="#" id="btnDisclaimer" class="btn" title="Disclaimer">Disclaimer</a></li>
+        <li><a href="#" id="btnHelp" class="btn" title="Help">Help</a></li>
+      </ul>
+    </div>
+    <!--EOF Links-->
+
+  </div>
+</div>
+  <div id="headerTitle">
+   <h1 class="clearBoth">Braintree PayPal</h1>
+   <p>by <span>Numinix</span></p>
+  </div>
+        <br class="clearBoth" />
+  <!--EOF Header-->
+  <div class="contentWrapper">
+
+    <!--BOF INSTALLATION-->
+      <div class="bodyHeaderContainer" id="Installation" >
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Installation</span>
+        </div>
+        <div class="bodyWrapper">
+            <ol>
+                <li>Install <a href="https://www.numinix.com/braintree-payments-921.html" target="_blank">Braintree for Zen Cart</a>.</li>
+                <li>Install <a href="https://www.numinix.com/numinix-premium-plugin-installer-for-zen-cart-1345.html" target="_blank"></a>Numinix Premium Plugin Installer version 2.0.0 or newer.</li>
+                <li>Backup your database and all files.</li>
+                <li>Upload all files in this package while maintaining the directory structure (rename YOUR_ADMIN to your admin folder).</li>
+                <li>Log into your Zen Cart admin and verify that the configuration menu appears under Modules > Payment.</li>
+                <li>Copy your Braintree account settings from the Braintree Payments module (installed in step 1).</li>
+                <li>Log into your PayPal Developer Dashboard and retrieve your PayPal Client ID.</li>
+                <li>Enter your PayPal–specific settings, including the Merchant Account ID and the PayPal Client ID, in the <code>braintree_paypal.php</code> configuration.</li>
+                <li>Configure order statuses for <em>Paid</em> (MODULE_PAYMENT_BRAINTREE_PAYPAL_ORDER_STATUS), <em>Pending</em> (MODULE_PAYMENT_BRAINTREE_PAYPAL_PENDING_STATUS_ID), and <em>Refunded</em> (MODULE_PAYMENT_BRAINTREE_PAYPAL_REFUNDED_STATUS_ID) orders.</li>
+                <li>Test PayPal transactions in Sandbox mode before switching to Production.</li>
+            </ol>
+        </div>
+      </div>
+      <!--EOF INSTALLATION-->
+
+      <!--BOF TIPS-->
+      <div class="bodyHeaderContainer" id="InstallationTips">
+        <div class="bodyHeader" id="blue">
+          <span class="bodyHeaderTxt">Tips</span>
+
+        </div>
+        <div class="bodyWrapper">
+            <ul>
+              <li>To add a PayPal account to your Braintree setup, follow these steps:</li>
+              <ul>
+                <li>Log into your <a href="https://www.braintreepayments.com/">Braintree Control Panel</a> and navigate to <strong>Settings > Processing</strong>.</li>
+                <li>Locate the <strong>PayPal</strong> section and click <strong>Enable</strong>.</li>
+                <li>Follow the prompts to connect your existing PayPal account or create a new one.</li>
+                <li>Once connected, configure the PayPal settings, including <strong>currency support, payment buttons, and funding sources</strong>.</li>
+                <li>Log into your Zen Cart Admin and navigate to <strong>Modules > Payment > Braintree PayPal</strong>.</li>
+                <li>Enter your <strong>PayPal Merchant Account ID</strong> and configure additional settings, such as <strong>order statuses</strong> and <strong>accepted currencies</strong>.</li>
+                <li>Test PayPal transactions in <strong>Sandbox Mode</strong> by making test purchases with a PayPal sandbox account.</li>
+                <li>Once testing is successful, switch to <strong>Production Mode</strong> and update your live configuration.</li>
+              </ul>
+            </ul>
+        </div>
+      </div>
+      <!--EOF TIPS-->
+
+      <!--BOF UNINSTALL-->
+      <div class="bodyHeaderContainer" id="Uninstall">
+        <div class="bodyHeader">
+          <span class="bodyHeaderTxt">Uninstall</span>
+
+        </div>
+        <div class="bodyWrapper">
+          <ol>
+            <li>Uninstall the mod first by clicking the Remove button in Modules > Payment > Braintree PayPal</li>
+            <li>Remove edits performed in the installation procedure (if applicable).</li>
+            <li>Delete all uploaded files from your store.</li>
+          </ol>
+        </div>
+      </div>
+      <!--EOF UNINSTALL-->
+
+    <!--BOF About Us-->
+    <div class="bodyHeaderContainer" id="About">
+      <div class="numHeader bodyHeader">
+        <span class="bodyHeaderTxt">About the Plugin</span>
+      </div>
+      <div class="bodyWrapper">
+        <div class="spacer">
+         <div class="bodyRow"><span class="bodyStrong">Title:</span><span class="content">Braintree PayPal</span></div>
+        <div class="bodyRow"><span class="bodyStrong">Author:</span><span class="content">Numinix</span></div>
+        <div class="bodyRow"><span class="bodyStrong">Description:</span><span class="content">Add support for Braintree PayPal in ZenCart.</span></div>
+        <div class="bodyRow"><span class="bodyStrong">Installation Level:</span><span class="content">Easy</span></div>
+        <div class="bodyRow"><span class="bodyStrong">Installation Time:</span><span class="content">~ 10-15 minutes</span></div>
+        <div class="bodyRow"><span class="bodyStrong">Author Notes:</span><span class="content">Zen Cart is the copyright of the Zen Cart Development Team.</span></div>
+        </div>
+      </div>
+    </div>
+    <!--EOF About Us-->
+
+    <!--BOF License-->
+    <div class="bodyHeaderContainer" id="License">
+      <div class="numHeader bodyHeader">
+        <span class="bodyHeaderTxt">License</span>
+      </div>
+      <div class="bodyWrapper">
+        <div class="spacer">
+          <iframe src="../../license.txt" width="100%" height="500px" scrolling="scroll"></iframe>
+        </div>
+      </div>
+    </div>
+    <!--EOF License-->
+
+    <!--BOF Disclalimer-->
+    <div class="bodyHeaderContainer" id="Disclaimer">
+      <div class="numHeader bodyHeader">
+        <span class="bodyHeaderTxt">Disclaimer</span>
+      </div>
+      <div class="bodyWrapper">
+        <div class="spacer">
+          <p>This module is installed at your own risk.  If you are unsure of how to complete the installation procedure, please view our help section for additional information.  Numinix Web Development LTD takes no responsibility for problems related to the installation of this module.</p>
+        </div>
+      </div>
+    </div>
+    <!--EOF Disclaimer-->
+
+    <!--BOF HELP-->
+    <div class="bodyHeaderContainer" id="Help">
+      <div class="bodyHeader">
+        <span class="bodyHeaderTxt">Help</span>
+      </div>
+      <div class="bodyWrapper">
+        <div class="spacer">
+          <div class="bodyRow"><span class="bodyStrong">Contact Us:</span><span class="content"><a href="http://www.numinix.com/support/" target="_blank">http://www.numinix.com/support/</a></span></div>
+        </div>
+      </div>
+    </div>
+    <!--EOF HELP-->
+  </div>
+  <!-- <div id="footerContainer">&copy; 2015 Numinix Web Development</div> -->
+</div>
+
+<footer class="readme-footer">
+  <div class="readme-footer-container">
+    <div class="footer-column footer-column-1">
+      <h3 class="title">Ready To Start A Project?</h3>
+      <p class="paragraph">Get in touch to let us know what you’re looking for and one of our solutions architects will get back to you soon.</p>
+      <a class="connect-link" href="https://numinix.atlassian.net/servicedesk/customer/portals">Connect with Experts</a>
+      <div class="details">
+        <img src="images/numinix-emblem.png" alt="numinix-emblem">
+        <ul>
+          <li>
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="16" viewBox="0 0 11 16" fill="none">
+                <path d="M5.5 0C2.46728 0 0 2.46728 0 5.49997C0 9.26363 4.92196 14.7889 5.13152 15.0223C5.32835 15.2415 5.67201 15.2411 5.86848 15.0223C6.07804 14.7889 11 9.26363 11 5.49997C10.9999 2.46728 8.53269 0 5.5 0ZM5.5 8.26716C3.97416 8.26716 2.73284 7.02581 2.73284 5.49997C2.73284 3.97414 3.97419 2.73281 5.5 2.73281C7.02581 2.73281 8.26713 3.97417 8.26713 5.5C8.26713 7.02584 7.02581 8.26716 5.5 8.26716Z" fill="#171717"/>
+              </svg>
+            </span>
+            805-510 West Hastings  Street, Vancouver, BC, Canada V6B 1L8
+          </li>
+          <li>
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="10" viewBox="0 0 13 10" fill="none">
+                <path d="M12.9908 1.09647C12.9908 1.0808 13.001 1.06554 13.0004 1.05005L9.0332 5.08304L12.9956 8.98719C12.9979 8.9593 12.9908 8.93118 12.9908 8.90269V1.09647Z" fill="#171717"/>
+                <path d="M8.42744 5.70435L6.80793 7.34829C6.72598 7.43147 6.62014 7.47319 6.51424 7.47319C6.41054 7.47319 6.30684 7.43326 6.22546 7.35323L4.61035 5.76537L0.62207 9.82123C0.719047 9.858 0.823139 9.88654 0.932146 9.88654H12.0964C12.2583 9.88654 12.4101 9.83452 12.5421 9.75694L8.42744 5.70435Z" fill="#171717"/>
+                <path d="M6.50984 6.41042L12.5643 0.257195C12.4272 0.171208 12.2676 0.113525 12.0966 0.113525H0.932378C0.709677 0.113525 0.505615 0.204756 0.34668 0.343897L6.50984 6.41042Z" fill="#171717"/>
+                <path d="M0 1.24634V8.90258C0 8.99047 0.0191467 9.07521 0.0399314 9.15619L3.97874 5.15443L0 1.24634Z" fill="#171717"/>
+              </svg>
+            </span>
+            support@numinix.com
+          </li>
+          <li>
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16" fill="none">
+                <path d="M13.5051 11.4327L11.5656 9.38463C10.8729 8.65316 9.69536 8.94578 9.41829 9.89666C9.21049 10.555 8.51781 10.9207 7.8944 10.7744C6.50904 10.4087 4.63881 8.50687 4.29247 6.97079C4.08466 6.31243 4.50027 5.58097 5.12368 5.36155C6.02416 5.06897 6.30124 3.82547 5.60856 3.094L3.66906 1.04589C3.11491 0.533858 2.2837 0.533858 1.79882 1.04589L0.482733 2.43568C-0.833357 3.89862 0.621269 7.7754 3.87686 11.2133C7.13245 14.6512 10.8036 16.2605 12.189 14.7975L13.5051 13.4077C13.99 12.8225 13.99 11.9448 13.5051 11.4327Z" fill="#171717"/>
+              </svg>
+            </span>
+            1.855.686.4649 Ext 0
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-column footer-column-2">
+      <div class="links-group">
+        <div class="links">
+          <h4>Services</h4>
+          <div class="links-list">
+            <a href="https://www.numinix.com/services_development.html">Front-End Development</a>
+            <a href="https://www.numinix.com/services_design.html">Design</a>
+            <a href="https://www.numinix.com/services_speed.html">Speed Optimization</a>
+            <a href="https://www.numinix.com/services_apis.html">APIs</a>
+            <a href="https://www.numinix.com/services_installs_upgrades.html">Install & Updates</a>
+            <a href="https://www.numinix.com/plugins-381/">Plugins</a>
+            <a href="https://www.numinix.com/support/">Security & Support</a>
+          </div>
+        </div>
+
+        <div class="links">
+          <h4>Platforms</h4>
+          <div class="links-list">
+            <a href="https://www.numinix.com/expert_zen_cart_developers.html">Zen Cart</a>
+            <a href="https://www.numinix.com/woocommerce_development_services.html">WooCommerce</a>
+            <a href="https://www.numinix.com/platform_magento.html">Magento</a>
+            <a href="https://www.numinix.com/hire_dedicated_shopify_developers.html">Shopify</a>
+            <a href="#">Lightspeed</a>
+            <a href="https://www.numinix.com/platform_bigcommerce.html">BigCommerce</a>
+            <a href="https://www.numinix.com/platform_open_cart.html">OpenCart</a>
+            <a href="#">Lexmodo</a>
+          </div>
+        </div>
+
+        <div class="links">
+          <h4>Useful Links</h4>
+          <div class="links-list">
+            <a href="https://www.numinix.com/plugin_updates.html">Plugin Updates</a>
+            <a href="https://www.numinix.com/plugin_updates.html">Open Bug Reports</a>
+            <a href="https://www.numinix.com/demo/">Demos</a>
+            <a href="https://www.numinix.com/plan_comparison.html">Plans</a>
+            <a href="https://www.numinix.com/design_package_comparison.html">Web Design Packages</a>
+          </div>
+        </div>
+
+        <div class="links">
+          <h4>Company</h4>
+          <div class="links-list">
+            <a href="https://www.numinix.com/about_us.html">About</a>
+            <a href="https://www.numinix.com/blog/">Blog</a>
+            <a href="https://www.numinix.com/clients.html">Portfolio</a>
+            <a href="https://www.numinix.com/display_all_testimonials.html">Testimonials</a>
+            <a href="">Careers</a>
+            <a href="https://www.numinix.com/partners.html">Partners</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="socials">
+        <a href="https://www.facebook.com/numinix">
+          <svg xmlns="http://www.w3.org/2000/svg" width="39" height="39" viewBox="0 0 39 39" fill="none">
+            <path d="M21.6331 13.1031H23.338V10.1336C23.0438 10.0931 22.0323 10.0021 20.8543 10.0021C18.3963 10.0021 16.7125 11.5483 16.7125 14.3901V17.0055H14V20.3252H16.7125V28.678H20.038V20.326H22.6408L23.054 17.0063H20.0373V14.7193C20.038 13.7598 20.2964 13.1031 21.6331 13.1031Z" fill="#171717"/>
+          </svg>
+        </a>
+
+        <a href="https://twitter.com/numinix">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="39" viewBox="0 0 40 39" fill="none">
+            <path d="M29.633 13.1387C28.9284 13.4478 28.1776 13.6526 27.3948 13.7521C28.2001 13.2713 28.8147 12.5158 29.1036 11.6051C28.3528 12.0528 27.5239 12.369 26.6405 12.5454C25.9276 11.7863 24.9115 11.3162 23.8031 11.3162C21.6526 11.3162 19.9212 13.0617 19.9212 15.2016C19.9212 15.5095 19.9473 15.8055 20.0112 16.0874C16.7819 15.9299 13.9244 14.3821 12.0048 12.0244C11.6696 12.6058 11.473 13.2713 11.473 13.9878C11.473 15.333 12.1658 16.5256 13.1984 17.2159C12.5744 17.2041 11.9621 17.0229 11.4434 16.7375C11.4434 16.7494 11.4434 16.7648 11.4434 16.7802C11.4434 18.6678 12.7899 20.2357 14.5556 20.5969C14.2394 20.6833 13.8948 20.7248 13.5371 20.7248C13.2885 20.7248 13.0374 20.7106 12.8017 20.6585C13.305 22.1968 14.7332 23.3277 16.4314 23.3644C15.1098 24.3982 13.4317 25.0211 11.6152 25.0211C11.2966 25.0211 10.9911 25.0069 10.6855 24.9678C12.4062 26.0774 14.4454 26.711 16.6445 26.711C23.7924 26.711 27.7003 20.7899 27.7003 15.6575C27.7003 15.4858 27.6944 15.32 27.6861 15.1554C28.4571 14.6083 29.1048 13.925 29.633 13.1387Z" fill="#171717"/>
+          </svg>
+        </a>
+
+        <a href="https://www.linkedin.com/company/numinix-web-development-ltd">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="39" viewBox="0 0 40 39" fill="none">
+            <path d="M27.2595 26.519V21.0666C27.2595 18.3869 26.6826 16.34 23.5563 16.34C22.049 16.34 21.0441 17.1588 20.6347 17.9403H20.5975V16.5819H17.6387V26.519H20.7278V21.5877C20.7278 20.2851 20.9697 19.0383 22.57 19.0383C24.1518 19.0383 24.1704 20.5084 24.1704 21.6621V26.5004H27.2595V26.519Z" fill="#171717"/>
+            <path d="M12.6172 16.5812H15.7063V26.5183H12.6172V16.5812Z" fill="#171717"/>
+            <path d="M14.1575 11.6305C13.1713 11.6305 12.3711 12.4307 12.3711 13.4169C12.3711 14.4032 13.1713 15.222 14.1575 15.222C15.1438 15.222 15.944 14.4032 15.944 13.4169C15.944 12.4307 15.1438 11.6305 14.1575 11.6305Z" fill="#171717"/>
+          </svg>
+        </a>
+
+        <a href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" width="39" height="39" viewBox="0 0 39 39" fill="none">
+            <path d="M29.0345 16.8714C29.0747 15.5922 28.8035 14.323 28.2455 13.1807C27.8727 12.704 27.347 12.3815 26.7639 12.2716C24.3698 12.0566 21.9665 11.9691 19.5635 12.0098C17.1608 11.9689 14.7576 12.0563 12.3635 12.2716C11.8893 12.3633 11.4501 12.5931 11.0977 12.9341C10.325 13.6753 10.2686 14.9458 10.1522 16.016C10.0248 17.9451 10.0248 19.881 10.1522 21.8101C10.1733 22.4142 10.2607 23.0138 10.4128 23.5975C10.5158 24.0493 10.7256 24.4677 11.0233 24.8151C11.3758 25.1745 11.8246 25.416 12.3114 25.5081C14.1734 25.7468 16.0497 25.8447 17.9255 25.801V25.8011C20.9433 25.851 23.6023 25.7981 26.7336 25.5545C27.234 25.4656 27.6964 25.2211 28.059 24.8534C28.2946 24.611 28.473 24.3157 28.5804 23.9903C28.8927 23.0114 29.0461 21.9858 29.0345 20.9551C29.064 20.4232 29.064 17.4033 29.0345 16.8714ZM22.7206 18.7128C22.7195 18.7122 22.7185 18.7116 22.7174 18.711C22.0013 19.1215 21.1735 19.5567 20.3008 20.015C19.424 20.4754 18.5025 20.9588 17.6054 21.4635V15.9314V15.9314C18.4579 16.3937 19.3012 16.8483 20.1492 17.3076C20.996 17.7664 21.8475 18.2299 22.7174 18.711C22.7207 18.7091 22.7247 18.7071 22.728 18.7051L22.7206 18.7128Z" fill="#171717"/>
+          </svg>
+        </a>
+      </div>
+
+      <div class="payment-methods">
+        <a href="#"><img src="images/paypal.png" alt="paypal"></a>
+        <a href="#"><img src="images/visa.png" alt="visa"></a>
+        <a href="#"><img src="images/maestro.png" alt="maestro"></a>
+        <a href="#"><img src="images/discover.png" alt="discover"></a>
+        <a href="#"><img src="images/american-express.png" alt="american-express"></a>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="readme-footer-bottom">
+    <p class="copyright">© 2000-<span id="current-year">2025</span> Numinix Web Development Ltd. All rights reserved.</p>
+    <p class="madewith">
+      Made with
+      <span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="14" viewBox="0 0 16 14" fill="none">
+          <path d="M11.75 0.5C9.85484 0.5 8.63722 1.71578 8 2.80811C7.36278 1.71578 6.14516 0.5 4.25 0.5C1.84491 0.5 0 2.30591 0 4.70109C0 7.29824 2.31137 9.06689 5.76291 11.7448C7.45297 13.0549 7.56156 13.1544 8 13.5C8.35781 13.218 8.55584 13.0481 10.2371 11.7448C13.6886 9.06689 16 7.29824 16 4.70109C16 2.30594 14.1551 0.5 11.75 0.5Z" fill="#171717"/>
+        </svg>
+      </span>
+      in Canada
+    </p>
+  </div>
+</footer>
+
+<script>
+  function selectText(node) {
+
+    if (document.body.createTextRange) {
+        const range = document.body.createTextRange();
+        range.moveToElementText(node);
+        range.select();
+    } else if (window.getSelection) {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    } else {
+        console.warn("Could not select text in node: Unsupported browser.");
+    }
+}
+
+function highlightSelect(){
+  const elem = this.parentElement.parentElement.querySelector('.sh_sourceCode');
+  selectText(elem);
+
+}
+const selectList = document.querySelectorAll('.select');
+
+selectList.forEach(s => {
+  s.addEventListener('click', highlightSelect);
+});
+
+  // Mobile Menu dropdown
+  jQuery(document).ready(function() {
+    $('#js-nav-icon').click(function() {
+      $('.contentMenu').toggleClass('active');
+    });
+
+    $('.contentMenu li').click(function() {
+      $('.contentMenu').removeClass('active');
+    });
+  });
+
+  // Update current year
+  let date = new Date();
+  jQuery('#current-year').text(date.getFullYear());
+
+</script>
+
+</body>
+</html>
