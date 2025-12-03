@@ -10,6 +10,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_CONFIRM_FAILED' => 'We were unable to confirm your Google Pay payment with PayPal. Please select Google Pay again or choose a different payment method.',
     'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_PAYER_ACTION' => 'An additional action is required to complete your Google Pay payment. Please choose another payment method or contact us for assistance.',
     'MODULE_PAYMENT_PAYPALR_PAYING_WITH_GOOGLE_PAY' => 'Paying with Google Pay',
+    'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_INITIALIZE' => 'Google Pay is temporarily unavailable. Please try again or choose a different payment method.',
 ];
 
 return $define;

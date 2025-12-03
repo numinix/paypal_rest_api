@@ -10,6 +10,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_VENMO_ERROR_CONFIRM_FAILED' => 'We were unable to confirm your Venmo payment with PayPal. Please select Venmo again or choose a different payment method.',
     'MODULE_PAYMENT_PAYPALR_VENMO_ERROR_PAYER_ACTION' => 'An additional action is required to complete your Venmo payment. Please choose another payment method or contact us for assistance.',
     'MODULE_PAYMENT_PAYPALR_PAYING_WITH_VENMO' => 'Paying with Venmo',
+    'MODULE_PAYMENT_PAYPALR_VENMO_ERROR_INITIALIZE' => 'Venmo is temporarily unavailable. Please try again or choose a different payment method.',
 ];
 
 return $define;
