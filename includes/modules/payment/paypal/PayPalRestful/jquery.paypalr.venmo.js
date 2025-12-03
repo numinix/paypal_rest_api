@@ -1,5 +1,9 @@
 (function () {
     var checkoutSubmitting = false;
+    var sdkState = {
+        config: null,
+        loader: null,
+    };
 
     function hasPayloadData(payload) {
         if (!payload) {
@@ -69,15 +73,10 @@
         }
     }
 
-    /**
-     * Select the Venmo module radio button.
-     * Called when the user interacts with the Venmo button.
-     */
     function selectVenmoRadio() {
         var moduleRadio = document.getElementById('pmt-paypalr_venmo');
         if (moduleRadio && moduleRadio.type === 'radio' && !moduleRadio.checked) {
             moduleRadio.checked = true;
-            // Trigger change event for any listeners
             if (typeof jQuery !== 'undefined') {
                 jQuery(moduleRadio).trigger('change');
             } else {
@@ -86,10 +85,6 @@
         }
     }
 
-    /**
-     * Hide the module's radio button using CSS.
-     * The radio is still functional but visually hidden.
-     */
     function hideModuleRadio() {
         var moduleRadio = document.getElementById('pmt-paypalr_venmo');
         if (moduleRadio) {
@@ -105,6 +100,131 @@
         if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
             document.dispatchEvent(new CustomEvent('paypalr:venmo:rerender'));
         }
+    }
+
+    function fetchWalletOrder() {
+        return fetch('ppr_wallet.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: 'venmo' })
+        }).then(function(response) {
+            return response.json();
+        });
+    }
+
+    function loadPayPalSdk(config) {
+        var lastConfig = window.paypalrSdkConfig || {};
+        var needsReload = !config || !config.clientId;
+        needsReload = needsReload || (lastConfig.clientId !== config.clientId)
+            || (lastConfig.currency !== config.currency)
+            || (lastConfig.merchantId !== config.merchantId);
+
+        if (!needsReload && window.paypal && typeof window.paypal.Buttons === 'function') {
+            return Promise.resolve(window.paypal);
+        }
+
+        if (sdkState.loader && !needsReload) {
+            return sdkState.loader;
+        }
+
+        if (needsReload) {
+            sdkState.loader = null;
+            var existing = document.querySelector('script[data-paypal-sdk="true"]');
+            if (existing && existing.parentNode) {
+                existing.parentNode.removeChild(existing);
+            }
+        }
+
+        var query = '?client-id=' + encodeURIComponent(config.clientId)
+            + '&components=buttons,googlepay,applepay,venmo'
+            + '&currency=' + encodeURIComponent(config.currency || 'USD');
+
+        if (config.intent) {
+            query += '&intent=' + encodeURIComponent(config.intent);
+        }
+
+        if (config.merchantId) {
+            query += '&merchant-id=' + encodeURIComponent(config.merchantId);
+        }
+
+        sdkState.loader = new Promise(function(resolve, reject) {
+            var script = document.createElement('script');
+            script.src = 'https://www.paypal.com/sdk/js' + query;
+            script.dataset.paypalSdk = 'true';
+            script.onload = function () {
+                window.paypalrSdkConfig = {
+                    clientId: config.clientId,
+                    currency: config.currency,
+                    merchantId: config.merchantId
+                };
+                resolve(window.paypal);
+            };
+            script.onerror = function (event) {
+                reject(event);
+            };
+            document.head.appendChild(script);
+        });
+
+        return sdkState.loader;
+    }
+
+    function renderVenmoButton() {
+        var container = document.getElementById('paypalr-venmo-button');
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = '';
+
+        fetchWalletOrder().then(function (config) {
+            if (!config || config.success === false) {
+                console.warn('Unable to load Venmo configuration', config);
+                return;
+            }
+
+            sdkState.config = config;
+            return loadPayPalSdk(config).then(function (paypal) {
+                return paypal.Buttons({
+                    fundingSource: paypal.FUNDING.VENMO,
+                    style: {
+                        shape: 'rect',
+                        height: 40
+                    },
+                    createOrder: function () {
+                        return fetchWalletOrder().then(function (orderConfig) {
+                            if (orderConfig && orderConfig.success !== false) {
+                                sdkState.config = orderConfig;
+                                return orderConfig.orderID;
+                            }
+                            throw new Error('Unable to create Venmo order');
+                        });
+                    },
+                    onClick: function () {
+                        selectVenmoRadio();
+                    },
+                    onApprove: function (data) {
+                        var payload = {
+                            orderID: data.orderID,
+                            payerID: data.payerID,
+                            paymentID: data.paymentID,
+                            facilitatorAccessToken: data.facilitatorAccessToken,
+                            wallet: 'venmo'
+                        };
+                        document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: payload }));
+                    },
+                    onCancel: function (data) {
+                        console.warn('Venmo cancelled', data);
+                        document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: {} }));
+                    },
+                    onError: function (error) {
+                        console.error('Venmo encountered an error', error);
+                        document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: {} }));
+                    }
+                }).render('#paypalr-venmo-button');
+            });
+        }).catch(function (error) {
+            console.error('Failed to render Venmo button', error);
+        });
     }
 
     function observeOrderTotal() {
@@ -138,10 +258,8 @@
         setVenmoPayload(event.detail || {});
     });
 
-    // Hide the radio button on page load
     hideModuleRadio();
 
-    // Add click handler to the button container to select the radio
     var container = document.getElementById('paypalr-venmo-button');
     if (container) {
         container.addEventListener('click', function() {
@@ -153,5 +271,10 @@
         }
     }
 
+    if (typeof window !== 'undefined') {
+        window.paypalrVenmoRender = renderVenmoButton;
+    }
+
+    renderVenmoButton();
     observeOrderTotal();
 })();

@@ -1,5 +1,9 @@
 (function () {
     var checkoutSubmitting = false;
+    var sdkState = {
+        config: null,
+        loader: null,
+    };
 
     function hasPayloadData(payload) {
         if (!payload) {
@@ -107,6 +111,131 @@
         }
     }
 
+    function fetchWalletOrder() {
+        return fetch('ppr_wallet.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: 'google_pay' })
+        }).then(function(response) {
+            return response.json();
+        });
+    }
+
+    function loadPayPalSdk(config) {
+        var lastConfig = window.paypalrSdkConfig || {};
+        var needsReload = !config || !config.clientId;
+        needsReload = needsReload || (lastConfig.clientId !== config.clientId)
+            || (lastConfig.currency !== config.currency)
+            || (lastConfig.merchantId !== config.merchantId);
+
+        if (!needsReload && window.paypal && typeof window.paypal.Buttons === 'function') {
+            return Promise.resolve(window.paypal);
+        }
+
+        if (sdkState.loader && !needsReload) {
+            return sdkState.loader;
+        }
+
+        if (needsReload) {
+            sdkState.loader = null;
+            var existing = document.querySelector('script[data-paypal-sdk="true"]');
+            if (existing && existing.parentNode) {
+                existing.parentNode.removeChild(existing);
+            }
+        }
+
+        var query = '?client-id=' + encodeURIComponent(config.clientId)
+            + '&components=buttons,googlepay,applepay,venmo'
+            + '&currency=' + encodeURIComponent(config.currency || 'USD');
+
+        if (config.intent) {
+            query += '&intent=' + encodeURIComponent(config.intent);
+        }
+
+        if (config.merchantId) {
+            query += '&merchant-id=' + encodeURIComponent(config.merchantId);
+        }
+
+        sdkState.loader = new Promise(function(resolve, reject) {
+            var script = document.createElement('script');
+            script.src = 'https://www.paypal.com/sdk/js' + query;
+            script.dataset.paypalSdk = 'true';
+            script.onload = function () {
+                window.paypalrSdkConfig = {
+                    clientId: config.clientId,
+                    currency: config.currency,
+                    merchantId: config.merchantId
+                };
+                resolve(window.paypal);
+            };
+            script.onerror = function (event) {
+                reject(event);
+            };
+            document.head.appendChild(script);
+        });
+
+        return sdkState.loader;
+    }
+
+    function renderGooglePayButton() {
+        var container = document.getElementById('paypalr-googlepay-button');
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = '';
+
+        fetchWalletOrder().then(function (config) {
+            if (!config || config.success === false) {
+                console.warn('Unable to load Google Pay configuration', config);
+                return;
+            }
+
+            sdkState.config = config;
+            return loadPayPalSdk(config).then(function (paypal) {
+                return paypal.Buttons({
+                    fundingSource: paypal.FUNDING.GOOGLEPAY,
+                    style: {
+                        shape: 'rect',
+                        height: 40
+                    },
+                    createOrder: function () {
+                        return fetchWalletOrder().then(function (orderConfig) {
+                            if (orderConfig && orderConfig.success !== false) {
+                                sdkState.config = orderConfig;
+                                return orderConfig.orderID;
+                            }
+                            throw new Error('Unable to create Google Pay order');
+                        });
+                    },
+                    onClick: function () {
+                        selectGooglePayRadio();
+                    },
+                    onApprove: function (data) {
+                        var payload = {
+                            orderID: data.orderID,
+                            payerID: data.payerID,
+                            paymentID: data.paymentID,
+                            facilitatorAccessToken: data.facilitatorAccessToken,
+                            wallet: 'google_pay'
+                        };
+                        document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: payload }));
+                    },
+                    onCancel: function (data) {
+                        console.warn('Google Pay cancelled', data);
+                        document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: {} }));
+                    },
+                    onError: function (error) {
+                        console.error('Google Pay encountered an error', error);
+                        document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: {} }));
+                    }
+                }).render('#paypalr-googlepay-button');
+            });
+        }).catch(function (error) {
+            console.error('Failed to render Google Pay button', error);
+        });
+    }
+
     function observeOrderTotal() {
         var totalElement = document.getElementById('ottotal');
         if (!totalElement || typeof MutationObserver === 'undefined') {
@@ -152,6 +281,12 @@
             container.innerHTML = '<span class="paypalr-googlepay-placeholder">' + (typeof paypalrGooglePayText !== 'undefined' ? paypalrGooglePayText : 'Google Pay') + '</span>';
         }
     }
+
+    if (typeof window !== 'undefined') {
+        window.paypalrGooglePayRender = renderGooglePayButton;
+    }
+
+    renderGooglePayButton();
 
     observeOrderTotal();
 })();

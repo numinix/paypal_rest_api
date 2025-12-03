@@ -385,6 +385,16 @@ class paypalr_googlepay extends base
         ];
     }
 
+    public function ajaxCreateWalletOrder(): array
+    {
+        $response = $this->buildWalletAjaxResponse('google_pay');
+        if ($response['success'] === false && empty($response['message'])) {
+            $response['message'] = MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_INITIALIZE ?? 'Unable to start Google Pay. Please try again.';
+        }
+
+        return $response;
+    }
+
     public function pre_confirmation_check()
     {
         $this->paypalCommon->processWalletConfirmation(
@@ -437,6 +447,40 @@ class paypalr_googlepay extends base
     protected function createOrderGuid(\order $order, string $ppr_type): string
     {
         return $this->paypalCommon->createOrderGuid($order, $ppr_type);
+    }
+
+    protected function buildWalletAjaxResponse(string $ppr_type): array
+    {
+        $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
+        $client_id = trim($client_id);
+
+        $merchant_id = defined('MODULE_PAYMENT_PAYPALR_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_MERCHANT_ID) : '*';
+        $merchant_id = ($merchant_id === '') ? '*' : $merchant_id;
+
+        $intent = (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || ($ppr_type !== 'card' && MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)'))
+            ? 'CAPTURE'
+            : 'AUTHORIZE';
+
+        if ($client_id === '') {
+            return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_INITIALIZE ?? 'Unable to start Google Pay. Please try again.'];
+        }
+
+        if ($this->createPayPalOrder($ppr_type) === false) {
+            return ['success' => false];
+        }
+
+        $orderData = $_SESSION['PayPalRestful']['Order'] ?? [];
+        $current = $orderData['current']['purchase_units'][0]['amount'] ?? [];
+
+        return [
+            'success' => true,
+            'orderID' => $orderData['id'] ?? '',
+            'amount' => $current['value'] ?? '',
+            'currency' => $current['currency_code'] ?? ($_SESSION['currency'] ?? ''),
+            'intent' => $orderData['current']['intent'] ?? $intent,
+            'clientId' => $client_id,
+            'merchantId' => $merchant_id,
+        ];
     }
 
     public function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
