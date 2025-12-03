@@ -824,7 +824,7 @@ class paypalr_creditcard extends base
         return $this->paypalCommon->createOrderGuid($order, $ppr_type);
     }
 
-    protected function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
+    public function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
     {
         global $messageStack;
 
