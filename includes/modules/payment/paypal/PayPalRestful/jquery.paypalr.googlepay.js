@@ -97,6 +97,17 @@
         }
     }
 
+    /**
+     * Hide the textual label so the PayPal-rendered button (or placeholder)
+     * is the only visible call-to-action.
+     */
+    function hideModuleLabel() {
+        var moduleLabel = document.querySelector('label[for="pmt-paypalr_googlepay"]');
+        if (moduleLabel) {
+            moduleLabel.classList.add('paypalr-wallet-label-hidden');
+        }
+    }
+
     function rerenderGooglePayButton() {
         if (typeof window.paypalrGooglePayRender === 'function') {
             window.paypalrGooglePayRender();
@@ -140,6 +151,7 @@
 
     // Hide the radio button on page load
     hideModuleRadio();
+    hideModuleLabel();
 
     // Add click handler to the button container to select the radio
     var container = document.getElementById('paypalr-googlepay-button');

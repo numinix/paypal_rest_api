@@ -65,6 +65,19 @@
     border: 0 !important;
 }
 
+.paypalr-wallet-label-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
 /* Wallet button containers */
 .paypalr-googlepay-button,
 .paypalr-applepay-button,
@@ -74,7 +87,21 @@
 }
 
 /* Placeholder text for wallet buttons */
-.paypalr-googlepay-placeholder,
+.paypalr-googlepay-placeholder {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.4rem;
+    background-color: #000;
+    border: 1px solid #000;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
 .paypalr-applepay-placeholder,
 .paypalr-venmo-placeholder {
     display: inline-block;
