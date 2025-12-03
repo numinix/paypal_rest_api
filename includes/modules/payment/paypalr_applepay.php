@@ -103,9 +103,9 @@ class paypalr_applepay extends base
             
             // Add upgrade button if current version is less than latest version
             $installed_version = defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_VERSION') ? MODULE_PAYMENT_PAYPALR_APPLEPAY_VERSION : '0.0.0';
-            if (version_compare($installed_version, self::CURRENT_VERSION, '<')) {
+            if ($installed_version !== '0.0.0' && version_compare($installed_version, self::CURRENT_VERSION, '<')) {
                 $this->description .= sprintf(
-                    MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_UPGRADE_AVAILABLE ?? 
+                    MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_UPGRADE_AVAILABLE ??
                     '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="paypalr-upgrade-button" href="%3$s">Upgrade to %2$s</a></p>',
                     $installed_version,
                     self::CURRENT_VERSION,
@@ -226,8 +226,11 @@ class paypalr_applepay extends base
     protected function tableCheckup()
     {
         global $db;
-        
+
         // First, let the paypalCommon handle its tableCheckup
+        if (!isset($this->paypalCommon)) {
+            $this->paypalCommon = new PayPalCommon($this);
+        }
         $this->paypalCommon->tableCheckup();
         
         // If the payment module is installed and at the current version, nothing to be done.

@@ -273,10 +273,11 @@ class paypalr_savedcard extends base
     {
         global $db;
 
-        // First, let the paypalCommon handle its tableCheckup if it's initialized
-        if (isset($this->paypalCommon) && $this->paypalCommon instanceof PayPalCommon) {
-            $this->paypalCommon->tableCheckup();
+        // First, let the paypalCommon handle its tableCheckup
+        if (!isset($this->paypalCommon)) {
+            $this->paypalCommon = new PayPalCommon($this);
         }
+        $this->paypalCommon->tableCheckup();
 
         // If the payment module is installed and at the current version, nothing to be done.
         $current_version = self::CURRENT_VERSION;
