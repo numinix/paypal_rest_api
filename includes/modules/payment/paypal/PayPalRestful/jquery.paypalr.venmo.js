@@ -5,6 +5,9 @@
         loader: null,
     };
 
+    var sharedSdkLoader = window.paypalrSdkLoaderState || { key: null, promise: null };
+    window.paypalrSdkLoaderState = sharedSdkLoader;
+
     function hasPayloadData(payload) {
         if (!payload) {
             return false;
@@ -112,27 +115,51 @@
         });
     }
 
+    function buildSdkKey(config) {
+        var currency = config.currency || 'USD';
+        var intent = config.intent || '';
+        var merchantId = config.merchantId || '';
+        return [config.clientId, currency, intent, merchantId].join('|');
+    }
+
     function loadPayPalSdk(config) {
-        var lastConfig = window.paypalrSdkConfig || {};
-        var needsReload = !config || !config.clientId;
-        needsReload = needsReload || (lastConfig.clientId !== config.clientId)
-            || (lastConfig.currency !== config.currency)
-            || (lastConfig.merchantId !== config.merchantId);
-
-        if (!needsReload && window.paypal && typeof window.paypal.Buttons === 'function') {
-            return Promise.resolve(window.paypal);
+        if (!config || !config.clientId) {
+            return Promise.reject(new Error('Missing clientId for PayPal SDK load'));
         }
 
-        if (sdkState.loader && !needsReload) {
-            return sdkState.loader;
+        var desiredKey = buildSdkKey(config);
+        var existingScript = document.querySelector('script[data-paypal-sdk="true"]');
+
+        if (sharedSdkLoader.promise && sharedSdkLoader.key === desiredKey && window.paypal && typeof window.paypal.Buttons === 'function') {
+            return sharedSdkLoader.promise.then(function () { return window.paypal; });
         }
 
-        if (needsReload) {
-            sdkState.loader = null;
-            var existing = document.querySelector('script[data-paypal-sdk="true"]');
-            if (existing && existing.parentNode) {
-                existing.parentNode.removeChild(existing);
+        if (existingScript) {
+            var matchesClient = existingScript.src.indexOf(encodeURIComponent(config.clientId)) !== -1;
+            var matchesCurrency = existingScript.src.indexOf('currency=' + encodeURIComponent(config.currency || 'USD')) !== -1;
+            var matchesMerchant = !config.merchantId || existingScript.src.indexOf('merchant-id=' + encodeURIComponent(config.merchantId)) !== -1;
+
+            if (matchesClient && matchesCurrency && matchesMerchant) {
+                if (existingScript.dataset.loaded === 'true' && window.paypal && typeof window.paypal.Buttons === 'function') {
+                    sharedSdkLoader.key = desiredKey;
+                    sharedSdkLoader.promise = Promise.resolve(window.paypal);
+                    return sharedSdkLoader.promise;
+                }
+
+                return new Promise(function (resolve, reject) {
+                    existingScript.addEventListener('load', function () {
+                        existingScript.dataset.loaded = 'true';
+                        sharedSdkLoader.key = desiredKey;
+                        resolve(window.paypal);
+                    });
+                    existingScript.addEventListener('error', function (event) {
+                        sharedSdkLoader.promise = null;
+                        reject(event);
+                    });
+                });
             }
+
+            existingScript.parentNode.removeChild(existingScript);
         }
 
         var query = '?client-id=' + encodeURIComponent(config.clientId)
@@ -147,11 +174,14 @@
             query += '&merchant-id=' + encodeURIComponent(config.merchantId);
         }
 
-        sdkState.loader = new Promise(function(resolve, reject) {
+        sharedSdkLoader.promise = new Promise(function(resolve, reject) {
             var script = document.createElement('script');
             script.src = 'https://www.paypal.com/sdk/js' + query;
             script.dataset.paypalSdk = 'true';
+            script.dataset.loaded = 'false';
             script.onload = function () {
+                script.dataset.loaded = 'true';
+                sharedSdkLoader.key = desiredKey;
                 window.paypalrSdkConfig = {
                     clientId: config.clientId,
                     currency: config.currency,
@@ -160,12 +190,13 @@
                 resolve(window.paypal);
             };
             script.onerror = function (event) {
+                sharedSdkLoader.promise = null;
                 reject(event);
             };
             document.head.appendChild(script);
         });
 
-        return sdkState.loader;
+        return sharedSdkLoader.promise;
     }
 
     function renderVenmoButton() {
@@ -179,7 +210,8 @@
         fetchWalletOrder().then(function (config) {
             if (!config || config.success === false) {
                 console.warn('Unable to load Venmo configuration', config);
-                return;
+                container.innerHTML = '<span class="paypalr-venmo-unavailable">Venmo unavailable</span>';
+                return null;
             }
 
             sdkState.config = config;
@@ -210,20 +242,24 @@
                             facilitatorAccessToken: data.facilitatorAccessToken,
                             wallet: 'venmo'
                         };
+                        setVenmoPayload(payload);
                         document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: payload }));
                     },
                     onCancel: function (data) {
                         console.warn('Venmo cancelled', data);
+                        setVenmoPayload({});
                         document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: {} }));
                     },
                     onError: function (error) {
                         console.error('Venmo encountered an error', error);
+                        setVenmoPayload({});
                         document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: {} }));
                     }
                 }).render('#paypalr-venmo-button');
             });
         }).catch(function (error) {
             console.error('Failed to render Venmo button', error);
+            container.innerHTML = '<span class="paypalr-venmo-unavailable">Venmo unavailable</span>';
         });
     }
 
