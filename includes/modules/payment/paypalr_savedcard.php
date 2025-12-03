@@ -720,7 +720,7 @@ class paypalr_savedcard extends base
         return $order_info;
     }
 
-    protected function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
+    public function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
     {
         global $messageStack;
 

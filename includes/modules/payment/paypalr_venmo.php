@@ -350,6 +350,17 @@ class paypalr_venmo extends base
         return '';
     }
 
+    protected function getWalletAssets(string $scriptFilename): string
+    {
+        $css = '';
+        if (!defined('MODULE_PAYMENT_PAYPALR_WALLET_ASSETS_LOADED')) {
+            define('MODULE_PAYMENT_PAYPALR_WALLET_ASSETS_LOADED', true);
+            $css = '<style>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css') . '</style>';
+        }
+
+        return $css . '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/' . $scriptFilename) . '</script>';
+    }
+
     public function selection(): array
     {
         unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
@@ -360,7 +371,7 @@ class paypalr_venmo extends base
             zen_draw_hidden_field('paypalr_venmo_payload', '', 'id="paypalr-venmo-payload"') .
             zen_draw_hidden_field('paypalr_venmo_status', '', 'id="paypalr-venmo-status"');
 
-        $script = '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.venmo.js') . '</script>';
+        $script = $this->getWalletAssets('jquery.paypalr.venmo.js');
 
         return [
             'id' => $this->code,
@@ -428,7 +439,7 @@ class paypalr_venmo extends base
         return $this->paypalCommon->createOrderGuid($order, $ppr_type);
     }
 
-    protected function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
+    public function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
     {
         global $messageStack;
 

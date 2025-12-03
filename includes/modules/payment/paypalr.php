@@ -2167,7 +2167,7 @@ class paypalr extends base
         return $response_message;
     }
 
-    protected function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
+    public function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
     {
         if ($log_only === false) {
             global $messageStack;
