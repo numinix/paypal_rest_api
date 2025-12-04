@@ -413,8 +413,11 @@ class paypalr_googlepay extends base
         $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
         $client_id = trim($client_id);
 
-        $merchant_id = defined('MODULE_PAYMENT_PAYPALR_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_MERCHANT_ID) : '*';
-        $merchant_id = ($merchant_id === '') ? '*' : $merchant_id;
+        // Note: Google Pay requires the Google Merchant ID from the Google Pay & Wallet console,
+        // NOT the PayPal merchant ID. Do NOT use MODULE_PAYMENT_PAYPALR_MERCHANT_ID as it's a
+        // language label constant ("Merchant ID:"), not a configuration value.
+        // Use MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID which is a proper configuration setting.
+        $merchant_id = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID) : '';
 
         $intent = (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')
             ? 'capture'

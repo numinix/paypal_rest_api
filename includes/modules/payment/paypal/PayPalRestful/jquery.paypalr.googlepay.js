@@ -235,7 +235,9 @@
             query += '&intent=' + encodeURIComponent(config.intent);
         }
 
-        if (config.merchantId) {
+        // Only include merchant-id if it's a valid PayPal merchant ID (alphanumeric, typically 13 chars).
+        // Do NOT include language label strings like "Merchant ID:" or placeholder values like "*".
+        if (config.merchantId && /^[A-Z0-9]{5,20}$/i.test(config.merchantId)) {
             query += '&merchant-id=' + encodeURIComponent(config.merchantId);
         }
 
