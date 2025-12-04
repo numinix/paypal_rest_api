@@ -11,6 +11,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_PAYER_ACTION' => 'An additional action is required to complete your Google Pay payment. Please choose another payment method or contact us for assistance.',
     'MODULE_PAYMENT_PAYPALR_PAYING_WITH_GOOGLE_PAY' => 'Paying with Google Pay',
     'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_INITIALIZE' => 'Google Pay is temporarily unavailable. Please try again or choose a different payment method.',
+    'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_MERCHANT_ID' => 'Google Pay is temporarily unavailable because the Google Merchant ID has not been configured. Please choose a different payment method or contact us.',
 ];
 
 return $define;
