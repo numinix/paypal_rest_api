@@ -130,14 +130,33 @@
         return response.json();
     }
 
+    /**
+     * Fetch SDK configuration only (no order creation).
+     * Used during initial button rendering.
+     */
+    function fetchWalletConfig() {
+        return fetch('ppr_wallet.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: 'venmo', config_only: true })
+        }).then(parseWalletResponse).catch(function (error) {
+            console.error('Unable to load Venmo configuration', error);
+            return { success: false, message: error && error.message ? error.message : 'Unable to load Venmo configuration' };
+        });
+    }
+
+    /**
+     * Create a PayPal order for Venmo.
+     * Called when user clicks the Venmo button.
+     */
     function fetchWalletOrder() {
         return fetch('ppr_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ wallet: 'venmo' })
         }).then(parseWalletResponse).catch(function (error) {
-            console.error('Unable to load Venmo configuration', error);
-            return { success: false, message: error && error.message ? error.message : 'Unable to load Venmo configuration' };
+            console.error('Unable to create Venmo order', error);
+            return { success: false, message: error && error.message ? error.message : 'Unable to create Venmo order' };
         });
     }
 
@@ -233,7 +252,8 @@
 
         container.innerHTML = '';
 
-        fetchWalletOrder().then(function (config) {
+        // First, fetch only the SDK configuration (no order creation)
+        fetchWalletConfig().then(function (config) {
             if (!config || config.success === false) {
                 console.warn('Unable to load Venmo configuration', config);
                 container.innerHTML = '<span class="paypalr-venmo-unavailable">Venmo unavailable</span>';
@@ -248,6 +268,7 @@
                         shape: 'rect',
                         height: 40
                     },
+                    // createOrder is called when user clicks the button - this is when we create the PayPal order
                     createOrder: function () {
                         return fetchWalletOrder().then(function (orderConfig) {
                             if (orderConfig && orderConfig.success !== false) {

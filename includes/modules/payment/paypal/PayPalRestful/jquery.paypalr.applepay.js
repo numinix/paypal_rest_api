@@ -130,14 +130,33 @@
         return response.json();
     }
 
+    /**
+     * Fetch SDK configuration only (no order creation).
+     * Used during initial button rendering.
+     */
+    function fetchWalletConfig() {
+        return fetch('ppr_wallet.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: 'apple_pay', config_only: true })
+        }).then(parseWalletResponse).catch(function (error) {
+            console.error('Unable to load Apple Pay configuration', error);
+            return { success: false, message: error && error.message ? error.message : 'Unable to load Apple Pay configuration' };
+        });
+    }
+
+    /**
+     * Create a PayPal order for Apple Pay.
+     * Called when user clicks the Apple Pay button.
+     */
     function fetchWalletOrder() {
         return fetch('ppr_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ wallet: 'apple_pay' })
         }).then(parseWalletResponse).catch(function (error) {
-            console.error('Unable to load Apple Pay configuration', error);
-            return { success: false, message: error && error.message ? error.message : 'Unable to load Apple Pay configuration' };
+            console.error('Unable to create Apple Pay order', error);
+            return { success: false, message: error && error.message ? error.message : 'Unable to create Apple Pay order' };
         });
     }
 
@@ -233,7 +252,8 @@
 
         container.innerHTML = '';
 
-        fetchWalletOrder().then(function (config) {
+        // First, fetch only the SDK configuration (no order creation)
+        fetchWalletConfig().then(function (config) {
             if (!config || config.success === false) {
                 console.warn('Unable to load Apple Pay configuration', config);
                 container.innerHTML = '<span class="paypalr-applepay-unavailable">Apple Pay unavailable</span>';
@@ -248,6 +268,7 @@
                         shape: 'rect',
                         height: 40
                     },
+                    // createOrder is called when user clicks the button - this is when we create the PayPal order
                     createOrder: function () {
                         return fetchWalletOrder().then(function (orderConfig) {
                             if (orderConfig && orderConfig.success !== false) {

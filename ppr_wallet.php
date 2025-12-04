@@ -53,6 +53,7 @@ $requestBody = file_get_contents('php://input');
 $requestData = json_decode($requestBody, true) ?: [];
 
 $wallet = $requestData['wallet'] ?? '';
+$configOnly = !empty($requestData['config_only']);
 
 $moduleMap = [
     'google_pay' => 'paypalr_googlepay',
@@ -78,13 +79,27 @@ if (empty($moduleInstance->enabled)) {
     return;
 }
 
-if (!method_exists($moduleInstance, 'ajaxCreateWalletOrder')) {
-    echo json_encode(['success' => false, 'message' => 'Wallet module missing AJAX handler']);
-    require DIR_WS_INCLUDES . 'application_bottom.php';
-    return;
+// -----
+// If config_only is requested, return just the SDK configuration needed to initialize
+// the PayPal button without creating a PayPal order. This is used during initial page
+// load to render the button. The actual order creation happens when user clicks the button.
+//
+if ($configOnly) {
+    if (!method_exists($moduleInstance, 'ajaxGetWalletConfig')) {
+        echo json_encode(['success' => false, 'message' => 'Wallet module missing config handler']);
+        require DIR_WS_INCLUDES . 'application_bottom.php';
+        return;
+    }
+    $response = $moduleInstance->ajaxGetWalletConfig();
+} else {
+    if (!method_exists($moduleInstance, 'ajaxCreateWalletOrder')) {
+        echo json_encode(['success' => false, 'message' => 'Wallet module missing AJAX handler']);
+        require DIR_WS_INCLUDES . 'application_bottom.php';
+        return;
+    }
+    $response = $moduleInstance->ajaxCreateWalletOrder();
 }
 
-$response = $moduleInstance->ajaxCreateWalletOrder();
 if (!is_array($response)) {
     $response = ['success' => false, 'message' => 'Unexpected wallet response'];
 }
