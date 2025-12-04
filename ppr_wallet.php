@@ -13,6 +13,42 @@ require 'includes/application_top.php';
 
 header('Content-Type: application/json');
 
+// -----
+// Validate cart state before proceeding. A valid session and non-empty cart are required.
+//
+if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart']) || $_SESSION['cart']->count_contents() < 1) {
+    echo json_encode(['success' => false, 'message' => 'Cart is empty or session expired']);
+    require DIR_WS_INCLUDES . 'application_bottom.php';
+    return;
+}
+
+// -----
+// Initialize order and order_totals to populate $order->info with proper values.
+// This is necessary because the wallet modules need order total information
+// to create PayPal orders, and the fallback in the observer relies on $order->info.
+//
+global $order, $order_total_modules;
+
+try {
+    if (!isset($order) || !is_object($order)) {
+        require_once DIR_WS_CLASSES . 'order.php';
+        $order = new order();
+    }
+
+    if (!isset($order_total_modules) || !is_object($order_total_modules)) {
+        require_once DIR_WS_CLASSES . 'order_total.php';
+        $order_total_modules = new order_total();
+    }
+
+    // Run order totals processing to ensure $order->info is populated
+    $order_total_modules->collect_posts();
+    $order_total_modules->pre_confirmation_check();
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'message' => 'Unable to initialize order totals']);
+    require DIR_WS_INCLUDES . 'application_bottom.php';
+    return;
+}
+
 $requestBody = file_get_contents('php://input');
 $requestData = json_decode($requestBody, true) ?: [];
 
