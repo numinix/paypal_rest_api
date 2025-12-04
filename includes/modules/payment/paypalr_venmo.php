@@ -243,7 +243,13 @@ class paypalr_venmo extends base
         if (defined('MODULE_PAYMENT_PAYPALR_VENMO_VERSION')) {
             switch (true) {
                 case version_compare(MODULE_PAYMENT_PAYPALR_VENMO_VERSION, '1.3.4', '<'):
-                    if (!defined('MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID')) {
+                    $account_id_setting = $db->Execute(
+                        "SELECT configuration_id
+                           FROM " . TABLE_CONFIGURATION . "
+                          WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID'
+                          LIMIT 1"
+                    );
+                    if (!defined('MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID') && $account_id_setting->EOF) {
                         $db->Execute(
                             "INSERT INTO " . TABLE_CONFIGURATION . "
                                 (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
