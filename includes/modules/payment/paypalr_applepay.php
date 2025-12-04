@@ -385,6 +385,38 @@ class paypalr_applepay extends base
         ];
     }
 
+    /**
+     * Get wallet SDK configuration without creating a PayPal order.
+     * Used during initial button rendering - the actual order creation
+     * happens when user clicks the button (in createOrder callback).
+     *
+     * @return array
+     */
+    public function ajaxGetWalletConfig(): array
+    {
+        $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
+        $client_id = trim($client_id);
+
+        $merchant_id = defined('MODULE_PAYMENT_PAYPALR_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_MERCHANT_ID) : '*';
+        $merchant_id = ($merchant_id === '') ? '*' : $merchant_id;
+
+        $intent = (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')
+            ? 'capture'
+            : 'authorize';
+
+        if ($client_id === '') {
+            return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALR_APPLEPAY_ERROR_INITIALIZE ?? 'Unable to start Apple Pay. Please try again.'];
+        }
+
+        return [
+            'success' => true,
+            'clientId' => $client_id,
+            'merchantId' => $merchant_id,
+            'currency' => $_SESSION['currency'] ?? 'USD',
+            'intent' => $intent,
+        ];
+    }
+
     public function ajaxCreateWalletOrder(): array
     {
         $response = $this->buildWalletAjaxResponse('apple_pay');
