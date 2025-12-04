@@ -40,13 +40,15 @@ namespace {
             
             $content = file_get_contents($jsPath);
 
-            // Check that intent is NOT appended to query string
-            // The old code had: if (config.intent) { query += '&intent=' + ...
-            if (preg_match("/query\s*\+?=.*['\"]&intent=/", $content)) {
-                fwrite(STDERR, "FAIL: $jsFile still includes 'intent' parameter in SDK URL query string\n");
+            // Check that intent is NOT appended to query string for SDK URL
+            // The old code had: query += '&intent=' + encodeURIComponent(config.intent)
+            // This checks for the specific pattern where intent is added to query via +=
+            // The pattern won't match comments or other string occurrences
+            if (preg_match("/query\s*\+=\s*['\"]&intent=/", $content)) {
+                fwrite(STDERR, "FAIL: $jsFile still appends 'intent' parameter to SDK URL query string\n");
                 $passed = false;
             } else {
-                fwrite(STDOUT, "✓ $jsFile does NOT include 'intent' parameter in SDK URL\n");
+                fwrite(STDOUT, "✓ $jsFile does NOT append 'intent' parameter to SDK URL\n");
             }
 
             // Check for the explanatory comment about intent
@@ -57,13 +59,21 @@ namespace {
                 $passed = false;
             }
 
-            // Verify that the buildSdkKey function does NOT use intent as a variable in the return statement
-            // We check for the pattern "var intent = config.intent" which was in the old code
-            if (preg_match('/function buildSdkKey\(config\)[\s\S]{0,200}var\s+intent\s*=/', $content)) {
-                fwrite(STDERR, "FAIL: $jsFile buildSdkKey should not have intent variable\n");
-                $passed = false;
+            // Verify that the buildSdkKey function does NOT declare an intent variable
+            // We extract the buildSdkKey function body and check for "var intent ="
+            // This is more robust than using arbitrary character limits
+            $functionPattern = '/function\s+buildSdkKey\s*\([^)]*\)\s*\{([^}]*)\}/s';
+            if (preg_match($functionPattern, $content, $matches)) {
+                $functionBody = $matches[1];
+                if (preg_match('/var\s+intent\s*=/', $functionBody)) {
+                    fwrite(STDERR, "FAIL: $jsFile buildSdkKey should not have intent variable\n");
+                    $passed = false;
+                } else {
+                    fwrite(STDOUT, "✓ $jsFile buildSdkKey does not use intent variable\n");
+                }
             } else {
-                fwrite(STDOUT, "✓ $jsFile buildSdkKey does not use intent variable\n");
+                fwrite(STDERR, "FAIL: $jsFile could not find buildSdkKey function\n");
+                $passed = false;
             }
         }
 
