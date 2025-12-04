@@ -162,9 +162,9 @@
 
     function buildSdkKey(config) {
         var currency = config.currency || 'USD';
-        var intent = config.intent || '';
         var merchantId = config.merchantId || '';
-        return [config.clientId, currency, intent, merchantId].join('|');
+        // Note: intent is not included in SDK key because it's not passed to the SDK URL
+        return [config.clientId, currency, merchantId].join('|');
     }
 
     function loadPayPalSdk(config) {
@@ -211,9 +211,8 @@
             + '&components=buttons,googlepay,applepay,venmo'
             + '&currency=' + encodeURIComponent(config.currency || 'USD');
 
-        if (config.intent) {
-            query += '&intent=' + encodeURIComponent(config.intent);
-        }
+        // Note: The 'intent' parameter is NOT a valid PayPal SDK URL parameter.
+        // Intent (capture/authorize) is specified when creating the PayPal order, not when loading the SDK.
 
         // Only include merchant-id if it's a valid PayPal merchant ID (alphanumeric, typically 13 chars).
         // Do NOT include language label strings like "Merchant ID:" or placeholder values like "*".
