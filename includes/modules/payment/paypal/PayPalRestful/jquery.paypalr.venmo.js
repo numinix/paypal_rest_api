@@ -105,13 +105,39 @@
         }
     }
 
+    function parseWalletResponse(response) {
+        var contentType = (response.headers && response.headers.get('content-type')) || '';
+
+        if (!response.ok) {
+            return response.text().then(function (body) {
+                var message = 'Wallet endpoint returned HTTP ' + response.status;
+                var trimmed = (body || '').trim();
+
+                if (trimmed) {
+                    message += ': ' + trimmed;
+                }
+
+                throw new Error(message);
+            });
+        }
+
+        if (contentType.indexOf('application/json') === -1) {
+            return response.text().then(function (body) {
+                throw new Error('Wallet endpoint did not return JSON: ' + (body || '').trim());
+            });
+        }
+
+        return response.json();
+    }
+
     function fetchWalletOrder() {
         return fetch('ppr_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ wallet: 'venmo' })
-        }).then(function(response) {
-            return response.json();
+        }).then(parseWalletResponse).catch(function (error) {
+            console.error('Unable to load Venmo configuration', error);
+            return { success: false, message: error && error.message ? error.message : 'Unable to load Venmo configuration' };
         });
     }
 

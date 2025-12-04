@@ -446,28 +446,46 @@ class paypalr_venmo extends base
         return (defined('IS_AJAX_REQUEST') && IS_AJAX_REQUEST === true);
     }
 
-    protected function createPayPalOrder(string $ppr_type): bool
+    protected function createPayPalOrder(string $ppr_type, bool $redirectOnError = true): bool
     {
         global $order, $currencies;
 
-        $order_info = $this->getOrderTotalsInfo();
+        $order_info = $this->getOrderTotalsInfo($redirectOnError);
+
+        if (count($order_info) === 0) {
+            return false;
+        }
 
         return $this->paypalCommon->createPayPalOrder($this, $order, $order_info, $ppr_type, $currencies);
     }
 
-    protected function getOrderTotalsInfo(): array
+    protected function getOrderTotalsInfo(bool $redirectOnError = true): array
     {
         global $zcObserverPaypalrestful;
 
         if (!isset($zcObserverPaypalrestful) || !is_object($zcObserverPaypalrestful)) {
-            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
+            $message = MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing';
+
+            if ($redirectOnError) {
+                $this->setMessageAndRedirect($message, FILENAME_CHECKOUT_PAYMENT);
+            } else {
+                $this->log->write('Venmo: ' . $message . '; wallet request will not redirect.');
+            }
+
+            return [];
         }
 
         $order_info = $zcObserverPaypalrestful->getLastOrderValues();
 
         if (count($order_info) === 0) {
-            $this->log->write('Venmo: Missing order_total modifications; getLastOrderValues returned empty array.');
-            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
+            $message = 'Missing order_total modifications; getLastOrderValues returned empty array.';
+            $this->log->write('Venmo: ' . $message);
+
+            if ($redirectOnError) {
+                $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
+            }
+
+            return [];
         }
 
         $order_info['free_shipping_coupon'] = $zcObserverPaypalrestful->orderHasFreeShippingCoupon();
@@ -495,7 +513,7 @@ class paypalr_venmo extends base
             return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALR_VENMO_ERROR_INITIALIZE ?? 'Unable to start Venmo. Please try again.'];
         }
 
-        if ($this->createPayPalOrder($ppr_type) === false) {
+        if ($this->createPayPalOrder($ppr_type, false) === false) {
             return ['success' => false];
         }
 
@@ -555,7 +573,14 @@ class paypalr_venmo extends base
     {
         global $order;
 
-        $order_info = $this->getOrderTotalsInfo();
+        $order_info = $this->getOrderTotalsInfo(false);
+
+        if (count($order_info) === 0) {
+            return [
+                'success' => false,
+                'message' => MODULE_PAYMENT_PAYPALR_ALERT_MISSING_OBSERVER ?? 'Observer missing',
+            ];
+        }
 
         $this->paymentIsPending = false;
 
