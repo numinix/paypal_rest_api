@@ -636,6 +636,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
             'attributes' => [
                 'vault' => [
                     'store_in_vault' => 'ON_SUCCESS',
+                    'usage_type' => 'MERCHANT',
+                    'customer_type' => 'CONSUMER',
                 ],
             ],
         ];
@@ -662,6 +664,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
             'attributes' => [
                 'vault' => [
                     'store_in_vault' => 'ON_SUCCESS',
+                    'usage_type' => 'MERCHANT',
+                    'customer_type' => 'CONSUMER',
                 ],
             ],
         ];
