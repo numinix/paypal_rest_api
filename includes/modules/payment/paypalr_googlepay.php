@@ -5,7 +5,7 @@
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.3
+ * Last updated: v1.3.5
  */
 /**
  * Load the support class' auto-loader and common class.
@@ -52,7 +52,7 @@ class paypalr_googlepay extends base
         return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.3';
+    protected const CURRENT_VERSION = '1.3.5';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -242,10 +242,26 @@ class paypalr_googlepay extends base
         // Check for version-specific configuration updates
         if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION')) {
             switch (true) {
-                // Add future version-specific upgrades here
-                // case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.4', '<'):
-                //     // Add v1.3.4-specific changes here
-                
+                case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.4', '<'):
+                    if (!defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID')) {
+                        $db->Execute(
+                            "INSERT INTO " . TABLE_CONFIGURATION . "
+                                (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                             VALUES
+                                ('Google Merchant ID', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'Enter the Google Merchant ID associated with your Google Pay & Wallet console. This value is required for Google Pay transactions.', 6, 0, NULL, NULL, now())"
+                        );
+                    }
+                    // Fall through to update the stored version number
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.5', '<'):
+                    $db->Execute(
+                        "UPDATE " . TABLE_CONFIGURATION . "
+                            SET configuration_description = 'Enter the Google Merchant ID associated with your Google Pay & Wallet console. This value is required for Google Pay transactions.'
+                          WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID'
+                          LIMIT 1"
+                    );
+                    // Fall through to update the stored version number
+
                 default:
                     break;
             }
@@ -454,8 +470,10 @@ class paypalr_googlepay extends base
         $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
         $client_id = trim($client_id);
 
-        $merchant_id = defined('MODULE_PAYMENT_PAYPALR_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_MERCHANT_ID) : '*';
-        $merchant_id = ($merchant_id === '') ? '*' : $merchant_id;
+        $merchant_id = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID) : '';
+        if ($merchant_id === '') {
+            return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_MERCHANT_ID ?? 'Google Pay is temporarily unavailable. Please try again or choose a different payment method.'];
+        }
 
         $intent = (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || ($ppr_type !== 'card' && MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)'))
             ? 'CAPTURE'
@@ -713,8 +731,9 @@ class paypalr_googlepay extends base
              VALUES
                 ('Module Version', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
                 ('Enable PayPal Google Pay?', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS', 'False', 'Do you want to enable PayPal Google Pay payments?', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
+                ('Google Merchant ID', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'Enter the Google Merchant ID associated with your Google Pay & Wallet console. This value is required for Google Pay transactions.', 6, 0, NULL, NULL, now()),
                 ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
-                ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())"
+                ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())" 
         );
         
         // Define the module's current version so that the tableCheckup method will apply all changes
@@ -727,6 +746,7 @@ class paypalr_googlepay extends base
         return [
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS',
+            'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE',
         ];

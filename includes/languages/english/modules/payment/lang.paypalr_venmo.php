@@ -11,6 +11,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_VENMO_ERROR_PAYER_ACTION' => 'An additional action is required to complete your Venmo payment. Please choose another payment method or contact us for assistance.',
     'MODULE_PAYMENT_PAYPALR_PAYING_WITH_VENMO' => 'Paying with Venmo',
     'MODULE_PAYMENT_PAYPALR_VENMO_ERROR_INITIALIZE' => 'Venmo is temporarily unavailable. Please try again or choose a different payment method.',
+    'MODULE_PAYMENT_PAYPALR_VENMO_ERROR_ACCOUNT_ID' => 'Venmo is temporarily unavailable because the Venmo business profile ID has not been configured. Please choose a different payment method or contact us.',
 ];
 
 return $define;
