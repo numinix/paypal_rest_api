@@ -5,7 +5,7 @@
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.5
+ * Last updated: v1.3.6
  */
 /**
  * Load the support class' auto-loader and common class.
@@ -52,7 +52,7 @@ class paypalr_venmo extends base
         return defined('MODULE_PAYMENT_PAYPALR_VENMO_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_VENMO_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.5';
+    protected const CURRENT_VERSION = '1.3.6';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -257,6 +257,15 @@ class paypalr_venmo extends base
                     $db->Execute(
                         "UPDATE " . TABLE_CONFIGURATION . "
                             SET configuration_description = 'Enter the Venmo business profile or account ID tied to your PayPal Advanced Checkout credentials. This value is required for Venmo transactions.'
+                          WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID'
+                          LIMIT 1"
+                    );
+                    // Fall through to update the stored version number
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VENMO_VERSION, '1.3.6', '<'):
+                    $db->Execute(
+                        "UPDATE " . TABLE_CONFIGURATION . "
+                            SET configuration_description = 'Optional Venmo business profile ID reserved for future Venmo buttons; not required for PayPal-managed Venmo checkout.'
                           WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID'
                           LIMIT 1"
                     );
@@ -471,9 +480,6 @@ class paypalr_venmo extends base
         $client_id = trim($client_id);
 
         $merchant_id = defined('MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID) : '';
-        if ($merchant_id === '') {
-            return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALR_VENMO_ERROR_ACCOUNT_ID ?? 'Venmo is temporarily unavailable. Please try again or choose a different payment method.'];
-        }
 
         $intent = (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || ($ppr_type !== 'card' && MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)'))
             ? 'CAPTURE'
@@ -729,7 +735,7 @@ class paypalr_venmo extends base
              VALUES
                 ('Module Version', 'MODULE_PAYMENT_PAYPALR_VENMO_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
                 ('Enable PayPal Venmo?', 'MODULE_PAYMENT_PAYPALR_VENMO_STATUS', 'False', 'Do you want to enable PayPal Venmo payments?', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
-                ('Venmo Business Profile ID', 'MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID', '', 'Enter the Venmo business profile or account ID tied to your PayPal Advanced Checkout credentials. This value is required for Venmo transactions.', 6, 0, NULL, NULL, now()),
+                ('Venmo Business Profile ID', 'MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID', '', 'Optional Venmo business profile ID reserved for future Venmo buttons; not required for PayPal-managed Venmo checkout.', 6, 0, NULL, NULL, now()),
                 ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_VENMO_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
                 ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_VENMO_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())" 
         );
