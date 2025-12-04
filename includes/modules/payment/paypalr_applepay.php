@@ -397,8 +397,10 @@ class paypalr_applepay extends base
         $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
         $client_id = trim($client_id);
 
-        $merchant_id = defined('MODULE_PAYMENT_PAYPALR_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_MERCHANT_ID) : '*';
-        $merchant_id = ($merchant_id === '') ? '*' : $merchant_id;
+        // Note: Apple Pay via PayPal does not require a separate merchant-id parameter in the SDK URL.
+        // PayPal manages the Apple Pay merchant configuration internally through your PayPal account.
+        // Do NOT use MODULE_PAYMENT_PAYPALR_MERCHANT_ID as it's a language label, not a configuration value.
+        $merchant_id = '';
 
         $intent = (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')
             ? 'capture'
@@ -504,8 +506,10 @@ class paypalr_applepay extends base
         $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
         $client_id = trim($client_id);
 
-        $merchant_id = defined('MODULE_PAYMENT_PAYPALR_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_MERCHANT_ID) : '*';
-        $merchant_id = ($merchant_id === '') ? '*' : $merchant_id;
+        // Note: Apple Pay via PayPal does not require a separate merchant-id parameter in the SDK URL.
+        // PayPal manages the Apple Pay merchant configuration internally through your PayPal account.
+        // Do NOT use MODULE_PAYMENT_PAYPALR_MERCHANT_ID as it's a language label, not a configuration value.
+        $merchant_id = '';
 
         $intent = (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || ($ppr_type !== 'card' && MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)'))
             ? 'CAPTURE'
