@@ -83,14 +83,15 @@ if (strpos($googlePayJs, "hidePaymentMethodContainer()") === false) {
     echo "✓ Google Pay JS calls hidePaymentMethodContainer when ineligible\n";
 }
 
-// Test 8: Google Pay validates merchant ID before rendering
-// Check for merchant ID validation logic (either regex validation or checking if merchantId is truthy)
+// Test 8: Google Pay validates merchant ID before rendering (required in production, optional in sandbox)
+// Check for merchant ID validation logic and sandbox environment check
 if (strpos($googlePayJs, 'config.merchantId') === false || 
-    (strpos($googlePayJs, '.test(config.merchantId)') === false && strpos($googlePayJs, 'test(config.merchantId)') === false)) {
+    strpos($googlePayJs, 'config.environment') === false ||
+    strpos($googlePayJs, 'isSandbox') === false) {
     $testPassed = false;
-    $errors[] = "Google Pay JS should validate merchant ID before rendering";
+    $errors[] = "Google Pay JS should validate merchant ID (required in production, optional in sandbox)";
 } else {
-    echo "✓ Google Pay JS validates merchant ID before rendering\n";
+    echo "✓ Google Pay JS validates merchant ID (required in production, optional in sandbox)\n";
 }
 
 // Test 9: Google Pay verifies GOOGLEPAY funding source

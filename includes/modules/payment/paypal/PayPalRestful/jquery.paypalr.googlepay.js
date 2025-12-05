@@ -329,9 +329,13 @@
                 return null;
             }
 
-            // Google Pay requires a merchant ID to be configured
-            if (!config.merchantId || !/^[A-Z0-9]{5,20}$/i.test(config.merchantId)) {
-                console.warn('Google Pay: Invalid or missing Google Merchant ID');
+            // Google Pay requires a merchant ID in production mode
+            // In sandbox mode, Google Pay can be tested without a merchant ID
+            var isSandbox = config.environment === 'sandbox';
+            var hasMerchantId = config.merchantId && /^[A-Z0-9]{5,20}$/i.test(config.merchantId);
+
+            if (!isSandbox && !hasMerchantId) {
+                console.warn('Google Pay: Invalid or missing Google Merchant ID (required in production)');
                 hidePaymentMethodContainer();
                 return null;
             }
