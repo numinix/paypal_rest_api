@@ -34,12 +34,12 @@ if (strpos($applePayJs, 'function hidePaymentMethodContainer()') === false) {
     echo "✓ Apple Pay JS has hidePaymentMethodContainer function\n";
 }
 
-// Test 2: Apple Pay uses isEligible check
-if (strpos($applePayJs, 'buttonInstance.isEligible') === false) {
+// Test 2: Apple Pay uses isEligible check (native API uses applepay.isEligible())
+if (strpos($applePayJs, 'applepay.isEligible') === false) {
     $testPassed = false;
-    $errors[] = "Apple Pay JS should check button eligibility with isEligible";
+    $errors[] = "Apple Pay JS should check eligibility with applepay.isEligible";
 } else {
-    echo "✓ Apple Pay JS checks button eligibility with isEligible\n";
+    echo "✓ Apple Pay JS checks eligibility with applepay.isEligible\n";
 }
 
 // Test 3: Apple Pay calls hidePaymentMethodContainer when ineligible
@@ -171,12 +171,13 @@ if (strpos($venmoJs, "style.display = 'none'") === false) {
 }
 
 // Test 15: All JS files create appropriate eligibility check mechanisms
-// Apple Pay and Venmo still use buttonInstance, Google Pay uses native API
-if (strpos($applePayJs, 'var buttonInstance = paypal.Buttons') === false) {
+// Apple Pay uses native Applepay API, Google Pay uses native Googlepay API, Venmo uses buttonInstance
+// Apple Pay uses native Applepay API with ApplePaySession
+if (strpos($applePayJs, 'paypal.Applepay()') === false || strpos($applePayJs, 'ApplePaySession') === false) {
     $testPassed = false;
-    $errors[] = "Apple Pay JS should create buttonInstance to check eligibility";
+    $errors[] = "Apple Pay JS should use native Applepay API and ApplePaySession";
 } else {
-    echo "✓ Apple Pay JS creates buttonInstance to check eligibility\n";
+    echo "✓ Apple Pay JS uses native Applepay API and ApplePaySession\n";
 }
 
 // Google Pay uses native Googlepay API with PaymentsClient

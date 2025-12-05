@@ -107,9 +107,11 @@ namespace {
             // Note: 'venmo' is NOT a valid SDK component. Venmo is a funding source that works
             // through the 'buttons' component using paypal.FUNDING.VENMO
             // For native Google Pay implementation, only 'googlepay' component is needed.
+            // For native Apple Pay implementation, only 'applepay' component is needed.
             $hasValidComponents = (
                 strpos($content, "&components=buttons,googlepay,applepay") !== false ||
-                ($jsFile === 'jquery.paypalr.googlepay.js' && strpos($content, "&components=googlepay") !== false)
+                ($jsFile === 'jquery.paypalr.googlepay.js' && strpos($content, "&components=googlepay") !== false) ||
+                ($jsFile === 'jquery.paypalr.applepay.js' && strpos($content, "&components=applepay") !== false)
             );
             if ($hasValidComponents) {
                 fwrite(STDOUT, "✓ $jsFile includes valid components in SDK URL (no venmo)\n");
