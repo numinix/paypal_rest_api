@@ -12,6 +12,7 @@
 
 use PayPalRestful\Api\Data\CountryCodes;
 use PayPalRestful\Api\PayPalRestfulApi;
+use PayPalRestful\Common\Logger;
 use PayPalRestful\Zc2Pp\Amount;
 
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
@@ -27,6 +28,7 @@ class zcObserverPaypalrestful
     protected array $orderTotalChanges = [];
     protected bool $freeShippingCoupon = false;
     protected bool $headerAssetsSent = false;
+    protected ?Logger $log = null;
 
     public function __construct()
     {
@@ -51,6 +53,14 @@ class zcObserverPaypalrestful
 
         if (!$anyModuleEnabled) {
             return;
+        }
+
+        // -----
+        // Initialize the logger for SDK configuration debugging.
+        //
+        $this->log = new Logger();
+        if (strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false) {
+            $this->log->enableDebug();
         }
 
         // -----
@@ -450,16 +460,31 @@ class zcObserverPaypalrestful
             $js_fields['currency'] = $amount->getDefaultCurrencyCode();
         }
 
-        // possible components for future SDK integration: buttons,marks,messages,funding-eligibility,hosted-fields,card-fields,applepay
+        // -----
+        // Build the list of SDK components to load. Valid components are:
+        // buttons, marks, messages, funding-eligibility, hosted-fields, card-fields, googlepay, applepay
+        //
+        // Note: 'venmo' is NOT a valid SDK component. Venmo is a funding source that works through
+        // the 'buttons' component using paypal.FUNDING.VENMO. When Venmo is enabled, we add the
+        // 'buttons' component which allows rendering Venmo buttons via paypal.Buttons({ fundingSource: paypal.FUNDING.VENMO }).
+        //
         $components = ['messages'];
-        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS !== 'False') {
+
+        // Add 'buttons' component if any wallet payment method is enabled that uses PayPal Buttons
+        // (Venmo uses buttons with FUNDING.VENMO, PayPal wallet uses buttons with default funding)
+        $needsButtonsComponent = (
+            (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True')
+        );
+        if ($needsButtonsComponent) {
+            $components[] = 'buttons';
+        }
+
+        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True') {
             $components[] = 'googlepay';
         }
-        if (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS !== 'False') {
+        if (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True') {
             $components[] = 'applepay';
-        }
-        if (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS !== 'False') {
-            $components[] = 'venmo';
         }
         $js_fields['components'] = implode(',', array_unique($components));
 
@@ -472,6 +497,33 @@ class zcObserverPaypalrestful
         $js_fields['integration-date'] = '2025-08-01';
         $js_scriptparams[] = 'data-partner-attribution-id="' . PayPalRestfulApi::PARTNER_ATTRIBUTION_ID . '"';
         $js_scriptparams[] = 'data-namespace="PayPalSDK"';
+
+        // -----
+        // Log SDK configuration for debugging purposes. This helps diagnose issues
+        // like 400 errors from PayPal SDK when components are not enabled for the account.
+        //
+        if ($this->log !== null) {
+            $sdk_url = $js_url . '?' . str_replace('%2C', ',', http_build_query($js_fields));
+            $loggedClientId = (strlen($js_fields['client-id']) > 10)
+                ? substr($js_fields['client-id'], 0, 6) . '...' . substr($js_fields['client-id'], -4)
+                : $js_fields['client-id'];
+            $this->log->write(
+                "PayPal SDK Configuration for page '$current_page':\n" .
+                "  - Environment: " . MODULE_PAYMENT_PAYPALR_SERVER . "\n" .
+                "  - Client ID: " . $loggedClientId . "\n" .
+                "  - Components: " . $js_fields['components'] . "\n" .
+                "  - Currency: " . ($js_fields['currency'] ?? 'not set') . "\n" .
+                "  - Buyer Country: " . ($js_fields['buyer-country'] ?? 'not set') . "\n" .
+                "  - Enabled Modules: " .
+                    "PayPal=" . (defined('MODULE_PAYMENT_PAYPALR_STATUS') ? MODULE_PAYMENT_PAYPALR_STATUS : 'n/a') . ", " .
+                    "GooglePay=" . (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS : 'n/a') . ", " .
+                    "ApplePay=" . (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS : 'n/a') . ", " .
+                    "Venmo=" . (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') ? MODULE_PAYMENT_PAYPALR_VENMO_STATUS : 'n/a') . "\n" .
+                "  - SDK URL: " . $sdk_url,
+                true,
+                'before'
+            );
+        }
 ?>
 
 <script title="PayPalSDK" id="PayPalJSSDK" src="<?= $js_url . '?'. str_replace('%2C', ',', http_build_query($js_fields)) ?>" <?= implode(' ', $js_scriptparams) ?> async></script>

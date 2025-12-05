@@ -104,11 +104,21 @@ namespace {
                 $passed = false;
             }
 
-            if (strpos($content, "&components=buttons,googlepay,applepay,venmo") !== false) {
-                fwrite(STDOUT, "✓ $jsFile includes components in SDK URL\n");
+            // Note: 'venmo' is NOT a valid SDK component. Venmo is a funding source that works
+            // through the 'buttons' component using paypal.FUNDING.VENMO
+            if (strpos($content, "&components=buttons,googlepay,applepay") !== false) {
+                fwrite(STDOUT, "✓ $jsFile includes valid components in SDK URL (no venmo)\n");
             } else {
-                fwrite(STDERR, "FAIL: $jsFile should include components in SDK URL\n");
+                fwrite(STDERR, "FAIL: $jsFile should include valid components (buttons,googlepay,applepay) in SDK URL\n");
                 $passed = false;
+            }
+
+            // Verify 'venmo' is NOT in the components list
+            if (strpos($content, "components=") !== false && strpos($content, ",venmo") !== false) {
+                fwrite(STDERR, "FAIL: $jsFile should NOT include 'venmo' in components (venmo is not a valid SDK component)\n");
+                $passed = false;
+            } else {
+                fwrite(STDOUT, "✓ $jsFile correctly excludes 'venmo' from SDK components\n");
             }
 
             if (strpos($content, "&currency=") !== false) {
