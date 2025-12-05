@@ -1,3 +1,0 @@
-<?php
-  define('TEXT_LOGIN_ERROR_GUEST', 'No puede iniciar sesi&#243;n con una cuenta de invitado. Por favor registre una cuenta completa.');
-  define('ENTRY_EMAIL_ADDRESS_ERROR_GUEST', 'Existe una cuenta de invitado para esta direcci&#243;n de correo electr&#243;nico. Para acceder a las funciones completas de la cuenta, realice un restablecimiento de contraseña a su direcci&#243;n de correo electr&#243;nico.');

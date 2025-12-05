@@ -1,3 +1,0 @@
-<?php
-//Fixed Jquery errors
-?>

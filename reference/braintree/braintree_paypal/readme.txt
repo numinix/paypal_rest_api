@@ -1,1 +1,0 @@
-See /docs/Braintree PayPal/readme.html for documentation
