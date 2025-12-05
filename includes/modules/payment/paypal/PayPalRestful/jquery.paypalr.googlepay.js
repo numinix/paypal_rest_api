@@ -105,6 +105,54 @@
     }
 
     /**
+     * Hide the entire payment method container when payment is not eligible.
+     * This hides the parent element (e.g., paypalr_googlepay-custom-control-container)
+     * so the user doesn't see an unavailable payment option.
+     */
+    function hidePaymentMethodContainer() {
+        var container = document.getElementById('paypalr-googlepay-button');
+        if (!container) {
+            return;
+        }
+
+        // Find the parent container that wraps this payment method
+        // Common patterns: closest .moduleRow, closest payment container div, or parent with class containing 'container'
+        var parentContainer = container.closest('[id*="paypalr_googlepay"][id*="container"]') 
+            || container.closest('.moduleRow')
+            || container.closest('[class*="paypalr_googlepay"]');
+
+        // If we found a specific parent container, hide it
+        if (parentContainer) {
+            parentContainer.style.display = 'none';
+            return;
+        }
+
+        // Fallback: traverse up and hide a suitable parent
+        // Look for common payment module wrapper patterns
+        var parent = container.parentElement;
+        var depth = 0;
+        var maxDepth = 5;
+
+        while (parent && depth < maxDepth) {
+            // Check if parent has an ID or class indicating it's a payment container
+            var parentId = (parent.id || '').toLowerCase();
+            var parentClass = (parent.className || '').toLowerCase();
+
+            if (parentId.indexOf('paypalr_googlepay') !== -1 || 
+                parentClass.indexOf('paypalr_googlepay') !== -1 ||
+                parentClass.indexOf('modulerow') !== -1) {
+                parent.style.display = 'none';
+                return;
+            }
+            parent = parent.parentElement;
+            depth++;
+        }
+
+        // Last resort: just hide the button container itself and clear content
+        container.style.display = 'none';
+    }
+
+    /**
      * Hide the textual label so the PayPal-rendered button (or placeholder)
      * is the only visible call-to-action.
      */
@@ -277,13 +325,32 @@
         fetchWalletConfig().then(function (config) {
             if (!config || config.success === false) {
                 console.warn('Unable to load Google Pay configuration', config);
-                container.innerHTML = '<span class="paypalr-googlepay-unavailable">Google Pay unavailable</span>';
+                hidePaymentMethodContainer();
+                return null;
+            }
+
+            // Google Pay requires a merchant ID in production mode
+            // In sandbox mode, Google Pay can be tested without a merchant ID
+            var isSandbox = config.environment === 'sandbox';
+            var hasMerchantId = config.merchantId && /^[A-Z0-9]{5,20}$/i.test(config.merchantId);
+
+            if (!isSandbox && !hasMerchantId) {
+                console.warn('Google Pay: Invalid or missing Google Merchant ID (required in production)');
+                hidePaymentMethodContainer();
                 return null;
             }
 
             sdkState.config = config;
             return loadPayPalSdk(config).then(function (paypal) {
-                return paypal.Buttons({
+                // Verify GOOGLEPAY funding source is available
+                if (!paypal.FUNDING || !paypal.FUNDING.GOOGLEPAY) {
+                    console.warn('Google Pay funding source not available in PayPal SDK');
+                    hidePaymentMethodContainer();
+                    return null;
+                }
+
+                // Create the button instance to check eligibility
+                var buttonInstance = paypal.Buttons({
                     fundingSource: paypal.FUNDING.GOOGLEPAY,
                     style: {
                         shape: 'rect',
@@ -323,11 +390,20 @@
                         setGooglePayPayload({});
                         document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: {} }));
                     }
-                }).render('#paypalr-googlepay-button');
+                });
+
+                // Check if Google Pay is eligible for this user/device
+                if (typeof buttonInstance.isEligible === 'function' && !buttonInstance.isEligible()) {
+                    console.log('Google Pay is not eligible for this user/device');
+                    hidePaymentMethodContainer();
+                    return null;
+                }
+
+                return buttonInstance.render('#paypalr-googlepay-button');
             });
         }).catch(function (error) {
             console.error('Failed to render Google Pay button', error);
-            container.innerHTML = '<span class="paypalr-googlepay-unavailable">Google Pay unavailable</span>';
+            hidePaymentMethodContainer();
         });
     }
 
