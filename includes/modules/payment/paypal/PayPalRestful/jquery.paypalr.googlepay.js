@@ -562,7 +562,8 @@
                 }
 
                 // Create Google Payments Client
-                var googlePayEnvironment = isSandbox ? 'TEST' : 'PRODUCTION';
+                // Use environment from config (stored in sdkState) to determine Google Pay environment
+                var googlePayEnvironment = (sdkState.config && sdkState.config.environment === 'sandbox') ? 'TEST' : 'PRODUCTION';
                 var paymentsClient = new google.payments.api.PaymentsClient({
                     environment: googlePayEnvironment
                 });
