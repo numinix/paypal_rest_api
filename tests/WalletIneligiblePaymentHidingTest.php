@@ -34,12 +34,12 @@ if (strpos($applePayJs, 'function hidePaymentMethodContainer()') === false) {
     echo "✓ Apple Pay JS has hidePaymentMethodContainer function\n";
 }
 
-// Test 2: Apple Pay uses isEligible check
-if (strpos($applePayJs, 'buttonInstance.isEligible') === false) {
+// Test 2: Apple Pay uses isEligible check (native API uses applepay.isEligible())
+if (strpos($applePayJs, 'applepay.isEligible') === false) {
     $testPassed = false;
-    $errors[] = "Apple Pay JS should check button eligibility with isEligible";
+    $errors[] = "Apple Pay JS should check eligibility with applepay.isEligible";
 } else {
-    echo "✓ Apple Pay JS checks button eligibility with isEligible\n";
+    echo "✓ Apple Pay JS checks eligibility with applepay.isEligible\n";
 }
 
 // Test 3: Apple Pay calls hidePaymentMethodContainer when ineligible
@@ -67,8 +67,8 @@ if (strpos($googlePayJs, 'function hidePaymentMethodContainer()') === false) {
     echo "✓ Google Pay JS has hidePaymentMethodContainer function\n";
 }
 
-// Test 6: Google Pay uses isEligible check
-if (strpos($googlePayJs, 'buttonInstance.isEligible') === false) {
+// Test 6: Google Pay uses isEligible check (native API uses googlepay.isEligible())
+if (strpos($googlePayJs, 'googlepay.isEligible') === false) {
     $testPassed = false;
     $errors[] = "Google Pay JS should check button eligibility with isEligible";
 } else {
@@ -94,12 +94,12 @@ if (strpos($googlePayJs, 'config.merchantId') === false ||
     echo "✓ Google Pay JS validates merchant ID (required in production, optional in sandbox)\n";
 }
 
-// Test 9: Google Pay verifies GOOGLEPAY funding source
-if (strpos($googlePayJs, 'paypal.FUNDING.GOOGLEPAY') === false) {
+// Test 9: Google Pay uses native Googlepay API (paypal.Googlepay)
+if (strpos($googlePayJs, 'paypal.Googlepay') === false) {
     $testPassed = false;
-    $errors[] = "Google Pay JS should verify GOOGLEPAY funding source";
+    $errors[] = "Google Pay JS should use native PayPal Googlepay API";
 } else {
-    echo "✓ Google Pay JS verifies GOOGLEPAY funding source\n";
+    echo "✓ Google Pay JS uses native PayPal Googlepay API\n";
 }
 
 // Test 10: Venmo has hidePaymentMethodContainer function
@@ -170,19 +170,22 @@ if (strpos($venmoJs, "style.display = 'none'") === false) {
     echo "✓ Venmo JS hidePaymentMethodContainer uses display:none\n";
 }
 
-// Test 15: All JS files create buttonInstance before checking eligibility
-if (strpos($applePayJs, 'var buttonInstance = paypal.Buttons') === false) {
+// Test 15: All JS files create appropriate eligibility check mechanisms
+// Apple Pay uses native Applepay API, Google Pay uses native Googlepay API, Venmo uses buttonInstance
+// Apple Pay uses native Applepay API with ApplePaySession
+if (strpos($applePayJs, 'paypal.Applepay()') === false || strpos($applePayJs, 'ApplePaySession') === false) {
     $testPassed = false;
-    $errors[] = "Apple Pay JS should create buttonInstance to check eligibility";
+    $errors[] = "Apple Pay JS should use native Applepay API and ApplePaySession";
 } else {
-    echo "✓ Apple Pay JS creates buttonInstance to check eligibility\n";
+    echo "✓ Apple Pay JS uses native Applepay API and ApplePaySession\n";
 }
 
-if (strpos($googlePayJs, 'var buttonInstance = paypal.Buttons') === false) {
+// Google Pay uses native Googlepay API with PaymentsClient
+if (strpos($googlePayJs, 'paypal.Googlepay()') === false || strpos($googlePayJs, 'google.payments.api.PaymentsClient') === false) {
     $testPassed = false;
-    $errors[] = "Google Pay JS should create buttonInstance to check eligibility";
+    $errors[] = "Google Pay JS should use native Googlepay API and PaymentsClient";
 } else {
-    echo "✓ Google Pay JS creates buttonInstance to check eligibility\n";
+    echo "✓ Google Pay JS uses native Googlepay API and PaymentsClient\n";
 }
 
 if (strpos($venmoJs, 'var buttonInstance = paypal.Buttons') === false) {
