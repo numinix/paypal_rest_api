@@ -95,6 +95,54 @@
         }
     }
 
+    /**
+     * Hide the entire payment method container when payment is not eligible.
+     * This hides the parent element (e.g., paypalr_venmo-custom-control-container)
+     * so the user doesn't see an unavailable payment option.
+     */
+    function hidePaymentMethodContainer() {
+        var container = document.getElementById('paypalr-venmo-button');
+        if (!container) {
+            return;
+        }
+
+        // Find the parent container that wraps this payment method
+        // Common patterns: closest .moduleRow, closest payment container div, or parent with class containing 'container'
+        var parentContainer = container.closest('[id*="paypalr_venmo"][id*="container"]') 
+            || container.closest('.moduleRow')
+            || container.closest('[class*="paypalr_venmo"]');
+
+        // If we found a specific parent container, hide it
+        if (parentContainer) {
+            parentContainer.style.display = 'none';
+            return;
+        }
+
+        // Fallback: traverse up and hide a suitable parent
+        // Look for common payment module wrapper patterns
+        var parent = container.parentElement;
+        var depth = 0;
+        var maxDepth = 5;
+
+        while (parent && depth < maxDepth) {
+            // Check if parent has an ID or class indicating it's a payment container
+            var parentId = (parent.id || '').toLowerCase();
+            var parentClass = (parent.className || '').toLowerCase();
+
+            if (parentId.indexOf('paypalr_venmo') !== -1 || 
+                parentClass.indexOf('paypalr_venmo') !== -1 ||
+                parentClass.indexOf('modulerow') !== -1) {
+                parent.style.display = 'none';
+                return;
+            }
+            parent = parent.parentElement;
+            depth++;
+        }
+
+        // Last resort: just hide the button container itself and clear content
+        container.style.display = 'none';
+    }
+
     function rerenderVenmoButton() {
         if (typeof window.paypalrVenmoRender === 'function') {
             window.paypalrVenmoRender();
@@ -257,13 +305,14 @@
         fetchWalletConfig().then(function (config) {
             if (!config || config.success === false) {
                 console.warn('Unable to load Venmo configuration', config);
-                container.innerHTML = '<span class="paypalr-venmo-unavailable">Venmo unavailable</span>';
+                hidePaymentMethodContainer();
                 return null;
             }
 
             sdkState.config = config;
             return loadPayPalSdk(config).then(function (paypal) {
-                return paypal.Buttons({
+                // Create the button instance to check eligibility
+                var buttonInstance = paypal.Buttons({
                     fundingSource: paypal.FUNDING.VENMO,
                     style: {
                         shape: 'rect',
@@ -303,11 +352,20 @@
                         setVenmoPayload({});
                         document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: {} }));
                     }
-                }).render('#paypalr-venmo-button');
+                });
+
+                // Check if Venmo is eligible for this user/device
+                if (typeof buttonInstance.isEligible === 'function' && !buttonInstance.isEligible()) {
+                    console.log('Venmo is not eligible for this user/device');
+                    hidePaymentMethodContainer();
+                    return null;
+                }
+
+                return buttonInstance.render('#paypalr-venmo-button');
             });
         }).catch(function (error) {
             console.error('Failed to render Venmo button', error);
-            container.innerHTML = '<span class="paypalr-venmo-unavailable">Venmo unavailable</span>';
+            hidePaymentMethodContainer();
         });
     }
 
