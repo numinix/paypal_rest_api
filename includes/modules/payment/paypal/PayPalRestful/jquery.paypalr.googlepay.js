@@ -228,7 +228,7 @@
         }
 
         var query = '?client-id=' + encodeURIComponent(config.clientId)
-            + '&components=buttons,googlepay,applepay,venmo'
+            + '&components=buttons,googlepay,applepay'
             + '&currency=' + encodeURIComponent(config.currency || 'USD');
 
         // Note: The 'intent' parameter is NOT a valid PayPal SDK URL parameter.

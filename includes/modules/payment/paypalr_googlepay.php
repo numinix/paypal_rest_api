@@ -423,7 +423,26 @@ class paypalr_googlepay extends base
             ? 'capture'
             : 'authorize';
 
+        // -----
+        // Log wallet configuration request for debugging SDK 400 errors
+        //
+        $loggedClientId = (strlen($client_id) > 10)
+            ? substr($client_id, 0, 6) . '...' . substr($client_id, -4)
+            : ($client_id === '' ? '(empty)' : $client_id);
+        $this->log->write(
+            "Google Pay ajaxGetWalletConfig:\n" .
+            "  - Environment: " . MODULE_PAYMENT_PAYPALR_SERVER . "\n" .
+            "  - Client ID: " . $loggedClientId . "\n" .
+            "  - Google Merchant ID: " . ($merchant_id !== '' ? $merchant_id : '(not set)') . "\n" .
+            "  - Currency: " . ($_SESSION['currency'] ?? 'USD') . "\n" .
+            "  - Intent: " . $intent . "\n" .
+            "  - Module Enabled: " . ($this->enabled ? 'Yes' : 'No'),
+            true,
+            'before'
+        );
+
         if ($client_id === '') {
+            $this->log->write("Google Pay ajaxGetWalletConfig FAILED: Client ID is empty", true, 'after');
             return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ERROR_INITIALIZE ?? 'Unable to start Google Pay. Please try again.'];
         }
 

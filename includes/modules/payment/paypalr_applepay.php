@@ -406,7 +406,25 @@ class paypalr_applepay extends base
             ? 'capture'
             : 'authorize';
 
+        // -----
+        // Log wallet configuration request for debugging SDK 400 errors
+        //
+        $loggedClientId = (strlen($client_id) > 10)
+            ? substr($client_id, 0, 6) . '...' . substr($client_id, -4)
+            : ($client_id === '' ? '(empty)' : $client_id);
+        $this->log->write(
+            "Apple Pay ajaxGetWalletConfig:\n" .
+            "  - Environment: " . MODULE_PAYMENT_PAYPALR_SERVER . "\n" .
+            "  - Client ID: " . $loggedClientId . "\n" .
+            "  - Currency: " . ($_SESSION['currency'] ?? 'USD') . "\n" .
+            "  - Intent: " . $intent . "\n" .
+            "  - Module Enabled: " . ($this->enabled ? 'Yes' : 'No'),
+            true,
+            'before'
+        );
+
         if ($client_id === '') {
+            $this->log->write("Apple Pay ajaxGetWalletConfig FAILED: Client ID is empty", true, 'after');
             return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALR_APPLEPAY_ERROR_INITIALIZE ?? 'Unable to start Apple Pay. Please try again.'];
         }
 
