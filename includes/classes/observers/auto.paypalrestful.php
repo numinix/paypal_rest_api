@@ -474,16 +474,16 @@ class zcObserverPaypalrestful
         // (Venmo uses buttons with FUNDING.VENMO, PayPal wallet uses buttons with default funding)
         $needsButtonsComponent = (
             (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS !== 'False')
+            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True')
         );
         if ($needsButtonsComponent) {
             $components[] = 'buttons';
         }
 
-        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS !== 'False') {
+        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True') {
             $components[] = 'googlepay';
         }
-        if (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS !== 'False') {
+        if (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True') {
             $components[] = 'applepay';
         }
         $js_fields['components'] = implode(',', array_unique($components));
