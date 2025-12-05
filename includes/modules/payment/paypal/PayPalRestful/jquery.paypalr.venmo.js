@@ -211,8 +211,8 @@
     function buildSdkKey(config) {
         var currency = config.currency || 'USD';
         var merchantId = config.merchantId || '';
-        // Note: intent is not included in SDK key because it's not passed to the SDK URL
-        return [config.clientId, currency, merchantId].join('|');
+        var environment = config.environment || 'sandbox';
+        return [config.clientId, currency, merchantId, environment].join('|');
     }
 
     function loadPayPalSdk(config) {
@@ -222,6 +222,7 @@
 
         var desiredKey = buildSdkKey(config);
         var existingScript = document.querySelector('script[data-paypal-sdk="true"]');
+        var isSandbox = config.environment === 'sandbox';
 
         if (sharedSdkLoader.promise && sharedSdkLoader.key === desiredKey && window.paypal && typeof window.paypal.Buttons === 'function') {
             return sharedSdkLoader.promise.then(function () { return window.paypal; });
@@ -259,8 +260,10 @@
             + '&components=buttons,googlepay,applepay'
             + '&currency=' + encodeURIComponent(config.currency || 'USD');
 
-        // Note: The 'intent' parameter is NOT a valid PayPal SDK URL parameter.
-        // Intent (capture/authorize) is specified when creating the PayPal order, not when loading the SDK.
+        // Add buyer-country parameter for sandbox mode (required for testing)
+        if (isSandbox) {
+            query += '&buyer-country=US';
+        }
 
         // Only include merchant-id if it's a valid PayPal merchant ID (alphanumeric, typically 13 chars).
         // Do NOT include language label strings like "Merchant ID:" or placeholder values like "*".
@@ -279,7 +282,8 @@
                 window.paypalrSdkConfig = {
                     clientId: config.clientId,
                     currency: config.currency,
-                    merchantId: config.merchantId
+                    merchantId: config.merchantId,
+                    environment: config.environment
                 };
                 resolve(window.paypal);
             };

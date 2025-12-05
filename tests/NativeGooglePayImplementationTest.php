@@ -102,12 +102,13 @@ if (strpos($googlePayJs, "buyer-country=") === false || strpos($googlePayJs, 'is
     echo "✓ Google Pay JS adds buyer-country parameter for sandbox mode\n";
 }
 
-// Test 10: Google Pay JS loads SDK with components=googlepay
-if (strpos($googlePayJs, "&components=googlepay") === false) {
+// Test 10: Google Pay JS loads SDK with all wallet components (buttons,googlepay,applepay)
+// This ensures compatibility when multiple wallet modules are enabled simultaneously
+if (strpos($googlePayJs, "&components=buttons,googlepay,applepay") === false) {
     $testPassed = false;
-    $errors[] = "Google Pay JS should load SDK with components=googlepay";
+    $errors[] = "Google Pay JS should load SDK with components=buttons,googlepay,applepay";
 } else {
-    echo "✓ Google Pay JS loads SDK with components=googlepay\n";
+    echo "✓ Google Pay JS loads SDK with components=buttons,googlepay,applepay\n";
 }
 
 // Test 11: Google Pay JS uses isReadyToPay check

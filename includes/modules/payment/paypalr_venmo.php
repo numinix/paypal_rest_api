@@ -463,6 +463,7 @@ class paypalr_venmo extends base
             'merchantId' => $merchant_id,
             'currency' => $_SESSION['currency'] ?? 'USD',
             'intent' => $intent,
+            'environment' => MODULE_PAYMENT_PAYPALR_SERVER,
         ];
     }
 

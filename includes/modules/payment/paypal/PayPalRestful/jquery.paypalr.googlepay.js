@@ -362,11 +362,11 @@
             existingScript.parentNode.removeChild(existingScript);
         }
 
-        // Build SDK URL with googlepay component
+        // Build SDK URL with all wallet components to support multiple payment methods
         // Note: The 'intent' parameter is NOT a valid PayPal SDK URL parameter.
         // Intent (capture/authorize) is specified when creating the PayPal order, not when loading the SDK.
         var query = '?client-id=' + encodeURIComponent(config.clientId)
-            + '&components=googlepay'
+            + '&components=buttons,googlepay,applepay'
             + '&currency=' + encodeURIComponent(config.currency || 'USD');
 
         // Add buyer-country parameter for sandbox mode (required for testing)
