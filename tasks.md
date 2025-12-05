@@ -345,3 +345,158 @@ Before removing `legacy_recurring_reference/`:
 - The `PayPalProfileManager` class provides abstraction for both REST and Legacy APIs
 - Admin pages need significant work to match legacy functionality
 - Language files in `legacy_recurring_reference/includes/languages/` should be reviewed for any missing constants
+
+---
+
+# PayPal Wallet Module Native API Upgrade Tasks
+
+This section outlines the tasks for upgrading Apple Pay and Venmo wallet modules to use PayPal's native APIs, similar to the Google Pay upgrade completed in PR #X.
+
+## Context
+
+Google Pay has been upgraded from the deprecated `paypal.Buttons({ fundingSource: GOOGLEPAY })` approach to the native `paypal.Googlepay()` API. This provides better integration with PayPal's latest features and follows their official documentation.
+
+**Reference PRs/Commits:**
+- Google Pay native implementation: Uses `paypal.Googlepay()`, `google.payments.api.PaymentsClient`, `confirmOrder()`
+
+---
+
+## Phase 1: Apple Pay Native API Upgrade
+
+### Research & Planning
+- [ ] Review PayPal's official Apple Pay documentation: https://developer.paypal.com/docs/checkout/advanced/applepay/
+- [ ] Identify key differences between current `paypal.Buttons({ fundingSource: APPLEPAY })` and native `paypal.Applepay()` API
+- [ ] Document required SDK parameters for Apple Pay (`components=applepay`)
+- [ ] Understand Apple Pay Session API requirements
+
+### Implementation Tasks
+
+#### 1.1 SDK Loading Updates
+- [ ] Update SDK URL to use `components=applepay` instead of `buttons,googlepay,applepay`
+- [ ] Add any required Apple Pay-specific SDK parameters
+- [ ] Ensure proper error handling for SDK load failures
+
+#### 1.2 Native Apple Pay Integration
+- [ ] Replace `paypal.Buttons({ fundingSource: APPLEPAY })` with `paypal.Applepay()` API
+- [ ] Implement `paypal.Applepay().config()` for payment configuration
+- [ ] Implement native Apple Pay button using ApplePaySession API
+- [ ] Implement `paypal.Applepay().confirmOrder()` for order confirmation
+- [ ] Add eligibility check with `paypal.Applepay().isEligible()`
+
+#### 1.3 Payment Flow Implementation
+- [ ] Create ApplePaySession with proper merchant validation
+- [ ] Handle `onvalidatemerchant` callback
+- [ ] Handle `onpaymentauthorized` callback
+- [ ] Implement proper error handling for payment failures
+- [ ] Handle user cancellation gracefully
+
+#### 1.4 PHP Backend Updates (if needed)
+- [ ] Review `paypalr_applepay.php` for any required changes
+- [ ] Update `ajaxGetWalletConfig()` to return Apple Pay-specific configuration
+- [ ] Ensure proper merchant domain validation is in place
+
+### Testing
+- [ ] Test on Safari/macOS with Apple Pay configured
+- [ ] Test on iOS Safari with Apple Pay configured
+- [ ] Test eligibility hiding on non-Apple devices
+- [ ] Test error handling for declined payments
+- [ ] Test cancellation flow
+
+### Documentation
+- [ ] Update code comments with reference to PayPal documentation
+- [ ] Update any developer documentation
+
+---
+
+## Phase 2: Venmo Integration Review
+
+### Research & Assessment
+- [ ] Review PayPal's official Venmo documentation: https://developer.paypal.com/docs/checkout/venmo/
+- [ ] Determine if Venmo has a native API similar to Google Pay/Apple Pay
+- [ ] Assess if current `paypal.Buttons({ fundingSource: VENMO })` approach is deprecated
+
+### Current State Analysis
+The current Venmo implementation uses:
+```javascript
+paypal.Buttons({
+    fundingSource: paypal.FUNDING.VENMO,
+    createOrder: function() { ... },
+    onApprove: function(data) { ... }
+})
+```
+
+### Decision Point
+- [ ] **If native API exists**: Proceed with upgrade similar to Google Pay
+- [ ] **If no native API**: Document that current approach is correct and no changes needed
+
+### Implementation Tasks (if upgrade needed)
+
+#### 2.1 SDK Loading Updates
+- [ ] Update SDK URL parameters for Venmo component
+- [ ] Handle Venmo-specific eligibility requirements (US only, mobile preferred)
+
+#### 2.2 Native Venmo Integration (if applicable)
+- [ ] Replace `paypal.Buttons({ fundingSource: VENMO })` with native Venmo API
+- [ ] Implement payment configuration
+- [ ] Implement order confirmation flow
+- [ ] Add eligibility checks
+
+#### 2.3 Testing
+- [ ] Test on mobile devices (Venmo is mobile-focused)
+- [ ] Test eligibility hiding for non-US users
+- [ ] Test deep link flow to Venmo app
+- [ ] Test web fallback flow
+
+---
+
+## Phase 3: Test Suite Updates
+
+### Update Existing Tests
+- [ ] Update `WalletIneligiblePaymentHidingTest.php` for new Apple Pay API patterns
+- [ ] Update `WalletSdkIntentParameterTest.php` for new SDK components
+- [ ] Update `WalletMerchantIdValidationTest.php` if merchant ID handling changes
+
+### Create New Tests
+- [ ] Create `NativeApplePayImplementationTest.php` (similar to `NativeGooglePayImplementationTest.php`)
+- [ ] Create tests for Apple Pay Session flow
+- [ ] Create tests for merchant validation
+- [ ] Update Venmo tests if Venmo implementation changes
+
+---
+
+## Phase 4: Documentation & Cleanup
+
+### Code Documentation
+- [ ] Add reference links to PayPal documentation in code comments
+- [ ] Document any browser/device requirements
+- [ ] Document merchant setup requirements (Apple Developer account, domain verification)
+
+### User Documentation
+- [ ] Update admin configuration instructions
+- [ ] Document Apple Pay merchant domain verification process
+- [ ] Document Venmo eligibility requirements (US only)
+
+### Code Cleanup
+- [ ] Remove any deprecated code patterns
+- [ ] Ensure consistent code style across wallet modules
+- [ ] Review and update error messages
+
+---
+
+## Priority & Timeline
+
+| Phase | Priority | Estimated Effort | Dependencies |
+|-------|----------|------------------|--------------|
+| Phase 1: Apple Pay | High | 2-3 days | Apple Pay documentation review |
+| Phase 2: Venmo | Medium | 1-2 days | Venmo API research |
+| Phase 3: Tests | High | 1 day | Phases 1-2 completion |
+| Phase 4: Docs | Low | 0.5 days | All phases complete |
+
+---
+
+## Notes
+
+- **Apple Pay** has a well-documented native API at PayPal and requires ApplePaySession integration
+- **Venmo** may not have a separate native API like Google Pay - it might continue to use the PayPal Buttons approach as the recommended method
+- The Google Pay implementation can serve as a template for the Apple Pay upgrade
+- Thorough testing on actual Apple devices is essential for Apple Pay
