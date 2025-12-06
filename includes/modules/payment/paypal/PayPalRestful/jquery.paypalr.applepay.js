@@ -492,7 +492,7 @@
                 supportedNetworks: applePayConfig.supportedNetworks || ['visa', 'masterCard', 'amex', 'discover'],
                 total: {
                     label: applePayConfig.merchantName || 'Total',
-                    amount: orderConfig.amount || '0.00',
+                    amount: orderConfig.amount,
                     type: 'final'
                 }
             };

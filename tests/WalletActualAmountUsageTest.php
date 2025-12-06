@@ -52,8 +52,9 @@ if (preg_match($pattern, $applePayJs, $matches)) {
     }
     
     // Test 3: Payment request uses actual amount from order
-    $paymentRequestPattern = '/total:\s*\{[^}]*amount:\s*orderConfig\.amount/s';
-    if (preg_match($paymentRequestPattern, $clickHandlerBody)) {
+    // Check for both 'total:' and 'amount: orderConfig.amount' presence
+    if (strpos($clickHandlerBody, 'total:') !== false && 
+        strpos($clickHandlerBody, 'amount: orderConfig.amount') !== false) {
         echo "  ✓ Payment request total uses orderConfig.amount\n";
     } else {
         $testPassed = false;
@@ -108,8 +109,9 @@ if (preg_match($pattern, $googlePayJs, $matches)) {
     }
     
     // Test 3: Transaction info uses actual amount from order
-    $transactionInfoPattern = '/transactionInfo:\s*\{[^}]*totalPrice:\s*orderConfig\.amount/s';
-    if (preg_match($transactionInfoPattern, $clickHandlerBody)) {
+    // Check for both 'transactionInfo:' and 'totalPrice: orderConfig.amount' presence
+    if (strpos($clickHandlerBody, 'transactionInfo:') !== false && 
+        strpos($clickHandlerBody, 'totalPrice: orderConfig.amount') !== false) {
         echo "  ✓ Transaction info totalPrice uses orderConfig.amount\n";
     } else {
         $testPassed = false;

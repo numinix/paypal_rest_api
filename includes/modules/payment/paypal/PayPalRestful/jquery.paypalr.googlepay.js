@@ -510,7 +510,7 @@
                 allowedPaymentMethods: allowedPaymentMethods,
                 transactionInfo: {
                     totalPriceStatus: 'FINAL',
-                    totalPrice: orderConfig.amount || '0.00',
+                    totalPrice: orderConfig.amount,
                     currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
                     countryCode: 'US'
                 },
