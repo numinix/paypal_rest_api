@@ -481,6 +481,15 @@
                 return;
             }
 
+            if (!orderConfig.amount) {
+                console.error('Order created but amount is missing', orderConfig);
+                setApplePayPayload({});
+                if (typeof window.oprcHideProcessingOverlay === 'function') {
+                    window.oprcHideProcessingOverlay();
+                }
+                return;
+            }
+
             sdkState.config = orderConfig;
             var orderId = orderConfig.orderID;
 
