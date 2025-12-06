@@ -278,19 +278,22 @@
         }
 
         appleSdkLoader.promise = new Promise(function (resolve, reject) {
-            // If the SDK has already been loaded by something else, just resolve
-            if (typeof window.ApplePaySession !== 'undefined' &&
-                document.querySelector('script[data-apple-pay-sdk="true"]')) {
-                return resolve();
-            }
-
             var existing = document.querySelector('script[data-apple-pay-sdk="true"]');
+            
+            // If script exists and has already loaded, resolve immediately
             if (existing) {
+                // Check if script has finished loading
+                if (existing.readyState === 'complete' || existing.readyState === 'loaded') {
+                    return resolve();
+                }
+                
+                // Script exists but hasn't loaded yet, wait for it
                 existing.addEventListener('load', function () { resolve(); });
                 existing.addEventListener('error', function (e) { reject(e); });
                 return;
             }
 
+            // Create and load the script
             var script = document.createElement('script');
             script.src = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
             script.dataset.applePaySdk = 'true';
