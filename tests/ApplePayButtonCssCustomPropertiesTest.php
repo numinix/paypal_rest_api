@@ -88,15 +88,19 @@ if (preg_match('/apple-pay-button\s*\{[^}]*--apple-pay-button-border-radius[^}]*
 }
 
 // Test 5: JavaScript should NOT set CSS custom properties as inline styles
-if (strpos($js, 'button.style.cssText') !== false && strpos($js, '--apple-pay-button') !== false) {
+// Check both conditions to ensure inline styles are not used
+$hasInlineStyleCssText = (strpos($js, 'button.style.cssText') !== false);
+$hasApplePayCustomProp = (strpos($js, '--apple-pay-button') !== false);
+
+if ($hasInlineStyleCssText && $hasApplePayCustomProp) {
     $testPassed = false;
-    $errors[] = "JavaScript should NOT set --apple-pay-button-* custom properties as inline styles";
+    $errors[] = "JavaScript should NOT set --apple-pay-button-* custom properties as inline styles using button.style.cssText";
 } else {
     echo "✓ JavaScript does NOT set CSS custom properties as inline styles\n";
 }
 
 // Test 6: JavaScript should NOT use .style to set --apple-pay-button-width
-if (preg_match('/\.style[.\[].*--apple-pay-button-width/', $js)) {
+if (preg_match('/\.style[\.\[].*--apple-pay-button-width/', $js)) {
     $testPassed = false;
     $errors[] = "JavaScript should NOT use .style to set --apple-pay-button-width";
 } else {
