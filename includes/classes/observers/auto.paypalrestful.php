@@ -499,6 +499,15 @@ class zcObserverPaypalrestful
         $js_scriptparams[] = 'data-namespace="PayPalSDK"';
 
         // -----
+        // Add CSP nonce attribute if available (Zen Cart 2.0+ CSP support)
+        //
+        $csp_nonce = '';
+        if (isset($GLOBALS['CSP_NONCE']) && !empty($GLOBALS['CSP_NONCE'])) {
+            $csp_nonce = htmlspecialchars($GLOBALS['CSP_NONCE'], ENT_QUOTES, 'UTF-8');
+            $js_scriptparams[] = 'nonce="' . $csp_nonce . '"';
+        }
+
+        // -----
         // Log SDK configuration for debugging purposes. This helps diagnose issues
         // like 400 errors from PayPal SDK when components are not enabled for the account.
         //
@@ -586,8 +595,17 @@ class zcObserverPaypalrestful
                 'styleAlign' => $messageStyles['text']['align'] ?? 'center',
             ];
         }
+
+        // -----
+        // Add CSP nonce attribute if available (Zen Cart 2.0+ CSP support)
+        //
+        $csp_nonce_attr = '';
+        if (isset($GLOBALS['CSP_NONCE']) && !empty($GLOBALS['CSP_NONCE'])) {
+            $csp_nonce = htmlspecialchars($GLOBALS['CSP_NONCE'], ENT_QUOTES, 'UTF-8');
+            $csp_nonce_attr = ' nonce="' . $csp_nonce . '"';
+        }
 ?>
-<script title="PayPal Pay Later Messaging">
+<script title="PayPal Pay Later Messaging"<?= $csp_nonce_attr ?>>
 // PayPal PayLater messaging set up
 let paypalMessagesPageType = '<?= $pageType ?>';
 let paypalMessageableOverride = <?= $override ? json_encode($override) : '{}' ?>;
