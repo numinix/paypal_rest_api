@@ -432,6 +432,19 @@ class zcObserverPaypalrestful
 
     /** Internal methods **/
 
+    /**
+     * Get sanitized CSP nonce value if available.
+     * 
+     * @return string Sanitized CSP nonce or empty string if not set
+     */
+    protected function getCspNonce(): string
+    {
+        if (isset($GLOBALS['CSP_NONCE']) && !empty($GLOBALS['CSP_NONCE'])) {
+            return htmlspecialchars($GLOBALS['CSP_NONCE'], ENT_QUOTES, 'UTF-8');
+        }
+        return '';
+    }
+
     protected function outputJsSdkHeaderAssets($current_page): void
     {
         global $current_page_base, $order, $paypalSandboxBuyerCountryCodeOverride, $paypalSandboxLocaleOverride;
@@ -501,9 +514,8 @@ class zcObserverPaypalrestful
         // -----
         // Add CSP nonce attribute if available (Zen Cart 2.0+ CSP support)
         //
-        $csp_nonce = '';
-        if (isset($GLOBALS['CSP_NONCE']) && !empty($GLOBALS['CSP_NONCE'])) {
-            $csp_nonce = htmlspecialchars($GLOBALS['CSP_NONCE'], ENT_QUOTES, 'UTF-8');
+        $csp_nonce = $this->getCspNonce();
+        if (!empty($csp_nonce)) {
             $js_scriptparams[] = 'nonce="' . $csp_nonce . '"';
         }
 
@@ -599,11 +611,8 @@ class zcObserverPaypalrestful
         // -----
         // Add CSP nonce attribute if available (Zen Cart 2.0+ CSP support)
         //
-        $csp_nonce_attr = '';
-        if (isset($GLOBALS['CSP_NONCE']) && !empty($GLOBALS['CSP_NONCE'])) {
-            $csp_nonce = htmlspecialchars($GLOBALS['CSP_NONCE'], ENT_QUOTES, 'UTF-8');
-            $csp_nonce_attr = ' nonce="' . $csp_nonce . '"';
-        }
+        $csp_nonce = $this->getCspNonce();
+        $csp_nonce_attr = !empty($csp_nonce) ? ' nonce="' . $csp_nonce . '"' : '';
 ?>
 <script title="PayPal Pay Later Messaging"<?= $csp_nonce_attr ?>>
 // PayPal PayLater messaging set up
