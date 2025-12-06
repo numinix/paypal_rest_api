@@ -29,6 +29,11 @@
     var sharedSdkLoader = window.paypalrSdkLoaderState || { key: null, promise: null };
     window.paypalrSdkLoaderState = sharedSdkLoader;
 
+    // Apple Pay JS SDK loader state
+    var appleSdkLoader = {
+        promise: null
+    };
+
     // -------------------------------------------------------------------------
     // Utility Functions
     // -------------------------------------------------------------------------
@@ -259,6 +264,46 @@
     // -------------------------------------------------------------------------
     // SDK Loading
     // -------------------------------------------------------------------------
+
+    /**
+     * Load Apple's Apple Pay JS SDK.
+     * Required for the <apple-pay-button> WebKit custom element to render properly.
+     * This SDK must be loaded before the button element is appended to the DOM.
+     *
+     * @returns {Promise} Resolves when the SDK is loaded
+     */
+    function loadApplePayJsSdk() {
+        if (appleSdkLoader.promise) {
+            return appleSdkLoader.promise;
+        }
+
+        appleSdkLoader.promise = new Promise(function (resolve, reject) {
+            var existing = document.querySelector('script[data-apple-pay-sdk="true"]');
+            
+            // If script exists and has already loaded, resolve immediately
+            if (existing) {
+                // Check if script has finished loading
+                if (existing.readyState === 'complete' || existing.readyState === 'loaded') {
+                    return resolve();
+                }
+                
+                // Script exists but hasn't loaded yet, wait for it
+                existing.addEventListener('load', function () { resolve(); });
+                existing.addEventListener('error', function (e) { reject(e); });
+                return;
+            }
+
+            // Create and load the script
+            var script = document.createElement('script');
+            script.src = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
+            script.dataset.applePaySdk = 'true';
+            script.onload = function () { resolve(); };
+            script.onerror = function (e) { reject(e); };
+            document.head.appendChild(script);
+        });
+
+        return appleSdkLoader.promise;
+    }
 
     function buildSdkKey(config) {
         var currency = config.currency || 'USD';
@@ -509,13 +554,14 @@
 
     /**
      * Create a native Apple Pay button element.
+     * Note: Sizing via CSS custom properties (--apple-pay-button-width, etc.) is handled in paypalr.css
+     * to ensure proper rendering on iOS Safari. Do not set these as inline styles.
      */
     function createApplePayButton() {
         var button = document.createElement('apple-pay-button');
         button.setAttribute('buttonstyle', 'black');
         button.setAttribute('type', 'pay');
         button.setAttribute('locale', 'en-US');
-        button.style.cssText = '--apple-pay-button-width: 100%; --apple-pay-button-height: 40px; --apple-pay-button-border-radius: 4px;';
         button.addEventListener('click', onApplePayButtonClicked);
         return button;
     }
@@ -581,18 +627,22 @@
                                     console.log('Apple Pay: User cannot make payments with active card');
                                     // Still show button - user might add a card
                                 }
-                                // Create and render the Apple Pay button
-                                var button = createApplePayButton();
-                                container.appendChild(button);
-                                return button;
+                                // Load Apple Pay JS SDK and then create/render the button
+                                return loadApplePayJsSdk().then(function () {
+                                    var button = createApplePayButton();
+                                    container.appendChild(button);
+                                    return button;
+                                });
                             });
                     }
                 }
 
-                // Create and render the Apple Pay button
-                var button = createApplePayButton();
-                container.appendChild(button);
-                return button;
+                // Load Apple Pay JS SDK and then create/render the button
+                return loadApplePayJsSdk().then(function () {
+                    var button = createApplePayButton();
+                    container.appendChild(button);
+                    return button;
+                });
             });
         }).catch(function (error) {
             console.error('Failed to render Apple Pay button', error);
