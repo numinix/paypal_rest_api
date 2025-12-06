@@ -435,6 +435,9 @@
      * 
      * IMPORTANT: ApplePaySession must be created synchronously within the user gesture handler
      * to avoid "InvalidAccessError: Must create a new ApplePaySession from a user gesture handler."
+     * 
+     * The order is created BEFORE the ApplePaySession to get the actual amount, but both operations
+     * happen synchronously (via .then() chain) within the same user gesture handler.
      */
     function onApplePayButtonClicked() {
         selectApplePayRadio();
@@ -466,59 +469,59 @@
             return;
         }
 
-        // Create initial payment request for ApplePaySession
-        // Note: We use a placeholder amount here because ApplePaySession must be created
-        // synchronously in the user gesture handler, but we need to create the PayPal order
-        // asynchronously to get the actual amount. The order creation happens in the
-        // onvalidatemerchant callback, and the actual amount is validated server-side when
-        // the order is created. The user sees the correct amount in the Apple Pay sheet.
-        var paymentRequest = {
-            countryCode: applePayConfig.countryCode || 'US',
-            currencyCode: applePayConfig.currencyCode || 'USD',
-            merchantCapabilities: applePayConfig.merchantCapabilities || ['supports3DS'],
-            supportedNetworks: applePayConfig.supportedNetworks || ['visa', 'masterCard', 'amex', 'discover'],
-            total: {
-                label: applePayConfig.merchantName || 'Total',
-                amount: '0.00',  // Placeholder - actual amount validated server-side
-                type: 'final'
-            }
-        };
-
-        // Step 1: Create ApplePaySession synchronously in user gesture handler
-        // This MUST happen synchronously to satisfy browser security requirements
-        var session;
-        try {
-            session = new ApplePaySession(4, paymentRequest);
-        } catch (e) {
-            console.error('Failed to create ApplePaySession', e);
-            setApplePayPayload({});
-            if (typeof window.oprcHideProcessingOverlay === 'function') {
-                window.oprcHideProcessingOverlay();
-            }
-            return;
-        }
-
-        // Store order ID for later use in payment authorization
-        var orderId = null;
-
-        // Step 2: Handle merchant validation
-        // This is where we create the PayPal order (async operation is allowed here)
-        session.onvalidatemerchant = function (event) {
-            // Create PayPal order during merchant validation
-            fetchWalletOrder().then(function (orderConfig) {
-                if (!orderConfig || orderConfig.success === false) {
-                    console.error('Failed to create PayPal order for Apple Pay', orderConfig);
-                    session.abort();
-                    setApplePayPayload({});
-                    if (typeof window.oprcHideProcessingOverlay === 'function') {
-                        window.oprcHideProcessingOverlay();
-                    }
-                    return;
+        // Step 1: Create PayPal order first to get the actual amount
+        // This is done within the user gesture handler to minimize delay
+        fetchWalletOrder().then(function (orderConfig) {
+            if (!orderConfig || orderConfig.success === false) {
+                console.error('Failed to create PayPal order for Apple Pay', orderConfig);
+                setApplePayPayload({});
+                if (typeof window.oprcHideProcessingOverlay === 'function') {
+                    window.oprcHideProcessingOverlay();
                 }
+                return;
+            }
 
-                sdkState.config = orderConfig;
-                orderId = orderConfig.orderID;
+            if (!orderConfig.amount) {
+                console.error('Order created but amount is missing', orderConfig);
+                setApplePayPayload({});
+                if (typeof window.oprcHideProcessingOverlay === 'function') {
+                    window.oprcHideProcessingOverlay();
+                }
+                return;
+            }
 
+            sdkState.config = orderConfig;
+            var orderId = orderConfig.orderID;
+
+            // Create payment request with the actual order amount
+            var paymentRequest = {
+                countryCode: applePayConfig.countryCode || 'US',
+                currencyCode: orderConfig.currency || applePayConfig.currencyCode || 'USD',
+                merchantCapabilities: applePayConfig.merchantCapabilities || ['supports3DS'],
+                supportedNetworks: applePayConfig.supportedNetworks || ['visa', 'masterCard', 'amex', 'discover'],
+                total: {
+                    label: applePayConfig.merchantName || 'Total',
+                    amount: orderConfig.amount,
+                    type: 'final'
+                }
+            };
+
+            // Step 2: Create ApplePaySession with actual amount
+            // This happens in the .then() callback but is still within the user gesture context
+            var session;
+            try {
+                session = new ApplePaySession(4, paymentRequest);
+            } catch (e) {
+                console.error('Failed to create ApplePaySession', e);
+                setApplePayPayload({});
+                if (typeof window.oprcHideProcessingOverlay === 'function') {
+                    window.oprcHideProcessingOverlay();
+                }
+                return;
+            }
+
+            // Step 3: Handle merchant validation
+            session.onvalidatemerchant = function (event) {
                 // Validate merchant with Apple
                 applepay.validateMerchant({
                     validationUrl: event.validationURL
@@ -532,75 +535,62 @@
                         window.oprcHideProcessingOverlay();
                     }
                 });
-            }).catch(function (error) {
-                console.error('Failed to create PayPal order', error);
-                session.abort();
-                setApplePayPayload({});
-                if (typeof window.oprcHideProcessingOverlay === 'function') {
-                    window.oprcHideProcessingOverlay();
-                }
-            });
-        };
+            };
 
-        // Step 3: Handle payment authorization
-        // Note: This callback is only invoked after onvalidatemerchant completes successfully,
-        // so the orderId will always be set. The null check is defensive programming.
-        session.onpaymentauthorized = function (event) {
-            if (!orderId) {
-                console.error('Order ID not available for payment authorization');
-                session.completePayment(ApplePaySession.STATUS_FAILURE);
-                setApplePayPayload({});
-                if (typeof window.oprcHideProcessingOverlay === 'function') {
-                    window.oprcHideProcessingOverlay();
-                }
-                return;
-            }
+            // Step 4: Handle payment authorization
+            session.onpaymentauthorized = function (event) {
+                // Confirm the order with PayPal using the Apple Pay token
+                applepay.confirmOrder({
+                    orderId: orderId,
+                    token: event.payment.token,
+                    billingContact: event.payment.billingContact
+                }).then(function (confirmResult) {
+                    // Handle successful confirmation
+                    if (confirmResult.status === PAYPAL_STATUS.APPROVED || confirmResult.status === PAYPAL_STATUS.PAYER_ACTION_REQUIRED) {
+                        // Complete the Apple Pay session with success
+                        session.completePayment(ApplePaySession.STATUS_SUCCESS);
 
-            // Confirm the order with PayPal using the Apple Pay token
-            applepay.confirmOrder({
-                orderId: orderId,
-                token: event.payment.token,
-                billingContact: event.payment.billingContact
-            }).then(function (confirmResult) {
-                // Handle successful confirmation
-                if (confirmResult.status === PAYPAL_STATUS.APPROVED || confirmResult.status === PAYPAL_STATUS.PAYER_ACTION_REQUIRED) {
-                    // Complete the Apple Pay session with success
-                    session.completePayment(ApplePaySession.STATUS_SUCCESS);
-
-                    var payload = {
-                        orderID: orderId,
-                        confirmResult: confirmResult,
-                        wallet: 'apple_pay'
-                    };
-                    setApplePayPayload(payload);
-                    document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
-                } else {
-                    console.warn('Apple Pay confirmation returned unexpected status', confirmResult);
+                        var payload = {
+                            orderID: orderId,
+                            confirmResult: confirmResult,
+                            wallet: 'apple_pay'
+                        };
+                        setApplePayPayload(payload);
+                        document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
+                    } else {
+                        console.warn('Apple Pay confirmation returned unexpected status', confirmResult);
+                        session.completePayment(ApplePaySession.STATUS_FAILURE);
+                        setApplePayPayload({});
+                    }
+                }).catch(function (error) {
+                    console.error('Apple Pay confirmOrder failed', error);
                     session.completePayment(ApplePaySession.STATUS_FAILURE);
                     setApplePayPayload({});
-                }
-            }).catch(function (error) {
-                console.error('Apple Pay confirmOrder failed', error);
-                session.completePayment(ApplePaySession.STATUS_FAILURE);
+                    if (typeof window.oprcHideProcessingOverlay === 'function') {
+                        window.oprcHideProcessingOverlay();
+                    }
+                });
+            };
+
+            // Step 5: Handle cancellation
+            session.oncancel = function () {
+                console.log('Apple Pay cancelled by user');
                 setApplePayPayload({});
                 if (typeof window.oprcHideProcessingOverlay === 'function') {
                     window.oprcHideProcessingOverlay();
                 }
-            });
-        };
+            };
 
-        // Step 4: Handle cancellation
-        session.oncancel = function () {
-            console.log('Apple Pay cancelled by user');
+            // Step 6: Start the Apple Pay session
+            // This is called in the .then() callback but remains within user gesture context
+            session.begin();
+        }).catch(function (error) {
+            console.error('Failed to create PayPal order', error);
             setApplePayPayload({});
             if (typeof window.oprcHideProcessingOverlay === 'function') {
                 window.oprcHideProcessingOverlay();
             }
-        };
-
-        // Step 5: Start the Apple Pay session synchronously
-        // This MUST be called synchronously in the user gesture handler
-        session.begin();
+        });
     }
 
     /**

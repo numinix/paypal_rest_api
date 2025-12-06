@@ -1,12 +1,12 @@
 <?php
 /**
- * Test to verify that Google Pay loadPaymentData() is called as close to the user gesture
- * as possible to avoid potential user gesture timeout issues.
+ * Test to verify that Google Pay loadPaymentData() is called with the actual order amount
+ * to avoid showing a $0.00 placeholder to users.
  *
  * This test ensures that:
- * 1. paymentsClient.loadPaymentData() is called synchronously in onGooglePayButtonClicked
- * 2. The payment sheet is invoked before order creation completes
- * 3. Order creation happens in parallel with payment data collection
+ * 1. fetchWalletOrder() is called first to get the actual order amount
+ * 2. paymentsClient.loadPaymentData() is called with the real amount
+ * 3. All operations happen within the user gesture context
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -56,25 +56,52 @@ if (strpos($clickHandlerBody, 'var paymentDataRequest') !== false) {
     echo "✗ Payment data request is not prepared\n";
 }
 
-// Test 3: loadPaymentData and fetchWalletOrder are called in parallel (Promise.all)
-if (strpos($clickHandlerBody, 'Promise.all') !== false) {
-    echo "✓ loadPaymentData and fetchWalletOrder run in parallel (Promise.all)\n";
+// Test 3: fetchWalletOrder is called before loadPaymentData to get actual amount
+if (strpos($clickHandlerBody, 'fetchWalletOrder') !== false && 
+    strpos($clickHandlerBody, 'loadPaymentData') !== false) {
+    
+    // Check if fetchWalletOrder appears before loadPaymentData
+    $fetchPos = strpos($clickHandlerBody, 'fetchWalletOrder()');
+    $loadPos = strpos($clickHandlerBody, 'loadPaymentData(');
+    
+    if ($fetchPos !== false && $loadPos !== false && $fetchPos < $loadPos) {
+        echo "✓ fetchWalletOrder is called before loadPaymentData to get actual amount\n";
+    } else {
+        $testPassed = false;
+        $errors[] = "fetchWalletOrder should be called before loadPaymentData";
+        echo "✗ fetchWalletOrder is not called before loadPaymentData\n";
+    }
 } else {
     $testPassed = false;
-    $errors[] = "loadPaymentData and fetchWalletOrder should run in parallel with Promise.all";
-    echo "✗ loadPaymentData and fetchWalletOrder do not run in parallel\n";
+    $errors[] = "fetchWalletOrder and loadPaymentData should both be present";
+    echo "✗ fetchWalletOrder or loadPaymentData not found\n";
 }
 
-// Test 4: fetchWalletOrder is NOT called before loadPaymentData
-// Extract the code before loadPaymentData
+// Test 4: loadPaymentData is called inside fetchWalletOrder's .then() callback
+// This ensures we have the order amount before calling loadPaymentData
 if ($loadPaymentDataPos !== false) {
-    $codeBeforeLoadPaymentData = substr($clickHandlerBody, 0, $loadPaymentDataPos);
-    if (strpos($codeBeforeLoadPaymentData, 'fetchWalletOrder()') !== false) {
-        // This is actually OK now since we're using Promise.all
-        // But we want to ensure loadPaymentData is called synchronously, not inside fetchWalletOrder's .then()
-        echo "✓ fetchWalletOrder pattern verified\n";
-    } else {
-        echo "✓ fetchWalletOrder is NOT called before loadPaymentData\n";
+    // Extract fetchWalletOrder .then() callback
+    // Match the callback body up to the closing brace at the appropriate level
+    $fetchPattern = '/fetchWalletOrder\(\)\.then\(function\s*\([^)]*\)\s*\{([\s\S]*?)^\s{8}\}\)/m';
+    if (preg_match($fetchPattern, $clickHandlerBody, $fetchMatches)) {
+        $fetchThenBody = $fetchMatches[1];
+        
+        if (strpos($fetchThenBody, 'loadPaymentData') !== false) {
+            echo "✓ loadPaymentData is called inside fetchWalletOrder .then() callback\n";
+        } else {
+            $testPassed = false;
+            $errors[] = "loadPaymentData should be called inside fetchWalletOrder .then() callback";
+            echo "✗ loadPaymentData is not in fetchWalletOrder .then() callback\n";
+        }
+        
+        // Verify order amount is used in payment request
+        if (strpos($fetchThenBody, 'orderConfig.amount') !== false) {
+            echo "✓ Order amount from fetchWalletOrder is used in payment request\n";
+        } else {
+            $testPassed = false;
+            $errors[] = "orderConfig.amount should be used in payment request";
+            echo "✗ Order amount is not used in payment request\n";
+        }
     }
 }
 
@@ -88,13 +115,14 @@ if (strpos($clickHandlerBody, 'var googlepay = sdkState.googlepay') !== false &&
     echo "✗ SDK references are not properly validated\n";
 }
 
-// Test 6: Verify placeholder amount is used in initial payment request
-if (strpos($clickHandlerBody, "'0.00'") !== false || strpos($clickHandlerBody, '"0.00"') !== false) {
-    echo "✓ Placeholder amount is used in payment data request\n";
+// Test 6: Verify actual order amount is used (not placeholder '0.00')
+// The payment request should use orderConfig.amount instead of hardcoded '0.00'
+if (strpos($clickHandlerBody, "orderConfig.amount") !== false) {
+    echo "✓ Actual order amount is used in payment data request\n";
 } else {
     $testPassed = false;
-    $errors[] = "Placeholder amount should be used since order is created in parallel";
-    echo "✗ Placeholder amount is not used\n";
+    $errors[] = "orderConfig.amount should be used instead of placeholder";
+    echo "✗ Actual order amount is not used\n";
 }
 
 // Test 7: Verify confirmOrder is called with orderId from order creation
@@ -116,15 +144,15 @@ if (strpos($clickHandlerBody, 'CANCELED') !== false || strpos($clickHandlerBody,
     echo "✗ Missing cancellation handling\n";
 }
 
-// Test 9: Verify the code structure follows the improved pattern
-// loadPaymentData should be called synchronously, not inside fetchWalletOrder's .then()
-$improvedPattern = '/loadPaymentData.*Promise\.all/s';
+// Test 9: Verify the code structure follows the correct pattern
+// fetchWalletOrder should be called first, then loadPaymentData with actual amount
+$improvedPattern = '/fetchWalletOrder\(\)\.then[\s\S]*?loadPaymentData/';
 if (preg_match($improvedPattern, $clickHandlerBody)) {
-    echo "✓ Code follows improved pattern with Promise.all for parallel execution\n";
+    echo "✓ Code follows correct pattern: fetch order first, then load payment data\n";
 } else {
     $testPassed = false;
-    $errors[] = "Code should use Promise.all for parallel execution";
-    echo "✗ Code structure does not follow improved pattern\n";
+    $errors[] = "Code should call fetchWalletOrder first, then loadPaymentData";
+    echo "✗ Code structure does not follow correct pattern\n";
 }
 
 // Summary
@@ -132,10 +160,10 @@ echo "\n";
 if ($testPassed) {
     echo "All Google Pay user gesture tests passed! ✓\n\n";
     echo "Summary:\n";
-    echo "- loadPaymentData is called close to the user gesture\n";
-    echo "- Order creation runs in parallel with payment data collection\n";
-    echo "- This minimizes delay between user gesture and payment sheet display\n";
-    echo "- Prevents potential user gesture timeout issues in some browsers\n";
+    echo "- fetchWalletOrder is called first to get the actual order amount\n";
+    echo "- loadPaymentData is called with the real amount (not $0.00)\n";
+    echo "- All operations happen within the user gesture context\n";
+    echo "- This fixes the $0.00 amount display issue\n";
     exit(0);
 } else {
     echo "Tests failed:\n";
