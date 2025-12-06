@@ -38,6 +38,15 @@
     // Utility Functions
     // -------------------------------------------------------------------------
 
+    /**
+     * Get CSP nonce from existing script tags if available.
+     * This helps comply with Content Security Policy when loading external scripts.
+     */
+    function getCspNonce() {
+        var existingScript = document.querySelector('script[nonce]');
+        return existingScript ? existingScript.nonce || existingScript.getAttribute('nonce') : '';
+    }
+
     function hasPayloadData(payload) {
         if (!payload) {
             return false;
@@ -297,6 +306,13 @@
             var script = document.createElement('script');
             script.src = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
             script.dataset.applePaySdk = 'true';
+            
+            // Add CSP nonce if available
+            var nonce = getCspNonce();
+            if (nonce) {
+                script.setAttribute('nonce', nonce);
+            }
+            
             script.onload = function () { resolve(); };
             script.onerror = function (e) { reject(e); };
             document.head.appendChild(script);
@@ -381,6 +397,13 @@
             script.src = 'https://www.paypal.com/sdk/js' + query;
             script.dataset.paypalSdk = 'true';
             script.dataset.loaded = 'false';
+            
+            // Add CSP nonce if available
+            var nonce = getCspNonce();
+            if (nonce) {
+                script.setAttribute('nonce', nonce);
+            }
+            
             script.onload = function () {
                 script.dataset.loaded = 'true';
                 sharedSdkLoader.key = desiredKey;

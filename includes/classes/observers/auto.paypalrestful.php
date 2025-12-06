@@ -432,6 +432,19 @@ class zcObserverPaypalrestful
 
     /** Internal methods **/
 
+    /**
+     * Get sanitized CSP nonce value if available.
+     * 
+     * @return string Sanitized CSP nonce or empty string if not set
+     */
+    protected function getCspNonce(): string
+    {
+        if (isset($GLOBALS['CSP_NONCE']) && !empty($GLOBALS['CSP_NONCE'])) {
+            return htmlspecialchars($GLOBALS['CSP_NONCE'], ENT_QUOTES, 'UTF-8');
+        }
+        return '';
+    }
+
     protected function outputJsSdkHeaderAssets($current_page): void
     {
         global $current_page_base, $order, $paypalSandboxBuyerCountryCodeOverride, $paypalSandboxLocaleOverride;
@@ -497,6 +510,14 @@ class zcObserverPaypalrestful
         $js_fields['integration-date'] = '2025-08-01';
         $js_scriptparams[] = 'data-partner-attribution-id="' . PayPalRestfulApi::PARTNER_ATTRIBUTION_ID . '"';
         $js_scriptparams[] = 'data-namespace="PayPalSDK"';
+
+        // -----
+        // Add CSP nonce attribute if available (Zen Cart 2.0+ CSP support)
+        //
+        $csp_nonce = $this->getCspNonce();
+        if (!empty($csp_nonce)) {
+            $js_scriptparams[] = 'nonce="' . $csp_nonce . '"';
+        }
 
         // -----
         // Log SDK configuration for debugging purposes. This helps diagnose issues
@@ -586,8 +607,14 @@ class zcObserverPaypalrestful
                 'styleAlign' => $messageStyles['text']['align'] ?? 'center',
             ];
         }
+
+        // -----
+        // Add CSP nonce attribute if available (Zen Cart 2.0+ CSP support)
+        //
+        $csp_nonce = $this->getCspNonce();
+        $csp_nonce_attr = !empty($csp_nonce) ? ' nonce="' . $csp_nonce . '"' : '';
 ?>
-<script title="PayPal Pay Later Messaging">
+<script title="PayPal Pay Later Messaging"<?= $csp_nonce_attr ?>>
 // PayPal PayLater messaging set up
 let paypalMessagesPageType = '<?= $pageType ?>';
 let paypalMessageableOverride = <?= $override ? json_encode($override) : '{}' ?>;

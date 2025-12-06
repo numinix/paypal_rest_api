@@ -28,6 +28,18 @@ The module's operation has been validated …
 
 For additional information, refer to the payment-module's [wiki articles](https://github.com/lat9/paypalr/wiki).
 
+## Content Security Policy (CSP) Support
+
+This module includes full support for Content Security Policy (CSP) with script-src nonces, ensuring compatibility with modern web security practices. When Zen Cart provides a `$GLOBALS['CSP_NONCE']` variable, the module automatically:
+
+- Adds the nonce attribute to PayPal SDK script tags
+- Adds the nonce attribute to inline scripts
+- Propagates the nonce to dynamically created script tags in JavaScript
+
+This prevents CSP violations when loading PayPal SDK and related scripts. The module works seamlessly with or without CSP enabled—no configuration needed.
+
+For detailed information about CSP support, including setup instructions and troubleshooting, see [docs/CSP_SUPPORT.md](docs/CSP_SUPPORT.md).
+
 ## Integrated sign-up (ISU)
 
 Zen Cart's admin exposes a **Complete PayPal setup** button that now opens the Numinix onboarding portal. The bridge script collects your storefront metadata, generates a tracking reference and redirects administrators to [numinix.com](https://www.numinix.com/) where the secure PayPal flow runs. Once onboarding finishes, the portal returns administrators to the Payment Modules page so they can paste the issued credentials into the module configuration.
