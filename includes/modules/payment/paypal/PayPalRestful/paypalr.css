@@ -112,3 +112,9 @@
     font-size: 0.9rem;
     color: #666;
 }
+
+/* Native Apple Pay button element (WebKit custom element) */
+apple-pay-button {
+    display: inline-block;
+    -webkit-appearance: -apple-pay-button;
+}
