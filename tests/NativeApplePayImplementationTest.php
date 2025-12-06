@@ -101,12 +101,13 @@ if (strpos($applePayJs, "buyer-country=") === false || strpos($applePayJs, 'isSa
     echo "✓ Apple Pay JS adds buyer-country parameter for sandbox mode\n";
 }
 
-// Test 10: Apple Pay JS loads SDK with components=applepay
-if (strpos($applePayJs, "&components=applepay") === false) {
+// Test 10: Apple Pay JS loads SDK with components including applepay
+// Note: All wallet modules load SDK with all components for compatibility
+if (strpos($applePayJs, "&components=buttons,googlepay,applepay") === false) {
     $testPassed = false;
-    $errors[] = "Apple Pay JS should load SDK with components=applepay";
+    $errors[] = "Apple Pay JS should load SDK with components=buttons,googlepay,applepay";
 } else {
-    echo "✓ Apple Pay JS loads SDK with components=applepay\n";
+    echo "✓ Apple Pay JS loads SDK with components=buttons,googlepay,applepay\n";
 }
 
 // Test 11: Apple Pay JS uses validateMerchant
@@ -202,7 +203,7 @@ echo "\n";
 if ($testPassed) {
     echo "All native Apple Pay implementation tests passed! ✓\n\n";
     echo "Summary of native Apple Pay implementation:\n";
-    echo "- Uses PayPal SDK with components=applepay\n";
+    echo "- Uses PayPal SDK with components=buttons,googlepay,applepay (for wallet module compatibility)\n";
     echo "- Uses paypal.Applepay().config() for payment configuration\n";
     echo "- Uses ApplePaySession for native payment sheet\n";
     echo "- Uses paypal.Applepay().confirmOrder() for order confirmation\n";
