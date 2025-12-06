@@ -410,6 +410,14 @@
     // Native Google Pay Integration
     // -------------------------------------------------------------------------
 
+    function getAllowedPaymentMethods(config) {
+        if (config && Array.isArray(config.allowedPaymentMethods) && config.allowedPaymentMethods.length > 0) {
+            return config.allowedPaymentMethods;
+        }
+
+        return null;
+    }
+
     /**
      * Handle the Google Pay button click event.
      * Creates a PayPal order and initiates the Google Pay payment flow.
@@ -448,6 +456,15 @@
 
             // Get the payment data request configuration from PayPal
             var paymentDataRequest = googlepay.config();
+            var allowedPaymentMethods = getAllowedPaymentMethods(paymentDataRequest);
+
+            if (!allowedPaymentMethods) {
+                console.error('Google Pay configuration is missing allowedPaymentMethods');
+                setGooglePayPayload({});
+                return;
+            }
+
+            paymentDataRequest.allowedPaymentMethods = allowedPaymentMethods;
 
             // Override transaction info with actual order data
             paymentDataRequest.transactionInfo = {
@@ -571,12 +588,19 @@
 
                 // Get base configuration from PayPal for isReadyToPay check
                 var baseConfig = googlepay.config();
+                var allowedPaymentMethods = getAllowedPaymentMethods(baseConfig);
+
+                if (!allowedPaymentMethods) {
+                    console.error('Google Pay configuration is missing allowedPaymentMethods');
+                    hidePaymentMethodContainer();
+                    return null;
+                }
 
                 // Check if user is ready to pay with Google Pay
                 var isReadyToPayRequest = {
                     apiVersion: baseConfig.apiVersion || 2,
                     apiVersionMinor: baseConfig.apiVersionMinor || 0,
-                    allowedPaymentMethods: baseConfig.allowedPaymentMethods
+                    allowedPaymentMethods: allowedPaymentMethods
                 };
 
                 return paymentsClient.isReadyToPay(isReadyToPayRequest)
