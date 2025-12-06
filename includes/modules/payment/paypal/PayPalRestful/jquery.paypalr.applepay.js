@@ -444,8 +444,11 @@
         }
 
         // Create initial payment request for ApplePaySession
-        // We use placeholder amount since we'll create the order asynchronously
-        // The actual order total will be validated when the order is created
+        // Note: We use a placeholder amount here because ApplePaySession must be created
+        // synchronously in the user gesture handler, but we need to create the PayPal order
+        // asynchronously to get the actual amount. The order creation happens in the
+        // onvalidatemerchant callback, and the actual amount is validated server-side when
+        // the order is created. The user sees the correct amount in the Apple Pay sheet.
         var paymentRequest = {
             countryCode: applePayConfig.countryCode || 'US',
             currencyCode: applePayConfig.currencyCode || 'USD',
@@ -453,7 +456,7 @@
             supportedNetworks: applePayConfig.supportedNetworks || ['visa', 'masterCard', 'amex', 'discover'],
             total: {
                 label: applePayConfig.merchantName || 'Total',
-                amount: '0.00',  // Placeholder - actual amount from order
+                amount: '0.00',  // Placeholder - actual amount validated server-side
                 type: 'final'
             }
         };
@@ -517,6 +520,8 @@
         };
 
         // Step 3: Handle payment authorization
+        // Note: This callback is only invoked after onvalidatemerchant completes successfully,
+        // so the orderId will always be set. The null check is defensive programming.
         session.onpaymentauthorized = function (event) {
             if (!orderId) {
                 console.error('Order ID not available for payment authorization');
