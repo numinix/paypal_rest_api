@@ -29,6 +29,11 @@
     var sharedSdkLoader = window.paypalrSdkLoaderState || { key: null, promise: null };
     window.paypalrSdkLoaderState = sharedSdkLoader;
 
+    // Apple Pay JS SDK loader state
+    var appleSdkLoader = {
+        promise: null
+    };
+
     // -------------------------------------------------------------------------
     // Utility Functions
     // -------------------------------------------------------------------------
@@ -259,6 +264,43 @@
     // -------------------------------------------------------------------------
     // SDK Loading
     // -------------------------------------------------------------------------
+
+    /**
+     * Load Apple's Apple Pay JS SDK.
+     * Required for the <apple-pay-button> WebKit custom element to render properly.
+     * This SDK must be loaded before the button element is appended to the DOM.
+     *
+     * @returns {Promise} Resolves when the SDK is loaded
+     */
+    function loadApplePayJsSdk() {
+        if (appleSdkLoader.promise) {
+            return appleSdkLoader.promise;
+        }
+
+        appleSdkLoader.promise = new Promise(function (resolve, reject) {
+            // If the SDK has already been loaded by something else, just resolve
+            if (typeof window.ApplePaySession !== 'undefined' &&
+                document.querySelector('script[data-apple-pay-sdk="true"]')) {
+                return resolve();
+            }
+
+            var existing = document.querySelector('script[data-apple-pay-sdk="true"]');
+            if (existing) {
+                existing.addEventListener('load', function () { resolve(); });
+                existing.addEventListener('error', function (e) { reject(e); });
+                return;
+            }
+
+            var script = document.createElement('script');
+            script.src = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
+            script.dataset.applePaySdk = 'true';
+            script.onload = function () { resolve(); };
+            script.onerror = function (e) { reject(e); };
+            document.head.appendChild(script);
+        });
+
+        return appleSdkLoader.promise;
+    }
 
     function buildSdkKey(config) {
         var currency = config.currency || 'USD';
@@ -582,18 +624,22 @@
                                     console.log('Apple Pay: User cannot make payments with active card');
                                     // Still show button - user might add a card
                                 }
-                                // Create and render the Apple Pay button
-                                var button = createApplePayButton();
-                                container.appendChild(button);
-                                return button;
+                                // Load Apple Pay JS SDK and then create/render the button
+                                return loadApplePayJsSdk().then(function () {
+                                    var button = createApplePayButton();
+                                    container.appendChild(button);
+                                    return button;
+                                });
                             });
                     }
                 }
 
-                // Create and render the Apple Pay button
-                var button = createApplePayButton();
-                container.appendChild(button);
-                return button;
+                // Load Apple Pay JS SDK and then create/render the button
+                return loadApplePayJsSdk().then(function () {
+                    var button = createApplePayButton();
+                    container.appendChild(button);
+                    return button;
+                });
             });
         }).catch(function (error) {
             console.error('Failed to render Apple Pay button', error);
