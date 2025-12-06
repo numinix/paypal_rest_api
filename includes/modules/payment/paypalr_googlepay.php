@@ -417,7 +417,7 @@ class paypalr_googlepay extends base
         // NOT the PayPal merchant ID. Do NOT use MODULE_PAYMENT_PAYPALR_MERCHANT_ID as it's a
         // language label constant ("Merchant ID:"), not a configuration value.
         // Use MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID which is a proper configuration setting.
-        $merchant_id = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID) : '';
+        $google_merchant_id = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID) : '';
 
         $intent = (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')
             ? 'capture'
@@ -433,7 +433,7 @@ class paypalr_googlepay extends base
             "Google Pay ajaxGetWalletConfig:\n" .
             "  - Environment: " . MODULE_PAYMENT_PAYPALR_SERVER . "\n" .
             "  - Client ID: " . $loggedClientId . "\n" .
-            "  - Google Merchant ID: " . ($merchant_id !== '' ? $merchant_id : '(not set)') . "\n" .
+            "  - Google Merchant ID: " . ($google_merchant_id !== '' ? $google_merchant_id : '(not set)') . "\n" .
             "  - Currency: " . ($_SESSION['currency'] ?? 'USD') . "\n" .
             "  - Intent: " . $intent . "\n" .
             "  - Module Enabled: " . ($this->enabled ? 'Yes' : 'No'),
@@ -449,7 +449,8 @@ class paypalr_googlepay extends base
         return [
             'success' => true,
             'clientId' => $client_id,
-            'merchantId' => $merchant_id,
+            'merchantId' => $google_merchant_id,
+            'googleMerchantId' => $google_merchant_id,
             'currency' => $_SESSION['currency'] ?? 'USD',
             'intent' => $intent,
             'environment' => MODULE_PAYMENT_PAYPALR_SERVER,
