@@ -509,13 +509,14 @@
 
     /**
      * Create a native Apple Pay button element.
+     * Note: Sizing via CSS custom properties (--apple-pay-button-width, etc.) is handled in paypalr.css
+     * to ensure proper rendering on iOS Safari. Do not set these as inline styles.
      */
     function createApplePayButton() {
         var button = document.createElement('apple-pay-button');
         button.setAttribute('buttonstyle', 'black');
         button.setAttribute('type', 'pay');
         button.setAttribute('locale', 'en-US');
-        button.style.cssText = '--apple-pay-button-width: 100%; --apple-pay-button-height: 40px; --apple-pay-button-border-radius: 4px;';
         button.addEventListener('click', onApplePayButtonClicked);
         return button;
     }
