@@ -117,5 +117,4 @@
 apple-pay-button {
     display: inline-block;
     -webkit-appearance: -apple-pay-button;
-    -apple-pay-button-type: pay;
 }
