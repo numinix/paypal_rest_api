@@ -260,9 +260,9 @@
 
     function buildSdkKey(config) {
         var currency = config.currency || 'USD';
-        var merchantId = config.merchantId || '';
+        var googleMerchantId = config.googleMerchantId || config.merchantId || '';
         var environment = config.environment || 'sandbox';
-        return [config.clientId, currency, merchantId, environment].join('|');
+        return [config.clientId, currency, googleMerchantId, environment].join('|');
     }
 
     /**
@@ -327,6 +327,7 @@
         }
 
         var desiredKey = buildSdkKey(config);
+        var googleMerchantId = config.googleMerchantId || config.merchantId || '';
         var existingScript = document.querySelector('script[data-paypal-sdk="true"]');
         var isSandbox = config.environment === 'sandbox';
 
@@ -337,7 +338,7 @@
         if (existingScript) {
             var matchesClient = existingScript.src.indexOf(encodeURIComponent(config.clientId)) !== -1;
             var matchesCurrency = existingScript.src.indexOf('currency=' + encodeURIComponent(config.currency || 'USD')) !== -1;
-            var matchesMerchant = !config.merchantId || existingScript.src.indexOf('merchant-id=' + encodeURIComponent(config.merchantId)) !== -1;
+            var matchesMerchant = !googleMerchantId || existingScript.src.indexOf('google-pay-merchant-id=' + encodeURIComponent(googleMerchantId)) !== -1;
 
             if (matchesClient && matchesCurrency && matchesMerchant) {
                 if (existingScript.dataset.loaded === 'true' && window.paypal && typeof window.paypal.Googlepay === 'function') {
@@ -374,10 +375,11 @@
             query += '&buyer-country=US';
         }
 
-        // Only include merchant-id if it's a valid PayPal merchant ID (alphanumeric, typically 13 chars).
-        // Do NOT include language label strings like "Merchant ID:" or placeholder values like "*".
-        if (config.merchantId && /^[A-Z0-9]{5,20}$/i.test(config.merchantId)) {
-            query += '&merchant-id=' + encodeURIComponent(config.merchantId);
+        // Include Google Pay merchant ID when provided to ensure allowedPaymentMethods are returned.
+        // Google Merchant IDs are numeric (and sometimes alphanumeric) strings provided by Google.
+        var googleMerchantId = config.googleMerchantId || config.merchantId;
+        if (googleMerchantId && /^[A-Z0-9-]{5,30}$/i.test(googleMerchantId)) {
+            query += '&google-pay-merchant-id=' + encodeURIComponent(googleMerchantId);
         }
 
         sharedSdkLoader.promise = new Promise(function (resolve, reject) {
@@ -392,6 +394,7 @@
                     clientId: config.clientId,
                     currency: config.currency,
                     merchantId: config.merchantId,
+                    googleMerchantId: config.googleMerchantId || config.merchantId,
                     environment: config.environment
                 };
                 resolve(window.paypal);
@@ -543,7 +546,8 @@
             // Google Pay requires a merchant ID in production mode
             // In sandbox mode, Google Pay can be tested without a merchant ID
             var isSandbox = config.environment === 'sandbox';
-            var hasMerchantId = config.merchantId && /^[A-Z0-9]{5,20}$/i.test(config.merchantId);
+            var googleMerchantId = config.googleMerchantId || config.merchantId;
+            var hasMerchantId = googleMerchantId && /^[A-Z0-9-]{5,30}$/i.test(googleMerchantId);
 
             if (!isSandbox && !hasMerchantId) {
                 console.warn('Google Pay: Invalid or missing Google Merchant ID (required in production)');
@@ -568,7 +572,9 @@
                 }
 
                 // Initialize PayPal Google Pay
-                var googlepay = paypal.Googlepay();
+                var googlepay = paypal.Googlepay({
+                    merchantId: hasMerchantId ? googleMerchantId : undefined
+                });
                 sdkState.googlepay = googlepay;
 
                 // Check eligibility using PayPal's isEligible method
