@@ -48,9 +48,10 @@ if (preg_match('/apple-pay-button\s*\{[^}]*display\s*:/s', $css) === 0) {
 
 // Test 3: CSS sets -webkit-appearance for apple-pay-button
 // This property is required for the native Apple Pay button styling
-if (strpos($css, '-webkit-appearance') === false || strpos($css, '-apple-pay-button') === false) {
+// Check that both -webkit-appearance and -apple-pay-button are within the apple-pay-button rule
+if (preg_match('/apple-pay-button\s*\{[^}]*-webkit-appearance[^}]*-apple-pay-button[^}]*\}/s', $css) === 0) {
     $testPassed = false;
-    $errors[] = "CSS should set -webkit-appearance: -apple-pay-button for native styling";
+    $errors[] = "CSS should set -webkit-appearance: -apple-pay-button for native styling within apple-pay-button rule";
 } else {
     echo "✓ CSS sets -webkit-appearance: -apple-pay-button for native styling\n";
 }
