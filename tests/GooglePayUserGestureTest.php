@@ -81,7 +81,8 @@ if (strpos($clickHandlerBody, 'fetchWalletOrder') !== false &&
 // This ensures we have the order amount before calling loadPaymentData
 if ($loadPaymentDataPos !== false) {
     // Extract fetchWalletOrder .then() callback
-    $fetchPattern = '/fetchWalletOrder\(\)\.then\(function\s*\([^)]*\)\s*\{([\s\S]*?)\n        \}\)/';
+    // Match the callback body up to the closing brace at the appropriate level
+    $fetchPattern = '/fetchWalletOrder\(\)\.then\(function\s*\([^)]*\)\s*\{([\s\S]*?)^\s{8}\}\)/m';
     if (preg_match($fetchPattern, $clickHandlerBody, $fetchMatches)) {
         $fetchThenBody = $fetchMatches[1];
         

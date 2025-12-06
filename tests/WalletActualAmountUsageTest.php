@@ -26,7 +26,8 @@ echo "Testing Apple Pay...\n";
 $applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js');
 
 // Extract the onApplePayButtonClicked function
-$pattern = '/function onApplePayButtonClicked\s*\(\s*\)\s*\{([\s\S]*?)\n    \}/';
+// Match the function body up to the final closing brace at the function level
+$pattern = '/function onApplePayButtonClicked\s*\(\s*\)\s*\{([\s\S]*?)^\s{4}\}/m';
 if (preg_match($pattern, $applePayJs, $matches)) {
     $clickHandlerBody = $matches[1];
     
@@ -83,7 +84,8 @@ echo "Testing Google Pay...\n";
 $googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js');
 
 // Extract the onGooglePayButtonClicked function
-$pattern = '/function onGooglePayButtonClicked\s*\(\s*\)\s*\{([\s\S]*?)\n    \}/';
+// Match the function body up to the final closing brace at the function level
+$pattern = '/function onGooglePayButtonClicked\s*\(\s*\)\s*\{([\s\S]*?)^\s{4}\}/m';
 if (preg_match($pattern, $googlePayJs, $matches)) {
     $clickHandlerBody = $matches[1];
     
