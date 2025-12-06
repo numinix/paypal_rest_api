@@ -81,15 +81,24 @@
         var totalText = totalElement.textContent || totalElement.innerText || '';
         
         // Remove currency symbols and extract numeric value
-        // Handles formats like: $123.45, USD 123.45, 123.45 USD, €123,45
-        var numericMatch = totalText.match(/[\d,]+\.?\d*/);
+        // Handles formats like: $123.45, USD 123.45, 123.45 USD, €123,45, 1,234.56
+        var numericMatch = totalText.match(/\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d+(?:\.\d{2})?/);
         if (!numericMatch) {
             console.warn('Could not extract numeric amount from: ' + totalText);
             return { amount: '0.00', currency: 'USD' };
         }
 
-        // Remove commas and ensure valid decimal format
+        // Remove commas and validate as a number
         var amount = numericMatch[0].replace(/,/g, '');
+        var parsedAmount = parseFloat(amount);
+        
+        if (isNaN(parsedAmount) || parsedAmount < 0) {
+            console.warn('Invalid amount extracted: ' + amount);
+            return { amount: '0.00', currency: 'USD' };
+        }
+        
+        // Format to 2 decimal places
+        amount = parsedAmount.toFixed(2);
         
         // Detect currency from text (defaults to USD)
         var currency = 'USD';
@@ -594,9 +603,16 @@
                     validationUrl: event.validationURL
                 }).then(function (merchantSession) {
                     session.completeMerchantValidation(merchantSession);
+                }).catch(function (error) {
+                    console.error('Merchant validation failed', error);
+                    session.abort();
+                    setApplePayPayload({});
+                    if (typeof window.oprcHideProcessingOverlay === 'function') {
+                        window.oprcHideProcessingOverlay();
+                    }
                 });
             }).catch(function (error) {
-                console.error('Merchant validation failed', error);
+                console.error('Order creation or merchant validation failed', error);
                 session.abort();
                 setApplePayPayload({});
                 if (typeof window.oprcHideProcessingOverlay === 'function') {
@@ -607,6 +623,17 @@
 
         // Step 5: Handle payment authorization
         session.onpaymentauthorized = function (event) {
+            // Verify order was created before attempting confirmation
+            if (!orderId) {
+                console.error('Payment authorized but orderId is not available');
+                session.completePayment(ApplePaySession.STATUS_FAILURE);
+                setApplePayPayload({});
+                if (typeof window.oprcHideProcessingOverlay === 'function') {
+                    window.oprcHideProcessingOverlay();
+                }
+                return;
+            }
+            
             // Confirm the order with PayPal using the Apple Pay token
             applepay.confirmOrder({
                 orderId: orderId,
