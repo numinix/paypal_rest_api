@@ -4,6 +4,13 @@
  * instead of a $0.00 placeholder when displaying the payment sheet.
  *
  * This test ensures that:
+ * For Apple Pay:
+ * 1. getOrderTotalFromPage() is called to extract amount from page (e.g., #ottotal)
+ * 2. The page amount (orderTotal.amount) is used in the payment request
+ * 3. fetchWalletOrder() is called to create the server-side PayPal order
+ * 4. The order is validated in onvalidatemerchant callback
+ *
+ * For Google Pay:
  * 1. fetchWalletOrder() is called before creating the payment session
  * 2. The actual order amount (orderConfig.amount) is used in the payment request
  * 3. No hardcoded '0.00' placeholders are used in the final payment request
@@ -31,45 +38,51 @@ $pattern = '/function onApplePayButtonClicked\s*\(\s*\)\s*\{([\s\S]*?)^\s{4}\}/m
 if (preg_match($pattern, $applePayJs, $matches)) {
     $clickHandlerBody = $matches[1];
     
-    // Test 1: fetchWalletOrder is called before creating ApplePaySession
-    $fetchPos = strpos($clickHandlerBody, 'fetchWalletOrder()');
-    $sessionPos = strpos($clickHandlerBody, 'new ApplePaySession');
-    
-    if ($fetchPos !== false && $sessionPos !== false && $fetchPos < $sessionPos) {
-        echo "  ✓ fetchWalletOrder is called before creating ApplePaySession\n";
+    // Test 1: getOrderTotalFromPage is called to extract amount from page
+    if (strpos($clickHandlerBody, 'getOrderTotalFromPage') !== false) {
+        echo "  ✓ getOrderTotalFromPage is called to extract amount from page\n";
     } else {
         $testPassed = false;
-        $errors[] = "Apple Pay: fetchWalletOrder should be called before ApplePaySession";
-        echo "  ✗ fetchWalletOrder is not called before ApplePaySession\n";
+        $errors[] = "Apple Pay: getOrderTotalFromPage should be called to extract amount from page";
+        echo "  ✗ getOrderTotalFromPage is not called\n";
     }
     
-    // Test 2: orderConfig.amount is used in payment request
-    if (strpos($clickHandlerBody, 'orderConfig.amount') !== false) {
-        echo "  ✓ orderConfig.amount is used in payment request\n";
+    // Test 2: orderTotal.amount (from page) is used in payment request
+    if (strpos($clickHandlerBody, 'orderTotal.amount') !== false) {
+        echo "  ✓ orderTotal.amount (from page) is used in payment request\n";
     } else {
         $testPassed = false;
-        $errors[] = "Apple Pay: orderConfig.amount should be used in payment request";
-        echo "  ✗ orderConfig.amount is not used\n";
+        $errors[] = "Apple Pay: orderTotal.amount should be used in payment request";
+        echo "  ✗ orderTotal.amount is not used\n";
     }
     
-    // Test 3: Payment request uses actual amount from order
-    // Check for both 'total:' and 'amount: orderConfig.amount' presence
+    // Test 3: Payment request uses actual amount from page
+    // Check for both 'total:' and 'amount: orderTotal.amount' presence
     if (strpos($clickHandlerBody, 'total:') !== false && 
-        strpos($clickHandlerBody, 'amount: orderConfig.amount') !== false) {
-        echo "  ✓ Payment request total uses orderConfig.amount\n";
+        strpos($clickHandlerBody, 'amount: orderTotal.amount') !== false) {
+        echo "  ✓ Payment request total uses orderTotal.amount (from page)\n";
     } else {
         $testPassed = false;
-        $errors[] = "Apple Pay: Payment request should use orderConfig.amount for total";
-        echo "  ✗ Payment request does not use orderConfig.amount for total\n";
+        $errors[] = "Apple Pay: Payment request should use orderTotal.amount for total";
+        echo "  ✗ Payment request does not use orderTotal.amount for total\n";
     }
     
-    // Test 4: Currency uses order currency
-    if (strpos($clickHandlerBody, 'orderConfig.currency') !== false) {
-        echo "  ✓ Currency is taken from order configuration\n";
+    // Test 4: Currency uses page currency or config
+    if (strpos($clickHandlerBody, 'orderTotal.currency') !== false) {
+        echo "  ✓ Currency is taken from page total\n";
     } else {
         $testPassed = false;
-        $errors[] = "Apple Pay: Currency should be taken from orderConfig";
-        echo "  ✗ Currency is not taken from order configuration\n";
+        $errors[] = "Apple Pay: Currency should be taken from orderTotal (page)";
+        echo "  ✗ Currency is not taken from page total\n";
+    }
+    
+    // Test 5: fetchWalletOrder is still called (for server-side order creation)
+    if (strpos($clickHandlerBody, 'fetchWalletOrder') !== false) {
+        echo "  ✓ fetchWalletOrder is called for server-side order creation\n";
+    } else {
+        $testPassed = false;
+        $errors[] = "Apple Pay: fetchWalletOrder should be called for server-side order";
+        echo "  ✗ fetchWalletOrder is not called\n";
     }
 } else {
     $testPassed = false;
@@ -140,10 +153,11 @@ echo "\n";
 if ($testPassed) {
     echo "All wallet actual amount usage tests passed! ✓\n\n";
     echo "Summary:\n";
-    echo "- Apple Pay fetches order before creating session and uses actual amount\n";
+    echo "- Apple Pay extracts amount from page (#ottotal) and uses it synchronously\n";
+    echo "- Apple Pay creates session with page amount, then validates server order\n";
     echo "- Google Pay fetches order before loading payment data and uses actual amount\n";
-    echo "- Both use orderConfig.amount and orderConfig.currency from server\n";
-    echo "- This fixes the $0.00 amount display issue in payment modals\n";
+    echo "- Both approaches ensure users see correct amounts (not $0.00)\n";
+    echo "- Apple Pay approach maintains user gesture context compliance\n";
     exit(0);
 } else {
     echo "Tests failed:\n";
