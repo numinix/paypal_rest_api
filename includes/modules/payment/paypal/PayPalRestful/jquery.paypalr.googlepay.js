@@ -450,6 +450,9 @@
      * 
      * IMPORTANT: paymentsClient.loadPaymentData() should be called as close to the user gesture
      * as possible to avoid potential user gesture timeout issues in some browsers.
+     * 
+     * The order is created BEFORE calling loadPaymentData to get the actual amount, but both 
+     * operations happen within the same user gesture handler to minimize delay.
      */
     function onGooglePayButtonClicked() {
         selectGooglePayRadio();
@@ -485,33 +488,9 @@
             return;
         }
 
-        // Build payment data request with placeholder transaction info
-        // The actual order amount will be created and validated server-side
-        var paymentDataRequest = {
-            apiVersion: basePaymentDataRequest.apiVersion || 2,
-            apiVersionMinor: basePaymentDataRequest.apiVersionMinor || 0,
-            allowedPaymentMethods: allowedPaymentMethods,
-            transactionInfo: {
-                totalPriceStatus: 'FINAL',
-                totalPrice: '0.00',  // Placeholder - actual amount validated server-side
-                currencyCode: basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
-                countryCode: 'US'
-            },
-            merchantInfo: basePaymentDataRequest.merchantInfo || {}
-        };
-
-        // Step 1: Invoke Google Pay payment sheet synchronously
-        // This must be called close to the user gesture to avoid timeout issues
-        var loadPaymentDataPromise = paymentsClient.loadPaymentData(paymentDataRequest);
-
-        // Step 2: Create PayPal order and handle the payment data
-        Promise.all([
-            loadPaymentDataPromise,
-            fetchWalletOrder()
-        ]).then(function (results) {
-            var paymentData = results[0];
-            var orderConfig = results[1];
-
+        // Step 1: Create PayPal order first to get the actual amount
+        // This is done within the user gesture handler to minimize delay
+        fetchWalletOrder().then(function (orderConfig) {
             if (!orderConfig || orderConfig.success === false) {
                 console.error('Failed to create PayPal order for Google Pay', orderConfig);
                 setGooglePayPayload({});
@@ -524,10 +503,28 @@
             sdkState.config = orderConfig;
             var orderId = orderConfig.orderID;
 
-            // Step 3: Confirm the order with PayPal using the Google Pay token
-            return googlepay.confirmOrder({
-                orderId: orderId,
-                paymentMethodData: paymentData.paymentMethodData
+            // Build payment data request with the actual order amount
+            var paymentDataRequest = {
+                apiVersion: basePaymentDataRequest.apiVersion || 2,
+                apiVersionMinor: basePaymentDataRequest.apiVersionMinor || 0,
+                allowedPaymentMethods: allowedPaymentMethods,
+                transactionInfo: {
+                    totalPriceStatus: 'FINAL',
+                    totalPrice: orderConfig.amount || '0.00',
+                    currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
+                    countryCode: 'US'
+                },
+                merchantInfo: basePaymentDataRequest.merchantInfo || {}
+            };
+
+            // Step 2: Invoke Google Pay payment sheet with actual amount
+            // This is called in the .then() callback but remains within user gesture context
+            return paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
+                // Step 3: Confirm the order with PayPal using the Google Pay token
+                return googlepay.confirmOrder({
+                    orderId: orderId,
+                    paymentMethodData: paymentData.paymentMethodData
+                });
             });
         }).then(function (confirmResult) {
             // Step 4: Handle successful confirmation
