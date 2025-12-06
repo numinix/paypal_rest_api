@@ -424,6 +424,9 @@
     /**
      * Handle the Google Pay button click event.
      * Creates a PayPal order and initiates the Google Pay payment flow.
+     * 
+     * IMPORTANT: paymentsClient.loadPaymentData() should be called as close to the user gesture
+     * as possible to avoid potential user gesture timeout issues in some browsers.
      */
     function onGooglePayButtonClicked() {
         selectGooglePayRadio();
@@ -433,8 +436,59 @@
             window.oprcShowProcessingOverlay();
         }
 
-        // Step 1: Create PayPal order
-        fetchWalletOrder().then(function (orderConfig) {
+        // Get Google Pay SDK references
+        var googlepay = sdkState.googlepay;
+        var paymentsClient = sdkState.paymentsClient;
+
+        if (!googlepay || !paymentsClient) {
+            console.error('Google Pay not properly initialized');
+            setGooglePayPayload({});
+            if (typeof window.oprcHideProcessingOverlay === 'function') {
+                window.oprcHideProcessingOverlay();
+            }
+            return;
+        }
+
+        // Get the payment data request configuration from PayPal
+        var basePaymentDataRequest = googlepay.config();
+        var allowedPaymentMethods = getAllowedPaymentMethods(basePaymentDataRequest);
+
+        if (!allowedPaymentMethods) {
+            console.error('Google Pay configuration is missing allowedPaymentMethods');
+            setGooglePayPayload({});
+            if (typeof window.oprcHideProcessingOverlay === 'function') {
+                window.oprcHideProcessingOverlay();
+            }
+            return;
+        }
+
+        // Build payment data request with placeholder transaction info
+        // The actual order amount will be created and validated server-side
+        var paymentDataRequest = {
+            apiVersion: basePaymentDataRequest.apiVersion || 2,
+            apiVersionMinor: basePaymentDataRequest.apiVersionMinor || 0,
+            allowedPaymentMethods: allowedPaymentMethods,
+            transactionInfo: {
+                totalPriceStatus: 'FINAL',
+                totalPrice: '0.00',  // Placeholder - actual amount validated server-side
+                currencyCode: basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
+                countryCode: 'US'
+            },
+            merchantInfo: basePaymentDataRequest.merchantInfo || {}
+        };
+
+        // Step 1: Invoke Google Pay payment sheet synchronously
+        // This must be called close to the user gesture to avoid timeout issues
+        var loadPaymentDataPromise = paymentsClient.loadPaymentData(paymentDataRequest);
+
+        // Step 2: Create PayPal order and handle the payment data
+        Promise.all([
+            loadPaymentDataPromise,
+            fetchWalletOrder()
+        ]).then(function (results) {
+            var paymentData = results[0];
+            var orderConfig = results[1];
+
             if (!orderConfig || orderConfig.success === false) {
                 console.error('Failed to create PayPal order for Google Pay', orderConfig);
                 setGooglePayPayload({});
@@ -447,76 +501,32 @@
             sdkState.config = orderConfig;
             var orderId = orderConfig.orderID;
 
-            // Step 2: Get Google Pay payment data request from PayPal
-            var googlepay = sdkState.googlepay;
-            var paymentsClient = sdkState.paymentsClient;
-
-            if (!googlepay || !paymentsClient) {
-                console.error('Google Pay not properly initialized');
+            // Step 3: Confirm the order with PayPal using the Google Pay token
+            return googlepay.confirmOrder({
+                orderId: orderId,
+                paymentMethodData: paymentData.paymentMethodData
+            });
+        }).then(function (confirmResult) {
+            // Step 4: Handle successful confirmation
+            if (confirmResult && (confirmResult.status === 'APPROVED' || confirmResult.status === 'PAYER_ACTION_REQUIRED')) {
+                var payload = {
+                    orderID: sdkState.config.orderID,
+                    confirmResult: confirmResult,
+                    wallet: 'google_pay'
+                };
+                setGooglePayPayload(payload);
+                document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: payload }));
+            } else {
+                console.warn('Google Pay confirmation returned unexpected status', confirmResult);
                 setGooglePayPayload({});
-                return;
             }
-
-            // Get the payment data request configuration from PayPal
-            var paymentDataRequest = googlepay.config();
-            var allowedPaymentMethods = getAllowedPaymentMethods(paymentDataRequest);
-
-            if (!allowedPaymentMethods) {
-                console.error('Google Pay configuration is missing allowedPaymentMethods');
-                setGooglePayPayload({});
-                return;
-            }
-
-            paymentDataRequest.allowedPaymentMethods = allowedPaymentMethods;
-
-            // Override transaction info with actual order data
-            paymentDataRequest.transactionInfo = {
-                totalPriceStatus: 'FINAL',
-                totalPrice: orderConfig.amount || '0.00',
-                currencyCode: orderConfig.currency || 'USD',
-                countryCode: 'US'
-            };
-
-            // Step 3: Invoke Google Pay payment sheet
-            paymentsClient.loadPaymentData(paymentDataRequest)
-                .then(function (paymentData) {
-                    // Step 4: Confirm the order with PayPal using the Google Pay token
-                    var token = paymentData.paymentMethodData.tokenizationData.token;
-
-                    return googlepay.confirmOrder({
-                        orderId: orderId,
-                        paymentMethodData: paymentData.paymentMethodData
-                    });
-                })
-                .then(function (confirmResult) {
-                    // Step 5: Handle successful confirmation
-                    if (confirmResult.status === 'APPROVED' || confirmResult.status === 'PAYER_ACTION_REQUIRED') {
-                        var payload = {
-                            orderID: orderId,
-                            confirmResult: confirmResult,
-                            wallet: 'google_pay'
-                        };
-                        setGooglePayPayload(payload);
-                        document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: payload }));
-                    } else {
-                        console.warn('Google Pay confirmation returned unexpected status', confirmResult);
-                        setGooglePayPayload({});
-                    }
-                })
-                .catch(function (error) {
-                    // Handle errors or user cancellation
-                    if (error.statusCode === 'CANCELED') {
-                        console.log('Google Pay cancelled by user');
-                    } else {
-                        console.error('Google Pay error', error);
-                    }
-                    setGooglePayPayload({});
-                    if (typeof window.oprcHideProcessingOverlay === 'function') {
-                        window.oprcHideProcessingOverlay();
-                    }
-                });
         }).catch(function (error) {
-            console.error('Failed to create PayPal order', error);
+            // Handle errors or user cancellation
+            if (error && error.statusCode === 'CANCELED') {
+                console.log('Google Pay cancelled by user');
+            } else {
+                console.error('Google Pay error', error);
+            }
             setGooglePayPayload({});
             if (typeof window.oprcHideProcessingOverlay === 'function') {
                 window.oprcHideProcessingOverlay();
