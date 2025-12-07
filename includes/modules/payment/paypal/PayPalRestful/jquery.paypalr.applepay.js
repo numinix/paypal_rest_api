@@ -583,8 +583,10 @@
                     return;
                 }
 
-                if (!config.amount) {
-                    console.error('Order created but amount is missing', config);
+                // Validate amount is present and not an empty string
+                // Note: We allow '0' or '0.00' as valid amounts (e.g., for free orders with coupons)
+                if (config.amount === undefined || config.amount === null || config.amount === '') {
+                    console.error('Order created but amount is missing or empty', config);
                     session.abort();
                     setApplePayPayload({});
                     if (typeof window.oprcHideProcessingOverlay === 'function') {

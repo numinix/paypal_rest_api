@@ -544,11 +544,18 @@ class paypalr_applepay extends base
 
         $orderData = $_SESSION['PayPalRestful']['Order'] ?? [];
         $current = $orderData['current']['purchase_units'][0]['amount'] ?? [];
+        $amount = $current['value'] ?? '';
+
+        // Validate that amount is present and non-empty after order creation
+        if ($amount === '' || !isset($orderData['id'])) {
+            $this->log->write('Apple Pay: Order created but amount or orderID is missing from session structure', true);
+            return ['success' => false, 'message' => 'Order created but amount is missing'];
+        }
 
         return [
             'success' => true,
-            'orderID' => $orderData['id'] ?? '',
-            'amount' => $current['value'] ?? '',
+            'orderID' => $orderData['id'],
+            'amount' => $amount,
             'currency' => $current['currency_code'] ?? ($_SESSION['currency'] ?? ''),
             'intent' => $orderData['current']['intent'] ?? $intent,
             'clientId' => $client_id,
