@@ -25,8 +25,8 @@ echo "=====================================\n\n";
 echo "Testing PHP amount validation...\n";
 $applePayPhp = file_get_contents(__DIR__ . '/../includes/modules/payment/paypalr_applepay.php');
 
-// Test 1: PHP validates amount is not empty before returning success
-if (preg_match('/\$amount\s*=\s*\$current\[\'value\'\]\s*\?\?/', $applePayPhp)) {
+// Test 1: PHP extracts amount from current array
+if (preg_match('/\$amount\s*=\s*\$current\[\'value\'\]\s*\?\?\s*[\'\"][\'\"]/', $applePayPhp)) {
     echo "  ✓ PHP extracts amount from current array\n";
 } else {
     $testPassed = false;
@@ -35,7 +35,7 @@ if (preg_match('/\$amount\s*=\s*\$current\[\'value\'\]\s*\?\?/', $applePayPhp)) 
 }
 
 // Test 2: PHP checks if amount is empty string
-if (preg_match('/if\s*\(\s*\$amount\s*===\s*[\'\"]\s*[\'\"]\s*\|\|/', $applePayPhp)) {
+if (preg_match('/if\s*\(\s*\$amount\s*===\s*[\'\"][\'\"]/', $applePayPhp)) {
     echo "  ✓ PHP checks if amount is empty string\n";
 } else {
     $testPassed = false;
@@ -53,7 +53,7 @@ if (preg_match('/amount.*is missing.*session structure/', $applePayPhp)) {
 }
 
 // Test 4: PHP returns error message when amount is missing
-if (preg_match('/return\s*\[\s*[\'"]success[\'"]\s*=>\s*false.*[\'"]message[\'"]\s*=>\s*[\'"].*amount.*missing/', $applePayPhp)) {
+if (preg_match('/return.*success.*false.*message.*Order created but amount is missing/s', $applePayPhp)) {
     echo "  ✓ PHP returns error message when amount is missing\n";
 } else {
     $testPassed = false;
