@@ -549,7 +549,7 @@ class paypalr_applepay extends base
         // Validate that amount is present and non-empty after order creation
         if ($amount === '' || !isset($orderData['id'])) {
             $this->log->write('Apple Pay: Order created but amount or orderID is missing from session structure', true);
-            return ['success' => false, 'message' => 'Order created but amount is missing'];
+            return ['success' => false, 'message' => 'Order validation failed'];
         }
 
         return [

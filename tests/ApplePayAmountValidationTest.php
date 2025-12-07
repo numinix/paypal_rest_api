@@ -52,13 +52,13 @@ if (preg_match('/amount.*is missing.*session structure/', $applePayPhp)) {
     echo "  ✗ PHP does not log error for missing amount\n";
 }
 
-// Test 4: PHP returns error message when amount is missing
-if (preg_match('/return.*success.*false.*message.*Order created but amount is missing/s', $applePayPhp)) {
-    echo "  ✓ PHP returns error message when amount is missing\n";
+// Test 4: PHP returns error message when validation fails
+if (preg_match('/return.*success.*false.*message.*Order validation failed/s', $applePayPhp)) {
+    echo "  ✓ PHP returns error message when validation fails\n";
 } else {
     $testPassed = false;
-    $errors[] = "PHP should return error message when amount is missing";
-    echo "  ✗ PHP does not return error message for missing amount\n";
+    $errors[] = "PHP should return error message when validation fails";
+    echo "  ✗ PHP does not return error message for validation failure\n";
 }
 
 echo "\n";
@@ -119,11 +119,12 @@ if ($testPassed) {
     echo "All Apple Pay amount validation tests passed! ✓\n\n";
     echo "Summary:\n";
     echo "- PHP validates amount exists and is non-empty before returning success\n";
-    echo "- PHP logs detailed error when amount is missing from session structure\n";
+    echo "- PHP validates orderID exists before returning success\n";
+    echo "- PHP logs detailed error when amount or orderID is missing from session structure\n";
     echo "- JavaScript explicitly checks for undefined, null, and empty string\n";
     echo "- JavaScript allows '0' and '0.00' as valid amounts (e.g., free orders)\n";
     echo "- Error messages clearly indicate the issue is missing/empty amount\n";
-    echo "- This prevents spurious 'cancelled by user' messages when amount is missing\n";
+    echo "- This prevents spurious 'cancelled by user' messages when validation fails\n";
     exit(0);
 } else {
     echo "Tests failed:\n";
