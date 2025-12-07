@@ -4,10 +4,15 @@
  * to avoid "InvalidAccessError: Must create a new ApplePaySession from a user gesture handler."
  *
  * This test ensures that:
- * 1. ApplePaySession is created in onApplePayButtonClicked (the click handler)
- * 2. session.begin() is called in onApplePayButtonClicked (synchronously)
- * 3. Order creation happens in onvalidatemerchant (asynchronously is OK)
- * 4. The ApplePaySession is created BEFORE any async operations (fetchWalletOrder)
+ * 1. Order total is extracted from page synchronously (e.g., #ottotal element)
+ * 2. ApplePaySession is created synchronously in onApplePayButtonClicked (the click handler)
+ * 3. session.begin() is called synchronously in onApplePayButtonClicked
+ * 4. PayPal order creation happens asynchronously in onvalidatemerchant callback
+ * 5. The ApplePaySession is created BEFORE any async .then() callbacks
+ *
+ * This approach balances two requirements:
+ * - User gesture compliance (session created synchronously)
+ * - Actual amount display (extracted from page, not $0.00 placeholder)
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -34,8 +39,8 @@ if (preg_match($pattern, $applePayJs, $matches)) {
     exit(1);
 }
 
-// Test 1: ApplePaySession is created in the click handler within fetchWalletOrder's .then()
-// This is acceptable as long as the entire chain is within the user gesture context
+// Test 1: ApplePaySession is created synchronously in the click handler (NOT in .then())
+// This is critical to avoid "InvalidAccessError: Must create a new ApplePaySession from a user gesture handler"
 $sessionCreatePos = strpos($clickHandlerBody, 'new ApplePaySession');
 $firstThenPos = strpos($clickHandlerBody, '.then(');
 
@@ -44,10 +49,12 @@ if ($sessionCreatePos === false) {
     $errors[] = "ApplePaySession is not created in the click handler";
     echo "✗ ApplePaySession is not created in the click handler\n";
 } elseif ($firstThenPos !== false && $sessionCreatePos > $firstThenPos) {
-    // This is now expected - session is created inside .then() to use actual order amount
-    echo "✓ ApplePaySession is created in .then() callback after fetching order amount\n";
+    // Session should NOT be inside .then() - this causes user gesture errors
+    $testPassed = false;
+    $errors[] = "ApplePaySession must be created synchronously, NOT inside .then() callback";
+    echo "✗ ApplePaySession is created inside .then() callback (causes user gesture error)\n";
 } else {
-    echo "✓ ApplePaySession is created in the click handler\n";
+    echo "✓ ApplePaySession is created synchronously in the click handler\n";
 }
 
 // Test 2: session.begin() is called in the click handler at the top level (not in a .then() callback)
@@ -91,51 +98,50 @@ if ($sessionBeginPos === false) {
     }
 }
 
-// Test 3: fetchWalletOrder IS called before ApplePaySession creation to get actual amount
-// Extract the code before ApplePaySession creation
-if ($sessionCreatePos !== false) {
-    $codeBeforeSessionCreate = substr($clickHandlerBody, 0, $sessionCreatePos);
-    if (strpos($codeBeforeSessionCreate, 'fetchWalletOrder') !== false) {
-        echo "✓ fetchWalletOrder is called before ApplePaySession creation to get actual amount\n";
-    } else {
-        $testPassed = false;
-        $errors[] = "fetchWalletOrder should be called BEFORE ApplePaySession creation to get the actual order amount.";
-        echo "✗ fetchWalletOrder is not called before ApplePaySession creation\n";
+// Test 3: getOrderTotalFromPage IS called to extract amount from page
+// This allows showing actual amount while creating session synchronously
+if (strpos($clickHandlerBody, 'getOrderTotalFromPage') !== false) {
+    echo "✓ getOrderTotalFromPage is called to extract order amount from page\n";
+} else {
+    $testPassed = false;
+    $errors[] = "getOrderTotalFromPage should be called to get order amount from page";
+    echo "✗ getOrderTotalFromPage is not called\n";
+}
+
+// Test 3b: fetchWalletOrder IS called to create server-side order
+if (strpos($clickHandlerBody, 'fetchWalletOrder') !== false) {
+    echo "✓ fetchWalletOrder is called to create PayPal order\n";
+} else {
+    $testPassed = false;
+    $errors[] = "fetchWalletOrder should be called to create PayPal order";
+    echo "✗ fetchWalletOrder is not called\n";
+}
+
+// Test 4: Order is handled in onvalidatemerchant (not before session creation)
+// The order promise is awaited in onvalidatemerchant to avoid blocking session creation
+if (strpos($clickHandlerBody, 'onvalidatemerchant') !== false) {
+    // Extract onvalidatemerchant callback
+    $onvalidatePattern = '/onvalidatemerchant\s*=\s*function\s*\([^)]*\)\s*\{([\s\S]*?)^\s{8}\};/m';
+    if (preg_match($onvalidatePattern, $clickHandlerBody, $onvalidateMatches)) {
+        $onvalidateBody = $onvalidateMatches[1];
+        
+        if (strpos($onvalidateBody, 'orderPromise') !== false || strpos($onvalidateBody, '.then(') !== false) {
+            echo "✓ Order promise is handled in onvalidatemerchant callback\n";
+        } else {
+            $testPassed = false;
+            $errors[] = "Order promise should be handled in onvalidatemerchant";
+            echo "✗ Order promise is not handled in onvalidatemerchant\n";
+        }
     }
 }
 
-// Test 4: ApplePaySession is created inside fetchWalletOrder's .then() callback
-// This ensures we have the order amount before creating the session
-if (strpos($clickHandlerBody, 'fetchWalletOrder') !== false && 
-    strpos($clickHandlerBody, 'new ApplePaySession') !== false) {
-    
-    // Extract fetchWalletOrder .then() callback
-    // Match the callback body up to the closing brace at the appropriate level
-    $fetchPattern = '/fetchWalletOrder\(\)\.then\(function\s*\([^)]*\)\s*\{([\s\S]*?)^\s{8}\}\)/m';
-    if (preg_match($fetchPattern, $clickHandlerBody, $fetchMatches)) {
-        $fetchThenBody = $fetchMatches[1];
-        
-        if (strpos($fetchThenBody, 'new ApplePaySession') !== false) {
-            echo "✓ ApplePaySession is created inside fetchWalletOrder .then() callback with actual amount\n";
-        } else {
-            $testPassed = false;
-            $errors[] = "ApplePaySession should be created inside fetchWalletOrder .then() callback";
-            echo "✗ ApplePaySession is not in fetchWalletOrder .then() callback\n";
-        }
-        
-        // Verify order amount is used in payment request
-        if (strpos($fetchThenBody, 'orderConfig.amount') !== false) {
-            echo "✓ Order amount from fetchWalletOrder is used in payment request\n";
-        } else {
-            $testPassed = false;
-            $errors[] = "orderConfig.amount should be used in payment request";
-            echo "✗ Order amount is not used in payment request\n";
-        }
-    }
+// Test 4b: Page amount is used in payment request (from getOrderTotalFromPage)
+if (strpos($clickHandlerBody, 'orderTotal.amount') !== false) {
+    echo "✓ Order amount from page is used in payment request\n";
 } else {
     $testPassed = false;
-    $errors[] = "fetchWalletOrder or ApplePaySession not found";
-    echo "✗ fetchWalletOrder or ApplePaySession not found\n";
+    $errors[] = "orderTotal.amount should be used in payment request";
+    echo "✗ Order amount from page is not used in payment request\n";
 }
 
 // Test 5: Verify ApplePaySession is created with try-catch for error handling
@@ -175,13 +181,14 @@ if (strpos($clickHandlerBody, 'var orderId') !== false ||
 // Test 8: Verify the code structure follows the correct pattern:
 // 1. Get applepay SDK reference (synchronous)
 // 2. Get applePayConfig (synchronous)
-// 3. Call fetchWalletOrder (async but within user gesture)
-// 4. Create ApplePaySession in .then() with actual amount (still within gesture context)
-// 5. Set up handlers (synchronous)
-// 6. Call session.begin() (synchronous)
-$structurePattern = '/applepay\.config\(\)[\s\S]*?fetchWalletOrder\(\)\.then[\s\S]*?new ApplePaySession[\s\S]*?onvalidatemerchant[\s\S]*?onpaymentauthorized[\s\S]*?oncancel[\s\S]*?session\.begin\(\)/';
+// 3. Get order total from page (synchronous)
+// 4. Start fetchWalletOrder (returns promise)
+// 5. Create ApplePaySession synchronously with page amount
+// 6. Set up handlers (synchronous) - onvalidatemerchant waits for order
+// 7. Call session.begin() (synchronous)
+$structurePattern = '/applepay\.config\(\)[\s\S]*?getOrderTotalFromPage\(\)[\s\S]*?fetchWalletOrder\(\)[\s\S]*?new ApplePaySession[\s\S]*?onvalidatemerchant[\s\S]*?onpaymentauthorized[\s\S]*?oncancel[\s\S]*?session\.begin\(\)/';
 if (preg_match($structurePattern, $clickHandlerBody)) {
-    echo "✓ Code follows correct pattern with order creation before session for actual amount\n";
+    echo "✓ Code follows correct pattern: session created synchronously with page amount, order handled in onvalidatemerchant\n";
 } else {
     $testPassed = false;
     $errors[] = "Code does not follow correct pattern";
@@ -193,11 +200,11 @@ echo "\n";
 if ($testPassed) {
     echo "All Apple Pay session user gesture tests passed! ✓\n\n";
     echo "Summary:\n";
-    echo "- fetchWalletOrder is called first to get the actual order amount\n";
-    echo "- ApplePaySession is created in .then() callback with the actual amount\n";
+    echo "- Order total is extracted from page synchronously (e.g., #ottotal)\n";
+    echo "- ApplePaySession is created synchronously with page amount\n";
     echo "- session.begin() is called synchronously after session creation\n";
-    echo "- All operations happen within the user gesture context\n";
-    echo "- This fixes the $0.00 amount display issue while maintaining user gesture compliance\n";
+    echo "- PayPal order creation happens in onvalidatemerchant callback\n";
+    echo "- This maintains user gesture context AND shows actual amount (not $0.00)\n";
     exit(0);
 } else {
     echo "Tests failed:\n";
