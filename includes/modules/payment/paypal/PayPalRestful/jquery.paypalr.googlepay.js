@@ -135,7 +135,10 @@
             moduleRadio.style.display = 'none';
             moduleRadio.setAttribute('aria-hidden', 'true');
             moduleRadio.tabIndex = -1;
+            return true;
         }
+
+        return false;
     }
 
     function getGooglePayButton() {
@@ -214,7 +217,35 @@
         var moduleLabel = document.querySelector('label[for="pmt-paypalr_googlepay"]');
         if (moduleLabel) {
             moduleLabel.classList.add('paypalr-wallet-label-hidden');
+            moduleLabel.style.display = 'none';
+            moduleLabel.setAttribute('aria-hidden', 'true');
+            return true;
         }
+
+        return false;
+    }
+
+    function ensureWalletSelectionHidden() {
+        hideModuleRadio();
+        hideModuleLabel();
+
+        if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') {
+            return;
+        }
+
+        var attempts = 0;
+        var observer = new MutationObserver(function () {
+            var radioHidden = hideModuleRadio();
+            var labelHidden = hideModuleLabel();
+
+            attempts++;
+
+            if ((radioHidden && labelHidden) || attempts >= 20) {
+                observer.disconnect();
+            }
+        });
+
+        observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
     }
 
     function rerenderGooglePayButton() {
@@ -790,8 +821,7 @@
     });
 
     // Hide the radio button on page load
-    hideModuleRadio();
-    hideModuleLabel();
+    ensureWalletSelectionHidden();
 
     var moduleRadio = document.getElementById('pmt-paypalr_googlepay');
     if (moduleRadio) {

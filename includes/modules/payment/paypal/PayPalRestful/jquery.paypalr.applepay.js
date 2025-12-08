@@ -201,7 +201,10 @@
             moduleRadio.style.display = 'none';
             moduleRadio.setAttribute('aria-hidden', 'true');
             moduleRadio.tabIndex = -1;
+            return true;
         }
+
+        return false;
     }
 
     function getApplePayButton() {
@@ -280,7 +283,35 @@
         var moduleLabel = document.querySelector('label[for="pmt-paypalr_applepay"]');
         if (moduleLabel) {
             moduleLabel.classList.add('paypalr-wallet-label-hidden');
+            moduleLabel.style.display = 'none';
+            moduleLabel.setAttribute('aria-hidden', 'true');
+            return true;
         }
+
+        return false;
+    }
+
+    function ensureWalletSelectionHidden() {
+        hideModuleRadio();
+        hideModuleLabel();
+
+        if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') {
+            return;
+        }
+
+        var attempts = 0;
+        var observer = new MutationObserver(function () {
+            var radioHidden = hideModuleRadio();
+            var labelHidden = hideModuleLabel();
+
+            attempts++;
+
+            if ((radioHidden && labelHidden) || attempts >= 20) {
+                observer.disconnect();
+            }
+        });
+
+        observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
     }
 
     function rerenderApplePayButton() {
@@ -916,8 +947,7 @@
     });
 
     // Hide the radio button on page load
-    hideModuleRadio();
-    hideModuleLabel();
+    ensureWalletSelectionHidden();
 
     // If a user still clicks the hidden radio, trigger the Apple Pay button
     var moduleRadio = document.getElementById('pmt-paypalr_applepay');
