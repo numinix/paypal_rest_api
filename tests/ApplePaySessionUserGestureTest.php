@@ -7,7 +7,7 @@
  * 1. Order total is extracted from page synchronously (e.g., #ottotal element)
  * 2. ApplePaySession is created synchronously in onApplePayButtonClicked (the click handler)
  * 3. session.begin() is called synchronously in onApplePayButtonClicked
- * 4. PayPal order creation happens asynchronously in onvalidatemerchant callback
+ * 4. PayPal order creation happens asynchronously in onpaymentauthorized callback
  * 5. The ApplePaySession is created BEFORE any async .then() callbacks
  *
  * This approach balances two requirements:
@@ -117,20 +117,21 @@ if (strpos($clickHandlerBody, 'fetchWalletOrder') !== false) {
     echo "✗ fetchWalletOrder is not called\n";
 }
 
-// Test 4: Order is handled in onvalidatemerchant (not before session creation)
-// The order promise is awaited in onvalidatemerchant to avoid blocking session creation
+// Test 4: Merchant validation happens in onvalidatemerchant (async but immediate)
+// Merchant validation uses async promises but doesn't wait for order creation
 if (strpos($clickHandlerBody, 'onvalidatemerchant') !== false) {
     // Extract onvalidatemerchant callback
     $onvalidatePattern = '/onvalidatemerchant\s*=\s*function\s*\([^)]*\)\s*\{([\s\S]*?)^\s{8}\};/m';
     if (preg_match($onvalidatePattern, $clickHandlerBody, $onvalidateMatches)) {
         $onvalidateBody = $onvalidateMatches[1];
         
-        if (strpos($onvalidateBody, 'orderPromise') !== false || strpos($onvalidateBody, '.then(') !== false) {
-            echo "✓ Order promise is handled in onvalidatemerchant callback\n";
+        // Check that validateMerchant is called (uses promises, which is fine)
+        if (strpos($onvalidateBody, 'validateMerchant') !== false) {
+            echo "✓ Merchant validation is handled in onvalidatemerchant callback\n";
         } else {
             $testPassed = false;
-            $errors[] = "Order promise should be handled in onvalidatemerchant";
-            echo "✗ Order promise is not handled in onvalidatemerchant\n";
+            $errors[] = "validateMerchant should be called in onvalidatemerchant";
+            echo "✗ validateMerchant is not called in onvalidatemerchant\n";
         }
     }
 }
@@ -183,12 +184,12 @@ if (strpos($clickHandlerBody, 'var orderId') !== false ||
 // 2. Get applePayConfig (synchronous)
 // 3. Get order total from page (synchronous)
 // 4. Create ApplePaySession synchronously with page amount (no order creation yet)
-// 5. Set up handlers (synchronous) - onvalidatemerchant validates immediately
+// 5. Set up handlers (synchronous) - onvalidatemerchant validates immediately, onpaymentauthorized creates order
 // 6. Call session.begin() (synchronous)
-// Order creation happens in onvalidatemerchant (parallel) or onpaymentauthorized (when needed)
+// Order creation happens ONLY in onpaymentauthorized (when user authorizes payment)
 $structurePattern = '/applepay\.config\(\)[\s\S]*?getOrderTotalFromPage\(\)[\s\S]*?new ApplePaySession[\s\S]*?onvalidatemerchant[\s\S]*?onpaymentauthorized[\s\S]*?oncancel[\s\S]*?session\.begin\(\)/';
 if (preg_match($structurePattern, $clickHandlerBody)) {
-    echo "✓ Code follows correct pattern: session created synchronously with page amount, merchant validation immediate\n";
+    echo "✓ Code follows correct pattern: session created synchronously with page amount, order created in onpaymentauthorized\n";
 } else {
     $testPassed = false;
     $errors[] = "Code does not follow correct pattern";
@@ -203,7 +204,7 @@ if ($testPassed) {
     echo "- Order total is extracted from page synchronously (e.g., #ottotal)\n";
     echo "- ApplePaySession is created synchronously with page amount\n";
     echo "- session.begin() is called synchronously after session creation\n";
-    echo "- PayPal order creation happens in onvalidatemerchant callback\n";
+    echo "- PayPal order creation happens in onpaymentauthorized callback\n";
     echo "- This maintains user gesture context AND shows actual amount (not $0.00)\n";
     exit(0);
 } else {

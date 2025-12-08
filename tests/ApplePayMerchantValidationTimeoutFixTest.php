@@ -1,23 +1,24 @@
 <?php
 /**
  * Test to verify that Apple Pay merchant validation happens IMMEDIATELY
- * without waiting for PayPal order creation, to prevent timeout issues.
+ * without creating PayPal orders, to prevent timeout and avoid wasted orders.
  *
  * This test ensures that:
  * 1. onvalidatemerchant calls validateMerchant() immediately
- * 2. Order creation happens in parallel (not blocking merchant validation)
- * 3. Order is awaited in onpaymentauthorized (when actually needed)
+ * 2. Order creation does NOT happen in onvalidatemerchant
+ * 3. Order is created in onpaymentauthorized (only when user authorizes payment)
  * 4. This prevents the "payment not completed" / auto-close issue
+ * 5. This prevents creating orders when users cancel without authorizing
  *
- * Previous behavior (WRONG - causes timeout):
- * - onvalidatemerchant waits for orderPromise.then() before calling validateMerchant()
- * - If order creation is slow, Apple Pay times out waiting for completeMerchantValidation()
- * - Session cancels automatically, user sees "payment not completed"
+ * Previous behavior (WRONG - wastes orders):
+ * - onvalidatemerchant creates order immediately when modal opens
+ * - If user cancels, order is created but never used
+ * - Results in abandoned orders in PayPal system
  *
- * New behavior (CORRECT - prevents timeout):
- * - onvalidatemerchant calls validateMerchant() immediately
- * - Order creation starts in parallel but doesn't block merchant validation
- * - Order is awaited in onpaymentauthorized where it's actually needed
+ * New behavior (CORRECT - creates orders only when needed):
+ * - onvalidatemerchant calls validateMerchant() immediately (no order creation)
+ * - Order creation ONLY happens in onpaymentauthorized when user authorizes
+ * - If user cancels, no order is created
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -27,8 +28,8 @@ declare(strict_types=1);
 $testPassed = true;
 $errors = [];
 
-echo "Testing Apple Pay Merchant Validation Timeout Fix\n";
-echo "===================================================\n\n";
+echo "Testing Apple Pay Order Creation Timing Fix\n";
+echo "============================================\n\n";
 
 // Get the Apple Pay JS file content
 $applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js');
@@ -76,43 +77,52 @@ if ($validateMerchantPos === false) {
     echo "  ✓ validateMerchant is called immediately\n";
 }
 
-// Test 2: Order creation doesn't block merchant validation
-echo "\nTest 2: Order creation doesn't block merchant validation\n";
+// Test 2: Order creation does NOT happen in onvalidatemerchant
+echo "\nTest 2: Order creation does NOT happen in onvalidatemerchant\n";
 
-// The pattern we want: validateMerchant is called directly, order creation happens in parallel
-// The pattern we DON'T want: orderPromise.then(...validateMerchant...)
+// The pattern we DON'T want: orderPromise = fetchWalletOrder() in onvalidatemerchant
+// We want order creation to ONLY happen in onpaymentauthorized
 
 if (preg_match('/orderPromise\s*=\s*fetchWalletOrder\(\)/', $onvalidateBody)) {
-    // Order creation starts in onvalidatemerchant (good - parallel execution)
-    echo "  ✓ Order creation starts in parallel in onvalidatemerchant\n";
-} else {
-    // Order creation might happen elsewhere (e.g., in click handler or onpaymentauthorized)
-    echo "  ℹ Order creation may happen outside onvalidatemerchant\n";
-}
-
-// Verify validateMerchant is NOT nested inside orderPromise.then()
-if (preg_match('/orderPromise\.then\([^{]*\{[^}]*validateMerchant/s', $onvalidateBody)) {
     $testPassed = false;
-    $errors[] = "validateMerchant must not wait for orderPromise to resolve";
-    echo "  ✗ CRITICAL: validateMerchant waits for order (causes timeout)\n";
+    $errors[] = "Order creation should NOT happen in onvalidatemerchant";
+    echo "  ✗ FAIL: Order is created in onvalidatemerchant (wastes orders on cancel)\n";
 } else {
-    echo "  ✓ validateMerchant does not wait for order creation\n";
+    echo "  ✓ Order is NOT created in onvalidatemerchant\n";
 }
 
-// Test 3: Order is awaited in onpaymentauthorized (where it's actually needed)
-echo "\nTest 3: Order is awaited when actually needed (onpaymentauthorized)\n";
+// Also check that fetchWalletOrder is not called at all in onvalidatemerchant
+if (strpos($onvalidateBody, 'fetchWalletOrder') !== false) {
+    $testPassed = false;
+    $errors[] = "fetchWalletOrder should NOT be called in onvalidatemerchant";
+    echo "  ✗ FAIL: fetchWalletOrder is called in onvalidatemerchant\n";
+} else {
+    echo "  ✓ fetchWalletOrder is NOT called in onvalidatemerchant\n";
+}
+
+// Test 3: Order is created in onpaymentauthorized (when user authorizes)
+echo "\nTest 3: Order is created in onpaymentauthorized (when user authorizes)\n";
 
 $onpaymentPattern = '/session\.onpaymentauthorized\s*=\s*function\s*\([^)]*\)\s*\{([\s\S]*?)^\s{8}\};/m';
 if (preg_match($onpaymentPattern, $clickHandlerBody, $onpaymentMatches)) {
     $onpaymentBody = $onpaymentMatches[1];
     
-    // Check if order is awaited here
-    if (strpos($onpaymentBody, 'orderPromise') !== false || 
-        strpos($onpaymentBody, 'fetchWalletOrder') !== false) {
-        echo "  ✓ Order is created/awaited in onpaymentauthorized\n";
+    // Check if order is created here (this is where it should happen)
+    if (strpos($onpaymentBody, 'fetchWalletOrder') !== false) {
+        echo "  ✓ Order is created in onpaymentauthorized\n";
     } else {
-        // Order might be already available from onvalidatemerchant
-        echo "  ℹ Order may be already available from earlier step\n";
+        $testPassed = false;
+        $errors[] = "Order should be created in onpaymentauthorized";
+        echo "  ✗ Order is NOT created in onpaymentauthorized\n";
+    }
+    
+    // Verify orderPromise is assigned here
+    if (preg_match('/orderPromise\s*=\s*fetchWalletOrder\(\)/', $onpaymentBody)) {
+        echo "  ✓ orderPromise is assigned in onpaymentauthorized\n";
+    } else {
+        $testPassed = false;
+        $errors[] = "orderPromise should be assigned in onpaymentauthorized";
+        echo "  ✗ orderPromise is NOT assigned in onpaymentauthorized\n";
     }
     
     // Verify confirmOrder is called (this needs the order)
@@ -157,17 +167,18 @@ if (preg_match('/session\.begin\(\)/', $clickHandlerBody)) {
 // Summary
 echo "\n";
 if ($testPassed) {
-    echo "All merchant validation timeout fix tests passed! ✓\n\n";
+    echo "All Apple Pay order creation timing tests passed! ✓\n\n";
     echo "Summary:\n";
-    echo "- Merchant validation happens immediately without waiting for order\n";
-    echo "- Order creation runs in parallel (doesn't block merchant validation)\n";
-    echo "- Order is awaited in onpaymentauthorized when actually needed\n";
-    echo "- This prevents Apple Pay timeout and auto-close issues\n";
+    echo "- Merchant validation happens immediately without creating order\n";
+    echo "- Order creation does NOT happen in onvalidatemerchant\n";
+    echo "- Order is created in onpaymentauthorized when user authorizes payment\n";
+    echo "- This prevents creating wasted orders when users cancel\n";
     echo "\nThis fixes the issue where:\n";
     echo "- User clicks Apple Pay button\n";
-    echo "- Modal opens with correct price\n";
-    echo "- Modal shows 'processing' and then auto-closes\n";
-    echo "- Console shows 'cancelled by user' (actually a timeout)\n";
+    echo "- Modal opens and merchant validation succeeds\n";
+    echo "- User cancels without authorizing payment\n";
+    echo "- Previously: Order was created and wasted\n";
+    echo "- Now: No order is created, saving API calls and avoiding abandoned orders\n";
     exit(0);
 } else {
     echo "Tests failed:\n";

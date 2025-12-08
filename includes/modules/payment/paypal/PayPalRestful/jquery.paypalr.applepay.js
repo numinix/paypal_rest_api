@@ -565,15 +565,14 @@
      * 1. Extract order total from the page (e.g., #ottotal element) synchronously
      * 2. Create ApplePaySession synchronously with this amount
      * 3. Call session.begin() synchronously
-     * 4. In onvalidatemerchant: Validate merchant IMMEDIATELY (don't wait for order)
-     * 5. Start PayPal order creation in parallel (not blocking merchant validation)
-     * 6. In onpaymentauthorized: Wait for order, then confirm payment with PayPal
+     * 4. In onvalidatemerchant: Validate merchant IMMEDIATELY (don't create order yet)
+     * 5. In onpaymentauthorized: Create PayPal order, then confirm payment with PayPal
      * 
      * This approach:
      * - Maintains user gesture context (session created synchronously)
      * - Shows actual amount to user (extracted from page, not $0.00 placeholder)
      * - Prevents merchant validation timeout (validates immediately without waiting)
-     * - Creates PayPal order when actually needed (in onpaymentauthorized)
+     * - Only creates PayPal orders when user authorizes payment (not on cancel)
      */
     function onApplePayButtonClicked(event) {
         if (event) {
@@ -653,18 +652,13 @@
 
         // Step 4: Handle merchant validation
         // IMPORTANT: Validate merchant IMMEDIATELY, don't wait for order creation
-        // Order creation can happen in parallel or in onpaymentauthorized
+        // Order creation should ONLY happen in onpaymentauthorized (when user authorizes payment)
         session.onvalidatemerchant = function (event) {
             console.log('[Apple Pay] onvalidatemerchant called, validationURL:', event.validationURL);
             
-            // Start order creation in parallel (don't wait for it)
-            if (!orderPromise) {
-                console.log('[Apple Pay] Starting order creation in parallel with merchant validation...');
-                orderPromise = fetchWalletOrder();
-            }
-            
-            // Validate merchant immediately without waiting for order creation
-            console.log('[Apple Pay] Calling validateMerchant immediately...');
+            // DO NOT create order here - only validate merchant
+            // Order creation happens in onpaymentauthorized when user actually authorizes payment
+            console.log('[Apple Pay] Calling validateMerchant (order creation will happen in onpaymentauthorized)...');
             applepay.validateMerchant({
                 validationUrl: event.validationURL
             }).then(function (merchantSession) {
@@ -682,15 +676,13 @@
         };
 
         // Step 5: Handle payment authorization
-        // Wait for order creation to complete before confirming payment
+        // Create order only when user authorizes payment
         session.onpaymentauthorized = function (event) {
-            console.log('[Apple Pay] onpaymentauthorized called');
+            console.log('[Apple Pay] onpaymentauthorized called - user has authorized payment');
             
-            // Ensure order creation started
-            if (!orderPromise) {
-                console.log('[Apple Pay] Starting order creation (was not started in onvalidatemerchant)...');
-                orderPromise = fetchWalletOrder();
-            }
+            // Create the order now that user has authorized payment
+            console.log('[Apple Pay] Creating PayPal order...');
+            orderPromise = fetchWalletOrder();
             
             // Wait for order to be created
             orderPromise.then(function (config) {
