@@ -132,7 +132,30 @@
         var moduleRadio = document.getElementById('pmt-paypalr_googlepay');
         if (moduleRadio) {
             moduleRadio.classList.add('paypalr-wallet-radio-hidden');
+            moduleRadio.style.display = 'none';
+            moduleRadio.setAttribute('aria-hidden', 'true');
+            moduleRadio.tabIndex = -1;
         }
+    }
+
+    function getGooglePayButton() {
+        var container = document.getElementById('paypalr-googlepay-button');
+        if (!container) {
+            return null;
+        }
+
+        return container.querySelector('button');
+    }
+
+    function triggerGooglePayButtonClick() {
+        var button = getGooglePayButton();
+
+        if (button) {
+            button.click();
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -718,6 +741,35 @@
     // Hide the radio button on page load
     hideModuleRadio();
     hideModuleLabel();
+
+    var moduleRadio = document.getElementById('pmt-paypalr_googlepay');
+    if (moduleRadio) {
+        moduleRadio.addEventListener('click', function () {
+            selectGooglePayRadio();
+            triggerGooglePayButtonClick();
+        });
+    }
+
+    var checkoutForm = document.querySelector('form[name="checkout_payment"]');
+    if (checkoutForm) {
+        checkoutForm.addEventListener('submit', function (event) {
+            if (checkoutSubmitting) {
+                return;
+            }
+
+            var radio = document.getElementById('pmt-paypalr_googlepay');
+            var statusField = document.getElementById('paypalr-googlepay-status');
+            var payloadApproved = statusField && statusField.value === 'approved';
+
+            if (radio && radio.checked && !payloadApproved) {
+                selectGooglePayRadio();
+                if (triggerGooglePayButtonClick()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            }
+        });
+    }
 
     // Add click handler to the button container to select the radio
     var container = document.getElementById('paypalr-googlepay-button');

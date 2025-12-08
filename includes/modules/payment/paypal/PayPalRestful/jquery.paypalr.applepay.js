@@ -198,7 +198,30 @@
         var moduleRadio = document.getElementById('pmt-paypalr_applepay');
         if (moduleRadio) {
             moduleRadio.classList.add('paypalr-wallet-radio-hidden');
+            moduleRadio.style.display = 'none';
+            moduleRadio.setAttribute('aria-hidden', 'true');
+            moduleRadio.tabIndex = -1;
         }
+    }
+
+    function getApplePayButton() {
+        var container = document.getElementById('paypalr-applepay-button');
+        if (!container) {
+            return null;
+        }
+
+        return container.querySelector('apple-pay-button') || container.querySelector('button');
+    }
+
+    function triggerApplePayButtonClick() {
+        var button = getApplePayButton();
+
+        if (button) {
+            button.click();
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -854,6 +877,37 @@
     // Hide the radio button on page load
     hideModuleRadio();
     hideModuleLabel();
+
+    // If a user still clicks the hidden radio, trigger the Apple Pay button
+    var moduleRadio = document.getElementById('pmt-paypalr_applepay');
+    if (moduleRadio) {
+        moduleRadio.addEventListener('click', function () {
+            selectApplePayRadio();
+            triggerApplePayButtonClick();
+        });
+    }
+
+    // Intercept checkout submission when Apple Pay radio is selected
+    var checkoutForm = document.querySelector('form[name="checkout_payment"]');
+    if (checkoutForm) {
+        checkoutForm.addEventListener('submit', function (event) {
+            if (checkoutSubmitting) {
+                return;
+            }
+
+            var radio = document.getElementById('pmt-paypalr_applepay');
+            var statusField = document.getElementById('paypalr-applepay-status');
+            var payloadApproved = statusField && statusField.value === 'approved';
+
+            if (radio && radio.checked && !payloadApproved) {
+                selectApplePayRadio();
+                if (triggerApplePayButtonClick()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            }
+        });
+    }
 
     // Add click handler to the button container to select the radio
     var container = document.getElementById('paypalr-applepay-button');
