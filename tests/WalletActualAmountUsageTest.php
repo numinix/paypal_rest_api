@@ -34,7 +34,7 @@ $applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/P
 
 // Extract the onApplePayButtonClicked function
 // Match the function body up to the final closing brace at the function level
-$pattern = '/function onApplePayButtonClicked\s*\(\s*\)\s*\{([\s\S]*?)^\s{4}\}/m';
+$pattern = '/function onApplePayButtonClicked\s*\([^)]*\)\s*\{([\s\S]*?)^\s{4}\}/m';
 if (preg_match($pattern, $applePayJs, $matches)) {
     $clickHandlerBody = $matches[1];
     

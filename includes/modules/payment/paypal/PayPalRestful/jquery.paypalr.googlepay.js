@@ -307,12 +307,24 @@
      * Called when user clicks the Google Pay button.
      */
     function fetchWalletOrder() {
+        console.log('[Google Pay] fetchWalletOrder: Starting order creation request to ppr_wallet.php');
+        var startTime = Date.now();
+        
         return fetch('ppr_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ wallet: 'google_pay' })
-        }).then(parseWalletResponse).catch(function (error) {
-            console.error('Unable to create Google Pay order', error);
+        }).then(function(response) {
+            var elapsed = Date.now() - startTime;
+            console.log('[Google Pay] fetchWalletOrder: Received response after ' + elapsed + 'ms, status:', response.status);
+            return parseWalletResponse(response);
+        }).then(function(data) {
+            var elapsed = Date.now() - startTime;
+            console.log('[Google Pay] fetchWalletOrder: Order creation completed after ' + elapsed + 'ms, data:', data);
+            return data;
+        }).catch(function (error) {
+            var elapsed = Date.now() - startTime;
+            console.error('[Google Pay] fetchWalletOrder: Unable to create Google Pay order after ' + elapsed + 'ms', error);
             return { success: false, message: error && error.message ? error.message : 'Unable to create Google Pay order' };
         });
     }
@@ -509,6 +521,8 @@
      * operations happen within the same user gesture handler to minimize delay.
      */
     function onGooglePayButtonClicked() {
+        console.log('[Google Pay] Button clicked, starting payment flow');
+        
         selectGooglePayRadio();
 
         // Show processing overlay if available
@@ -521,7 +535,7 @@
         var paymentsClient = sdkState.paymentsClient;
 
         if (!googlepay || !paymentsClient) {
-            console.error('Google Pay not properly initialized');
+            console.error('[Google Pay] Not properly initialized - googlepay:', !!googlepay, 'paymentsClient:', !!paymentsClient);
             setGooglePayPayload({});
             if (typeof window.oprcHideProcessingOverlay === 'function') {
                 window.oprcHideProcessingOverlay();
@@ -530,11 +544,12 @@
         }
 
         // Get the payment data request configuration from PayPal
+        console.log('[Google Pay] Getting base payment configuration from PayPal SDK');
         var basePaymentDataRequest = googlepay.config();
         var allowedPaymentMethods = getAllowedPaymentMethods(basePaymentDataRequest);
 
         if (!allowedPaymentMethods) {
-            console.error('Google Pay configuration is missing allowedPaymentMethods');
+            console.error('[Google Pay] Configuration is missing allowedPaymentMethods');
             setGooglePayPayload({});
             if (typeof window.oprcHideProcessingOverlay === 'function') {
                 window.oprcHideProcessingOverlay();
@@ -542,11 +557,16 @@
             return;
         }
 
+        console.log('[Google Pay] Configuration valid, allowed payment methods:', allowedPaymentMethods.length);
+
         // Step 1: Create PayPal order first to get the actual amount
         // This is done within the user gesture handler to minimize delay
+        console.log('[Google Pay] Step 1: Creating PayPal order to get actual amount');
         fetchWalletOrder().then(function (orderConfig) {
+            console.log('[Google Pay] Order creation result:', orderConfig);
+            
             if (!orderConfig || orderConfig.success === false) {
-                console.error('Failed to create PayPal order for Google Pay', orderConfig);
+                console.error('[Google Pay] Failed to create PayPal order', orderConfig);
                 setGooglePayPayload({});
                 if (typeof window.oprcHideProcessingOverlay === 'function') {
                     window.oprcHideProcessingOverlay();
@@ -555,13 +575,15 @@
             }
 
             if (!orderConfig.amount) {
-                console.error('Order created but amount is missing', orderConfig);
+                console.error('[Google Pay] Order created but amount is missing', orderConfig);
                 setGooglePayPayload({});
                 if (typeof window.oprcHideProcessingOverlay === 'function') {
                     window.oprcHideProcessingOverlay();
                 }
                 return;
             }
+
+            console.log('[Google Pay] Order validated - ID:', orderConfig.orderID, 'Amount:', orderConfig.amount, 'Currency:', orderConfig.currency);
 
             sdkState.config = orderConfig;
             var orderId = orderConfig.orderID;
@@ -580,18 +602,26 @@
                 merchantInfo: basePaymentDataRequest.merchantInfo || {}
             };
 
+            console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
+
             // Step 2: Invoke Google Pay payment sheet with actual amount
             // This is called in the .then() callback but remains within user gesture context
             return paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
+                console.log('[Google Pay] Payment data received from Google Pay sheet');
+                
                 // Step 3: Confirm the order with PayPal using the Google Pay token
+                console.log('[Google Pay] Step 3: Confirming order with PayPal, orderID:', orderId);
                 return googlepay.confirmOrder({
                     orderId: orderId,
                     paymentMethodData: paymentData.paymentMethodData
                 });
             });
         }).then(function (confirmResult) {
+            console.log('[Google Pay] Step 4: Order confirmation result:', confirmResult);
+            
             // Step 4: Handle successful confirmation
             if (confirmResult && (confirmResult.status === 'APPROVED' || confirmResult.status === 'PAYER_ACTION_REQUIRED')) {
+                console.log('[Google Pay] Order confirmed successfully, status:', confirmResult.status);
                 var payload = {
                     orderID: sdkState.config.orderID,
                     confirmResult: confirmResult,
@@ -600,15 +630,15 @@
                 setGooglePayPayload(payload);
                 document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: payload }));
             } else {
-                console.warn('Google Pay confirmation returned unexpected status', confirmResult);
+                console.warn('[Google Pay] Confirmation returned unexpected status', confirmResult);
                 setGooglePayPayload({});
             }
         }).catch(function (error) {
             // Handle errors or user cancellation
             if (error && error.statusCode === 'CANCELED') {
-                console.log('Google Pay cancelled by user');
+                console.log('[Google Pay] Payment cancelled by user');
             } else {
-                console.error('Google Pay error', error);
+                console.error('[Google Pay] Payment error occurred', error);
             }
             setGooglePayPayload({});
             if (typeof window.oprcHideProcessingOverlay === 'function') {
@@ -621,17 +651,23 @@
      * Render the native Google Pay button using Google's PaymentsClient.
      */
     function renderGooglePayButton() {
+        console.log('[Google Pay] Starting button rendering');
+        
         var container = document.getElementById('paypalr-googlepay-button');
         if (!container) {
+            console.warn('[Google Pay] Button container not found');
             return;
         }
 
         container.innerHTML = '';
 
         // First, fetch only the SDK configuration (no order creation)
+        console.log('[Google Pay] Fetching wallet configuration');
         fetchWalletConfig().then(function (config) {
+            console.log('[Google Pay] Configuration loaded:', config);
+            
             if (!config || config.success === false) {
-                console.warn('Unable to load Google Pay configuration', config);
+                console.warn('[Google Pay] Unable to load configuration', config);
                 hidePaymentMethodContainer();
                 return null;
             }
@@ -642,8 +678,10 @@
             var googleMerchantId = config.googleMerchantId || config.merchantId;
             var hasMerchantId = googleMerchantId && /^[A-Z0-9-]{5,30}$/i.test(googleMerchantId);
 
+            console.log('[Google Pay] Environment:', config.environment, 'Sandbox:', isSandbox, 'Has merchant ID:', hasMerchantId);
+
             if (!isSandbox && !hasMerchantId) {
-                console.warn('Google Pay: Invalid or missing Google Merchant ID (required in production)');
+                console.warn('[Google Pay] Invalid or missing Google Merchant ID (required in production)');
                 hidePaymentMethodContainer();
                 return null;
             }
@@ -651,20 +689,23 @@
             sdkState.config = config;
 
             // Load both PayPal SDK and Google Pay JS in parallel
+            console.log('[Google Pay] Loading PayPal SDK and Google Pay JS library');
             return Promise.all([
                 loadPayPalSdk(config),
                 loadGooglePayJs()
             ]).then(function (results) {
                 var paypal = results[0];
+                console.log('[Google Pay] SDKs loaded successfully');
 
                 // Verify PayPal Googlepay API is available
                 if (typeof paypal.Googlepay !== 'function') {
-                    console.warn('PayPal Googlepay API not available');
+                    console.warn('[Google Pay] PayPal Googlepay API not available');
                     hidePaymentMethodContainer();
                     return null;
                 }
 
                 // Initialize PayPal Google Pay
+                console.log('[Google Pay] Initializing PayPal Googlepay API');
                 var googlepay = paypal.Googlepay({
                     merchantId: hasMerchantId ? googleMerchantId : undefined
                 });
@@ -672,14 +713,17 @@
 
                 // Check eligibility using PayPal's isEligible method
                 if (typeof googlepay.isEligible === 'function' && !googlepay.isEligible()) {
-                    console.log('Google Pay is not eligible for this user/device');
+                    console.log('[Google Pay] Not eligible for this user/device');
                     hidePaymentMethodContainer();
                     return null;
                 }
 
+                console.log('[Google Pay] Eligibility check passed');
+
                 // Create Google Payments Client
                 // Use environment from config (stored in sdkState) to determine Google Pay environment
                 var googlePayEnvironment = (sdkState.config && sdkState.config.environment === 'sandbox') ? 'TEST' : 'PRODUCTION';
+                console.log('[Google Pay] Creating PaymentsClient with environment:', googlePayEnvironment);
                 var paymentsClient = new google.payments.api.PaymentsClient({
                     environment: googlePayEnvironment
                 });
@@ -690,10 +734,12 @@
                 var allowedPaymentMethods = getAllowedPaymentMethods(baseConfig);
 
                 if (!allowedPaymentMethods) {
-                    console.error('Google Pay configuration is missing allowedPaymentMethods');
+                    console.error('[Google Pay] Configuration is missing allowedPaymentMethods');
                     hidePaymentMethodContainer();
                     return null;
                 }
+
+                console.log('[Google Pay] Checking if ready to pay with', allowedPaymentMethods.length, 'payment methods');
 
                 // Check if user is ready to pay with Google Pay
                 var isReadyToPayRequest = {
@@ -704,11 +750,15 @@
 
                 return paymentsClient.isReadyToPay(isReadyToPayRequest)
                     .then(function (response) {
+                        console.log('[Google Pay] isReadyToPay response:', response);
+                        
                         if (!response.result) {
-                            console.log('Google Pay is not ready to pay on this device');
+                            console.log('[Google Pay] Not ready to pay on this device');
                             hidePaymentMethodContainer();
                             return null;
                         }
+
+                        console.log('[Google Pay] Device is ready to pay, creating button');
 
                         // Create and render the Google Pay button
                         var button = paymentsClient.createButton({
@@ -720,12 +770,13 @@
                         });
 
                         container.appendChild(button);
+                        console.log('[Google Pay] Button rendered successfully');
 
                         return button;
                     });
             });
         }).catch(function (error) {
-            console.error('Failed to render Google Pay button', error);
+            console.error('[Google Pay] Failed to render button', error);
             hidePaymentMethodContainer();
         });
     }
