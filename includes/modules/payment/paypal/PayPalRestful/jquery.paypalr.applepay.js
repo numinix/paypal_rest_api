@@ -507,6 +507,8 @@
             event.stopPropagation();
         }
 
+        var sessionAbortReason = null;
+
         selectApplePayRadio();
 
         // Show processing overlay if available
@@ -580,6 +582,7 @@
             orderPromise.then(function (config) {
                 if (!config || config.success === false) {
                     console.error('Failed to create PayPal order for Apple Pay', config);
+                    sessionAbortReason = 'Failed to create PayPal order';
                     session.abort();
                     setApplePayPayload({});
                     if (typeof window.oprcHideProcessingOverlay === 'function') {
@@ -592,6 +595,7 @@
                 // Note: We allow '0' or '0.00' as valid amounts (e.g., for free orders with coupons)
                 if (config.amount === undefined || config.amount === null || config.amount === '') {
                     console.error('Order created but amount is missing or empty', config);
+                    sessionAbortReason = 'Apple Pay amount missing from order';
                     session.abort();
                     setApplePayPayload({});
                     if (typeof window.oprcHideProcessingOverlay === 'function') {
@@ -606,20 +610,22 @@
                 sdkState.config = config;
 
                 // Validate merchant with Apple
-                return applepay.validateMerchant({
-                    validationUrl: event.validationURL
-                }).then(function (merchantSession) {
-                    session.completeMerchantValidation(merchantSession);
-                }).catch(function (error) {
-                    console.error('Merchant validation failed', error);
-                    session.abort();
-                    setApplePayPayload({});
-                    if (typeof window.oprcHideProcessingOverlay === 'function') {
-                        window.oprcHideProcessingOverlay();
-                    }
+                    return applepay.validateMerchant({
+                        validationUrl: event.validationURL
+                    }).then(function (merchantSession) {
+                        session.completeMerchantValidation(merchantSession);
+                    }).catch(function (error) {
+                        console.error('Merchant validation failed', error);
+                        sessionAbortReason = 'Merchant validation failed';
+                        session.abort();
+                        setApplePayPayload({});
+                        if (typeof window.oprcHideProcessingOverlay === 'function') {
+                            window.oprcHideProcessingOverlay();
+                        }
                 });
             }).catch(function (error) {
                 console.error('Order creation or merchant validation failed', error);
+                sessionAbortReason = 'Order creation or merchant validation error';
                 session.abort();
                 setApplePayPayload({});
                 if (typeof window.oprcHideProcessingOverlay === 'function') {
@@ -676,7 +682,11 @@
 
         // Step 6: Handle cancellation
         session.oncancel = function () {
-            console.log('Apple Pay cancelled by user');
+            if (sessionAbortReason) {
+                console.error('Apple Pay session aborted before completion:', sessionAbortReason);
+            } else {
+                console.log('Apple Pay cancelled by user');
+            }
             setApplePayPayload({});
             if (typeof window.oprcHideProcessingOverlay === 'function') {
                 window.oprcHideProcessingOverlay();
