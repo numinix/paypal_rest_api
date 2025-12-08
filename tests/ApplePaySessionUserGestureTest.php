@@ -29,7 +29,7 @@ echo "Testing Apple Pay Session User Gesture Handling\n";
 echo "================================================\n\n";
 
 // Extract the onApplePayButtonClicked function
-$pattern = '/function onApplePayButtonClicked\s*\(\s*\)\s*\{([\s\S]*?)\n    \}/';
+$pattern = '/function onApplePayButtonClicked\s*\([^)]*\)\s*\{([\s\S]*?)^\s{4}\}/m';
 if (preg_match($pattern, $applePayJs, $matches)) {
     $clickHandlerBody = $matches[1];
 } else {
@@ -182,13 +182,13 @@ if (strpos($clickHandlerBody, 'var orderId') !== false ||
 // 1. Get applepay SDK reference (synchronous)
 // 2. Get applePayConfig (synchronous)
 // 3. Get order total from page (synchronous)
-// 4. Start fetchWalletOrder (returns promise)
-// 5. Create ApplePaySession synchronously with page amount
-// 6. Set up handlers (synchronous) - onvalidatemerchant waits for order
-// 7. Call session.begin() (synchronous)
-$structurePattern = '/applepay\.config\(\)[\s\S]*?getOrderTotalFromPage\(\)[\s\S]*?fetchWalletOrder\(\)[\s\S]*?new ApplePaySession[\s\S]*?onvalidatemerchant[\s\S]*?onpaymentauthorized[\s\S]*?oncancel[\s\S]*?session\.begin\(\)/';
+// 4. Create ApplePaySession synchronously with page amount (no order creation yet)
+// 5. Set up handlers (synchronous) - onvalidatemerchant validates immediately
+// 6. Call session.begin() (synchronous)
+// Order creation happens in onvalidatemerchant (parallel) or onpaymentauthorized (when needed)
+$structurePattern = '/applepay\.config\(\)[\s\S]*?getOrderTotalFromPage\(\)[\s\S]*?new ApplePaySession[\s\S]*?onvalidatemerchant[\s\S]*?onpaymentauthorized[\s\S]*?oncancel[\s\S]*?session\.begin\(\)/';
 if (preg_match($structurePattern, $clickHandlerBody)) {
-    echo "✓ Code follows correct pattern: session created synchronously with page amount, order handled in onvalidatemerchant\n";
+    echo "✓ Code follows correct pattern: session created synchronously with page amount, merchant validation immediate\n";
 } else {
     $testPassed = false;
     $errors[] = "Code does not follow correct pattern";
