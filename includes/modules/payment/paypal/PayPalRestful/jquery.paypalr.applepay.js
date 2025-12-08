@@ -501,7 +501,12 @@
      * 3. We create the PayPal order in onvalidatemerchant callback
      * 4. The order total observer ensures the button is re-rendered when amounts change
      */
-    function onApplePayButtonClicked() {
+    function onApplePayButtonClicked(event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
         selectApplePayRadio();
 
         // Show processing overlay if available
