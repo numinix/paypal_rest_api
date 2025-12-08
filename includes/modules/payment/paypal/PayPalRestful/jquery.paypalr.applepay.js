@@ -678,7 +678,7 @@
         // Step 5: Handle payment authorization
         // Create order only when user authorizes payment
         session.onpaymentauthorized = function (event) {
-            console.log('[Apple Pay] onpaymentauthorized called - user has authorized payment');
+            console.log('[Apple Pay] onpaymentauthorized called - creating order now that user has authorized payment');
             
             // Create the order now that user has authorized payment
             console.log('[Apple Pay] Creating PayPal order...');
