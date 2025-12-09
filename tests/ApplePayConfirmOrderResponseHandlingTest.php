@@ -1,19 +1,23 @@
 <?php
 /**
- * Test: Apple Pay confirmOrder Response Handling
+ * Test: Apple Pay confirmOrder Response Handling (DEPRECATED)
  *
- * This test validates that the Apple Pay module correctly handles the response from
- * PayPal's confirmOrder() SDK method.
+ * DEPRECATED: This test is kept for historical reference but is no longer applicable.
+ * As of the server-side confirmation fix, Apple Pay no longer calls confirmOrder()
+ * on the client side. Instead, it follows the Braintree pattern:
+ * 1. Complete the Apple Pay session after order creation
+ * 2. Pass the payment token to the server
+ * 3. Let the server handle confirmPaymentSource
  *
- * According to PayPal SDK source code (paypal-applepay-components/src/applepay.js),
- * the confirmOrder method returns Promise<void | PayPalApplePayErrorType>, which means:
- * - On success: resolves with undefined (void)
- * - On failure: throws PayPalApplePayError
+ * See ApplePayServerSideConfirmationTest.php for the current test coverage.
  *
- * The test verifies that the JavaScript code:
- * 1. Does NOT check for a status field in the response (which doesn't exist)
- * 2. Treats reaching .then() as success
- * 3. Properly catches and handles errors in .catch()
+ * Historical Context:
+ * This test was created when the code incorrectly called confirmOrder() on the client
+ * and then checked for a status field that didn't exist in the response. That approach
+ * was causing "internal server error" failures even when orders were created successfully.
+ *
+ * The fix removed the client-side confirmOrder call entirely and moved confirmation
+ * to the server, matching the working Braintree Apple Pay implementation.
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -36,11 +40,13 @@ class ApplePayConfirmOrderResponseHandlingTest
     
     public function run(): void
     {
-        echo "\n=== Apple Pay confirmOrder Response Handling Test ===\n\n";
+        echo "\n=== Apple Pay confirmOrder Response Handling Test (DEPRECATED) ===\n";
+        echo "⚠️  This test is deprecated. The code no longer uses client-side confirmOrder.\n";
+        echo "See ApplePayServerSideConfirmationTest.php for current test coverage.\n\n";
+        
+        echo "Historical validation (checking that old bugs are not reintroduced):\n\n";
         
         $this->testNoStatusCheck();
-        $this->testSuccessHandling();
-        $this->testErrorLogging();
         
         $this->printResults();
     }
