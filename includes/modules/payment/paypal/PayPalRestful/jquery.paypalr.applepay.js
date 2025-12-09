@@ -733,12 +733,13 @@
                 sdkState.config = config;
                 
                 console.log('[Apple Pay] Confirming order with PayPal, orderID:', orderId);
-                
+
                 // Confirm the order with PayPal using the Apple Pay token
                 applepay.confirmOrder({
                     orderId: orderId,
                     token: event.payment.token,
-                    billingContact: event.payment.billingContact
+                    billingContact: event.payment.billingContact,
+                    shippingContact: event.payment.shippingContact
                 }).then(function (confirmResult) {
                     console.log('[Apple Pay] confirmOrder result:', confirmResult);
                     
