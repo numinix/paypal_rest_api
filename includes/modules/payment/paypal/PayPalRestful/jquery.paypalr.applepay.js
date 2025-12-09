@@ -744,26 +744,19 @@
                     console.log('[Apple Pay] confirmOrder result:', confirmResult);
                     
                     // Handle successful confirmation
-                    // The confirmOrder response structure is: { approveApplePayPayment: null } on success
-                    // The mutation completes successfully if no error is thrown
-                    // We just need to check that we got a response without errors
-                    if (confirmResult && (confirmResult.approveApplePayPayment !== undefined || confirmResult.approveApplePayPayment === null)) {
-                        console.log('[Apple Pay] Order confirmed successfully');
-                        // Complete the Apple Pay session with success
-                        session.completePayment(ApplePaySession.STATUS_SUCCESS);
+                    // The confirmOrder response returns void on success according to PayPal SDK
+                    // If we reach this point without an error being thrown, the confirmation succeeded
+                    console.log('[Apple Pay] Order confirmed successfully');
+                    // Complete the Apple Pay session with success
+                    session.completePayment(ApplePaySession.STATUS_SUCCESS);
 
-                        var payload = {
-                            orderID: orderId,
-                            confirmResult: confirmResult,
-                            wallet: 'apple_pay'
-                        };
-                        setApplePayPayload(payload);
-                        document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
-                    } else {
-                        console.warn('[Apple Pay] Apple Pay confirmation returned unexpected result', confirmResult);
-                        session.completePayment(ApplePaySession.STATUS_FAILURE);
-                        setApplePayPayload({});
-                    }
+                    var payload = {
+                        orderID: orderId,
+                        confirmResult: confirmResult,
+                        wallet: 'apple_pay'
+                    };
+                    setApplePayPayload(payload);
+                    document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
                 }).catch(function (error) {
                     console.error('[Apple Pay] confirmOrder failed', error);
                     session.completePayment(ApplePaySession.STATUS_FAILURE);
