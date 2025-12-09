@@ -125,14 +125,14 @@ if (strpos($clickHandlerBody, "orderConfig.amount") !== false) {
     echo "✗ Actual order amount is not used\n";
 }
 
-// Test 7: Verify confirmOrder is called with orderId from order creation
-if (strpos($clickHandlerBody, 'confirmOrder') !== false && 
-    strpos($clickHandlerBody, 'orderId:') !== false) {
-    echo "✓ confirmOrder is called with orderId\n";
+// Test 7: Verify confirmOrder is NOT called on client side (should be server-side only)
+// After the fix, Google Pay follows Apple Pay pattern: no client-side confirmOrder
+if (strpos($clickHandlerBody, 'googlepay.confirmOrder') === false) {
+    echo "✓ confirmOrder is correctly NOT called on client side\n";
 } else {
     $testPassed = false;
-    $errors[] = "confirmOrder should be called with orderId";
-    echo "✗ confirmOrder pattern is incorrect\n";
+    $errors[] = "confirmOrder should NOT be called on client side (should be server-side only)";
+    echo "✗ confirmOrder should not be called on client side\n";
 }
 
 // Test 8: Verify error handling for CANCELED status
