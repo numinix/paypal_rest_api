@@ -661,7 +661,22 @@
             console.log('[Apple Pay] Calling validateMerchant (order creation will happen in onpaymentauthorized)...');
             applepay.validateMerchant({
                 validationUrl: event.validationURL
-            }).then(function (merchantSession) {
+            }).then(function (merchantValidationResponse) {
+                var merchantSession = merchantValidationResponse && merchantValidationResponse.merchantSession
+                    ? merchantValidationResponse.merchantSession
+                    : merchantValidationResponse;
+
+                if (!merchantSession) {
+                    sessionAbortReason = 'Merchant validation returned empty session';
+                    console.error('[Apple Pay] Merchant validation succeeded but no session returned');
+                    session.abort();
+                    setApplePayPayload({});
+                    if (typeof window.oprcHideProcessingOverlay === 'function') {
+                        window.oprcHideProcessingOverlay();
+                    }
+                    return;
+                }
+
                 console.log('[Apple Pay] validateMerchant succeeded, completing merchant validation');
                 session.completeMerchantValidation(merchantSession);
             }).catch(function (error) {
