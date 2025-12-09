@@ -733,6 +733,9 @@
                 sdkState.config = config;
                 
                 console.log('[Apple Pay] Confirming order with PayPal, orderID:', orderId);
+                console.log('[Apple Pay] Payment token:', event.payment.token);
+                console.log('[Apple Pay] Billing contact:', event.payment.billingContact);
+                console.log('[Apple Pay] Shipping contact:', event.payment.shippingContact);
 
                 // Confirm the order with PayPal using the Apple Pay token
                 applepay.confirmOrder({
@@ -744,25 +747,24 @@
                     console.log('[Apple Pay] confirmOrder result:', confirmResult);
                     
                     // Handle successful confirmation
-                    if (confirmResult.status === PAYPAL_STATUS.APPROVED || confirmResult.status === PAYPAL_STATUS.PAYER_ACTION_REQUIRED) {
-                        console.log('[Apple Pay] Order confirmed successfully, status:', confirmResult.status);
-                        // Complete the Apple Pay session with success
-                        session.completePayment(ApplePaySession.STATUS_SUCCESS);
+                    // The confirmOrder response returns void on success according to PayPal SDK
+                    // If we reach this point without an error being thrown, the confirmation succeeded
+                    console.log('[Apple Pay] Order confirmed successfully');
+                    // Complete the Apple Pay session with success
+                    session.completePayment(ApplePaySession.STATUS_SUCCESS);
 
-                        var payload = {
-                            orderID: orderId,
-                            confirmResult: confirmResult,
-                            wallet: 'apple_pay'
-                        };
-                        setApplePayPayload(payload);
-                        document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
-                    } else {
-                        console.warn('[Apple Pay] Apple Pay confirmation returned unexpected status', confirmResult);
-                        session.completePayment(ApplePaySession.STATUS_FAILURE);
-                        setApplePayPayload({});
-                    }
+                    var payload = {
+                        orderID: orderId,
+                        confirmResult: confirmResult,
+                        wallet: 'apple_pay'
+                    };
+                    setApplePayPayload(payload);
+                    document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
                 }).catch(function (error) {
                     console.error('[Apple Pay] confirmOrder failed', error);
+                    console.error('[Apple Pay] Error name:', error.name);
+                    console.error('[Apple Pay] Error message:', error.message);
+                    console.error('[Apple Pay] PayPal Debug ID:', error.paypalDebugId);
                     session.completePayment(ApplePaySession.STATUS_FAILURE);
                     setApplePayPayload({});
                     if (typeof window.oprcHideProcessingOverlay === 'function') {
