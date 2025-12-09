@@ -497,7 +497,7 @@ class paypalr_venmo extends base
         return (defined('IS_AJAX_REQUEST') && IS_AJAX_REQUEST === true);
     }
 
-    protected function createPayPalOrder(string $ppr_type, bool $redirectOnError = true): bool
+    public function createPayPalOrder(string $ppr_type, bool $redirectOnError = true): bool
     {
         global $order, $currencies;
 
