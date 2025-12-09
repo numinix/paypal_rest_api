@@ -733,6 +733,9 @@
                 sdkState.config = config;
                 
                 console.log('[Apple Pay] Confirming order with PayPal, orderID:', orderId);
+                console.log('[Apple Pay] Payment token:', event.payment.token);
+                console.log('[Apple Pay] Billing contact:', event.payment.billingContact);
+                console.log('[Apple Pay] Shipping contact:', event.payment.shippingContact);
 
                 // Confirm the order with PayPal using the Apple Pay token
                 applepay.confirmOrder({
@@ -759,6 +762,9 @@
                     document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
                 }).catch(function (error) {
                     console.error('[Apple Pay] confirmOrder failed', error);
+                    console.error('[Apple Pay] Error name:', error.name);
+                    console.error('[Apple Pay] Error message:', error.message);
+                    console.error('[Apple Pay] PayPal Debug ID:', error.paypalDebugId);
                     session.completePayment(ApplePaySession.STATUS_FAILURE);
                     setApplePayPayload({});
                     if (typeof window.oprcHideProcessingOverlay === 'function') {
