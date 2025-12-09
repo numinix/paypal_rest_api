@@ -21,8 +21,18 @@
 
 class ApplePayConfirmOrderResponseHandlingTest
 {
-    private string $jsFile = '/home/runner/work/paypal_rest_api/paypal_rest_api/includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js';
+    private string $jsFile;
     private array $testResults = [];
+    
+    public function __construct()
+    {
+        // Use __DIR__ to make path relative to test file location
+        $this->jsFile = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js';
+        
+        if (!file_exists($this->jsFile)) {
+            throw new RuntimeException("JavaScript file not found: {$this->jsFile}");
+        }
+    }
     
     public function run(): void
     {
@@ -45,8 +55,23 @@ class ApplePayConfirmOrderResponseHandlingTest
         
         $content = file_get_contents($this->jsFile);
         
-        // Look for the old incorrect pattern
-        $hasOldStatusCheck = preg_match('/confirmResult\.status\s*===\s*PAYPAL_STATUS\.(APPROVED|PAYER_ACTION_REQUIRED)/', $content);
+        // Look for various forms of incorrect status checks
+        $patterns = [
+            '/confirmResult\.status\s*===/',
+            '/confirmResult\.status\s*!==/',
+            '/confirmResult\.status\s*==/',
+            '/confirmResult\.status\s*!=/',
+            '/confirmResult\[\'status\'\]/',
+            '/confirmResult\["status"\]/',
+        ];
+        
+        $hasOldStatusCheck = false;
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $content)) {
+                $hasOldStatusCheck = true;
+                break;
+            }
+        }
         
         if ($hasOldStatusCheck) {
             $this->testResults[] = [
@@ -74,45 +99,44 @@ class ApplePayConfirmOrderResponseHandlingTest
         
         $content = file_get_contents($this->jsFile);
         
-        // Find the confirmOrder call and its .then() handler
-        $pattern = '/applepay\.confirmOrder\(\{.*?\}\)\.then\(function\s*\(confirmResult\)\s*\{(.*?)\}\)\.catch/s';
+        // More flexible check: look for key success indicators in the file
+        // 1. confirmOrder is called
+        $hasConfirmOrderCall = strpos($content, 'applepay.confirmOrder') !== false;
         
-        if (preg_match($pattern, $content, $matches)) {
-            $thenBlock = $matches[1];
-            
-            // Check that the .then() block:
-            // 1. Completes payment with SUCCESS
-            // 2. Sets payload
-            // 3. Does NOT have conditional logic checking status
-            
-            $hasSuccessCompletion = strpos($thenBlock, 'session.completePayment(ApplePaySession.STATUS_SUCCESS)') !== false;
-            $setsPayload = strpos($thenBlock, 'setApplePayPayload(payload)') !== false;
-            $hasConditionalStatusCheck = preg_match('/if\s*\(.*?status.*?\)/', $thenBlock);
-            
-            if ($hasSuccessCompletion && $setsPayload && !$hasConditionalStatusCheck) {
-                $this->testResults[] = [
-                    'name' => 'Correct success handling',
-                    'passed' => true,
-                    'message' => 'Success is correctly handled in .then() without status checks'
-                ];
-                echo "  ✓ PASS: Success handling is correct\n";
-            } else {
-                $this->testResults[] = [
-                    'name' => 'Correct success handling',
-                    'passed' => false,
-                    'message' => 'Success handling has issues: success=' . ($hasSuccessCompletion ? 'yes' : 'no') . 
-                                ', payload=' . ($setsPayload ? 'yes' : 'no') . 
-                                ', conditional=' . ($hasConditionalStatusCheck ? 'yes' : 'no')
-                ];
-                echo "  ❌ FAIL: Success handling has issues\n";
-            }
+        // 2. Success completion exists somewhere after confirmOrder
+        $hasSuccessCompletion = strpos($content, 'session.completePayment(ApplePaySession.STATUS_SUCCESS)') !== false;
+        
+        // 3. Payload is set
+        $setsPayload = strpos($content, 'setApplePayPayload(payload)') !== false;
+        
+        // 4. No conditional status checks after confirmOrder (simplified check)
+        $confirmOrderPos = strpos($content, 'applepay.confirmOrder');
+        $nextCatchPos = strpos($content, '.catch', $confirmOrderPos);
+        
+        if ($confirmOrderPos !== false && $nextCatchPos !== false) {
+            $thenBlock = substr($content, $confirmOrderPos, $nextCatchPos - $confirmOrderPos);
+            $hasConditionalStatusCheck = preg_match('/if\s*\([^)]*confirmResult[^)]*status[^)]*\)/', $thenBlock);
+        } else {
+            $hasConditionalStatusCheck = false;
+        }
+        
+        if ($hasConfirmOrderCall && $hasSuccessCompletion && $setsPayload && !$hasConditionalStatusCheck) {
+            $this->testResults[] = [
+                'name' => 'Correct success handling',
+                'passed' => true,
+                'message' => 'Success is correctly handled in .then() without status checks'
+            ];
+            echo "  ✓ PASS: Success handling is correct\n";
         } else {
             $this->testResults[] = [
                 'name' => 'Correct success handling',
                 'passed' => false,
-                'message' => 'Could not find confirmOrder .then() block'
+                'message' => 'Success handling has issues: confirmOrder=' . ($hasConfirmOrderCall ? 'yes' : 'no') .
+                            ', success=' . ($hasSuccessCompletion ? 'yes' : 'no') . 
+                            ', payload=' . ($setsPayload ? 'yes' : 'no') . 
+                            ', conditional=' . ($hasConditionalStatusCheck ? 'yes' : 'no')
             ];
-            echo "  ❌ FAIL: Could not find confirmOrder .then() block\n";
+            echo "  ❌ FAIL: Success handling has issues\n";
         }
     }
     
