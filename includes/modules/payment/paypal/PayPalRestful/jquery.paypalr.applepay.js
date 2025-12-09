@@ -744,8 +744,11 @@
                     console.log('[Apple Pay] confirmOrder result:', confirmResult);
                     
                     // Handle successful confirmation
-                    if (confirmResult.status === PAYPAL_STATUS.APPROVED || confirmResult.status === PAYPAL_STATUS.PAYER_ACTION_REQUIRED) {
-                        console.log('[Apple Pay] Order confirmed successfully, status:', confirmResult.status);
+                    // The confirmOrder response structure is: { approveApplePayPayment: null } on success
+                    // The mutation completes successfully if no error is thrown
+                    // We just need to check that we got a response without errors
+                    if (confirmResult && (confirmResult.approveApplePayPayment !== undefined || confirmResult.approveApplePayPayment === null)) {
+                        console.log('[Apple Pay] Order confirmed successfully');
                         // Complete the Apple Pay session with success
                         session.completePayment(ApplePaySession.STATUS_SUCCESS);
 
@@ -757,7 +760,7 @@
                         setApplePayPayload(payload);
                         document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
                     } else {
-                        console.warn('[Apple Pay] Apple Pay confirmation returned unexpected status', confirmResult);
+                        console.warn('[Apple Pay] Apple Pay confirmation returned unexpected result', confirmResult);
                         session.completePayment(ApplePaySession.STATUS_FAILURE);
                         setApplePayPayload({});
                     }
