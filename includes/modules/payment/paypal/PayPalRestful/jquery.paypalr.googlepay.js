@@ -608,33 +608,25 @@
             // This is called in the .then() callback but remains within user gesture context
             return paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
                 console.log('[Google Pay] Payment data received from Google Pay sheet');
+                console.log('[Google Pay] Payment method data:', paymentData.paymentMethodData);
                 
-                // Step 3: Confirm the order with PayPal using the Google Pay token
-                console.log('[Google Pay] Step 3: Confirming order with PayPal, orderID:', orderId);
-                return googlepay.confirmOrder({
-                    orderId: orderId,
-                    paymentMethodData: paymentData.paymentMethodData
-                });
-            });
-        }).then(function (confirmResult) {
-            console.log('[Google Pay] Step 4: Order confirmation result:', confirmResult);
-            
-            // Step 4: Handle successful confirmation
-            if (confirmResult && (confirmResult.status === 'APPROVED' || confirmResult.status === 'PAYER_ACTION_REQUIRED')) {
-                console.log('[Google Pay] Order confirmed successfully, status:', confirmResult.status);
+                // Build the payload with the payment data
+                // The server-side confirmPaymentSource API call will use this data
+                // Similar to Apple Pay's approach: let the server handle confirmation
                 var payload = {
-                    orderID: sdkState.config.orderID,
-                    confirmResult: confirmResult,
+                    orderID: orderId,
+                    paymentMethodData: paymentData.paymentMethodData,
                     wallet: 'google_pay'
                 };
+                
+                console.log('[Google Pay] Setting payload and submitting form');
                 setGooglePayPayload(payload);
                 document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: payload }));
-            } else {
-                console.warn('[Google Pay] Confirmation returned unexpected status', confirmResult);
-                setGooglePayPayload({});
-            }
+            });
         }).catch(function (error) {
-            // Handle errors or user cancellation
+            console.log('[Google Pay] Payment flow completed or error occurred');
+            
+            // Handle specific error types
             if (error && error.statusCode === 'CANCELED') {
                 console.log('[Google Pay] Payment cancelled by user');
             } else {
