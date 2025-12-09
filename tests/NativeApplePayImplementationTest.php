@@ -158,6 +158,14 @@ if (strpos($applePayJs, 'orderId:') === false) {
     echo "✓ Apple Pay JS passes orderId to confirmOrder\n";
 }
 
+// Test 16b: Apple Pay JS passes shippingContact to confirmOrder
+if (strpos($applePayJs, 'shippingContact: event.payment.shippingContact') === false) {
+    $testPassed = false;
+    $errors[] = "Apple Pay JS should pass shippingContact to confirmOrder";
+} else {
+    echo "✓ Apple Pay JS passes shippingContact to confirmOrder\n";
+}
+
 // Test 17: Apple Pay JS creates native Apple Pay button
 if (strpos($applePayJs, 'createApplePayButton') === false && strpos($applePayJs, 'apple-pay-button') === false) {
     $testPassed = false;
