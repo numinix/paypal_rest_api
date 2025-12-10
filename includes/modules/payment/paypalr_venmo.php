@@ -84,6 +84,11 @@ class paypalr_venmo extends base
     protected bool $onOpcConfirmationPage = false;
     protected array $paypalRestfulSessionOnEntry = [];
 
+    public function getErrorInfo(): ErrorInfo
+    {
+        return $this->errorInfo;
+    }
+
     /**
      * class constructor
      */

@@ -84,6 +84,11 @@ class paypalr_googlepay extends base
     protected bool $onOpcConfirmationPage = false;
     protected array $paypalRestfulSessionOnEntry = [];
 
+    public function getErrorInfo(): ErrorInfo
+    {
+        return $this->errorInfo;
+    }
+
     /**
      * class constructor
      */
