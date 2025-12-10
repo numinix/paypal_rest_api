@@ -124,24 +124,79 @@ class PayPalCommon {
      *
      * Apple Pay's payment token is an associative array when posted from the
      * browser. PayPal's /confirm-payment-source endpoint expects the token to
-     * be a JSON string, not an array. Convert it here so the request matches
-     * PayPal's schema and avoids MALFORMED_REQUEST_JSON errors.
+     * be a JSON string, not an array. Additionally, Apple Pay contact information
+     * needs to be transformed into PayPal's expected format.
      */
     protected function normalizeWalletPayload(string $walletType, array $payload, array $errorMessages): array
     {
-        if ($walletType === 'apple_pay' && isset($payload['token']) && is_array($payload['token'])) {
-            $encodedToken = json_encode($payload['token']);
-            if ($encodedToken === false) {
-                $jsonError = function_exists('json_last_error_msg') ? json_last_error_msg() : 'unknown error';
-                $this->paymentModule->log->write(
-                    "Apple Pay: Failed to encode token payload ({$jsonError}).",
-                    true,
-                    'after'
-                );
-                $this->paymentModule->setMessageAndRedirect($errorMessages['payload_invalid'], FILENAME_CHECKOUT_PAYMENT);
+        if ($walletType === 'apple_pay') {
+            // Convert token from array to JSON string
+            if (isset($payload['token']) && is_array($payload['token'])) {
+                $encodedToken = json_encode($payload['token']);
+                if ($encodedToken === false) {
+                    $jsonError = function_exists('json_last_error_msg') ? json_last_error_msg() : 'unknown error';
+                    $this->paymentModule->log->write(
+                        "Apple Pay: Failed to encode token payload ({$jsonError}).",
+                        true,
+                        'after'
+                    );
+                    $this->paymentModule->setMessageAndRedirect($errorMessages['payload_invalid'], FILENAME_CHECKOUT_PAYMENT);
+                }
+
+                $payload['token'] = $encodedToken;
             }
 
-            $payload['token'] = $encodedToken;
+            // Transform Apple Pay billing contact to PayPal format
+            if (isset($payload['billing_contact']) && is_array($payload['billing_contact'])) {
+                $billingContact = $payload['billing_contact'];
+                
+                // Extract name (only if at least one field is present)
+                if (!empty($billingContact['givenName']) || !empty($billingContact['familyName'])) {
+                    $givenName = $billingContact['givenName'] ?? '';
+                    $familyName = $billingContact['familyName'] ?? '';
+                    
+                    // Only add name if at least one field is non-empty
+                    if ($givenName !== '' || $familyName !== '') {
+                        $payload['name'] = [
+                            'given_name' => $givenName,
+                            'surname' => $familyName
+                        ];
+                    }
+                }
+                
+                // Extract email
+                if (!empty($billingContact['emailAddress'])) {
+                    $payload['email_address'] = $billingContact['emailAddress'];
+                }
+                
+                // Extract billing address (ensure essential fields are present)
+                $addressLines = $billingContact['addressLines'] ?? [];
+                $hasAddressLine = !empty($addressLines[0]);
+                $hasLocality = !empty($billingContact['locality']);
+                $hasCountryCode = !empty($billingContact['countryCode']);
+                
+                // Only include address if we have essential components (address line OR locality, AND country code)
+                if (($hasAddressLine || $hasLocality) && $hasCountryCode) {
+                    $payload['billing_address'] = [
+                        'address_line_1' => $addressLines[0] ?? '',
+                        'admin_area_2' => $billingContact['locality'] ?? '',
+                        'admin_area_1' => $billingContact['administrativeArea'] ?? '',
+                        'postal_code' => $billingContact['postalCode'] ?? '',
+                        'country_code' => $billingContact['countryCode']
+                    ];
+                    
+                    // Add second address line if present
+                    if (isset($addressLines[1]) && $addressLines[1] !== '') {
+                        $payload['billing_address']['address_line_2'] = $addressLines[1];
+                    }
+                }
+                
+                // Remove the raw billing_contact as it's now transformed
+                unset($payload['billing_contact']);
+            }
+
+            // Remove shipping_contact and other non-PayPal fields
+            unset($payload['shipping_contact'], $payload['wallet'], $payload['orderID']);
         }
 
         return $payload;
