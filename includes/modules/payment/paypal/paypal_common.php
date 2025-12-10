@@ -146,57 +146,18 @@ class PayPalCommon {
                 $payload['token'] = $encodedToken;
             }
 
-            // Transform Apple Pay billing contact to PayPal format
-            if (isset($payload['billing_contact']) && is_array($payload['billing_contact'])) {
-                $billingContact = $payload['billing_contact'];
-                
-                // Extract name (only if at least one field is present)
-                if (!empty($billingContact['givenName']) || !empty($billingContact['familyName'])) {
-                    $givenName = $billingContact['givenName'] ?? '';
-                    $familyName = $billingContact['familyName'] ?? '';
-                    
-                    // Only add name if at least one field is non-empty
-                    if ($givenName !== '' || $familyName !== '') {
-                        $payload['name'] = [
-                            'given_name' => $givenName,
-                            'surname' => $familyName
-                        ];
-                    }
-                }
-                
-                // Extract email
-                if (!empty($billingContact['emailAddress'])) {
-                    $payload['email_address'] = $billingContact['emailAddress'];
-                }
-                
-                // Extract billing address (ensure essential fields are present)
-                $addressLines = $billingContact['addressLines'] ?? [];
-                $hasAddressLine = !empty($addressLines[0]);
-                $hasLocality = !empty($billingContact['locality']);
-                $hasCountryCode = !empty($billingContact['countryCode']);
-                
-                // Only include address if we have essential components (address line OR locality, AND country code)
-                if (($hasAddressLine || $hasLocality) && $hasCountryCode) {
-                    $payload['billing_address'] = [
-                        'address_line_1' => $addressLines[0] ?? '',
-                        'admin_area_2' => $billingContact['locality'] ?? '',
-                        'admin_area_1' => $billingContact['administrativeArea'] ?? '',
-                        'postal_code' => $billingContact['postalCode'] ?? '',
-                        'country_code' => $billingContact['countryCode']
-                    ];
-                    
-                    // Add second address line if present
-                    if (isset($addressLines[1]) && $addressLines[1] !== '') {
-                        $payload['billing_address']['address_line_2'] = $addressLines[1];
-                    }
-                }
-                
-                // Remove the raw billing_contact as it's now transformed
-                unset($payload['billing_contact']);
+            // For Apple Pay confirmPaymentSource, PayPal only accepts the token field.
+            // Contact information (name, email, billing_address) should NOT be included
+            // in the payment_source as PayPal rejects them with MALFORMED_REQUEST_JSON.
+            // The contact info is already in the order from createOrder.
+            
+            // Remove all fields except token
+            $normalizedPayload = [];
+            if (isset($payload['token'])) {
+                $normalizedPayload['token'] = $payload['token'];
             }
-
-            // Remove shipping_contact and other non-PayPal fields
-            unset($payload['shipping_contact'], $payload['wallet'], $payload['orderID']);
+            
+            return $normalizedPayload;
         }
 
         return $payload;

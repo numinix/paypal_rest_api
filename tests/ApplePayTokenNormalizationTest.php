@@ -1,7 +1,11 @@
 <?php
 /**
- * Test that Apple Pay tokens and contact information are normalized to PayPal's expected format
+ * Test that Apple Pay tokens are normalized to PayPal's expected format
  * before calling confirmPaymentSource to satisfy PayPal's schema.
+ * 
+ * Per PayPal's API schema, Apple Pay confirmPaymentSource should ONLY contain
+ * the token field. Contact information (name, email, billing_address) should
+ * NOT be included as they cause MALFORMED_REQUEST_JSON errors.
  */
 
 require_once __DIR__ . '/../includes/modules/payment/paypal/paypal_common.php';
@@ -80,7 +84,7 @@ if ($normalizedPayload['token'] !== json_encode($applePayload['token'])) {
     fwrite(STDOUT, "✓ Apple Pay token matches JSON encoding of payload\n");
 }
 
-// Test 2: Contact normalization
+// Test 2: Only token field should be present (no contact fields)
 $applePayloadWithContacts = [
     'orderID' => 'TEST-ORDER-ID',
     'token' => [
@@ -103,48 +107,33 @@ $applePayloadWithContacts = [
 
 $normalizedWithContacts = $common->normalizeWalletPayloadPublic('apple_pay', $applePayloadWithContacts, $errorMessages);
 
-// Check name transformation
-if (!isset($normalizedWithContacts['name']) || 
-    $normalizedWithContacts['name']['given_name'] !== 'John' ||
-    $normalizedWithContacts['name']['surname'] !== 'Doe') {
-    fwrite(STDERR, "FAIL: Name should be transformed to PayPal format\n");
+// Verify only token is present - contact fields should be excluded
+if (isset($normalizedWithContacts['name']) || 
+    isset($normalizedWithContacts['email_address']) ||
+    isset($normalizedWithContacts['billing_address'])) {
+    fwrite(STDERR, "FAIL: Contact fields (name, email_address, billing_address) should NOT be in normalized payload\n");
     $failures++;
 } else {
-    fwrite(STDOUT, "✓ Name transformed to PayPal format\n");
+    fwrite(STDOUT, "✓ Contact fields correctly excluded from payment source\n");
 }
 
-// Check email transformation
-if (!isset($normalizedWithContacts['email_address']) || 
-    $normalizedWithContacts['email_address'] !== 'john.doe@example.com') {
-    fwrite(STDERR, "FAIL: Email should be extracted\n");
+// Verify token is still present and properly encoded
+if (!isset($normalizedWithContacts['token']) || !is_string($normalizedWithContacts['token'])) {
+    fwrite(STDERR, "FAIL: Token should be present and JSON-encoded\n");
     $failures++;
 } else {
-    fwrite(STDOUT, "✓ Email extracted correctly\n");
+    fwrite(STDOUT, "✓ Token field present and properly encoded\n");
 }
 
-// Check billing address transformation
-if (!isset($normalizedWithContacts['billing_address']) ||
-    $normalizedWithContacts['billing_address']['address_line_1'] !== '123 Main St' ||
-    $normalizedWithContacts['billing_address']['address_line_2'] !== 'Apt 4' ||
-    $normalizedWithContacts['billing_address']['admin_area_2'] !== 'San Francisco' ||
-    $normalizedWithContacts['billing_address']['admin_area_1'] !== 'CA' ||
-    $normalizedWithContacts['billing_address']['postal_code'] !== '94105' ||
-    $normalizedWithContacts['billing_address']['country_code'] !== 'US') {
-    fwrite(STDERR, "FAIL: Billing address should be transformed to PayPal format\n");
+// Verify ONLY token field exists (no extra fields)
+$allowedKeys = ['token'];
+$actualKeys = array_keys($normalizedWithContacts);
+$extraKeys = array_diff($actualKeys, $allowedKeys);
+if (!empty($extraKeys)) {
+    fwrite(STDERR, "FAIL: Only 'token' field should be present, found extra keys: " . implode(', ', $extraKeys) . "\n");
     $failures++;
 } else {
-    fwrite(STDOUT, "✓ Billing address transformed to PayPal format\n");
-}
-
-// Check that raw contacts are removed
-if (isset($normalizedWithContacts['billing_contact']) || 
-    isset($normalizedWithContacts['shipping_contact']) ||
-    isset($normalizedWithContacts['wallet']) ||
-    isset($normalizedWithContacts['orderID'])) {
-    fwrite(STDERR, "FAIL: Raw contact fields should be removed\n");
-    $failures++;
-} else {
-    fwrite(STDOUT, "✓ Raw contact fields removed\n");
+    fwrite(STDOUT, "✓ Normalized payload contains only token field\n");
 }
 
 // Test 3: Non-Apple Pay payload unchanged
@@ -157,7 +146,7 @@ if ($untouchedPayload['token'] !== 'already-string') {
 }
 
 if ($failures === 0) {
-    fwrite(STDOUT, "\nAll Apple Pay token and contact normalization tests passed!\n");
+    fwrite(STDOUT, "\nAll Apple Pay token normalization tests passed!\n");
     exit(0);
 }
 
