@@ -622,6 +622,7 @@
         var orderPromise = null;
 
         // Create payment request with the actual order amount from the page
+        // Request contact fields that PayPal's confirmPaymentSource API requires
         var paymentRequest = {
             countryCode: applePayConfig.countryCode || 'US',
             currencyCode: orderTotal.currency || applePayConfig.currencyCode || 'USD',
@@ -631,7 +632,11 @@
                 label: applePayConfig.merchantName || 'Total',
                 amount: orderTotal.amount,
                 type: 'final'
-            }
+            },
+            // Request billing contact fields required by PayPal's API
+            requiredBillingContactFields: ['postalAddress', 'name', 'email'],
+            // Request shipping contact for physical goods (if cart contains shippable items)
+            requiredShippingContactFields: ['postalAddress', 'name', 'email', 'phone']
         };
 
         // Step 3: Create ApplePaySession synchronously in the click handler
