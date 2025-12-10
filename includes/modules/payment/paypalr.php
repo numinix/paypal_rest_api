@@ -163,6 +163,11 @@ class paypalr extends base
      */
     protected ErrorInfo $errorInfo; //- An instance of the ErrorInfo class, logs debug tracing information.
 
+    public function getErrorInfo(): ErrorInfo
+    {
+        return $this->errorInfo;
+    }
+
     /**
      * An instance of the PayPalRestfulApi class.
      */

@@ -79,7 +79,7 @@ class PayPalCommon {
             [$walletType => $payload]
         );
         if ($confirm_response === false) {
-            $this->paymentModule->errorInfo->copyErrorInfo($this->paymentModule->ppr->getErrorInfo());
+            $this->paymentModule->getErrorInfo()->copyErrorInfo($this->paymentModule->ppr->getErrorInfo());
             $this->paymentModule->setMessageAndRedirect($errorMessages['confirm_failed'], FILENAME_CHECKOUT_PAYMENT);
         }
 
@@ -903,8 +903,8 @@ class PayPalCommon {
                 "createPayPalOrder($ppr_type): PayPal order creation FAILED.\n" .
                 "  Error: " . Logger::logJSON($error_info)
             );
-            if (isset($paymentModule->errorInfo)) {
-                $paymentModule->errorInfo->copyErrorInfo($error_info);
+            if (method_exists($paymentModule, 'getErrorInfo')) {
+                $paymentModule->getErrorInfo()->copyErrorInfo($error_info);
             }
             return false;
         }
