@@ -1,7 +1,7 @@
 <?php
 /**
  * Test to verify the native Google Pay implementation follows PayPal's official
- * Google Pay integration guide.
+ * Google Pay integration guide and uses server-side confirmation pattern.
  *
  * Reference: https://developer.paypal.com/docs/checkout/advanced/googlepay/
  *
@@ -12,9 +12,10 @@
  * 4. Use google.payments.api.PaymentsClient for the Google Pay client
  * 5. Use paymentsClient.createButton() for rendering the button
  * 6. Use paymentsClient.loadPaymentData() for payment flow
- * 7. Use paypal.Googlepay().confirmOrder() for order confirmation
+ * 7. NOT use client-side confirmOrder (uses server-side confirmPaymentSource instead)
  * 8. Check eligibility with paypal.Googlepay().isEligible()
  * 9. Add buyer-country parameter for sandbox mode
+ * 10. Pass payment data to server for confirmation
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -78,12 +79,13 @@ if (strpos($googlePayJs, 'paymentsClient.loadPaymentData') === false) {
     echo "✓ Google Pay JS uses paymentsClient.loadPaymentData()\n";
 }
 
-// Test 7: Google Pay JS uses googlepay.confirmOrder()
-if (strpos($googlePayJs, 'googlepay.confirmOrder') === false) {
+// Test 7: Google Pay JS does NOT use client-side confirmOrder (uses server-side confirmation)
+// Per GOOGLE_PAY_SERVER_SIDE_CONFIRMATION fix, confirmOrder should NOT be called on client
+if (strpos($googlePayJs, 'googlepay.confirmOrder') !== false) {
     $testPassed = false;
-    $errors[] = "Google Pay JS should use googlepay.confirmOrder()";
+    $errors[] = "Google Pay JS should NOT use client-side googlepay.confirmOrder() - uses server-side confirmPaymentSource instead";
 } else {
-    echo "✓ Google Pay JS uses googlepay.confirmOrder()\n";
+    echo "✓ Google Pay JS does NOT use client-side googlepay.confirmOrder() (server handles confirmation)\n";
 }
 
 // Test 8: Google Pay JS uses googlepay.isEligible() for eligibility check
@@ -151,12 +153,13 @@ if (strpos($googlePayJs, 'CANCELED') === false) {
     echo "✓ Google Pay JS handles user cancellation (CANCELED status)\n";
 }
 
-// Test 16: Google Pay JS passes orderId to confirmOrder
-if (strpos($googlePayJs, 'orderId:') === false) {
+// Test 16: Google Pay JS sets payload with orderId
+// Server-side confirmation uses payload with orderId and paymentMethodData
+if (strpos($googlePayJs, 'orderID:') === false && strpos($googlePayJs, 'orderId') === false) {
     $testPassed = false;
-    $errors[] = "Google Pay JS should pass orderId to confirmOrder";
+    $errors[] = "Google Pay JS should set orderId in payload";
 } else {
-    echo "✓ Google Pay JS passes orderId to confirmOrder\n";
+    echo "✓ Google Pay JS sets orderId in payload\n";
 }
 
 // Test 17: Google Pay JS includes loadGooglePayJs function
@@ -167,12 +170,13 @@ if (strpos($googlePayJs, 'function loadGooglePayJs') === false) {
     echo "✓ Google Pay JS has loadGooglePayJs function\n";
 }
 
-// Test 18: Google Pay JS handles APPROVED status from confirmOrder
-if (strpos($googlePayJs, 'APPROVED') === false) {
+// Test 18: Google Pay JS includes paymentMethodData in payload
+// Server-side confirmation needs the payment data from Google Pay
+if (strpos($googlePayJs, 'paymentMethodData') === false) {
     $testPassed = false;
-    $errors[] = "Google Pay JS should handle APPROVED status from confirmOrder";
+    $errors[] = "Google Pay JS should include paymentMethodData in payload for server confirmation";
 } else {
-    echo "✓ Google Pay JS handles APPROVED status from confirmOrder\n";
+    echo "✓ Google Pay JS includes paymentMethodData in payload\n";
 }
 
 // Summary

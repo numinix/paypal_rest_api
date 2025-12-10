@@ -1,7 +1,7 @@
 <?php
 /**
  * Test to verify the native Apple Pay implementation follows PayPal's official
- * Apple Pay integration guide.
+ * Apple Pay integration guide and uses server-side confirmation pattern.
  *
  * Reference: https://developer.paypal.com/docs/checkout/advanced/applepay/
  *
@@ -9,11 +9,13 @@
  * 1. Load PayPal SDK with components=applepay
  * 2. Use paypal.Applepay().config() for payment configuration
  * 3. Use ApplePaySession for the Apple Pay payment sheet
- * 4. Use paypal.Applepay().confirmOrder() for order confirmation
+ * 4. NOT use client-side confirmOrder (uses server-side confirmPaymentSource instead)
  * 5. Check eligibility with paypal.Applepay().isEligible()
  * 6. Handle onvalidatemerchant callback
  * 7. Handle onpaymentauthorized callback
  * 8. Add buyer-country parameter for sandbox mode
+ * 9. Request required contact fields from Apple Pay (name, email, address)
+ * 10. Pass payment token and contacts to server for confirmation
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -61,12 +63,13 @@ if (strpos($applePayJs, 'new ApplePaySession') === false) {
     echo "✓ Apple Pay JS creates ApplePaySession with new ApplePaySession()\n";
 }
 
-// Test 5: Apple Pay JS uses applepay.confirmOrder()
-if (strpos($applePayJs, 'applepay.confirmOrder') === false) {
+// Test 5: Apple Pay JS does NOT use client-side confirmOrder (uses server-side confirmation)
+// Per APPLE_PAY_SERVER_SIDE_CONFIRMATION_FIX.md, confirmOrder should NOT be called on client
+if (strpos($applePayJs, 'applepay.confirmOrder') !== false) {
     $testPassed = false;
-    $errors[] = "Apple Pay JS should use applepay.confirmOrder()";
+    $errors[] = "Apple Pay JS should NOT use client-side applepay.confirmOrder() - uses server-side confirmPaymentSource instead";
 } else {
-    echo "✓ Apple Pay JS uses applepay.confirmOrder()\n";
+    echo "✓ Apple Pay JS does NOT use client-side applepay.confirmOrder() (server handles confirmation)\n";
 }
 
 // Test 6: Apple Pay JS uses applepay.isEligible() for eligibility check
@@ -150,20 +153,22 @@ if (strpos($applePayJs, 'session.oncancel') === false) {
     echo "✓ Apple Pay JS handles user cancellation (oncancel)\n";
 }
 
-// Test 16: Apple Pay JS passes orderId to confirmOrder
-if (strpos($applePayJs, 'orderId:') === false) {
+// Test 16: Apple Pay JS sets payload with orderId  
+// Server-side confirmation uses payload with orderId, token, and contacts
+if (strpos($applePayJs, 'orderID:') === false && strpos($applePayJs, 'orderId') === false) {
     $testPassed = false;
-    $errors[] = "Apple Pay JS should pass orderId to confirmOrder";
+    $errors[] = "Apple Pay JS should set orderId in payload";
 } else {
-    echo "✓ Apple Pay JS passes orderId to confirmOrder\n";
+    echo "✓ Apple Pay JS sets orderId in payload\n";
 }
 
-// Test 16b: Apple Pay JS passes shippingContact to confirmOrder
-if (strpos($applePayJs, 'shippingContact: event.payment.shippingContact') === false) {
+// Test 16b: Apple Pay JS includes contact information in payload
+// Server-side confirmation needs billing and shipping contacts
+if (strpos($applePayJs, 'billing_contact') === false && strpos($applePayJs, 'billingContact') === false) {
     $testPassed = false;
-    $errors[] = "Apple Pay JS should pass shippingContact to confirmOrder";
+    $errors[] = "Apple Pay JS should include billing contact in payload";
 } else {
-    echo "✓ Apple Pay JS passes shippingContact to confirmOrder\n";
+    echo "✓ Apple Pay JS includes contact information in payload\n";
 }
 
 // Test 17: Apple Pay JS creates native Apple Pay button
