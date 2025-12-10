@@ -51,14 +51,28 @@ class PayPalCommon {
         $_SESSION['PayPalRestful']['ppr_type'] = $walletType;
 
         $payloadRaw = $_POST[$payloadFieldName] ?? '';
+        $payload = null;
+
         if (trim($payloadRaw) === '') {
+            $payload = $_SESSION['PayPalRestful']['WalletPayload'][$walletType] ?? null;
+
+            if (is_array($payload)) {
+                $this->paymentModule->log->write("Using cached {$walletType} payload from session", true, 'after');
+            }
+        } else {
+            $payload = json_decode($payloadRaw, true);
+
+            if (!is_array($payload)) {
+                $this->paymentModule->setMessageAndRedirect($errorMessages['payload_invalid'], FILENAME_CHECKOUT_PAYMENT);
+            }
+        }
+
+        if (!is_array($payload)) {
             $this->paymentModule->setMessageAndRedirect($errorMessages['payload_missing'], FILENAME_CHECKOUT_PAYMENT);
         }
 
-        $payload = json_decode($payloadRaw, true);
-        if (!is_array($payload)) {
-            $this->paymentModule->setMessageAndRedirect($errorMessages['payload_invalid'], FILENAME_CHECKOUT_PAYMENT);
-        }
+        $payload = $this->normalizeWalletPayload($walletType, $payload, $errorMessages);
+        $_SESSION['PayPalRestful']['WalletPayload'][$walletType] = $payload;
 
         $paypal_order_created = $this->paymentModule->createPayPalOrder($walletType);
         if ($paypal_order_created === false) {
@@ -103,6 +117,34 @@ class PayPalCommon {
         $_SESSION['PayPalRestful']['Order']['payment_source'] = $walletType;
 
         $this->paymentModule->log->write("pre_confirmation_check ($walletType) completed successfully.", true, 'after');
+    }
+
+    /**
+     * Normalize wallet payloads prior to confirming the payment source.
+     *
+     * Apple Pay's payment token is an associative array when posted from the
+     * browser. PayPal's /confirm-payment-source endpoint expects the token to
+     * be a JSON string, not an array. Convert it here so the request matches
+     * PayPal's schema and avoids MALFORMED_REQUEST_JSON errors.
+     */
+    protected function normalizeWalletPayload(string $walletType, array $payload, array $errorMessages): array
+    {
+        if ($walletType === 'apple_pay' && isset($payload['token']) && is_array($payload['token'])) {
+            $encodedToken = json_encode($payload['token']);
+            if ($encodedToken === false) {
+                $jsonError = function_exists('json_last_error_msg') ? json_last_error_msg() : 'unknown error';
+                $this->paymentModule->log->write(
+                    "Apple Pay: Failed to encode token payload ({$jsonError}).",
+                    true,
+                    'after'
+                );
+                $this->paymentModule->setMessageAndRedirect($errorMessages['payload_invalid'], FILENAME_CHECKOUT_PAYMENT);
+            }
+
+            $payload['token'] = $encodedToken;
+        }
+
+        return $payload;
     }
 
     /**
