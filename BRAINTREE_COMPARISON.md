@@ -198,6 +198,10 @@ console.warn('[Apple Pay] ...');
 - **Braintree**: Uses client tokens/tokenization keys from Braintree SDK
 - **PayPal**: Uses PayPal client ID and creates orders via PayPal API
 
+### 2. Apple Pay payload requirements
+- **Braintree**: Sends only the Apple Pay nonce/token to Braintree; contact details are handled separately in the checkout flow.
+- **PayPal**: The `confirmPaymentSource` API for Apple Pay accepts **only** the `token` field. Including contact fields (`name`, `email_address`, `billing_address`) causes `400 INVALID_REQUEST / MALFORMED_REQUEST_JSON` errors, which is why the PayPal Apple Pay plugin was failing while the Braintree module (which only sends the token) was working. The fix strips those fields before confirming the payment source.
+
 ### 2. Order Creation Timing
 - **Braintree**: No server-side order creation before payment (tokenizes on payment authorization)
 - **PayPal**: Creates PayPal order on server, uses order ID for confirmation
