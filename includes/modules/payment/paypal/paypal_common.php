@@ -150,12 +150,18 @@ class PayPalCommon {
             if (isset($payload['billing_contact']) && is_array($payload['billing_contact'])) {
                 $billingContact = $payload['billing_contact'];
                 
-                // Extract name
+                // Extract name (only if at least one field is present)
                 if (!empty($billingContact['givenName']) || !empty($billingContact['familyName'])) {
-                    $payload['name'] = [
-                        'given_name' => $billingContact['givenName'] ?? '',
-                        'surname' => $billingContact['familyName'] ?? ''
-                    ];
+                    $givenName = $billingContact['givenName'] ?? '';
+                    $familyName = $billingContact['familyName'] ?? '';
+                    
+                    // Only add name if at least one field is non-empty
+                    if ($givenName !== '' || $familyName !== '') {
+                        $payload['name'] = [
+                            'given_name' => $givenName,
+                            'surname' => $familyName
+                        ];
+                    }
                 }
                 
                 // Extract email
@@ -163,15 +169,20 @@ class PayPalCommon {
                     $payload['email_address'] = $billingContact['emailAddress'];
                 }
                 
-                // Extract billing address
-                if (!empty($billingContact['addressLines']) || !empty($billingContact['locality'])) {
-                    $addressLines = $billingContact['addressLines'] ?? [];
+                // Extract billing address (ensure essential fields are present)
+                $addressLines = $billingContact['addressLines'] ?? [];
+                $hasAddressLine = !empty($addressLines[0]);
+                $hasLocality = !empty($billingContact['locality']);
+                $hasCountryCode = !empty($billingContact['countryCode']);
+                
+                // Only include address if we have essential components (address line OR locality, AND country code)
+                if (($hasAddressLine || $hasLocality) && $hasCountryCode) {
                     $payload['billing_address'] = [
                         'address_line_1' => $addressLines[0] ?? '',
                         'admin_area_2' => $billingContact['locality'] ?? '',
                         'admin_area_1' => $billingContact['administrativeArea'] ?? '',
                         'postal_code' => $billingContact['postalCode'] ?? '',
-                        'country_code' => $billingContact['countryCode'] ?? ''
+                        'country_code' => $billingContact['countryCode']
                     ];
                     
                     // Add second address line if present

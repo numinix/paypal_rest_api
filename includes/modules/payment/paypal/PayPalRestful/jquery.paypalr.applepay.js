@@ -635,7 +635,9 @@
             },
             // Request billing contact fields required by PayPal's API
             requiredBillingContactFields: ['postalAddress', 'name', 'email'],
-            // Request shipping contact for physical goods (if cart contains shippable items)
+            // Request shipping contact for physical goods
+            // Note: Always requested because PayPal may need shipping info even for mixed carts
+            // Future enhancement: Make this conditional based on cart content type
             requiredShippingContactFields: ['postalAddress', 'name', 'email', 'phone']
         };
 
