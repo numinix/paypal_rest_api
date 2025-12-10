@@ -35,6 +35,8 @@ class StubPaymentModule
     public function setMessageAndRedirect($message, $page)
     {
         $this->redirects[] = [$message, $page];
+        // In production, this would redirect and exit. Simulate by throwing exception.
+        throw new Exception("Redirect to $page with message: $message");
     }
 }
 
@@ -136,7 +138,29 @@ if (!empty($extraKeys)) {
     fwrite(STDOUT, "✓ Normalized payload contains only token field\n");
 }
 
-// Test 3: Non-Apple Pay payload unchanged
+// Test 3: Missing token should trigger redirect
+$payloadWithoutToken = [
+    'orderID' => 'TEST-ORDER-ID',
+    'wallet' => 'apple_pay',
+];
+
+try {
+    $normalizedWithoutToken = $common->normalizeWalletPayloadPublic('apple_pay', $payloadWithoutToken, $errorMessages);
+    fwrite(STDERR, "FAIL: Missing token should trigger redirect (no exception thrown)\n");
+    $failures++;
+} catch (Exception $e) {
+    // Check that redirect was triggered
+    if (count($paymentModule->redirects) === 0) {
+        fwrite(STDERR, "FAIL: Missing token should trigger redirect\n");
+        $failures++;
+    } else {
+        fwrite(STDOUT, "✓ Missing token correctly triggers redirect\n");
+        // Reset redirects for next test
+        $paymentModule->redirects = [];
+    }
+}
+
+// Test 4: Non-Apple Pay payload unchanged
 $untouchedPayload = $common->normalizeWalletPayloadPublic('google_pay', ['token' => 'already-string'], $errorMessages);
 if ($untouchedPayload['token'] !== 'already-string') {
     fwrite(STDERR, "FAIL: Non-Apple Pay payload should not be modified\n");

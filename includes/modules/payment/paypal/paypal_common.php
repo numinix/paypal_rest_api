@@ -151,13 +151,18 @@ class PayPalCommon {
             // in the payment_source as PayPal rejects them with MALFORMED_REQUEST_JSON.
             // The contact info is already in the order from createOrder.
             
-            // Remove all fields except token
-            $normalizedPayload = [];
-            if (isset($payload['token'])) {
-                $normalizedPayload['token'] = $payload['token'];
+            // Validate token is present
+            if (!isset($payload['token']) || $payload['token'] === '') {
+                $this->paymentModule->log->write(
+                    "Apple Pay: Payment token is missing from payload.",
+                    true,
+                    'after'
+                );
+                $this->paymentModule->setMessageAndRedirect($errorMessages['payload_invalid'], FILENAME_CHECKOUT_PAYMENT);
             }
             
-            return $normalizedPayload;
+            // Return only the token field
+            return ['token' => $payload['token']];
         }
 
         return $payload;
