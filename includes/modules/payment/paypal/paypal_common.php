@@ -974,11 +974,18 @@ class PayPalCommon {
 
         // Log the payment source being sent to PayPal
         $payment_source = $order_request['payment_source'] ?? [];
-        $payment_source_type = array_key_first($payment_source);
+        $payment_source_type = '';
+        $has_vault_id = 'n/a';
+
+        if (is_array($payment_source) && !empty($payment_source)) {
+            $payment_source_type = array_key_first($payment_source);
+            $has_vault_id = (!empty($payment_source[$payment_source_type]['vault_id']) ? 'yes' : 'no');
+        }
+
         $log->write(
             "createPayPalOrder($ppr_type): Sending order to PayPal.\n" .
             "  Payment source type: $payment_source_type\n" .
-            "  Has vault_id in source: " . (!empty($payment_source[$payment_source_type]['vault_id']) ? 'yes' : 'no')
+            "  Has vault_id in source: $has_vault_id"
         );
 
         $paypal_order = $paymentModule->ppr->createOrder($order_request);
