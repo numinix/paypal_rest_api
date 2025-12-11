@@ -74,7 +74,7 @@ class paypalr_savedcard extends base
 
     public ?PayPalRestfulApi $ppr = null;
     protected ErrorInfo $errorInfo;
-    protected Logger $log;
+    public Logger $log;
     protected bool $emailAlerts = false;
     protected PayPalCommon $paypalCommon;
     protected array $ccInfo = [];

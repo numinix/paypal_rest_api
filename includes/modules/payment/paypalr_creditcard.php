@@ -74,7 +74,7 @@ class paypalr_creditcard extends base
 
     public PayPalRestfulApi $ppr;
     protected ErrorInfo $errorInfo;
-    protected Logger $log;
+    public Logger $log;
     protected bool $emailAlerts = false;
     protected PayPalCommon $paypalCommon;
     protected array $ccInfo = [];

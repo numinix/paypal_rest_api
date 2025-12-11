@@ -73,7 +73,7 @@ class paypalr_applepay extends base
 
     public PayPalRestfulApi $ppr;
     protected ErrorInfo $errorInfo;
-    protected Logger $log;
+    public Logger $log;
     protected bool $emailAlerts = false;
     protected PayPalCommon $paypalCommon;
     protected array $orderInfo = [];
