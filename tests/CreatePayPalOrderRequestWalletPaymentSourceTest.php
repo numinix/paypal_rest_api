@@ -1,12 +1,14 @@
 <?php
 /**
  * Test to verify wallet payment types have correct payment_source handling:
- * - Apple Pay: MUST include empty payment_source.apple_pay for confirmPaymentSource flow
+ * - Apple Pay: Include payment_source.apple_pay with token ONLY when token is available in session
+ *              Do NOT include payment_source.apple_pay when token is not yet available (PayPal rejects empty objects)
  * - Google Pay, Venmo: Do NOT include payment_source (SDK handles it)
  * - Card, PayPal: Include full payment_source details
  *
- * Apple Pay requires empty payment_source to indicate the payment method will be
- * confirmed later via confirmPaymentSource API with the encrypted token.
+ * Apple Pay flow:
+ * 1. Initial order creation (button click): No token in session → no payment_source.apple_pay
+ * 2. After user authorizes: Token available in session → include payment_source.apple_pay with token
  */
 declare(strict_types=1);
 
@@ -174,20 +176,39 @@ namespace {
         fwrite(STDOUT, "  ✓ google_pay: No payment_source included (correct behavior)\n");
     }
 
-    // Test 2: Apple Pay SHOULD include the token in payment_source.apple_pay for confirmPaymentSource flow
+    // Test 2a: Apple Pay WITH token in session SHOULD include payment_source.apple_pay with token
     $request_applepay = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
     $payload_applepay = $request_applepay->get();
 
     if (!isset($payload_applepay['payment_source']['apple_pay'])) {
-        fwrite(STDERR, "FAIL: apple_pay request SHOULD include payment_source.apple_pay\n");
-        fwrite(STDERR, "  Required for confirmPaymentSource flow to work correctly.\n");
+        fwrite(STDERR, "FAIL: apple_pay request with token in session SHOULD include payment_source.apple_pay\n");
+        fwrite(STDERR, "  Token in session should be included in the order request.\n");
         $failures++;
     } elseif (($payload_applepay['payment_source']['apple_pay']['token'] ?? '') !== 'test-apple-token') {
         fwrite(STDERR, "FAIL: apple_pay payment_source.apple_pay should include token from session\n");
-        fwrite(STDERR, "  Token must be present for PayPal order creation.\n");
+        fwrite(STDERR, "  Expected 'test-apple-token' but got: " . ($payload_applepay['payment_source']['apple_pay']['token'] ?? 'undefined') . "\n");
+        $failures++;
     } else {
-        fwrite(STDOUT, "  ✓ apple_pay: Has tokenized payment_source.apple_pay (correct behavior)\n");
+        fwrite(STDOUT, "  ✓ apple_pay (with token): Has tokenized payment_source.apple_pay (correct behavior)\n");
     }
+
+    // Test 2b: Apple Pay WITHOUT token in session should NOT include payment_source.apple_pay
+    // This simulates the initial order creation when the button is clicked but before token is available
+    unset($_SESSION['PayPalRestful']['WalletPayload']['apple_pay']);
+    $request_applepay_no_token = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
+    $payload_applepay_no_token = $request_applepay_no_token->get();
+
+    if (isset($payload_applepay_no_token['payment_source']['apple_pay'])) {
+        fwrite(STDERR, "FAIL: apple_pay request without token should NOT include payment_source.apple_pay\n");
+        fwrite(STDERR, "  PayPal rejects empty payment_source objects with MALFORMED_REQUEST_JSON error.\n");
+        fwrite(STDERR, "  Found: " . json_encode($payload_applepay_no_token['payment_source']['apple_pay']) . "\n");
+        $failures++;
+    } else {
+        fwrite(STDOUT, "  ✓ apple_pay (without token): No payment_source included (correct behavior)\n");
+    }
+    
+    // Restore token for subsequent tests
+    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = ['token' => 'test-apple-token'];
 
     // Test 3: Venmo should NOT have payment_source
     $request_venmo = new CreatePayPalOrderRequest('venmo', $order, [], $order_info, []);
