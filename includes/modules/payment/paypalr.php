@@ -117,7 +117,7 @@ class paypalr extends base
      *
      * @var boolean
      */
-    protected bool $emailAlerts;
+    public bool $emailAlerts;
 
     /**
      * sort order of display
@@ -156,7 +156,7 @@ class paypalr extends base
     /**
      * Debug interface, shared with the PayPalRestfulApi class.
      */
-    protected Logger $log; //- An instance of the Logger class, logs debug tracing information.
+    public Logger $log; //- An instance of the Logger class, logs debug tracing information.
 
     /**
      * An array to maintain error information returned by various PayPalRestfulApi methods.
@@ -202,7 +202,7 @@ class paypalr extends base
     /**
      * Cache of orders' customer identifiers to reduce repeated database lookups when storing vault details.
      */
-    protected array $orderCustomerCache = [];
+    public array $orderCustomerCache = [];
 
     /**
      * Cached active vault cards for the current customer.

@@ -74,15 +74,15 @@ class paypalr_savedcard extends base
 
     public ?PayPalRestfulApi $ppr = null;
     protected ErrorInfo $errorInfo;
-    protected Logger $log;
-    protected bool $emailAlerts = false;
+    public Logger $log;
+    public bool $emailAlerts = false;
     protected PayPalCommon $paypalCommon;
     protected array $ccInfo = [];
     protected array $orderInfo = [];
     protected bool $paymentIsPending = false;
     protected bool $billingCountryIsSupported = true;
     protected bool $shippingCountryIsSupported = true;
-    protected array $orderCustomerCache = [];
+    public array $orderCustomerCache = [];
     protected bool $onOpcConfirmationPage = false;
     protected array $paypalRestfulSessionOnEntry = [];
 
