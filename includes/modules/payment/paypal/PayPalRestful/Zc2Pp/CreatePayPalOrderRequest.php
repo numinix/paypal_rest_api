@@ -173,7 +173,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
                 && isset($appleWalletPayload['token'])
                 && $appleWalletPayload['token'] !== ''
             ) {
-                // Very rare path – token is already known
+                // Very rare path - token is already known
                 $this->request['payment_source']['apple_pay'] = ['token' => $appleWalletPayload['token']];
             } else {
                 // Indicate that this is a wallet order without sending any fields yet.

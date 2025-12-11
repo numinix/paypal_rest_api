@@ -2,14 +2,14 @@
 /**
  * Test to verify wallet payment types have correct payment_source handling:
  * - Apple Pay: Include payment_source.apple_pay with token ONLY when token is available in session
- *              When token is not available, include EMPTY payment_source object ({}) to indicate
+ *              When token is not available, include empty payment_source object ({}) to indicate
  *              this is a wallet order for confirmPaymentSource flow
  * - Google Pay, Venmo: Do NOT include payment_source (SDK handles it)
  * - Card, PayPal: Include full payment_source details
  *
  * Apple Pay flow:
- * 1. Initial order creation (button click): No token in session → payment_source: {} (empty stdClass)
- * 2. After user authorizes: Token available in session → include payment_source.apple_pay with token
+ * 1. Initial order creation (button click): No token in session -> payment_source: {} (empty stdClass)
+ * 2. After user authorizes: Token available in session -> include payment_source.apple_pay with token
  */
 declare(strict_types=1);
 
