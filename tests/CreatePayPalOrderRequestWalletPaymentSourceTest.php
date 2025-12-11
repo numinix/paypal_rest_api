@@ -2,13 +2,14 @@
 /**
  * Test to verify wallet payment types have correct payment_source handling:
  * - Apple Pay: Include payment_source.apple_pay with token ONLY when token is available in session
- *              Do NOT include payment_source.apple_pay when token is not yet available (PayPal rejects empty objects)
+ *              When token is not available, include empty payment_source object ({}) to indicate
+ *              this is a wallet order for confirmPaymentSource flow
  * - Google Pay, Venmo: Do NOT include payment_source (SDK handles it)
  * - Card, PayPal: Include full payment_source details
  *
  * Apple Pay flow:
- * 1. Initial order creation (button click): No token in session → no payment_source.apple_pay
- * 2. After user authorizes: Token available in session → include payment_source.apple_pay with token
+ * 1. Initial order creation (button click): No token in session -> payment_source: {} (empty stdClass)
+ * 2. After user authorizes: Token available in session -> include payment_source.apple_pay with token
  */
 declare(strict_types=1);
 
@@ -192,19 +193,39 @@ namespace {
         fwrite(STDOUT, "  ✓ apple_pay (with token): Has tokenized payment_source.apple_pay (correct behavior)\n");
     }
 
-    // Test 2b: Apple Pay WITHOUT token in session should NOT include payment_source.apple_pay
+    // Test 2b: Apple Pay WITHOUT token in session should include EMPTY payment_source object
     // This simulates the initial order creation when the button is clicked but before token is available
+    // PayPal expects payment_source: {} to indicate a wallet order that will be confirmed later
     unset($_SESSION['PayPalRestful']['WalletPayload']['apple_pay']);
     $request_applepay_no_token = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
     $payload_applepay_no_token = $request_applepay_no_token->get();
 
-    if (isset($payload_applepay_no_token['payment_source']['apple_pay'])) {
-        fwrite(STDERR, "FAIL: apple_pay request without token should NOT include payment_source.apple_pay\n");
-        fwrite(STDERR, "  PayPal rejects empty payment_source objects with MALFORMED_REQUEST_JSON error.\n");
-        fwrite(STDERR, "  Found: " . json_encode($payload_applepay_no_token['payment_source']['apple_pay']) . "\n");
+    if (!isset($payload_applepay_no_token['payment_source'])) {
+        fwrite(STDERR, "FAIL: apple_pay request without token SHOULD include payment_source (as empty object)\n");
+        fwrite(STDERR, "  PayPal needs payment_source: {} to indicate a wallet order for confirmPaymentSource flow.\n");
         $failures++;
+    } elseif (!($payload_applepay_no_token['payment_source'] instanceof \stdClass)) {
+        // If not stdClass, it might be an array with apple_pay or other data - check that
+        if (is_array($payload_applepay_no_token['payment_source']) && isset($payload_applepay_no_token['payment_source']['apple_pay'])) {
+            fwrite(STDERR, "FAIL: apple_pay request without token should NOT include payment_source.apple_pay\n");
+            fwrite(STDERR, "  Only an empty payment_source object should be sent, not payment_source.apple_pay.\n");
+            fwrite(STDERR, "  Found: " . json_encode($payload_applepay_no_token['payment_source']['apple_pay']) . "\n");
+            $failures++;
+        } else {
+            fwrite(STDERR, "FAIL: apple_pay payment_source should be stdClass (empty object)\n");
+            fwrite(STDERR, "  Found type: " . gettype($payload_applepay_no_token['payment_source']) . "\n");
+            $failures++;
+        }
     } else {
-        fwrite(STDOUT, "  ✓ apple_pay (without token): No payment_source included (correct behavior)\n");
+        // Verify it will encode to {} in JSON
+        $json_encoded = json_encode($payload_applepay_no_token['payment_source']);
+        if ($json_encoded !== '{}') {
+            fwrite(STDERR, "FAIL: apple_pay payment_source should encode to '{}' in JSON\n");
+            fwrite(STDERR, "  Found: $json_encoded\n");
+            $failures++;
+        } else {
+            fwrite(STDOUT, "  ✓ apple_pay (without token): Has empty payment_source object (correct behavior)\n");
+        }
     }
     
     // Restore token for subsequent tests
