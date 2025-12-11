@@ -92,6 +92,29 @@ class PayPalCommon {
             $_SESSION['PayPalRestful']['Order']['id'],
             [$walletType => $payload]
         );
+
+        // Retry once on transient PayPal 500 errors (INTERNAL_SERVICE_ERROR)
+        if ($confirm_response === false) {
+            $error_info = $this->paymentModule->ppr->getErrorInfo();
+            $errNum = $error_info['errNum'] ?? 0;
+            $issue = $error_info['details'][0]['issue'] ?? '';
+            $debug_id = $error_info['debug_id'] ?? '';
+
+            if ($errNum === 500 || strcasecmp($issue, 'INTERNAL_SERVICE_ERROR') === 0) {
+                $this->paymentModule->log->write(
+                    "confirmPaymentSource ($walletType) received INTERNAL_SERVICE_ERROR; retrying once.\n" .
+                    ($debug_id !== '' ? "  PayPal Debug ID: $debug_id" : ''),
+                    true,
+                    'after'
+                );
+
+                $confirm_response = $this->paymentModule->ppr->confirmPaymentSource(
+                    $_SESSION['PayPalRestful']['Order']['id'],
+                    [$walletType => $payload]
+                );
+            }
+        }
+
         if ($confirm_response === false) {
             $this->paymentModule->getErrorInfo()->copyErrorInfo($this->paymentModule->ppr->getErrorInfo());
             $this->paymentModule->setMessageAndRedirect($errorMessages['confirm_failed'], FILENAME_CHECKOUT_PAYMENT);
