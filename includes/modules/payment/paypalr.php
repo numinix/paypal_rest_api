@@ -117,7 +117,7 @@ class paypalr extends base
      *
      * @var boolean
      */
-    protected bool $emailAlerts;
+    public bool $emailAlerts;
 
     /**
      * sort order of display
@@ -202,7 +202,7 @@ class paypalr extends base
     /**
      * Cache of orders' customer identifiers to reduce repeated database lookups when storing vault details.
      */
-    protected array $orderCustomerCache = [];
+    public array $orderCustomerCache = [];
 
     /**
      * Cached active vault cards for the current customer.
