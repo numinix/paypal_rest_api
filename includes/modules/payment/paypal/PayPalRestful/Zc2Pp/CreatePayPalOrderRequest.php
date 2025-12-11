@@ -158,16 +158,15 @@ class CreatePayPalOrderRequest extends ErrorInfo
         } elseif ($ppr_type === 'paypal') {
             $this->request['payment_source']['paypal'] = $this->buildPayPalPaymentSource($order);
         } elseif ($ppr_type === 'apple_pay') {
-            // For Apple Pay with confirmPaymentSource flow, include the wallet token (if present)
-            // so that PayPal recognizes the payment source during order creation.
-            // The token was normalized and stored during the wallet confirmation step.
+            // For Apple Pay with confirmPaymentSource flow, include the wallet token if present.
+            // The token is normalized and stored during the wallet confirmation step.
+            // If the token isn't available yet (e.g., during initial order creation from the button click),
+            // do NOT include payment_source.apple_pay at all - PayPal rejects empty payment_source objects.
             $appleWalletPayload = $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] ?? null;
             if (is_array($appleWalletPayload) && isset($appleWalletPayload['token']) && $appleWalletPayload['token'] !== '') {
                 $this->request['payment_source']['apple_pay'] = ['token' => $appleWalletPayload['token']];
-            } else {
-                // Fallback to an empty payment_source if the token isn't available to avoid PHP notices.
-                $this->request['payment_source']['apple_pay'] = [];
             }
+            // If token is not available, don't include payment_source.apple_pay (it will be added during confirmPaymentSource)
         }
         // For google_pay and venmo - do NOT include payment_source
         // The PayPal SDK handles the payment source during the wallet authorization flow
