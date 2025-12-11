@@ -138,17 +138,11 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // -----
         // Add payment source to the order-creation request based on payment type.
         // 
-        // IMPORTANT: For wallet payments (Google Pay, Apple Pay, Venmo) when using the
-        // PayPal JavaScript SDK Buttons approach, we should NOT include the payment_source
-        // in the createOrder request. The SDK handles the payment source when the user
-        // completes the wallet authorization flow. Including payment_source for these
-        // wallet types causes errors:
-        // - Apple Pay: MALFORMED_REQUEST_JSON for name field format
-        // - Venmo: NOT_ENABLED_TO_VAULT_PAYMENT_SOURCE if vaulting isn't enabled
-        //
-        // We only include payment_source for:
-        // - 'card' (credit card) - requires card details
-        // - 'paypal' (PayPal button) - requires PayPal-specific fields
+        // Payment source handling varies by type:
+        // - 'card': Include full card details in payment_source
+        // - 'paypal': Include PayPal-specific fields
+        // - 'apple_pay': Include empty payment_source to indicate Apple Pay will be confirmed later
+        // - 'google_pay', 'venmo': Do NOT include payment_source (SDK handles it)
         //
         if ($ppr_type === 'card') {
             $this->request['payment_source']['card'] = $this->buildCardPaymentSource($order, $cc_info);
@@ -163,8 +157,13 @@ class CreatePayPalOrderRequest extends ErrorInfo
             }
         } elseif ($ppr_type === 'paypal') {
             $this->request['payment_source']['paypal'] = $this->buildPayPalPaymentSource($order);
+        } elseif ($ppr_type === 'apple_pay') {
+            // For Apple Pay with confirmPaymentSource flow, include an empty payment_source
+            // to indicate that Apple Pay will be used. The token will be provided later
+            // when calling confirmPaymentSource.
+            $this->request['payment_source']['apple_pay'] = [];
         }
-        // For google_pay, apple_pay, and venmo - do NOT include payment_source
+        // For google_pay and venmo - do NOT include payment_source
         // The PayPal SDK handles the payment source during the wallet authorization flow
 
         $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request, true, true));

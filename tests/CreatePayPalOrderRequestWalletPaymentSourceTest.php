@@ -1,15 +1,12 @@
 <?php
 /**
- * Test to verify wallet payment types (Google Pay, Apple Pay, Venmo) do NOT include
- * payment_source in the order creation request when using the PayPal JavaScript SDK
- * Buttons approach.
+ * Test to verify wallet payment types have correct payment_source handling:
+ * - Apple Pay: MUST include empty payment_source.apple_pay for confirmPaymentSource flow
+ * - Google Pay, Venmo: Do NOT include payment_source (SDK handles it)
+ * - Card, PayPal: Include full payment_source details
  *
- * The PayPal SDK handles the payment source during the wallet authorization flow,
- * so including payment_source during order creation causes errors:
- * - Apple Pay: MALFORMED_REQUEST_JSON for name field format
- * - Venmo: NOT_ENABLED_TO_VAULT_PAYMENT_SOURCE if vaulting isn't enabled
- *
- * Only 'card' and 'paypal' payment types should include payment_source.
+ * Apple Pay requires empty payment_source to indicate the payment method will be
+ * confirmed later via confirmPaymentSource API with the encrypted token.
  */
 declare(strict_types=1);
 
@@ -176,16 +173,20 @@ namespace {
         fwrite(STDOUT, "  ✓ google_pay: No payment_source included (correct behavior)\n");
     }
 
-    // Test 2: Apple Pay should NOT have payment_source
+    // Test 2: Apple Pay SHOULD have empty payment_source.apple_pay for confirmPaymentSource flow
     $request_applepay = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
     $payload_applepay = $request_applepay->get();
 
-    if (isset($payload_applepay['payment_source']['apple_pay'])) {
-        fwrite(STDERR, "FAIL: apple_pay request should NOT include payment_source.apple_pay\n");
-        fwrite(STDERR, "  Including it causes MALFORMED_REQUEST_JSON error from PayPal.\n");
+    if (!isset($payload_applepay['payment_source']['apple_pay'])) {
+        fwrite(STDERR, "FAIL: apple_pay request SHOULD include empty payment_source.apple_pay\n");
+        fwrite(STDERR, "  Required for confirmPaymentSource flow to work correctly.\n");
+        $failures++;
+    } elseif ($payload_applepay['payment_source']['apple_pay'] !== []) {
+        fwrite(STDERR, "FAIL: apple_pay payment_source.apple_pay should be empty array\n");
+        fwrite(STDERR, "  Token will be provided later via confirmPaymentSource.\n");
         $failures++;
     } else {
-        fwrite(STDOUT, "  ✓ apple_pay: No payment_source included (correct behavior)\n");
+        fwrite(STDOUT, "  ✓ apple_pay: Has empty payment_source.apple_pay (correct behavior)\n");
     }
 
     // Test 3: Venmo should NOT have payment_source
