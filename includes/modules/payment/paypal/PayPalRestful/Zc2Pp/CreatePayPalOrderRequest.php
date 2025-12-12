@@ -158,27 +158,21 @@ class CreatePayPalOrderRequest extends ErrorInfo
         } elseif ($ppr_type === 'paypal') {
             $this->request['payment_source']['paypal'] = $this->buildPayPalPaymentSource($order);
         } elseif ($ppr_type === 'apple_pay') {
-            // For Apple Pay with the confirmPaymentSource flow:
-            // - If the wallet token is already available in the session (rare), include it now.
-            // - Otherwise, add an EMPTY payment_source object so PayPal knows this is
-            //   a wallet-based order that will be completed via /confirm-payment-source.
-            //
-            // IMPORTANT:
-            //   Do NOT send an empty payment_source.apple_pay object; that causes
-            //   MALFORMED_REQUEST_JSON errors. We only send the token for apple_pay
-            //   at confirmation time.
+            // Apple Pay:
+            // - When the Apple Pay token is already available in the session
+            //   (server-side confirmation flow), attach it as the payment source.
+            // - Otherwise (initial wallet order from JS), do NOT send payment_source;
+            //   the token will be attached later when we recreate the order with the
+            //   token present.
             $appleWalletPayload = $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] ?? null;
 
             if (is_array($appleWalletPayload)
                 && isset($appleWalletPayload['token'])
                 && $appleWalletPayload['token'] !== ''
             ) {
-                // Very rare path - token is already known
-                $this->request['payment_source']['apple_pay'] = ['token' => $appleWalletPayload['token']];
-            } else {
-                // Indicate that this is a wallet order without sending any fields yet.
-                // JSON encoding will produce: "payment_source": {}
-                $this->request['payment_source'] = new \stdClass();
+                $this->request['payment_source']['apple_pay'] = [
+                    'token' => $appleWalletPayload['token'],
+                ];
             }
         }
         // For google_pay and venmo - do NOT include payment_source
