@@ -114,7 +114,7 @@ class PayPalCommon {
 
             // Mark the wallet as confirmed so captureWalletPayment() can run.
             $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
-            $_SESSION['PayPalRestful']['Order']['payment_source']          = $walletType;
+            $_SESSION['PayPalRestful']['Order']['payment_source'] = $walletType;
 
             $this->paymentModule->log->write(
                 "pre_confirmation_check ($walletType) completed via createOrder-only flow (no confirmPaymentSource).",
