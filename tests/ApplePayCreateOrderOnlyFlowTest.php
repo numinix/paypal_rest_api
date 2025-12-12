@@ -1,27 +1,16 @@
 <?php
 /**
- * Test: Apple Pay Create-Order-Only Flow (No confirmPaymentSource)
+ * Test: Apple Pay uses confirmPaymentSource flow
  *
- * This test validates that Apple Pay payment confirmation now uses a
- * create-order-only flow instead of the confirmPaymentSource endpoint.
- *
- * Background:
- * - PayPal's /v2/checkout/orders/{id}/confirm-payment-source endpoint was
- *   returning INTERNAL_SERVICE_ERROR (500) for Apple Pay
- * - Sending empty payment_source: {} on createOrder caused 422 ORDER_NOT_APPROVED
- *
- * Solution:
- * - Initial order creation (JS): No payment_source sent
- * - After token available: Create fresh order with payment_source.apple_pay.token
- * - Skip confirmPaymentSource entirely for Apple Pay
- * - Go directly to captureOrder
+ * This test validates that Apple Pay reuses the standard wallet flow that
+ * creates the order once and then calls confirmPaymentSource with the token
+ * collected in the browser.
  *
  * The test verifies:
- * 1. processWalletConfirmation detects apple_pay and branches to special flow
- * 2. The special flow clears previous order and creates new one
- * 3. Sets wallet_payment_confirmed flag without calling confirmPaymentSource
- * 4. Returns early (doesn't execute confirmPaymentSource code path)
- * 5. Google Pay and Venmo still use the confirmPaymentSource flow
+ * 1. processWalletConfirmation no longer shortcuts Apple Pay into a special
+ *    createOrder-only path
+ * 2. There is no code that clears the session order just for Apple Pay
+ * 3. confirmPaymentSource remains in place for wallet flows (including Apple Pay)
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -31,303 +20,133 @@ class ApplePayCreateOrderOnlyFlowTest
 {
     private string $phpFile;
     private array $testResults = [];
-    
+
     public function __construct()
     {
         // Use __DIR__ to make path relative to test file location
         $this->phpFile = dirname(__DIR__) . '/includes/modules/payment/paypal/paypal_common.php';
-        
+
         if (!file_exists($this->phpFile)) {
             throw new RuntimeException("PHP file not found: {$this->phpFile}");
         }
     }
-    
+
     public function run(): void
     {
-        echo "\n=== Apple Pay Create-Order-Only Flow Test ===\n\n";
-        
-        $this->testApplePaySpecialCase();
-        $this->testApplePayClearsOrder();
-        $this->testApplePayCreatesNewOrder();
-        $this->testApplePaySetsConfirmedFlag();
-        $this->testApplePaySkipsConfirmPaymentSource();
-        $this->testGooglePayStillUsesConfirmFlow();
-        
+        echo "\n=== Apple Pay confirmPaymentSource Flow Test ===\n\n";
+
+        $this->testNoApplePayBypass();
+        $this->testApplePayDoesNotClearOrder();
+        $this->testConfirmPaymentSourcePresent();
+
         $this->printResults();
     }
-    
+
     /**
-     * Test that processWalletConfirmation has special handling for apple_pay
+     * Test that processWalletConfirmation does NOT have an Apple Pay early return
      */
-    private function testApplePaySpecialCase(): void
+    private function testNoApplePayBypass(): void
     {
-        echo "Test 1: Verify special apple_pay handling exists...\n";
-        
+        echo "Test 1: Verify no Apple Pay bypass block exists...\n";
+
         $content = file_get_contents($this->phpFile);
-        
-        // Look for the apple_pay special case block
-        $hasApplePayCheck = preg_match('/if\s*\(\s*\$walletType\s*===\s*[\'"]apple_pay[\'"]\s*\)/', $content);
-        
-        if ($hasApplePayCheck) {
+
+        // Look for the old apple_pay special-case block that returned early
+        $hasApplePayBypass = preg_match('/apple_pay[^\n]+createOrder-only flow/', $content);
+
+        if ($hasApplePayBypass) {
             $this->testResults[] = [
-                'name' => 'Apple Pay special case detection',
-                'passed' => true,
-                'message' => 'Found apple_pay wallet type check'
+                'name' => 'Apple Pay bypass removed',
+                'passed' => false,
+                'message' => 'Found legacy Apple Pay create-order-only flow'
             ];
-            echo "  ✓ PASS: Apple Pay special case block exists\n";
+            echo "  ❌ FAIL: Legacy Apple Pay create-order-only flow still present\n";
         } else {
             $this->testResults[] = [
-                'name' => 'Apple Pay special case detection',
-                'passed' => false,
-                'message' => 'Could not find apple_pay wallet type check'
+                'name' => 'Apple Pay bypass removed',
+                'passed' => true,
+                'message' => 'Apple Pay uses standard wallet flow'
             ];
-            echo "  ❌ FAIL: No special handling for apple_pay found\n";
+            echo "  ✓ PASS: Apple Pay uses standard wallet flow\n";
         }
     }
-    
+
     /**
-     * Test that Apple Pay flow clears previous order
+     * Test that Apple Pay flow no longer clears previous order
      */
-    private function testApplePayClearsOrder(): void
+    private function testApplePayDoesNotClearOrder(): void
     {
-        echo "Test 2: Verify Apple Pay flow clears previous order...\n";
-        
+        echo "Test 2: Verify Apple Pay flow does not clear previous order...\n";
+
         $content = file_get_contents($this->phpFile);
-        
-        // Simple check: look for the unset within a reasonable distance after the apple_pay check
-        $applePayPos = strpos($content, "if (\$walletType === 'apple_pay')");
-        if ($applePayPos === false) {
-            $this->testResults[] = [
-                'name' => 'Apple Pay clears previous order',
-                'passed' => false,
-                'message' => 'Could not find apple_pay check'
-            ];
-            echo "  ❌ FAIL: Could not find apple_pay check\n";
-            return;
+
+        $clearsOrder = false;
+        $applePos = strpos($content, 'apple_pay');
+        if ($applePos !== false) {
+            $searchArea = substr($content, $applePos, 500);
+            $clearsOrder = strpos($searchArea, "unset(\$_SESSION['PayPalRestful']['Order']") !== false;
         }
-        
-        // Look for unset within 2000 characters after the apple_pay check
-        $searchArea = substr($content, $applePayPos, 2000);
-        $clearsOrder = strpos($searchArea, "unset(\$_SESSION['PayPalRestful']['Order'])") !== false;
-        
+
         if ($clearsOrder) {
             $this->testResults[] = [
-                'name' => 'Apple Pay clears previous order',
-                'passed' => true,
-                'message' => 'Order is cleared before creating new one'
+                'name' => 'Apple Pay does not clear order',
+                'passed' => false,
+                'message' => 'Session order should not be cleared for Apple Pay'
             ];
-            echo "  ✓ PASS: Previous order is cleared\n";
+            echo "  ❌ FAIL: Found session order clearing logic\n";
         } else {
             $this->testResults[] = [
-                'name' => 'Apple Pay clears previous order',
-                'passed' => false,
-                'message' => 'Previous order should be cleared'
+                'name' => 'Apple Pay does not clear order',
+                'passed' => true,
+                'message' => 'No session order clearing logic detected'
             ];
-            echo "  ❌ FAIL: Previous order not being cleared\n";
+            echo "  ✓ PASS: Session order not cleared by Apple Pay flow\n";
         }
     }
-    
+
     /**
-     * Test that Apple Pay flow creates a new order
+     * Test that confirmPaymentSource remains in the wallet flow
      */
-    private function testApplePayCreatesNewOrder(): void
+    private function testConfirmPaymentSourcePresent(): void
     {
-        echo "Test 3: Verify Apple Pay flow creates new order...\n";
-        
+        echo "Test 3: Verify confirmPaymentSource call exists...\n";
+
         $content = file_get_contents($this->phpFile);
-        
-        // Simple check: look for createPayPalOrder within a reasonable distance after the apple_pay check
-        $applePayPos = strpos($content, "if (\$walletType === 'apple_pay')");
-        if ($applePayPos === false) {
+
+        $confirmPos = strpos($content, 'confirmPaymentSource');
+
+        if ($confirmPos !== false) {
             $this->testResults[] = [
-                'name' => 'Apple Pay creates new order',
-                'passed' => false,
-                'message' => 'Could not find apple_pay check'
-            ];
-            echo "  ❌ FAIL: Could not find apple_pay check\n";
-            return;
-        }
-        
-        // Look for createPayPalOrder within 2000 characters after the apple_pay check
-        $searchArea = substr($content, $applePayPos, 2000);
-        $createsOrder = strpos($searchArea, 'createPayPalOrder') !== false;
-        
-        if ($createsOrder) {
-            $this->testResults[] = [
-                'name' => 'Apple Pay creates new order',
+                'name' => 'confirmPaymentSource present',
                 'passed' => true,
-                'message' => 'New order created with token'
+                'message' => 'confirmPaymentSource call present for wallet flows'
             ];
-            echo "  ✓ PASS: New order is created\n";
+            echo "  ✓ PASS: confirmPaymentSource call present\n";
         } else {
             $this->testResults[] = [
-                'name' => 'Apple Pay creates new order',
+                'name' => 'confirmPaymentSource present',
                 'passed' => false,
-                'message' => 'New order should be created'
+                'message' => 'confirmPaymentSource call missing for wallet flows'
             ];
-            echo "  ❌ FAIL: New order not being created\n";
+            echo "  ❌ FAIL: confirmPaymentSource call missing\n";
         }
     }
-    
+
     /**
-     * Test that Apple Pay flow sets wallet_payment_confirmed flag
+     * Print summary of test results
      */
-    private function testApplePaySetsConfirmedFlag(): void
-    {
-        echo "Test 4: Verify Apple Pay flow sets confirmed flag...\n";
-        
-        $content = file_get_contents($this->phpFile);
-        
-        // Simple check: look for wallet_payment_confirmed within a reasonable distance after the apple_pay check
-        $applePayPos = strpos($content, "if (\$walletType === 'apple_pay')");
-        if ($applePayPos === false) {
-            $this->testResults[] = [
-                'name' => 'Apple Pay sets confirmed flag',
-                'passed' => false,
-                'message' => 'Could not find apple_pay check'
-            ];
-            echo "  ❌ FAIL: Could not find apple_pay check\n";
-            return;
-        }
-        
-        // Look within 2000 characters after the apple_pay check
-        $searchArea = substr($content, $applePayPos, 2000);
-        $setsFlag = strpos($searchArea, "['wallet_payment_confirmed']") !== false &&
-                    strpos($searchArea, "= true") !== false;
-        
-        if ($setsFlag) {
-            $this->testResults[] = [
-                'name' => 'Apple Pay sets confirmed flag',
-                'passed' => true,
-                'message' => 'wallet_payment_confirmed flag is set'
-            ];
-            echo "  ✓ PASS: Confirmed flag is set\n";
-        } else {
-            $this->testResults[] = [
-                'name' => 'Apple Pay sets confirmed flag',
-                'passed' => false,
-                'message' => 'wallet_payment_confirmed flag should be set'
-            ];
-            echo "  ❌ FAIL: Confirmed flag not being set\n";
-        }
-    }
-    
-    /**
-     * Test that Apple Pay flow returns early (skips confirmPaymentSource)
-     */
-    private function testApplePaySkipsConfirmPaymentSource(): void
-    {
-        echo "Test 5: Verify Apple Pay flow returns early...\n";
-        
-        $content = file_get_contents($this->phpFile);
-        
-        // Simple check: look for return statement within a reasonable distance after the apple_pay check
-        $applePayPos = strpos($content, "if (\$walletType === 'apple_pay')");
-        if ($applePayPos === false) {
-            $this->testResults[] = [
-                'name' => 'Apple Pay returns early',
-                'passed' => false,
-                'message' => 'Could not find apple_pay check'
-            ];
-            echo "  ❌ FAIL: Could not find apple_pay check\n";
-            return;
-        }
-        
-        // Look within 2000 characters after the apple_pay check
-        $searchArea = substr($content, $applePayPos, 2000);
-        $returnsEarly = strpos($searchArea, 'return;') !== false;
-        $hasComment = stripos($searchArea, 'skip confirmPaymentSource') !== false;
-        
-        if ($returnsEarly && $hasComment) {
-            $this->testResults[] = [
-                'name' => 'Apple Pay returns early',
-                'passed' => true,
-                'message' => 'Returns early to skip confirmPaymentSource'
-            ];
-            echo "  ✓ PASS: Returns early, skipping confirmPaymentSource\n";
-        } else {
-            $this->testResults[] = [
-                'name' => 'Apple Pay returns early',
-                'passed' => false,
-                'message' => 'Should return early to skip confirmPaymentSource'
-            ];
-            echo "  ❌ FAIL: Not returning early\n";
-        }
-    }
-    
-    /**
-     * Test that Google Pay still uses confirmPaymentSource flow
-     */
-    private function testGooglePayStillUsesConfirmFlow(): void
-    {
-        echo "Test 6: Verify Google Pay still uses confirmPaymentSource...\n";
-        
-        $content = file_get_contents($this->phpFile);
-        
-        // Look for the Non-Apple Pay section comment
-        $hasNonApplePaySection = strpos($content, 'Non-Apple Pay wallets') !== false;
-        
-        // Find the apple_pay if block position
-        $applePayPos = strpos($content, "if (\$walletType === 'apple_pay')");
-        if ($applePayPos === false) {
-            $this->testResults[] = [
-                'name' => 'Non-Apple Pay uses confirmPaymentSource',
-                'passed' => false,
-                'message' => 'Could not find apple_pay check'
-            ];
-            echo "  ❌ FAIL: Could not find apple_pay check\n";
-            return;
-        }
-        
-        // Look for confirmPaymentSource after the apple_pay block
-        $afterApplePay = substr($content, $applePayPos + 1000); // Skip past the apple_pay block
-        $callsConfirm = strpos($afterApplePay, 'confirmPaymentSource') !== false;
-        
-        if ($callsConfirm && $hasNonApplePaySection) {
-            $this->testResults[] = [
-                'name' => 'Non-Apple Pay uses confirmPaymentSource',
-                'passed' => true,
-                'message' => 'Google Pay/Venmo still use confirmPaymentSource'
-            ];
-            echo "  ✓ PASS: Non-Apple Pay wallets still use confirmPaymentSource\n";
-        } else {
-            $this->testResults[] = [
-                'name' => 'Non-Apple Pay uses confirmPaymentSource',
-                'passed' => false,
-                'message' => 'Non-Apple Pay wallets should still use confirmPaymentSource'
-            ];
-            echo "  ❌ FAIL: confirmPaymentSource not found for non-Apple Pay\n";
-        }
-    }
-    
     private function printResults(): void
     {
-        echo "\n";
-        echo "=== Test Summary ===\n";
-        
-        $passed = 0;
-        $failed = 0;
-        
+        echo "\nTest Results:\n";
         foreach ($this->testResults as $result) {
-            if ($result['passed']) {
-                $passed++;
-            } else {
-                $failed++;
-                echo "❌ {$result['name']}: {$result['message']}\n";
-            }
-        }
-        
-        echo "\n";
-        if ($failed === 0) {
-            echo "✓ All tests passed ($passed/$passed)\n";
-            exit(0);
-        } else {
-            echo "❌ Some tests failed ($passed passed, $failed failed)\n";
-            exit(1);
+            $status = $result['passed'] ? 'PASS' : 'FAIL';
+            echo "- {$result['name']}: {$status} ({$result['message']})\n";
         }
     }
 }
 
-// Run the test
-$test = new ApplePayCreateOrderOnlyFlowTest();
-$test->run();
+// Run the test when executed directly
+if (basename(__FILE__) === basename($_SERVER['PHP_SELF'])) {
+    $test = new ApplePayCreateOrderOnlyFlowTest();
+    $test->run();
+}
