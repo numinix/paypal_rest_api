@@ -255,7 +255,7 @@ class ApplePayCreateOrderOnlyFlowTest
         }
     }
     
-     /**
+    /**
      * Test that Google Pay still uses confirmPaymentSource flow
      */
     private function testGooglePayStillUsesConfirmFlow(): void
