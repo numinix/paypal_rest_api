@@ -88,9 +88,28 @@ class PayPalCommon {
                 if (!isset($_SESSION['PayPalRestful']['Order'])) {
                     $_SESSION['PayPalRestful']['Order'] = [];
                 }
-                
+
                 $_SESSION['PayPalRestful']['Order']['id'] = $payload['orderID'];
-                
+
+                // Refresh the order status now that the client-side confirmation is complete
+                $order_status = $this->paymentModule->ppr->getOrderStatus($payload['orderID']);
+                if ($order_status === false) {
+                    $this->paymentModule->getErrorInfo()->copyErrorInfo($this->paymentModule->ppr->getErrorInfo());
+                    $this->paymentModule->setMessageAndRedirect($errorMessages['confirm_failed'], FILENAME_CHECKOUT_PAYMENT);
+                }
+
+                $status = $order_status['status'] ?? '';
+                if ($status !== '') {
+                    $_SESSION['PayPalRestful']['Order']['status'] = $status;
+                    $_SESSION['PayPalRestful']['Order']['current'] = $order_status;
+
+                    $this->paymentModule->log->write(
+                        "Apple Pay: Retrieved order status after client-side confirmation: $status",
+                        true,
+                        'after'
+                    );
+                }
+
                 $this->paymentModule->log->write(
                     "Apple Pay: Saved orderID from client-side confirmation: " . $payload['orderID'],
                     true,
