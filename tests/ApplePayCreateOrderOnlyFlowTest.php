@@ -1,15 +1,15 @@
 <?php
 /**
- * Test: Apple Pay uses existing order and confirmPaymentSource
+ * Test: Apple Pay uses client-side confirmation flow
  *
- * This test validates that Apple Pay reuses the order created by JavaScript
- * and only calls confirmPaymentSource (not a second createOrder).
+ * This test validates that Apple Pay now uses a different flow than other wallets:
+ * - Apple Pay: Returns early, skipping both createOrder and confirmPaymentSource (handled client-side)
+ * - Google Pay/Venmo: Create order on server, then call confirmPaymentSource
  *
  * The test verifies:
- * 1. processWalletConfirmation does NOT call createPayPalOrder for Apple Pay
- * 2. Apple Pay uses the existing order ID from the session
- * 3. confirmPaymentSource is called with the existing order for Apple Pay
- * 4. Google Pay and Venmo still create orders (different flow)
+ * 1. processWalletConfirmation returns early for Apple Pay
+ * 2. Google Pay and Venmo still create orders (different flow)
+ * 3. confirmPaymentSource is still present for non-Apple Pay wallets
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -32,9 +32,9 @@ class ApplePayCreateOrderOnlyFlowTest
 
     public function run(): void
     {
-        echo "\n=== Apple Pay Existing Order + confirmPaymentSource Test ===\n\n";
+        echo "\n=== Apple Pay Client-Side Confirmation Flow Test ===\n\n";
 
-        $this->testApplePaySkipsCreateOrder();
+        $this->testApplePayReturnsEarly();
         $this->testOtherWalletsCreateOrder();
         $this->testConfirmPaymentSourcePresent();
 
@@ -42,31 +42,31 @@ class ApplePayCreateOrderOnlyFlowTest
     }
 
     /**
-     * Test that Apple Pay skips the createPayPalOrder call
+     * Test that Apple Pay returns early without calling createPayPalOrder or confirmPaymentSource
      */
-    private function testApplePaySkipsCreateOrder(): void
+    private function testApplePayReturnsEarly(): void
     {
-        echo "Test 1: Verify Apple Pay skips createPayPalOrder...\n";
+        echo "Test 1: Verify Apple Pay returns early...\n";
 
         $content = file_get_contents($this->phpFile);
 
-        // Look for apple_pay exclusion from createPayPalOrder
-        $hasApplePayExclusion = preg_match('/if\s*\(\s*\$walletType\s*!==\s*[\'"]apple_pay[\'"]\s*\)/', $content);
+        // Look for early return for apple_pay
+        $hasApplePayEarlyReturn = preg_match("/if\s*\(\s*\\\$walletType\s*===\s*'apple_pay'\s*\)\s*\{[^}]*return;/s", $content);
 
-        if ($hasApplePayExclusion) {
+        if ($hasApplePayEarlyReturn) {
             $this->testResults[] = [
-                'name' => 'Apple Pay skips createPayPalOrder',
+                'name' => 'Apple Pay returns early',
                 'passed' => true,
-                'message' => 'Apple Pay excluded from createPayPalOrder (uses existing order from JS)'
+                'message' => 'Apple Pay returns early (client-side confirmation)'
             ];
-            echo "  ✓ PASS: Apple Pay skips createPayPalOrder\n";
+            echo "  ✓ PASS: Apple Pay returns early\n";
         } else {
             $this->testResults[] = [
-                'name' => 'Apple Pay skips createPayPalOrder',
+                'name' => 'Apple Pay returns early',
                 'passed' => false,
-                'message' => 'Apple Pay should be excluded from createPayPalOrder call'
+                'message' => 'Apple Pay should return early to skip server-side confirmation'
             ];
-            echo "  ❌ FAIL: Apple Pay exclusion not found\n";
+            echo "  ❌ FAIL: Apple Pay early return not found\n";
         }
     }
 
@@ -99,7 +99,7 @@ class ApplePayCreateOrderOnlyFlowTest
     }
 
     /**
-     * Test that confirmPaymentSource is called for all wallets
+     * Test that confirmPaymentSource is called for non-Apple Pay wallets
      */
     private function testConfirmPaymentSourcePresent(): void
     {
@@ -113,7 +113,7 @@ class ApplePayCreateOrderOnlyFlowTest
             $this->testResults[] = [
                 'name' => 'confirmPaymentSource present',
                 'passed' => true,
-                'message' => 'confirmPaymentSource called for all wallets'
+                'message' => 'confirmPaymentSource called for non-Apple Pay wallets'
             ];
             echo "  ✓ PASS: confirmPaymentSource call present\n";
         } else {

@@ -76,23 +76,37 @@ class PayPalCommon {
 
         // -----------------------------------------------------------------
         // Wallet confirmation flow:
-        // - Apple Pay: Use existing order (created by JS), skip second createOrder
+        // - Apple Pay: Confirmation is handled client-side via paypal.Applepay().confirmOrder()
+        //   Skip both createOrder and confirmPaymentSource on server
         // - Google Pay, Venmo: Create order here, then confirm
         // -----------------------------------------------------------------
-        if ($walletType !== 'apple_pay') {
-            $paypal_order_created = $this->paymentModule->createPayPalOrder($walletType);
-            if ($paypal_order_created === false) {
-                $error_info = $this->paymentModule->ppr->getErrorInfo();
-                $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
-                $this->paymentModule->sendAlertEmail(
-                    MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
-                    MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
-                );
-                $this->paymentModule->setMessageAndRedirect(
-                    sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, $errorMessages['title'], $error_code),
-                    FILENAME_CHECKOUT_PAYMENT
-                );
-            }
+        if ($walletType === 'apple_pay') {
+            // Apple Pay confirmation is handled client-side via paypal.Applepay().confirmOrder()
+            $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
+            $_SESSION['PayPalRestful']['Order']['payment_source'] = 'apple_pay';
+
+            $this->paymentModule->log->write(
+                "pre_confirmation_check (apple_pay) skipped server confirmPaymentSource; confirmed client-side.",
+                true,
+                'after'
+            );
+
+            return;
+        }
+
+        // Google Pay and Venmo: Create order on server, then confirm
+        $paypal_order_created = $this->paymentModule->createPayPalOrder($walletType);
+        if ($paypal_order_created === false) {
+            $error_info = $this->paymentModule->ppr->getErrorInfo();
+            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
+            $this->paymentModule->sendAlertEmail(
+                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
+                MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
+            );
+            $this->paymentModule->setMessageAndRedirect(
+                sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, $errorMessages['title'], $error_code),
+                FILENAME_CHECKOUT_PAYMENT
+            );
         }
 
         $confirm_response = $this->paymentModule->ppr->confirmPaymentSource(
