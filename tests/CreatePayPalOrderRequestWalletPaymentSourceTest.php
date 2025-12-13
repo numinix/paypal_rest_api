@@ -134,7 +134,19 @@ namespace {
     $_SESSION['customer_id'] = 99;
     $_SESSION['customer_first_name'] = 'Jane';
     $_SESSION['customer_last_name'] = 'Doe';
-    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = ['token' => 'test-apple-token'];
+    $applePaymentData = [
+        'data' => 'encrypted-data',
+        'signature' => 'signature',
+        'header' => ['ephemeralPublicKey' => 'abc'],
+        'version' => 'EC_v1',
+    ];
+
+    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = [
+        'token' => json_encode([
+            'paymentData' => $applePaymentData,
+            'paymentMethod' => ['type' => 'credit'],
+        ]),
+    ];
 }
 
 namespace {
@@ -185,31 +197,45 @@ namespace {
         fwrite(STDERR, "FAIL: apple_pay request with token in session SHOULD include payment_source.apple_pay\n");
         fwrite(STDERR, "  Token in session should be included in the order request.\n");
         $failures++;
-    } elseif (($payload_applepay['payment_source']['apple_pay']['token'] ?? '') !== 'test-apple-token') {
-        fwrite(STDERR, "FAIL: apple_pay payment_source.apple_pay should include token from session\n");
-        fwrite(STDERR, "  Expected 'test-apple-token' but got: " . ($payload_applepay['payment_source']['apple_pay']['token'] ?? 'undefined') . "\n");
+    } elseif ($payload_applepay['payment_source']['apple_pay']['token'] !== $applePaymentData) {
+        fwrite(STDERR, "FAIL: apple_pay payment_source.apple_pay should include paymentData token from session\n");
+        fwrite(STDERR, "  token payload: " . json_encode($payload_applepay['payment_source']['apple_pay']['token']) . "\n");
         $failures++;
     } else {
-        fwrite(STDOUT, "  ✓ apple_pay (with token): Has tokenized payment_source.apple_pay (correct behavior)\n");
+        fwrite(STDOUT, "  ✓ apple_pay (with token): Has paymentData-only payment_source.apple_pay (correct behavior)\n");
     }
 
-    // Test 2b: Apple Pay WITHOUT token in session should include empty payment_source.apple_pay
+    // Test 2a-extended: Apple Pay token stored as JSON should be decoded and flattened to paymentData
+    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = [
+        'token' => json_encode([
+            'paymentData' => array_merge($applePaymentData, ['foo' => 'bar']),
+        ]),
+    ];
+    $request_applepay_json = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
+    $payload_applepay_json = $request_applepay_json->get();
+
+    $flattenedToken = $payload_applepay_json['payment_source']['apple_pay']['token'] ?? null;
+    if (!is_array($flattenedToken) || ($flattenedToken['foo'] ?? '') !== 'bar' || ($flattenedToken['data'] ?? '') !== 'encrypted-data') {
+        fwrite(STDERR, "FAIL: apple_pay token should be decoded and flattened to paymentData before request\n");
+        fwrite(STDERR, "  token payload: " . json_encode($flattenedToken) . "\n");
+        $failures++;
+    } else {
+        fwrite(STDOUT, "  ✓ apple_pay: JSON token decoded and flattened to paymentData for createOrder (correct behavior)\n");
+    }
+
+    // Test 2b: Apple Pay WITHOUT token in session should NOT include payment_source.apple_pay
     // This simulates the initial order creation when the button is clicked but before token is available
-    // PayPal needs the wallet type declared so confirmPaymentSource works when the token arrives
+    // PayPal rejects an empty apple_pay object with MALFORMED_REQUEST_JSON, so it must be omitted
     unset($_SESSION['PayPalRestful']['WalletPayload']['apple_pay']);
     $request_applepay_no_token = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
     $payload_applepay_no_token = $request_applepay_no_token->get();
 
-    if (!isset($payload_applepay_no_token['payment_source']['apple_pay'])) {
-        fwrite(STDERR, "FAIL: apple_pay request without token should include empty payment_source.apple_pay\n");
+    if (isset($payload_applepay_no_token['payment_source']['apple_pay'])) {
+        fwrite(STDERR, "FAIL: apple_pay request without token should NOT include payment_source.apple_pay\n");
         fwrite(STDERR, "  payment_source: " . json_encode($payload_applepay_no_token['payment_source'] ?? []) . "\n");
         $failures++;
-    } elseif ($payload_applepay_no_token['payment_source']['apple_pay'] !== []) {
-        fwrite(STDERR, "FAIL: apple_pay payment_source should be an empty array when token is missing\n");
-        fwrite(STDERR, "  Found: " . json_encode($payload_applepay_no_token['payment_source']['apple_pay']) . "\n");
-        $failures++;
     } else {
-        fwrite(STDOUT, "  ✓ apple_pay (without token): Empty payment_source.apple_pay present (correct behavior)\n");
+        fwrite(STDOUT, "  ✓ apple_pay (without token): payment_source.apple_pay omitted (correct behavior)\n");
     }
     
     // Restore token for subsequent tests

@@ -159,25 +159,42 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $this->request['payment_source']['paypal'] = $this->buildPayPalPaymentSource($order);
         } elseif ($ppr_type === 'apple_pay') {
             // Apple Pay:
-            // - Declare the payment source up front so PayPal knows this order will
-            //   be paid with Apple Pay. This enables /confirm-payment-source to
-            //   succeed once the token arrives from the browser.
             // - When the Apple Pay token is already available in the session
             //   (server-side confirmation flow), attach it as the payment source.
-            // - Otherwise (initial wallet order from JS), send an empty apple_pay
-            //   object to mark the intended wallet type.
+            // - Otherwise (initial wallet order from JS), omit payment_source.apple_pay
+            //   entirely; PayPal rejects an empty apple_pay object with
+            //   MALFORMED_REQUEST_JSON.
             $appleWalletPayload = $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] ?? null;
-
-            // Default: identify Apple Pay as the payment source
-            $this->request['payment_source']['apple_pay'] = [];
 
             if (is_array($appleWalletPayload)
                 && isset($appleWalletPayload['token'])
                 && $appleWalletPayload['token'] !== ''
             ) {
-                $this->request['payment_source']['apple_pay'] = [
-                    'token' => $appleWalletPayload['token'],
-                ];
+                $token = $appleWalletPayload['token'];
+
+                // Normalize token to an array and unwrap paymentData so token contains
+                // the expected data/signature/header/version properties PayPal requires.
+                if (is_string($token)) {
+                    $decodedToken = json_decode($token, true);
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        $this->log->write("Apple Pay: Token string is not valid JSON; omitting payment_source.apple_pay.", true, 'after');
+                        $token = '';
+                    } else {
+                        $token = $decodedToken;
+                    }
+                }
+
+                if (is_array($token) && isset($token['paymentData']) && is_array($token['paymentData'])) {
+                    $token = $token['paymentData'];
+                }
+
+                if (is_array($token) && isset($token['data'], $token['signature'], $token['header'], $token['version'])) {
+                    $this->request['payment_source']['apple_pay'] = [
+                        'token' => $token,
+                    ];
+                } elseif ($token !== '') {
+                    $this->log->write("Apple Pay: Token payload missing required fields; omitting payment_source.apple_pay.", true, 'after');
+                }
             }
         }
         // For google_pay and venmo - do NOT include payment_source

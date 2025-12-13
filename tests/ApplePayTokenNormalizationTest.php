@@ -58,13 +58,18 @@ $paymentModule = new StubPaymentModule();
 $common = new PayPalCommonWrapper($paymentModule);
 
 // Test 1: Token normalization
+$applePaymentData = [
+    'data' => 'encrypted-data',
+    'signature' => 'signature',
+    'header' => ['ephemeralPublicKey' => 'abc'],
+    'version' => 'EC_v1',
+];
+
 $applePayload = [
     'orderID' => 'TEST-ORDER-ID',
     'token' => [
-        'paymentData' => [
-            'data' => 'encrypted-data',
-            'signature' => 'signature',
-        ],
+        'paymentData' => $applePaymentData,
+        'paymentMethod' => ['type' => 'credit'],
     ],
     'wallet' => 'apple_pay',
 ];
@@ -79,20 +84,18 @@ if (!is_string($normalizedPayload['token'])) {
     fwrite(STDOUT, "✓ Apple Pay token normalized to JSON string\n");
 }
 
-if ($normalizedPayload['token'] !== json_encode($applePayload['token'])) {
-    fwrite(STDERR, "FAIL: Apple Pay token JSON does not match original payload\n");
+if ($normalizedPayload['token'] !== json_encode($applePaymentData)) {
+    fwrite(STDERR, "FAIL: Apple Pay token JSON should encode paymentData only\n");
     $failures++;
 } else {
-    fwrite(STDOUT, "✓ Apple Pay token matches JSON encoding of payload\n");
+    fwrite(STDOUT, "✓ Apple Pay token encodes paymentData payload\n");
 }
 
 // Test 2: Only token field should be present (no contact fields)
 $applePayloadWithContacts = [
     'orderID' => 'TEST-ORDER-ID',
     'token' => [
-        'paymentData' => [
-            'data' => 'encrypted-data',
-        ],
+        'paymentData' => $applePaymentData,
     ],
     'wallet' => 'apple_pay',
     'billing_contact' => [
