@@ -172,19 +172,29 @@ class CreatePayPalOrderRequest extends ErrorInfo
             ) {
                 $token = $appleWalletPayload['token'];
 
-                // PayPal expects the Apple Pay token as a structured object.
-                // If the token was stored in the session as a JSON string, decode
-                // it before building the payment_source to avoid 500 errors.
+                // Normalize token to an array and unwrap paymentData so token contains
+                // the expected data/signature/header/version properties PayPal requires.
                 if (is_string($token)) {
                     $decodedToken = json_decode($token, true);
-                    if (json_last_error() === JSON_ERROR_NONE && is_array($decodedToken)) {
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        $this->log->write("Apple Pay: Token string is not valid JSON; omitting payment_source.apple_pay.", true, 'after');
+                        $token = '';
+                    } else {
                         $token = $decodedToken;
                     }
                 }
 
-                $this->request['payment_source']['apple_pay'] = [
-                    'token' => $token,
-                ];
+                if (is_array($token) && isset($token['paymentData']) && is_array($token['paymentData'])) {
+                    $token = $token['paymentData'];
+                }
+
+                if (is_array($token) && isset($token['data'], $token['signature'], $token['header'], $token['version'])) {
+                    $this->request['payment_source']['apple_pay'] = [
+                        'token' => $token,
+                    ];
+                } elseif ($token !== '') {
+                    $this->log->write("Apple Pay: Token payload missing required fields; omitting payment_source.apple_pay.", true, 'after');
+                }
             }
         }
         // For google_pay and venmo - do NOT include payment_source

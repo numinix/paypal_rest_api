@@ -134,7 +134,19 @@ namespace {
     $_SESSION['customer_id'] = 99;
     $_SESSION['customer_first_name'] = 'Jane';
     $_SESSION['customer_last_name'] = 'Doe';
-    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = ['token' => 'test-apple-token'];
+    $applePaymentData = [
+        'data' => 'encrypted-data',
+        'signature' => 'signature',
+        'header' => ['ephemeralPublicKey' => 'abc'],
+        'version' => 'EC_v1',
+    ];
+
+    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = [
+        'token' => json_encode([
+            'paymentData' => $applePaymentData,
+            'paymentMethod' => ['type' => 'credit'],
+        ]),
+    ];
 }
 
 namespace {
@@ -185,26 +197,30 @@ namespace {
         fwrite(STDERR, "FAIL: apple_pay request with token in session SHOULD include payment_source.apple_pay\n");
         fwrite(STDERR, "  Token in session should be included in the order request.\n");
         $failures++;
-    } elseif (($payload_applepay['payment_source']['apple_pay']['token'] ?? '') !== 'test-apple-token') {
-        fwrite(STDERR, "FAIL: apple_pay payment_source.apple_pay should include token from session\n");
-        fwrite(STDERR, "  Expected 'test-apple-token' but got: " . ($payload_applepay['payment_source']['apple_pay']['token'] ?? 'undefined') . "\n");
+    } elseif ($payload_applepay['payment_source']['apple_pay']['token'] !== $applePaymentData) {
+        fwrite(STDERR, "FAIL: apple_pay payment_source.apple_pay should include paymentData token from session\n");
+        fwrite(STDERR, "  token payload: " . json_encode($payload_applepay['payment_source']['apple_pay']['token']) . "\n");
         $failures++;
     } else {
-        fwrite(STDOUT, "  ✓ apple_pay (with token): Has tokenized payment_source.apple_pay (correct behavior)\n");
+        fwrite(STDOUT, "  ✓ apple_pay (with token): Has paymentData-only payment_source.apple_pay (correct behavior)\n");
     }
 
-    // Test 2a-extended: Apple Pay token stored as JSON should be decoded before sending
-    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = ['token' => json_encode(['foo' => 'bar', 'nested' => ['baz' => 1]])];
-    $request_applepay_decoded = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
-    $payload_applepay_decoded = $request_applepay_decoded->get();
+    // Test 2a-extended: Apple Pay token stored as JSON should be decoded and flattened to paymentData
+    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = [
+        'token' => json_encode([
+            'paymentData' => array_merge($applePaymentData, ['foo' => 'bar']),
+        ]),
+    ];
+    $request_applepay_json = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
+    $payload_applepay_json = $request_applepay_json->get();
 
-    $decodedToken = $payload_applepay_decoded['payment_source']['apple_pay']['token'] ?? null;
-    if (!is_array($decodedToken) || $decodedToken['foo'] !== 'bar' || ($decodedToken['nested']['baz'] ?? null) !== 1) {
-        fwrite(STDERR, "FAIL: apple_pay JSON token should be decoded into structured array before request\n");
-        fwrite(STDERR, "  token payload: " . json_encode($decodedToken) . "\n");
+    $flattenedToken = $payload_applepay_json['payment_source']['apple_pay']['token'] ?? null;
+    if (!is_array($flattenedToken) || ($flattenedToken['foo'] ?? '') !== 'bar' || ($flattenedToken['data'] ?? '') !== 'encrypted-data') {
+        fwrite(STDERR, "FAIL: apple_pay token should be decoded and flattened to paymentData before request\n");
+        fwrite(STDERR, "  token payload: " . json_encode($flattenedToken) . "\n");
         $failures++;
     } else {
-        fwrite(STDOUT, "  ✓ apple_pay: JSON token decoded into structured payload (correct behavior)\n");
+        fwrite(STDOUT, "  ✓ apple_pay: JSON token decoded and flattened to paymentData for createOrder (correct behavior)\n");
     }
 
     // Test 2b: Apple Pay WITHOUT token in session should NOT include payment_source.apple_pay

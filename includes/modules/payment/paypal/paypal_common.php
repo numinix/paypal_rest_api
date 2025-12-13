@@ -157,9 +157,43 @@ class PayPalCommon {
     protected function normalizeWalletPayload(string $walletType, array $payload, array $errorMessages): array
     {
         if ($walletType === 'apple_pay') {
-            // Convert token from array to JSON string
-            if (isset($payload['token']) && is_array($payload['token'])) {
-                $encodedToken = json_encode($payload['token']);
+            // For Apple Pay confirmPaymentSource, PayPal only accepts the token field.
+            // Contact information (name, email, billing_address) should NOT be included
+            // in the payment_source as PayPal rejects them with MALFORMED_REQUEST_JSON.
+            // The contact info is already in the order from createOrder.
+
+            if (isset($payload['token'])) {
+                $token = $payload['token'];
+
+                if (is_string($token)) {
+                    $decodedToken = json_decode($token, true);
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        $this->paymentModule->log->write(
+                            "Apple Pay: Token string is not valid JSON.",
+                            true,
+                            'after'
+                        );
+                        $this->paymentModule->setMessageAndRedirect($errorMessages['payload_invalid'], FILENAME_CHECKOUT_PAYMENT);
+                    }
+
+                    $token = $decodedToken;
+                }
+
+                if (is_array($token) && isset($token['paymentData']) && is_array($token['paymentData'])) {
+                    $token = $token['paymentData'];
+                }
+
+                if (!is_array($token) || !isset($token['data'], $token['signature'], $token['header'], $token['version'])) {
+                    $this->paymentModule->log->write(
+                        "Apple Pay: Token payload missing required fields.",
+                        true,
+                        'after'
+                    );
+                    $this->paymentModule->setMessageAndRedirect($errorMessages['payload_invalid'], FILENAME_CHECKOUT_PAYMENT);
+                }
+
+                // Encode token to JSON string for confirmPaymentSource
+                $encodedToken = json_encode($token);
                 if ($encodedToken === false) {
                     $jsonError = function_exists('json_last_error_msg') ? json_last_error_msg() : 'unknown error';
                     $this->paymentModule->log->write(
@@ -173,11 +207,6 @@ class PayPalCommon {
                 $payload['token'] = $encodedToken;
             }
 
-            // For Apple Pay confirmPaymentSource, PayPal only accepts the token field.
-            // Contact information (name, email, billing_address) should NOT be included
-            // in the payment_source as PayPal rejects them with MALFORMED_REQUEST_JSON.
-            // The contact info is already in the order from createOrder.
-            
             // Validate token is present
             if (!isset($payload['token']) || $payload['token'] === '') {
                 $this->paymentModule->log->write(
@@ -187,7 +216,7 @@ class PayPalCommon {
                 );
                 $this->paymentModule->setMessageAndRedirect($errorMessages['payload_invalid'], FILENAME_CHECKOUT_PAYMENT);
             }
-            
+
             // Return only the token field
             return ['token' => $payload['token']];
         }

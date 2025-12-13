@@ -10,7 +10,7 @@ Creating the order without the token available meant we either left out the paym
 
 ## The Fix
 
-Updated the order creation to only include `payment_source.apple_pay` when the token is already present, and to omit it entirely when the token is not yet available. When present, the token is decoded from its JSON string into a structured payload before sending to PayPal, preventing 500 errors caused by a stringified token. The order GUID now incorporates the Apple Pay token (when present) so a new PayPal order is created once the token arrives instead of reusing a tokenless order that cannot be confirmed:
+Updated the order creation to only include `payment_source.apple_pay` when the token is already present, and to omit it entirely when the token is not yet available. When present, the token is normalized to the required payment data shape (unwrapping `paymentData` so the token field directly contains `data`, `signature`, `header`, `version`) and validated before sending to PayPal. The order GUID now incorporates the Apple Pay token (when present) so a new PayPal order is created once the token arrives instead of reusing a tokenless order that cannot be confirmed:
 
 ```json
 {
@@ -28,7 +28,7 @@ This avoids the malformed JSON error while still attaching the token when availa
 
 **File**: `includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php`
 
-**Change**: Added a new condition to include the Apple Pay payment source only when the token is present (otherwise omit it) and decode JSON-formatted tokens before sending:
+**Change**: Added a new condition to include the Apple Pay payment source only when the token is present (otherwise omit it), unwrap `paymentData` so the token contains the required fields, and validate the payload before sending:
 
 ```php
 } elseif ($ppr_type === 'apple_pay') {
@@ -36,12 +36,14 @@ This avoids the malformed JSON error while still attaching the token when availa
     if (is_array($appleWalletPayload) && isset($appleWalletPayload['token']) && $appleWalletPayload['token'] !== '') {
         $token = $appleWalletPayload['token'];
         if (is_string($token)) {
-            $decodedToken = json_decode($token, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedToken)) {
-                $token = $decodedToken;
-            }
+            $token = json_decode($token, true);
         }
-        $this->request['payment_source']['apple_pay'] = ['token' => $token];
+        if (is_array($token) && isset($token['paymentData'])) {
+            $token = $token['paymentData'];
+        }
+        if (is_array($token) && isset($token['data'], $token['signature'], $token['header'], $token['version'])) {
+            $this->request['payment_source']['apple_pay'] = ['token' => $token];
+        }
     }
 }
 ```
@@ -52,12 +54,13 @@ PayPal's Advanced Integration for Apple Pay uses a two-step flow:
 
 **Step 1: Create Order** (what we fixed)
 - Server creates order without `payment_source.apple_pay` unless the token is already available
+- When the token exists, it is validated/unwrapped to payment data fields and included
 - PayPal initializes order and returns order ID without rejecting malformed wallet data
 
 **Step 2: Confirm Payment** (already working correctly)
 - User authorizes payment in Apple Pay modal
 - Browser sends encrypted token to server
-- Server calls `confirmPaymentSource` with the token
+- Server calls `confirmPaymentSource` with the token (JSON-encoded payment data)
 - PayPal processes the payment
 
 Without Step 1 properly indicating Apple Pay, Step 2 fails with 500 error.
@@ -104,6 +107,7 @@ To verify the fix works in your environment:
 
 1. `includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php` - Main fix
 2. `tests/CreatePayPalOrderRequestWalletPaymentSourceTest.php` - Updated test
+3. `tests/ApplePayTokenNormalizationTest.php` - Validates paymentData unwrapping/encoding
 3. `docs/APPLE_PAY_500_ERROR_FIX.md` - Detailed documentation
 
 ## Related Documentation
