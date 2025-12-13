@@ -194,7 +194,7 @@ class PayPalCommon {
             // After client-side confirmOrder(), the payload contains: {orderID, wallet, confirmed: true}
             if (isset($payload['confirmed']) && $payload['confirmed'] === true && isset($payload['orderID'])) {
                 // This payload is from client-side confirmation - just return it as-is
-                // The orderID will be saved to the session in processWalletConfirmation
+                // The caller (processWalletConfirmation) will save the orderID to the session
                 return $payload;
             }
 
