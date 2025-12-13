@@ -710,7 +710,7 @@
             orderPromise.then(function (config) {
                 console.log('[Apple Pay] Order creation completed, config:', config);
                 
-                if (!config || config.success === false) {
+                if (!config || config.success === false || !config.orderID) {
                     console.error('[Apple Pay] Failed to create PayPal order for Apple Pay', config);
                     session.completePayment(ApplePaySession.STATUS_FAILURE);
                     setApplePayPayload({});
@@ -720,10 +720,14 @@
                     return;
                 }
 
-                // Validate amount is present and not an empty string
-                // Note: We allow '0' or '0.00' as valid amounts (e.g., for free orders with coupons)
-                if (config.amount === undefined || config.amount === null || config.amount === '') {
-                    console.error('[Apple Pay] Order created but amount is missing or empty', config);
+                // Store order data
+                orderConfig = config;
+                orderId = config.orderID;
+                sdkState.config = config;
+                
+                // Check if PayPal Applepay.confirmOrder is available
+                if (!sdkState.applepay || typeof sdkState.applepay.confirmOrder !== 'function') {
+                    console.error('[Apple Pay] PayPal Applepay.confirmOrder not available');
                     session.completePayment(ApplePaySession.STATUS_FAILURE);
                     setApplePayPayload({});
                     if (typeof window.oprcHideProcessingOverlay === 'function') {
@@ -732,43 +736,39 @@
                     return;
                 }
 
-                console.log('[Apple Pay] Order validation passed, orderID:', config.orderID, 'amount:', config.amount);
+                console.log('[Apple Pay] Calling paypal.Applepay().confirmOrder...', orderId);
 
-                // Store order data
-                orderConfig = config;
-                orderId = config.orderID;
-                sdkState.config = config;
-                
-                console.log('[Apple Pay] Order created successfully, completing Apple Pay session');
-                console.log('[Apple Pay] Payment token:', event.payment.token);
-                console.log('[Apple Pay] Billing contact:', event.payment.billingContact);
-                console.log('[Apple Pay] Shipping contact:', event.payment.shippingContact);
-
-                // Complete the Apple Pay session with success
-                // Similar to Braintree's approach: complete the session first, then submit the form with payment data
-                // The server will confirm the payment source using the token and contacts
-                session.completePayment(ApplePaySession.STATUS_SUCCESS);
-
-                // Build the payload with the payment token and contact information
-                // The server-side confirmPaymentSource API call will use this data
-                // Only include contacts if they are actually provided (not undefined/null)
-                var payload = {
-                    orderID: orderId,
+                // Confirm the order using PayPal's client-side API
+                // This handles the Apple Pay token and device context properly
+                return sdkState.applepay.confirmOrder({
+                    orderId: orderId,
                     token: event.payment.token,
-                    wallet: 'apple_pay'
-                };
-                
-                if (event.payment.billingContact) {
-                    payload.billing_contact = event.payment.billingContact;
-                }
-                
-                if (event.payment.shippingContact) {
-                    payload.shipping_contact = event.payment.shippingContact;
-                }
-                
-                console.log('[Apple Pay] Setting payload and submitting form');
-                setApplePayPayload(payload);
-                document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
+                    billingContact: event.payment.billingContact || null,
+                    shippingContact: event.payment.shippingContact || null
+                }).then(function (confirmResult) {
+                    console.log('[Apple Pay] confirmOrder result:', confirmResult);
+
+                    // Only now do we tell Apple Pay the payment succeeded
+                    session.completePayment(ApplePaySession.STATUS_SUCCESS);
+
+                    // Server no longer needs the token; it just needs to proceed with authorize/capture on this orderID
+                    var payload = {
+                        orderID: orderId,
+                        wallet: 'apple_pay',
+                        confirmed: true
+                    };
+
+                    console.log('[Apple Pay] Setting payload and submitting form');
+                    setApplePayPayload(payload);
+                    document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
+                }).catch(function (err) {
+                    console.error('[Apple Pay] confirmOrder failed:', err);
+                    session.completePayment(ApplePaySession.STATUS_FAILURE);
+                    setApplePayPayload({});
+                    if (typeof window.oprcHideProcessingOverlay === 'function') {
+                        window.oprcHideProcessingOverlay();
+                    }
+                });
             }).catch(function (error) {
                 console.error('[Apple Pay] Order creation failed', error);
                 session.completePayment(ApplePaySession.STATUS_FAILURE);

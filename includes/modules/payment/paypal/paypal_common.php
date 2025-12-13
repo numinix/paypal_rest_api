@@ -76,9 +76,24 @@ class PayPalCommon {
 
         // -----------------------------------------------------------------
         // Wallet confirmation flow:
-        // - Apple Pay: Use existing order (created by JS), skip second createOrder
+        // - Apple Pay: Confirmation is handled client-side via paypal.Applepay().confirmOrder()
+        //   Skip both createOrder and confirmPaymentSource on server
         // - Google Pay, Venmo: Create order here, then confirm
         // -----------------------------------------------------------------
+        if ($walletType === 'apple_pay') {
+            // Apple Pay confirmation is handled client-side via paypal.Applepay().confirmOrder()
+            $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
+            $_SESSION['PayPalRestful']['Order']['payment_source'] = 'apple_pay';
+
+            $this->paymentModule->log->write(
+                "pre_confirmation_check (apple_pay) skipped server confirmPaymentSource; confirmed client-side.",
+                true,
+                'after'
+            );
+
+            return;
+        }
+
         if ($walletType !== 'apple_pay') {
             $paypal_order_created = $this->paymentModule->createPayPalOrder($walletType);
             if ($paypal_order_created === false) {

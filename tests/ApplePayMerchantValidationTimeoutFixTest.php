@@ -125,13 +125,13 @@ if (preg_match($onpaymentPattern, $clickHandlerBody, $onpaymentMatches)) {
         echo "  ✗ orderPromise is NOT assigned in onpaymentauthorized\n";
     }
     
-    // Verify confirmOrder is NOT called (server-side confirmation pattern)
-    if (strpos($onpaymentBody, 'confirmOrder') === false) {
-        echo "  ✓ confirmOrder is not called (server-side confirmation)\n";
+    // Verify confirmOrder IS called (client-side confirmation pattern)
+    if (strpos($onpaymentBody, 'confirmOrder') !== false) {
+        echo "  ✓ confirmOrder is called (client-side confirmation as required by PayPal)\n";
     } else {
         $testPassed = false;
-        $errors[] = "confirmOrder should NOT be called in onpaymentauthorized (server handles confirmation)";
-        echo "  ✗ confirmOrder is called (should use server-side confirmation)\n";
+        $errors[] = "confirmOrder should be called in onpaymentauthorized (client-side confirmation)";
+        echo "  ✗ confirmOrder is NOT called (should use client-side confirmation)\n";
     }
 } else {
     $testPassed = false;
