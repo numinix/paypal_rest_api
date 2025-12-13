@@ -664,24 +664,42 @@ class PayPalCommon {
 
     /**
      * Common captureOrAuthorizePayment method for wallet modules
-     * Wallet modules always use capture (final sale)
+     * Determines whether to capture or authorize based on transaction mode
      *
      * @param PayPalRestfulApi $ppr PayPal REST API instance
      * @param Logger $log Logger instance
      * @param string $payment_source Payment source name (e.g., 'google_pay')
+     * @param string $transaction_mode Transaction mode (Final Sale, Auth Only, etc.)
+     * @param string $ppr_type Payment type (e.g., 'apple_pay', 'google_pay', 'venmo')
      * @return array|false
      */
-    public function captureWalletPayment(PayPalRestfulApi $ppr, Logger $log, string $payment_source)
+    public function captureWalletPayment(PayPalRestfulApi $ppr, Logger $log, string $payment_source, string $transaction_mode, string $ppr_type)
     {
         $paypal_order_id = $_SESSION['PayPalRestful']['Order']['id'];
         
-        // Wallets always use capture (final sale)
-        $response = $ppr->captureOrder($paypal_order_id);
+        // Determine if we should capture or authorize based on transaction mode
+        // For wallets, "Auth Only (Card-Only)" should still use capture since wallet != card
+        $should_capture = ($transaction_mode === 'Final Sale' ||
+                          ($ppr_type !== 'card' && $transaction_mode === 'Auth Only (Card-Only)'));
+        
+        $log->write("$payment_source: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
 
-        if ($response === false) {
-            $log->write($payment_source . ': capture failed. ' . Logger::logJSON($ppr->getErrorInfo()));
-            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
-            return false;
+        if ($should_capture) {
+            $response = $ppr->captureOrder($paypal_order_id);
+            if ($response === false) {
+                $log->write($payment_source . ': capture failed. ' . Logger::logJSON($ppr->getErrorInfo()));
+                unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+                return false;
+            }
+            $log->write("$payment_source: CAPTURE successful. Status: " . ($response['status'] ?? 'unknown'));
+        } else {
+            $response = $ppr->authorizeOrder($paypal_order_id);
+            if ($response === false) {
+                $log->write($payment_source . ': authorization failed. ' . Logger::logJSON($ppr->getErrorInfo()));
+                unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+                return false;
+            }
+            $log->write("$payment_source: AUTHORIZATION successful. Status: " . ($response['status'] ?? 'unknown'));
         }
 
         return $response;

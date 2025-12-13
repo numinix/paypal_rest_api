@@ -662,7 +662,13 @@ class paypalr_applepay extends base
 
     protected function captureOrAuthorizePayment(string $payment_source): array
     {
-        $response = $this->paypalCommon->captureWalletPayment($this->ppr, $this->log, 'Apple Pay');
+        $response = $this->paypalCommon->captureWalletPayment(
+            $this->ppr, 
+            $this->log, 
+            'Apple Pay',
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE,
+            'apple_pay'
+        );
         
         if ($response === false) {
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_CAPTURE_FAILED ?? 'Capture failed', FILENAME_CHECKOUT_PAYMENT);

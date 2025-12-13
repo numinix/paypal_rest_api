@@ -688,7 +688,13 @@ class paypalr_venmo extends base
 
     protected function captureOrAuthorizePayment(string $payment_source): array
     {
-        $response = $this->paypalCommon->captureWalletPayment($this->ppr, $this->log, 'Venmo');
+        $response = $this->paypalCommon->captureWalletPayment(
+            $this->ppr, 
+            $this->log, 
+            'Venmo',
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE,
+            'venmo'
+        );
         
         if ($response === false) {
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_CAPTURE_FAILED ?? 'Capture failed', FILENAME_CHECKOUT_PAYMENT);
