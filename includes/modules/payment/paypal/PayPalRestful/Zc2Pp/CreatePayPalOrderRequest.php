@@ -159,12 +159,17 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $this->request['payment_source']['paypal'] = $this->buildPayPalPaymentSource($order);
         } elseif ($ppr_type === 'apple_pay') {
             // Apple Pay:
+            // - Declare the payment source up front so PayPal knows this order will
+            //   be paid with Apple Pay. This enables /confirm-payment-source to
+            //   succeed once the token arrives from the browser.
             // - When the Apple Pay token is already available in the session
             //   (server-side confirmation flow), attach it as the payment source.
-            // - Otherwise (initial wallet order from JS), do NOT send payment_source;
-            //   the token will be attached later when we recreate the order with the
-            //   token present.
+            // - Otherwise (initial wallet order from JS), send an empty apple_pay
+            //   object to mark the intended wallet type.
             $appleWalletPayload = $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] ?? null;
+
+            // Default: identify Apple Pay as the payment source
+            $this->request['payment_source']['apple_pay'] = [];
 
             if (is_array($appleWalletPayload)
                 && isset($appleWalletPayload['token'])
