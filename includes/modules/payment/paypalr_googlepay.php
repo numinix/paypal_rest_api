@@ -681,7 +681,13 @@ class paypalr_googlepay extends base
 
     protected function captureOrAuthorizePayment(string $payment_source): array
     {
-        $response = $this->paypalCommon->captureWalletPayment($this->ppr, $this->log, 'Google Pay');
+        $response = $this->paypalCommon->captureWalletPayment(
+            $this->ppr, 
+            $this->log, 
+            'Google Pay',
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE,
+            'google_pay'
+        );
         
         if ($response === false) {
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_CAPTURE_FAILED ?? 'Capture failed', FILENAME_CHECKOUT_PAYMENT);
