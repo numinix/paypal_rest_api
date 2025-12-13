@@ -82,6 +82,22 @@ class PayPalCommon {
         // -----------------------------------------------------------------
         if ($walletType === 'apple_pay') {
             // Apple Pay confirmation is handled client-side via paypal.Applepay().confirmOrder()
+            // Save the orderID from the client-side confirmed payload
+            if (isset($payload['orderID']) && !empty($payload['orderID'])) {
+                // Ensure the session Order array exists
+                if (!isset($_SESSION['PayPalRestful']['Order'])) {
+                    $_SESSION['PayPalRestful']['Order'] = [];
+                }
+                
+                $_SESSION['PayPalRestful']['Order']['id'] = $payload['orderID'];
+                
+                $this->paymentModule->log->write(
+                    "Apple Pay: Saved orderID from client-side confirmation: " . $payload['orderID'],
+                    true,
+                    'after'
+                );
+            }
+            
             $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
             $_SESSION['PayPalRestful']['Order']['payment_source'] = 'apple_pay';
 
@@ -174,6 +190,14 @@ class PayPalCommon {
     protected function normalizeWalletPayload(string $walletType, array $payload, array $errorMessages): array
     {
         if ($walletType === 'apple_pay') {
+            // Check if this is a client-side confirmed payload
+            // After client-side confirmOrder(), the payload contains: {orderID, wallet, confirmed: true}
+            if (isset($payload['confirmed']) && $payload['confirmed'] === true && isset($payload['orderID'])) {
+                // This payload is from client-side confirmation - just return it as-is
+                // The orderID will be saved to the session in processWalletConfirmation
+                return $payload;
+            }
+
             // For Apple Pay confirmPaymentSource, PayPal only accepts the token field.
             // Contact information (name, email, billing_address) should NOT be included
             // in the payment_source as PayPal rejects them with MALFORMED_REQUEST_JSON.
