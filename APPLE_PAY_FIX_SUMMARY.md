@@ -10,7 +10,7 @@ Creating the order without the token available meant we either left out the paym
 
 ## The Fix
 
-Updated the order creation to only include `payment_source.apple_pay` when the token is already present, and to omit it entirely when the token is not yet available:
+Updated the order creation to only include `payment_source.apple_pay` when the token is already present, and to omit it entirely when the token is not yet available. The order GUID now incorporates the Apple Pay token (when present) so a new PayPal order is created once the token arrives instead of reusing a tokenless order that cannot be confirmed:
 
 ```json
 {
@@ -22,7 +22,7 @@ Updated the order creation to only include `payment_source.apple_pay` when the t
 }
 ```
 
-This avoids the malformed JSON error while still attaching the token when available so `confirmPaymentSource` continues to work.
+This avoids the malformed JSON error while still attaching the token when available so `confirmPaymentSource` continues to work, and forces order recreation when the token value changes.
 
 ## Code Changed
 
