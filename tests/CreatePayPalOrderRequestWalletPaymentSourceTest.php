@@ -1,15 +1,17 @@
 <?php
 /**
  * Test to verify wallet payment types have correct payment_source handling:
- * - Apple Pay: Include payment_source.apple_pay with token ONLY when token is available in session
+ * - Apple Pay: Include payment_source.apple_pay with token as JSON STRING when token is available in session
  *              When token is not available, do NOT send payment_source (the order will be 
  *              recreated with the token during server-side processWalletConfirmation)
+ *              Token must be a JSON string, not an array, to avoid PayPal MALFORMED_REQUEST_JSON error
  * - Google Pay, Venmo: Do NOT include payment_source (SDK handles it)
  * - Card, PayPal: Include full payment_source details
  *
- * Apple Pay flow (UPDATED in fix for 422/500 errors):
+ * Apple Pay flow (UPDATED to fix MALFORMED_REQUEST_JSON error):
  * 1. Initial order creation (button click): No token in session -> NO payment_source
- * 2. Server-side confirmation: Token available -> recreate order with payment_source.apple_pay.token
+ * 2. Server-side confirmation: Token available -> recreate order with payment_source.apple_pay.token (as JSON string)
+ * 3. Skip confirmPaymentSource for Apple Pay (avoids PayPal 500 INTERNAL_SERVICE_ERROR)
  */
 declare(strict_types=1);
 
