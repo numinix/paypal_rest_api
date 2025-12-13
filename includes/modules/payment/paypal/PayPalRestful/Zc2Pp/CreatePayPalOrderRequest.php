@@ -159,24 +159,31 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $this->request['payment_source']['paypal'] = $this->buildPayPalPaymentSource($order);
         } elseif ($ppr_type === 'apple_pay') {
             // Apple Pay:
-            // - Declare the payment source up front so PayPal knows this order will
-            //   be paid with Apple Pay. This enables /confirm-payment-source to
-            //   succeed once the token arrives from the browser.
             // - When the Apple Pay token is already available in the session
             //   (server-side confirmation flow), attach it as the payment source.
-            // - Otherwise (initial wallet order from JS), send an empty apple_pay
-            //   object to mark the intended wallet type.
+            // - Otherwise (initial wallet order from JS), omit payment_source.apple_pay
+            //   entirely; PayPal rejects an empty apple_pay object with
+            //   MALFORMED_REQUEST_JSON.
             $appleWalletPayload = $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] ?? null;
-
-            // Default: identify Apple Pay as the payment source
-            $this->request['payment_source']['apple_pay'] = [];
 
             if (is_array($appleWalletPayload)
                 && isset($appleWalletPayload['token'])
                 && $appleWalletPayload['token'] !== ''
             ) {
+                $token = $appleWalletPayload['token'];
+
+                // PayPal expects the Apple Pay token as a structured object.
+                // If the token was stored in the session as a JSON string, decode
+                // it before building the payment_source to avoid 500 errors.
+                if (is_string($token)) {
+                    $decodedToken = json_decode($token, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decodedToken)) {
+                        $token = $decodedToken;
+                    }
+                }
+
                 $this->request['payment_source']['apple_pay'] = [
-                    'token' => $appleWalletPayload['token'],
+                    'token' => $token,
                 ];
             }
         }

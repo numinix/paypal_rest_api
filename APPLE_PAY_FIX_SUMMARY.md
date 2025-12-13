@@ -2,53 +2,47 @@
 
 ## Problem Solved
 
-Apple Pay payments were failing with `INTERNAL_SERVER_ERROR` (500) when calling PayPal's `confirmPaymentSource` API. Users would complete the Apple Pay authorization, but then be redirected back to checkout instead of proceeding to success.
+Apple Pay payments were failing during the order creation/confirmation handoff. An earlier workaround added an empty `payment_source.apple_pay` object so `confirmPaymentSource` would know the intended wallet, but PayPal now rejects empty wallet objects with `MALFORMED_REQUEST_JSON`.
 
 ## What Was Wrong
 
-The code was creating PayPal orders for Apple Pay **without** any `payment_source` field:
-
-```json
-{
-    "intent": "AUTHORIZE",
-    "purchase_units": [...]
-    // NO payment_source - this was the problem!
-}
-```
-
-When the server later tried to call `confirmPaymentSource` with the Apple Pay token, PayPal returned a 500 error because it didn't know the order was supposed to be for Apple Pay.
+Creating the order without the token available meant we either left out the payment source entirely or sent an **empty** `payment_source.apple_pay` object. The latter now triggers `MALFORMED_REQUEST_JSON` from PayPal.
 
 ## The Fix
 
-Updated the order creation to include an **empty** `payment_source.apple_pay` object:
+Updated the order creation to only include `payment_source.apple_pay` when the token is already present, and to omit it entirely when the token is not yet available. When present, the token is decoded from its JSON string into a structured payload before sending to PayPal, preventing 500 errors caused by a stringified token. The order GUID now incorporates the Apple Pay token (when present) so a new PayPal order is created once the token arrives instead of reusing a tokenless order that cannot be confirmed:
 
 ```json
 {
     "intent": "AUTHORIZE",
     "purchase_units": [...],
     "payment_source": {
-        "apple_pay": {}  // <-- This tells PayPal to expect Apple Pay
+        "apple_pay": { "token": { ... } }  // Only when the token is available server-side
     }
 }
 ```
 
-This signals to PayPal:
-1. "This order will be paid with Apple Pay"
-2. "I'll send you the payment token later via confirmPaymentSource"
-3. "Please initialize the order accordingly"
+This avoids the malformed JSON error while still attaching the token when available so `confirmPaymentSource` continues to work, and forces order recreation when the token value changes.
 
 ## Code Changed
 
 **File**: `includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php`
 
-**Change**: Added a new condition to include empty payment_source for Apple Pay:
+**Change**: Added a new condition to include the Apple Pay payment source only when the token is present (otherwise omit it) and decode JSON-formatted tokens before sending:
 
 ```php
 } elseif ($ppr_type === 'apple_pay') {
-    // For Apple Pay with confirmPaymentSource flow, include an empty payment_source
-    // to indicate that Apple Pay will be used. The token will be provided later
-    // when calling confirmPaymentSource.
-    $this->request['payment_source']['apple_pay'] = [];
+    $appleWalletPayload = $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] ?? null;
+    if (is_array($appleWalletPayload) && isset($appleWalletPayload['token']) && $appleWalletPayload['token'] !== '') {
+        $token = $appleWalletPayload['token'];
+        if (is_string($token)) {
+            $decodedToken = json_decode($token, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedToken)) {
+                $token = $decodedToken;
+            }
+        }
+        $this->request['payment_source']['apple_pay'] = ['token' => $token];
+    }
 }
 ```
 
@@ -57,8 +51,8 @@ This signals to PayPal:
 PayPal's Advanced Integration for Apple Pay uses a two-step flow:
 
 **Step 1: Create Order** (what we fixed)
-- Server creates order with empty `payment_source.apple_pay`
-- PayPal initializes order for Apple Pay and returns order ID
+- Server creates order without `payment_source.apple_pay` unless the token is already available
+- PayPal initializes order and returns order ID without rejecting malformed wallet data
 
 **Step 2: Confirm Payment** (already working correctly)
 - User authorizes payment in Apple Pay modal
