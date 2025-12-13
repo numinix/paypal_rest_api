@@ -51,7 +51,8 @@ class ApplePayCreateOrderOnlyFlowTest
         $content = file_get_contents($this->phpFile);
 
         // Look for early return for apple_pay
-        $hasApplePayEarlyReturn = preg_match("/if\s*\(\s*\\\$walletType\s*===\s*'apple_pay'\s*\)\s*\{[^}]*return;/s", $content);
+        // Updated regex to handle nested braces
+        $hasApplePayEarlyReturn = preg_match("/if\s*\(\s*\\\$walletType\s*===\s*'apple_pay'\s*\)\s*\{.*?return;/s", $content);
 
         if ($hasApplePayEarlyReturn) {
             $this->testResults[] = [
