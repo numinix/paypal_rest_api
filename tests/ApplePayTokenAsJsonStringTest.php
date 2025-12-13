@@ -177,10 +177,10 @@ namespace {
     echo "\n=== Apple Pay Token as JSON String Test ===\n\n";
 
     // Simulate the token as it would be stored in session after normalizeWalletPayload()
-    // This represents the actual Apple Pay payment token structure
+    // This represents the actual Apple Pay payment token structure (using mock values)
     $applePaymentToken = [
         'data' => 'kHvow6zsnfZqGd+2eYYM8UQu0EaW73CaPXWQzgJhqPmhempCrumnkD58NS8s4zN2xHOR6bGQtlF0E2RsKl3kjfsZeQxVlew3/4vhrLp2a58z/6y2Bhk99B45tPWIT6QtCXr4zKTwnbtiwPmfNWeRYd6E6ImnfWhmt4aZ/VfoI/pc76WHIyqnrDafZjRHyk5Wf1CfqQy9aVl8VM3pM9Qi4AX3AhM4O8anT8edftWo7uIb8b0VvHq1Q7kImUdYhFy7ZSJxXmmysDGrpPcU/ACxtkctIr1RU7hTZFlSCXtJR3jUdZCRGg6afrsL8UQwrLG7/P/wdYqK1gPP1bG3/kJ48zo8ZN5SidL/580zY5Y8pSXPCoZBzRVpUbrvtlWQ9dlTvU3YZHj8puGT6FOJeDt+Zcl6yPX0p85svlbaPr0u2aw=',
-        'signature' => 'MIAGCSqGSIb3DQEHAqCAMIACAQExDTALBglghkgBZQMEAgEwgAYJKoZIhvcNAQcBAACggDCCA+MwggOIoAMCAQICCBZjTIsOMFcXMAoGCCqGSM49BAMCMHoxLjAsBgNVBAMMJUFwcGxlIEFwcGxpY2F0aW9uIEludGVncmF0aW9uIENBIC0gRzMxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9yaXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzAeFw0yNDA0MjkxNzQ3MjdaFw0yOTA0MjgxNzQ3MjZaMF8xJTAjBgNVBAMMHGVjYy1zbXAtYnJva2VyLXNpZ25fVUM0LVBST0QxFDASBgNVBAsMC2lPUyBTeXN0ZW1zMRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABMIVd...',
+        'signature' => 'MOCK_SIGNATURE_FOR_TESTING_PURPOSES_ONLY',
         'header' => [
             'publicKeyHash' => 'vuKS80eIGBVWIJSRM/rNPZIGY/bHhogd1I4f/jc1qdE=',
             'ephemeralPublicKey' => 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAErxNT9FJeIhpiftOFYG/XNUBINNi/fVSH2zjj72/OBVOkgyuxGRjjm1WnBGVzzGj2IFy3eBRAUB5ej4GSfDJPQw==',

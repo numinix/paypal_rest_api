@@ -144,7 +144,9 @@ namespace {
     ];
 
     // Session token is set to the NORMALIZED format (as returned by normalizeWalletPayload):
-    // The paymentData wrapper has been unwrapped and the token is JSON-encoded.
+    // - The paymentData wrapper has been unwrapped to get the actual token fields
+    // - The token has been JSON-encoded into a string
+    // This simulates the state AFTER normalizeWalletPayload() has processed the raw browser token.
     $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = [
         'token' => json_encode($applePaymentData),
     ];

@@ -173,7 +173,9 @@ class CreatePayPalOrderRequest extends ErrorInfo
                 $token = $appleWalletPayload['token'];
 
                 // PayPal expects token to be a JSON STRING, not an array/object.
-                // If we somehow have an array (raw token/paymentData), unwrap + encode it.
+                // Normally, normalizeWalletPayload() handles this, but we also
+                // handle the edge case where token might still be an array
+                // (e.g., if session was populated directly in tests or debugging).
                 if (is_array($token)) {
                     if (isset($token['paymentData']) && is_array($token['paymentData'])) {
                         $token = $token['paymentData'];
