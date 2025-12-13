@@ -654,7 +654,21 @@ class PayPalCommon {
         }
         $cart_hash = md5($cart_hash);
 
-        return substr($guid_base . '-' . $cart_hash, 0, 127);
+        $wallet_payload_hash = '';
+        if (in_array($ppr_type, ['apple_pay', 'google_pay', 'venmo'], true)) {
+            $wallet_payload = $_SESSION['PayPalRestful']['WalletPayload'][$ppr_type] ?? null;
+            if (is_array($wallet_payload) && !empty($wallet_payload)) {
+                $wallet_payload_hash = md5(json_encode($wallet_payload));
+            }
+        }
+
+        return substr(
+            $guid_base
+            . '-' . $cart_hash
+            . ($wallet_payload_hash !== '' ? '-' . $wallet_payload_hash : ''),
+            0,
+            127
+        );
     }
 
     /**

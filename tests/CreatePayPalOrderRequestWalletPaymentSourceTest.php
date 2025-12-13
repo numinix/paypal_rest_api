@@ -193,23 +193,19 @@ namespace {
         fwrite(STDOUT, "  ✓ apple_pay (with token): Has tokenized payment_source.apple_pay (correct behavior)\n");
     }
 
-    // Test 2b: Apple Pay WITHOUT token in session should include empty payment_source.apple_pay
+    // Test 2b: Apple Pay WITHOUT token in session should NOT include payment_source.apple_pay
     // This simulates the initial order creation when the button is clicked but before token is available
-    // PayPal needs the wallet type declared so confirmPaymentSource works when the token arrives
+    // PayPal rejects an empty apple_pay object with MALFORMED_REQUEST_JSON, so it must be omitted
     unset($_SESSION['PayPalRestful']['WalletPayload']['apple_pay']);
     $request_applepay_no_token = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
     $payload_applepay_no_token = $request_applepay_no_token->get();
 
-    if (!isset($payload_applepay_no_token['payment_source']['apple_pay'])) {
-        fwrite(STDERR, "FAIL: apple_pay request without token should include empty payment_source.apple_pay\n");
+    if (isset($payload_applepay_no_token['payment_source']['apple_pay'])) {
+        fwrite(STDERR, "FAIL: apple_pay request without token should NOT include payment_source.apple_pay\n");
         fwrite(STDERR, "  payment_source: " . json_encode($payload_applepay_no_token['payment_source'] ?? []) . "\n");
         $failures++;
-    } elseif ($payload_applepay_no_token['payment_source']['apple_pay'] !== []) {
-        fwrite(STDERR, "FAIL: apple_pay payment_source should be an empty array when token is missing\n");
-        fwrite(STDERR, "  Found: " . json_encode($payload_applepay_no_token['payment_source']['apple_pay']) . "\n");
-        $failures++;
     } else {
-        fwrite(STDOUT, "  ✓ apple_pay (without token): Empty payment_source.apple_pay present (correct behavior)\n");
+        fwrite(STDOUT, "  ✓ apple_pay (without token): payment_source.apple_pay omitted (correct behavior)\n");
     }
     
     // Restore token for subsequent tests
