@@ -92,14 +92,15 @@ class WalletCaptureOrAuthorizeIntentTest
         
         // Look for the logic that determines should_capture based on transaction_mode
         // Pattern should match: $should_capture = ($transaction_mode === 'Final Sale' || ...)
+        // OR using constants: $should_capture = ($transaction_mode === self::TRANSACTION_MODE_FINAL_SALE || ...)
         $hasTransactionModeCheck = preg_match(
-            '/\$should_capture\s*=\s*\(\s*\$transaction_mode\s*===\s*[\'"]Final Sale[\'"]/',
+            '/\$should_capture\s*=\s*\(\s*\$transaction_mode\s*===\s*(?:[\'"]Final Sale[\'"]|self::TRANSACTION_MODE_FINAL_SALE)/',
             $content
         );
         
         // Also check for the Auth Only (Card-Only) check with ppr_type
         $hasCardOnlyCheck = preg_match(
-            '/\$ppr_type\s*!==\s*[\'"]card[\'"]\s*&&\s*\$transaction_mode\s*===\s*[\'"]Auth Only \(Card-Only\)[\'"]/',
+            '/\$ppr_type\s*!==\s*[\'"]card[\'"]\s*&&\s*\$transaction_mode\s*===\s*(?:[\'"]Auth Only \(Card-Only\)[\'"]|self::TRANSACTION_MODE_AUTH_CARD_ONLY)/',
             $content
         );
         

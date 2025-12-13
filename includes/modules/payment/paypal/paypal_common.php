@@ -17,6 +17,13 @@ use PayPalRestful\Common\VaultManager;
 
 class PayPalCommon {
     /**
+     * Transaction mode constants
+     */
+    public const TRANSACTION_MODE_FINAL_SALE = 'Final Sale';
+    public const TRANSACTION_MODE_AUTH_ALL = 'Auth Only (All Txns)';
+    public const TRANSACTION_MODE_AUTH_CARD_ONLY = 'Auth Only (Card-Only)';
+    
+    /**
      * Reference to the parent payment module instance
      * @var object
      */
@@ -679,8 +686,8 @@ class PayPalCommon {
         
         // Determine if we should capture or authorize based on transaction mode
         // For wallets, "Auth Only (Card-Only)" should still use capture since wallet != card
-        $should_capture = ($transaction_mode === 'Final Sale' ||
-                          ($ppr_type !== 'card' && $transaction_mode === 'Auth Only (Card-Only)'));
+        $should_capture = ($transaction_mode === self::TRANSACTION_MODE_FINAL_SALE ||
+                          ($ppr_type !== 'card' && $transaction_mode === self::TRANSACTION_MODE_AUTH_CARD_ONLY));
         
         $log->write("$payment_source: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
 
@@ -980,8 +987,8 @@ class PayPalCommon {
         }
 
         // Determine if we should capture or authorize based on transaction mode
-        $should_capture = ($transaction_mode === 'Final Sale' ||
-                          ($ppr_type !== 'card' && $transaction_mode === 'Auth Only (Card-Only)'));
+        $should_capture = ($transaction_mode === self::TRANSACTION_MODE_FINAL_SALE ||
+                          ($ppr_type !== 'card' && $transaction_mode === self::TRANSACTION_MODE_AUTH_CARD_ONLY));
 
         $log->write("processCreditCardPayment: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
 
