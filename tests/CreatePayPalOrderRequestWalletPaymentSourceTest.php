@@ -193,6 +193,20 @@ namespace {
         fwrite(STDOUT, "  ✓ apple_pay (with token): Has tokenized payment_source.apple_pay (correct behavior)\n");
     }
 
+    // Test 2a-extended: Apple Pay token stored as JSON should be decoded before sending
+    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = ['token' => json_encode(['foo' => 'bar', 'nested' => ['baz' => 1]])];
+    $request_applepay_decoded = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
+    $payload_applepay_decoded = $request_applepay_decoded->get();
+
+    $decodedToken = $payload_applepay_decoded['payment_source']['apple_pay']['token'] ?? null;
+    if (!is_array($decodedToken) || $decodedToken['foo'] !== 'bar' || ($decodedToken['nested']['baz'] ?? null) !== 1) {
+        fwrite(STDERR, "FAIL: apple_pay JSON token should be decoded into structured array before request\n");
+        fwrite(STDERR, "  token payload: " . json_encode($decodedToken) . "\n");
+        $failures++;
+    } else {
+        fwrite(STDOUT, "  ✓ apple_pay: JSON token decoded into structured payload (correct behavior)\n");
+    }
+
     // Test 2b: Apple Pay WITHOUT token in session should NOT include payment_source.apple_pay
     // This simulates the initial order creation when the button is clicked but before token is available
     // PayPal rejects an empty apple_pay object with MALFORMED_REQUEST_JSON, so it must be omitted

@@ -170,8 +170,20 @@ class CreatePayPalOrderRequest extends ErrorInfo
                 && isset($appleWalletPayload['token'])
                 && $appleWalletPayload['token'] !== ''
             ) {
+                $token = $appleWalletPayload['token'];
+
+                // PayPal expects the Apple Pay token as a structured object.
+                // If the token was stored in the session as a JSON string, decode
+                // it before building the payment_source to avoid 500 errors.
+                if (is_string($token)) {
+                    $decodedToken = json_decode($token, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decodedToken)) {
+                        $token = $decodedToken;
+                    }
+                }
+
                 $this->request['payment_source']['apple_pay'] = [
-                    'token' => $appleWalletPayload['token'],
+                    'token' => $token,
                 ];
             }
         }

@@ -10,14 +10,14 @@ Creating the order without the token available meant we either left out the paym
 
 ## The Fix
 
-Updated the order creation to only include `payment_source.apple_pay` when the token is already present, and to omit it entirely when the token is not yet available. The order GUID now incorporates the Apple Pay token (when present) so a new PayPal order is created once the token arrives instead of reusing a tokenless order that cannot be confirmed:
+Updated the order creation to only include `payment_source.apple_pay` when the token is already present, and to omit it entirely when the token is not yet available. When present, the token is decoded from its JSON string into a structured payload before sending to PayPal, preventing 500 errors caused by a stringified token. The order GUID now incorporates the Apple Pay token (when present) so a new PayPal order is created once the token arrives instead of reusing a tokenless order that cannot be confirmed:
 
 ```json
 {
     "intent": "AUTHORIZE",
     "purchase_units": [...],
     "payment_source": {
-        "apple_pay": { "token": "..." }  // Only when the token is available server-side
+        "apple_pay": { "token": { ... } }  // Only when the token is available server-side
     }
 }
 ```
@@ -28,13 +28,20 @@ This avoids the malformed JSON error while still attaching the token when availa
 
 **File**: `includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php`
 
-**Change**: Added a new condition to include the Apple Pay payment source only when the token is present (otherwise omit it):
+**Change**: Added a new condition to include the Apple Pay payment source only when the token is present (otherwise omit it) and decode JSON-formatted tokens before sending:
 
 ```php
 } elseif ($ppr_type === 'apple_pay') {
     $appleWalletPayload = $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] ?? null;
     if (is_array($appleWalletPayload) && isset($appleWalletPayload['token']) && $appleWalletPayload['token'] !== '') {
-        $this->request['payment_source']['apple_pay'] = ['token' => $appleWalletPayload['token']];
+        $token = $appleWalletPayload['token'];
+        if (is_string($token)) {
+            $decodedToken = json_decode($token, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedToken)) {
+                $token = $decodedToken;
+            }
+        }
+        $this->request['payment_source']['apple_pay'] = ['token' => $token];
     }
 }
 ```
