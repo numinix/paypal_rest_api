@@ -75,21 +75,24 @@ class PayPalCommon {
         $_SESSION['PayPalRestful']['WalletPayload'][$walletType] = $payload;
 
         // -----------------------------------------------------------------
-        // Wallets (Apple Pay, Google Pay, Venmo, etc):
-        // Use the standard createOrder + confirmPaymentSource flow.
+        // Wallet confirmation flow:
+        // - Apple Pay: Use existing order (created by JS), skip second createOrder
+        // - Google Pay, Venmo: Create order here, then confirm
         // -----------------------------------------------------------------
-        $paypal_order_created = $this->paymentModule->createPayPalOrder($walletType);
-        if ($paypal_order_created === false) {
-            $error_info = $this->paymentModule->ppr->getErrorInfo();
-            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
-            $this->paymentModule->sendAlertEmail(
-                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
-                MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
-            );
-            $this->paymentModule->setMessageAndRedirect(
-                sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, $errorMessages['title'], $error_code),
-                FILENAME_CHECKOUT_PAYMENT
-            );
+        if ($walletType !== 'apple_pay') {
+            $paypal_order_created = $this->paymentModule->createPayPalOrder($walletType);
+            if ($paypal_order_created === false) {
+                $error_info = $this->paymentModule->ppr->getErrorInfo();
+                $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
+                $this->paymentModule->sendAlertEmail(
+                    MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
+                    MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
+                );
+                $this->paymentModule->setMessageAndRedirect(
+                    sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, $errorMessages['title'], $error_code),
+                    FILENAME_CHECKOUT_PAYMENT
+                );
+            }
         }
 
         $confirm_response = $this->paymentModule->ppr->confirmPaymentSource(

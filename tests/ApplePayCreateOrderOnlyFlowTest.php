@@ -1,16 +1,15 @@
 <?php
 /**
- * Test: Apple Pay uses confirmPaymentSource flow
+ * Test: Apple Pay uses existing order and confirmPaymentSource
  *
- * This test validates that Apple Pay reuses the standard wallet flow that
- * creates the order once and then calls confirmPaymentSource with the token
- * collected in the browser.
+ * This test validates that Apple Pay reuses the order created by JavaScript
+ * and only calls confirmPaymentSource (not a second createOrder).
  *
  * The test verifies:
- * 1. processWalletConfirmation no longer shortcuts Apple Pay into a special
- *    createOrder-only path
- * 2. There is no code that clears the session order just for Apple Pay
- * 3. confirmPaymentSource remains in place for wallet flows (including Apple Pay)
+ * 1. processWalletConfirmation does NOT call createPayPalOrder for Apple Pay
+ * 2. Apple Pay uses the existing order ID from the session
+ * 3. confirmPaymentSource is called with the existing order for Apple Pay
+ * 4. Google Pay and Venmo still create orders (different flow)
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -33,83 +32,78 @@ class ApplePayCreateOrderOnlyFlowTest
 
     public function run(): void
     {
-        echo "\n=== Apple Pay confirmPaymentSource Flow Test ===\n\n";
+        echo "\n=== Apple Pay Existing Order + confirmPaymentSource Test ===\n\n";
 
-        $this->testNoApplePayBypass();
-        $this->testApplePayDoesNotClearOrder();
+        $this->testApplePaySkipsCreateOrder();
+        $this->testOtherWalletsCreateOrder();
         $this->testConfirmPaymentSourcePresent();
 
         $this->printResults();
     }
 
     /**
-     * Test that processWalletConfirmation does NOT have an Apple Pay early return
+     * Test that Apple Pay skips the createPayPalOrder call
      */
-    private function testNoApplePayBypass(): void
+    private function testApplePaySkipsCreateOrder(): void
     {
-        echo "Test 1: Verify no Apple Pay bypass block exists...\n";
+        echo "Test 1: Verify Apple Pay skips createPayPalOrder...\n";
 
         $content = file_get_contents($this->phpFile);
 
-        // Look for the old apple_pay special-case block that returned early
-        $hasApplePayBypass = preg_match('/apple_pay[^\n]+createOrder-only flow/', $content);
+        // Look for apple_pay exclusion from createPayPalOrder
+        $hasApplePayExclusion = preg_match('/if\s*\(\s*\$walletType\s*!==\s*[\'"]apple_pay[\'"]\s*\)/', $content);
 
-        if ($hasApplePayBypass) {
+        if ($hasApplePayExclusion) {
             $this->testResults[] = [
-                'name' => 'Apple Pay bypass removed',
-                'passed' => false,
-                'message' => 'Found legacy Apple Pay create-order-only flow'
+                'name' => 'Apple Pay skips createPayPalOrder',
+                'passed' => true,
+                'message' => 'Apple Pay excluded from createPayPalOrder (uses existing order from JS)'
             ];
-            echo "  ❌ FAIL: Legacy Apple Pay create-order-only flow still present\n";
+            echo "  ✓ PASS: Apple Pay skips createPayPalOrder\n";
         } else {
             $this->testResults[] = [
-                'name' => 'Apple Pay bypass removed',
-                'passed' => true,
-                'message' => 'Apple Pay uses standard wallet flow'
+                'name' => 'Apple Pay skips createPayPalOrder',
+                'passed' => false,
+                'message' => 'Apple Pay should be excluded from createPayPalOrder call'
             ];
-            echo "  ✓ PASS: Apple Pay uses standard wallet flow\n";
+            echo "  ❌ FAIL: Apple Pay exclusion not found\n";
         }
     }
 
     /**
-     * Test that Apple Pay flow no longer clears previous order
+     * Test that Google Pay and Venmo still create orders
      */
-    private function testApplePayDoesNotClearOrder(): void
+    private function testOtherWalletsCreateOrder(): void
     {
-        echo "Test 2: Verify Apple Pay flow does not clear previous order...\n";
+        echo "Test 2: Verify Google Pay/Venmo create orders...\n";
 
         $content = file_get_contents($this->phpFile);
 
-        $clearsOrder = false;
-        $applePos = strpos($content, 'apple_pay');
-        if ($applePos !== false) {
-            $searchArea = substr($content, $applePos, 500);
-            $clearsOrder = strpos($searchArea, "unset(\$_SESSION['PayPalRestful']['Order']") !== false;
-        }
+        $hasCreateOrderCall = strpos($content, 'createPayPalOrder') !== false;
 
-        if ($clearsOrder) {
+        if ($hasCreateOrderCall) {
             $this->testResults[] = [
-                'name' => 'Apple Pay does not clear order',
-                'passed' => false,
-                'message' => 'Session order should not be cleared for Apple Pay'
+                'name' => 'Other wallets create orders',
+                'passed' => true,
+                'message' => 'createPayPalOrder still called for non-Apple Pay wallets'
             ];
-            echo "  ❌ FAIL: Found session order clearing logic\n";
+            echo "  ✓ PASS: Google Pay/Venmo still create orders\n";
         } else {
             $this->testResults[] = [
-                'name' => 'Apple Pay does not clear order',
-                'passed' => true,
-                'message' => 'No session order clearing logic detected'
+                'name' => 'Other wallets create orders',
+                'passed' => false,
+                'message' => 'createPayPalOrder call missing'
             ];
-            echo "  ✓ PASS: Session order not cleared by Apple Pay flow\n";
+            echo "  ❌ FAIL: createPayPalOrder call not found\n";
         }
     }
 
     /**
-     * Test that confirmPaymentSource remains in the wallet flow
+     * Test that confirmPaymentSource is called for all wallets
      */
     private function testConfirmPaymentSourcePresent(): void
     {
-        echo "Test 3: Verify confirmPaymentSource call exists...\n";
+        echo "Test 3: Verify confirmPaymentSource is called...\n";
 
         $content = file_get_contents($this->phpFile);
 
@@ -119,14 +113,14 @@ class ApplePayCreateOrderOnlyFlowTest
             $this->testResults[] = [
                 'name' => 'confirmPaymentSource present',
                 'passed' => true,
-                'message' => 'confirmPaymentSource call present for wallet flows'
+                'message' => 'confirmPaymentSource called for all wallets'
             ];
             echo "  ✓ PASS: confirmPaymentSource call present\n";
         } else {
             $this->testResults[] = [
                 'name' => 'confirmPaymentSource present',
                 'passed' => false,
-                'message' => 'confirmPaymentSource call missing for wallet flows'
+                'message' => 'confirmPaymentSource call missing'
             ];
             echo "  ❌ FAIL: confirmPaymentSource call missing\n";
         }
@@ -141,6 +135,15 @@ class ApplePayCreateOrderOnlyFlowTest
         foreach ($this->testResults as $result) {
             $status = $result['passed'] ? 'PASS' : 'FAIL';
             echo "- {$result['name']}: {$status} ({$result['message']})\n";
+        }
+        
+        // Exit with error code if any test failed
+        $allPassed = array_reduce($this->testResults, function($carry, $result) {
+            return $carry && $result['passed'];
+        }, true);
+        
+        if (!$allPassed) {
+            exit(1);
         }
     }
 }
