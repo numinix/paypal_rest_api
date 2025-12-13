@@ -177,6 +177,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
                 // handle the edge case where token might still be an array
                 // (e.g., if session was populated directly in tests or debugging).
                 if (is_array($token)) {
+                    $this->log->write("Apple Pay: Token is an array (expected JSON string from normalizeWalletPayload); converting to JSON string.", true, 'after');
+                    
                     if (isset($token['paymentData']) && is_array($token['paymentData'])) {
                         $token = $token['paymentData'];
                     }
