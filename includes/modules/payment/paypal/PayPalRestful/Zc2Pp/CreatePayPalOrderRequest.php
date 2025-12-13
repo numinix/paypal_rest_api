@@ -172,28 +172,32 @@ class CreatePayPalOrderRequest extends ErrorInfo
             ) {
                 $token = $appleWalletPayload['token'];
 
-                // Normalize token to an array and unwrap paymentData so token contains
-                // the expected data/signature/header/version properties PayPal requires.
-                if (is_string($token)) {
-                    $decodedToken = json_decode($token, true);
-                    if (json_last_error() !== JSON_ERROR_NONE) {
-                        $this->log->write("Apple Pay: Token string is not valid JSON; omitting payment_source.apple_pay.", true, 'after');
-                        $token = '';
+                // PayPal expects token to be a JSON STRING, not an array/object.
+                // If we somehow have an array (raw token/paymentData), unwrap + encode it.
+                if (is_array($token)) {
+                    if (isset($token['paymentData']) && is_array($token['paymentData'])) {
+                        $token = $token['paymentData'];
+                    }
+
+                    if (isset($token['data'], $token['signature'], $token['header'], $token['version'])) {
+                        $encoded = json_encode($token);
+                        if ($encoded !== false && $encoded !== '') {
+                            $token = $encoded;
+                        } else {
+                            $token = '';
+                        }
                     } else {
-                        $token = $decodedToken;
+                        $token = '';
                     }
                 }
 
-                if (is_array($token) && isset($token['paymentData']) && is_array($token['paymentData'])) {
-                    $token = $token['paymentData'];
-                }
-
-                if (is_array($token) && isset($token['data'], $token['signature'], $token['header'], $token['version'])) {
+                // If token is a string, it should already be JSON from normalizeWalletPayload().
+                if (is_string($token) && $token !== '') {
                     $this->request['payment_source']['apple_pay'] = [
                         'token' => $token,
                     ];
-                } elseif ($token !== '') {
-                    $this->log->write("Apple Pay: Token payload missing required fields; omitting payment_source.apple_pay.", true, 'after');
+                } else {
+                    $this->log->write("Apple Pay: Token could not be normalized to JSON string; omitting payment_source.apple_pay.", true, 'after');
                 }
             }
         }
