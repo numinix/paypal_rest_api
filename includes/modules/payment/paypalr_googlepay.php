@@ -139,8 +139,15 @@ class paypalr_googlepay extends base
         // Initialize the shared PayPal common class
         $this->paypalCommon = new PayPalCommon($this);
 
-        // Google Pay uses final sale mode
-        $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+        // -----
+        // An order's *initial* order-status depends on the mode in which the PayPal transaction
+        // is to be performed. Google Pay is a wallet payment (ppr_type !== 'card').
+        //
+        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)') {
+            $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+        } else {
+            $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+        }
         $this->order_status = ($order_status > 1) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
 
         $this->zone = $this->getModuleZoneSetting();
@@ -667,15 +674,19 @@ class paypalr_googlepay extends base
 
         $this->orderInfo['expiration_time'] = $payment['expiration_time'] ?? null;
 
-        if ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED) {
-            $pending_status = (int)MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID;
-            if ($pending_status > 0) {
-                $this->order_status = $pending_status;
-                $order->info['order_status'] = $pending_status;
-            }
+        // -----
+        // If the order's PayPal status doesn't indicate successful completion (CAPTURED for captures
+        // or CREATED for authorizations), ensure that the overall order's status is set to this 
+        // payment-module's PENDING status and set a processing flag so that the after_process method 
+        // will alert the store admin if configured.
+        //
+        $this->orderInfo['admin_alert_needed'] = false;
+        if ($payment_status !== PayPalRestfulApi::STATUS_CAPTURED && $payment_status !== PayPalRestfulApi::STATUS_CREATED) {
+            $this->order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+            $order->info['order_status'] = $this->order_status;
             $this->orderInfo['admin_alert_needed'] = true;
-        } else {
-            $this->orderInfo['admin_alert_needed'] = false;
+
+            $this->log->write("==> Google Pay::before_process: Payment status {$payment['status']} received from PayPal; order's status forced to pending.");
         }
     }
 
