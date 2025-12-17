@@ -692,10 +692,10 @@
                 }
 
                 // Initialize PayPal Google Pay
+                // Note: merchantId is configured via SDK URL parameter (google-pay-merchant-id)
+                // and should NOT be passed to the Googlepay() constructor
                 console.log('[Google Pay] Initializing PayPal Googlepay API');
-                var googlepay = paypal.Googlepay({
-                    merchantId: hasMerchantId ? googleMerchantId : undefined
-                });
+                var googlepay = paypal.Googlepay();
                 sdkState.googlepay = googlepay;
 
                 // Check eligibility using PayPal's isEligible method
