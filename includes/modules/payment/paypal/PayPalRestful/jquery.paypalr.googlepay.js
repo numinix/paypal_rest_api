@@ -552,6 +552,10 @@
 
         if (!allowedPaymentMethods) {
             console.error('[Google Pay] Configuration is missing allowedPaymentMethods');
+            console.error('[Google Pay] This usually means Google Pay is not enabled in your PayPal account.');
+            console.error('[Google Pay] To fix: Go to PayPal Developer Dashboard > Apps & Credentials > Your App > Features > Enable Google Pay');
+            console.error('[Google Pay] For live/production mode, you must enable Google Pay in your live PayPal business account.');
+            console.error('[Google Pay] Documentation: https://developer.paypal.com/docs/checkout/apm/google-pay/');
             setGooglePayPayload({});
             if (typeof window.oprcHideProcessingOverlay === 'function') {
                 window.oprcHideProcessingOverlay();
@@ -722,6 +726,10 @@
 
                 if (!allowedPaymentMethods) {
                     console.error('[Google Pay] Configuration is missing allowedPaymentMethods');
+                    console.error('[Google Pay] This usually means Google Pay is not enabled in your PayPal account.');
+                    console.error('[Google Pay] To fix: Go to PayPal Developer Dashboard > Apps & Credentials > Your App > Features > Enable Google Pay');
+                    console.error('[Google Pay] For live/production mode, you must enable Google Pay in your live PayPal business account.');
+                    console.error('[Google Pay] Documentation: https://developer.paypal.com/docs/checkout/apm/google-pay/');
                     hidePaymentMethodContainer();
                     return null;
                 }
