@@ -1134,7 +1134,11 @@ class PayPalCommon {
 
         if (is_array($payment_source) && !empty($payment_source)) {
             $payment_source_type = array_key_first($payment_source);
-            $has_vault_id = (!empty($payment_source[$payment_source_type]['vault_id']) ? 'yes' : 'no');
+            $payment_source_entry = $payment_source[$payment_source_type];
+
+            if (is_array($payment_source_entry)) {
+                $has_vault_id = (!empty($payment_source_entry['vault_id']) ? 'yes' : 'no');
+            }
         }
 
         $log->write(
