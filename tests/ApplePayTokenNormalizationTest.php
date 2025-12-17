@@ -163,13 +163,53 @@ try {
     }
 }
 
-// Test 4: Non-Apple Pay payload unchanged
-$untouchedPayload = $common->normalizeWalletPayloadPublic('google_pay', ['token' => 'already-string'], $errorMessages);
-if ($untouchedPayload['token'] !== 'already-string') {
-    fwrite(STDERR, "FAIL: Non-Apple Pay payload should not be modified\n");
+// Test 4: Google Pay token is extracted and normalized
+$googlePayPayload = [
+    'paymentMethodData' => [
+        'tokenizationData' => [
+            'type' => 'PAYMENT_GATEWAY',
+            'token' => 'test-google-token',
+        ],
+        'info' => [
+            'cardNetwork' => 'VISA',
+            'cardDetails' => '1111',
+        ],
+    ],
+    'wallet' => 'google_pay',
+];
+
+$normalizedGooglePay = $common->normalizeWalletPayloadPublic('google_pay', $googlePayPayload, $errorMessages);
+
+if ($normalizedGooglePay !== ['token' => 'test-google-token']) {
+    fwrite(STDERR, "FAIL: Google Pay payload should normalize to token-only structure\n");
     $failures++;
 } else {
-    fwrite(STDOUT, "✓ Non-Apple Pay payload left unchanged\n");
+    fwrite(STDOUT, "✓ Google Pay payload normalized to token-only structure\n");
+}
+
+// Test 5: Google Pay missing token should trigger redirect
+$invalidGooglePayPayload = [
+    'paymentMethodData' => [
+        'tokenizationData' => [
+            'type' => 'PAYMENT_GATEWAY',
+            'token' => '',
+        ],
+    ],
+    'wallet' => 'google_pay',
+];
+
+try {
+    $common->normalizeWalletPayloadPublic('google_pay', $invalidGooglePayPayload, $errorMessages);
+    fwrite(STDERR, "FAIL: Missing Google Pay token should trigger redirect\n");
+    $failures++;
+} catch (Exception $e) {
+    if (count($paymentModule->redirects) === 0) {
+        fwrite(STDERR, "FAIL: Missing Google Pay token should trigger redirect\n");
+        $failures++;
+    } else {
+        fwrite(STDOUT, "✓ Missing Google Pay token correctly triggers redirect\n");
+        $paymentModule->redirects = [];
+    }
 }
 
 if ($failures === 0) {
