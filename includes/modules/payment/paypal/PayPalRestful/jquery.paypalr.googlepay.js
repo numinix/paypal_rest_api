@@ -552,6 +552,10 @@
 
         if (!allowedPaymentMethods) {
             console.error('[Google Pay] Configuration is missing allowedPaymentMethods');
+            console.error('[Google Pay] This usually means Google Pay is not enabled in your PayPal account.');
+            console.error('[Google Pay] To fix: Go to PayPal Developer Dashboard > Apps & Credentials > Your App > Features > Enable Google Pay');
+            console.error('[Google Pay] For live/production mode, you must enable Google Pay in your live PayPal business account.');
+            console.error('[Google Pay] Documentation: https://developer.paypal.com/docs/checkout/apm/google-pay/');
             setGooglePayPayload({});
             if (typeof window.oprcHideProcessingOverlay === 'function') {
                 window.oprcHideProcessingOverlay();
@@ -560,6 +564,18 @@
         }
 
         console.log('[Google Pay] Configuration valid, allowed payment methods:', allowedPaymentMethods.length);
+
+        // Add billing address requirements to allowedPaymentMethods (similar to Braintree implementation)
+        if (allowedPaymentMethods && allowedPaymentMethods[0] && allowedPaymentMethods[0].parameters) {
+            allowedPaymentMethods[0].parameters.billingAddressRequired = true;
+            allowedPaymentMethods[0].parameters.billingAddressParameters = {
+                format: 'FULL',
+                phoneNumberRequired: true
+            };
+            console.log('[Google Pay] Added billing address requirements to payment methods');
+        } else {
+            console.warn('[Google Pay] Unable to add billing address requirements - payment method parameters not found');
+        }
 
         // Step 1: Create PayPal order first to get the actual amount
         // This is done within the user gesture handler to minimize delay
@@ -722,6 +738,10 @@
 
                 if (!allowedPaymentMethods) {
                     console.error('[Google Pay] Configuration is missing allowedPaymentMethods');
+                    console.error('[Google Pay] This usually means Google Pay is not enabled in your PayPal account.');
+                    console.error('[Google Pay] To fix: Go to PayPal Developer Dashboard > Apps & Credentials > Your App > Features > Enable Google Pay');
+                    console.error('[Google Pay] For live/production mode, you must enable Google Pay in your live PayPal business account.');
+                    console.error('[Google Pay] Documentation: https://developer.paypal.com/docs/checkout/apm/google-pay/');
                     hidePaymentMethodContainer();
                     return null;
                 }
