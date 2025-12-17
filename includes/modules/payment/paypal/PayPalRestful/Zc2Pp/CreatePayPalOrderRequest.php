@@ -142,7 +142,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // - 'card': Include full card details in payment_source
         // - 'paypal': Include PayPal-specific fields
         // - 'apple_pay': Include empty payment_source to indicate Apple Pay will be confirmed later
-        // - 'google_pay', 'venmo': Do NOT include payment_source (SDK handles it)
+        // - 'google_pay': Include empty payment_source to signal Google Pay wallet usage
+        // - 'venmo': Do NOT include payment_source (SDK handles it)
         //
         if ($ppr_type === 'card') {
             $this->request['payment_source']['card'] = $this->buildCardPaymentSource($order, $cc_info);
@@ -204,9 +205,14 @@ class CreatePayPalOrderRequest extends ErrorInfo
                     $this->log->write("Apple Pay: Token could not be normalized to JSON string; omitting payment_source.apple_pay.", true, 'after');
                 }
             }
+        } elseif ($ppr_type === 'google_pay') {
+            $this->request['payment_source']['google_pay'] = new \stdClass();
         }
-        // For google_pay and venmo - do NOT include payment_source
-        // The PayPal SDK handles the payment source during the wallet authorization flow
+
+        $payment_source_types = isset($this->request['payment_source']) ? implode(', ', array_keys($this->request['payment_source'])) : 'none';
+        $this->log->write("Payment source type: {$payment_source_types}");
+
+        // For venmo - do NOT include payment_source; the PayPal SDK handles the payment source during the wallet authorization flow
 
         $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request, true, true));
     }
