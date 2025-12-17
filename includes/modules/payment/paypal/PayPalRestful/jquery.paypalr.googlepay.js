@@ -565,6 +565,16 @@
 
         console.log('[Google Pay] Configuration valid, allowed payment methods:', allowedPaymentMethods.length);
 
+        // Add billing address requirements to allowedPaymentMethods (similar to Braintree implementation)
+        if (allowedPaymentMethods && allowedPaymentMethods[0] && allowedPaymentMethods[0].parameters) {
+            allowedPaymentMethods[0].parameters.billingAddressRequired = true;
+            allowedPaymentMethods[0].parameters.billingAddressParameters = {
+                format: 'FULL',
+                phoneNumberRequired: true
+            };
+            console.log('[Google Pay] Added billing address requirements to payment methods');
+        }
+
         // Step 1: Create PayPal order first to get the actual amount
         // This is done within the user gesture handler to minimize delay
         console.log('[Google Pay] Step 1: Creating PayPal order to get actual amount');
