@@ -573,6 +573,8 @@
                 phoneNumberRequired: true
             };
             console.log('[Google Pay] Added billing address requirements to payment methods');
+        } else {
+            console.warn('[Google Pay] Unable to add billing address requirements - payment method parameters not found');
         }
 
         // Step 1: Create PayPal order first to get the actual amount
