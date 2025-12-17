@@ -547,99 +547,103 @@
 
         // Get the payment data request configuration from PayPal
         console.log('[Google Pay] Getting base payment configuration from PayPal SDK');
-        var basePaymentDataRequest = googlepay.config();
-        var allowedPaymentMethods = getAllowedPaymentMethods(basePaymentDataRequest);
 
-        if (!allowedPaymentMethods) {
-            console.error('[Google Pay] Configuration is missing allowedPaymentMethods');
-            console.error('[Google Pay] This usually means Google Pay is not enabled in your PayPal account.');
-            console.error('[Google Pay] To fix: Go to PayPal Developer Dashboard > Apps & Credentials > Your App > Features > Enable Google Pay');
-            console.error('[Google Pay] For live/production mode, you must enable Google Pay in your live PayPal business account.');
-            console.error('[Google Pay] Documentation: https://developer.paypal.com/docs/checkout/apm/google-pay/');
-            setGooglePayPayload({});
-            if (typeof window.oprcHideProcessingOverlay === 'function') {
-                window.oprcHideProcessingOverlay();
-            }
-            return;
-        }
+        Promise.resolve().then(function () {
+            return googlepay.config();
+        }).then(function (basePaymentDataRequest) {
+            var allowedPaymentMethods = getAllowedPaymentMethods(basePaymentDataRequest);
 
-        console.log('[Google Pay] Configuration valid, allowed payment methods:', allowedPaymentMethods.length);
-
-        // Add billing address requirements to allowedPaymentMethods (similar to Braintree implementation)
-        if (allowedPaymentMethods && allowedPaymentMethods[0] && allowedPaymentMethods[0].parameters) {
-            allowedPaymentMethods[0].parameters.billingAddressRequired = true;
-            allowedPaymentMethods[0].parameters.billingAddressParameters = {
-                format: 'FULL',
-                phoneNumberRequired: true
-            };
-            console.log('[Google Pay] Added billing address requirements to payment methods');
-        } else {
-            console.warn('[Google Pay] Unable to add billing address requirements - payment method parameters not found');
-        }
-
-        // Step 1: Create PayPal order first to get the actual amount
-        // This is done within the user gesture handler to minimize delay
-        console.log('[Google Pay] Step 1: Creating PayPal order to get actual amount');
-        fetchWalletOrder().then(function (orderConfig) {
-            console.log('[Google Pay] Order creation result:', orderConfig);
-            
-            if (!orderConfig || orderConfig.success === false) {
-                console.error('[Google Pay] Failed to create PayPal order', orderConfig);
+            if (!allowedPaymentMethods) {
+                console.error('[Google Pay] Configuration is missing allowedPaymentMethods');
+                console.error('[Google Pay] This usually means Google Pay is not enabled in your PayPal account.');
+                console.error('[Google Pay] To fix: Go to PayPal Developer Dashboard > Apps & Credentials > Your App > Features > Enable Google Pay');
+                console.error('[Google Pay] For live/production mode, you must enable Google Pay in your live PayPal business account.');
+                console.error('[Google Pay] Documentation: https://developer.paypal.com/docs/checkout/apm/google-pay/');
                 setGooglePayPayload({});
                 if (typeof window.oprcHideProcessingOverlay === 'function') {
                     window.oprcHideProcessingOverlay();
                 }
-                return;
+                return null;
             }
 
-            if (!orderConfig.amount) {
-                console.error('[Google Pay] Order created but amount is missing', orderConfig);
-                setGooglePayPayload({});
-                if (typeof window.oprcHideProcessingOverlay === 'function') {
-                    window.oprcHideProcessingOverlay();
-                }
-                return;
-            }
+            console.log('[Google Pay] Configuration valid, allowed payment methods:', allowedPaymentMethods.length);
 
-            console.log('[Google Pay] Order validated - ID:', orderConfig.orderID, 'Amount:', orderConfig.amount, 'Currency:', orderConfig.currency);
-
-            sdkState.config = orderConfig;
-            var orderId = orderConfig.orderID;
-
-            // Build payment data request with the actual order amount
-            var paymentDataRequest = {
-                apiVersion: basePaymentDataRequest.apiVersion || 2,
-                apiVersionMinor: basePaymentDataRequest.apiVersionMinor || 0,
-                allowedPaymentMethods: allowedPaymentMethods,
-                transactionInfo: {
-                    totalPriceStatus: 'FINAL',
-                    totalPrice: orderConfig.amount,
-                    currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
-                    countryCode: 'US'
-                },
-                merchantInfo: basePaymentDataRequest.merchantInfo || {}
-            };
-
-            console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
-
-            // Step 2: Invoke Google Pay payment sheet with actual amount
-            // This is called in the .then() callback but remains within user gesture context
-            return paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
-                console.log('[Google Pay] Payment data received from Google Pay sheet');
-                console.log('[Google Pay] Payment method data:', paymentData.paymentMethodData);
-                
-                // Build the payload with the payment data
-                // The server-side confirmPaymentSource API call will use this data
-                // Similar to Apple Pay's approach: let the server handle confirmation
-                var payload = {
-                    orderID: orderId,
-                    paymentMethodData: paymentData.paymentMethodData,
-                    wallet: 'google_pay'
+            // Add billing address requirements to allowedPaymentMethods (similar to Braintree implementation)
+            if (allowedPaymentMethods && allowedPaymentMethods[0] && allowedPaymentMethods[0].parameters) {
+                allowedPaymentMethods[0].parameters.billingAddressRequired = true;
+                allowedPaymentMethods[0].parameters.billingAddressParameters = {
+                    format: 'FULL',
+                    phoneNumberRequired: true
                 };
+                console.log('[Google Pay] Added billing address requirements to payment methods');
+            } else {
+                console.warn('[Google Pay] Unable to add billing address requirements - payment method parameters not found');
+            }
+
+            // Step 1: Create PayPal order first to get the actual amount
+            // This is done within the user gesture handler to minimize delay
+            console.log('[Google Pay] Step 1: Creating PayPal order to get actual amount');
+            return fetchWalletOrder().then(function (orderConfig) {
+                console.log('[Google Pay] Order creation result:', orderConfig);
                 
-                console.log('[Google Pay] Setting payload and submitting form');
-                setGooglePayPayload(payload);
-                document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: payload }));
+                if (!orderConfig || orderConfig.success === false) {
+                    console.error('[Google Pay] Failed to create PayPal order', orderConfig);
+                    setGooglePayPayload({});
+                    if (typeof window.oprcHideProcessingOverlay === 'function') {
+                        window.oprcHideProcessingOverlay();
+                    }
+                    return null;
+                }
+
+                if (!orderConfig.amount) {
+                    console.error('[Google Pay] Order created but amount is missing', orderConfig);
+                    setGooglePayPayload({});
+                    if (typeof window.oprcHideProcessingOverlay === 'function') {
+                        window.oprcHideProcessingOverlay();
+                    }
+                    return null;
+                }
+
+                console.log('[Google Pay] Order validated - ID:', orderConfig.orderID, 'Amount:', orderConfig.amount, 'Currency:', orderConfig.currency);
+
+                sdkState.config = orderConfig;
+                var orderId = orderConfig.orderID;
+
+                // Build payment data request with the actual order amount
+                var paymentDataRequest = {
+                    apiVersion: basePaymentDataRequest.apiVersion || 2,
+                    apiVersionMinor: basePaymentDataRequest.apiVersionMinor || 0,
+                    allowedPaymentMethods: allowedPaymentMethods,
+                    transactionInfo: {
+                        totalPriceStatus: 'FINAL',
+                        totalPrice: orderConfig.amount,
+                        currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
+                        countryCode: 'US'
+                    },
+                    merchantInfo: basePaymentDataRequest.merchantInfo || {}
+                };
+
+                console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
+
+                // Step 2: Invoke Google Pay payment sheet with actual amount
+                // This is called in the .then() callback but remains within user gesture context
+                return paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
+                    console.log('[Google Pay] Payment data received from Google Pay sheet');
+                    console.log('[Google Pay] Payment method data:', paymentData.paymentMethodData);
+                    
+                    // Build the payload with the payment data
+                    // The server-side confirmPaymentSource API call will use this data
+                    // Similar to Apple Pay's approach: let the server handle confirmation
+                    var payload = {
+                        orderID: orderId,
+                        paymentMethodData: paymentData.paymentMethodData,
+                        wallet: 'google_pay'
+                    };
+                    
+                    console.log('[Google Pay] Setting payload and submitting form');
+                    setGooglePayPayload(payload);
+                    document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: payload }));
+                });
             });
         }).catch(function (error) {
             console.log('[Google Pay] Payment flow completed or error occurred');
@@ -733,54 +737,57 @@
                 sdkState.paymentsClient = paymentsClient;
 
                 // Get base configuration from PayPal for isReadyToPay check
-                var baseConfig = googlepay.config();
-                var allowedPaymentMethods = getAllowedPaymentMethods(baseConfig);
+                return Promise.resolve().then(function () {
+                    return googlepay.config();
+                }).then(function (baseConfig) {
+                    var allowedPaymentMethods = getAllowedPaymentMethods(baseConfig);
 
-                if (!allowedPaymentMethods) {
-                    console.error('[Google Pay] Configuration is missing allowedPaymentMethods');
-                    console.error('[Google Pay] This usually means Google Pay is not enabled in your PayPal account.');
-                    console.error('[Google Pay] To fix: Go to PayPal Developer Dashboard > Apps & Credentials > Your App > Features > Enable Google Pay');
-                    console.error('[Google Pay] For live/production mode, you must enable Google Pay in your live PayPal business account.');
-                    console.error('[Google Pay] Documentation: https://developer.paypal.com/docs/checkout/apm/google-pay/');
-                    hidePaymentMethodContainer();
-                    return null;
-                }
+                    if (!allowedPaymentMethods) {
+                        console.error('[Google Pay] Configuration is missing allowedPaymentMethods');
+                        console.error('[Google Pay] This usually means Google Pay is not enabled in your PayPal account.');
+                        console.error('[Google Pay] To fix: Go to PayPal Developer Dashboard > Apps & Credentials > Your App > Features > Enable Google Pay');
+                        console.error('[Google Pay] For live/production mode, you must enable Google Pay in your live PayPal business account.');
+                        console.error('[Google Pay] Documentation: https://developer.paypal.com/docs/checkout/apm/google-pay/');
+                        hidePaymentMethodContainer();
+                        return null;
+                    }
 
-                console.log('[Google Pay] Checking if ready to pay with', allowedPaymentMethods.length, 'payment methods');
+                    console.log('[Google Pay] Checking if ready to pay with', allowedPaymentMethods.length, 'payment methods');
 
-                // Check if user is ready to pay with Google Pay
-                var isReadyToPayRequest = {
-                    apiVersion: baseConfig.apiVersion || 2,
-                    apiVersionMinor: baseConfig.apiVersionMinor || 0,
-                    allowedPaymentMethods: allowedPaymentMethods
-                };
+                    // Check if user is ready to pay with Google Pay
+                    var isReadyToPayRequest = {
+                        apiVersion: baseConfig.apiVersion || 2,
+                        apiVersionMinor: baseConfig.apiVersionMinor || 0,
+                        allowedPaymentMethods: allowedPaymentMethods
+                    };
 
-                return paymentsClient.isReadyToPay(isReadyToPayRequest)
-                    .then(function (response) {
-                        console.log('[Google Pay] isReadyToPay response:', response);
-                        
-                        if (!response.result) {
-                            console.log('[Google Pay] Not ready to pay on this device');
-                            hidePaymentMethodContainer();
-                            return null;
-                        }
+                    return paymentsClient.isReadyToPay(isReadyToPayRequest)
+                        .then(function (response) {
+                            console.log('[Google Pay] isReadyToPay response:', response);
+                            
+                            if (!response.result) {
+                                console.log('[Google Pay] Not ready to pay on this device');
+                                hidePaymentMethodContainer();
+                                return null;
+                            }
 
-                        console.log('[Google Pay] Device is ready to pay, creating button');
+                            console.log('[Google Pay] Device is ready to pay, creating button');
 
-                        // Create and render the Google Pay button
-                        var button = paymentsClient.createButton({
-                            onClick: onGooglePayButtonClicked,
-                            buttonColor: 'black',
-                            buttonType: 'pay',
-                            buttonRadius: 4,
-                            buttonSizeMode: 'fill'
+                            // Create and render the Google Pay button
+                            var button = paymentsClient.createButton({
+                                onClick: onGooglePayButtonClicked,
+                                buttonColor: 'black',
+                                buttonType: 'pay',
+                                buttonRadius: 4,
+                                buttonSizeMode: 'fill'
+                            });
+
+                            container.appendChild(button);
+                            console.log('[Google Pay] Button rendered successfully');
+
+                            return button;
                         });
-
-                        container.appendChild(button);
-                        console.log('[Google Pay] Button rendered successfully');
-
-                        return button;
-                    });
+                });
             });
         }).catch(function (error) {
             console.error('[Google Pay] Failed to render button', error);
