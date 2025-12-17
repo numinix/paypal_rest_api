@@ -289,9 +289,9 @@ class PayPalCommon {
         }
 
         if ($walletType === 'google_pay') {
-            if (isset($payload['token'])) {
-                $token = $payload['token'];
-            } else {
+            $token = $payload['token'] ?? null;
+
+            if (!is_string($token)) {
                 $token = $payload['paymentMethodData']['tokenizationData']['token'] ?? null;
             }
 
@@ -301,7 +301,7 @@ class PayPalCommon {
 
             if (!is_string($token) || $token === '') {
                 $this->paymentModule->log->write(
-                    'Google Pay: tokenizationData.token is missing or invalid in wallet payload.',
+                    'Google Pay: paymentMethodData.tokenizationData.token is missing or invalid in wallet payload. ' . $errorMessages['payload_invalid'],
                     true,
                     'after'
                 );
