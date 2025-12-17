@@ -89,7 +89,10 @@ Each module must:
 
 ## Version History
 
-### 1.3.4 (Current)
+### 1.3.6 (Current)
+- Removed the unused Google Pay merchant ID configuration key; PayPal REST Google Pay flows no longer require this value.
+
+### 1.3.4
 - Updated PayPal Vault configuration description via upgrade action
 - Removed legacy ACCEPT_CARDS configuration (credit card module is now separate)
 

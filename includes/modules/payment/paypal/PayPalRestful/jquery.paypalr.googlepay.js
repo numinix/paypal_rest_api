@@ -458,9 +458,11 @@
         }
 
         // Include Google Pay merchant ID when provided to ensure allowedPaymentMethods are returned.
-        // Google Merchant IDs are numeric (and sometimes alphanumeric) strings provided by Google.
+        // Do NOT include language label strings like "Merchant ID:" or placeholder values like "*".
+        // Validation pattern: /^[A-Z0-9]{5,20}$/i.test(config.merchantId)
+        var merchantIdIsValid = /^[A-Z0-9]{5,20}$/i.test(config.merchantId || '');
         var googleMerchantId = config.googleMerchantId || config.merchantId;
-        if (googleMerchantId && /^[A-Z0-9-]{5,30}$/i.test(googleMerchantId)) {
+        if (googleMerchantId && (merchantIdIsValid || /^[A-Z0-9]{5,20}$/i.test(googleMerchantId))) {
             query += '&google-pay-merchant-id=' + encodeURIComponent(googleMerchantId);
         }
 
@@ -664,19 +666,12 @@
                 return null;
             }
 
-            // Google Pay requires a merchant ID in production mode
-            // In sandbox mode, Google Pay can be tested without a merchant ID
             var isSandbox = config.environment === 'sandbox';
+            var merchantIdIsValid = /^[A-Z0-9]{5,20}$/i.test(config.merchantId || '');
             var googleMerchantId = config.googleMerchantId || config.merchantId;
-            var hasMerchantId = googleMerchantId && /^[A-Z0-9-]{5,30}$/i.test(googleMerchantId);
+            var hasMerchantId = merchantIdIsValid || (googleMerchantId && /^[A-Z0-9]{5,20}$/i.test(googleMerchantId));
 
             console.log('[Google Pay] Environment:', config.environment, 'Sandbox:', isSandbox, 'Has merchant ID:', hasMerchantId);
-
-            if (!isSandbox && !hasMerchantId) {
-                console.warn('[Google Pay] Invalid or missing Google Merchant ID (required in production)');
-                hidePaymentMethodContainer();
-                return null;
-            }
 
             sdkState.config = config;
 

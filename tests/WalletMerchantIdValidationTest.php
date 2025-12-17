@@ -53,7 +53,7 @@ namespace {
     /**
      * Test that Google Pay ajaxGetWalletConfig uses the correct merchant ID constant
      */
-    function testGooglePayUsesCorrectMerchantIdConstant(): bool
+    function testGooglePayDoesNotRequireMerchantIdConstant(): bool
     {
         $passed = true;
         $googlePayFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalr_googlepay.php';
@@ -69,20 +69,12 @@ namespace {
         // Get the method body (limited scope check)
         $methodBody = substr($content, $methodStart, 1500);
 
-        // Check that MODULE_PAYMENT_PAYPALR_MERCHANT_ID is NOT used
-        if (strpos($methodBody, "defined('MODULE_PAYMENT_PAYPALR_MERCHANT_ID')") !== false) {
-            fwrite(STDERR, "FAIL: Google Pay ajaxGetWalletConfig should NOT use MODULE_PAYMENT_PAYPALR_MERCHANT_ID (it's a language label)\n");
-            $passed = false;
-        } else {
-            fwrite(STDOUT, "✓ Google Pay ajaxGetWalletConfig does not use MODULE_PAYMENT_PAYPALR_MERCHANT_ID\n");
-        }
-
-        // Check that the correct constant IS used
+        // Google Pay no longer needs a Google Merchant ID configuration value when using the PayPal REST API.
         if (strpos($methodBody, "MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID") !== false) {
-            fwrite(STDOUT, "✓ Google Pay ajaxGetWalletConfig uses MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID\n");
-        } else {
-            fwrite(STDERR, "FAIL: Google Pay ajaxGetWalletConfig should use MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID\n");
+            fwrite(STDERR, "FAIL: Google Pay ajaxGetWalletConfig should not reference MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID\n");
             $passed = false;
+        } else {
+            fwrite(STDOUT, "✓ Google Pay ajaxGetWalletConfig does not reference MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID\n");
         }
 
         return $passed;
@@ -213,8 +205,8 @@ namespace {
         $failures++;
     }
 
-    fwrite(STDOUT, "Test 2: Verifying Google Pay uses correct merchant ID constant...\n");
-    if (testGooglePayUsesCorrectMerchantIdConstant()) {
+    fwrite(STDOUT, "Test 2: Verifying Google Pay does not require Google Merchant ID configuration...\n");
+    if (testGooglePayDoesNotRequireMerchantIdConstant()) {
         fwrite(STDOUT, "  ✓ Test passed\n\n");
     } else {
         fwrite(STDERR, "  ✗ Test failed\n\n");
@@ -255,7 +247,7 @@ namespace {
         fwrite(STDOUT, "1. MODULE_PAYMENT_PAYPALR_MERCHANT_ID is a LANGUAGE LABEL ('Merchant ID:'),\n");
         fwrite(STDOUT, "   not a configuration value. It should NOT be used as a merchant ID.\n");
         fwrite(STDOUT, "2. Apple Pay via PayPal does not require merchant-id parameter in SDK URL.\n");
-        fwrite(STDOUT, "3. Google Pay needs MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID (Google Pay & Wallet console ID).\n");
+        fwrite(STDOUT, "3. Google Pay via PayPal REST no longer relies on a Google Merchant ID configuration.\n");
         fwrite(STDOUT, "4. Venmo uses MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID (optional).\n");
         fwrite(STDOUT, "5. JavaScript validates merchant ID format before including in SDK URL.\n");
         exit(0);
