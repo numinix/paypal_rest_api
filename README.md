@@ -38,7 +38,7 @@ This module includes full support for Content Security Policy (CSP) with script-
 
 This prevents CSP violations when loading PayPal SDK and related scripts. The module works seamlessly with or without CSP enabled—no configuration needed.
 
-For detailed information about CSP support, including setup instructions and troubleshooting, see [docs/CSP_SUPPORT.md](docs/CSP_SUPPORT.md).
+For detailed information about CSP support, including setup instructions and troubleshooting, see the [CSP Support section](docs/PayPal%20Advanced%20Checkout/readme.html#CSPSupport) in the documentation.
 
 ## Integrated sign-up (ISU)
 
@@ -112,7 +112,7 @@ Now customers will see two separate payment options:
 
 The credit card module extends the `paypalr` class and overrides only the presentation layer to show credit card fields without the PayPal wallet button. It shares all payment processing logic, vault management, 3DS authentication, and transaction handling with the parent module.
 
-For complete documentation, see [docs/CREDIT_CARD_MODULE.md](docs/CREDIT_CARD_MODULE.md).
+For complete documentation, see the [Credit Card Module section](docs/PayPal%20Advanced%20Checkout/readme.html#CreditCardModule) in the documentation.
 
 ## Charging vaulted cards from custom code
 
