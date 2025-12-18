@@ -46,6 +46,8 @@
             <li><a href="#Installation" id="btnInstallation" class="btn" title="Installation" data-target="Installation">Installation</a></li>
             <li><a href="#Configuration" id="btnConfiguration" class="btn" title="Configuration" data-target="Configuration">Configuration</a></li>
             <li><a href="#Usage" id="btnUsage" class="btn" title="Usage" data-target="Usage">Usage</a></li>
+            <li><a href="#CSPSupport" id="btnCSPSupport" class="btn" title="CSP Support" data-target="CSPSupport">CSP Support</a></li>
+            <li><a href="#CreditCardModule" id="btnCreditCardModule" class="btn" title="Credit Card Module" data-target="CreditCardModule">Credit Card Module</a></li>
             <li><a href="#Automation" id="btnAutomation" class="btn" title="Operations" data-target="Automation">Operations</a></li>
             <li><a href="#Uninstallation" id="btnUninstallation" class="btn" title="Uninstallation" data-target="Uninstallation">Uninstallation</a></li>
             <li><a href="#Troubleshooting" id="btnTroubleshooting" class="btn" title="Troubleshooting" data-target="Troubleshooting">Troubleshooting</a></li>
@@ -339,6 +341,139 @@
       </div>
       <!--EOF USAGE-->
 
+      <!--BOF CSP SUPPORT-->
+      <div class="bodyHeaderContainer" id="CSPSupport">
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Content Security Policy (CSP) Support</span>
+        </div>
+        <div class="bodyWrapper">
+          <h4>Overview</h4>
+          <p class="bodyText">The PayPal Advanced Checkout module includes full support for Content Security Policy (CSP) with script-src nonces. This ensures compatibility with modern web security practices and prevents CSP violations when loading PayPal SDK and related scripts.</p>
+          
+          <h4>What is CSP?</h4>
+          <p class="bodyText">Content Security Policy (CSP) is a web security standard that helps prevent cross-site scripting (XSS) attacks by controlling which scripts can execute on a webpage. When a CSP policy is in place with <code>script-src</code> directive, scripts need to either be loaded from whitelisted domains, include a nonce attribute that matches the CSP header, or have their content hashed and the hash added to the CSP.</p>
+          
+          <h4>How This Module Implements CSP</h4>
+          <p class="bodyText">This module uses the <strong>nonce-based approach</strong>, which is the recommended method for dynamically loaded scripts. When Zen Cart has CSP enabled and provides a <code>$GLOBALS['CSP_NONCE']</code> variable, the observer automatically adds the nonce attribute to the PayPal SDK script tag, inline script tags, and sanitizes the nonce value using <code>htmlspecialchars()</code> for security.</p>
+          
+          <h5>Affected Components</h5>
+          <p class="bodyText">The following components now support CSP nonces:</p>
+          <ol class="steps">
+            <li><strong>Observer (auto.paypalrestful.php)</strong> - PayPal SDK script tag and inline Pay Later messaging script tag</li>
+            <li><strong>Google Pay (jquery.paypalr.googlepay.js)</strong> - PayPal SDK script and Google Pay JS library script (pay.google.com)</li>
+            <li><strong>Apple Pay (jquery.paypalr.applepay.js)</strong> - PayPal SDK script and Apple Pay SDK script (applepay.cdn-apple.com)</li>
+            <li><strong>Venmo (jquery.paypalr.venmo.js)</strong> - PayPal SDK script (dynamically loaded)</li>
+          </ol>
+          
+          <h4>Compatibility</h4>
+          <p class="bodyText"><strong>With CSP Enabled:</strong> When Zen Cart provides a <code>$GLOBALS['CSP_NONCE']</code> variable, all script tags automatically include the nonce attribute, no CSP violations occur, and scripts execute normally.</p>
+          <p class="bodyText"><strong>Without CSP:</strong> When CSP is not enabled or <code>$GLOBALS['CSP_NONCE']</code> is not set, script tags are rendered without nonce attributes and the module continues to work normally with no changes to existing behavior.</p>
+          
+          <h4>Setting Up CSP in Zen Cart</h4>
+          <p class="bodyText">If you want to enable CSP in your Zen Cart installation:</p>
+          <ol>
+            <li><strong>Generate a nonce for each request</strong> (in your main application initialization):
+              <pre style="background: #f5f5f5; padding: 0.5em; border-radius: 4px; overflow-x: auto; font-size: 0.9em;"><code>$GLOBALS['CSP_NONCE'] = bin2hex(random_bytes(16));</code></pre>
+            </li>
+            <li><strong>Send the CSP header</strong> (before any output):
+              <pre style="background: #f5f5f5; padding: 0.5em; border-radius: 4px; overflow-x: auto; font-size: 0.9em;"><code>header("Content-Security-Policy: script-src 'self' 'nonce-" . $GLOBALS['CSP_NONCE'] . "' https://www.paypal.com https://pay.google.com https://applepay.cdn-apple.com; object-src 'none'; base-uri 'self';");</code></pre>
+              <p class="bodyText">Or for report-only mode (recommended for testing):</p>
+              <pre style="background: #f5f5f5; padding: 0.5em; border-radius: 4px; overflow-x: auto; font-size: 0.9em;"><code>header("Content-Security-Policy-Report-Only: script-src 'self' 'nonce-" . $GLOBALS['CSP_NONCE'] . "' https://www.paypal.com https://pay.google.com https://applepay.cdn-apple.com; object-src 'none'; base-uri 'self';");</code></pre>
+            </li>
+            <li><strong>Add nonce to other scripts</strong> in your templates:
+              <pre style="background: #f5f5f5; padding: 0.5em; border-radius: 4px; overflow-x: auto; font-size: 0.9em;"><code>&lt;script nonce="&lt;?= htmlspecialchars($GLOBALS['CSP_NONCE'], ENT_QUOTES, 'UTF-8') ?&gt;"&gt;
+    // Your inline JavaScript
+&lt;/script&gt;</code></pre>
+            </li>
+          </ol>
+          
+          <h4>Security Considerations</h4>
+          <ul class="bodyList">
+            <li><strong>Nonce must be unique per request:</strong> Never reuse the same nonce across multiple page loads</li>
+            <li><strong>Nonce must be unpredictable:</strong> Use <code>random_bytes()</code> or similar cryptographically secure random generator</li>
+            <li><strong>Sanitize nonce output:</strong> Always use <code>htmlspecialchars()</code> when outputting the nonce to prevent injection</li>
+            <li><strong>Don't use 'unsafe-inline':</strong> The nonce-based approach is more secure than allowing all inline scripts</li>
+          </ul>
+        </div>
+      </div>
+      <!--EOF CSP SUPPORT-->
+
+      <!--BOF CREDIT CARD MODULE-->
+      <div class="bodyHeaderContainer" id="CreditCardModule">
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">PayPal Credit Card Module</span>
+        </div>
+        <div class="bodyWrapper">
+          <h4>Overview</h4>
+          <p class="bodyText">The <code>paypalr_creditcard</code> payment module provides credit card payment processing as a separate, standalone module option alongside the base PayPal Advanced Checkout (<code>paypalr</code>) module. This separation allows merchants to offer PayPal wallet payments and credit card payments as distinct choices to customers during checkout.</p>
+          
+          <h4>Purpose</h4>
+          <p class="bodyText">Prior to this module, the <code>paypalr</code> module combined both PayPal wallet and credit card payment options within a single module selection. While functional, this design had some limitations:</p>
+          <ul class="bodyList">
+            <li>Both payment methods appeared as a single option in the payment modules list</li>
+            <li>Customers saw both PayPal and credit card options within one payment method selection</li>
+            <li>Store administrators couldn't independently control the availability of each payment method</li>
+          </ul>
+          <p class="bodyText">The <code>paypalr_creditcard</code> module addresses these issues by creating a separate module specifically for credit card payments.</p>
+          
+          <h4>Features</h4>
+          <ul class="bodyList">
+            <li><strong>Independent Module:</strong> Appears as a separate payment method option in both admin and storefront</li>
+            <li><strong>Credit Cards Only:</strong> Shows only credit card input fields, no PayPal wallet button</li>
+            <li><strong>Shared Infrastructure:</strong> Uses <code>PayPalCommon</code> class for shared payment processing logic, follows same pattern as wallet modules (Google Pay, Apple Pay, Venmo)</li>
+            <li><strong>Individual Control:</strong> Can be enabled/disabled independently from the PayPal wallet option</li>
+            <li><strong>Full Feature Support:</strong> Supports all credit card features including saved cards (PayPal Vault), multiple card types (Visa, MasterCard, Amex, Discover, etc.), authorization and capture modes, refunds, voids, and captures from admin, and 3D Secure authentication support</li>
+          </ul>
+          
+          <h4>Installation</h4>
+          <ol>
+            <li><strong>Prerequisite:</strong> The base <code>paypalr</code> (PayPal Advanced Checkout) module must be installed and configured with valid API credentials</li>
+            <li><strong>Install the Module:</strong> Navigate to <strong>Modules &rarr; Payment</strong> in the admin, find "PayPal Credit Cards" in the list, and click "Install"</li>
+            <li><strong>Configure:</strong> Enable credit card payments, set the sort order relative to other payment modules, and optionally restrict to specific geographic zones</li>
+          </ol>
+          
+          <h4>Configuration</h4>
+          <p class="bodyText">The credit card module has its own configuration but shares the PayPal API credentials and most settings from the base <code>paypalr</code> module.</p>
+          <h5>Shared Settings (from paypalr)</h5>
+          <p class="bodyText">PayPal Server (live/sandbox), Client ID and Secret, Transaction Mode (Final Sale vs Auth Only), Order Status IDs, Currency settings, Debugging options, and all PayPal API configuration.</p>
+          
+          <h5>Independent Settings (paypalr_creditcard specific)</h5>
+          <ul class="bodyList">
+            <li><code>MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS</code>: Enable/disable credit card payments</li>
+            <li><code>MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER</code>: Display order</li>
+            <li><code>MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE</code>: Geographic zone restriction</li>
+            <li><code>MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION</code>: Module version (read-only)</li>
+          </ul>
+          
+          <h4>Recommended Setup</h4>
+          <p class="bodyText">For the cleanest separation of PayPal wallet and credit card options:</p>
+          <ol>
+            <li><strong>Install both modules:</strong> PayPal Advanced Checkout (<code>paypalr</code>) and PayPal Credit Cards (<code>paypalr_creditcard</code>)</li>
+            <li><strong>Configure paypalr for wallet-only:</strong> Set "Accept Credit Cards?" to <code>false</code> to make <code>paypalr</code> show only the PayPal wallet button</li>
+            <li><strong>Enable paypalr_creditcard:</strong> This provides the credit card payment option</li>
+          </ol>
+          <p class="bodyText">Now customers will see two separate payment method choices: <strong>PayPal</strong> for PayPal wallet payments and <strong>Credit Card</strong> for direct credit card payments.</p>
+          
+          <h4>Alternative Setups</h4>
+          <ul class="bodyList">
+            <li><strong>Credit cards only:</strong> Enable only <code>paypalr_creditcard</code>, disable <code>paypalr</code></li>
+            <li><strong>Combined (original behavior):</strong> Enable only <code>paypalr</code> with "Accept Credit Cards = true"</li>
+            <li><strong>PayPal wallet only:</strong> Enable only <code>paypalr</code> with "Accept Credit Cards = false"</li>
+          </ul>
+          
+          <h4>Vault (Saved Cards)</h4>
+          <p class="bodyText">The credit card module fully supports PayPal Vault for saving customer cards. Cards are automatically vaulted with PayPal for security, customers can choose to save cards for future use via checkbox, saved cards appear in the credit card module's payment selection, and vault management uses the same <code>account_saved_credit_cards</code> page as the parent module. Vault functionality requires <code>MODULE_PAYMENT_PAYPALR_ENABLE_VAULT = True</code> in the base module configuration.</p>
+          
+          <h4>Troubleshooting</h4>
+          <ul class="bodyList">
+            <li><strong>Module doesn't appear in admin:</strong> The parent <code>paypalr</code> module is not installed. Install and configure the PayPal Advanced Checkout module first.</li>
+            <li><strong>Module is disabled on storefront:</strong> Check that SSL is configured (site using HTTPS in production), supported card types are enabled in Configuration &rarr; Credit Cards, parent <code>paypalr</code> module has valid API credentials, and the module's STATUS is set to True.</li>
+            <li><strong>Credit card fields don't appear:</strong> Check server error logs for PHP errors, verify the parent module shows credit card fields when configured to accept cards.</li>
+          </ul>
+        </div>
+      </div>
+      <!--EOF CREDIT CARD MODULE-->
+
       <!--BOF AUTOMATION-->
       <div class="bodyHeaderContainer" id="Automation">
         <div class="bodyHeader" id="blue">
@@ -490,6 +625,8 @@
                 <a href="#Installation">Installation</a>
                 <a href="#Configuration">Configuration</a>
                 <a href="#Usage">Usage</a>
+                <a href="#CSPSupport">CSP Support</a>
+                <a href="#CreditCardModule">Credit Card Module</a>
               </div>
             </div>
             <div class="links">
