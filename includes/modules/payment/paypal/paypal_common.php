@@ -314,7 +314,18 @@ class PayPalCommon {
                 return $payload;
             }
 
-            // Legacy server-side confirmation path (fallback)
+            // LEGACY/FALLBACK: Server-side confirmation path
+            // This code path is kept for backward compatibility or debugging purposes, but is not
+            // currently used in production since Google Pay now uses client-side confirmOrder().
+            // 
+            // Under normal operation, the client-side confirmed payload will always have
+            // confirmed: true and will return early above. This fallback would only execute if:
+            // - The JavaScript fails to call confirmOrder() and falls back to old behavior
+            // - Testing/debugging scenarios that bypass client-side confirmation
+            // - Future modifications that temporarily revert to server-side confirmation
+            //
+            // Consider removing this code in a future release after sufficient production validation
+            // of the client-side confirmation flow.
             $token = $payload['token'] ?? null;
 
             if (!is_string($token)) {

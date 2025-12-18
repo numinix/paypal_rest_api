@@ -19,7 +19,7 @@
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
 
-class GooglePayServerSideConfirmationTest
+class GooglePayClientSideConfirmationTest
 {
     private string $jsFile;
     private string $phpFile;
@@ -221,5 +221,5 @@ class GooglePayServerSideConfirmationTest
 }
 
 // Run the test
-$test = new GooglePayServerSideConfirmationTest();
+$test = new GooglePayClientSideConfirmationTest();
 $test->run();
