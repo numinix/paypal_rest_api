@@ -122,6 +122,41 @@
             <li>Optionally create <code>includes/templates/&lt;your template&gt;/css/ascc_overrides.css</code> to layer additional styling. The plugin does not ship with this file so you can maintain your overrides outside of version control.</li>
           </ol>
           <p class="bodyText">Once the loader is in place, the saved-card page adopts the responsive template&rsquo;s layout automatically. You can remove or extend styles at any time by editing your optional <code>ascc_overrides.css</code> file.</p>
+          <h4>Optional wallet buttons on product and cart pages</h4>
+          <p class="bodyText">PayPal Advanced Checkout can display wallet payment buttons (Google Pay, Apple Pay, Venmo) directly on shopping cart and product pages for faster checkout. These buttons allow customers to complete purchases without navigating to the standard checkout flow.</p>
+          <p class="bodyText"><strong>Shopping cart page integration:</strong></p>
+          <ol>
+            <li>Open your active template&rsquo;s shopping cart file: <code>includes/templates/YOUR_TEMPLATE/templates/tpl_shopping_cart_default.php</code></li>
+            <li>Locate the "Continue Checkout" or "Proceed to Checkout" button section (typically near the bottom after order totals)</li>
+            <li>Add the following code immediately before or after the checkout button:</li>
+          </ol>
+          <pre style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>&lt;?php
+  // PayPal Wallet Buttons (Google Pay, Apple Pay, Venmo)
+  $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_paypalr_shopping_cart.php';
+  if (!file_exists($template_path)) {
+    $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_paypalr_shopping_cart.php';
+  }
+  if (file_exists($template_path)) {
+    include($template_path);
+  }
+?&gt;</code></pre>
+          <p class="bodyText"><strong>Product page integration:</strong></p>
+          <ol>
+            <li>Open your active template&rsquo;s product info display file: <code>includes/templates/YOUR_TEMPLATE/templates/tpl_product_info_display.php</code></li>
+            <li>Locate the "Add to Cart" button section (typically within the product options/quantity form)</li>
+            <li>Add the following code immediately after the "Add to Cart" button:</li>
+          </ol>
+          <pre style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>&lt;?php
+  // PayPal Wallet Buttons (Google Pay, Apple Pay, Venmo)
+  $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_paypalr_product_info.php';
+  if (!file_exists($template_path)) {
+    $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_paypalr_product_info.php';
+  }
+  if (file_exists($template_path)) {
+    include($template_path);
+  }
+?&gt;</code></pre>
+          <p class="bodyText">After adding these snippets, wallet buttons appear automatically when their corresponding payment modules (PayPal Google Pay, PayPal Apple Pay, PayPal Venmo) are installed and enabled. Each button handles payment authorization, shipping address collection, shipping method selection, order total calculation, and order creation&mdash;all without leaving the page.</p>
         </div>
       </div>
       <!--EOF INSTALLATION-->
@@ -428,7 +463,7 @@
                 </span>
                 <div>
                   <strong>Phone</strong><br />
-                  <a href="tel:+16043100027">+1 (604) 310-0027</a>
+                  <a href="tel:+18556864649">1-855-NUMINIX</a>
                 </div>
               </li>
               <li>
@@ -510,7 +545,7 @@
         </div>
       </div>
       <div class="readme-footer-bottom">
-        <p class="copyright">&copy; 2024 Numinix Web Design Inc.</p>
+        <p class="copyright">&copy; <script>document.write(new Date().getFullYear())</script> Numinix Web Design Inc.</p>
         <p class="madewith">Made with
           <span aria-hidden="true">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#E63946">
