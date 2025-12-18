@@ -83,6 +83,7 @@
 .paypalr-applepay-button,
 .paypalr-venmo-button {
     min-height: 40px;
+    max-width: 400px;
     cursor: pointer;
 }
 
@@ -120,4 +121,5 @@ apple-pay-button {
     --apple-pay-button-width: 100%;
     --apple-pay-button-height: 40px;
     --apple-pay-button-border-radius: 4px;
+    max-width: 400px;
 }
