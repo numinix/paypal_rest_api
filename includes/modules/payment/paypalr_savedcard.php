@@ -285,6 +285,18 @@ class paypalr_savedcard extends base
             return;
         }
 
+        // Check for version-specific configuration updates
+        if (defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_VERSION')) {
+            switch (true) {
+                // Add future version-specific upgrades here
+                // case version_compare(MODULE_PAYMENT_PAYPALR_SAVEDCARD_VERSION, '1.3.5', '<'):
+                //     // Add v1.3.5-specific changes here
+                
+                default:
+                    break;
+            }
+        }
+
         // Record the current version of the payment module into its database configuration setting
         $db->Execute(
             "UPDATE " . TABLE_CONFIGURATION . "
