@@ -240,7 +240,7 @@ mkdir -p ajax
 
 ---
 
-## Phase 4: Copy and Adapt AJAX Handlers
+## Phase 4: Copy and Adapt AJAX Handlers ✅ COMPLETE
 
 ### 4.1 Main AJAX Handler (Order Data, Shipping, Totals)
 **Source:** `reference/braintree_payments/catalog/ajax/braintree.php` (804 lines)
@@ -488,9 +488,10 @@ Each wallet module needs these constants:
 - [x] Copy and adapt `tpl_modules_paypalr_product_venmo.php` (271 lines - full implementation with product cart integration)
 
 ## Phase 4: AJAX Handlers
-- [ ] Copy and adapt `ajax/paypalr_wallet.php` (placeholder created, full implementation pending)
-- [ ] Copy and adapt `ajax/paypalr_wallet_checkout.php` (placeholder created, full implementation pending)
-- [ ] Copy and adapt `ajax/paypalr_wallet_clear_cart.php` (placeholder created, full implementation pending)
+- [x] Copy and adapt `ajax/paypalr_wallet.php` (804 lines - full implementation from braintree.php)
+- [x] Copy and adapt `ajax/paypalr_wallet_checkout.php` (561 lines - full implementation from braintree_checkout_handler.php)
+- [x] Copy and adapt `ajax/paypalr_wallet_clear_cart.php` (35 lines - full implementation from braintree_clear_cart.php)
+- [x] Copy and adapt `includes/functions/paypalr_functions.php` (291 lines - helper functions)
 
 ## Phase 5: Loader Override
 - [x] Copy and adapt `paypalr_wallet_ajax.core.php`
