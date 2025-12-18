@@ -269,10 +269,9 @@
             + '&components=buttons,googlepay,applepay'
             + '&currency=' + encodeURIComponent(config.currency || 'USD');
 
-        // Add buyer-country parameter for sandbox mode (required for testing)
-        if (isSandbox) {
-            query += '&buyer-country=US';
-        }
+        // Add buyer-country parameter to ensure Venmo eligibility detection works correctly
+        // Venmo is US-only, so we always specify US as the buyer country
+        query += '&buyer-country=US';
 
         // Only include merchant-id if it's a valid PayPal merchant ID (alphanumeric, typically 13 chars).
         // Do NOT include language label strings like "Merchant ID:" or placeholder values like "*".
