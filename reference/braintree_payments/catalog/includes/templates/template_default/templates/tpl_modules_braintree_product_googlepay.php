@@ -20,6 +20,8 @@
 (function () {
     "use strict";
 
+    window.braintreeGooglePaySessionAppend = window.braintreeGooglePaySessionAppend || "<?php echo zen_session_id() ? ('?' . zen_session_name() . '=' . zen_session_id()) : ''; ?>";
+
     window.googlePayScriptsLoaded = window.googlePayScriptsLoaded || false;
     let googlePayRetryAttempts = 0;
     const MAX_RETRY_ATTEMPTS = 3;

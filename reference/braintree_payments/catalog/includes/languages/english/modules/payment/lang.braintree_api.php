@@ -6,6 +6,7 @@ $define = [
     'MODULE_PAYMENT_BRAINTREE_TEXT_TITLE' => (IS_ADMIN_FLAG === true) ? 'Braintree Credit Cards' : 'Credit Card',
     'MODULE_PAYMENT_BRAINTREE_TEXT_ADMIN_TITLE' => 'Braintree Credit Card Payments',
     'MODULE_PAYMENT_BRAINTREE_TEXT_ADMIN_DESCRIPTION' => 'Accept credit cards supported by your Merchant Account via Braintree<br />(<a href="https://www.braintreepayments.com/" target="_blank">Manage your Braintree account.</a>)',
+    'MODULE_PAYMENT_BRAINTREE_CURRENCY_MISMATCH_WARNING' => '<div class="messageStackWarning braintree-currency-warning">Note: Your selected currency (%s) differs from the settlement currency (%s) for this payment method. You will be charged in %s.</div>',
     'MODULE_PAYMENT_BRAINTREE_SIGNUP_HEADLINE' => 'Need a Braintree account?',
     'MODULE_PAYMENT_BRAINTREE_SIGNUP_DESCRIPTION' => 'Use our partner sign-up link to create your Braintree account and collect the API keys required below.',
     'MODULE_PAYMENT_BRAINTREE_SIGNUP_LINK_TEXT' => 'Apply for Braintree',

@@ -5,7 +5,7 @@ $country_query = "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES . " WHERE
 $country_result = $db->Execute($country_query);
 $storeCountryCode = $country_result->fields['countries_iso_code_2'] ?? 'US';  // Fallback to 'US' if not found
 
-$currencyCode = $_SESSION['currency'];
+$currencyCode = $_SESSION['currency'] ?? DEFAULT_CURRENCY;
 $storeName = STORE_NAME;
 $initialTotal = number_format($currencies->value(zen_get_products_base_price((int)$_GET['products_id'])), 2, '.', '');
 

@@ -2,7 +2,19 @@
 require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/braintree_applepay.php');
 $applePayModule = new braintree_applepay();
 $clientToken = $applePayModule->generate_client_token();
-$use3DS = (defined('MODULE_PAYMENT_BRAINTREE_APPLE_PAY_USE_3DS') && MODULE_PAYMENT_BRAINTREE_APPLE_PAY_USE_3DS === 'True');
+
+// Define variables if not already set (e.g., when included directly instead of via tpl_braintree_shopping_cart.php)
+if (!isset($storeCountryCode)) {
+    $country_query = "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES . " WHERE countries_id = " . (int)STORE_COUNTRY;
+    $country_result = $db->Execute($country_query);
+    $storeCountryCode = $country_result->fields['countries_iso_code_2'] ?? 'US';
+}
+if (empty($currencyCode)) {
+    $currencyCode = $_SESSION['currency'] ?? DEFAULT_CURRENCY;
+}
+if (!isset($initialTotal)) {
+    $initialTotal = number_format($currencies->value($_SESSION['cart']->total), 2, '.', '');
+}
 ?>
 
 <style>
@@ -19,267 +31,421 @@ $use3DS = (defined('MODULE_PAYMENT_BRAINTREE_APPLE_PAY_USE_3DS') && MODULE_PAYME
 }
 </style>
 
-<script src="https://js.braintreegateway.com/web/3.115.2/js/client.min.js"></script>
-<script src="https://js.braintreegateway.com/web/3.115.2/js/apple-pay.min.js"></script>
-<?php if ($use3DS): ?>
-<script src="https://js.braintreegateway.com/web/3.115.2/js/three-d-secure.min.js"></script>
-<?php endif; ?>
-
 <script>
-"use strict";
+(function () {
+    "use strict";
 
-document.addEventListener("DOMContentLoaded", function () {
-    if (typeof ApplePaySession === "undefined" || !ApplePaySession.canMakePayments()) return;
+    window.applePayScriptsLoaded = window.applePayScriptsLoaded || false;
+    let applePayRetryAttempts = 0;
+    const MAX_RETRY_ATTEMPTS = 3;
+    const MAX_BRAINTREE_WAIT_ATTEMPTS = 10;
 
-    const container = document.getElementById("apple-pay-button-container");
-    if (!container) return;
+    // Detect iOS Chrome (CriOS) - needed for sequential loading
+    const ua = navigator.userAgent || "";
+    const isIOSChrome = /CriOS/.test(ua);
 
-    braintree.client.create({
-        authorization: "<?php echo $clientToken; ?>"
-    }).then(clientInstance => {
-        <?php if ($use3DS): ?>
-        braintree.threeDSecure.create({ client: clientInstance, version: 2 }, function (err, threeDSInstance) {
-            if (err && err.code === "THREEDS_NOT_ENABLED_FOR_V2") {
-                braintree.threeDSecure.create({ client: clientInstance, version: 1 }, function (errV1, fallbackInstance) {
-                    if (!errV1) window.threeDS = fallbackInstance;
-                });
-            } else if (!err) {
-                window.threeDS = threeDSInstance;
-            }
-        });
-        <?php endif; ?>
+    function hasModernBrowserSupport() {
+        return (typeof window.Promise !== 'undefined') && (typeof window.fetch === 'function');
+    }
 
-        return braintree.applePay.create({ client: clientInstance });
-    }).then(applePayInstance => {
-        let applePayButtonReady = false;
+    if (!hasModernBrowserSupport()) {
+        // Apple Pay should remain hidden on unsupported browsers
+        return;
+    }
 
-        function initializeApplePayButton() {
-            if (applePayButtonReady) return;
-            applePayButtonReady = true;
-
-            const button = document.createElement("button");
-            button.className = "apple-pay-button";
-            button.type = "button";
-            container.appendChild(button);
-
-            let cachedShippingContact = null;
-            let cachedSelectedShippingId = null;
-            window.applePayFinalTotal = "<?php echo $initialTotal; ?>";
-
-            button.addEventListener("click", function () {
-                const paymentRequest = applePayInstance.createPaymentRequest({
-                    countryCode: "<?php echo $storeCountryCode; ?>",
-                    currencyCode: "<?php echo $currencyCode; ?>",
-                    total: {
-                        label: "<?php echo addslashes(STORE_NAME); ?>",
-                        amount: window.applePayFinalTotal
-                    },
-                    requiredBillingContactFields: ["postalAddress", "name", "phone", "email"],
-                    requiredShippingContactFields: ["postalAddress", "name", "phone", "email"],
-                    shippingType: "shipping"
-                });
-
-                const session = new ApplePaySession(3, paymentRequest);
-
-                session.onvalidatemerchant = function (event) {
-                    applePayInstance.performValidation({
-                        validationURL: event.validationURL,
-                        displayName: "<?php echo addslashes(STORE_NAME); ?>"
-                    }, function (err, merchantSession) {
-                        if (err) {
-                            session.abort();
-                            return;
-                        }
-                        session.completeMerchantValidation(merchantSession);
-                    });
-                };
-
-                session.onshippingcontactselected = event => {
-                    cachedShippingContact = event.shippingContact;
-
-                    fetch("ajax/braintree.php", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            shippingAddress: cachedShippingContact,
-                            selectedShippingOptionId: cachedSelectedShippingId || null,
-                            module: "braintree_applepay"
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        const shippingOptionParams = data.newShippingOptionParameters || {};
-                        if (!cachedSelectedShippingId && shippingOptionParams.defaultSelectedOptionId) {
-                            cachedSelectedShippingId = shippingOptionParams.defaultSelectedOptionId;
-                        }
-
-                        const fallbackShippingOptions = Array.isArray(shippingOptionParams.shippingOptions) ? shippingOptionParams.shippingOptions : [];
-                        const shippingMethods = data.newShippingMethods || fallbackShippingOptions.map(opt => ({
-                            label: opt.label,
-                            amount: opt.price,
-                            identifier: opt.id,
-                            detail: opt.detail
-                        }));
-
-                        const transactionInfo = data.newTransactionInfo || {};
-                        const total = (data.newTotal && data.newTotal.amount) || transactionInfo.totalPrice || "<?php echo $initialTotal; ?>";
-                        const lineItemSource = data.newLineItems || (Array.isArray(transactionInfo.displayItems) ? transactionInfo.displayItems : []);
-                        const safeLineItems = Array.isArray(lineItemSource) ? lineItemSource : [];
-                        const lineItems = safeLineItems.map(item => ({
-                            label: item.label,
-                            amount: item.price
-                        }));
-
-                        window.applePayFinalTotal = total;
-
-                        session.completeShippingContactSelection({
-                            newShippingMethods: shippingMethods,
-                            newTotal: { label: "<?php echo addslashes(STORE_NAME); ?>", amount: total },
-                            newLineItems: lineItems
-                        });
-                    })
-                    .catch(() => session.abort());
-                };
-
-                session.onshippingmethodselected = event => {
-                    cachedSelectedShippingId = event.shippingMethod.identifier;
-                    if (!cachedShippingContact) return session.abort();
-
-                    fetch("ajax/braintree.php", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            selectedShippingOptionId: event.shippingMethod.identifier,
-                            shippingAddress: cachedShippingContact,
-                            module: "braintree_applepay"
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        const lineItems = Array.isArray(data.newLineItems) ? data.newLineItems : [];
-                        const total = (data.newTotal && data.newTotal.amount) || (data.newTransactionInfo && data.newTransactionInfo.totalPrice) || "<?php echo $initialTotal; ?>";
-
-                        window.applePayFinalTotal = total;
-
-                        session.completeShippingMethodSelection({
-                            newTotal: { label: "<?php echo addslashes(STORE_NAME); ?>", amount: total },
-                            newLineItems: lineItems
-                        });
-                    })
-                    .catch(() => session.abort());
-                };
-
-                session.onpaymentauthorized = event => {
-                    applePayInstance.tokenize({ token: event.payment.token }, (err, payload) => {
-                        if (err || !payload || !payload.nonce) {
-                            session.completePayment(ApplePaySession.STATUS_FAILURE);
-                            return;
-                        }
-
-                        const shipping = normalizeContact(event.payment.shippingContact);
-                        const billing = normalizeContact(event.payment.billingContact || event.payment.shippingContact);
-                        const email = billing.email || shipping.email || '';
-
-                        const payloadData = {
-                            payment_method_nonce: payload.nonce,
-                            module: "braintree_applepay",
-                            currency: "<?php echo $currencyCode; ?>",
-                            total: window.applePayFinalTotal,
-                            shipping_address: shipping,
-                            billing_address: billing,
-                            email: email
-                        };
-
-                        <?php if ($use3DS): ?>
-                        if (window.threeDS && typeof window.threeDS.verifyCard === 'function' && !window.threeDS._destroyed) {
-                            const bin = payload.details && payload.details.bin;
-
-                            if (!bin) {
-                                finalizeApplePayPayment(payloadData, session);
-                                return;
-                            }
-
-                            const billingNameParts = (billing.name || '').trim().split(/\s+/);
-                            const billingGiven = billingNameParts.shift() || '';
-                            const billingSurname = billingNameParts.join(' ');
-
-                            window.threeDS.verifyCard({
-                                amount: window.applePayFinalTotal,
-                                nonce: payload.nonce,
-                                bin: bin,
-                                email: email,
-                                billingAddress: {
-                                    givenName: billingGiven,
-                                    surname: billingSurname,
-                                    phoneNumber: billing.phone,
-                                    streetAddress: billing.address1,
-                                    locality: billing.locality,
-                                    region: billing.administrativeArea,
-                                    postalCode: billing.postalCode,
-                                    countryCodeAlpha2: billing.countryCode
-                                },
-                                onLookupComplete: function (data, next) {
-                                    next();
-                                }
-                            }).then(function (verification) {
-                                if (verification && verification.nonce) {
-                                    payloadData.payment_method_nonce = verification.nonce;
-                                    finalizeApplePayPayment(payloadData, session);
-                                } else {
-                                    session.completePayment(ApplePaySession.STATUS_FAILURE);
-                                }
-                            }).catch(function () {
-                                session.completePayment(ApplePaySession.STATUS_FAILURE);
-                            });
-                        } else {
-                            finalizeApplePayPayment(payloadData, session);
-                        }
-                        <?php else: ?>
-                        finalizeApplePayPayment(payloadData, session);
-                        <?php endif; ?>
-                    });
-                };
-
-                session.begin();
-            });
+    function loadApplePayScripts() {
+        if (window.applePayScriptsLoaded) {
+            console.log('Apple Pay (Cart): Required scripts already loaded');
+            return Promise.resolve();
         }
 
-        function fallbackToBasicApplePay(reason) {
-            console.warn("Apple Pay active-card check failed or unavailable:", reason);
-            try {
-                if (typeof ApplePaySession !== "undefined" && typeof ApplePaySession.canMakePayments === "function") {
-                    if (ApplePaySession.canMakePayments()) {
-                        initializeApplePayButton();
+        const scripts = [
+            "https://js.braintreegateway.com/web/3.133.0/js/client.min.js",
+            "https://js.braintreegateway.com/web/3.133.0/js/apple-pay.min.js",
+            "https://js.braintreegateway.com/web/3.133.0/js/three-d-secure.min.js"
+        ];
+
+        const loadScript = function (src) {
+            return new Promise(function (resolve, reject) {
+                const selector = 'script[src="' + src.replace(/"/g, '\\"') + '"]';
+                const existing = document.querySelector(selector);
+                if (existing) {
+                    if (existing.dataset.loaded === 'true') {
+                        console.log('Apple Pay (Cart): Script already loaded', src);
+                        resolve();
                         return;
                     }
+                    // Script exists but may already be loaded (e.g., from cache on page refresh or by another module like Google Pay)
+                    // Check if it's already loaded or still loading
+                    if (existing.readyState === 'complete' || existing.readyState === 'loaded' || !existing.readyState) {
+                        // If readyState is 'complete', 'loaded', or undefined (script added via <script src=""> tag), consider it loaded
+                        existing.dataset.loaded = 'true';
+                        console.log('Apple Pay (Cart): Script already loaded (from existing tag)', src);
+                        resolve();
+                        return;
+                    }
+                    // Script is still loading, wait for it
+                    existing.addEventListener('load', function () {
+                        existing.dataset.loaded = 'true';
+                        console.log('Apple Pay (Cart): Script loaded', src);
+                        resolve();
+                    });
+                    existing.addEventListener('error', function () {
+                        console.warn('Apple Pay (Cart): Failed to load script', src);
+                        reject(new Error("Failed to load script: " + src));
+                    });
+                    return;
                 }
-            } catch (err) {
-                console.warn("Apple Pay basic availability check failed:", err);
-            }
+
+                const script = document.createElement("script");
+                script.src = src;
+                script.async = true;
+                script.dataset.loaded = 'false';
+                script.addEventListener('load', function () {
+                    script.dataset.loaded = 'true';
+                    console.log('Apple Pay (Cart): Loaded script', src);
+                    resolve();
+                });
+                script.addEventListener('error', function () {
+                    console.warn('Apple Pay (Cart): Failed to load script', src);
+                    reject(new Error("Failed to load script: " + src));
+                });
+                document.head.appendChild(script);
+            });
+        };
+
+        console.log('Apple Pay (Cart): Loading resources', scripts);
+        console.log('Apple Pay (Cart): Browser detection - iOS Chrome:', isIOSChrome);
+
+        // iOS Chrome requires sequential loading to avoid race conditions and initialization issues
+        // All other browsers work fine with parallel loading (faster)
+        if (isIOSChrome) {
+            console.log('Apple Pay (Cart): Using sequential loading for iOS Chrome');
+            return scripts.reduce(function (promise, src) {
+                return promise.then(function () {
+                    return loadScript(src);
+                });
+            }, Promise.resolve()).then(function () {
+                window.applePayScriptsLoaded = true;
+            });
+        } else {
+            console.log('Apple Pay (Cart): Using parallel loading for non-iOS Chrome browsers');
+            return Promise.all(scripts.map(function (src) {
+                return loadScript(src);
+            })).then(function () {
+                window.applePayScriptsLoaded = true;
+            });
         }
+    }
 
-        const canCheckActiveCard = (
-            typeof ApplePaySession !== "undefined" &&
-            typeof ApplePaySession.canMakePaymentsWithActiveCard === "function" &&
-            applePayInstance.merchantIdentifier
-        );
+    function onDomReady(callback) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', callback);
+        } else {
+            // Use setTimeout to ensure the container element is rendered
+            // even if the DOM is already "ready" when this script runs
+            setTimeout(callback, 0);
+        }
+    }
 
-        if (!canCheckActiveCard) {
-            fallbackToBasicApplePay("Active-card check not supported in this browser.");
+    function initializeApplePay() {
+        if (typeof ApplePaySession === "undefined" || !ApplePaySession.canMakePayments()) {
             return;
         }
 
-        ApplePaySession.canMakePaymentsWithActiveCard(applePayInstance.merchantIdentifier)
-            .then(function (canMakePayments) {
-                if (canMakePayments) {
-                    initializeApplePayButton();
-                } else {
-                    fallbackToBasicApplePay("No active cards");
+        const container = document.getElementById("apple-pay-button-container");
+        if (!container) {
+            console.warn('Apple Pay (Cart): Button container not found in DOM');
+            return;
+        }
+
+        // Ensure braintree object is available before proceeding
+        if (typeof braintree === "undefined" || !braintree.client) {
+            console.warn('Apple Pay (Cart): Braintree client not ready yet, will retry');
+            return;
+        }
+
+        braintree.client.create({
+            authorization: "<?php echo $clientToken; ?>"
+        }).then(function (clientInstance) {
+            return braintree.threeDSecure.create({ client: clientInstance, version: 2 })
+                .then(function (threeDSInstance) {
+                    window.appleThreeDS = threeDSInstance;
+                    return braintree.applePay.create({ client: clientInstance });
+                })
+                .catch(function (err) {
+                    console.warn("3DS setup skipped:", err);
+                    window.appleThreeDS = null;
+                    return braintree.applePay.create({ client: clientInstance });
+                });
+        }).then(function (applePayInstance) {
+            if (!applePayInstance) {
+                return;
+            }
+
+            ApplePaySession.canMakePaymentsWithActiveCard(applePayInstance.merchantIdentifier).then(function (canMakePayments) {
+                if (!canMakePayments) {
+                    return;
                 }
+
+                const button = document.createElement("button");
+                button.className = "apple-pay-button";
+                button.type = "button";
+                container.appendChild(button);
+
+                let cachedShippingContact = null;
+                let cachedSelectedShippingId = null;
+                let pendingRedirectUrl = null;
+                window.applePayFinalTotal = "<?php echo $initialTotal; ?>";
+
+                button.addEventListener("click", function () {
+                    const paymentRequest = applePayInstance.createPaymentRequest({
+                        countryCode: "<?php echo $storeCountryCode; ?>",
+                        currencyCode: "<?php echo $currencyCode; ?>",
+                        total: {
+                            label: "<?php echo addslashes(STORE_NAME); ?>",
+                            amount: window.applePayFinalTotal
+                        },
+                        requiredBillingContactFields: ["postalAddress", "name", "phone", "email"],
+                        requiredShippingContactFields: ["postalAddress", "name", "phone", "email"],
+                        shippingType: "shipping"
+                    });
+
+                    const session = new ApplePaySession(3, paymentRequest);
+
+                    session.onvalidatemerchant = function (event) {
+                        applePayInstance.performValidation({
+                            validationURL: event.validationURL,
+                            displayName: "<?php echo addslashes(STORE_NAME); ?>"
+                        })
+                            .then(function (merchantSession) {
+                                session.completeMerchantValidation(merchantSession);
+                            })
+                            .catch(function (err) {
+                                console.error('Apple Pay validation error:', err);
+                                session.abort();
+                            });
+                    };
+
+
+                    session.onshippingcontactselected = event => {
+                        cachedShippingContact = event.shippingContact;
+
+                        fetch("ajax/braintree.php", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                shippingAddress: cachedShippingContact,
+                                selectedShippingOptionId: cachedSelectedShippingId || undefined,
+                                module: "braintree_applepay"
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            const shippingParams = data.newShippingOptionParameters || {};
+                            if (!cachedSelectedShippingId && shippingParams.defaultSelectedOptionId) {
+                                cachedSelectedShippingId = shippingParams.defaultSelectedOptionId;
+                            }
+
+                            const fallbackShippingMethods = Array.isArray(shippingParams.shippingOptions)
+                                ? shippingParams.shippingOptions.map(function (opt) {
+                                    return {
+                                        label: opt.label,
+                                        amount: opt.price,
+                                        identifier: opt.id,
+                                        detail: opt.detail
+                                    };
+                                })
+                                : [];
+
+                            const shippingMethods = data.newShippingMethods || fallbackShippingMethods;
+
+                            const transactionInfo = data.newTransactionInfo || {};
+                            const total = (data.newTotal && data.newTotal.amount) || transactionInfo.totalPrice || "<?php echo $initialTotal; ?>";
+                            const fallbackLineItems = Array.isArray(transactionInfo.displayItems)
+                                ? transactionInfo.displayItems.map(function (item) {
+                                    return {
+                                        label: item.label,
+                                        amount: item.price
+                                    };
+                                })
+                                : [];
+                            const lineItems = data.newLineItems || fallbackLineItems;
+
+                            window.applePayFinalTotal = total;
+
+                            session.completeShippingContactSelection({
+                                newShippingMethods: shippingMethods,
+                                newTotal: { label: "<?php echo addslashes(STORE_NAME); ?>", amount: total },
+                                newLineItems: lineItems
+                            });
+                        })
+                        .catch(() => session.abort());
+                    };
+
+                    session.onshippingmethodselected = event => {
+                        cachedSelectedShippingId = event.shippingMethod.identifier;
+                        if (!cachedShippingContact) return session.abort();
+
+                        fetch("ajax/braintree.php", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                selectedShippingOptionId: event.shippingMethod.identifier,
+                                shippingAddress: cachedShippingContact,
+                                module: "braintree_applepay"
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            const transactionInfo = data.newTransactionInfo || {};
+                            const total = (data.newTotal && data.newTotal.amount) || transactionInfo.totalPrice || "<?php echo $initialTotal; ?>";
+                            const fallbackLineItems = Array.isArray(transactionInfo.displayItems)
+                                ? transactionInfo.displayItems.map(function (item) {
+                                    return {
+                                        label: item.label,
+                                        amount: item.price
+                                    };
+                                })
+                                : [];
+                            const lineItems = data.newLineItems || fallbackLineItems;
+
+                            window.applePayFinalTotal = total;
+
+                            session.completeShippingMethodSelection({
+                                newTotal: { label: "<?php echo addslashes(STORE_NAME); ?>", amount: total },
+                                newLineItems: lineItems
+                            });
+                        })
+                        .catch(() => session.abort());
+                    };
+
+                    session.oncancel = event => {
+                        console.log('Apple Pay (Cart): Session cancelled or completed');
+                        if (pendingRedirectUrl) {
+                            console.log('Apple Pay (Cart): Redirecting to', pendingRedirectUrl);
+                            window.location.href = pendingRedirectUrl;
+                        }
+                    };
+
+                    session.onpaymentauthorized = event => {
+                        applePayInstance.tokenize({ token: event.payment.token })
+                            .then(function (payload) {
+                                if (!payload || !payload.nonce) {
+                                    session.completePayment(ApplePaySession.STATUS_FAILURE);
+                                    return;
+                                }
+
+                                const shipping = normalizeContact(event.payment.shippingContact);
+                                const billing = normalizeContact(event.payment.billingContact || event.payment.shippingContact);
+                                const email = billing.email || shipping.email || '';
+
+                                const payloadData = {
+                                    payment_method_nonce: payload.nonce,
+                                    module: "braintree_applepay",
+                                    currency: "<?php echo $currencyCode; ?>",
+                                    total: window.applePayFinalTotal,
+                                    shipping_address: shipping,
+                                    billing_address: billing,
+                                    email: email
+                                };
+
+                                if (window.appleThreeDS && typeof window.appleThreeDS.verifyCard === 'function' && !window.appleThreeDS._destroyed) {
+                                    const bin = payload.details && payload.details.bin;
+
+                                    if (!bin) {
+                                        finalizeApplePayPayment(payloadData, session);
+                                        return;
+                                    }
+
+                                    window.appleThreeDS.verifyCard({
+                                        amount: window.applePayFinalTotal,
+                                        nonce: payload.nonce,
+                                        bin: bin,
+                                        email: email,
+                                        billingAddress: {
+                                            givenName: billing.name ? billing.name.split(" ")[0] || '' : '',
+                                            surname: billing.name ? billing.name.split(" ")[1] || '' : '',
+                                            phoneNumber: billing.phone,
+                                            streetAddress: billing.address1,
+                                            locality: billing.locality,
+                                            region: billing.administrativeArea,
+                                            postalCode: billing.postalCode,
+                                            countryCodeAlpha2: billing.countryCode
+                                        },
+                                        onLookupComplete: function (data, next) {
+                                            next();
+                                        }
+                                    }).then(function (verification) {
+                                        if (verification && verification.nonce) {
+                                            payloadData.payment_method_nonce = verification.nonce;
+                                            finalizeApplePayPayment(payloadData, session);
+                                        } else {
+                                            session.completePayment(ApplePaySession.STATUS_FAILURE);
+                                        }
+                                    }).catch(function () {
+                                        session.completePayment(ApplePaySession.STATUS_FAILURE);
+                                    });
+                                } else {
+                                    finalizeApplePayPayment(payloadData, session);
+                                }
+                            })
+                            .catch(function (err) {
+                                console.error('Apple Pay tokenize error:', err);
+                                session.completePayment(ApplePaySession.STATUS_FAILURE);
+                            });
+                    };
+
+                    session.begin();
+                });
+            });
+        }).catch(error => {
+            console.error('Error initializing Apple Pay:', error);
+        });
+    }
+
+    function attemptApplePayInitialization() {
+        loadApplePayScripts()
+            .then(function () {
+                // Wait for braintree object to be available after scripts load
+                function waitForBraintree(attempts) {
+                    attempts = attempts || 0;
+                    if (typeof braintree !== "undefined" && braintree.client) {
+                        console.log('Apple Pay (Cart): Braintree client ready, initializing');
+                        onDomReady(initializeApplePay);
+                        applePayRetryAttempts = 0; // Reset on success
+                    } else if (attempts < MAX_BRAINTREE_WAIT_ATTEMPTS) {
+                        console.log('Apple Pay (Cart): Waiting for braintree object (attempt ' + (attempts + 1) + ')');
+                        setTimeout(function() { waitForBraintree(attempts + 1); }, 100);
+                    } else {
+                        console.error('Apple Pay (Cart): Braintree client not available after waiting');
+                        applePayRetryAttempts++;
+                        if (applePayRetryAttempts < MAX_RETRY_ATTEMPTS) {
+                            const delay = Math.min(1000 * Math.pow(2, applePayRetryAttempts - 1), 5000);
+                            console.log('Apple Pay (Cart): Retrying full initialization in ' + delay + 'ms');
+                            setTimeout(attemptApplePayInitialization, delay);
+                        }
+                    }
+                }
+                waitForBraintree();
             })
-            .catch(fallbackToBasicApplePay);
-    });
-});
+            .catch(function (error) {
+                console.error('Apple Pay (Cart): Failed to load scripts:', error);
+                applePayRetryAttempts++;
+                
+                if (applePayRetryAttempts < MAX_RETRY_ATTEMPTS) {
+                    const delay = Math.min(1000 * Math.pow(2, applePayRetryAttempts - 1), 5000);
+                    console.log('Apple Pay (Cart): Retrying in ' + delay + 'ms (attempt ' + applePayRetryAttempts + ' of ' + MAX_RETRY_ATTEMPTS + ')');
+                    setTimeout(attemptApplePayInitialization, delay);
+                } else {
+                    // Fail silently after all retries on cart/product pages
+                    console.warn('Apple Pay (Cart): Initialization failed after ' + MAX_RETRY_ATTEMPTS + ' attempts. Button will not be displayed.');
+                }
+            });
+    }
+
+    attemptApplePayInitialization();
+})();
 
 function normalizeContact(contact) {
     const fullName = ((contact.givenName || "") + " " + (contact.familyName || "")).trim();
@@ -298,21 +464,41 @@ function normalizeContact(contact) {
 }
 
 function finalizeApplePayPayment(payloadData, session) {
+    console.log('Apple Pay (Cart): Finalizing payment', payloadData);
     fetch("ajax/braintree_checkout_handler.php", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest"
+        },
         body: JSON.stringify(payloadData)
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Apple Pay (Cart): Received response', response);
+        if (response.redirected && response.url) {
+            return { status: 'success', redirect_url: response.url };
+        }
+        return response.json();
+    })
     .then(json => {
-        if (json.status === "success" && json.redirect_url) {
+        console.log('Apple Pay (Cart): Parsed JSON', json);
+        if (json.status === "success") {
+            const redirectUrl = json.redirect_url || 'index.php?main_page=checkout_success';
+            console.log('Apple Pay (Cart): Payment successful, will redirect to', redirectUrl);
+            pendingRedirectUrl = redirectUrl;
             session.completePayment(ApplePaySession.STATUS_SUCCESS);
-            window.location.href = json.redirect_url;
+            setTimeout(function () {
+                window.location.href = redirectUrl;
+            }, 50);
         } else {
+            console.error('Apple Pay (Cart): Payment failed', json);
             session.completePayment(ApplePaySession.STATUS_FAILURE);
         }
     })
-    .catch(() => session.completePayment(ApplePaySession.STATUS_FAILURE));
+    .catch(error => {
+        console.error('Apple Pay (Cart): Error during payment finalization', error);
+        session.completePayment(ApplePaySession.STATUS_FAILURE);
+    });
 }
 </script>
 

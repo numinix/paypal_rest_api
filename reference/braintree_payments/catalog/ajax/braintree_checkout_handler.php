@@ -25,11 +25,20 @@ $_GET['main_page'] = $current_page_base = 'checkout_process';
 $loaderPrefix = 'braintree_ajax';
 require('includes/application_top.php');
 require_once(DIR_WS_FUNCTIONS . 'braintree_functions.php');
-require_once(DIR_WS_CLASSES . 'Customer.php');
-require_once(DIR_WS_CLASSES . 'payment.php');
-require_once(DIR_WS_CLASSES . 'order.php');
-require_once(DIR_WS_CLASSES . 'shipping.php');
-require_once(DIR_WS_CLASSES . 'order_total.php');
+// Note: Customer.php does not exist in Zen Cart 1.5.6c+ and is not needed
+// The following classes are loaded via Zen Cart's autoloader or must be explicitly required
+if (!class_exists('payment')) {
+    require_once(DIR_WS_CLASSES . 'payment.php');
+}
+if (!class_exists('order')) {
+    require_once(DIR_WS_CLASSES . 'order.php');
+}
+if (!class_exists('shipping')) {
+    require_once(DIR_WS_CLASSES . 'shipping.php');
+}
+if (!class_exists('order_total')) {
+    require_once(DIR_WS_CLASSES . 'order_total.php');
+}
 
 $isAjaxRequest = (
     !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
@@ -44,7 +53,7 @@ if (function_exists('zen_load_language')) {
     braintree_load_language_file('email_extras');
 }
 
-define('LOG_FILE_PATH', DIR_FS_LOGS . 'braintree_handler.log');
+define('LOG_FILE_PATH', DIR_FS_LOGS . '/braintree_handler.log');
 
 $braintreeCheckoutErrorHandled = false;
 $braintreeCheckoutErrorResponder = function ($message) use (&$braintreeCheckoutErrorHandled) {
@@ -266,7 +275,7 @@ if (!isset($_SESSION['customer_id'])) {
                       VALUES ($customer_id, now(), 1, now(), now())");
     }
     // Set session variables based on whether guest checkout is used
-    if ($is_guest_checkout) {
+    if ($isGuestCheckout) {
         // Treat the Google/Apple Pay flow as a guest checkout but still set the core customer id
         $_SESSION['customer_guest_id'] = $customer_id;
         $_SESSION['customer_id'] = $customer_id;
@@ -427,7 +436,9 @@ if (empty($_SESSION['payment']) || strpos($GLOBALS[$_SESSION['payment']]->code ?
     $order_totals = $order_total_modules->pre_confirmation_check();
 }
 
-$payment_modules->checkCreditCovered();
+if (method_exists($payment_modules, 'checkCreditCovered')) {
+    $payment_modules->checkCreditCovered();
+}
 
 if ($credit_covers === true) {
     $order->info['payment_method'] = $order->info['payment_module_code'] = '';

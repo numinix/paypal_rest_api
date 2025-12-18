@@ -333,6 +333,46 @@ class BraintreeCommon {
     }
 
     /**
+     * Get the settlement currency for a merchant account.
+     * 
+     * @param string $merchantAccountID The merchant account ID to query
+     * @return string|null The currency code (e.g., 'USD', 'CAD') or null if not found
+     */
+    public function get_merchant_account_currency($merchantAccountID = null) {
+        // If no merchant account ID provided, try to use the one from session
+        if (empty($merchantAccountID) && !empty($_SESSION['braintree_merchant_account_id'])) {
+            $merchantAccountID = $_SESSION['braintree_merchant_account_id'];
+        }
+        
+        if (empty($merchantAccountID)) {
+            return null;
+        }
+        
+        try {
+            $merchantAccounts = $this->gateway->merchantAccount()->all();
+            foreach ($merchantAccounts as $account) {
+                if ($account->id === $merchantAccountID) {
+                    $currency = $account->currencyIsoCode;
+                    $this->log_debug('get_merchant_account_currency', [
+                        'merchant_account_id' => $this->mask_sensitive_value($merchantAccountID),
+                        'currency' => $currency
+                    ]);
+                    return $currency;
+                }
+            }
+            
+            $this->log_debug('get_merchant_account_currency', [
+                'merchant_account_id' => $this->mask_sensitive_value($merchantAccountID),
+                'result' => 'not_found'
+            ]);
+            return null;
+        } catch (Exception $e) {
+            $this->log_debug('get_merchant_account_currency ERROR', $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Before processing the payment.
      *
      * @param string $merchantAccountID The merchant account ID to use for this transaction
@@ -417,23 +457,46 @@ class BraintreeCommon {
         global $order, $messageStack, $currencies;
 
         try {
-            // $order->info['total'] is in the store's default currency
-            // Use $currencies->value() to apply exchange rate conversion to session currency
-            $amount = $currencies->value($order->info['total']);
+            // Determine the settlement currency for this transaction
+            // This is the currency that Braintree will actually process the payment in
+            $settlementCurrency = null;
+            if (isset($moduleData['merchantAccountId'])) {
+                $settlementCurrency = $this->get_merchant_account_currency($moduleData['merchantAccountId']);
+            }
+            
+            // Fall back to session currency if we can't determine the merchant account currency
+            // Or fall back to default currency if session currency isn't set
+            $targetCurrency = $settlementCurrency ?? ($_SESSION['currency'] ?? DEFAULT_CURRENCY);
+            $sessionCurrency = $_SESSION['currency'] ?? DEFAULT_CURRENCY;
+            
+            // Calculate amount in the settlement currency
+            // $order->info['total'] is always in the store's default currency
+            // We need to convert it to the settlement currency
+            $amount = $order->info['total'];
+            
+            // If settlement currency differs from default currency, convert it
+            if (strtoupper($targetCurrency) !== strtoupper(DEFAULT_CURRENCY)) {
+                $fromRate = $currencies->get_value(DEFAULT_CURRENCY);
+                $toRate = $currencies->get_value($targetCurrency);
+                
+                if ($fromRate > 0) {
+                    $amount = ($amount / $fromRate) * $toRate;
+                }
+            }
             
             // Validate amount is valid and greater than zero
             if (!is_numeric($amount) || $amount <= 0) {
                 $errorMsg = sprintf(
-                    'Invalid transaction amount: %s (order total: %s, session currency: %s)',
+                    'Invalid transaction amount: %s (order total: %s, settlement currency: %s)',
                     var_export($amount, true),
                     var_export($order->info['total'], true),
-                    $_SESSION['currency'] ?? 'unknown'
+                    $targetCurrency
                 );
                 $this->log_debug('process_braintree_payment AMOUNT ERROR', [
                     'error' => $errorMsg,
                     'amount_raw' => $amount,
                     'order_total' => $order->info['total'],
-                    'session_currency' => $_SESSION['currency'] ?? 'unknown'
+                    'settlement_currency' => $targetCurrency
                 ]);
                 $messageStack->add_session('checkout_payment', 'Payment processing failed: Invalid amount.', 'error');
                 return false;
@@ -443,12 +506,13 @@ class BraintreeCommon {
             $amount = number_format((float)$amount, 2, '.', '');
             
             // Log currency information for debugging
-            $sessionCurrency = isset($_SESSION['currency']) ? $_SESSION['currency'] : 'unknown';
             $this->log_debug('process_braintree_payment CURRENCY INFO', [
                 'session_currency' => $sessionCurrency,
+                'settlement_currency' => $targetCurrency,
                 'order_amount_formatted' => $amount,
                 'order_total_raw' => $order->info['total'],
-                'note' => 'Using order total in session currency (Zen Cart handles conversion)',
+                'currency_match' => (strtoupper($sessionCurrency) === strtoupper($targetCurrency)),
+                'note' => 'Amount calculated in settlement currency based on merchant account',
                 'merchant_account_id' => isset($moduleData['merchantAccountId']) ? 
                     $this->mask_sensitive_value($moduleData['merchantAccountId']) : 'not set'
             ]);

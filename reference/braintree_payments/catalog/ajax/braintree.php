@@ -12,7 +12,48 @@ require_once(DIR_WS_CLASSES . 'shipping.php');
 require_once(DIR_WS_CLASSES . 'order_total.php');
 require_once(DIR_WS_FUNCTIONS . 'braintree_functions.php');
 
-define('LOG_FILE_PATH', DIR_FS_LOGS . 'braintree_handler.log');
+define('LOG_FILE_PATH', DIR_FS_LOGS . '/braintree_handler.log');
+
+/**
+ * Get a validated base currency code
+ * Ensures the currency exists in the Zen Cart currencies array
+ * Falls back to USD or first available currency if needed
+ * 
+ * Side effects: May log warning or error messages if fallback is needed
+ * 
+ * @param object $currencies The Zen Cart currencies object with a 'currencies' property
+ * @param string|null $preferredCurrency The preferred currency code to use, or null
+ * @return string A valid currency code that exists in the currencies array
+ */
+function get_validated_base_currency($currencies, $preferredCurrency = null) {
+    // Try preferred currency first
+    if ($preferredCurrency !== null && isset($currencies->currencies[$preferredCurrency])) {
+        return $preferredCurrency;
+    }
+    
+    // Try DEFAULT_CURRENCY
+    if (defined('DEFAULT_CURRENCY') && isset($currencies->currencies[DEFAULT_CURRENCY])) {
+        return DEFAULT_CURRENCY;
+    }
+    
+    // Try USD as fallback
+    if (isset($currencies->currencies['USD'])) {
+        log_braintree_message('WARNING: DEFAULT_CURRENCY not available, falling back to USD');
+        return 'USD';
+    }
+    
+    // Last resort: use first available currency
+    $availableCurrencies = array_keys($currencies->currencies);
+    if (!empty($availableCurrencies)) {
+        $fallbackCurrency = $availableCurrencies[0];
+        log_braintree_message('WARNING: Neither DEFAULT_CURRENCY nor USD available, using ' . $fallbackCurrency);
+        return $fallbackCurrency;
+    }
+    
+    // This should never happen in a properly configured Zen Cart
+    log_braintree_message('ERROR: No currencies available in Zen Cart configuration!');
+    return 'USD'; // Return USD as absolute last resort even if not configured
+}
 
 header('Content-Type: application/json');
 
@@ -32,6 +73,7 @@ if (empty($_SESSION['currency'])) {
 
 $displayCurrency = $_SESSION['currency'];
 $displayCurrencyValue = $currencies->currencies[$displayCurrency]['value'] ?? 1;
+log_braintree_message('Display currency: ' . $displayCurrency . ', currency value: ' . $displayCurrencyValue);
 
 $module = isset($data['module']) ? $data['module'] : 'braintree_api';
 switch ($module) {
@@ -148,6 +190,7 @@ $_SESSION['shipping_weight'] = null;
 $_SESSION['shipping_num_boxes'] = null;
 
 // Manually build a minimal $order object so shipping modules can use it
+// Keep in DEFAULT_CURRENCY for proper Zen Cart calculations
 global $order;
 $order = new stdClass();
 $order->delivery = array(
@@ -164,11 +207,17 @@ $order->delivery = array(
     'zone_id' => $zone_id,
     'format_id' => zen_get_address_format_id($country_id),
 );
+// Use DEFAULT_CURRENCY for calculations - cart->show_total() returns base currency value
+// Get validated base currency (with fallback if DEFAULT_CURRENCY not properly configured)
+$baseCurrency = get_validated_base_currency($currencies, defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : null);
 $order->info = array(
     'subtotal' => $_SESSION['cart']->show_total(),
-    'currency' => $_SESSION['currency'],
-    'currency_value' => $currencies->currencies[$_SESSION['currency']]['value'] ?? 1,
+    'currency' => $baseCurrency,
+    'currency_value' => $currencies->currencies[$baseCurrency]['value'] ?? 1,
 );
+
+log_braintree_message('Initial order object created in base currency: ' . $baseCurrency . 
+    ', subtotal: ' . $order->info['subtotal']);
 
 // Required by shipping quote logic
 $total_weight = $_SESSION['cart']->show_weight();
@@ -178,6 +227,9 @@ $total_count = $_SESSION['cart']->count_contents();
 // Quote shipping options based on delivery
 $shipping_modules = new shipping();
 $quotes = $shipping_modules->quote();
+
+// Debug: Log raw shipping quotes
+log_braintree_message('Raw shipping quotes returned: ' . print_r($quotes, true));
 
 if (!function_exists('braintree_calculate_tax_inclusive_amount')) {
     function braintree_calculate_tax_inclusive_amount($baseAmount, $taxRate)
@@ -219,6 +271,7 @@ if (!isset($data['selectedShippingOptionId']) || empty($data['selectedShippingOp
 }
 
 // Populate shipping options and set the selected one
+// Shipping costs from modules are in base currency
 $shippingOptions = [];
 foreach ($quotes as $quote) {
     if (!empty($quote['error']) || empty($quote['methods'])) continue;
@@ -227,14 +280,23 @@ foreach ($quotes as $quote) {
         $optionId = "{$quote['id']}_{$method['id']}";
         $baseCost = (float)($method['cost'] ?? 0);
         $taxRate = (float)($quote['tax'] ?? 0);
-        $taxInclusiveCost = (float)braintree_calculate_tax_inclusive_amount($baseCost, $taxRate);
+        
+        // Calculate tax-inclusive cost in base currency
+        $taxInclusiveCostBase = (float)braintree_calculate_tax_inclusive_amount($baseCost, $taxRate);
         if (function_exists('zen_round')) {
-            $taxInclusiveCost = (float)zen_round($taxInclusiveCost, 2);
+            $taxInclusiveCostBase = (float)zen_round($taxInclusiveCostBase, 2);
         } else {
-            $taxInclusiveCost = round($taxInclusiveCost, 2);
+            $taxInclusiveCostBase = round($taxInclusiveCostBase, 2);
         }
 
-        $shippingDisplayAmount = $currencies->value($taxInclusiveCost, true, $displayCurrency);
+        // Convert to display currency for showing to customer
+        $shippingDisplayAmount = $currencies->value($taxInclusiveCostBase, true, $displayCurrency);
+        
+        log_braintree_message('Shipping option: ' . $optionId . 
+            ', base cost: ' . $baseCost . 
+            ', tax rate: ' . $taxRate . 
+            ', tax-inclusive base: ' . $taxInclusiveCostBase . 
+            ', display amount (' . $displayCurrency . '): ' . $shippingDisplayAmount);
 
         $shippingOptions[] = [
             'id' => $optionId,
@@ -244,6 +306,7 @@ foreach ($quotes as $quote) {
         ];
 
         if ($optionId === $selectedShippingOption) {
+            // Store base cost for later calculations
             $_SESSION['shipping'] = [
                 'id' => $optionId,
                 'title' => $quote['module'],
@@ -259,6 +322,11 @@ foreach ($quotes as $quote) {
             if (array_key_exists('tax_description', $quote)) {
                 $_SESSION['shipping']['tax_description'] = $quote['tax_description'];
             }
+            log_braintree_message('Selected shipping method: ' . $optionId . 
+                ', base cost: ' . $baseCost . 
+                ', tax rate: ' . $taxRate . 
+                ', tax-inclusive base: ' . $taxInclusiveCostBase .
+                ', display amount (' . $displayCurrency . '): ' . $shippingDisplayAmount);
         }
     }
 }
@@ -266,6 +334,9 @@ foreach ($quotes as $quote) {
 // Provide shipping to order total modules
 global $shipping;
 $shipping = $_SESSION['shipping'];
+
+// Debug: Log the shipping session data used by order totals
+log_braintree_message('Shipping session data for order totals: ' . print_r($_SESSION['shipping'], true));
 
 log_braintree_message('Shipping options returned: ' . print_r($shippingOptions, true));
 
@@ -275,13 +346,36 @@ log_braintree_message('Shipping options returned: ' . print_r($shippingOptions, 
 $_SESSION['customer_country_id'] = $country_id;
 $_SESSION['customer_zone_id'] = $zone_id;
 
+// Debug: Log customer session variables used for tax calculation
+log_braintree_message('Customer session variables for tax: customer_country_id=' . $country_id . ', customer_zone_id=' . $zone_id);
+
+// Unset sendto/billto before creating the order to ensure proper tax calculation.
+// When sendto is false (set earlier for shipping quotes), the order class can't properly
+// calculate product taxes. By unsetting it, the order class falls back to using the customer
+// location session variables (customer_country_id, customer_zone_id) set above. After order
+// creation, the delivery/billing addresses are explicitly set, allowing ot_tax to calculate
+// taxes correctly on both products and shipping.
+if (isset($_SESSION['sendto'])) {
+    unset($_SESSION['sendto']);
+}
+if (isset($_SESSION['billto'])) {
+    unset($_SESSION['billto']);
+}
+
 // Now rebuild the $order object (with shipping already set)
+// IMPORTANT: Keep the order in DEFAULT_CURRENCY for all Zen Cart calculations
+// We'll convert to display currency after all tax and total calculations are complete
 $order = new order();
-$order->info['currency'] = $displayCurrency;
-$order->info['currency_value'] = $displayCurrencyValue;
+// Do NOT override the currency - let Zen Cart use DEFAULT_CURRENCY for calculations
+// $order->info['currency'] is already set to DEFAULT_CURRENCY by the order class
 $order->info['shipping_cost'] = $_SESSION['shipping']['cost'];
 $order->info['shipping_method'] = $_SESSION['shipping']['module'] . " (" . $_SESSION['shipping']['title'] . ")";
 $order->info['shipping_module_code'] = $_SESSION['shipping']['id'];
+
+// Get the validated base currency - this will be used throughout order processing
+$baseCurrency = get_validated_base_currency($currencies, $order->info['currency'] ?? null);
+log_braintree_message('Order object created in base currency: ' . $baseCurrency . 
+    ' (will convert to display currency ' . $displayCurrency . ' after calculations)');
 
 // Set billing and delivery addresses for tax calculation purposes
 // Tax modules need both addresses to properly calculate taxes, including shipping taxes
@@ -320,58 +414,281 @@ $addressData = array(
 $order->billing = $addressData;
 $order->delivery = $addressData;
 
+// Manually calculate and apply product taxes since the order class couldn't do it
+// (no valid sendto address was available during construction)
+if (isset($order->products) && is_array($order->products) && function_exists('zen_get_tax_rate')) {
+    log_braintree_message('Manually calculating product taxes for ' . count($order->products) . ' product(s)');
+    
+    // Collect product IDs that need tax class lookup
+    $productIdsNeedingLookup = [];
+    
+    foreach ($order->products as $index => $product) {
+        if (!isset($product['tax_class_id'])) {
+            // Extract product ID from the format "product_id:attributes_hash"
+            $productIdParts = explode(':', $product['id']);
+            if (!empty($productIdParts[0])) {
+                $productId = (int)$productIdParts[0];
+                if ($productId > 0) {
+                    $productIdsNeedingLookup[] = $productId;
+                }
+            }
+        }
+    }
+    
+    // Batch query for all tax classes if needed
+    $taxClassMap = [];
+    if (!empty($productIdsNeedingLookup)) {
+        // Sanitize all product IDs to ensure they are integers
+        $sanitizedIds = array_map('intval', $productIdsNeedingLookup);
+        $productIdsList = implode(',', $sanitizedIds);
+        $taxClassQuery = $db->Execute(
+            "SELECT products_id, products_tax_class_id FROM " . TABLE_PRODUCTS . 
+            " WHERE products_id IN (" . $productIdsList . ")"
+        );
+        while (!$taxClassQuery->EOF) {
+            $taxClassMap[$taxClassQuery->fields['products_id']] = $taxClassQuery->fields['products_tax_class_id'];
+            $taxClassQuery->MoveNext();
+        }
+    }
+    
+    // Calculate and apply taxes for each product
+    foreach ($order->products as $index => $product) {
+        // Get the tax class for this product
+        $taxClassId = 0;
+        if (isset($product['tax_class_id'])) {
+            $taxClassId = $product['tax_class_id'];
+        } else {
+            // Use the batched tax class data
+            $productIdParts = explode(':', $product['id']);
+            if (!empty($productIdParts[0])) {
+                $productId = (int)$productIdParts[0];
+                if (isset($taxClassMap[$productId])) {
+                    $taxClassId = $taxClassMap[$productId];
+                }
+            }
+        }
+        
+        // Calculate the tax rate for this product based on the delivery address
+        $taxRate = zen_get_tax_rate($taxClassId, $country_id, $zone_id);
+        
+        // Update the product tax information
+        $order->products[$index]['tax'] = $taxRate;
+        $order->products[$index]['tax_class_id'] = $taxClassId;
+        
+        // Get tax description if available
+        if (function_exists('zen_get_tax_description')) {
+            $order->products[$index]['tax_description'] = zen_get_tax_description($taxClassId, $country_id, $zone_id);
+        }
+        
+        log_braintree_message('  Product ' . ($index + 1) . ' (' . ($product['name'] ?? 'N/A') . '): tax_class_id=' . $taxClassId . ', tax_rate=' . $taxRate . '%');
+    }
+    
+    log_braintree_message('Product tax calculation complete');
+}
+
+// Debug: Log products in the order (after tax calculation)
+if (isset($order->products) && is_array($order->products)) {
+    log_braintree_message('Order contains ' . count($order->products) . ' product(s):');
+    foreach ($order->products as $index => $product) {
+        log_braintree_message('  Product ' . ($index + 1) . ': ' . print_r([
+            'id' => $product['id'] ?? 'N/A',
+            'name' => $product['name'] ?? 'N/A',
+            'qty' => $product['qty'] ?? 'N/A',
+            'price' => $product['price'] ?? 'N/A',
+            'final_price' => $product['final_price'] ?? 'N/A',
+            'tax' => $product['tax'] ?? 'N/A',
+            'tax_class_id' => $product['tax_class_id'] ?? 'N/A',
+            'tax_description' => $product['tax_description'] ?? 'N/A',
+        ], true));
+    }
+} else {
+    log_braintree_message('Order products array is empty or not set');
+}
+
+// Debug: Log billing and delivery addresses
+log_braintree_message('Billing address set: ' . print_r([
+    'firstname' => $addressData['firstname'] ?? 'N/A',
+    'lastname' => $addressData['lastname'] ?? 'N/A',
+    'street_address' => $addressData['street_address'] ?? 'N/A',
+    'suburb' => $addressData['suburb'] ?? 'N/A',
+    'city' => $addressData['city'] ?? 'N/A',
+    'state' => $addressData['state'] ?? 'N/A',
+    'postcode' => $addressData['postcode'] ?? 'N/A',
+    'country_id' => $addressData['country_id'] ?? 'N/A',
+    'zone_id' => $addressData['zone_id'] ?? 'N/A',
+    'country_iso_code_2' => $addressData['country']['iso_code_2'] ?? 'N/A',
+], true));
+log_braintree_message('Delivery address set: ' . print_r([
+    'firstname' => $addressData['firstname'] ?? 'N/A',
+    'lastname' => $addressData['lastname'] ?? 'N/A',
+    'street_address' => $addressData['street_address'] ?? 'N/A',
+    'suburb' => $addressData['suburb'] ?? 'N/A',
+    'city' => $addressData['city'] ?? 'N/A',
+    'state' => $addressData['state'] ?? 'N/A',
+    'postcode' => $addressData['postcode'] ?? 'N/A',
+    'country_id' => $addressData['country_id'] ?? 'N/A',
+    'zone_id' => $addressData['zone_id'] ?? 'N/A',
+    'country_iso_code_2' => $addressData['country']['iso_code_2'] ?? 'N/A',
+], true));
+
 // Recalculate order totals
+// These totals are calculated in DEFAULT_CURRENCY (Zen Cart base currency)
+// Debug: Verify product taxes are set before order_totals processes
+if (isset($order->products) && is_array($order->products)) {
+    log_braintree_message('Product taxes before order_totals->process():');
+    foreach ($order->products as $index => $product) {
+        log_braintree_message('  Product ' . ($index + 1) . ': ' . print_r([
+            'tax' => $product['tax'] ?? 'N/A',
+            'tax_class_id' => $product['tax_class_id'] ?? 'N/A',
+            'final_price' => $product['final_price'] ?? 'N/A',
+            'qty' => $product['qty'] ?? 'N/A',
+        ], true));
+    }
+}
+// Pre-calculate expected product and shipping taxes in base currency so we can
+// ensure ot_tax reflects both components.
+$productTaxBase = 0.0;
+if (isset($order->products) && is_array($order->products)) {
+    foreach ($order->products as $product) {
+        $linePrice = isset($product['final_price']) ? (float)$product['final_price'] : (float)($product['price'] ?? 0);
+        $lineQty = (float)($product['qty'] ?? 1);
+        $taxRate = (float)($product['tax'] ?? 0);
+        $productTaxBase += $linePrice * $lineQty * ($taxRate / 100);
+    }
+}
+
+$shippingTaxBase = 0.0;
+if (isset($_SESSION['shipping']['cost'], $_SESSION['shipping']['tax'])) {
+    $shippingTaxBase = (float)$_SESSION['shipping']['cost'] * ((float)$_SESSION['shipping']['tax'] / 100);
+}
+
+log_braintree_message('Order delivery address before order_totals->process(): ' . print_r([
+    'country_id' => $order->delivery['country_id'] ?? 'N/A',
+    'zone_id' => $order->delivery['zone_id'] ?? 'N/A',
+], true));
 $order_total_modules = new order_total();
 $order_totals = $order_total_modules->process();
 
+// If ot_tax only includes shipping tax, add the missing product tax so totals
+// are accurate for the payment sheet.
+foreach ($order_totals as &$ot) {
+    if (($ot['code'] ?? '') !== 'ot_tax') {
+        continue;
+    }
+
+    $existingTaxBase = (float)($ot['value'] ?? 0);
+    $recordedProductTax = max($existingTaxBase - $shippingTaxBase, 0);
+    $missingProductTax = $productTaxBase - $recordedProductTax;
+
+    if ($missingProductTax > 0.0001) {
+        $ot['value'] = $existingTaxBase + $missingProductTax;
+        $order->info['tax'] = ($order->info['tax'] ?? 0) + $missingProductTax;
+        log_braintree_message('Product tax missing from ot_tax; adding ' . $missingProductTax . ' (base).');
+    }
+}
+unset($ot);
+
+// Debug: Log detailed order totals information
+log_braintree_message('Order totals calculated in base currency (' . $baseCurrency . '):');
+foreach ($order_totals as $index => $ot) {
+    log_braintree_message('  Order total ' . ($index + 1) . ': ' . print_r([
+        'code' => $ot['code'] ?? 'N/A',
+        'title' => $ot['title'] ?? 'N/A',
+        'text' => $ot['text'] ?? 'N/A',
+        'value' => $ot['value'] ?? 'N/A',
+        'sort_order' => $ot['sort_order'] ?? 'N/A',
+    ], true));
+}
+log_braintree_message('Order info after totals: subtotal=' . $order->info['subtotal'] . ', currency=' . $baseCurrency . ', shipping_cost=' . ($order->info['shipping_cost'] ?? 'N/A') . ', tax=' . ($order->info['tax'] ?? 'N/A') . ', total=' . ($order->info['total'] ?? 'N/A'));
+
 // Extract displayItems and calculate the order total manually so that
 // shipping is always included even when discounts/coupons are present
+// All these values are in base currency and will be converted to display currency below
 $displayItems = [];
-$calculatedTotal = (float)$order->info['subtotal'];
+$calculatedTotalBase = (float)$order->info['subtotal'];
 $shippingAddedToTotal = false;
+$totalTaxBase = 0; // Accumulate all tax amounts to create a single TAX display item
+log_braintree_message('Starting total calculation with subtotal in base currency (' . $baseCurrency . '): ' . $calculatedTotalBase);
 
 foreach ($order_totals as $ot) {
     $type = 'LINE_ITEM';
-    $value = $ot['value'];
+    $valueBase = $ot['value']; // Value in base currency
+    log_braintree_message('Processing order total: code=' . $ot['code'] . ', base value=' . $valueBase . ', title=' . $ot['title']);
+    
     if ($ot['code'] === 'ot_subtotal') {
         $type = 'SUBTOTAL';
     } elseif ($ot['code'] === 'ot_shipping') {
-        $calculatedTotal += $value;
+        $calculatedTotalBase += $valueBase;
         $shippingAddedToTotal = true;
+        log_braintree_message('Added shipping to total (base): ' . $valueBase . ', new total (base): ' . $calculatedTotalBase);
+        // Convert to display currency for the payment gateway
+        $valueDisplay = $currencies->value($valueBase, true, $displayCurrency);
         $displayItems[] = [
             'label' => 'Shipping',
             'type' => 'LINE_ITEM',
-            'price' => number_format($currencies->value($value, true, $displayCurrency), 2, '.', ''),
-            'status' => ($value > 0 ? 'FINAL' : 'PENDING'),
+            'price' => number_format($valueDisplay, 2, '.', ''),
+            'status' => ($valueDisplay > 0 ? 'FINAL' : 'PENDING'),
         ];
         continue;
     } elseif ($ot['code'] === 'ot_tax') {
-        $type = 'TAX';
-        $calculatedTotal += $value;
+        // Accumulate all tax amounts instead of adding each as a separate display item
+        // This ensures payment gateways receive a single combined tax amount
+        $totalTaxBase += $valueBase;
+        $calculatedTotalBase += $valueBase;
+        log_braintree_message('Accumulated tax (base): ' . $valueBase . ', total tax so far (base): ' . $totalTaxBase . ', new total (base): ' . $calculatedTotalBase);
+        continue; // Skip adding individual tax items to displayItems
     } elseif (!empty($GLOBALS[$ot['code']]->deduction) || !empty($GLOBALS[$ot['code']]->credit_class)) {
         $type = 'DISCOUNT';
-        $value = -abs($value);
-        $calculatedTotal += $value;
+        $valueBase = -abs($valueBase);
+        $calculatedTotalBase += $valueBase;
+        log_braintree_message('Added discount to total (base): ' . $valueBase . ', new total (base): ' . $calculatedTotalBase);
     } elseif ($ot['code'] === 'ot_total') {
         // ignore built-in total; we're computing it manually
+        log_braintree_message('Skipping ot_total (calculated manually)');
         continue;
     } else {
-        $calculatedTotal += $value;
+        $calculatedTotalBase += $valueBase;
+        log_braintree_message('Added other order total to total (base): ' . $valueBase . ', new total (base): ' . $calculatedTotalBase);
     }
 
+    // Convert to display currency for the payment gateway
+    $valueDisplay = $currencies->value($valueBase, true, $displayCurrency);
     $displayItems[] = [
         'label' => strip_tags($ot['title']),
         'type' => $type,
-        'price' => number_format($currencies->value($value, true, $displayCurrency), 2, '.', ''),
+        'price' => number_format($valueDisplay, 2, '.', ''),
     ];
 }
 
-if (!$shippingAddedToTotal) {
-    $calculatedTotal += $_SESSION['shipping']['cost'] ?? 0;
+// Add the accumulated tax as a single TAX display item
+if ($totalTaxBase > 0) {
+    $totalTaxDisplay = $currencies->value($totalTaxBase, true, $displayCurrency);
+    $displayItems[] = [
+        'label' => 'Tax',
+        'type' => 'TAX',
+        'price' => number_format($totalTaxDisplay, 2, '.', ''),
+    ];
+    log_braintree_message('Added combined tax display item (base): ' . $totalTaxBase . ', display: ' . $totalTaxDisplay);
 }
 
-// Final total for Google Pay
-$finalTotal = number_format($currencies->value($calculatedTotal, true, $displayCurrency), 2, '.', '');
+if (!$shippingAddedToTotal) {
+    $calculatedTotalBase += $_SESSION['shipping']['cost'] ?? 0;
+    log_braintree_message('Shipping was not in order_totals, adding from session (base): ' . ($_SESSION['shipping']['cost'] ?? 0) . ', new total (base): ' . $calculatedTotalBase);
+}
+
+// Now convert the final total from base currency to display currency
+$calculatedTotalDisplay = $currencies->value($calculatedTotalBase, true, $displayCurrency);
+$finalTotal = number_format($calculatedTotalDisplay, 2, '.', '');
+
+log_braintree_message('Currency conversion summary:');
+log_braintree_message('  Base currency: ' . $baseCurrency);
+log_braintree_message('  Display currency: ' . $displayCurrency);
+log_braintree_message('  Base currency rate: ' . ($currencies->currencies[$baseCurrency]['value'] ?? 1));
+log_braintree_message('  Display currency rate: ' . $displayCurrencyValue);
+log_braintree_message('  Total in base currency (' . $baseCurrency . '): ' . $calculatedTotalBase);
+log_braintree_message('  Total in display currency (' . $displayCurrency . '): ' . $calculatedTotalDisplay);
+log_braintree_message('Final total formatted for payment: ' . $finalTotal);
+log_braintree_message('Display items: ' . print_r($displayItems, true));
 
 
 // build final response
@@ -397,6 +714,7 @@ switch ($module) {
 
     case 'braintree_applepay':
         // Convert values to Apple Pay format
+        // Shipping costs are in base currency, need to convert to display currency
         $appleShippingMethods = [];
         foreach ($quotes as $quote) {
             if (!empty($quote['error']) || empty($quote['methods'])) continue;
@@ -405,14 +723,17 @@ switch ($module) {
                 $optionId = "{$quote['id']}_{$method['id']}";
                 $baseCost = (float)($method['cost'] ?? 0);
                 $taxRate = (float)($quote['tax'] ?? 0);
-                $taxInclusiveCost = (float)braintree_calculate_tax_inclusive_amount($baseCost, $taxRate);
+                
+                // Calculate tax-inclusive cost in base currency
+                $taxInclusiveCostBase = (float)braintree_calculate_tax_inclusive_amount($baseCost, $taxRate);
                 if (function_exists('zen_round')) {
-                    $taxInclusiveCost = (float)zen_round($taxInclusiveCost, 2);
+                    $taxInclusiveCostBase = (float)zen_round($taxInclusiveCostBase, 2);
                 } else {
-                    $taxInclusiveCost = round($taxInclusiveCost, 2);
+                    $taxInclusiveCostBase = round($taxInclusiveCostBase, 2);
                 }
 
-                $appleShippingDisplayAmount = $currencies->value($taxInclusiveCost, true, $displayCurrency);
+                // Convert to display currency for Apple Pay
+                $appleShippingDisplayAmount = $currencies->value($taxInclusiveCostBase, true, $displayCurrency);
 
                 $appleShippingMethods[] = [
                     'label' => "{$quote['module']} - {$method['title']}",

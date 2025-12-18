@@ -194,13 +194,53 @@ class braintree_api extends base {
 
         if (!$this->enabled) return false;
         
-        // Calculate order amount in session currency for 3DS verification
-        // $order->info['total'] is in the store's default currency
-        // Use $currencies->value() to apply exchange rate conversion to session currency
-        $orderAmountInSessionCurrency = $currencies->value($order->info['total']);
+        // Determine the settlement currency for this transaction
+        // This is critical for 3DS verification to show the correct amount to the customer
+        $settlementCurrency = null;
+        if (!empty($this->merchantAccountID)) {
+            $settlementCurrency = $this->braintreeCommon->get_merchant_account_currency($this->merchantAccountID);
+        }
+        
+        // Fall back to session currency if we can't determine merchant account currency
+        // Or fall back to default currency if session currency isn't set
+        $targetCurrency = $settlementCurrency ?? ($_SESSION['currency'] ?? DEFAULT_CURRENCY);
+        $sessionCurrency = $_SESSION['currency'] ?? DEFAULT_CURRENCY;
+        
+        // Calculate order amount in the settlement currency for 3DS verification
+        // $order->info['total'] is always in the store's default currency
+        $orderAmount = $order->info['total'];
+        
+        // If settlement currency differs from default currency, convert it
+        if (strtoupper($targetCurrency) !== strtoupper(DEFAULT_CURRENCY)) {
+            $fromRate = $currencies->get_value(DEFAULT_CURRENCY);
+            $toRate = $currencies->get_value($targetCurrency);
+            
+            if ($fromRate > 0) {
+                $orderAmount = ($orderAmount / $fromRate) * $toRate;
+            }
+        }
         
         // Format the amount for JavaScript
-        $formattedOrderAmount = number_format((float)$orderAmountInSessionCurrency, 2, '.', '');
+        $formattedOrderAmount = number_format((float)$orderAmount, 2, '.', '');
+        
+        // Store settlement currency and amount in session for consistency between 3DS and transaction
+        $_SESSION['braintree_settlement_currency'] = $targetCurrency;
+        $_SESSION['braintree_settlement_amount'] = $formattedOrderAmount;
+
+        $fieldsArray = [];
+        
+        // Show currency mismatch warning if session currency differs from settlement currency
+        if (strtoupper($sessionCurrency) !== strtoupper($targetCurrency)) {
+            $fieldsArray[] = [
+                'title' => '',
+                'field' => sprintf(
+                    MODULE_PAYMENT_BRAINTREE_CURRENCY_MISMATCH_WARNING,
+                    strtoupper($sessionCurrency),
+                    strtoupper($targetCurrency),
+                    strtoupper($targetCurrency)
+                )
+            ];
+        }
 
         $this->cc_type_check = 'var value = document.checkout_payment.braintree_cc_type.value;' .
             'if(value == "Solo" || value == "Maestro" || value == "Switch") {' .
@@ -217,8 +257,6 @@ class braintree_api extends base {
         if (empty($this->cards)) {
             $this->cc_type_check = '';
         }
-
-        $fieldsArray = [];
 
         if (!empty($this->cc_type_check)) {
             $fieldsArray[] = [
@@ -381,6 +419,18 @@ class braintree_api extends base {
                         margin-bottom: 1em;
                         font-size: 0.95em;
                     }
+                    .braintree-currency-warning-block {
+                        width: 100%;
+                        max-width: 100%;
+                        clear: both;
+                        margin-bottom: 1em;
+                    }
+                    .braintree-currency-warning-block .braintree-currency-warning {
+                        display: block;
+                        width: 100%;
+                        box-sizing: border-box;
+                        overflow-wrap: break-word;
+                    }
                 </style>';
         
         // Add hidden input fields and JavaScript
@@ -391,6 +441,38 @@ class braintree_api extends base {
                 <script defer>
                 (function(){
                     'use strict';
+
+                    function formatCurrencyWarning() {
+                        const warning = document.querySelector('.creditcard-form .braintree-currency-warning');
+                        if (!warning) return;
+                        const creditCardForm = warning.closest('.creditcard-form');
+                        if (!creditCardForm || !creditCardForm.parentNode) return;
+
+                        const originalHolder = warning.parentElement;
+                        let wrapper = warning.closest('.braintree-currency-warning-block');
+                        if (!wrapper) {
+                            wrapper = document.createElement('div');
+                            wrapper.className = 'braintree-currency-warning-block';
+                        }
+
+                        if (warning.parentNode !== wrapper) {
+                            warning.parentNode.removeChild(warning);
+                            wrapper.appendChild(warning);
+                        }
+
+                        if (wrapper.parentNode !== creditCardForm.parentNode) {
+                            creditCardForm.parentNode.insertBefore(wrapper, creditCardForm);
+                        }
+
+                        if (originalHolder && originalHolder !== wrapper && creditCardForm.contains(originalHolder)) {
+                            const hasHostedField = originalHolder.querySelector('#braintree_api-cc-number-hosted, #braintree_expiry-hosted, #braintree_api-cc-cvv-hosted');
+                            if (!hasHostedField && originalHolder.parentNode) {
+                                originalHolder.parentNode.removeChild(originalHolder);
+                            }
+                        }
+                    }
+
+                    formatCurrencyWarning();
 
                     console.log('Credit Card: Initializing hosted fields controller');
 
@@ -989,12 +1071,20 @@ class braintree_api extends base {
                             blockPage(false, false);
                             processingOverlayVisible = true;
                             processingOverlayUsedOprc = false;
+                            // Set cursor to wait for OPC compatibility
+                            if (typeof jQuery !== 'undefined') {
+                                jQuery('*').css('cursor', 'wait');
+                            }
                             return;
                         }
 
                         if (usedOprcOverlay) {
                             processingOverlayVisible = true;
                             processingOverlayUsedOprc = true;
+                            // Set cursor to wait for OPC compatibility
+                            if (typeof jQuery !== 'undefined') {
+                                jQuery('*').css('cursor', 'wait');
+                            }
                         } else {
                             processingOverlayVisible = false;
                             processingOverlayUsedOprc = false;
@@ -1007,6 +1097,10 @@ class braintree_api extends base {
                                 unblockPage();
                                 processingOverlayVisible = false;
                                 processingOverlayUsedOprc = false;
+                                // Reset cursor for OPC compatibility
+                                if (typeof jQuery !== 'undefined') {
+                                    jQuery('*').css('cursor', '');
+                                }
                             }
                         }
                     }
@@ -1035,6 +1129,10 @@ class braintree_api extends base {
                         if (handled) {
                             processingOverlayVisible = false;
                             processingOverlayUsedOprc = false;
+                            // Reset cursor for OPC compatibility
+                            if (typeof jQuery !== 'undefined') {
+                                jQuery('*').css('cursor', '');
+                            }
                         }
                     }
 
@@ -1526,10 +1624,10 @@ class braintree_api extends base {
 
                         //alert('Authentication was canceled or failed. Please try again.');
 
-                        const verifyBtn = document.querySelector('#paymentSubmit input');
+                        const verifyBtn = findSubmitButton();
                         if (verifyBtn) {
                             verifyBtn.disabled = false;
-                            verifyBtn.value = 'Continue';
+                            setButtonText(verifyBtn, 'Continue');
                         }
                         braintreeSubmissionInProgress = false;
                         showBraintreeSubmitMessage('Authentication was canceled or failed. Please try again.');
@@ -1592,17 +1690,40 @@ class braintree_api extends base {
                         window.braintreeHostedFieldsInitialized = false;
                     }
 
+                    // Helper function to set button text for different checkout systems
+                    function setButtonText(button, text) {
+                        if (!button) return;
+                        // Use value for input elements, textContent for buttons
+                        if (button.tagName === 'INPUT') {
+                            button.value = text;
+                        } else {
+                            button.textContent = text;
+                        }
+                    }
+
+                    // Helper function to find the submit button across different checkout systems
+                    function findSubmitButton() {
+                        // Try selectors for different checkout systems:
+                        // 1. One Page Checkout plugin
+                        // 2. OPRC (One Page Responsive Checkout)
+                        // 3. Zen Cart native checkout
+                        return document.querySelector('#checkoutOneSubmit .button_confirm_order') ||
+                               document.querySelector('#paymentSubmit button') ||
+                               document.querySelector('#paymentSubmit input');
+                    }
+
                     function setLoading(type) {
-                        const verifyBtn = document.querySelector('#paymentSubmit input');
+                        const verifyBtn = findSubmitButton();
                         if (!verifyBtn) return;
+                        
                         if (type === 'loading') {
-                            verifyBtn.value = 'Processing Card...';
+                            setButtonText(verifyBtn, 'Processing Card...');
                             verifyBtn.disabled = true;
                         } else if (type === 'reset') {
-                            verifyBtn.value = 'Continue';
+                            setButtonText(verifyBtn, 'Continue');
                             verifyBtn.disabled = false;
                         } else if (type === 'success') {
-                            verifyBtn.value = 'Card Authorized!';
+                            setButtonText(verifyBtn, 'Card Authorized!');
                             verifyBtn.disabled = true;
                         }
                     }

@@ -15,10 +15,10 @@
 
 ?>
 <script src="https://pay.google.com/gp/p/js/pay.js"></script>
-<script src="https://js.braintreegateway.com/web/3.115.2/js/client.min.js"></script>
-<script src="https://js.braintreegateway.com/web/3.115.2/js/google-payment.min.js"></script>
+<script src="https://js.braintreegateway.com/web/3.133.0/js/client.min.js"></script>
+<script src="https://js.braintreegateway.com/web/3.133.0/js/google-payment.min.js"></script>
 <?php if ($use3DS): ?>
-<script src="https://js.braintreegateway.com/web/3.115.2/js/three-d-secure.min.js"></script>
+<script src="https://js.braintreegateway.com/web/3.133.0/js/three-d-secure.min.js"></script>
 <?php endif; ?>
 
 <script>

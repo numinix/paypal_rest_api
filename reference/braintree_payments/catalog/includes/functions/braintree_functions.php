@@ -28,7 +28,7 @@ if (!function_exists('braintree_load_language_file')) {
 if (!function_exists('braintree_checkout_log')) {
     function braintree_checkout_log($message, $logFilePath = null)
     {
-        $targetFile = $logFilePath ?: (defined('LOG_FILE_PATH') ? LOG_FILE_PATH : DIR_FS_LOGS . 'braintree_handler.log');
+        $targetFile = $logFilePath ?: (defined('LOG_FILE_PATH') ? LOG_FILE_PATH : DIR_FS_LOGS . '/braintree_handler.log');
         if (!is_dir(dirname($targetFile))) {
             @mkdir(dirname($targetFile), 0755, true);
         }
