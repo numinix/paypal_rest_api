@@ -529,11 +529,13 @@ pre.sh_sourceCode {
     display:flex;
     flex-direction:row;
     justify-content: space-between;
+    align-items:center;
     flex-wrap:wrap;
     max-width:1548px;
-    padding-right:15px;    
+    padding-right:15px;
     padding-left:15px;
     margin:auto;
+    gap:12px;
 }
 .readme-footer .readme-footer-bottom .copyright,
 .readme-footer .readme-footer-bottom .madewith {
@@ -547,12 +549,11 @@ pre.sh_sourceCode {
     display:flex;
     flex-direction:row;
     align-items:center;
+    gap:8px;
 }
 .readme-footer .readme-footer-bottom .madewith span {
     width:16px;
     height:13px;
-    margin-right:5px;
-    margin-left:5px;
 }
 .readme-footer .readme-footer-bottom .madewith span svg {
     width:100%;
