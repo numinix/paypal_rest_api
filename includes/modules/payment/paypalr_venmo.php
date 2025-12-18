@@ -78,8 +78,6 @@ class paypalr_venmo extends base
     protected PayPalCommon $paypalCommon;
     protected array $orderInfo = [];
     protected bool $paymentIsPending = false;
-    protected bool $billingCountryIsSupported = true;
-    protected bool $shippingCountryIsSupported = true;
     public array $orderCustomerCache = [];
     protected bool $onOpcConfirmationPage = false;
     protected array $paypalRestfulSessionOnEntry = [];
@@ -194,12 +192,9 @@ class paypalr_venmo extends base
                 return;
             }
 
-            if (isset($order->billing['country'])) {
-                $this->billingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->billing['country']['iso_code_2']) !== '');
-            }
-            if ($_SESSION['cart']->get_content_type() !== 'virtual') {
-                $this->shippingCountryIsSupported = (CountryCodes::ConvertCountryCode($order->delivery['country']['iso_code_2'] ?? '??') !== '');
-            }
+            // Note: Country/device eligibility for Venmo is handled client-side by PayPal's JavaScript SDK
+            // The SDK's isEligible() method will determine if Venmo is available based on user location,
+            // device type, and other factors. We do not perform server-side country checks.
         }
 
         global $current_page_base;
