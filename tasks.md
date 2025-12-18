@@ -1,3 +1,541 @@
+# PayPal Wallet Buttons - Product & Shopping Cart Pages Implementation
+
+## 🎯 Project Objective
+
+Add PayPal wallet payment buttons (Google Pay, Apple Pay, Venmo) to the product page and shopping cart page, following the proven implementation pattern from the Braintree Payments module.
+
+## ⚠️ CRITICAL: DO NOT REINVENT THE WHEEL
+
+**The braintree_payments reference module contains a complete, battle-tested implementation with all bugs and compatibility issues already resolved. Your job is to COPY and ADAPT this code for PayPal, NOT to create new implementations from scratch.**
+
+All file paths in this document point directly to working reference code that should be copied and renamed.
+
+---
+
+# 📚 Reference Module Structure
+
+## Braintree Payments Module Location
+**Base Path:** `/home/runner/work/paypal_rest_api/paypal_rest_api/reference/braintree_payments/`
+
+### Key Components Overview
+
+| Component | Purpose | File Count |
+|-----------|---------|------------|
+| Template Files | Button rendering and JavaScript | 7 files |
+| AJAX Handlers | Server-side payment processing | 3 files |
+| Loader Override | Minimal Zen Cart initialization | 1 file |
+| Documentation | Installation instructions | 1 file |
+
+---
+
+# 📂 Complete File Reference Map
+
+## 1. Template Files for Button Integration
+
+### Shopping Cart Page Templates
+**Location:** `reference/braintree_payments/catalog/includes/templates/template_default/templates/`
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `tpl_braintree_shopping_cart.php` | 114 | Main shopping cart button loader with CSS |
+| `tpl_modules_braintree_googlepay.php` | 603 | Google Pay button JavaScript (cart page) |
+| `tpl_modules_braintree_applepay.php` | 543 | Apple Pay button JavaScript (cart page) |
+| `tpl_modules_braintree_paypal.php` | 179 | PayPal button JavaScript (cart page, future use) |
+
+### Product Page Templates
+**Location:** `reference/braintree_payments/catalog/includes/templates/template_default/templates/`
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `tpl_braintree_product_info.php` | 39 | Main product page button loader |
+| `tpl_modules_braintree_product_googlepay.php` | 603 | Google Pay button JavaScript (product page) |
+| `tpl_modules_braintree_product_applepay.php` | 678 | Apple Pay button JavaScript (product page) |
+
+**Key Features in Template Files:**
+- Browser compatibility detection
+- Sequential vs parallel script loading (iOS Chrome handling)
+- 3D Secure support
+- Retry logic with exponential backoff
+- Comprehensive error handling
+- Session management
+- Currency conversion handling
+
+## 2. AJAX Processing Files
+
+**Location:** `reference/braintree_payments/catalog/ajax/`
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `braintree.php` | 804 | Main AJAX endpoint for order data, shipping methods, totals |
+| `braintree_checkout_handler.php` | 561 | Final order processing and payment capture |
+| `braintree_clear_cart.php` | 35 | Cart cleanup after successful payment |
+
+**Key Features in AJAX Files:**
+- Session validation and recovery
+- Currency conversion logic
+- Shipping method selection and calculation
+- Order total calculation with proper tax handling
+- Order creation and payment processing
+- Error handling and logging
+- Support for guest checkout
+- Address validation
+
+## 3. Zen Cart Loader Override
+
+**Location:** `reference/braintree_payments/catalog/includes/auto_loaders/`
+
+| File | Purpose |
+|------|---------|
+| `braintree_ajax.core.php` | Custom autoloader for AJAX requests - loads only essential Zen Cart components |
+
+**Why This Matters:**
+- AJAX files use `$loaderPrefix = 'braintree_ajax'` to signal Zen Cart to use this override
+- Loads minimal classes: notifier, shopping_cart, currencies, message_stack, etc.
+- Skips heavy components like template processing, breadcrumbs, navigation
+- **Critical for performance** - significantly reduces AJAX response time
+
+## 4. Documentation
+
+**Location:** `reference/braintree_payments/docs/Braintree Payments/readme.html`
+
+Contains:
+- Template modification instructions (lines 95-126)
+- Code snippets for integration
+- Configuration requirements
+- Merchant setup steps
+
+---
+
+# 🏗️ Implementation Plan
+
+## Phase 1: Create Directory Structure ✅
+
+### 1.1 Create Template Directories
+```bash
+# PayPal module template directory
+mkdir -p includes/templates/template_default/templates/paypal_wallet_buttons
+```
+
+**Files to Create:**
+- `includes/templates/template_default/templates/tpl_paypalr_shopping_cart.php`
+- `includes/templates/template_default/templates/tpl_paypalr_product_info.php`
+- `includes/templates/template_default/templates/tpl_modules_paypalr_googlepay.php`
+- `includes/templates/template_default/templates/tpl_modules_paypalr_applepay.php`
+- `includes/templates/template_default/templates/tpl_modules_paypalr_venmo.php`
+- `includes/templates/template_default/templates/tpl_modules_paypalr_product_googlepay.php`
+- `includes/templates/template_default/templates/tpl_modules_paypalr_product_applepay.php`
+- `includes/templates/template_default/templates/tpl_modules_paypalr_product_venmo.php`
+
+### 1.2 Create AJAX Directory
+```bash
+mkdir -p ajax
+```
+
+**Files to Create:**
+- `ajax/paypalr_wallet.php` (copy from `braintree.php`)
+- `ajax/paypalr_wallet_checkout.php` (copy from `braintree_checkout_handler.php`)
+- `ajax/paypalr_wallet_clear_cart.php` (copy from `braintree_clear_cart.php`)
+
+### 1.3 Create Loader Override
+**File to Create:**
+- `includes/auto_loaders/paypalr_wallet_ajax.core.php` (copy from `braintree_ajax.core.php`)
+
+---
+
+## Phase 2: Copy and Adapt Shopping Cart Templates
+
+### 2.1 Main Shopping Cart Button Loader
+**Source:** `reference/braintree_payments/catalog/includes/templates/template_default/templates/tpl_braintree_shopping_cart.php`
+
+**Target:** `includes/templates/template_default/templates/tpl_paypalr_shopping_cart.php`
+
+**Adaptations Required:**
+1. Replace `MODULE_PAYMENT_BRAINTREE_GOOGLE_PAY_` constants with `MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_`
+2. Replace `MODULE_PAYMENT_BRAINTREE_APPLE_PAY_` constants with `MODULE_PAYMENT_PAYPALR_APPLE_PAY_`
+3. Add Venmo module loading (currently commented out in Braintree version)
+4. Replace template paths: `tpl_modules_braintree_*` → `tpl_modules_paypalr_*`
+5. Update CSS IDs if needed to avoid conflicts
+
+### 2.2 Google Pay Shopping Cart Button
+**Source:** `reference/braintree_payments/catalog/includes/templates/template_default/templates/tpl_modules_braintree_googlepay.php`
+
+**Target:** `includes/templates/template_default/templates/tpl_modules_paypalr_googlepay.php`
+
+**Adaptations Required:**
+1. Replace `require_once(DIR_WS_MODULES . 'payment/braintree_googlepay.php')` with `paypalr_googlepay.php`
+2. Replace `new braintree_googlepay()` with `new paypalr_googlepay()`
+3. Update AJAX endpoints: `ajax/braintree.php` → `ajax/paypalr_wallet.php`
+4. Update AJAX endpoints: `ajax/braintree_checkout_handler.php` → `ajax/paypalr_wallet_checkout.php`
+5. Update AJAX endpoints: `ajax/braintree_clear_cart.php` → `ajax/paypalr_wallet_clear_cart.php`
+6. Replace all `braintree` JavaScript variable names with `paypalr` (e.g., `braintreeGooglePaySessionAppend` → `paypalrGooglePaySessionAppend`)
+7. Update module constant references: `MODULE_PAYMENT_BRAINTREE_GOOGLE_PAY_*` → `MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_*`
+8. Update log file paths and function names if logging is module-specific
+
+### 2.3 Apple Pay Shopping Cart Button
+**Source:** `reference/braintree_payments/catalog/includes/templates/template_default/templates/tpl_modules_braintree_applepay.php`
+
+**Target:** `includes/templates/template_default/templates/tpl_modules_paypalr_applepay.php`
+
+**Adaptations Required:**
+1. Same as Google Pay adaptations above
+2. Replace `braintree_applepay` module references with `paypalr_applepay`
+3. Update all JavaScript variable prefixes from `braintree` to `paypalr`
+4. Update AJAX endpoint URLs
+5. Update module constant references
+
+### 2.4 Venmo Shopping Cart Button
+**Source:** Create new based on Google Pay template structure
+
+**Target:** `includes/templates/template_default/templates/tpl_modules_paypalr_venmo.php`
+
+**Adaptations Required:**
+1. Use Google Pay template as base structure
+2. Replace Google Pay specific code with Venmo equivalents
+3. Use `paypalr_venmo` module class
+4. Update all references and constants for Venmo
+
+---
+
+## Phase 3: Copy and Adapt Product Page Templates
+
+### 3.1 Main Product Page Button Loader
+**Source:** `reference/braintree_payments/catalog/includes/templates/template_default/templates/tpl_braintree_product_info.php`
+
+**Target:** `includes/templates/template_default/templates/tpl_paypalr_product_info.php`
+
+**Adaptations Required:**
+1. Replace all `MODULE_PAYMENT_BRAINTREE_*` constants with `MODULE_PAYMENT_PAYPALR_*`
+2. Replace template paths: `tpl_modules_braintree_product_*` → `tpl_modules_paypalr_product_*`
+3. Add Venmo module loading
+
+### 3.2 Google Pay Product Page Button
+**Source:** `reference/braintree_payments/catalog/includes/templates/template_default/templates/tpl_modules_braintree_product_googlepay.php`
+
+**Target:** `includes/templates/template_default/templates/tpl_modules_paypalr_product_googlepay.php`
+
+**Adaptations Required:**
+1. Same adaptations as shopping cart version (Phase 2.2)
+2. Keep product-specific JavaScript for "Add to Cart" functionality
+3. Update initial total calculation to use PayPal product pricing
+
+### 3.3 Apple Pay Product Page Button
+**Source:** `reference/braintree_payments/catalog/includes/templates/template_default/templates/tpl_modules_braintree_product_applepay.php`
+
+**Target:** `includes/templates/template_default/templates/tpl_modules_paypalr_product_applepay.php`
+
+**Adaptations Required:**
+1. Same adaptations as shopping cart version (Phase 2.3)
+2. Keep product-specific JavaScript for "Add to Cart" functionality
+3. Update initial total calculation to use PayPal product pricing
+
+### 3.4 Venmo Product Page Button
+**Source:** Create new based on Google Pay product template
+
+**Target:** `includes/templates/template_default/templates/tpl_modules_paypalr_product_venmo.php`
+
+**Adaptations Required:**
+1. Use Google Pay product template as base
+2. Adapt for Venmo specifics
+3. Update all references and constants
+
+---
+
+## Phase 4: Copy and Adapt AJAX Handlers
+
+### 4.1 Main AJAX Handler (Order Data, Shipping, Totals)
+**Source:** `reference/braintree_payments/catalog/ajax/braintree.php` (804 lines)
+
+**Target:** `ajax/paypalr_wallet.php`
+
+**Critical Code to Preserve:**
+- Session validation logic (lines 64-72)
+- Currency handling with `get_validated_base_currency()` function (lines 28-56)
+- Module switching logic (lines 78-92)
+- Country code fetching (lines 96-99)
+- **ALL shipping method calculation logic**
+- **ALL order total calculation logic**
+- Error handling and logging
+
+**Adaptations Required:**
+1. Change `$loaderPrefix = 'braintree_ajax'` to `$loaderPrefix = 'paypalr_wallet_ajax'`
+2. Replace `require_once(DIR_WS_FUNCTIONS . 'braintree_functions.php')` with PayPal equivalent
+3. Update module names: `braintree_googlepay` → `paypalr_googlepay`, etc.
+4. Update log file path: `DIR_FS_LOGS . '/braintree_handler.log'` → `DIR_FS_LOGS . '/paypalr_wallet_handler.log'`
+5. Update constant names: `MODULE_PAYMENT_BRAINTREE_*_DEBUGGING` → `MODULE_PAYMENT_PAYPALR_*_DEBUGGING`
+6. **DO NOT change any business logic - only names and paths**
+
+### 4.2 Checkout Handler (Final Order Processing)
+**Source:** `reference/braintree_payments/catalog/ajax/braintree_checkout_handler.php` (561 lines)
+
+**Target:** `ajax/paypalr_wallet_checkout.php`
+
+**Critical Code to Preserve:**
+- Session parameter handling for sandboxed iframes (lines 3-19)
+- Exception and error handlers (lines 59-83)
+- Payload validation (lines 86-99)
+- **ALL order creation logic**
+- **ALL payment processing logic**
+- Customer creation for guest checkout
+- Order history updates
+- Email notifications
+
+**Adaptations Required:**
+1. Change `$loaderPrefix = 'braintree_ajax'` to `$loaderPrefix = 'paypalr_wallet_ajax'`
+2. Update module require paths
+3. Update log file paths
+4. Update function name references
+5. **Preserve all business logic intact**
+
+### 4.3 Cart Clear Handler
+**Source:** `reference/braintree_payments/catalog/ajax/braintree_clear_cart.php` (35 lines)
+
+**Target:** `ajax/paypalr_wallet_clear_cart.php`
+
+**Adaptations Required:**
+1. Change `$loaderPrefix = 'braintree_ajax'` to `$loaderPrefix = 'paypalr_wallet_ajax'`
+2. Update module references
+3. Simple file - mainly renaming
+
+---
+
+## Phase 5: Create Zen Cart Loader Override
+
+### 5.1 AJAX Loader Configuration
+**Source:** `reference/braintree_payments/catalog/includes/auto_loaders/braintree_ajax.core.php` (384 lines)
+
+**Target:** `includes/auto_loaders/paypalr_wallet_ajax.core.php`
+
+**Critical Code to Preserve:**
+- Zen Cart 2.0+ vs 1.5.x version detection (lines 21-23)
+- All class loading logic for both versions
+- Minimal autoload configuration (cart, currencies, sessions, sanitize, languages, customer_auth)
+- **This file is crucial for AJAX performance**
+
+**Adaptations Required:**
+1. Update header comment to reference PayPal Wallet
+2. **DO NOT change any loading logic**
+3. **DO NOT add extra classes unless absolutely necessary**
+
+---
+
+## Phase 6: Update Existing Payment Modules
+
+### 6.1 Add AJAX Methods to Payment Modules
+
+**Files to Update:**
+- `includes/modules/payment/paypalr_googlepay.php`
+- `includes/modules/payment/paypalr_applepay.php`
+- `includes/modules/payment/paypalr_venmo.php`
+
+**Methods Needed:**
+Each module likely already has these, but verify:
+- `generate_client_token()` or equivalent for SDK initialization
+- `ajaxGetWalletConfig()` - returns configuration for button initialization
+- `ajaxCreateWalletOrder()` - creates PayPal order
+- Module constants for:
+  - `*_PRODUCT_PAGE` - enable on product page
+  - `*_SHOPPING_CART` - enable on shopping cart
+  - `*_ENVIRONMENT` - sandbox/production
+  - `*_MERCHANT_ID` - merchant identification
+  - `*_USE_3DS` - 3D Secure setting
+
+---
+
+## Phase 7: Template Integration Instructions
+
+### 7.1 Shopping Cart Page Integration
+
+**Developer Instructions:**
+
+1. Open `includes/templates/YOUR_TEMPLATE/templates/tpl_shopping_cart_default.php`
+2. Locate the "Continue Checkout" button section
+3. Add this code above or below the button:
+
+```php
+<?php
+  $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_paypalr_shopping_cart.php';
+  if (!file_exists($template_path)) {
+    $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_paypalr_shopping_cart.php';
+  }
+  include($template_path);
+?>
+```
+
+**Reference:** See `reference/braintree_payments/docs/Braintree Payments/readme.html` lines 95-108
+
+### 7.2 Product Page Integration
+
+**Developer Instructions:**
+
+1. Open `includes/templates/YOUR_TEMPLATE/templates/tpl_product_info_display.php`
+2. Locate the "Add to Cart" button section
+3. Add this code above or below the button:
+
+```php
+<?php
+  $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_paypalr_product_info.php';
+  if (!file_exists($template_path)) {
+    $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_paypalr_product_info.php';
+  }
+  include($template_path);
+?>
+```
+
+**Reference:** See `reference/braintree_payments/docs/Braintree Payments/readme.html` lines 113-126
+
+---
+
+## Phase 8: Testing & Validation
+
+### 8.1 Shopping Cart Page Tests
+- [ ] Google Pay button appears when enabled
+- [ ] Apple Pay button appears on Safari/iOS
+- [ ] Venmo button appears when eligible
+- [ ] Buttons hidden when modules disabled
+- [ ] Shipping method selection works
+- [ ] Tax calculation correct
+- [ ] Order total calculation correct
+- [ ] Payment processing successful
+- [ ] Cart cleared after payment
+- [ ] Order created in database
+- [ ] Customer email sent
+
+### 8.2 Product Page Tests
+- [ ] All buttons appear when enabled
+- [ ] Product quantity selection works
+- [ ] Product options/attributes handled
+- [ ] Price calculation correct with options
+- [ ] Add to cart then checkout flow works
+- [ ] Direct payment from product page works
+
+### 8.3 Browser/Device Tests
+- [ ] Chrome (desktop & mobile)
+- [ ] Safari (desktop & iOS)
+- [ ] Firefox
+- [ ] Edge
+- [ ] iOS Chrome (sequential script loading)
+- [ ] Android Chrome
+
+### 8.4 Error Handling Tests
+- [ ] Declined payment handled gracefully
+- [ ] Expired session handled
+- [ ] Invalid cart state handled
+- [ ] Network errors caught
+- [ ] User cancellation handled
+
+---
+
+# 🔑 Key Success Factors
+
+## 1. Copy, Don't Rewrite
+- **COPY** the braintree files first
+- **RENAME** variables, functions, and paths
+- **TEST** after each file is adapted
+- Only modify business logic if PayPal API differs from Braintree
+
+## 2. Preserve Critical Logic
+- Currency conversion handling
+- Session management
+- Error handling and retry logic
+- Shipping calculation
+- Tax calculation
+- Order total calculation
+- Guest checkout support
+
+## 3. File Naming Convention
+| Braintree | PayPal |
+|-----------|--------|
+| `braintree_*` | `paypalr_*` or `paypalr_wallet_*` |
+| `tpl_modules_braintree_*` | `tpl_modules_paypalr_*` |
+| JavaScript: `braintree*` variables | `paypalr*` or `paypalrWallet*` |
+
+## 4. Essential Configuration Constants
+Each wallet module needs these constants:
+- `MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS`
+- `MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SHOPPING_CART`
+- `MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE`
+- `MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENVIRONMENT`
+- `MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID`
+- `MODULE_PAYMENT_PAYPALR_GOOGLEPAY_USE_3DS`
+- (Same pattern for Apple Pay and Venmo)
+
+---
+
+# 📋 Implementation Checklist
+
+## Pre-Implementation
+- [x] Review all Braintree reference files
+- [x] Understand AJAX loader pattern
+- [x] Understand session handling
+- [x] Understand currency conversion
+- [x] Create implementation plan
+
+## Phase 1: Directory Structure
+- [ ] Create template directories
+- [ ] Create ajax directory
+- [ ] Create auto_loaders entry
+
+## Phase 2: Shopping Cart Templates
+- [ ] Copy and adapt `tpl_paypalr_shopping_cart.php`
+- [ ] Copy and adapt `tpl_modules_paypalr_googlepay.php`
+- [ ] Copy and adapt `tpl_modules_paypalr_applepay.php`
+- [ ] Copy and adapt `tpl_modules_paypalr_venmo.php`
+
+## Phase 3: Product Page Templates
+- [ ] Copy and adapt `tpl_paypalr_product_info.php`
+- [ ] Copy and adapt `tpl_modules_paypalr_product_googlepay.php`
+- [ ] Copy and adapt `tpl_modules_paypalr_product_applepay.php`
+- [ ] Copy and adapt `tpl_modules_paypalr_product_venmo.php`
+
+## Phase 4: AJAX Handlers
+- [ ] Copy and adapt `ajax/paypalr_wallet.php`
+- [ ] Copy and adapt `ajax/paypalr_wallet_checkout.php`
+- [ ] Copy and adapt `ajax/paypalr_wallet_clear_cart.php`
+
+## Phase 5: Loader Override
+- [ ] Copy and adapt `paypalr_wallet_ajax.core.php`
+
+## Phase 6: Module Updates
+- [ ] Verify `paypalr_googlepay.php` has required methods
+- [ ] Verify `paypalr_applepay.php` has required methods
+- [ ] Verify `paypalr_venmo.php` has required methods
+- [ ] Add missing constants if needed
+
+## Phase 7: Integration
+- [ ] Create shopping cart integration docs
+- [ ] Create product page integration docs
+- [ ] Test shopping cart integration
+- [ ] Test product page integration
+
+## Phase 8: Testing
+- [ ] Run all shopping cart tests
+- [ ] Run all product page tests
+- [ ] Run browser compatibility tests
+- [ ] Run error handling tests
+
+---
+
+# 🚨 Common Pitfalls to Avoid
+
+1. **Don't skip the loader override** - AJAX will be slow without it
+2. **Don't modify business logic** unless necessary for PayPal API
+3. **Don't remove error handling** - it's there for a reason
+4. **Don't forget session handling** - crucial for guest checkout
+5. **Don't ignore currency conversion** - stores may use different currencies
+6. **Don't skip browser compatibility code** - iOS Chrome needs sequential loading
+7. **Test on real devices** - Apple Pay and some features only work on actual devices
+
+---
+
+# 📞 Support References
+
+- Braintree Module Documentation: `reference/braintree_payments/docs/Braintree Payments/readme.html`
+- Braintree AJAX Handler: `reference/braintree_payments/catalog/ajax/braintree.php`
+- Braintree Templates: `reference/braintree_payments/catalog/includes/templates/template_default/templates/`
+- PayPal Advanced Checkout Docs: https://developer.paypal.com/docs/checkout/
+
+---
+
 # Legacy Recurring Payments Feature Migration Tasks
 
 This document outlines the features from `legacy_recurring_reference/` that need to be reviewed, ported, or confirmed as already implemented in the current REST API implementation before the legacy directory can be removed.
