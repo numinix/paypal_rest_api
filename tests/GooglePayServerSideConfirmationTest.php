@@ -1,19 +1,19 @@
 <?php
 /**
- * Test: Google Pay Server-Side Confirmation
+ * Test: Google Pay Client-Side Confirmation
  *
  * This test validates that the Google Pay module correctly handles payment confirmation
- * on the server side instead of attempting to confirm in JavaScript.
+ * on the client side using googlepay.confirmOrder(), matching the Apple Pay pattern.
  *
  * Background:
- * - Following the Apple Pay fix, Google Pay now also moves confirmation to the server
- * - Previously, Google Pay called googlepay.confirmOrder() on the client
- * - This could cause double-confirmation issues (client + server)
+ * - Google Pay was failing with INTERNAL_SERVER_ERROR during server-side confirmPaymentSource
+ * - Following the Apple Pay fix pattern, Google Pay now uses client-side confirmation
+ * - This matches PayPal's recommended Advanced Integration pattern for Google Pay
  *
  * The test verifies that the JavaScript code:
- * 1. Does NOT call googlepay.confirmOrder() after loadPaymentData
- * 2. Includes paymentMethodData in the payload for server-side processing
- * 3. The PHP pre_confirmation_check handles confirmPaymentSource on the server
+ * 1. DOES call googlepay.confirmOrder() after loadPaymentData
+ * 2. Returns a simplified payload with {orderID, confirmed: true, wallet}
+ * 3. The PHP pre_confirmation_check skips confirmPaymentSource when confirmed: true
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -42,22 +42,22 @@ class GooglePayServerSideConfirmationTest
     
     public function run(): void
     {
-        echo "\n=== Google Pay Server-Side Confirmation Test ===\n\n";
+        echo "\n=== Google Pay Client-Side Confirmation Test ===\n\n";
         
-        $this->testNoClientSideConfirmOrder();
-        $this->testPayloadContainsPaymentMethodData();
-        $this->testServerSideConfirmation();
+        $this->testClientSideConfirmOrder();
+        $this->testPayloadContainsConfirmed();
+        $this->testServerSkipsConfirmation();
         $this->testConsistentWithApplePay();
         
         $this->printResults();
     }
     
     /**
-     * Test that confirmOrder is NOT called after loadPaymentData
+     * Test that confirmOrder IS called after loadPaymentData
      */
-    private function testNoClientSideConfirmOrder(): void
+    private function testClientSideConfirmOrder(): void
     {
-        echo "Test 1: Verify confirmOrder is NOT called after loadPaymentData...\n";
+        echo "Test 1: Verify confirmOrder IS called after loadPaymentData...\n";
         
         $content = file_get_contents($this->jsFile);
         
@@ -70,24 +70,24 @@ class GooglePayServerSideConfirmationTest
             // Check if confirmOrder is called within this callback
             $hasConfirmOrder = strpos($callback, 'googlepay.confirmOrder') !== false;
             
-            if (!$hasConfirmOrder) {
+            if ($hasConfirmOrder) {
                 $this->testResults[] = [
-                    'name' => 'No client-side confirmOrder',
+                    'name' => 'Client-side confirmOrder',
                     'passed' => true,
-                    'message' => 'confirmOrder is correctly NOT called after loadPaymentData'
+                    'message' => 'confirmOrder is correctly called after loadPaymentData'
                 ];
-                echo "  ✓ PASS: confirmOrder not called on client side\n";
+                echo "  ✓ PASS: confirmOrder called on client side\n";
             } else {
                 $this->testResults[] = [
-                    'name' => 'No client-side confirmOrder',
+                    'name' => 'Client-side confirmOrder',
                     'passed' => false,
-                    'message' => 'confirmOrder should NOT be called after loadPaymentData'
+                    'message' => 'confirmOrder SHOULD be called after loadPaymentData'
                 ];
-                echo "  ❌ FAIL: confirmOrder is still being called on client side\n";
+                echo "  ❌ FAIL: confirmOrder is NOT being called on client side\n";
             }
         } else {
             $this->testResults[] = [
-                'name' => 'No client-side confirmOrder',
+                'name' => 'Client-side confirmOrder',
                 'passed' => false,
                 'message' => 'Could not find loadPaymentData callback'
             ];
@@ -96,61 +96,61 @@ class GooglePayServerSideConfirmationTest
     }
     
     /**
-     * Test that the payload includes paymentMethodData
+     * Test that the payload includes confirmed: true
      */
-    private function testPayloadContainsPaymentMethodData(): void
+    private function testPayloadContainsConfirmed(): void
     {
-        echo "Test 2: Verify payload includes paymentMethodData...\n";
+        echo "Test 2: Verify payload includes confirmed: true...\n";
         
         $content = file_get_contents($this->jsFile);
         
-        // Look for paymentMethodData being added to payload
-        $hasPaymentMethodData = strpos($content, 'paymentMethodData: paymentData.paymentMethodData') !== false;
+        // Look for confirmed: true being added to payload
+        $hasConfirmed = strpos($content, 'confirmed: true') !== false;
         
-        if ($hasPaymentMethodData) {
+        if ($hasConfirmed) {
             $this->testResults[] = [
-                'name' => 'Payload contains paymentMethodData',
+                'name' => 'Payload contains confirmed',
                 'passed' => true,
-                'message' => 'paymentMethodData is included in the payload'
+                'message' => 'confirmed: true is included in the payload'
             ];
-            echo "  ✓ PASS: Payload includes paymentMethodData\n";
+            echo "  ✓ PASS: Payload includes confirmed: true\n";
         } else {
             $this->testResults[] = [
-                'name' => 'Payload contains paymentMethodData',
+                'name' => 'Payload contains confirmed',
                 'passed' => false,
-                'message' => 'paymentMethodData is missing from payload'
+                'message' => 'confirmed: true is missing from payload'
             ];
-            echo "  ❌ FAIL: paymentMethodData not in payload\n";
+            echo "  ❌ FAIL: confirmed: true not in payload\n";
         }
     }
     
     /**
-     * Test that the PHP processWalletConfirmation calls confirmPaymentSource
+     * Test that the PHP processWalletConfirmation skips confirmPaymentSource when confirmed
      */
-    private function testServerSideConfirmation(): void
+    private function testServerSkipsConfirmation(): void
     {
-        echo "Test 3: Verify PHP handles server-side confirmation...\n";
+        echo "Test 3: Verify PHP skips server-side confirmation when confirmed...\n";
         
         $content = file_get_contents($this->phpFile);
         
-        // Look for confirmPaymentSource call in processWalletConfirmation
-        $hasConfirmPaymentSource = strpos($content, 'confirmPaymentSource') !== false;
-        $hasWalletTypeWrapper = strpos($content, '[$walletType => $payload]') !== false;
+        // Look for the logic that checks for confirmed: true and skips confirmPaymentSource
+        $hasConfirmedCheck = strpos($content, "isset(\$payload['confirmed']) && \$payload['confirmed'] === true") !== false;
+        $hasGooglePayInCondition = preg_match('/if\s*\(\$walletType\s*===\s*[\'"]apple_pay[\'"]\s*\|\|\s*\$walletType\s*===\s*[\'"]google_pay[\'"]\)/', $content);
         
-        if ($hasConfirmPaymentSource && $hasWalletTypeWrapper) {
+        if ($hasConfirmedCheck && $hasGooglePayInCondition) {
             $this->testResults[] = [
-                'name' => 'Server-side confirmation',
+                'name' => 'Server skips confirmation',
                 'passed' => true,
-                'message' => 'PHP correctly calls confirmPaymentSource with wallet type wrapper'
+                'message' => 'PHP correctly skips confirmPaymentSource when confirmed: true for Google Pay'
             ];
-            echo "  ✓ PASS: Server handles confirmation with confirmPaymentSource\n";
+            echo "  ✓ PASS: Server skips confirmPaymentSource when already confirmed\n";
         } else {
             $this->testResults[] = [
-                'name' => 'Server-side confirmation',
+                'name' => 'Server skips confirmation',
                 'passed' => false,
-                'message' => 'confirmPaymentSource not properly implemented'
+                'message' => 'Server does not properly check for confirmed: true (has_check=' . ($hasConfirmedCheck ? 'yes' : 'no') . ', has_google_pay=' . ($hasGooglePayInCondition ? 'yes' : 'no') . ')'
             ];
-            echo "  ❌ FAIL: Server-side confirmation not properly implemented\n";
+            echo "  ❌ FAIL: Server does not properly skip confirmation\n";
         }
     }
     
@@ -163,25 +163,25 @@ class GooglePayServerSideConfirmationTest
         
         $content = file_get_contents($this->jsFile);
         
-        // Check that Google Pay does NOT call confirmOrder after getting payment data
-        $hasNoConfirmOrderInCallback = !preg_match('/loadPaymentData.*\.then.*googlepay\.confirmOrder/s', $content);
+        // Check that Google Pay DOES call confirmOrder after getting payment data
+        $hasConfirmOrderInCallback = preg_match('/loadPaymentData.*\.then.*googlepay\.confirmOrder/s', $content);
         
         // Check that it sets the payload and dispatches event
         $setsPayload = strpos($content, 'setGooglePayPayload(payload)') !== false;
         $dispatchesEvent = strpos($content, 'paypalr:googlepay:payload') !== false;
         
-        if ($hasNoConfirmOrderInCallback && $setsPayload && $dispatchesEvent) {
+        if ($hasConfirmOrderInCallback && $setsPayload && $dispatchesEvent) {
             $this->testResults[] = [
                 'name' => 'Consistent with Apple Pay',
                 'passed' => true,
-                'message' => 'Google Pay follows the same server-side confirmation pattern as Apple Pay'
+                'message' => 'Google Pay follows the same client-side confirmation pattern as Apple Pay'
             ];
             echo "  ✓ PASS: Google Pay follows Apple Pay pattern\n";
         } else {
             $this->testResults[] = [
                 'name' => 'Consistent with Apple Pay',
                 'passed' => false,
-                'message' => 'Google Pay does not follow Apple Pay pattern: no_confirm=' . ($hasNoConfirmOrderInCallback ? 'yes' : 'no') . ', sets_payload=' . ($setsPayload ? 'yes' : 'no') . ', dispatches=' . ($dispatchesEvent ? 'yes' : 'no')
+                'message' => 'Google Pay does not follow Apple Pay pattern: has_confirm=' . ($hasConfirmOrderInCallback ? 'yes' : 'no') . ', sets_payload=' . ($setsPayload ? 'yes' : 'no') . ', dispatches=' . ($dispatchesEvent ? 'yes' : 'no')
             ];
             echo "  ❌ FAIL: Google Pay does not follow Apple Pay pattern\n";
         }

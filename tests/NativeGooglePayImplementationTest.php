@@ -1,7 +1,7 @@
 <?php
 /**
  * Test to verify the native Google Pay implementation follows PayPal's official
- * Google Pay integration guide and uses server-side confirmation pattern.
+ * Google Pay integration guide and uses client-side confirmation pattern.
  *
  * Reference: https://developer.paypal.com/docs/checkout/advanced/googlepay/
  *
@@ -12,10 +12,10 @@
  * 4. Use google.payments.api.PaymentsClient for the Google Pay client
  * 5. Use paymentsClient.createButton() for rendering the button
  * 6. Use paymentsClient.loadPaymentData() for payment flow
- * 7. NOT use client-side confirmOrder (uses server-side confirmPaymentSource instead)
+ * 7. Use client-side confirmOrder (matching Apple Pay pattern)
  * 8. Check eligibility with paypal.Googlepay().isEligible()
  * 9. Add buyer-country parameter for sandbox mode
- * 10. Pass payment data to server for confirmation
+ * 10. Pass confirmation result to server with {orderID, confirmed: true}
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -79,13 +79,13 @@ if (strpos($googlePayJs, 'paymentsClient.loadPaymentData') === false) {
     echo "✓ Google Pay JS uses paymentsClient.loadPaymentData()\n";
 }
 
-// Test 7: Google Pay JS does NOT use client-side confirmOrder (uses server-side confirmation)
-// Per GOOGLE_PAY_SERVER_SIDE_CONFIRMATION fix, confirmOrder should NOT be called on client
-if (strpos($googlePayJs, 'googlepay.confirmOrder') !== false) {
+// Test 7: Google Pay JS DOES use client-side confirmOrder (matching Apple Pay pattern)
+// Following the fix for INTERNAL_SERVER_ERROR, confirmOrder should be called on client
+if (strpos($googlePayJs, 'googlepay.confirmOrder') === false) {
     $testPassed = false;
-    $errors[] = "Google Pay JS should NOT use client-side googlepay.confirmOrder() - uses server-side confirmPaymentSource instead";
+    $errors[] = "Google Pay JS should use client-side googlepay.confirmOrder() to match Apple Pay pattern";
 } else {
-    echo "✓ Google Pay JS does NOT use client-side googlepay.confirmOrder() (server handles confirmation)\n";
+    echo "✓ Google Pay JS uses client-side googlepay.confirmOrder() (matching Apple Pay pattern)\n";
 }
 
 // Test 8: Google Pay JS uses googlepay.isEligible() for eligibility check
