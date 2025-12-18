@@ -245,10 +245,21 @@ class paypalr_googlepay extends base
         }
         $this->paypalCommon->tableCheckup();
         
-        // If the payment module is installed and at the current version, nothing to be done.
+        // If the payment module is installed and at the current version, verify all required configs exist
         $current_version = self::CURRENT_VERSION;
-        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION === $current_version) {
-            return;
+        $version_is_current = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION === $current_version;
+        
+        if ($version_is_current) {
+            // Check if all required configuration keys exist
+            $check_query = $db->Execute(
+                "SELECT configuration_key FROM " . TABLE_CONFIGURATION . "
+                 WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID'"
+            );
+            // If all required configs exist, nothing more to be done
+            if (!$check_query->EOF) {
+                return;
+            }
+            // Otherwise, fall through to apply missing configurations even though version is current
         }
         
         // Check for version-specific configuration updates
@@ -265,8 +276,19 @@ class paypalr_googlepay extends base
 
                 case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.7', '<'):
                     $this->applyVersionSqlFile('1.3.7_add_googlepay_merchant_id.sql');
+                    break;
 
                 default:
+                    // Version is >= 1.3.7, check if MERCHANT_ID config is missing and add it
+                    if ($version_is_current) {
+                        $check_merchant_id = $db->Execute(
+                            "SELECT configuration_key FROM " . TABLE_CONFIGURATION . "
+                             WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID'"
+                        );
+                        if ($check_merchant_id->EOF) {
+                            $this->applyVersionSqlFile('1.3.7_add_googlepay_merchant_id.sql');
+                        }
+                    }
                     break;
             }
         }
