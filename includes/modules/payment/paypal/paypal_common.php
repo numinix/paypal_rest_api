@@ -93,13 +93,15 @@ class PayPalCommon {
         // Wallet confirmation flow:
         // - Apple Pay: Confirmation is handled client-side via paypal.Applepay().confirmOrder()
         //   Skip both createOrder and confirmPaymentSource on server
-        // - Google Pay, Venmo: Create order here, then confirm
+        // - Google Pay: Confirmation is handled client-side via paypal.Googlepay().confirmOrder()
+        //   Skip server-side confirmPaymentSource, just retrieve order status
+        // - Venmo: Create order here, then confirm server-side
         // -----------------------------------------------------------------
-        if ($walletType === 'apple_pay') {
-            // Apple Pay confirmation is handled client-side via paypal.Applepay().confirmOrder()
-            // Save the orderID from the client-side confirmed payload
-            if (isset($payload['orderID']) && !empty($payload['orderID'])) {
-                // Ensure the session Order array exists
+        if ($walletType === 'apple_pay' || $walletType === 'google_pay') {
+            // Check if this is a client-side confirmed payload
+            // After client-side confirmOrder(), the payload contains: {orderID, confirmed: true, wallet}
+            if (isset($payload['confirmed']) && $payload['confirmed'] === true && isset($payload['orderID'])) {
+                // Save the orderID from the client-side confirmed payload
                 if (!isset($_SESSION['PayPalRestful']['Order'])) {
                     $_SESSION['PayPalRestful']['Order'] = [];
                 }
@@ -119,32 +121,32 @@ class PayPalCommon {
                     $_SESSION['PayPalRestful']['Order']['current'] = $order_status;
 
                     $this->paymentModule->log->write(
-                        "Apple Pay: Retrieved order status after client-side confirmation: $status",
+                        ucfirst(str_replace('_', ' ', $walletType)) . ": Retrieved order status after client-side confirmation: $status",
                         true,
                         'after'
                     );
                 }
 
                 $this->paymentModule->log->write(
-                    "Apple Pay: Saved orderID from client-side confirmation: " . $payload['orderID'],
+                    ucfirst(str_replace('_', ' ', $walletType)) . ": Saved orderID from client-side confirmation: " . $payload['orderID'],
                     true,
                     'after'
                 );
-            }
             
-            $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
-            $_SESSION['PayPalRestful']['Order']['payment_source'] = 'apple_pay';
+                $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
+                $_SESSION['PayPalRestful']['Order']['payment_source'] = $walletType;
 
-            $this->paymentModule->log->write(
-                "pre_confirmation_check (apple_pay) skipped server confirmPaymentSource; confirmed client-side.",
-                true,
-                'after'
-            );
+                $this->paymentModule->log->write(
+                    "pre_confirmation_check ($walletType) skipped server confirmPaymentSource; confirmed client-side.",
+                    true,
+                    'after'
+                );
 
-            return;
+                return;
+            }
         }
 
-        // Google Pay and Venmo: Create order on server, then confirm
+        // Venmo: Create order on server, then confirm
         if ($walletType === 'google_pay' && $payloadOrderId !== null) {
             if (!isset($_SESSION['PayPalRestful']['Order'])) {
                 $_SESSION['PayPalRestful']['Order'] = [];
@@ -317,6 +319,15 @@ class PayPalCommon {
         }
 
         if ($walletType === 'google_pay') {
+            // Check if this is a client-side confirmed payload
+            // After client-side confirmOrder(), the payload contains: {orderID, confirmed: true, wallet}
+            if (isset($payload['confirmed']) && $payload['confirmed'] === true && isset($payload['orderID'])) {
+                // This payload is from client-side confirmation - just return it as-is
+                // The caller (processWalletConfirmation) will save the orderID to the session
+                return $payload;
+            }
+
+            // Legacy server-side confirmation path (fallback)
             $token = $payload['token'] ?? null;
 
             if (!is_string($token)) {
