@@ -1,3 +1,8 @@
+:root {
+    --paypalr-wallet-button-min-width: 200px;
+    --paypalr-wallet-button-max-width: 320px;
+}
+
 #ppr-subtitle {
     font-size: 85%;
 }
@@ -83,8 +88,23 @@
 .paypalr-applepay-button,
 .paypalr-venmo-button {
     min-height: 40px;
-    max-width: 400px;
+    min-width: var(--paypalr-wallet-button-min-width);
+    max-width: var(--paypalr-wallet-button-max-width);
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
     cursor: pointer;
+    box-sizing: border-box;
+}
+
+.paypalr-googlepay-button > *,
+.paypalr-applepay-button > *,
+.paypalr-venmo-button > * {
+    width: 100%;
+    max-width: var(--paypalr-wallet-button-max-width);
+    box-sizing: border-box;
 }
 
 /* Placeholder text for wallet buttons */
@@ -116,10 +136,14 @@
 
 /* Native Apple Pay button element (WebKit custom element) */
 apple-pay-button {
-    display: inline-block;
+    display: block;
     -webkit-appearance: -apple-pay-button;
     --apple-pay-button-width: 100%;
     --apple-pay-button-height: 40px;
     --apple-pay-button-border-radius: 4px;
-    max-width: 400px;
+    min-width: var(--paypalr-wallet-button-min-width);
+    max-width: var(--paypalr-wallet-button-max-width);
+    width: 100%;
+    margin: 0 auto;
+    box-sizing: border-box;
 }
