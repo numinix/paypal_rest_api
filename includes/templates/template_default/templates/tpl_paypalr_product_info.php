@@ -11,10 +11,10 @@ $initialTotal = number_format($currencies->value(zen_get_products_base_price((in
 
 // Load Google Pay template if enabled for product page
 if (
-    defined('MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_STATUS') &&
-    MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_STATUS === 'True' &&
-    defined('MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_PRODUCT_PAGE') &&
-    MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_PRODUCT_PAGE === 'True'
+    defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') &&
+    MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True' &&
+    defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE') &&
+    MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE === 'True'
 ) {
     $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_modules_paypalr_product_googlepay.php';
     if (!file_exists($template_path)) {
@@ -25,10 +25,10 @@ if (
 
 // Load Apple Pay template if enabled for product page
 if (
-    defined('MODULE_PAYMENT_PAYPALR_APPLE_PAY_STATUS') &&
-    MODULE_PAYMENT_PAYPALR_APPLE_PAY_STATUS === 'True' &&
-    defined('MODULE_PAYMENT_PAYPALR_APPLE_PAY_PRODUCT_PAGE') &&
-    MODULE_PAYMENT_PAYPALR_APPLE_PAY_PRODUCT_PAGE === 'True'
+    defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') &&
+    MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True' &&
+    defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_PRODUCT_PAGE') &&
+    MODULE_PAYMENT_PAYPALR_APPLEPAY_PRODUCT_PAGE === 'True'
 ) {
     $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_modules_paypalr_product_applepay.php';
     if (!file_exists($template_path)) {

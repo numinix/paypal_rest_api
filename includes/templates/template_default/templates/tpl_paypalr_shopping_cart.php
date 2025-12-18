@@ -9,7 +9,7 @@ $initialTotal         = number_format($currencies->value($_SESSION['cart']->tota
 $storeName = STORE_NAME;
 
 // Load Google Pay template
-if (defined('MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_STATUS === 'True' && defined('MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_SHOPPING_CART') && MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_SHOPPING_CART === 'True') {
+if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True' && defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SHOPPING_CART') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SHOPPING_CART === 'True') {
     $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_modules_paypalr_googlepay.php';
     if (!file_exists($template_path)) {
         $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_modules_paypalr_googlepay.php';
@@ -18,7 +18,7 @@ if (defined('MODULE_PAYMENT_PAYPALR_GOOGLE_PAY_STATUS') && MODULE_PAYMENT_PAYPAL
 }
 
 // Load Apple Pay template
-if (defined('MODULE_PAYMENT_PAYPALR_APPLE_PAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLE_PAY_STATUS === 'True' && defined('MODULE_PAYMENT_PAYPALR_APPLE_PAY_SHOPPING_CART') && MODULE_PAYMENT_PAYPALR_APPLE_PAY_SHOPPING_CART === 'True') {
+if (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True' && defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_SHOPPING_CART') && MODULE_PAYMENT_PAYPALR_APPLEPAY_SHOPPING_CART === 'True') {
     $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_modules_paypalr_applepay.php';
     if (!file_exists($template_path)) {
         $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_modules_paypalr_applepay.php';

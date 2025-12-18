@@ -52,7 +52,7 @@ class paypalr_applepay extends base
         return defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_APPLEPAY_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.3';
+    protected const CURRENT_VERSION = '1.3.4';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -254,9 +254,15 @@ class paypalr_applepay extends base
         // Check for version-specific configuration updates
         if (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_VERSION')) {
             switch (true) {
-                // Add future version-specific upgrades here
-                // case version_compare(MODULE_PAYMENT_PAYPALR_APPLEPAY_VERSION, '1.3.4', '<'):
-                //     // Add v1.3.4-specific changes here
+                case version_compare(MODULE_PAYMENT_PAYPALR_APPLEPAY_VERSION, '1.3.4', '<'):
+                    // Add configuration options to control button display on cart and product pages
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Enable on Shopping Cart Page?', 'MODULE_PAYMENT_PAYPALR_APPLEPAY_SHOPPING_CART', 'True', 'Do you want to display the Apple Pay button on the shopping cart page?', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now()),
+                            ('Enable on Product Page?', 'MODULE_PAYMENT_PAYPALR_APPLEPAY_PRODUCT_PAGE', 'True', 'Do you want to display the Apple Pay button on product pages?', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now())"
+                    );
                 
                 default:
                     break;
@@ -831,6 +837,8 @@ class paypalr_applepay extends base
             'MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS',
             'MODULE_PAYMENT_PAYPALR_APPLEPAY_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_APPLEPAY_ZONE',
+            'MODULE_PAYMENT_PAYPALR_APPLEPAY_SHOPPING_CART',
+            'MODULE_PAYMENT_PAYPALR_APPLEPAY_PRODUCT_PAGE',
         ];
     }
 

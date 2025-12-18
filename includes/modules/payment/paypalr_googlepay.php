@@ -52,7 +52,7 @@ class paypalr_googlepay extends base
         return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.8';
+    protected const CURRENT_VERSION = '1.3.9';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -271,6 +271,16 @@ class paypalr_googlepay extends base
                             (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
                          VALUES
                             ('Google Pay Merchant ID (optional)', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'Optional Google Merchant ID used for the PayPal SDK google-pay-merchant-id parameter. Must be 5-20 alphanumeric characters. Leave blank unless instructed by PayPal.', 6, 0, NULL, NULL, now())"
+                    );
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.9', '<'):
+                    // Add configuration options to control button display on cart and product pages
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Enable on Shopping Cart Page?', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SHOPPING_CART', 'True', 'Do you want to display the Google Pay button on the shopping cart page?', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now()),
+                            ('Enable on Product Page?', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE', 'True', 'Do you want to display the Google Pay button on product pages?', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now())"
                     );
 
                 default:
@@ -845,6 +855,8 @@ class paypalr_googlepay extends base
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID',
+            'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SHOPPING_CART',
+            'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE',
         ];
     }
 

@@ -52,7 +52,7 @@ class paypalr_venmo extends base
         return defined('MODULE_PAYMENT_PAYPALR_VENMO_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_VENMO_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.6';
+    protected const CURRENT_VERSION = '1.3.7';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -281,6 +281,17 @@ class paypalr_venmo extends base
                             SET configuration_description = 'Optional Venmo business profile ID reserved for future Venmo buttons; not required for PayPal-managed Venmo checkout.'
                           WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID'
                           LIMIT 1"
+                    );
+                    // Fall through to update the stored version number
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VENMO_VERSION, '1.3.7', '<'):
+                    // Add configuration options to control button display on cart and product pages
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Enable on Shopping Cart Page?', 'MODULE_PAYMENT_PAYPALR_VENMO_SHOPPING_CART', 'True', 'Do you want to display the Venmo button on the shopping cart page?', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now()),
+                            ('Enable on Product Page?', 'MODULE_PAYMENT_PAYPALR_VENMO_PRODUCT_PAGE', 'True', 'Do you want to display the Venmo button on product pages?', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now())"
                     );
                     // Fall through to update the stored version number
 
@@ -852,6 +863,8 @@ class paypalr_venmo extends base
             'MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID',
             'MODULE_PAYMENT_PAYPALR_VENMO_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_VENMO_ZONE',
+            'MODULE_PAYMENT_PAYPALR_VENMO_SHOPPING_CART',
+            'MODULE_PAYMENT_PAYPALR_VENMO_PRODUCT_PAGE',
         ];
     }
 
