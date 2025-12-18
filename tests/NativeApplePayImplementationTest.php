@@ -64,7 +64,7 @@ if (strpos($applePayJs, 'new ApplePaySession') === false) {
 }
 
 // Test 5: Apple Pay JS does NOT use client-side confirmOrder (uses server-side confirmation)
-// Per APPLE_PAY_SERVER_SIDE_CONFIRMATION_FIX.md, confirmOrder should NOT be called on client
+// confirmOrder should NOT be called on client - server handles confirmation via confirmPaymentSource
 if (strpos($applePayJs, 'applepay.confirmOrder') !== false) {
     $testPassed = false;
     $errors[] = "Apple Pay JS should NOT use client-side applepay.confirmOrder() - uses server-side confirmPaymentSource instead";
