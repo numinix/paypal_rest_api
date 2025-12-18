@@ -5,7 +5,7 @@
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.6
+ * Last updated: v1.3.7
  */
 /**
  * Load the support class' auto-loader and common class.
@@ -52,7 +52,7 @@ class paypalr_googlepay extends base
         return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.6';
+    protected const CURRENT_VERSION = '1.3.7';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -255,12 +255,16 @@ class paypalr_googlepay extends base
         if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION')) {
             switch (true) {
                 case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.6', '<'):
-                    // MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID is no longer required by the PayPal REST API integration.
+                    // MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID was previously removed; clean up any legacy rows
                     $db->Execute(
                         "DELETE FROM " . TABLE_CONFIGURATION . "
                           WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID'
                           LIMIT 1"
                     );
+                    // Fall through to re-introduce the configuration with validation
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.7', '<'):
+                    $this->applyVersionSqlFile('1.3.7_add_googlepay_merchant_id.sql');
 
                 default:
                     break;
@@ -413,6 +417,8 @@ class paypalr_googlepay extends base
         $client_id = (MODULE_PAYMENT_PAYPALR_SERVER === 'live') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
         $client_id = trim($client_id);
 
+        [$google_merchant_id, $google_merchant_log_value] = $this->getGoogleMerchantIdConfig();
+
         $intent = (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')
             ? 'capture'
             : 'authorize';
@@ -429,6 +435,7 @@ class paypalr_googlepay extends base
             "  - Client ID: " . $loggedClientId . "\n" .
             "  - Currency: " . ($_SESSION['currency'] ?? 'USD') . "\n" .
             "  - Intent: " . $intent . "\n" .
+            "  - Google Merchant ID: " . $google_merchant_log_value . "\n" .
             "  - Module Enabled: " . ($this->enabled ? 'Yes' : 'No'),
             true,
             'before'
@@ -442,8 +449,8 @@ class paypalr_googlepay extends base
         return [
             'success' => true,
             'clientId' => $client_id,
-            'merchantId' => '',
-            'googleMerchantId' => '',
+            'merchantId' => $google_merchant_id,
+            'googleMerchantId' => $google_merchant_id,
             'currency' => $_SESSION['currency'] ?? 'USD',
             'intent' => $intent,
             'environment' => MODULE_PAYMENT_PAYPALR_SERVER,
@@ -552,6 +559,8 @@ class paypalr_googlepay extends base
         $orderData = $_SESSION['PayPalRestful']['Order'] ?? [];
         $current = $orderData['current']['purchase_units'][0]['amount'] ?? [];
 
+        $googleMerchantId = $this->getGoogleMerchantIdConfig()[0];
+
         return [
             'success' => true,
             'orderID' => $orderData['id'] ?? '',
@@ -559,7 +568,8 @@ class paypalr_googlepay extends base
             'currency' => $current['currency_code'] ?? ($_SESSION['currency'] ?? ''),
             'intent' => $orderData['current']['intent'] ?? $intent,
             'clientId' => $client_id,
-            'merchantId' => '',
+            'merchantId' => $googleMerchantId,
+            'googleMerchantId' => $googleMerchantId,
         ];
     }
 
@@ -811,7 +821,8 @@ class paypalr_googlepay extends base
                 ('Module Version', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
                 ('Enable PayPal Google Pay?', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS', 'False', 'Do you want to enable PayPal Google Pay payments?', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
                 ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
-                ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())" 
+                ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now()),
+                ('Google Pay Merchant ID (optional)', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'Optional Google Merchant ID used for the PayPal SDK google-pay-merchant-id parameter. Must be 5-20 alphanumeric characters. Leave blank unless instructed by PayPal.', 6, 0, NULL, NULL, now())" 
         );
         
         // Define the module's current version so that the tableCheckup method will apply all changes
@@ -826,7 +837,60 @@ class paypalr_googlepay extends base
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE',
+            'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID',
         ];
+    }
+
+    /**
+     * Retrieve the Google Merchant ID configuration value with validation and logging output.
+     *
+     * @return array [validatedMerchantId, logValue]
+     */
+    protected function getGoogleMerchantIdConfig(): array
+    {
+        $rawMerchantId = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID') ? trim((string)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID) : '';
+
+        if ($rawMerchantId === '') {
+            return ['', 'not set'];
+        }
+
+        if (preg_match('/^[A-Z0-9]{5,20}$/i', $rawMerchantId) === 1) {
+            return [$rawMerchantId, $rawMerchantId];
+        }
+
+        return ['', 'invalid (ignored: ' . $rawMerchantId . ')'];
+    }
+
+    /**
+     * Apply a versioned SQL file that ships with the module to update configuration automatically.
+     */
+    protected function applyVersionSqlFile(string $filename): void
+    {
+        global $db;
+
+        $path = DIR_FS_CATALOG . 'docs/developers/versions/' . $filename;
+        if (!file_exists($path)) {
+            return;
+        }
+
+        $sql = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($sql === false) {
+            return;
+        }
+
+        $statement = '';
+        foreach ($sql as $line) {
+            $trimmed = trim($line);
+            if ($trimmed === '' || strpos($trimmed, '--') === 0) {
+                continue;
+            }
+            $statement .= $trimmed . ' ';
+        }
+
+        $statement = trim($statement);
+        if ($statement !== '') {
+            $db->Execute($statement);
+        }
     }
 
     public function remove()
