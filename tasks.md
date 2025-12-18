@@ -142,7 +142,7 @@ mkdir -p ajax
 
 ---
 
-## Phase 2: Copy and Adapt Shopping Cart Templates
+## Phase 2: Copy and Adapt Shopping Cart Templates ✅ COMPLETE
 
 ### 2.1 Main Shopping Cart Button Loader
 **Source:** `reference/braintree_payments/catalog/includes/templates/template_default/templates/tpl_braintree_shopping_cart.php`
@@ -476,10 +476,10 @@ Each wallet module needs these constants:
 - [x] Create auto_loaders entry
 
 ## Phase 2: Shopping Cart Templates
-- [x] Copy and adapt `tpl_paypalr_shopping_cart.php`
-- [ ] Copy and adapt `tpl_modules_paypalr_googlepay.php` (placeholder created, full implementation pending)
-- [ ] Copy and adapt `tpl_modules_paypalr_applepay.php` (placeholder created, full implementation pending)
-- [ ] Copy and adapt `tpl_modules_paypalr_venmo.php` (placeholder created, full implementation pending)
+- [x] Copy and adapt `tpl_paypalr_shopping_cart.php` (completed in Phase 1)
+- [x] Copy and adapt `tpl_modules_paypalr_googlepay.php` (387 lines - full implementation)
+- [x] Copy and adapt `tpl_modules_paypalr_applepay.php` (506 lines - full implementation)
+- [x] Copy and adapt `tpl_modules_paypalr_venmo.php` (222 lines - full implementation using PayPal Buttons SDK)
 
 ## Phase 3: Product Page Templates
 - [x] Copy and adapt `tpl_paypalr_product_info.php`
