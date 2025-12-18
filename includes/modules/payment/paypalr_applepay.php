@@ -263,6 +263,7 @@ class paypalr_applepay extends base
                             ('Enable on Shopping Cart Page?', 'MODULE_PAYMENT_PAYPALR_APPLEPAY_SHOPPING_CART', 'True', 'Do you want to display the Apple Pay button on the shopping cart page?', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now()),
                             ('Enable on Product Page?', 'MODULE_PAYMENT_PAYPALR_APPLEPAY_PRODUCT_PAGE', 'True', 'Do you want to display the Apple Pay button on product pages?', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now())"
                     );
+                    // Fall through to update the stored version number
                 
                 default:
                     break;

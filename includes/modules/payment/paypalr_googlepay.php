@@ -272,6 +272,7 @@ class paypalr_googlepay extends base
                          VALUES
                             ('Google Pay Merchant ID (optional)', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'Optional Google Merchant ID used for the PayPal SDK google-pay-merchant-id parameter. Must be 5-20 alphanumeric characters. Leave blank unless instructed by PayPal.', 6, 0, NULL, NULL, now())"
                     );
+                    // Fall through to add button display configuration
 
                 case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.9', '<'):
                     // Add configuration options to control button display on cart and product pages
