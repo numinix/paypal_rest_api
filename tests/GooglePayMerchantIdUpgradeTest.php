@@ -90,10 +90,9 @@ namespace {
         
         // Check that it handles case when version IS 1.3.7 but config is missing
         $hasDefaultCase = strpos($methodBody, 'default:') !== false;
-        $defaultCaseHandlesMissingConfig = preg_match(
-            '/default:.*?if.*?check.*?MERCHANT_ID.*?EOF.*?applyVersionSqlFile.*?1\.3\.7/s',
-            $methodBody
-        ) === 1;
+        $usesHelperMethod = strpos($content, 'merchantIdConfigExists()') !== false;
+        $defaultCaseHandlesMissingConfig = strpos($methodBody, 'if ($version_is_current && !$this->merchantIdConfigExists())') !== false &&
+                                           strpos($methodBody, "applyVersionSqlFile('1.3.7_add_googlepay_merchant_id.sql')") !== false;
 
         if ($hasVersionCompare137) {
             fwrite(STDOUT, "✓ tableCheckup handles upgrade from version < 1.3.7\n");
@@ -102,7 +101,7 @@ namespace {
             $passed = false;
         }
 
-        if ($hasDefaultCase && $defaultCaseHandlesMissingConfig) {
+        if ($hasDefaultCase && $usesHelperMethod && $defaultCaseHandlesMissingConfig) {
             fwrite(STDOUT, "✓ tableCheckup handles missing config when version is already 1.3.7\n");
         } else {
             fwrite(STDERR, "FAIL: tableCheckup should handle missing config when version is already 1.3.7\n");
@@ -132,13 +131,14 @@ namespace {
         $methodBody = substr($content, $methodStart, $methodEnd - $methodStart);
 
         // Check that early return is guarded by config existence check
-        $earlyReturnPattern = '/if.*?\$version_is_current.*?\{.*?SELECT.*?MERCHANT_ID.*?if.*?!.*?EOF.*?\{.*?return;/s';
-        $hasGuardedEarlyReturn = preg_match($earlyReturnPattern, $methodBody) === 1;
+        $usesHelperMethod = strpos($content, 'merchantIdConfigExists()') !== false;
+        $earlyReturnUsesHelper = strpos($methodBody, 'if ($version_is_current && $this->merchantIdConfigExists())') !== false;
+        $hasEarlyReturn = strpos($methodBody, 'return;') !== false;
 
-        if ($hasGuardedEarlyReturn) {
-            fwrite(STDOUT, "✓ Early return only happens when MERCHANT_ID config exists\n");
+        if ($usesHelperMethod && $earlyReturnUsesHelper && $hasEarlyReturn) {
+            fwrite(STDOUT, "✓ Early return only happens when MERCHANT_ID config exists (via helper method)\n");
         } else {
-            fwrite(STDERR, "FAIL: Early return should be guarded by config existence check\n");
+            fwrite(STDERR, "FAIL: Early return should be guarded by config existence check via helper method\n");
             $passed = false;
         }
 

@@ -249,17 +249,9 @@ class paypalr_googlepay extends base
         $current_version = self::CURRENT_VERSION;
         $version_is_current = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION === $current_version;
         
-        if ($version_is_current) {
-            // Check if all required configuration keys exist
-            $check_query = $db->Execute(
-                "SELECT configuration_key FROM " . TABLE_CONFIGURATION . "
-                 WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID'"
-            );
-            // If all required configs exist, nothing more to be done
-            if (!$check_query->EOF) {
-                return;
-            }
-            // Otherwise, fall through to apply missing configurations even though version is current
+        if ($version_is_current && $this->merchantIdConfigExists()) {
+            // Version is current and all required configs exist, nothing more to be done
+            return;
         }
         
         // Check for version-specific configuration updates
@@ -280,14 +272,8 @@ class paypalr_googlepay extends base
 
                 default:
                     // Version is >= 1.3.7, check if MERCHANT_ID config is missing and add it
-                    if ($version_is_current) {
-                        $check_merchant_id = $db->Execute(
-                            "SELECT configuration_key FROM " . TABLE_CONFIGURATION . "
-                             WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID'"
-                        );
-                        if ($check_merchant_id->EOF) {
-                            $this->applyVersionSqlFile('1.3.7_add_googlepay_merchant_id.sql');
-                        }
+                    if ($version_is_current && !$this->merchantIdConfigExists()) {
+                        $this->applyVersionSqlFile('1.3.7_add_googlepay_merchant_id.sql');
                     }
                     break;
             }
@@ -301,6 +287,23 @@ class paypalr_googlepay extends base
               WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION'
               LIMIT 1"
         );
+    }
+
+    /**
+     * Check if the MERCHANT_ID configuration exists in the database
+     *
+     * @return bool True if the configuration exists, false otherwise
+     */
+    protected function merchantIdConfigExists(): bool
+    {
+        global $db;
+        
+        $check_query = $db->Execute(
+            "SELECT configuration_key FROM " . TABLE_CONFIGURATION . "
+             WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID'"
+        );
+        
+        return !$check_query->EOF;
     }
 
     protected function validateConfiguration(bool $curl_installed): bool

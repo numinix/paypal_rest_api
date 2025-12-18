@@ -67,17 +67,20 @@ fwrite(STDOUT, "Initial state: VERSION = 1.3.7, MERCHANT_ID config does not exis
 fwrite(STDOUT, "Expected: tableCheckup() detects missing config, applies SQL\n");
 
 // Verify the code checks if config exists before early return
-$earlyReturnPattern = '/if.*?\$version_is_current.*?\{.*?SELECT.*?MERCHANT_ID.*?if.*?!.*?EOF.*?\{.*?return;/s';
-if (preg_match($earlyReturnPattern, $content) === 1) {
-    fwrite(STDOUT, "✓ Code checks for config existence before early return\n");
+$hasHelperMethod = strpos($content, 'protected function merchantIdConfigExists()') !== false;
+$earlyReturnUsesHelper = strpos($content, 'if ($version_is_current && $this->merchantIdConfigExists())') !== false;
+
+if ($hasHelperMethod && $earlyReturnUsesHelper) {
+    fwrite(STDOUT, "✓ Code checks for config existence before early return using helper method\n");
 } else {
     fwrite(STDERR, "✗ FAIL: Missing config existence check before early return\n");
     exit(1);
 }
 
 // Verify the default case handles missing config
-$defaultCasePattern = '/default:.*?if.*?\$version_is_current.*?\{.*?SELECT.*?MERCHANT_ID.*?if.*?EOF.*?\{.*?applyVersionSqlFile.*?1\.3\.7/s';
-if (preg_match($defaultCasePattern, $content) === 1) {
+$defaultCaseUsesHelper = preg_match('/default:.*?if.*?\$version_is_current.*?!.*?merchantIdConfigExists\(\).*?applyVersionSqlFile.*?1\.3\.7/s', $content) === 1;
+
+if ($defaultCaseUsesHelper) {
     fwrite(STDOUT, "✓ Code applies missing config in default case when version is current\n");
 } else {
     fwrite(STDERR, "✗ FAIL: Default case doesn't handle missing config\n");
@@ -92,9 +95,9 @@ fwrite(STDOUT, "-------------------------------------------------------------\n"
 fwrite(STDOUT, "Initial state: VERSION = 1.3.7, MERCHANT_ID config exists\n");
 fwrite(STDOUT, "Expected: tableCheckup() returns early, no changes made\n");
 
-if (strpos($content, 'if (!$check_query->EOF) {') !== false && 
+if (strpos($content, 'if ($version_is_current && $this->merchantIdConfigExists())') !== false && 
     strpos($content, 'return;') !== false) {
-    fwrite(STDOUT, "✓ Code returns early when config exists\n");
+    fwrite(STDOUT, "✓ Code returns early when config exists using helper method\n");
 } else {
     fwrite(STDERR, "✗ FAIL: Missing early return when config exists\n");
     exit(1);
@@ -156,6 +159,7 @@ fwrite(STDOUT, "✓ Missing config when version is 1.3.7 is detected and fixed\n
 fwrite(STDOUT, "✓ Early return only happens when config exists (optimization)\n");
 fwrite(STDOUT, "✓ SQL file is idempotent (uses INSERT IGNORE)\n");
 fwrite(STDOUT, "✓ Configuration is included in keys() and install() methods\n");
+fwrite(STDOUT, "✓ Helper method merchantIdConfigExists() reduces code duplication\n");
 fwrite(STDOUT, "\nThe fix ensures that the Google Pay Merchant ID configuration\n");
 fwrite(STDOUT, "will be added regardless of how the module reaches version 1.3.7.\n");
 
