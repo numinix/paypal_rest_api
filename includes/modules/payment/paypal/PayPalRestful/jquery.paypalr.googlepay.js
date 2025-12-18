@@ -631,18 +631,36 @@
                     console.log('[Google Pay] Payment data received from Google Pay sheet');
                     console.log('[Google Pay] Payment method data:', paymentData.paymentMethodData);
                     
-                    // Build the payload with the payment data
-                    // The server-side confirmPaymentSource API call will use this data
-                    // Similar to Apple Pay's approach: let the server handle confirmation
-                    var payload = {
-                        orderID: orderId,
-                        paymentMethodData: paymentData.paymentMethodData,
-                        wallet: 'google_pay'
-                    };
+                    // Step 3: Confirm the order using PayPal's client-side API
+                    // Similar to Apple Pay, Google Pay now uses client-side confirmation via confirmOrder()
+                    // This is the recommended flow per PayPal's Advanced Integration documentation
+                    console.log('[Google Pay] Calling paypal.Googlepay().confirmOrder...', orderId);
                     
-                    console.log('[Google Pay] Setting payload and submitting form');
-                    setGooglePayPayload(payload);
-                    document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: payload }));
+                    return googlepay.confirmOrder({
+                        orderId: orderId,
+                        paymentMethodData: paymentData.paymentMethodData
+                    }).then(function (confirmResult) {
+                        console.log('[Google Pay] confirmOrder result:', confirmResult);
+                        
+                        // Build the payload with the confirmed order details
+                        // The server will retrieve the confirmed order status
+                        var payload = {
+                            orderID: orderId,
+                            confirmed: true,
+                            wallet: 'google_pay'
+                        };
+                        
+                        console.log('[Google Pay] Setting payload and submitting form');
+                        setGooglePayPayload(payload);
+                        document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: payload }));
+                    }).catch(function (confirmError) {
+                        console.error('[Google Pay] confirmOrder failed:', confirmError);
+                        setGooglePayPayload({});
+                        if (typeof window.oprcHideProcessingOverlay === 'function') {
+                            window.oprcHideProcessingOverlay();
+                        }
+                        throw confirmError;
+                    });
                 });
             });
         }).catch(function (error) {
