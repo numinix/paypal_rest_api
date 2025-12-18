@@ -54,6 +54,7 @@ $requestData = json_decode($requestBody, true) ?: [];
 
 $wallet = $requestData['wallet'] ?? '';
 $configOnly = !empty($requestData['config_only']);
+$payloadData = $requestData['payload'] ?? null;
 
 $moduleMap = [
     'google_pay' => 'paypalr_googlepay',
@@ -75,6 +76,28 @@ require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/' . $moduleCode . '.php'
 $moduleInstance = new $moduleCode();
 if (empty($moduleInstance->enabled)) {
     echo json_encode(['success' => false, 'message' => 'Wallet module is disabled']);
+    require DIR_WS_INCLUDES . 'application_bottom.php';
+    return;
+}
+
+// Save posted wallet payloads (e.g., Venmo onApprove) into the session before proceeding to confirmation
+if ($payloadData !== null) {
+    $isPayloadArray = is_array($payloadData);
+    $hasOrderId = $isPayloadArray && isset($payloadData['orderID']) && is_string($payloadData['orderID']) && trim($payloadData['orderID']) !== '';
+
+    if (!$isPayloadArray || !$hasOrderId) {
+        echo json_encode(['success' => false, 'message' => 'Invalid wallet payload']);
+        require DIR_WS_INCLUDES . 'application_bottom.php';
+        return;
+    }
+
+    if (!isset($_SESSION['PayPalRestful']['WalletPayload'])) {
+        $_SESSION['PayPalRestful']['WalletPayload'] = [];
+    }
+
+    $_SESSION['PayPalRestful']['WalletPayload'][$wallet] = $payloadData;
+
+    echo json_encode(['success' => true, 'cached' => true]);
     require DIR_WS_INCLUDES . 'application_bottom.php';
     return;
 }

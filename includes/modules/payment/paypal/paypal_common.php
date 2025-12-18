@@ -66,6 +66,8 @@ class PayPalCommon {
 
             if (is_array($payload)) {
                 $this->paymentModule->log->write("Using cached {$walletType} payload from session", true, 'after');
+            } else {
+                $this->paymentModule->log->write("No {$walletType} payload in POST; session cache empty.", true, 'after');
             }
         } else {
             $payload = json_decode($payloadRaw, true);
@@ -79,7 +81,7 @@ class PayPalCommon {
             $this->paymentModule->setMessageAndRedirect($errorMessages['payload_missing'], FILENAME_CHECKOUT_PAYMENT);
         }
 
-        if ($walletType === 'google_pay' && isset($payload['orderID']) && is_string($payload['orderID'])) {
+        if (isset($payload['orderID']) && is_string($payload['orderID'])) {
             $payloadOrderId = trim($payload['orderID']);
             if ($payloadOrderId === '') {
                 $payloadOrderId = null;
@@ -148,28 +150,44 @@ class PayPalCommon {
 
         // Venmo: Create order on server, then confirm using server-side confirmPaymentSource
         // (This path is also a fallback for any future wallet types that don't use client-side confirmation)
-        $this->paymentModule->log->write(
-            "Wallet confirmation ($walletType): Creating PayPal order on server for confirmPaymentSource.",
-            true,
-            'after'
-        );
+        $orderIdToConfirm = $_SESSION['PayPalRestful']['Order']['id'] ?? null;
 
-        $paypal_order_created = $this->paymentModule->createPayPalOrder($walletType);
-        if ($paypal_order_created === false) {
-            $error_info = $this->paymentModule->ppr->getErrorInfo();
-            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
-            $this->paymentModule->sendAlertEmail(
-                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
-                MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
-            );
-            $this->paymentModule->setMessageAndRedirect(
-                sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, $errorMessages['title'], $error_code),
-                FILENAME_CHECKOUT_PAYMENT
+        if ($orderIdToConfirm === null && $payloadOrderId !== null) {
+            $_SESSION['PayPalRestful']['Order']['id'] = $payloadOrderId;
+            $orderIdToConfirm = $payloadOrderId;
+            $this->paymentModule->log->write(
+                "Wallet confirmation ($walletType): Using payload orderID {$payloadOrderId} for confirmPaymentSource.",
+                true,
+                'after'
             );
         }
 
+        if ($orderIdToConfirm === null) {
+            $this->paymentModule->log->write(
+                "Wallet confirmation ($walletType): Creating PayPal order on server for confirmPaymentSource.",
+                true,
+                'after'
+            );
+
+            $paypal_order_created = $this->paymentModule->createPayPalOrder($walletType);
+            if ($paypal_order_created === false) {
+                $error_info = $this->paymentModule->ppr->getErrorInfo();
+                $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
+                $this->paymentModule->sendAlertEmail(
+                    MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
+                    MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
+                );
+                $this->paymentModule->setMessageAndRedirect(
+                    sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, $errorMessages['title'], $error_code),
+                    FILENAME_CHECKOUT_PAYMENT
+                );
+            }
+
+            $orderIdToConfirm = $_SESSION['PayPalRestful']['Order']['id'] ?? null;
+        }
+
         $confirm_response = $this->paymentModule->ppr->confirmPaymentSource(
-            $_SESSION['PayPalRestful']['Order']['id'],
+            $orderIdToConfirm,
             [$walletType => $payload]
         );
 
