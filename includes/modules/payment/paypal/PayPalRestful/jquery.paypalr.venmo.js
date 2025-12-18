@@ -87,6 +87,22 @@
         }
     }
 
+    function cacheVenmoPayload(payload) {
+        try {
+            return fetch('ppr_wallet.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wallet: 'venmo', payload: payload })
+            }).then(parseWalletResponse).catch(function (error) {
+                console.warn('Unable to cache Venmo payload', error);
+                return { success: false };
+            });
+        } catch (error) {
+            console.warn('Unable to cache Venmo payload', error);
+            return Promise.resolve({ success: false });
+        }
+    }
+
     function setVenmoPayload(payload) {
         var payloadField = document.getElementById('paypalr-venmo-payload');
         if (payloadField) {
@@ -388,8 +404,10 @@
                             facilitatorAccessToken: data.facilitatorAccessToken,
                             wallet: 'venmo'
                         };
-                        setVenmoPayload(payload);
-                        document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: payload }));
+                        return cacheVenmoPayload(payload).finally(function () {
+                            setVenmoPayload(payload);
+                            document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: payload }));
+                        });
                     },
                     onCancel: function (data) {
                         console.warn('Venmo cancelled', data);
