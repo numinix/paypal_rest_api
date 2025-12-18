@@ -52,7 +52,7 @@ class paypalr_googlepay extends base
         return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.7';
+    protected const CURRENT_VERSION = '1.3.8';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -245,12 +245,9 @@ class paypalr_googlepay extends base
         }
         $this->paypalCommon->tableCheckup();
         
-        // If the payment module is installed and at the current version, verify all required configs exist
+        // If the payment module is installed and at the current version, nothing to be done.
         $current_version = self::CURRENT_VERSION;
-        $version_is_current = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION === $current_version;
-        
-        if ($version_is_current && $this->merchantIdConfigExists()) {
-            // Version is current and all required configs exist, nothing more to be done
+        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION === $current_version) {
             return;
         }
         
@@ -267,14 +264,16 @@ class paypalr_googlepay extends base
                     // Fall through to re-introduce the configuration with validation
 
                 case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.7', '<'):
-                    $this->applyVersionSqlFile('1.3.7_add_googlepay_merchant_id.sql');
-                    break;
+                case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.8', '<'):
+                    // Add the optional Google Merchant ID configuration
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Google Pay Merchant ID (optional)', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'Optional Google Merchant ID used for the PayPal SDK google-pay-merchant-id parameter. Must be 5-20 alphanumeric characters. Leave blank unless instructed by PayPal.', 6, 0, NULL, NULL, now())"
+                    );
 
                 default:
-                    // Version is >= 1.3.7, check if MERCHANT_ID config is missing and add it
-                    if ($version_is_current && !$this->merchantIdConfigExists()) {
-                        $this->applyVersionSqlFile('1.3.7_add_googlepay_merchant_id.sql');
-                    }
                     break;
             }
         }
@@ -287,23 +286,6 @@ class paypalr_googlepay extends base
               WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION'
               LIMIT 1"
         );
-    }
-
-    /**
-     * Check if the MERCHANT_ID configuration exists in the database
-     *
-     * @return bool True if the configuration exists, false otherwise
-     */
-    protected function merchantIdConfigExists(): bool
-    {
-        global $db;
-        
-        $check_query = $db->Execute(
-            "SELECT configuration_key FROM " . TABLE_CONFIGURATION . "
-             WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID'"
-        );
-        
-        return !$check_query->EOF;
     }
 
     protected function validateConfiguration(bool $curl_installed): bool
@@ -884,38 +866,6 @@ class paypalr_googlepay extends base
         }
 
         return ['', 'invalid (ignored: ' . $rawMerchantId . ')'];
-    }
-
-    /**
-     * Apply a versioned SQL file that ships with the module to update configuration automatically.
-     */
-    protected function applyVersionSqlFile(string $filename): void
-    {
-        global $db;
-
-        $path = DIR_FS_CATALOG . 'docs/developers/versions/' . $filename;
-        if (!file_exists($path)) {
-            return;
-        }
-
-        $sql = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if ($sql === false) {
-            return;
-        }
-
-        $statement = '';
-        foreach ($sql as $line) {
-            $trimmed = trim($line);
-            if ($trimmed === '' || strpos($trimmed, '--') === 0) {
-                continue;
-            }
-            $statement .= $trimmed . ' ';
-        }
-
-        $statement = trim($statement);
-        if ($statement !== '') {
-            $db->Execute($statement);
-        }
     }
 
     public function remove()
