@@ -291,6 +291,7 @@ class paypalr_savedcard extends base
                 // Add future version-specific upgrades here
                 // case version_compare(MODULE_PAYMENT_PAYPALR_SAVEDCARD_VERSION, '1.3.5', '<'):
                 //     // Add v1.3.5-specific changes here
+                //     break;
                 
                 default:
                     break;
