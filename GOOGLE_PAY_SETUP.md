@@ -58,16 +58,16 @@ After enabling Google Pay, verify it's working:
 
 ## Do I Need a Google Merchant ID?
 
-**For PayPal REST API Integration: NO**
+**For PayPal REST API Integration: Optional**
 
-When using PayPal as your payment gateway (which this integration does), you do **NOT** need to register separately with Google for a Google Merchant ID. PayPal acts as the gateway and handles the Google Pay integration for you.
+PayPal continues to act as the gateway for Google Pay. Most merchants can leave the new **Google Pay Merchant ID** configuration blank. If PayPal provides you with a Google Merchant ID to improve eligibility checks, enter the 5–20 character alphanumeric value in the module's admin setting and it will be passed to the PayPal SDK as the `google-pay-merchant-id` parameter.
 
-The only requirement is to enable Google Pay in your PayPal account as described above.
+The primary requirement remains enabling Google Pay in your PayPal account as described above.
 
 ### Sandbox vs. Production
 
-- **Sandbox**: Works without Google Merchant ID once enabled in PayPal Developer Dashboard
-- **Production**: Works without Google Merchant ID once enabled in PayPal Business Account
+- **Sandbox**: Typically works without a Google Merchant ID once enabled in PayPal Developer Dashboard. If PayPal supplies a merchant ID for testing, add it to the new configuration field so the SDK receives it.
+- **Production**: Works without a Google Merchant ID for most accounts once enabled in PayPal Business Account. If PayPal instructs you to use a Google Merchant ID, enter it so the SDK can return eligible `allowedPaymentMethods`.
 
 ## Technical Details
 
@@ -85,7 +85,7 @@ The only requirement is to enable Google Pay in your PayPal account as described
    - And other configuration details
 
 3. **Payment Processing**: PayPal acts as the payment gateway, so:
-   - You don't need a separate Google Merchant ID
+   - A Google Merchant ID is optional and now has a dedicated configuration field; when provided it is sent to the SDK for eligibility checks
    - PayPal handles tokenization and payment processing
    - Payments are processed through your PayPal account
 
@@ -186,8 +186,9 @@ If you've followed all steps above and Google Pay still isn't working:
 
 ## Version History
 
+- **v1.3.7**: Added validated `MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID` configuration to send Google Merchant ID via the PayPal SDK when provided
 - **v1.3.6**: Removed `MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID` requirement
-- Previous: Required Google Merchant ID (no longer needed)
+- Previous: Required Google Merchant ID
 
 ## Summary
 
@@ -196,8 +197,7 @@ If you've followed all steps above and Google Pay still isn't working:
 1. ✅ **Do**: Enable Google Pay in your PayPal account (required)
 2. ✅ **Do**: Use HTTPS for production
 3. ✅ **Do**: Enable in both sandbox AND live PayPal accounts
-4. ❌ **Don't**: Try to register separately with Google for a Merchant ID
-5. ❌ **Don't**: Configure `google-pay-merchant-id` in the SDK URL
-6. ❌ **Don't**: Pass `merchantId` to `paypal.Googlepay()` constructor
+4. ✅ **Do**: Enter the Google Merchant ID (5–20 alphanumeric characters) in the new configuration field **only** if PayPal supplies one; otherwise leave it blank
+5. ❌ **Don't**: Pass `merchantId` to `paypal.Googlepay()` constructor (the SDK URL parameter is used instead)
 
 **This integration uses PayPal as the payment gateway, which means PayPal handles all Google Pay configuration and processing. You only need to enable Google Pay in your PayPal account.**

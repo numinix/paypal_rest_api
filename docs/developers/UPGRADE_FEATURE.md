@@ -89,7 +89,10 @@ Each module must:
 
 ## Version History
 
-### 1.3.6 (Current)
+### 1.3.7 (Current)
+- Added an optional, validated Google Pay merchant ID configuration that is passed via the PayPal SDK `google-pay-merchant-id` parameter when provided.
+
+### 1.3.6
 - Removed the unused Google Pay merchant ID configuration key; PayPal REST Google Pay flows no longer require this value.
 
 ### 1.3.4

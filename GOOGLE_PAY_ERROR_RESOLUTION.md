@@ -26,7 +26,7 @@ You're in **production/live mode** and Google Pay is not yet enabled for your li
 
 You stated: *"Since we're implementing via the PayPal Rest API, we do not need a Google Merchant ID."*
 
-**You are absolutely correct!** When using PayPal as the payment gateway (which this integration does), you do NOT need to register separately with Google for a Google Merchant ID. PayPal handles that for you.
+**You are still correct about onboarding:** When using PayPal as the gateway, you don't register separately with Google. However, PayPal can provide a Google Merchant ID for eligibility purposes. The module now includes an optional, validated configuration field that passes the value to the PayPal SDK when supplied. If PayPal hasn't given you an ID, simply leave the field blank.
 
 ## The Actual Solution
 
@@ -70,7 +70,7 @@ Created `GOOGLE_PAY_SETUP.md` with:
 - Step-by-step setup instructions
 - Sandbox vs. production requirements
 - Troubleshooting guide
-- Explanation of why you don't need a Google Merchant ID
+- Explanation of when a Google Merchant ID is optional and how to configure it
 
 ## Next Steps for You
 
@@ -106,7 +106,7 @@ If you've enabled Google Pay in your live PayPal account and still see issues:
 
 ## Summary
 
-- ✅ Your understanding about not needing a Google Merchant ID was correct
+- ✅ Your understanding about not needing to register separately for a Google Merchant ID was correct; use the new optional field only if PayPal provides an ID
 - ✅ The code is working as designed
 - ✅ The solution is to enable Google Pay in your PayPal account
 - ✅ Better error messages now guide users to this solution

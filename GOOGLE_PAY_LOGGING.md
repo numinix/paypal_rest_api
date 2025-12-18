@@ -152,7 +152,7 @@ Look for all 4 steps completing successfully.
 **Solution:**
 - Ensure container `#paypalr-googlepay-button` exists
 - Test on compatible device/browser
-- Confirm PayPal credentials and environment are configured (Google Merchant ID is not required for the PayPal REST integration)
+- Confirm PayPal credentials and environment are configured. If PayPal provided a Google Merchant ID, enter the 5–20 character value in the configuration so it is logged and passed to the SDK; otherwise leave it blank.
 
 ### Issue: Payment Fails After Sheet Opens
 
