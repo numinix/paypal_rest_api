@@ -52,7 +52,7 @@ class paypalr_googlepay extends base
         return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.7';
+    protected const CURRENT_VERSION = '1.3.8';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -264,7 +264,14 @@ class paypalr_googlepay extends base
                     // Fall through to re-introduce the configuration with validation
 
                 case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.7', '<'):
-                    $this->applyVersionSqlFile('1.3.7_add_googlepay_merchant_id.sql');
+                case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.8', '<'):
+                    // Add the optional Google Merchant ID configuration
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Google Pay Merchant ID (optional)', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'Optional Google Merchant ID used for the PayPal SDK google-pay-merchant-id parameter. Must be 5-20 alphanumeric characters. Leave blank unless instructed by PayPal.', 6, 0, NULL, NULL, now())"
+                    );
 
                 default:
                     break;
@@ -859,38 +866,6 @@ class paypalr_googlepay extends base
         }
 
         return ['', 'invalid (ignored: ' . $rawMerchantId . ')'];
-    }
-
-    /**
-     * Apply a versioned SQL file that ships with the module to update configuration automatically.
-     */
-    protected function applyVersionSqlFile(string $filename): void
-    {
-        global $db;
-
-        $path = DIR_FS_CATALOG . 'docs/developers/versions/' . $filename;
-        if (!file_exists($path)) {
-            return;
-        }
-
-        $sql = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if ($sql === false) {
-            return;
-        }
-
-        $statement = '';
-        foreach ($sql as $line) {
-            $trimmed = trim($line);
-            if ($trimmed === '' || strpos($trimmed, '--') === 0) {
-                continue;
-            }
-            $statement .= $trimmed . ' ';
-        }
-
-        $statement = trim($statement);
-        if ($statement !== '') {
-            $db->Execute($statement);
-        }
     }
 
     public function remove()

@@ -35,7 +35,7 @@ $module_code = trim((string)($_GET['module'] ?? ''));
 $action = strtolower(trim((string)($_GET['action'] ?? '')));
 
 // Validate module code
-$valid_modules = ['paypalr', 'paypalr_applepay', 'paypalr_googlepay', 'paypalr_venmo'];
+$valid_modules = ['paypalr', 'paypalr_applepay', 'paypalr_googlepay', 'paypalr_venmo', 'paypalr_savedcard'];
 if (!in_array($module_code, $valid_modules, true)) {
     paypalr_upgrade_message(
         'Invalid module specified for upgrade.',
