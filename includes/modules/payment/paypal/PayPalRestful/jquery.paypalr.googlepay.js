@@ -21,6 +21,9 @@
         paymentsClient: null
     };
 
+    var WALLET_BUTTON_MIN_WIDTH = '200px';
+    var WALLET_BUTTON_MAX_WIDTH = '320px';
+
     var sharedSdkLoader = window.paypalrSdkLoaderState || { key: null, promise: null };
     window.paypalrSdkLoaderState = sharedSdkLoader;
 
@@ -30,6 +33,32 @@
     // -------------------------------------------------------------------------
     // Utility Functions
     // -------------------------------------------------------------------------
+
+    function normalizeWalletContainer(element) {
+        if (!element) {
+            return;
+        }
+
+        element.style.display = 'flex';
+        element.style.alignItems = 'center';
+        element.style.justifyContent = 'center';
+        element.style.width = '100%';
+        element.style.maxWidth = WALLET_BUTTON_MAX_WIDTH;
+        element.style.minWidth = WALLET_BUTTON_MIN_WIDTH;
+        element.style.margin = '0 auto';
+        element.style.boxSizing = 'border-box';
+    }
+
+    function normalizeWalletButton(element) {
+        if (!element) {
+            return;
+        }
+
+        element.style.width = '100%';
+        element.style.maxWidth = WALLET_BUTTON_MAX_WIDTH;
+        element.style.minWidth = WALLET_BUTTON_MIN_WIDTH;
+        element.style.boxSizing = 'border-box';
+    }
 
     /**
      * Get CSP nonce from existing script tags if available.
@@ -691,6 +720,7 @@
             return;
         }
 
+        normalizeWalletContainer(container);
         container.innerHTML = '';
 
         // First, fetch only the SDK configuration (no order creation)
@@ -800,6 +830,7 @@
                                 buttonSizeMode: 'fill'
                             });
 
+                            normalizeWalletButton(button);
                             container.appendChild(button);
                             console.log('[Google Pay] Button rendered successfully');
 
@@ -887,12 +918,14 @@
     // Add click handler to the button container to select the radio
     var container = document.getElementById('paypalr-googlepay-button');
     if (container) {
+        normalizeWalletContainer(container);
         container.addEventListener('click', function () {
             selectGooglePayRadio();
         });
 
         if (container.innerHTML.trim() === '') {
             container.innerHTML = '<span class="paypalr-googlepay-placeholder">' + (typeof paypalrGooglePayText !== 'undefined' ? paypalrGooglePayText : 'Google Pay') + '</span>';
+            normalizeWalletButton(container.firstElementChild);
         }
     }
 

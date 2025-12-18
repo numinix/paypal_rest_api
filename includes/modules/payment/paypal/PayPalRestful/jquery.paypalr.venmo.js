@@ -5,6 +5,9 @@
         loader: null,
     };
 
+    var WALLET_BUTTON_MIN_WIDTH = '200px';
+    var WALLET_BUTTON_MAX_WIDTH = '320px';
+
     var sharedSdkLoader = window.paypalrSdkLoaderState || { key: null, promise: null };
     window.paypalrSdkLoaderState = sharedSdkLoader;
 
@@ -12,6 +15,32 @@
      * Get CSP nonce from existing script tags if available.
      * This helps comply with Content Security Policy when loading external scripts.
      */
+    function normalizeWalletContainer(element) {
+        if (!element) {
+            return;
+        }
+
+        element.style.display = 'flex';
+        element.style.alignItems = 'center';
+        element.style.justifyContent = 'center';
+        element.style.width = '100%';
+        element.style.maxWidth = WALLET_BUTTON_MAX_WIDTH;
+        element.style.minWidth = WALLET_BUTTON_MIN_WIDTH;
+        element.style.margin = '0 auto';
+        element.style.boxSizing = 'border-box';
+    }
+
+    function normalizeWalletButton(element) {
+        if (!element) {
+            return;
+        }
+
+        element.style.width = '100%';
+        element.style.maxWidth = WALLET_BUTTON_MAX_WIDTH;
+        element.style.minWidth = WALLET_BUTTON_MIN_WIDTH;
+        element.style.boxSizing = 'border-box';
+    }
+
     function getCspNonce() {
         var existingScript = document.querySelector('script[nonce]');
         return existingScript ? existingScript.nonce || existingScript.getAttribute('nonce') : '';
@@ -318,6 +347,7 @@
             return;
         }
 
+        normalizeWalletContainer(container);
         container.innerHTML = '';
 
         // First, fetch only the SDK configuration (no order creation)
@@ -423,12 +453,14 @@
 
     var container = document.getElementById('paypalr-venmo-button');
     if (container) {
+        normalizeWalletContainer(container);
         container.addEventListener('click', function() {
             selectVenmoRadio();
         });
 
         if (container.innerHTML.trim() === '') {
             container.innerHTML = '<span class="paypalr-venmo-placeholder">' + (typeof paypalrVenmoText !== 'undefined' ? paypalrVenmoText : 'Venmo') + '</span>';
+            normalizeWalletButton(container.firstElementChild);
         }
     }
 
