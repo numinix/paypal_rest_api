@@ -324,17 +324,34 @@ function nxp_paypal_handle_start(array $session): void
         $_SESSION['nxp_paypal']['env'] = $session['env'];
     }
 
+    // Check if client provided a return URL (for proxy requests from external admin panels)
+    $clientReturnUrl = nxp_paypal_filter_string($_REQUEST['client_return_url'] ?? null);
+    $returnUrl = $clientReturnUrl ?: nxp_paypal_current_url();
+    
+    // Validate and enhance the return URL
+    if ($clientReturnUrl !== null) {
+        // Add tracking_id and environment to return URL if not already present
+        $returnUrl = nxp_paypal_enhance_return_url($clientReturnUrl, $_SESSION['nxp_paypal']['tracking_id'], $session['env']);
+        
+        nxp_paypal_log_debug('Using client-provided return URL', [
+            'client_return_url' => $clientReturnUrl,
+            'enhanced_return_url' => $returnUrl,
+        ]);
+    }
+
     $payload = [
         'environment' => $session['env'],
         'tracking_id' => $_SESSION['nxp_paypal']['tracking_id'],
         'origin' => nxp_paypal_get_origin(),
-        'return_url' => nxp_paypal_current_url(),
+        'return_url' => $returnUrl,
     ];
 
     nxp_paypal_log_debug('Processing start action', [
         'environment' => $payload['environment'],
         'tracking_id' => $payload['tracking_id'],
         'origin' => $payload['origin'],
+        'return_url' => $payload['return_url'],
+        'has_client_return_url' => $clientReturnUrl !== null,
     ]);
 
     try {
@@ -2145,6 +2162,58 @@ function nxp_paypal_current_url(): string
     $queryString = http_build_query($filtered, '', '&', PHP_QUERY_RFC3986);
 
     return $origin . $path . ($queryString !== '' ? '?' . $queryString : '');
+}
+
+/**
+ * Enhances a client-provided return URL with tracking parameters.
+ *
+ * @param string $clientReturnUrl The return URL from the client
+ * @param string $trackingId The tracking ID for this onboarding session
+ * @param string $environment The environment (sandbox or live)
+ * @return string Enhanced return URL with tracking parameters
+ */
+function nxp_paypal_enhance_return_url(string $clientReturnUrl, string $trackingId, string $environment): string
+{
+    // Parse the URL
+    $parsed = parse_url($clientReturnUrl);
+    if ($parsed === false || empty($parsed['scheme']) || empty($parsed['host'])) {
+        // Invalid URL, return as-is
+        return $clientReturnUrl;
+    }
+    
+    // Extract existing query parameters
+    $queryParams = [];
+    if (!empty($parsed['query'])) {
+        parse_str($parsed['query'], $queryParams);
+    }
+    
+    // Add tracking_id and env if not already present
+    if (empty($queryParams['tracking_id']) && $trackingId !== '') {
+        $queryParams['tracking_id'] = $trackingId;
+    }
+    if (empty($queryParams['env']) && in_array($environment, ['sandbox', 'live'], true)) {
+        $queryParams['env'] = $environment;
+    }
+    
+    // Rebuild the URL
+    $url = $parsed['scheme'] . '://' . $parsed['host'];
+    if (!empty($parsed['port'])) {
+        $url .= ':' . $parsed['port'];
+    }
+    if (!empty($parsed['path'])) {
+        $url .= $parsed['path'];
+    }
+    
+    $queryString = http_build_query($queryParams, '', '&', PHP_QUERY_RFC3986);
+    if ($queryString !== '') {
+        $url .= '?' . $queryString;
+    }
+    
+    if (!empty($parsed['fragment'])) {
+        $url .= '#' . $parsed['fragment'];
+    }
+    
+    return $url;
 }
 
 /**

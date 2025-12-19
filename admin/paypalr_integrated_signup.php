@@ -50,6 +50,12 @@ if ($action === 'save_credentials' && $isAjaxRequest) {
     exit;
 }
 
+// Handle completion flow - receives PayPal redirect with credentials
+if ($action === 'complete') {
+    paypalr_handle_completion();
+    exit;
+}
+
 // Handle legacy redirect-based flow for backwards compatibility
 if ($action === 'return') {
     paypalr_handle_legacy_return();
@@ -287,6 +293,7 @@ function paypalr_render_onboarding_page(): void
     $modulesPageUrl = paypalr_modules_page_url();
     $proxyUrl = paypalr_self_url(['action' => 'proxy']);
     $saveUrl = paypalr_self_url(['action' => 'save_credentials']);
+    $completeUrl = paypalr_self_url(['action' => 'complete']);
     $securityToken = $_SESSION['securityToken'] ?? '';
     
     // Security token should exist if admin is properly logged in
@@ -473,6 +480,7 @@ function paypalr_render_onboarding_page(): void
             (function() {
                 var proxyUrl = <?php echo json_encode($proxyUrl); ?>;
                 var saveUrl = <?php echo json_encode($saveUrl); ?>;
+                var completeUrl = <?php echo json_encode($completeUrl); ?>;
                 var environment = <?php echo json_encode($environment); ?>;
                 var modulesPageUrl = <?php echo json_encode($modulesPageUrl); ?>;
                 var securityToken = <?php echo json_encode($securityToken); ?>;
@@ -534,6 +542,17 @@ function paypalr_render_onboarding_page(): void
                         env: state.environment
                     });
                     
+                    // For 'start' action, include the client return URL
+                    if (action === 'start') {
+                        // Build return URL with tracking parameters
+                        var returnUrl = completeUrl;
+                        if (state.trackingId) {
+                            returnUrl += (returnUrl.indexOf('?') === -1 ? '?' : '&') + 'tracking_id=' + encodeURIComponent(state.trackingId);
+                        }
+                        returnUrl += (returnUrl.indexOf('?') === -1 ? '?' : '&') + 'env=' + encodeURIComponent(state.environment);
+                        payload.client_return_url = returnUrl;
+                    }
+                    
                     return fetch(proxyUrl, {
                         method: 'POST',
                         headers: {
@@ -555,24 +574,31 @@ function paypalr_render_onboarding_page(): void
                 }
                 
                 function openPayPalPopup(url) {
-                    var width = 960;
-                    var height = 720;
-                    var left = window.screenX + Math.max((window.outerWidth - width) / 2, 0);
-                    var top = window.screenY + Math.max((window.outerHeight - height) / 2, 0);
-                    var features = 'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes';
+                    // Log the popup open attempt
+                    console.log('[PayPal ISU] Opening PayPal signup in new tab:', {
+                        url: url,
+                        tracking_id: state.trackingId,
+                        environment: state.environment
+                    });
                     
-                    state.popup = window.open(url, 'paypalOnboarding', features);
+                    // Use window.open with '_blank' to open in new tab (more user-friendly)
+                    // Fall back to popup window if tab opening fails
+                    state.popup = window.open(url, '_blank');
                     
                     if (!state.popup || state.popup.closed) {
                         setStatus('Please allow popups for this site to continue.', 'error');
                         startButton.disabled = false;
+                        console.error('[PayPal ISU] Failed to open PayPal signup window - popup blocked');
                         return false;
                     }
                     
                     try {
                         state.popup.focus();
-                    } catch(e) {}
+                    } catch(e) {
+                        console.warn('[PayPal ISU] Could not focus popup window:', e);
+                    }
                     
+                    console.log('[PayPal ISU] PayPal signup window opened successfully');
                     monitorPopup();
                     return true;
                 }
@@ -632,6 +658,14 @@ function paypalr_render_onboarding_page(): void
                     if (!completionEvent) {
                         return;
                     }
+
+                    console.log('[PayPal ISU] Received completion message from popup:', {
+                        event: eventName,
+                        has_merchant_id: !!(payload.merchantId || payload.merchant_id || payload.merchantIdInPayPal),
+                        has_auth_code: !!(payload.authCode || payload.auth_code),
+                        has_shared_id: !!(payload.sharedId || payload.shared_id),
+                        has_tracking_id: !!payload.trackingId
+                    });
 
                     // Extract merchant_id from the completion message if provided
                     // This is critical for credential retrieval - PayPal returns this
@@ -1335,4 +1369,407 @@ function paypalr_redact_sensitive($value)
     }
     
     return (string) $value;
+}
+
+/**
+ * Handles the completion flow when PayPal redirects back to the client.
+ * This displays credentials for copy/paste while attempting auto-save in background.
+ */
+function paypalr_handle_completion(): void
+{
+    $proxyUrl = paypalr_self_url(['action' => 'proxy']);
+    $saveUrl = paypalr_self_url(['action' => 'save_credentials']);
+    $modulesPageUrl = paypalr_modules_page_url();
+    $securityToken = $_SESSION['securityToken'] ?? '';
+    
+    // Extract PayPal return parameters
+    $merchantId = trim((string)($_GET['merchantIdInPayPal'] ?? $_GET['merchantId'] ?? $_GET['merchant_id'] ?? ''));
+    $authCode = trim((string)($_GET['authCode'] ?? $_GET['auth_code'] ?? ''));
+    $sharedId = trim((string)($_GET['sharedId'] ?? $_GET['shared_id'] ?? ''));
+    $trackingId = trim((string)($_GET['tracking_id'] ?? $_SESSION['paypalr_isu_tracking_id'] ?? ''));
+    $environment = trim((string)($_GET['env'] ?? $_SESSION['paypalr_isu_environment'] ?? paypalr_detect_environment()));
+    
+    // Validate environment
+    $allowedEnvironments = ['sandbox', 'live'];
+    if (!in_array($environment, $allowedEnvironments, true)) {
+        $environment = paypalr_detect_environment();
+    }
+    
+    paypalr_log_debug('Completion handler called', [
+        'has_merchant_id' => $merchantId !== '',
+        'has_auth_code' => $authCode !== '',
+        'has_shared_id' => $sharedId !== '',
+        'has_tracking_id' => $trackingId !== '',
+        'environment' => $environment,
+    ]);
+    
+    // Store in session for retrieval
+    if ($merchantId !== '') {
+        $_SESSION['paypalr_isu_merchant_id'] = $merchantId;
+    }
+    if ($authCode !== '') {
+        $_SESSION['paypalr_isu_auth_code'] = $authCode;
+    }
+    if ($sharedId !== '') {
+        $_SESSION['paypalr_isu_shared_id'] = $sharedId;
+    }
+    if ($trackingId !== '') {
+        $_SESSION['paypalr_isu_tracking_id'] = $trackingId;
+    }
+    $_SESSION['paypalr_isu_environment'] = $environment;
+    
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PayPal Setup Complete</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 900px;
+                margin: 40px auto;
+                padding: 20px;
+                background: #f5f5f5;
+            }
+            .completion-container {
+                background: white;
+                border-radius: 8px;
+                padding: 30px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            h1 {
+                color: #2d7a2d;
+                margin-top: 0;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .icon {
+                font-size: 32px;
+            }
+            .status {
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 4px;
+            }
+            .status.info {
+                background: #e7f3ff;
+                color: #0066cc;
+                border-left: 4px solid #0066cc;
+            }
+            .status.success {
+                background: #e6f7e6;
+                color: #2d7a2d;
+                border-left: 4px solid #2d7a2d;
+            }
+            .status.error {
+                background: #ffe6e6;
+                color: #cc0000;
+                border-left: 4px solid #cc0000;
+            }
+            .credentials-box {
+                background: #f9f9f9;
+                padding: 20px;
+                border-radius: 4px;
+                margin: 20px 0;
+                border: 2px solid #0066cc;
+            }
+            .credentials-box h2 {
+                margin-top: 0;
+                color: #333;
+                font-size: 18px;
+            }
+            .credential-row {
+                margin: 15px 0;
+            }
+            .credential-row label {
+                display: block;
+                font-weight: bold;
+                margin-bottom: 5px;
+                color: #555;
+            }
+            .credential-input-group {
+                display: flex;
+                gap: 10px;
+            }
+            .credential-row input {
+                flex: 1;
+                padding: 10px;
+                font-family: monospace;
+                font-size: 14px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background: white;
+            }
+            .copy-btn {
+                padding: 10px 20px;
+                background: #0066cc;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                white-space: nowrap;
+            }
+            .copy-btn:hover {
+                background: #0052a3;
+            }
+            .copy-btn.copied {
+                background: #2d7a2d;
+            }
+            .actions {
+                margin-top: 30px;
+                display: flex;
+                gap: 15px;
+            }
+            .btn {
+                padding: 12px 24px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 16px;
+                text-decoration: none;
+                display: inline-block;
+            }
+            .btn-primary {
+                background: #0066cc;
+                color: white;
+            }
+            .btn-primary:hover {
+                background: #0052a3;
+            }
+            .btn-secondary {
+                background: #6b7280;
+                color: white;
+            }
+            .btn-secondary:hover {
+                background: #4b5563;
+            }
+            .spinner {
+                display: inline-block;
+                width: 16px;
+                height: 16px;
+                border: 2px solid #f3f3f3;
+                border-top: 2px solid #0066cc;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin-right: 8px;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .hidden {
+                display: none;
+            }
+            #auto-save-status {
+                margin: 15px 0;
+                padding: 12px;
+                border-radius: 4px;
+                font-weight: 500;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="completion-container">
+            <h1><span class="icon">✓</span> PayPal Setup Complete!</h1>
+            
+            <div class="status info">
+                <p><strong>Your PayPal account has been successfully connected.</strong></p>
+                <p>Your API credentials are shown below. They are being saved automatically, but you can also copy them manually if needed.</p>
+            </div>
+            
+            <div id="auto-save-status" class="hidden"></div>
+            
+            <div id="credentials-display" class="credentials-box">
+                <h2>Retrieving Your PayPal Credentials...</h2>
+                <p><span class="spinner"></span> Please wait while we fetch your credentials from PayPal...</p>
+            </div>
+            
+            <div class="actions">
+                <a href="<?php echo htmlspecialchars($modulesPageUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-primary" id="return-btn">Return to PayPal Module</a>
+                <button type="button" onclick="window.close();" class="btn btn-secondary">Close Window</button>
+            </div>
+        </div>
+        
+        <script>
+            (function() {
+                var proxyUrl = <?php echo json_encode($proxyUrl); ?>;
+                var saveUrl = <?php echo json_encode($saveUrl); ?>;
+                var modulesPageUrl = <?php echo json_encode($modulesPageUrl); ?>;
+                var securityToken = <?php echo json_encode($securityToken); ?>;
+                var merchantId = <?php echo json_encode($merchantId); ?>;
+                var authCode = <?php echo json_encode($authCode); ?>;
+                var sharedId = <?php echo json_encode($sharedId); ?>;
+                var trackingId = <?php echo json_encode($trackingId); ?>;
+                var environment = <?php echo json_encode($environment); ?>;
+                
+                var credentialsDisplay = document.getElementById('credentials-display');
+                var autoSaveStatus = document.getElementById('auto-save-status');
+                var returnBtn = document.getElementById('return-btn');
+                
+                function setAutoSaveStatus(message, type) {
+                    autoSaveStatus.textContent = message;
+                    autoSaveStatus.className = 'status ' + type;
+                    autoSaveStatus.classList.remove('hidden');
+                }
+                
+                function displayCredentials(credentials, env) {
+                    var html = '<h2>Your PayPal API Credentials</h2>';
+                    html += '<p style="color: #555; margin-bottom: 15px;">Environment: <strong>' + escapeHtml(env) + '</strong></p>';
+                    
+                    html += '<div class="credential-row">';
+                    html += '<label for="client-id">Client ID:</label>';
+                    html += '<div class="credential-input-group">';
+                    html += '<input type="text" id="client-id" value="' + escapeHtml(credentials.client_id) + '" readonly>';
+                    html += '<button class="copy-btn" onclick="copyToClipboard(\'client-id\', this)">Copy</button>';
+                    html += '</div></div>';
+                    
+                    html += '<div class="credential-row">';
+                    html += '<label for="client-secret">Client Secret:</label>';
+                    html += '<div class="credential-input-group">';
+                    html += '<input type="text" id="client-secret" value="' + escapeHtml(credentials.client_secret) + '" readonly>';
+                    html += '<button class="copy-btn" onclick="copyToClipboard(\'client-secret\', this)">Copy</button>';
+                    html += '</div></div>';
+                    
+                    credentialsDisplay.innerHTML = html;
+                }
+                
+                window.copyToClipboard = function(inputId, button) {
+                    var input = document.getElementById(inputId);
+                    if (!input) return;
+                    
+                    input.select();
+                    input.setSelectionRange(0, 99999);
+                    
+                    try {
+                        document.execCommand('copy');
+                        var originalText = button.textContent;
+                        button.textContent = 'Copied!';
+                        button.classList.add('copied');
+                        setTimeout(function() {
+                            button.textContent = originalText;
+                            button.classList.remove('copied');
+                        }, 2000);
+                    } catch (err) {
+                        alert('Failed to copy. Please select and copy manually.');
+                    }
+                };
+                
+                function escapeHtml(text) {
+                    var div = document.createElement('div');
+                    div.textContent = text;
+                    return div.innerHTML;
+                }
+                
+                function fetchCredentials() {
+                    if (!trackingId) {
+                        credentialsDisplay.innerHTML = '<h2>Error</h2><p style="color: #cc0000;">Missing tracking ID. Please try the setup process again.</p>';
+                        return;
+                    }
+                    
+                    var payload = {
+                        proxy_action: 'status',
+                        action: 'proxy',
+                        securityToken: securityToken,
+                        tracking_id: trackingId,
+                        merchant_id: merchantId,
+                        authCode: authCode,
+                        sharedId: sharedId,
+                        env: environment
+                    };
+                    
+                    fetch(proxyUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: new URLSearchParams(payload).toString()
+                    })
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('Network error');
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        if (!data || !data.success) {
+                            throw new Error(data && data.message || 'Failed to fetch credentials');
+                        }
+                        
+                        var responseData = data.data || {};
+                        if (responseData.credentials && responseData.credentials.client_id && responseData.credentials.client_secret) {
+                            displayCredentials(responseData.credentials, responseData.environment || environment);
+                            attemptAutoSave(responseData.credentials, responseData.environment || environment);
+                        } else {
+                            credentialsDisplay.innerHTML = '<h2>Credentials Not Ready Yet</h2><p>PayPal is still provisioning your account. Please wait a moment and refresh this page, or return to the admin panel.</p>';
+                            setAutoSaveStatus('Credentials are not yet available. You may need to wait a few moments for PayPal to complete provisioning.', 'info');
+                        }
+                    })
+                    .catch(function(error) {
+                        credentialsDisplay.innerHTML = '<h2>Error Retrieving Credentials</h2><p style="color: #cc0000;">' + escapeHtml(error.message || 'Failed to fetch credentials') + '</p><p>Please return to the admin panel and check your configuration.</p>';
+                        setAutoSaveStatus('Failed to retrieve credentials: ' + (error.message || 'Unknown error'), 'error');
+                    });
+                }
+                
+                function attemptAutoSave(credentials, env) {
+                    setAutoSaveStatus('Attempting to save credentials automatically...', 'info');
+                    
+                    var payload = {
+                        action: 'save_credentials',
+                        securityToken: securityToken,
+                        client_id: credentials.client_id,
+                        client_secret: credentials.client_secret,
+                        environment: env
+                    };
+                    
+                    fetch(saveUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: new URLSearchParams(payload).toString()
+                    })
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('Network error while saving credentials');
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        if (!data || !data.success) {
+                            throw new Error(data && data.message || 'Failed to save credentials');
+                        }
+                        
+                        setAutoSaveStatus('✓ Credentials saved successfully! You can now return to the PayPal module.', 'success');
+                        returnBtn.focus();
+                    })
+                    .catch(function(error) {
+                        setAutoSaveStatus('⚠ Auto-save failed: ' + (error.message || 'Unknown error') + '. Please copy the credentials above and enter them manually in the PayPal module configuration.', 'error');
+                    });
+                }
+                
+                // Send completion message to opener window if it exists
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        window.opener.postMessage({
+                            event: 'paypal_onboarding_complete',
+                            merchantId: merchantId,
+                            authCode: authCode,
+                            sharedId: sharedId,
+                            trackingId: trackingId,
+                            environment: environment
+                        }, '*');
+                    } catch(e) {
+                        // Ignore postMessage errors
+                    }
+                }
+                
+                // Fetch credentials immediately
+                fetchCredentials();
+            })();
+        </script>
+    </body>
+    </html>
+    <?php
 }

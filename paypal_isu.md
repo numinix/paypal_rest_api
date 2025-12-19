@@ -62,12 +62,16 @@ Based on the logs provided:
 - [ ] Persist authCode and sharedId from postMessage in client session
 - [ ] Use authCode and sharedId in status polling requests to trigger credential exchange
 
-### Issue 4: Auto-Save Credentials on Client
+### Issue 4: Display and Auto-Save Credentials on Client
+- [ ] **Display credentials on completion page for manual copy/paste (PRIMARY)**
+- [ ] **Attempt auto-save in background (SECONDARY)**
+- [ ] Show clear copy buttons next to each credential field
+- [ ] Display auto-save status (attempting, success, failed)
+- [ ] If auto-save succeeds, show success message and option to proceed to admin
+- [ ] If auto-save fails, show failure message with manual save instructions
 - [ ] Verify `autoSaveCredentials()` function is called when credentials received
 - [ ] Add validation that credentials are properly formatted before save
 - [ ] Ensure environment parameter is passed correctly to save endpoint
-- [ ] Add success feedback after credentials are saved
-- [ ] Add fallback if auto-save fails (show credentials for manual entry)
 
 ## Code Changes Required
 
@@ -77,6 +81,9 @@ Based on the logs provided:
 - [ ] Add `action=complete` handler to receive PayPal redirect
 - [ ] Extract merchantId, authCode, sharedId from URL parameters  
 - [ ] Display user-friendly completion page on client domain
+- [ ] **Display credentials prominently for user to copy/paste**
+- [ ] **Attempt auto-save in background while showing credentials**
+- [ ] Show success/failure status of auto-save attempt
 - [ ] Send completion data to opener via postMessage
 - [ ] Provide "Return to Admin" button
 
