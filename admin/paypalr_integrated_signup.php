@@ -969,9 +969,10 @@ function paypalr_render_onboarding_page(): void
                                     } else {
                                         throw new Error('PayPal Signup SDK not available after loading partner.js');
                                     }
-                                    // Auto-trigger the mini-browser
-                                    setStatus('Opening PayPal signup...', 'info');
-                                    triggerMiniBrowser();
+                                    // Show instruction to click the visible link
+                                    // (Real user click required for mini-browser to work reliably)
+                                    setStatus('Click "Continue with PayPal" below to complete signup', 'info');
+                                    startButton.disabled = false;
                                     pollStatus();
                                 });
                             } else {
@@ -1024,8 +1025,11 @@ function paypalr_render_onboarding_page(): void
                         link.setAttribute('data-paypal-onboard-complete', 'paypalOnboardedCallback');
                         link.setAttribute('data-paypal-button', 'true');
                         
-                        // Hidden initially - we'll auto-trigger it after partner.js loads
-                        link.style.display = 'none';
+                        // Make link visible and clickable - requires real user click for mini-browser to work
+                        link.textContent = 'Continue with PayPal';
+                        link.style.display = 'inline-block';
+                        link.style.marginTop = '10px';
+                        link.className = 'button';
                         
                         container.appendChild(link);
                         container.style.display = 'block';
