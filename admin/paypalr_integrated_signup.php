@@ -916,11 +916,8 @@ function paypalr_render_onboarding_page(): void
                     state.merchantId = null;
                     setStatus('Starting PayPal signup...', 'info');
 
-                    // Load the correct partner.js for the environment first
-                    loadPartnerJs(state.environment)
-                        .then(function() {
-                            return proxyRequest('start', {nonce: state.nonce || ''});
-                        })
+                    // First get the signup URL from the server
+                    proxyRequest('start', {nonce: state.nonce || ''})
                         .then(function(response) {
                             var data = response.data || {};
                             state.trackingId = data.tracking_id;
@@ -954,14 +951,25 @@ function paypalr_render_onboarding_page(): void
                                 throw new Error('No PayPal signup URL received');
                             }
                             
-                            // Try to use PayPal's mini-browser flow first (via partner.js)
-                            // Fall back to popup if mini-browser is not available
-                            if (useMiniBrowserFlow(redirectUrl)) {
-                                setStatus('Complete your PayPal setup in the overlay...', 'info');
-                                pollStatus();
-                            } else if (openPayPalPopup(redirectUrl)) {
-                                setStatus('Follow the steps in the PayPal window...', 'info');
-                                pollStatus();
+                            // Create the mini-browser link first (before loading partner.js)
+                            // This prevents partner.js errors on init
+                            var miniBrowserReady = prepareMiniBrowserLink(redirectUrl);
+                            
+                            if (miniBrowserReady) {
+                                // Load partner.js AFTER link is in DOM
+                                setStatus('Loading PayPal integration...', 'info');
+                                return loadPartnerJs(state.environment).then(function() {
+                                    // Auto-trigger the mini-browser
+                                    setStatus('Opening PayPal signup...', 'info');
+                                    triggerMiniBrowser();
+                                    pollStatus();
+                                });
+                            } else {
+                                // Fall back to popup window
+                                if (openPayPalPopup(redirectUrl)) {
+                                    setStatus('Follow the steps in the PayPal window...', 'info');
+                                    pollStatus();
+                                }
                             }
                         })
                         .catch(function(error) {
@@ -971,62 +979,83 @@ function paypalr_render_onboarding_page(): void
                 }
                 
                 /**
-                 * Attempts to use PayPal's mini-browser flow via the partner.js script.
+                 * Prepares the mini-browser link BEFORE loading partner.js.
                  * 
-                 * The mini-browser provides a more seamless experience as it displays
-                 * PayPal signup in an overlay without leaving the page. The partner.js
-                 * script handles the overlay and calls our callback when complete.
+                 * This function creates the link element in the DOM so that when
+                 * partner.js loads, it can find and process it without errors.
                  * 
                  * Per PayPal docs: The link MUST have:
                  * - data-paypal-onboard-complete="callbackName" for the callback
                  * - displayMode=minibrowser in the URL
                  * 
                  * @param {string} signupUrl - The PayPal action_url for signup
-                 * @returns {boolean} True if mini-browser was successfully triggered
+                 * @returns {boolean} True if link was successfully created
                  */
-                function useMiniBrowserFlow(signupUrl) {
-                    // Check if PayPal partner.js has loaded and enhanced PAYPAL.apps
-                    if (typeof PAYPAL !== 'undefined' && PAYPAL.apps && PAYPAL.apps.Signup) {
-                        try {
-                            // Create a temporary link element for PayPal's mini-browser
-                            var container = document.getElementById('paypal-signup-container');
-                            if (container) {
-                                container.innerHTML = '';
-                                
-                                // Ensure minibrowser mode per PayPal docs
-                                var url = signupUrl;
-                                url += (url.indexOf('?') === -1 ? '?' : '&') + 'displayMode=minibrowser';
-                                
-                                var link = document.createElement('a');
-                                link.href = url;
-                                // Do NOT set target="_blank" - mini-browser needs to intercept the click
-                                
-                                // REQUIRED by PayPal to trigger callback with authCode/sharedId
-                                link.setAttribute('data-paypal-onboard-complete', 'paypalOnboardedCallback');
-                                link.setAttribute('data-paypal-button', 'true');
-                                
-                                // Style the button
-                                link.textContent = 'Continue PayPal Signup';
-                                link.className = 'button';
-                                link.style.marginTop = '10px';
-                                
-                                container.appendChild(link);
-                                container.style.display = 'block';
-                                
-                                console.log('[PayPal ISU] Mini-browser link created with displayMode=minibrowser');
-                                
-                                // PayPal's SDK automatically processes data-paypal-button links
-                                // No need to call render() - that can cause errors
-                                
-                                return true;
-                            }
-                        } catch (e) {
-                            // Mini-browser failed, fall back to popup
-                            console.warn('[PayPal ISU] Mini-browser failed:', e);
+                function prepareMiniBrowserLink(signupUrl) {
+                    try {
+                        var container = document.getElementById('paypal-signup-container');
+                        if (!container) {
+                            console.warn('[PayPal ISU] Container not found for mini-browser');
+                            return false;
                         }
+                        
+                        container.innerHTML = '';
+                        
+                        // Ensure minibrowser mode per PayPal docs
+                        var url = signupUrl;
+                        url += (url.indexOf('?') === -1 ? '?' : '&') + 'displayMode=minibrowser';
+                        
+                        var link = document.createElement('a');
+                        link.href = url;
+                        link.id = 'paypal-mini-browser-link';
+                        // Do NOT set target="_blank" - mini-browser needs to intercept the click
+                        
+                        // REQUIRED by PayPal to trigger callback with authCode/sharedId
+                        link.setAttribute('data-paypal-onboard-complete', 'paypalOnboardedCallback');
+                        link.setAttribute('data-paypal-button', 'true');
+                        
+                        // Hidden initially - we'll auto-trigger it after partner.js loads
+                        link.style.display = 'none';
+                        
+                        container.appendChild(link);
+                        container.style.display = 'block';
+                        
+                        console.log('[PayPal ISU] Mini-browser link prepared with displayMode=minibrowser');
+                        
+                        return true;
+                    } catch (e) {
+                        console.error('[PayPal ISU] Failed to prepare mini-browser link:', e);
+                        return false;
                     }
-                    
-                    return false;
+                }
+                
+                /**
+                 * Triggers the mini-browser after partner.js has loaded.
+                 * 
+                 * This programmatically clicks the link, which partner.js intercepts
+                 * to open the mini-browser overlay. This provides a one-click UX
+                 * instead of requiring the user to click twice.
+                 */
+                function triggerMiniBrowser() {
+                    try {
+                        var link = document.getElementById('paypal-mini-browser-link');
+                        if (!link) {
+                            console.error('[PayPal ISU] Mini-browser link not found');
+                            setStatus('Failed to open PayPal signup. Please refresh and try again.', 'error');
+                            startButton.disabled = false;
+                            return;
+                        }
+                        
+                        // Small delay to ensure partner.js has fully initialized
+                        setTimeout(function() {
+                            console.log('[PayPal ISU] Triggering mini-browser...');
+                            link.click();
+                        }, 500);
+                    } catch (e) {
+                        console.error('[PayPal ISU] Failed to trigger mini-browser:', e);
+                        setStatus('Failed to open PayPal signup. Please refresh and try again.', 'error');
+                        startButton.disabled = false;
+                    }
                 }
 
                 startButton.addEventListener('click', startOnboarding);
