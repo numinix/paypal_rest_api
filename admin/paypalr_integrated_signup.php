@@ -461,10 +461,7 @@ function paypalr_render_onboarding_page(): void
             an authCode and sharedId to your seller's browser via the callback function."
             See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
         -->
-        <script id="paypal-partner-js"
-                src="https://www.paypal.com/webapps/merchantboarding/js/lib/lightbox/partner.js"
-                data-paypal-onboard-complete="paypalOnboardedCallback"
-                async></script>
+        <!-- PayPal partner.js will be loaded dynamically based on environment -->
         
         <script>
             /**
@@ -880,6 +877,37 @@ function paypalr_render_onboarding_page(): void
                     return div.innerHTML;
                 }
                 
+                /**
+                 * Loads PayPal partner.js SDK for the correct environment.
+                 * 
+                 * @param {string} env - 'sandbox' or 'live'
+                 * @returns {Promise} Resolves when script is loaded
+                 */
+                function loadPartnerJs(env) {
+                    return new Promise(function(resolve, reject) {
+                        var existing = document.getElementById('paypal-partner-js');
+                        if (existing) existing.remove();
+
+                        var s = document.createElement('script');
+                        s.id = 'paypal-partner-js';
+                        s.async = true;
+                        s.src = (env === 'sandbox'
+                            ? 'https://www.sandbox.paypal.com/webapps/merchantboarding/js/lib/lightbox/partner.js'
+                            : 'https://www.paypal.com/webapps/merchantboarding/js/lib/lightbox/partner.js'
+                        );
+
+                        s.onload = function() {
+                            console.log('[PayPal ISU] partner.js loaded for', env);
+                            resolve();
+                        };
+                        s.onerror = function() {
+                            console.error('[PayPal ISU] Failed to load partner.js for', env);
+                            reject(new Error('Failed to load PayPal partner.js'));
+                        };
+                        document.head.appendChild(s);
+                    });
+                }
+                
                 function startOnboarding() {
                     startButton.disabled = true;
                     state.pollAttempts = 0;
@@ -888,7 +916,11 @@ function paypalr_render_onboarding_page(): void
                     state.merchantId = null;
                     setStatus('Starting PayPal signup...', 'info');
 
-                    proxyRequest('start', {nonce: state.nonce || ''})
+                    // Load the correct partner.js for the environment first
+                    loadPartnerJs(state.environment)
+                        .then(function() {
+                            return proxyRequest('start', {nonce: state.nonce || ''});
+                        })
                         .then(function(response) {
                             var data = response.data || {};
                             state.trackingId = data.tracking_id;
@@ -945,8 +977,9 @@ function paypalr_render_onboarding_page(): void
                  * PayPal signup in an overlay without leaving the page. The partner.js
                  * script handles the overlay and calls our callback when complete.
                  * 
-                 * Per PayPal docs: When using the mini-browser, add a link element with
-                 * data-paypal-button="true" that the partner.js script will enhance.
+                 * Per PayPal docs: The link MUST have:
+                 * - data-paypal-onboard-complete="callbackName" for the callback
+                 * - displayMode=minibrowser in the URL
                  * 
                  * @param {string} signupUrl - The PayPal action_url for signup
                  * @returns {boolean} True if mini-browser was successfully triggered
@@ -960,23 +993,37 @@ function paypalr_render_onboarding_page(): void
                             if (container) {
                                 container.innerHTML = '';
                                 
+                                // Ensure minibrowser mode per PayPal docs
+                                var url = signupUrl;
+                                url += (url.indexOf('?') === -1 ? '?' : '&') + 'displayMode=minibrowser';
+                                
                                 var link = document.createElement('a');
-                                link.href = signupUrl;
+                                link.href = url;
+                                link.target = '_blank';
+                                
+                                // REQUIRED by PayPal to trigger callback with authCode/sharedId
+                                link.setAttribute('data-paypal-onboard-complete', 'paypalOnboardedCallback');
                                 link.setAttribute('data-paypal-button', 'true');
-                                link.style.display = 'none';
+                                
+                                // Keep visible so user click is 100% "user gesture"
+                                // (programmatic click can be blocked depending on browser policies)
+                                link.textContent = 'Continue PayPal Signup';
+                                link.style.display = 'inline-block';
+                                link.className = 'button';
+                                
                                 container.appendChild(link);
+                                container.style.display = 'block';
                                 
                                 // Trigger PayPal's mini-browser by calling their render method
                                 PAYPAL.apps.Signup.render();
                                 
-                                // Click the link to trigger the mini-browser
-                                link.click();
+                                console.log('[PayPal ISU] Mini-browser link created with displayMode=minibrowser');
                                 
                                 return true;
                             }
                         } catch (e) {
                             // Mini-browser failed, fall back to popup
-                            console.log('PayPal mini-browser not available, using popup:', e);
+                            console.warn('[PayPal ISU] Mini-browser failed:', e);
                         }
                     }
                     
