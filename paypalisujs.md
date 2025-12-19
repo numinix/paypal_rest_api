@@ -40,16 +40,16 @@ Success Message → User Stays in Admin (no tab switching)
 
 ### Tasks
 
-- [ ] Create new AJAX endpoint `action=save_isu_credentials` in `admin/paypalr_integrated_signup.php`
-- [ ] Accept parameters: `merchantId`, `merchantIdInPayPal`, `authCode`, `sharedId`, `environment`
-- [ ] Validate security token and session
-- [ ] Proxy to numinix.com finalize API with credentials
-- [ ] Return JSON response with success/failure status
-- [ ] Add comprehensive logging for debugging
-- [ ] Handle errors gracefully with user-friendly messages
+- [x] Create new AJAX endpoint `action=save_isu_credentials` in `admin/paypalr_integrated_signup.php`
+- [x] Accept parameters: `merchantId`, `merchantIdInPayPal`, `authCode`, `sharedId`, `environment`
+- [x] Validate security token and session
+- [x] Proxy to numinix.com finalize API with credentials
+- [x] Return JSON response with success/failure status
+- [x] Add comprehensive logging for debugging
+- [x] Handle errors gracefully with user-friendly messages
 
 **Files to Modify**:
-- `admin/paypalr_integrated_signup.php` - Add new save endpoint
+- `admin/paypalr_integrated_signup.php` - Add new save endpoint ✅
 
 **Testing**:
 - Test endpoint with mock data

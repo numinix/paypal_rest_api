@@ -50,6 +50,12 @@ if ($action === 'save_credentials' && $isAjaxRequest) {
     exit;
 }
 
+// Handle JavaScript SDK credential save - Phase 2
+if ($action === 'save_isu_credentials' && $isAjaxRequest) {
+    paypalr_handle_save_isu_credentials();
+    exit;
+}
+
 // Handle completion flow - receives PayPal redirect with credentials
 if ($action === 'complete') {
     paypalr_handle_completion();
@@ -1262,6 +1268,174 @@ function paypalr_handle_save_credentials(): void
         'success' => true,
         'message' => 'Credentials saved.',
         'environment' => $environment,
+    ]);
+    exit;
+}
+
+/**
+ * Handles JavaScript SDK ISU credential save (Phase 2).
+ * Receives authCode, sharedId, and merchantId from PayPal JS SDK callback,
+ * proxies to numinix.com finalize API, and saves returned credentials.
+ */
+function paypalr_handle_save_isu_credentials(): void
+{
+    header('Content-Type: application/json');
+
+    // Validate security token
+    $token = (string)($_POST['securityToken'] ?? '');
+    if ($token === '' || $token !== (string)($_SESSION['securityToken'] ?? '')) {
+        paypalr_json_error('Invalid security token. Please refresh and try again.');
+    }
+
+    // Extract parameters from JavaScript SDK callback
+    $authCode = trim((string)($_POST['authCode'] ?? ''));
+    $sharedId = trim((string)($_POST['sharedId'] ?? ''));
+    $merchantId = trim((string)($_POST['merchantId'] ?? $_POST['merchantIdInPayPal'] ?? ''));
+    
+    // Validate required parameters
+    if ($merchantId === '') {
+        paypalr_json_error('Merchant ID is required.');
+    }
+
+    // Validate environment
+    $allowedEnvironments = ['sandbox', 'live'];
+    $requestedEnvironment = trim(strtolower((string)($_POST['environment'] ?? '')));
+    if (in_array($requestedEnvironment, $allowedEnvironments, true)) {
+        $environment = $requestedEnvironment;
+    } else {
+        $environment = paypalr_detect_environment();
+    }
+
+    paypalr_log_debug('JavaScript SDK credential save initiated', [
+        'has_auth_code' => $authCode !== '',
+        'has_shared_id' => $sharedId !== '',
+        'has_merchant_id' => $merchantId !== '',
+        'environment' => $environment,
+    ]);
+
+    // Prepare request to numinix.com finalize API
+    $numinixUrl = 'https://www.numinix.com/api/paypal_onboarding.php';
+    $payload = [
+        'nxp_paypal_action' => 'finalize',
+        'merchant_id' => $merchantId,
+        'env' => $environment,
+    ];
+
+    // Include authCode and sharedId if provided
+    if ($authCode !== '') {
+        $payload['auth_code'] = $authCode;
+    }
+    if ($sharedId !== '') {
+        $payload['shared_id'] = $sharedId;
+    }
+
+    paypalr_log_debug('Proxying to Numinix finalize API', [
+        'url' => $numinixUrl,
+        'environment' => $environment,
+        'has_auth_code' => $authCode !== '',
+        'has_shared_id' => $sharedId !== '',
+    ]);
+
+    // Make request to numinix.com
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $numinixUrl,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($payload),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/x-www-form-urlencoded',
+            'User-Agent: ZenCart-PayPalR-ISU/1.0',
+        ],
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false || $curlError !== '') {
+        paypalr_log_debug('Numinix API request failed', [
+            'error' => $curlError,
+            'http_code' => $httpCode,
+        ]);
+        paypalr_json_error('Failed to contact Numinix API: ' . $curlError);
+    }
+
+    paypalr_log_debug('Numinix API response received', [
+        'http_code' => $httpCode,
+        'response_length' => strlen((string)$response),
+    ]);
+
+    // Parse response
+    $data = json_decode((string)$response, true);
+    if (!is_array($data)) {
+        paypalr_log_debug('Invalid JSON response from Numinix API', [
+            'response' => substr((string)$response, 0, 500),
+        ]);
+        paypalr_json_error('Invalid response from Numinix API.');
+    }
+
+    // Check for API errors
+    if (!isset($data['success']) || $data['success'] !== true) {
+        $errorMessage = $data['message'] ?? 'Unknown error from Numinix API';
+        paypalr_log_debug('Numinix API returned error', [
+            'message' => $errorMessage,
+            'data' => $data,
+        ]);
+        paypalr_json_error($errorMessage);
+    }
+
+    // Extract credentials from response
+    $responseData = $data['data'] ?? [];
+    $credentials = $responseData['credentials'] ?? [];
+    $clientId = trim((string)($credentials['client_id'] ?? ''));
+    $clientSecret = trim((string)($credentials['client_secret'] ?? ''));
+
+    if ($clientId === '' || $clientSecret === '') {
+        // Credentials not ready yet - this might happen if PayPal provisioning is delayed
+        $step = $responseData['step'] ?? 'unknown';
+        $statusHint = $responseData['status_hint'] ?? '';
+        
+        paypalr_log_debug('Credentials not yet available', [
+            'step' => $step,
+            'status_hint' => $statusHint,
+        ]);
+
+        echo json_encode([
+            'success' => false,
+            'waiting' => true,
+            'message' => 'PayPal is still provisioning your account. Please wait a moment.',
+            'step' => $step,
+            'status_hint' => $statusHint,
+        ]);
+        exit;
+    }
+
+    // Save credentials to database
+    $saved = paypalr_save_credentials($clientId, $clientSecret, $environment);
+
+    if (!$saved) {
+        paypalr_log_debug('Failed to save credentials to database');
+        paypalr_json_error('Unable to save PayPal credentials to database.');
+    }
+
+    paypalr_log_debug('JavaScript SDK ISU credentials saved successfully', [
+        'environment' => $environment,
+        'has_client_id' => $clientId !== '',
+        'has_client_secret' => $clientSecret !== '',
+    ]);
+
+    // Return success with credentials for display
+    echo json_encode([
+        'success' => true,
+        'message' => 'PayPal credentials saved successfully!',
+        'environment' => $environment,
+        'credentials' => [
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+        ],
     ]);
     exit;
 }
