@@ -1409,6 +1409,8 @@ function paypalr_handle_completion(): void
         'has_shared_id' => $sharedId !== '',
         'has_tracking_id' => $trackingId !== '',
         'environment' => $environment,
+        'all_get_params' => array_keys($_GET),
+        'merchant_id_value' => $merchantId,
     ]);
     
     // Retrieve nonce from session (stored during start request)
@@ -1622,6 +1624,9 @@ function paypalr_handle_completion(): void
                 var autoSaveStatus = document.getElementById('auto-save-status');
                 var returnBtn = document.getElementById('return-btn');
                 
+                var retryCount = 0;
+                var maxRetries = 60; // Maximum 60 retries (5 minutes at 5 second intervals)
+                
                 function setAutoSaveStatus(message, type) {
                     autoSaveStatus.textContent = message;
                     autoSaveStatus.className = 'status ' + type;
@@ -1751,6 +1756,26 @@ function paypalr_handle_completion(): void
                             // Credentials should be available but aren't - this is an error
                             credentialsDisplay.innerHTML = '<h2>Error</h2><p style="color: #cc0000;">PayPal onboarding completed but credentials were not returned. Please contact support or enter credentials manually.</p>';
                             setAutoSaveStatus('Unable to retrieve credentials automatically. Please obtain them manually from PayPal.', 'error');
+                        } else if (responseData.step === 'waiting' || responseData.status_hint === 'provisioning') {
+                            // Still provisioning - show status and schedule retry
+                            retryCount++;
+                            
+                            if (retryCount > maxRetries) {
+                                credentialsDisplay.innerHTML = '<h2>Timeout</h2><p style="color: #cc0000;">PayPal is taking longer than expected to provision your account. Please try again later or contact support.</p>';
+                                setAutoSaveStatus('Timeout waiting for credentials. Please try again later.', 'error');
+                                return;
+                            }
+                            
+                            var pollingInterval = responseData.polling_interval || 5000;
+                            var remainingTime = Math.ceil((maxRetries - retryCount) * pollingInterval / 1000);
+                            credentialsDisplay.innerHTML = '<h2>Retrieving Credentials...</h2><p>PayPal is provisioning your account. This usually takes just a few seconds.</p><p><span class="spinner" role="status" aria-label="Loading"></span> Checking status... (attempt ' + retryCount + ' of ' + maxRetries + ')</p>';
+                            setAutoSaveStatus('Waiting for PayPal to provision your account... (' + retryCount + '/' + maxRetries + ' attempts)', 'info');
+                            
+                            // Retry after the polling interval
+                            setTimeout(function() {
+                                console.log('Retrying credential fetch after ' + pollingInterval + 'ms (attempt ' + retryCount + ')');
+                                fetchCredentials();
+                            }, pollingInterval);
                         } else {
                             credentialsDisplay.innerHTML = '<h2>Credentials Not Ready Yet</h2><p>PayPal is still provisioning your account. Please wait a moment and refresh this page, or return to the admin panel.</p>';
                             setAutoSaveStatus('Credentials are not yet available. You may need to wait a few moments for PayPal to complete provisioning.', 'info');
