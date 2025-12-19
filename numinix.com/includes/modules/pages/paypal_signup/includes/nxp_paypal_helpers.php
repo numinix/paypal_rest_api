@@ -330,6 +330,15 @@ function nxp_paypal_handle_start(array $session): void
     
     // Validate and enhance the return URL
     if ($clientReturnUrl !== null) {
+        // Validate URL to prevent open redirect vulnerabilities
+        if (!nxp_paypal_validate_return_url($clientReturnUrl)) {
+            nxp_paypal_log_debug('Client return URL validation failed', [
+                'client_return_url' => $clientReturnUrl,
+                'origin' => nxp_paypal_get_origin(),
+            ]);
+            nxp_paypal_json_error('Invalid return URL provided.');
+        }
+        
         // Add tracking_id and environment to return URL if not already present
         $returnUrl = nxp_paypal_enhance_return_url($clientReturnUrl, $_SESSION['nxp_paypal']['tracking_id'], $session['env']);
         
@@ -2214,6 +2223,63 @@ function nxp_paypal_enhance_return_url(string $clientReturnUrl, string $tracking
     }
     
     return $url;
+}
+
+/**
+ * Validates a client-provided return URL to prevent open redirect vulnerabilities.
+ *
+ * @param string $returnUrl The return URL to validate
+ * @return bool True if the URL is valid and safe, false otherwise
+ */
+function nxp_paypal_validate_return_url(string $returnUrl): bool
+{
+    // Parse the URL
+    $parsed = parse_url($returnUrl);
+    if ($parsed === false || empty($parsed['scheme']) || empty($parsed['host'])) {
+        return false;
+    }
+    
+    // Only allow HTTPS (HTTP allowed for localhost development)
+    $allowedSchemes = ['https'];
+    $host = strtolower($parsed['host']);
+    if ($host === 'localhost' || $host === '127.0.0.1' || strpos($host, '.local') !== false) {
+        $allowedSchemes[] = 'http';
+    }
+    
+    if (!in_array(strtolower($parsed['scheme']), $allowedSchemes, true)) {
+        return false;
+    }
+    
+    // Check against allowed domains/patterns
+    // This can be configured via constant or database in production
+    if (defined('NUMINIX_PPCP_ALLOWED_RETURN_DOMAINS')) {
+        $allowedDomains = explode(',', NUMINIX_PPCP_ALLOWED_RETURN_DOMAINS);
+        $allowed = false;
+        foreach ($allowedDomains as $domain) {
+            $domain = trim(strtolower($domain));
+            if ($domain === '' || $domain === '*') {
+                $allowed = true;
+                break;
+            }
+            // Support wildcard subdomains (e.g., *.example.com)
+            if (strpos($domain, '*.') === 0) {
+                $baseDomain = substr($domain, 2);
+                if ($host === $baseDomain || substr($host, -(strlen($baseDomain) + 1)) === '.' . $baseDomain) {
+                    $allowed = true;
+                    break;
+                }
+            } elseif ($host === $domain) {
+                $allowed = true;
+                break;
+            }
+        }
+        
+        return $allowed;
+    }
+    
+    // If no specific whitelist is configured, allow any HTTPS URL
+    // This maintains backward compatibility but should be configured in production
+    return true;
 }
 
 /**

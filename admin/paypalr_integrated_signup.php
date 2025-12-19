@@ -1581,11 +1581,11 @@ function paypalr_handle_completion(): void
                 <p>Your API credentials are shown below. They are being saved automatically, but you can also copy them manually if needed.</p>
             </div>
             
-            <div id="auto-save-status" class="hidden"></div>
+            <div id="auto-save-status" class="hidden" role="status" aria-live="polite"></div>
             
             <div id="credentials-display" class="credentials-box">
                 <h2>Retrieving Your PayPal Credentials...</h2>
-                <p><span class="spinner"></span> Please wait while we fetch your credentials from PayPal...</p>
+                <p><span class="spinner" role="status" aria-label="Loading"></span> Please wait while we fetch your credentials from PayPal...</p>
             </div>
             
             <div class="actions">
@@ -1641,22 +1641,50 @@ function paypalr_handle_completion(): void
                     var input = document.getElementById(inputId);
                     if (!input) return;
                     
+                    var textToCopy = input.value;
+                    var originalText = button.textContent;
+                    
+                    // Try modern Clipboard API first
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(textToCopy)
+                            .then(function() {
+                                button.textContent = 'Copied!';
+                                button.classList.add('copied');
+                                setTimeout(function() {
+                                    button.textContent = originalText;
+                                    button.classList.remove('copied');
+                                }, 2000);
+                            })
+                            .catch(function() {
+                                // Fall back to legacy method
+                                copyToClipboardLegacy(input, button, originalText);
+                            });
+                    } else {
+                        // Fall back to legacy method
+                        copyToClipboardLegacy(input, button, originalText);
+                    }
+                };
+                
+                function copyToClipboardLegacy(input, button, originalText) {
                     input.select();
                     input.setSelectionRange(0, 99999);
                     
                     try {
-                        document.execCommand('copy');
-                        var originalText = button.textContent;
-                        button.textContent = 'Copied!';
-                        button.classList.add('copied');
-                        setTimeout(function() {
-                            button.textContent = originalText;
-                            button.classList.remove('copied');
-                        }, 2000);
+                        var successful = document.execCommand('copy');
+                        if (successful) {
+                            button.textContent = 'Copied!';
+                            button.classList.add('copied');
+                            setTimeout(function() {
+                                button.textContent = originalText;
+                                button.classList.remove('copied');
+                            }, 2000);
+                        } else {
+                            alert('Failed to copy. Please select and copy manually.');
+                        }
                     } catch (err) {
                         alert('Failed to copy. Please select and copy manually.');
                     }
-                };
+                }
                 
                 function escapeHtml(text) {
                     var div = document.createElement('div');
@@ -1750,8 +1778,21 @@ function paypalr_handle_completion(): void
                 }
                 
                 // Send completion message to opener window if it exists
+                // Note: merchantId, authCode, sharedId are not sensitive credentials themselves
+                // They are temporary IDs that will be exchanged for credentials server-side
                 if (window.opener && !window.opener.closed) {
                     try {
+                        // Try to determine the opener's origin for targeted postMessage
+                        var targetOrigin = '*';
+                        try {
+                            if (window.opener.location && window.opener.location.origin) {
+                                targetOrigin = window.opener.location.origin;
+                            }
+                        } catch(e) {
+                            // Cross-origin opener - can't access location
+                            // Keep targetOrigin as '*' for cross-domain compatibility
+                        }
+                        
                         window.opener.postMessage({
                             event: 'paypal_onboarding_complete',
                             merchantId: merchantId,
@@ -1759,7 +1800,7 @@ function paypalr_handle_completion(): void
                             sharedId: sharedId,
                             trackingId: trackingId,
                             environment: environment
-                        }, '*');
+                        }, targetOrigin);
                     } catch(e) {
                         // Ignore postMessage errors
                     }
