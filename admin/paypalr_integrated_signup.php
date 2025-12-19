@@ -999,25 +999,24 @@ function paypalr_render_onboarding_page(): void
                                 
                                 var link = document.createElement('a');
                                 link.href = url;
-                                link.target = '_blank';
+                                // Do NOT set target="_blank" - mini-browser needs to intercept the click
                                 
                                 // REQUIRED by PayPal to trigger callback with authCode/sharedId
                                 link.setAttribute('data-paypal-onboard-complete', 'paypalOnboardedCallback');
                                 link.setAttribute('data-paypal-button', 'true');
                                 
-                                // Keep visible so user click is 100% "user gesture"
-                                // (programmatic click can be blocked depending on browser policies)
+                                // Style the button
                                 link.textContent = 'Continue PayPal Signup';
-                                link.style.display = 'inline-block';
                                 link.className = 'button';
+                                link.style.marginTop = '10px';
                                 
                                 container.appendChild(link);
                                 container.style.display = 'block';
                                 
-                                // Trigger PayPal's mini-browser by calling their render method
-                                PAYPAL.apps.Signup.render();
-                                
                                 console.log('[PayPal ISU] Mini-browser link created with displayMode=minibrowser');
+                                
+                                // PayPal's SDK automatically processes data-paypal-button links
+                                // No need to call render() - that can cause errors
                                 
                                 return true;
                             }
