@@ -729,8 +729,11 @@ function paypalr_render_onboarding_page(): void
                             tracking_id: state.trackingId,
                             partner_referral_id: state.partnerReferralId || '',
                             merchant_id: state.merchantId || '',
+                            // Send both camelCase and snake_case for maximum compatibility
                             authCode: state.authCode || '',
                             sharedId: state.sharedId || '',
+                            auth_code: state.authCode || '',
+                            shared_id: state.sharedId || '',
                             nonce: state.nonce
                         })
                         .then(function(response) {
@@ -959,6 +962,13 @@ function paypalr_render_onboarding_page(): void
                                 // Load partner.js AFTER link is in DOM
                                 setStatus('Loading PayPal integration...', 'info');
                                 return loadPartnerJs(state.environment).then(function() {
+                                    // Call render() to activate the SDK's link processing
+                                    if (window.PAYPAL && PAYPAL.apps && PAYPAL.apps.Signup) {
+                                        PAYPAL.apps.Signup.render();
+                                        console.log('[PayPal ISU] Called PAYPAL.apps.Signup.render()');
+                                    } else {
+                                        throw new Error('PayPal Signup SDK not available after loading partner.js');
+                                    }
                                     // Auto-trigger the mini-browser
                                     setStatus('Opening PayPal signup...', 'info');
                                     triggerMiniBrowser();
@@ -1030,7 +1040,7 @@ function paypalr_render_onboarding_page(): void
                 }
                 
                 /**
-                 * Triggers the mini-browser after partner.js has loaded.
+                 * Triggers the mini-browser after partner.js has loaded and render() has been called.
                  * 
                  * This programmatically clicks the link, which partner.js intercepts
                  * to open the mini-browser overlay. This provides a one-click UX
@@ -1046,11 +1056,10 @@ function paypalr_render_onboarding_page(): void
                             return;
                         }
                         
-                        // Small delay to ensure partner.js has fully initialized
-                        setTimeout(function() {
-                            console.log('[PayPal ISU] Triggering mini-browser...');
-                            link.click();
-                        }, 500);
+                        // Click immediately - the user gesture context is preserved since
+                        // this is still within the original click handler chain
+                        console.log('[PayPal ISU] Triggering mini-browser...');
+                        link.click();
                     } catch (e) {
                         console.error('[PayPal ISU] Failed to trigger mini-browser:', e);
                         setStatus('Failed to open PayPal signup. Please refresh and try again.', 'error');
