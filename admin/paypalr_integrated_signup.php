@@ -1710,8 +1710,12 @@ function paypalr_handle_completion(): void
                         return;
                     }
                     
+                    // Use 'finalize' action when coming from PayPal redirect (has merchantId)
+                    // Use 'status' action for subsequent polls if needed
+                    var proxyAction = merchantId ? 'finalize' : 'status';
+                    
                     var payload = {
-                        proxy_action: 'status',
+                        proxy_action: proxyAction,
                         action: 'proxy',
                         securityToken: securityToken,
                         tracking_id: trackingId,
@@ -1743,6 +1747,10 @@ function paypalr_handle_completion(): void
                         if (responseData.credentials && responseData.credentials.client_id && responseData.credentials.client_secret) {
                             displayCredentials(responseData.credentials, responseData.environment || environment);
                             attemptAutoSave(responseData.credentials, responseData.environment || environment);
+                        } else if (responseData.step === 'completed') {
+                            // Credentials should be available but aren't - this is an error
+                            credentialsDisplay.innerHTML = '<h2>Error</h2><p style="color: #cc0000;">PayPal onboarding completed but credentials were not returned. Please contact support or enter credentials manually.</p>';
+                            setAutoSaveStatus('Unable to retrieve credentials automatically. Please obtain them manually from PayPal.', 'error');
                         } else {
                             credentialsDisplay.innerHTML = '<h2>Credentials Not Ready Yet</h2><p>PayPal is still provisioning your account. Please wait a moment and refresh this page, or return to the admin panel.</p>';
                             setAutoSaveStatus('Credentials are not yet available. You may need to wait a few moments for PayPal to complete provisioning.', 'info');
