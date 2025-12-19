@@ -125,10 +125,12 @@ This ensures users can see credentials were successfully retrieved, even if auto
 - [ ] Test with sandbox environment
 - [ ] Test with live environment  
 - [ ] Test environment mismatch handling
-- [ ] Test credential exchange with authCode/sharedId
+- [x] Test credential exchange with authCode/sharedId (fixed URL encoding issue)
 - [ ] Test cross-session persistence and retrieval
 - [ ] Verify postMessage works correctly
 - [ ] Test with configured domain whitelist
+- [ ] Verify authCode and sharedId are properly captured from PayPal redirect
+- [ ] Verify credentials are retrieved instantly after signup completion
 
 ## Security Considerations
 

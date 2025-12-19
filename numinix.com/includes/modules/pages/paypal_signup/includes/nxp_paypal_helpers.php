@@ -2193,7 +2193,10 @@ function nxp_paypal_enhance_return_url(string $clientReturnUrl, string $tracking
     // Extract existing query parameters
     $queryParams = [];
     if (!empty($parsed['query'])) {
-        parse_str($parsed['query'], $queryParams);
+        // Decode HTML entities that may have been introduced during transport
+        // This handles cases where & was encoded as &amp; in the query string
+        $decodedQuery = html_entity_decode($parsed['query'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        parse_str($decodedQuery, $queryParams);
     }
     
     // Add tracking_id and env if not already present
