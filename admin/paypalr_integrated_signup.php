@@ -134,6 +134,14 @@ function paypalr_handle_proxy_request(): void
             'data_keys' => array_keys($data),
         ];
 
+        // Store nonce in session for use in completion page
+        if ($proxyAction === 'start' && !empty($data['nonce'])) {
+            $_SESSION['paypalr_isu_nonce'] = $data['nonce'];
+            paypalr_log_debug('Stored nonce in session for completion page', [
+                'tracking_id' => $data['tracking_id'] ?? null,
+            ]);
+        }
+
         // Provide a sanitized view of the full response for debugging when polling/finalizing
         if (in_array($proxyAction, ['status', 'finalize'], true)) {
             $logContext['sanitized_data'] = paypalr_redact_sensitive($data);
@@ -1403,6 +1411,9 @@ function paypalr_handle_completion(): void
         'environment' => $environment,
     ]);
     
+    // Retrieve nonce from session (stored during start request)
+    $nonce = trim((string)($_SESSION['paypalr_isu_nonce'] ?? ''));
+    
     // Store in session for retrieval
     if ($merchantId !== '') {
         $_SESSION['paypalr_isu_merchant_id'] = $merchantId;
@@ -1605,6 +1616,7 @@ function paypalr_handle_completion(): void
                 var sharedId = <?php echo json_encode($sharedId); ?>;
                 var trackingId = <?php echo json_encode($trackingId); ?>;
                 var environment = <?php echo json_encode($environment); ?>;
+                var nonce = <?php echo json_encode($nonce); ?>;
                 
                 var credentialsDisplay = document.getElementById('credentials-display');
                 var autoSaveStatus = document.getElementById('auto-save-status');
@@ -1706,7 +1718,8 @@ function paypalr_handle_completion(): void
                         merchant_id: merchantId,
                         authCode: authCode,
                         sharedId: sharedId,
-                        env: environment
+                        env: environment,
+                        nonce: nonce
                     };
                     
                     fetch(proxyUrl, {

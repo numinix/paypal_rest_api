@@ -334,9 +334,6 @@ if (IS_ADMIN_FLAG === true) {
 
     $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_DESCRIPTION'] =
         '<b>PayPal Advanced Checkout</b>, v%s<br><br>' .   //- %s is filled in with the current module version
-        '<p>' . $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_INTRO'] . '</p>' .
-        '<p><a class="paypalr-isu-button" data-partner-attribution-id="NuminixPPCP_SP" href="' . zen_href_link('paypalr_integrated_signup.php', '', 'SSL') . '" rel="noopener noreferrer" target="_blank">' . $define['MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON'] . '</a></p>' .
-        '<p>We will open a secure browser tab on <strong>numinix.com</strong>. Complete the PayPal steps there and copy the issued credentials into the configuration fields below.</p>' .
         '<a href="https://www.paypal.com/login" rel="noopener noreferrer" target="_blank">Manage your PayPal <b>business</b> account</a><br><br>' .
         '<b>Configuration instructions:</b><br>' .
         '<ol>
