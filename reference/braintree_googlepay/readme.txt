@@ -1,1 +1,0 @@
-See /docs/Braintree Google Pay/readme.html for documentation

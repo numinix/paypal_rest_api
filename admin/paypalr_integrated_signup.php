@@ -50,6 +50,18 @@ if ($action === 'save_credentials' && $isAjaxRequest) {
     exit;
 }
 
+// Handle JavaScript SDK credential save - Phase 2
+if ($action === 'save_isu_credentials' && $isAjaxRequest) {
+    paypalr_handle_save_isu_credentials();
+    exit;
+}
+
+// Handle completion flow - receives PayPal redirect with credentials
+if ($action === 'complete') {
+    paypalr_handle_completion();
+    exit;
+}
+
 // Handle legacy redirect-based flow for backwards compatibility
 if ($action === 'return') {
     paypalr_handle_legacy_return();
@@ -127,6 +139,14 @@ function paypalr_handle_proxy_request(): void
             'message' => $decoded['message'] ?? null,
             'data_keys' => array_keys($data),
         ];
+
+        // Store nonce in session for use in completion page
+        if ($proxyAction === 'start' && !empty($data['nonce'])) {
+            $_SESSION['paypalr_isu_nonce'] = $data['nonce'];
+            paypalr_log_debug('Stored nonce in session for completion page', [
+                'tracking_id' => $data['tracking_id'] ?? null,
+            ]);
+        }
 
         // Provide a sanitized view of the full response for debugging when polling/finalizing
         if (in_array($proxyAction, ['status', 'finalize'], true)) {
@@ -287,6 +307,7 @@ function paypalr_render_onboarding_page(): void
     $modulesPageUrl = paypalr_modules_page_url();
     $proxyUrl = paypalr_self_url(['action' => 'proxy']);
     $saveUrl = paypalr_self_url(['action' => 'save_credentials']);
+    $completeUrl = paypalr_self_url(['action' => 'complete']);
     $securityToken = $_SESSION['securityToken'] ?? '';
     
     // Security token should exist if admin is properly logged in
@@ -364,7 +385,7 @@ function paypalr_render_onboarding_page(): void
                 border-radius: 3px;
                 word-break: break-all;
             }
-            button {
+            button, a.button {
                 background: #0066cc;
                 color: white;
                 border: none;
@@ -372,8 +393,10 @@ function paypalr_render_onboarding_page(): void
                 border-radius: 4px;
                 cursor: pointer;
                 font-size: 16px;
+                text-decoration: none;
+                display: inline-block;
             }
-            button:hover {
+            button:hover, a.button:hover {
                 background: #0052a3;
             }
             button:disabled {
@@ -440,10 +463,7 @@ function paypalr_render_onboarding_page(): void
             an authCode and sharedId to your seller's browser via the callback function."
             See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
         -->
-        <script id="paypal-partner-js"
-                src="https://www.paypal.com/webapps/merchantboarding/js/lib/lightbox/partner.js"
-                data-paypal-onboard-complete="paypalOnboardedCallback"
-                async></script>
+        <!-- PayPal partner.js will be loaded dynamically based on environment -->
         
         <script>
             /**
@@ -473,6 +493,7 @@ function paypalr_render_onboarding_page(): void
             (function() {
                 var proxyUrl = <?php echo json_encode($proxyUrl); ?>;
                 var saveUrl = <?php echo json_encode($saveUrl); ?>;
+                var completeUrl = <?php echo json_encode($completeUrl); ?>;
                 var environment = <?php echo json_encode($environment); ?>;
                 var modulesPageUrl = <?php echo json_encode($modulesPageUrl); ?>;
                 var securityToken = <?php echo json_encode($securityToken); ?>;
@@ -534,6 +555,17 @@ function paypalr_render_onboarding_page(): void
                         env: state.environment
                     });
                     
+                    // For 'start' action, include the client return URL
+                    if (action === 'start') {
+                        // Build return URL with tracking parameters
+                        var returnUrl = completeUrl;
+                        if (state.trackingId) {
+                            returnUrl += (returnUrl.indexOf('?') === -1 ? '?' : '&') + 'tracking_id=' + encodeURIComponent(state.trackingId);
+                        }
+                        returnUrl += (returnUrl.indexOf('?') === -1 ? '?' : '&') + 'env=' + encodeURIComponent(state.environment);
+                        payload.client_return_url = returnUrl;
+                    }
+                    
                     return fetch(proxyUrl, {
                         method: 'POST',
                         headers: {
@@ -555,24 +587,31 @@ function paypalr_render_onboarding_page(): void
                 }
                 
                 function openPayPalPopup(url) {
-                    var width = 960;
-                    var height = 720;
-                    var left = window.screenX + Math.max((window.outerWidth - width) / 2, 0);
-                    var top = window.screenY + Math.max((window.outerHeight - height) / 2, 0);
-                    var features = 'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes';
+                    // Log the popup open attempt
+                    console.log('[PayPal ISU] Opening PayPal signup in new tab:', {
+                        url: url,
+                        tracking_id: state.trackingId,
+                        environment: state.environment
+                    });
                     
-                    state.popup = window.open(url, 'paypalOnboarding', features);
+                    // Use window.open with '_blank' to open in new tab (more user-friendly)
+                    // Fall back to popup window if tab opening fails
+                    state.popup = window.open(url, '_blank');
                     
                     if (!state.popup || state.popup.closed) {
                         setStatus('Please allow popups for this site to continue.', 'error');
                         startButton.disabled = false;
+                        console.error('[PayPal ISU] Failed to open PayPal signup window - popup blocked');
                         return false;
                     }
                     
                     try {
                         state.popup.focus();
-                    } catch(e) {}
+                    } catch(e) {
+                        console.warn('[PayPal ISU] Could not focus popup window:', e);
+                    }
                     
+                    console.log('[PayPal ISU] PayPal signup window opened successfully');
                     monitorPopup();
                     return true;
                 }
@@ -633,6 +672,14 @@ function paypalr_render_onboarding_page(): void
                         return;
                     }
 
+                    console.log('[PayPal ISU] Received completion message from popup:', {
+                        event: eventName,
+                        has_merchant_id: !!(payload.merchantId || payload.merchant_id || payload.merchantIdInPayPal),
+                        has_auth_code: !!(payload.authCode || payload.auth_code),
+                        has_shared_id: !!(payload.sharedId || payload.shared_id),
+                        has_tracking_id: !!payload.trackingId
+                    });
+
                     // Extract merchant_id from the completion message if provided
                     // This is critical for credential retrieval - PayPal returns this
                     // in the redirect URL and the completion page forwards it via postMessage
@@ -684,8 +731,11 @@ function paypalr_render_onboarding_page(): void
                             tracking_id: state.trackingId,
                             partner_referral_id: state.partnerReferralId || '',
                             merchant_id: state.merchantId || '',
+                            // Send both camelCase and snake_case for maximum compatibility
                             authCode: state.authCode || '',
                             sharedId: state.sharedId || '',
+                            auth_code: state.authCode || '',
+                            shared_id: state.sharedId || '',
                             nonce: state.nonce
                         })
                         .then(function(response) {
@@ -832,108 +882,158 @@ function paypalr_render_onboarding_page(): void
                     return div.innerHTML;
                 }
                 
+                /**
+                 * Loads PayPal partner.js SDK for the correct environment.
+                 * 
+                 * @param {string} env - 'sandbox' or 'live'
+                 * @returns {Promise} Resolves when script is loaded
+                 */
+                function loadPartnerJs(env) {
+                    return new Promise(function(resolve, reject) {
+                        var existing = document.getElementById('paypal-partner-js');
+                        if (existing) existing.remove();
+
+                        var s = document.createElement('script');
+                        s.id = 'paypal-partner-js';
+                        s.async = true;
+                        s.src = (env === 'sandbox'
+                            ? 'https://www.sandbox.paypal.com/webapps/merchantboarding/js/lib/lightbox/partner.js'
+                            : 'https://www.paypal.com/webapps/merchantboarding/js/lib/lightbox/partner.js'
+                        );
+
+                        s.onload = function() {
+                            console.log('[PayPal ISU] partner.js loaded for', env);
+                            resolve();
+                        };
+                        s.onerror = function() {
+                            console.error('[PayPal ISU] Failed to load partner.js for', env);
+                            reject(new Error('Failed to load PayPal partner.js'));
+                        };
+                        document.head.appendChild(s);
+                    });
+                }
+                
                 function startOnboarding() {
                     startButton.disabled = true;
                     state.pollAttempts = 0;
                     state.environment = resolveEnvironmentSelection();
                     state.partnerReferralId = null;
                     state.merchantId = null;
-                    setStatus('Starting PayPal signup...', 'info');
+                    setStatus('Loading PayPal signup...', 'info');
 
-                    proxyRequest('start', {nonce: state.nonce || ''})
-                        .then(function(response) {
-                            var data = response.data || {};
-                            state.trackingId = data.tracking_id;
-                            state.partnerReferralId = data.partner_referral_id || null;
-                            state.merchantId = data.merchant_id || null;
-                            if (data.environment && allowedEnvironments.indexOf(data.environment.toLowerCase()) !== -1) {
-                                state.environment = data.environment.toLowerCase();
-                                if (environmentSelect) {
-                                    environmentSelect.value = state.environment;
-                                }
+                    // First, load partner.js for the current environment
+                    loadPartnerJs(state.environment).then(function() {
+                        console.log('[PayPal ISU] partner.js loaded, getting signup URL...');
+                        
+                        // Now get the signup URL from the server
+                        return proxyRequest('start', {nonce: state.nonce || ''});
+                    })
+                    .then(function(response) {
+                        var data = response.data || {};
+                        state.trackingId = data.tracking_id;
+                        state.partnerReferralId = data.partner_referral_id || null;
+                        state.merchantId = data.merchant_id || null;
+                        if (data.environment && allowedEnvironments.indexOf(data.environment.toLowerCase()) !== -1) {
+                            state.environment = data.environment.toLowerCase();
+                            if (environmentSelect) {
+                                environmentSelect.value = state.environment;
                             }
-                            // Use nonce from server response, or generate a cryptographically secure one
-                            state.nonce = data.nonce;
-                            if (!state.nonce) {
-                                setStatus('Session error. Please refresh and try again.', 'error');
-                                startButton.disabled = false;
-                                return;
-                            }
-                            
-                            var redirectUrl = data.redirect_url || data.action_url;
-                            if (!redirectUrl && data.links) {
-                                for (var i = 0; i < data.links.length; i++) {
-                                    if (data.links[i].rel === 'action_url') {
-                                        redirectUrl = data.links[i].href;
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            if (!redirectUrl) {
-                                throw new Error('No PayPal signup URL received');
-                            }
-                            
-                            // Try to use PayPal's mini-browser flow first (via partner.js)
-                            // Fall back to popup if mini-browser is not available
-                            if (useMiniBrowserFlow(redirectUrl)) {
-                                setStatus('Complete your PayPal setup in the overlay...', 'info');
-                                pollStatus();
-                            } else if (openPayPalPopup(redirectUrl)) {
-                                setStatus('Follow the steps in the PayPal window...', 'info');
-                                pollStatus();
-                            }
-                        })
-                        .catch(function(error) {
-                            setStatus(error.message || 'Failed to start onboarding', 'error');
+                        }
+                        // Use nonce from server response, or generate a cryptographically secure one
+                        state.nonce = data.nonce;
+                        if (!state.nonce) {
+                            setStatus('Session error. Please refresh and try again.', 'error');
                             startButton.disabled = false;
-                        });
+                            return;
+                        }
+                        
+                        var redirectUrl = data.redirect_url || data.action_url;
+                        if (!redirectUrl && data.links) {
+                            for (var i = 0; i < data.links.length; i++) {
+                                if (data.links[i].rel === 'action_url') {
+                                    redirectUrl = data.links[i].href;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (!redirectUrl) {
+                            throw new Error('No PayPal signup URL received');
+                        }
+                        
+                        // Replace the Start button with a PayPal mini-browser link
+                        // This preserves the user gesture from the original click
+                        var newLink = transformButtonToPayPalLink(redirectUrl);
+                        
+                        // Call render() to activate the SDK's link processing
+                        if (window.PAYPAL && PAYPAL.apps && PAYPAL.apps.Signup) {
+                            PAYPAL.apps.Signup.render();
+                            console.log('[PayPal ISU] Called PAYPAL.apps.Signup.render()');
+                        } else {
+                            throw new Error('PayPal Signup SDK not available after loading partner.js');
+                        }
+                        
+                        // Trigger the click on the transformed link immediately
+                        // This works because we're still in the user gesture context
+                        newLink.click();
+                        
+                        setStatus('Opening PayPal signup...', 'info');
+                        pollStatus();
+                    })
+                    .catch(function(error) {
+                        setStatus(error.message || 'Failed to start onboarding', 'error');
+                        startButton.disabled = false;
+                    });
                 }
                 
                 /**
-                 * Attempts to use PayPal's mini-browser flow via the partner.js script.
+                 * Replaces the Start button with a PayPal mini-browser link.
                  * 
-                 * The mini-browser provides a more seamless experience as it displays
-                 * PayPal signup in an overlay without leaving the page. The partner.js
-                 * script handles the overlay and calls our callback when complete.
+                 * This function creates a new <a> tag with the PayPal signup URL and replaces
+                 * the original button while preserving the user gesture context from the original click.
                  * 
-                 * Per PayPal docs: When using the mini-browser, add a link element with
-                 * data-paypal-button="true" that the partner.js script will enhance.
+                 * Per PayPal docs: The link MUST have:
+                 * - data-paypal-onboard-complete="callbackName" for the callback
+                 * - data-paypal-button="true" to be processed by partner.js
+                 * - displayMode=minibrowser in the URL
                  * 
                  * @param {string} signupUrl - The PayPal action_url for signup
-                 * @returns {boolean} True if mini-browser was successfully triggered
+                 * @returns {HTMLAnchorElement} The new link element
                  */
-                function useMiniBrowserFlow(signupUrl) {
-                    // Check if PayPal partner.js has loaded and enhanced PAYPAL.apps
-                    if (typeof PAYPAL !== 'undefined' && PAYPAL.apps && PAYPAL.apps.Signup) {
-                        try {
-                            // Create a temporary link element for PayPal's mini-browser
-                            var container = document.getElementById('paypal-signup-container');
-                            if (container) {
-                                container.innerHTML = '';
-                                
-                                var link = document.createElement('a');
-                                link.href = signupUrl;
-                                link.setAttribute('data-paypal-button', 'true');
-                                link.style.display = 'none';
-                                container.appendChild(link);
-                                
-                                // Trigger PayPal's mini-browser by calling their render method
-                                PAYPAL.apps.Signup.render();
-                                
-                                // Click the link to trigger the mini-browser
-                                link.click();
-                                
-                                return true;
-                            }
-                        } catch (e) {
-                            // Mini-browser failed, fall back to popup
-                            console.log('PayPal mini-browser not available, using popup:', e);
-                        }
-                    }
+                function transformButtonToPayPalLink(signupUrl) {
+                    // Ensure minibrowser mode per PayPal docs
+                    var url = signupUrl;
+                    url += (url.indexOf('?') === -1 ? '?' : '&') + 'displayMode=minibrowser';
                     
-                    return false;
+                    // Create a new anchor element styled as the button
+                    var link = document.createElement('a');
+                    link.id = 'start-button';
+                    link.href = url;
+                    link.textContent = 'Start PayPal Signup';
+                    link.className = 'button'; // Use existing button styles
+                    link.style.cssText = startButton.style.cssText; // Copy any inline styles
+                    
+                    // REQUIRED by PayPal to trigger callback with authCode/sharedId
+                    link.setAttribute('data-paypal-onboard-complete', 'paypalOnboardedCallback');
+                    link.setAttribute('data-paypal-button', 'true');
+                    
+                    // Do NOT set target="_blank" - partner.js needs to intercept the click
+                    
+                    // Replace the button with the link
+                    startButton.parentNode.replaceChild(link, startButton);
+                    
+                    // Update the global reference
+                    startButton = link;
+                    
+                    console.log('[PayPal ISU] Replaced start button with PayPal mini-browser link');
+                    
+                    return link;
                 }
+                
+
+                startButton.addEventListener('click', startOnboarding);
+                 * instead of requiring the user to click twice.
+                 */
 
                 startButton.addEventListener('click', startOnboarding);
                 if (environmentSelect) {
@@ -1225,6 +1325,174 @@ function paypalr_handle_save_credentials(): void
 }
 
 /**
+ * Handles JavaScript SDK ISU credential save (Phase 2).
+ * Receives authCode, sharedId, and merchantId from PayPal JS SDK callback,
+ * proxies to numinix.com finalize API, and saves returned credentials.
+ */
+function paypalr_handle_save_isu_credentials(): void
+{
+    header('Content-Type: application/json');
+
+    // Validate security token
+    $token = (string)($_POST['securityToken'] ?? '');
+    if ($token === '' || $token !== (string)($_SESSION['securityToken'] ?? '')) {
+        paypalr_json_error('Invalid security token. Please refresh and try again.');
+    }
+
+    // Extract parameters from JavaScript SDK callback
+    $authCode = trim((string)($_POST['authCode'] ?? ''));
+    $sharedId = trim((string)($_POST['sharedId'] ?? ''));
+    $merchantId = trim((string)($_POST['merchantId'] ?? $_POST['merchantIdInPayPal'] ?? ''));
+    
+    // Validate required parameters
+    if ($merchantId === '') {
+        paypalr_json_error('Merchant ID is required.');
+    }
+
+    // Validate environment
+    $allowedEnvironments = ['sandbox', 'live'];
+    $requestedEnvironment = trim(strtolower((string)($_POST['environment'] ?? '')));
+    if (in_array($requestedEnvironment, $allowedEnvironments, true)) {
+        $environment = $requestedEnvironment;
+    } else {
+        $environment = paypalr_detect_environment();
+    }
+
+    paypalr_log_debug('JavaScript SDK credential save initiated', [
+        'has_auth_code' => $authCode !== '',
+        'has_shared_id' => $sharedId !== '',
+        'has_merchant_id' => $merchantId !== '',
+        'environment' => $environment,
+    ]);
+
+    // Prepare request to numinix.com finalize API
+    $numinixUrl = 'https://www.numinix.com/api/paypal_onboarding.php';
+    $payload = [
+        'nxp_paypal_action' => 'finalize',
+        'merchant_id' => $merchantId,
+        'env' => $environment,
+    ];
+
+    // Include authCode and sharedId if provided
+    if ($authCode !== '') {
+        $payload['auth_code'] = $authCode;
+    }
+    if ($sharedId !== '') {
+        $payload['shared_id'] = $sharedId;
+    }
+
+    paypalr_log_debug('Proxying to Numinix finalize API', [
+        'url' => $numinixUrl,
+        'environment' => $environment,
+        'has_auth_code' => $authCode !== '',
+        'has_shared_id' => $sharedId !== '',
+    ]);
+
+    // Make request to numinix.com
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $numinixUrl,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($payload),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/x-www-form-urlencoded',
+            'User-Agent: ZenCart-PayPalR-ISU/1.0',
+        ],
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false || $curlError !== '') {
+        paypalr_log_debug('Numinix API request failed', [
+            'error' => $curlError,
+            'http_code' => $httpCode,
+        ]);
+        paypalr_json_error('Failed to contact Numinix API: ' . $curlError);
+    }
+
+    paypalr_log_debug('Numinix API response received', [
+        'http_code' => $httpCode,
+        'response_length' => strlen((string)$response),
+    ]);
+
+    // Parse response
+    $data = json_decode((string)$response, true);
+    if (!is_array($data)) {
+        paypalr_log_debug('Invalid JSON response from Numinix API', [
+            'response' => substr((string)$response, 0, 500),
+        ]);
+        paypalr_json_error('Invalid response from Numinix API.');
+    }
+
+    // Check for API errors
+    if (!isset($data['success']) || $data['success'] !== true) {
+        $errorMessage = $data['message'] ?? 'Unknown error from Numinix API';
+        paypalr_log_debug('Numinix API returned error', [
+            'message' => $errorMessage,
+            'data' => $data,
+        ]);
+        paypalr_json_error($errorMessage);
+    }
+
+    // Extract credentials from response
+    $responseData = $data['data'] ?? [];
+    $credentials = $responseData['credentials'] ?? [];
+    $clientId = trim((string)($credentials['client_id'] ?? ''));
+    $clientSecret = trim((string)($credentials['client_secret'] ?? ''));
+
+    if ($clientId === '' || $clientSecret === '') {
+        // Credentials not ready yet - this might happen if PayPal provisioning is delayed
+        $step = $responseData['step'] ?? 'unknown';
+        $statusHint = $responseData['status_hint'] ?? '';
+        
+        paypalr_log_debug('Credentials not yet available', [
+            'step' => $step,
+            'status_hint' => $statusHint,
+        ]);
+
+        echo json_encode([
+            'success' => false,
+            'waiting' => true,
+            'message' => 'PayPal is still provisioning your account. Please wait a moment.',
+            'step' => $step,
+            'status_hint' => $statusHint,
+        ]);
+        exit;
+    }
+
+    // Save credentials to database
+    $saved = paypalr_save_credentials($clientId, $clientSecret, $environment);
+
+    if (!$saved) {
+        paypalr_log_debug('Failed to save credentials to database');
+        paypalr_json_error('Unable to save PayPal credentials to database.');
+    }
+
+    paypalr_log_debug('JavaScript SDK ISU credentials saved successfully', [
+        'environment' => $environment,
+        'has_client_id' => $clientId !== '',
+        'has_client_secret' => $clientSecret !== '',
+    ]);
+
+    // Return success with credentials for display
+    echo json_encode([
+        'success' => true,
+        'message' => 'PayPal credentials saved successfully!',
+        'environment' => $environment,
+        'credentials' => [
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+        ],
+    ]);
+    exit;
+}
+
+/**
  * Returns the origin (scheme + host) for the current request.
  *
  * @return string
@@ -1335,4 +1603,486 @@ function paypalr_redact_sensitive($value)
     }
     
     return (string) $value;
+}
+
+/**
+ * Handles the completion flow when PayPal redirects back to the client.
+ * This displays credentials for copy/paste while attempting auto-save in background.
+ */
+function paypalr_handle_completion(): void
+{
+    $proxyUrl = paypalr_self_url(['action' => 'proxy']);
+    $saveUrl = paypalr_self_url(['action' => 'save_credentials']);
+    $modulesPageUrl = paypalr_modules_page_url();
+    $securityToken = $_SESSION['securityToken'] ?? '';
+    
+    // Extract PayPal return parameters
+    $merchantId = trim((string)($_GET['merchantIdInPayPal'] ?? $_GET['merchantId'] ?? $_GET['merchant_id'] ?? ''));
+    $authCode = trim((string)($_GET['authCode'] ?? $_GET['auth_code'] ?? ''));
+    $sharedId = trim((string)($_GET['sharedId'] ?? $_GET['shared_id'] ?? ''));
+    $trackingId = trim((string)($_GET['tracking_id'] ?? $_SESSION['paypalr_isu_tracking_id'] ?? ''));
+    $environment = trim((string)($_GET['env'] ?? $_SESSION['paypalr_isu_environment'] ?? paypalr_detect_environment()));
+    
+    // Validate environment
+    $allowedEnvironments = ['sandbox', 'live'];
+    if (!in_array($environment, $allowedEnvironments, true)) {
+        $environment = paypalr_detect_environment();
+    }
+    
+    paypalr_log_debug('Completion handler called', [
+        'has_merchant_id' => $merchantId !== '',
+        'has_auth_code' => $authCode !== '',
+        'has_shared_id' => $sharedId !== '',
+        'has_tracking_id' => $trackingId !== '',
+        'environment' => $environment,
+        'all_get_params' => array_keys($_GET),
+        'merchant_id_value' => $merchantId,
+    ]);
+    
+    // Retrieve nonce from session (stored during start request)
+    $nonce = trim((string)($_SESSION['paypalr_isu_nonce'] ?? ''));
+    
+    // Store in session for retrieval
+    if ($merchantId !== '') {
+        $_SESSION['paypalr_isu_merchant_id'] = $merchantId;
+    }
+    if ($authCode !== '') {
+        $_SESSION['paypalr_isu_auth_code'] = $authCode;
+    }
+    if ($sharedId !== '') {
+        $_SESSION['paypalr_isu_shared_id'] = $sharedId;
+    }
+    if ($trackingId !== '') {
+        $_SESSION['paypalr_isu_tracking_id'] = $trackingId;
+    }
+    $_SESSION['paypalr_isu_environment'] = $environment;
+    
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PayPal Setup Complete</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 900px;
+                margin: 40px auto;
+                padding: 20px;
+                background: #f5f5f5;
+            }
+            .completion-container {
+                background: white;
+                border-radius: 8px;
+                padding: 30px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            h1 {
+                color: #2d7a2d;
+                margin-top: 0;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .icon {
+                font-size: 32px;
+            }
+            .status {
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 4px;
+            }
+            .status.info {
+                background: #e7f3ff;
+                color: #0066cc;
+                border-left: 4px solid #0066cc;
+            }
+            .status.success {
+                background: #e6f7e6;
+                color: #2d7a2d;
+                border-left: 4px solid #2d7a2d;
+            }
+            .status.error {
+                background: #ffe6e6;
+                color: #cc0000;
+                border-left: 4px solid #cc0000;
+            }
+            .credentials-box {
+                background: #f9f9f9;
+                padding: 20px;
+                border-radius: 4px;
+                margin: 20px 0;
+                border: 2px solid #0066cc;
+            }
+            .credentials-box h2 {
+                margin-top: 0;
+                color: #333;
+                font-size: 18px;
+            }
+            .credential-row {
+                margin: 15px 0;
+            }
+            .credential-row label {
+                display: block;
+                font-weight: bold;
+                margin-bottom: 5px;
+                color: #555;
+            }
+            .credential-input-group {
+                display: flex;
+                gap: 10px;
+            }
+            .credential-row input {
+                flex: 1;
+                padding: 10px;
+                font-family: monospace;
+                font-size: 14px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background: white;
+            }
+            .copy-btn {
+                padding: 10px 20px;
+                background: #0066cc;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                white-space: nowrap;
+            }
+            .copy-btn:hover {
+                background: #0052a3;
+            }
+            .copy-btn.copied {
+                background: #2d7a2d;
+            }
+            .actions {
+                margin-top: 30px;
+                display: flex;
+                gap: 15px;
+            }
+            .btn {
+                padding: 12px 24px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 16px;
+                text-decoration: none;
+                display: inline-block;
+            }
+            .btn-primary {
+                background: #0066cc;
+                color: white;
+            }
+            .btn-primary:hover {
+                background: #0052a3;
+            }
+            .btn-secondary {
+                background: #6b7280;
+                color: white;
+            }
+            .btn-secondary:hover {
+                background: #4b5563;
+            }
+            .spinner {
+                display: inline-block;
+                width: 16px;
+                height: 16px;
+                border: 2px solid #f3f3f3;
+                border-top: 2px solid #0066cc;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin-right: 8px;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .hidden {
+                display: none;
+            }
+            #auto-save-status {
+                margin: 15px 0;
+                padding: 12px;
+                border-radius: 4px;
+                font-weight: 500;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="completion-container">
+            <h1><span class="icon">✓</span> PayPal Setup Complete!</h1>
+            
+            <div class="status info">
+                <p><strong>Your PayPal account has been successfully connected.</strong></p>
+                <p>Your API credentials are shown below. They are being saved automatically, but you can also copy them manually if needed.</p>
+            </div>
+            
+            <div id="auto-save-status" class="hidden" role="status" aria-live="polite"></div>
+            
+            <div id="credentials-display" class="credentials-box">
+                <h2>Retrieving Your PayPal Credentials...</h2>
+                <p><span class="spinner" role="status" aria-label="Loading"></span> Please wait while we fetch your credentials from PayPal...</p>
+            </div>
+            
+            <div class="actions">
+                <a href="<?php echo htmlspecialchars($modulesPageUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-primary" id="return-btn">Return to PayPal Module</a>
+                <button type="button" onclick="window.close();" class="btn btn-secondary">Close Window</button>
+            </div>
+        </div>
+        
+        <script>
+            (function() {
+                var proxyUrl = <?php echo json_encode($proxyUrl); ?>;
+                var saveUrl = <?php echo json_encode($saveUrl); ?>;
+                var modulesPageUrl = <?php echo json_encode($modulesPageUrl); ?>;
+                var securityToken = <?php echo json_encode($securityToken); ?>;
+                var merchantId = <?php echo json_encode($merchantId); ?>;
+                var authCode = <?php echo json_encode($authCode); ?>;
+                var sharedId = <?php echo json_encode($sharedId); ?>;
+                var trackingId = <?php echo json_encode($trackingId); ?>;
+                var environment = <?php echo json_encode($environment); ?>;
+                var nonce = <?php echo json_encode($nonce); ?>;
+                
+                var credentialsDisplay = document.getElementById('credentials-display');
+                var autoSaveStatus = document.getElementById('auto-save-status');
+                var returnBtn = document.getElementById('return-btn');
+                
+                var retryCount = 0;
+                var maxRetries = 60; // Maximum 60 retries (5 minutes at 5 second intervals)
+                
+                function setAutoSaveStatus(message, type) {
+                    autoSaveStatus.textContent = message;
+                    autoSaveStatus.className = 'status ' + type;
+                    autoSaveStatus.classList.remove('hidden');
+                }
+                
+                function displayCredentials(credentials, env) {
+                    var html = '<h2>Your PayPal API Credentials</h2>';
+                    html += '<p style="color: #555; margin-bottom: 15px;">Environment: <strong>' + escapeHtml(env) + '</strong></p>';
+                    
+                    html += '<div class="credential-row">';
+                    html += '<label for="client-id">Client ID:</label>';
+                    html += '<div class="credential-input-group">';
+                    html += '<input type="text" id="client-id" value="' + escapeHtml(credentials.client_id) + '" readonly>';
+                    html += '<button class="copy-btn" onclick="copyToClipboard(\'client-id\', this)">Copy</button>';
+                    html += '</div></div>';
+                    
+                    html += '<div class="credential-row">';
+                    html += '<label for="client-secret">Client Secret:</label>';
+                    html += '<div class="credential-input-group">';
+                    html += '<input type="text" id="client-secret" value="' + escapeHtml(credentials.client_secret) + '" readonly>';
+                    html += '<button class="copy-btn" onclick="copyToClipboard(\'client-secret\', this)">Copy</button>';
+                    html += '</div></div>';
+                    
+                    credentialsDisplay.innerHTML = html;
+                }
+                
+                window.copyToClipboard = function(inputId, button) {
+                    var input = document.getElementById(inputId);
+                    if (!input) return;
+                    
+                    var textToCopy = input.value;
+                    var originalText = button.textContent;
+                    
+                    // Try modern Clipboard API first
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(textToCopy)
+                            .then(function() {
+                                button.textContent = 'Copied!';
+                                button.classList.add('copied');
+                                setTimeout(function() {
+                                    button.textContent = originalText;
+                                    button.classList.remove('copied');
+                                }, 2000);
+                            })
+                            .catch(function() {
+                                // Fall back to legacy method
+                                copyToClipboardLegacy(input, button, originalText);
+                            });
+                    } else {
+                        // Fall back to legacy method
+                        copyToClipboardLegacy(input, button, originalText);
+                    }
+                };
+                
+                function copyToClipboardLegacy(input, button, originalText) {
+                    input.select();
+                    input.setSelectionRange(0, 99999);
+                    
+                    try {
+                        var successful = document.execCommand('copy');
+                        if (successful) {
+                            button.textContent = 'Copied!';
+                            button.classList.add('copied');
+                            setTimeout(function() {
+                                button.textContent = originalText;
+                                button.classList.remove('copied');
+                            }, 2000);
+                        } else {
+                            alert('Failed to copy. Please select and copy manually.');
+                        }
+                    } catch (err) {
+                        alert('Failed to copy. Please select and copy manually.');
+                    }
+                }
+                
+                function escapeHtml(text) {
+                    var div = document.createElement('div');
+                    div.textContent = text;
+                    return div.innerHTML;
+                }
+                
+                function fetchCredentials() {
+                    if (!trackingId) {
+                        credentialsDisplay.innerHTML = '<h2>Error</h2><p style="color: #cc0000;">Missing tracking ID. Please try the setup process again.</p>';
+                        return;
+                    }
+                    
+                    // Use 'finalize' action when coming from PayPal redirect (has merchantId)
+                    // Use 'status' action for subsequent polls if needed
+                    var proxyAction = merchantId ? 'finalize' : 'status';
+                    
+                    var payload = {
+                        proxy_action: proxyAction,
+                        action: 'proxy',
+                        securityToken: securityToken,
+                        tracking_id: trackingId,
+                        merchant_id: merchantId,
+                        authCode: authCode,
+                        sharedId: sharedId,
+                        env: environment,
+                        nonce: nonce
+                    };
+                    
+                    fetch(proxyUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: new URLSearchParams(payload).toString()
+                    })
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('Network error');
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        if (!data || !data.success) {
+                            throw new Error(data && data.message || 'Failed to fetch credentials');
+                        }
+                        
+                        var responseData = data.data || {};
+                        if (responseData.credentials && responseData.credentials.client_id && responseData.credentials.client_secret) {
+                            displayCredentials(responseData.credentials, responseData.environment || environment);
+                            attemptAutoSave(responseData.credentials, responseData.environment || environment);
+                        } else if (responseData.step === 'completed') {
+                            // Credentials should be available but aren't - this is an error
+                            credentialsDisplay.innerHTML = '<h2>Error</h2><p style="color: #cc0000;">PayPal onboarding completed but credentials were not returned. Please contact support or enter credentials manually.</p>';
+                            setAutoSaveStatus('Unable to retrieve credentials automatically. Please obtain them manually from PayPal.', 'error');
+                        } else if (responseData.step === 'waiting' || responseData.status_hint === 'provisioning') {
+                            // Still provisioning - show status and schedule retry
+                            retryCount++;
+                            
+                            if (retryCount > maxRetries) {
+                                credentialsDisplay.innerHTML = '<h2>Timeout</h2><p style="color: #cc0000;">PayPal is taking longer than expected to provision your account. Please try again later or contact support.</p>';
+                                setAutoSaveStatus('Timeout waiting for credentials. Please try again later.', 'error');
+                                return;
+                            }
+                            
+                            var pollingInterval = responseData.polling_interval || 5000;
+                            var remainingTime = Math.ceil((maxRetries - retryCount) * pollingInterval / 1000);
+                            credentialsDisplay.innerHTML = '<h2>Retrieving Credentials...</h2><p>PayPal is provisioning your account. This usually takes just a few seconds.</p><p><span class="spinner" role="status" aria-label="Loading"></span> Checking status... (attempt ' + retryCount + ' of ' + maxRetries + ')</p>';
+                            setAutoSaveStatus('Waiting for PayPal to provision your account... (' + retryCount + '/' + maxRetries + ' attempts)', 'info');
+                            
+                            // Retry after the polling interval
+                            setTimeout(function() {
+                                console.log('Retrying credential fetch after ' + pollingInterval + 'ms (attempt ' + retryCount + ')');
+                                fetchCredentials();
+                            }, pollingInterval);
+                        } else {
+                            credentialsDisplay.innerHTML = '<h2>Credentials Not Ready Yet</h2><p>PayPal is still provisioning your account. Please wait a moment and refresh this page, or return to the admin panel.</p>';
+                            setAutoSaveStatus('Credentials are not yet available. You may need to wait a few moments for PayPal to complete provisioning.', 'info');
+                        }
+                    })
+                    .catch(function(error) {
+                        credentialsDisplay.innerHTML = '<h2>Error Retrieving Credentials</h2><p style="color: #cc0000;">' + escapeHtml(error.message || 'Failed to fetch credentials') + '</p><p>Please return to the admin panel and check your configuration.</p>';
+                        setAutoSaveStatus('Failed to retrieve credentials: ' + (error.message || 'Unknown error'), 'error');
+                    });
+                }
+                
+                function attemptAutoSave(credentials, env) {
+                    setAutoSaveStatus('Attempting to save credentials automatically...', 'info');
+                    
+                    var payload = {
+                        action: 'save_credentials',
+                        securityToken: securityToken,
+                        client_id: credentials.client_id,
+                        client_secret: credentials.client_secret,
+                        environment: env
+                    };
+                    
+                    fetch(saveUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: new URLSearchParams(payload).toString()
+                    })
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('Network error while saving credentials');
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        if (!data || !data.success) {
+                            throw new Error(data && data.message || 'Failed to save credentials');
+                        }
+                        
+                        setAutoSaveStatus('✓ Credentials saved successfully! You can now return to the PayPal module.', 'success');
+                        returnBtn.focus();
+                    })
+                    .catch(function(error) {
+                        setAutoSaveStatus('⚠ Auto-save failed: ' + (error.message || 'Unknown error') + '. Please copy the credentials above and enter them manually in the PayPal module configuration.', 'error');
+                    });
+                }
+                
+                // Send completion message to opener window if it exists
+                // Note: merchantId, authCode, sharedId are not sensitive credentials themselves
+                // They are temporary IDs that will be exchanged for credentials server-side
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        // Try to determine the opener's origin for targeted postMessage
+                        var targetOrigin = '*';
+                        try {
+                            if (window.opener.location && window.opener.location.origin) {
+                                targetOrigin = window.opener.location.origin;
+                            }
+                        } catch(e) {
+                            // Cross-origin opener - can't access location
+                            // Keep targetOrigin as '*' for cross-domain compatibility
+                        }
+                        
+                        window.opener.postMessage({
+                            event: 'paypal_onboarding_complete',
+                            merchantId: merchantId,
+                            authCode: authCode,
+                            sharedId: sharedId,
+                            trackingId: trackingId,
+                            environment: environment
+                        }, targetOrigin);
+                    } catch(e) {
+                        // Ignore postMessage errors
+                    }
+                }
+                
+                // Fetch credentials immediately
+                fetchCredentials();
+            })();
+        </script>
+    </body>
+    </html>
+    <?php
 }

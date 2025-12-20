@@ -324,17 +324,43 @@ function nxp_paypal_handle_start(array $session): void
         $_SESSION['nxp_paypal']['env'] = $session['env'];
     }
 
+    // Check if client provided a return URL (for proxy requests from external admin panels)
+    $clientReturnUrl = nxp_paypal_filter_string($_REQUEST['client_return_url'] ?? null);
+    $returnUrl = $clientReturnUrl ?: nxp_paypal_current_url();
+    
+    // Validate and enhance the return URL
+    if ($clientReturnUrl !== null) {
+        // Validate URL to prevent open redirect vulnerabilities
+        if (!nxp_paypal_validate_return_url($clientReturnUrl)) {
+            nxp_paypal_log_debug('Client return URL validation failed', [
+                'client_return_url' => $clientReturnUrl,
+                'origin' => nxp_paypal_get_origin(),
+            ]);
+            nxp_paypal_json_error('Invalid return URL provided.');
+        }
+        
+        // Add tracking_id and environment to return URL if not already present
+        $returnUrl = nxp_paypal_enhance_return_url($clientReturnUrl, $_SESSION['nxp_paypal']['tracking_id'], $session['env']);
+        
+        nxp_paypal_log_debug('Using client-provided return URL', [
+            'client_return_url' => $clientReturnUrl,
+            'enhanced_return_url' => $returnUrl,
+        ]);
+    }
+
     $payload = [
         'environment' => $session['env'],
         'tracking_id' => $_SESSION['nxp_paypal']['tracking_id'],
         'origin' => nxp_paypal_get_origin(),
-        'return_url' => nxp_paypal_current_url(),
+        'return_url' => $returnUrl,
     ];
 
     nxp_paypal_log_debug('Processing start action', [
         'environment' => $payload['environment'],
         'tracking_id' => $payload['tracking_id'],
         'origin' => $payload['origin'],
+        'return_url' => $payload['return_url'],
+        'has_client_return_url' => $clientReturnUrl !== null,
     ]);
 
     try {
@@ -372,6 +398,9 @@ function nxp_paypal_handle_start(array $session): void
     $_SESSION['nxp_paypal']['tracking_id'] = $response['data']['tracking_id'] ?? $payload['tracking_id'];
     if (!empty($response['data']['partner_referral_id'])) {
         $_SESSION['nxp_paypal']['partner_referral_id'] = $response['data']['partner_referral_id'];
+    }
+    if (!empty($response['data']['seller_nonce'])) {
+        $_SESSION['nxp_paypal']['seller_nonce'] = $response['data']['seller_nonce'];
     }
     $_SESSION['nxp_paypal']['step'] = !empty($response['data']['step']) ? $response['data']['step'] : 'waiting';
     $_SESSION['nxp_paypal']['updated_at'] = time();
@@ -2145,6 +2174,118 @@ function nxp_paypal_current_url(): string
     $queryString = http_build_query($filtered, '', '&', PHP_QUERY_RFC3986);
 
     return $origin . $path . ($queryString !== '' ? '?' . $queryString : '');
+}
+
+/**
+ * Enhances a client-provided return URL with tracking parameters.
+ *
+ * @param string $clientReturnUrl The return URL from the client
+ * @param string $trackingId The tracking ID for this onboarding session
+ * @param string $environment The environment (sandbox or live)
+ * @return string Enhanced return URL with tracking parameters
+ */
+function nxp_paypal_enhance_return_url(string $clientReturnUrl, string $trackingId, string $environment): string
+{
+    // Parse the URL
+    $parsed = parse_url($clientReturnUrl);
+    if ($parsed === false || empty($parsed['scheme']) || empty($parsed['host'])) {
+        // Invalid URL, return as-is
+        return $clientReturnUrl;
+    }
+    
+    // Extract existing query parameters
+    $queryParams = [];
+    if (!empty($parsed['query'])) {
+        // Decode HTML entities that may have been introduced during transport
+        // This handles cases where & was encoded as &amp; in the query string
+        $decodedQuery = html_entity_decode($parsed['query'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        parse_str($decodedQuery, $queryParams);
+    }
+    
+    // Add tracking_id and env if not already present
+    if (empty($queryParams['tracking_id']) && $trackingId !== '') {
+        $queryParams['tracking_id'] = $trackingId;
+    }
+    if (empty($queryParams['env']) && in_array($environment, ['sandbox', 'live'], true)) {
+        $queryParams['env'] = $environment;
+    }
+    
+    // Rebuild the URL
+    $url = $parsed['scheme'] . '://' . $parsed['host'];
+    if (!empty($parsed['port'])) {
+        $url .= ':' . $parsed['port'];
+    }
+    if (!empty($parsed['path'])) {
+        $url .= $parsed['path'];
+    }
+    
+    $queryString = http_build_query($queryParams, '', '&', PHP_QUERY_RFC3986);
+    if ($queryString !== '') {
+        $url .= '?' . $queryString;
+    }
+    
+    if (!empty($parsed['fragment'])) {
+        $url .= '#' . $parsed['fragment'];
+    }
+    
+    return $url;
+}
+
+/**
+ * Validates a client-provided return URL to prevent open redirect vulnerabilities.
+ *
+ * @param string $returnUrl The return URL to validate
+ * @return bool True if the URL is valid and safe, false otherwise
+ */
+function nxp_paypal_validate_return_url(string $returnUrl): bool
+{
+    // Parse the URL
+    $parsed = parse_url($returnUrl);
+    if ($parsed === false || empty($parsed['scheme']) || empty($parsed['host'])) {
+        return false;
+    }
+    
+    // Only allow HTTPS (HTTP allowed for localhost development)
+    $allowedSchemes = ['https'];
+    $host = strtolower($parsed['host']);
+    if ($host === 'localhost' || $host === '127.0.0.1' || strpos($host, '.local') !== false) {
+        $allowedSchemes[] = 'http';
+    }
+    
+    if (!in_array(strtolower($parsed['scheme']), $allowedSchemes, true)) {
+        return false;
+    }
+    
+    // Check against allowed domains/patterns
+    // This can be configured via constant or database in production
+    if (defined('NUMINIX_PPCP_ALLOWED_RETURN_DOMAINS')) {
+        $allowedDomains = explode(',', NUMINIX_PPCP_ALLOWED_RETURN_DOMAINS);
+        $allowed = false;
+        foreach ($allowedDomains as $domain) {
+            $domain = trim(strtolower($domain));
+            if ($domain === '' || $domain === '*') {
+                $allowed = true;
+                break;
+            }
+            // Support wildcard subdomains (e.g., *.example.com)
+            if (strpos($domain, '*.') === 0) {
+                $baseDomain = substr($domain, 2);
+                if ($host === $baseDomain || substr($host, -(strlen($baseDomain) + 1)) === '.' . $baseDomain) {
+                    $allowed = true;
+                    break;
+                }
+            } elseif ($host === $domain) {
+                $allowed = true;
+                break;
+            }
+        }
+        
+        return $allowed;
+    }
+    
+    // If no specific whitelist is configured, allow any HTTPS URL
+    // This maintains backward compatibility but should be configured in production
+    return true;
 }
 
 /**

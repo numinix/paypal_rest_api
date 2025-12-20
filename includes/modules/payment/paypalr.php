@@ -499,7 +499,7 @@ class paypalr extends base
         
         // Add the button
         $button_text = defined('MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON') ? MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_BUTTON : 'Complete PayPal Setup';
-        $isu_html .= '<p style="margin: 15px 0;"><a href="' . $isu_url . '" class="button" style="display: inline-block; padding: 10px 20px; background-color: #0070ba; color: white; text-decoration: none; border-radius: 3px; font-weight: bold;">' . $button_text . ' (' . $env_label . ')</a></p>';
+        $isu_html .= '<p style="margin: 15px 0;"><a href="' . $isu_url . '" class="button" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 20px; background-color: #0070ba; color: white; text-decoration: none; border-radius: 3px; font-weight: bold;">' . $button_text . ' (' . $env_label . ')</a></p>';
         
         // Add manual fallback instructions
         if (defined('MODULE_PAYMENT_PAYPALR_TEXT_ADMIN_ISU_MANUAL_FALLBACK')) {

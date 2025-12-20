@@ -1,1 +1,0 @@
-See /docs/Braintree Payments/readme.html for documentation
