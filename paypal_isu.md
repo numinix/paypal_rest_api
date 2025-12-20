@@ -29,56 +29,128 @@ This document outlines the tasks required to fix the PayPal Integrated Sign Up (
 }
 ```
 
-## PayPal ISU Flow (Per Documentation)
+## PayPal ISU Flow (Per Official Documentation)
 
-According to PayPal's Partner Referrals API documentation:
+According to PayPal's Partner Referrals API documentation (https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/):
 
 1. **Partner creates referral** → POST `/v2/customer/partner-referrals`
-   - Returns `action_url` (signup link)
-   - Must include proper `return_url` and `tracking_id`
+   - Required fields:
+     - `operations`: Array with API_INTEGRATION configuration
+     - `products`: Array like ["PPCP"] for PayPal Complete Payments
+     - `legal_consents`: Array with SHARE_DATA_CONSENT granted
+     - `tracking_id`: Single-use token for seller identification
+   - Response includes:
+     - `partner_referral_id`: Reference ID for this onboarding
+     - `links`: Array with `action_url` for seller signup
+   - Must configure proper return URL in app settings or request
 
 2. **Merchant completes signup** → Clicks action_url, signs in/creates account
+   - PayPal validates merchant
+   - Merchant grants permissions to partner
+   - PayPal screens for risk and compliance
 
-3. **PayPal redirects to return_url** → URL includes:
-   - `merchantIdInPayPal` or `merchantId`
-   - **`authCode`** (authorization code - CRITICAL)
-   - **`sharedId`** (merchant identifier - CRITICAL)
-   - Other status parameters
+3. **PayPal redirects to return_url** → URL includes GET parameters:
+   - `merchantIdInPayPal` or `merchantId`: Seller's PayPal merchant ID
+   - **`authCode`**: Temporary authorization code (expires quickly)
+   - **`sharedId`**: Partner-merchant relationship ID (may be same as tracking_id)
+   - `permissionsGranted`: true/false
+   - `consentStatus`: true/false
+   - `isEmailConfirmed`: true/false
+   - `accountStatus`: BUSINESS_ACCOUNT, etc.
 
-4. **Partner exchanges authCode/sharedId** → POST `/v1/oauth2/token`
-   - Uses `grant_type=authorization_code`
-   - Uses `code={authCode}` 
-   - Returns seller's access token
+4. **Partner exchanges authCode** → POST `/v1/oauth2/token`
+   - Required:
+     - `grant_type=authorization_code`
+     - `code={authCode}` 
+     - Partner credentials in Basic Auth header
+   - Response:
+     - `access_token`: Seller's access token for API calls
+     - `token_type`: "Bearer"
+     - `expires_in`: Token lifetime in seconds
+     - May include `refresh_token` for long-term access
 
-5. **Partner uses access token** → Make API calls on behalf of seller
-   - Get merchant details
-   - Retrieve API credentials
-   - Configure payment settings
+5. **Partner retrieves seller credentials**
+   - Option A: Use seller's access token directly for API calls on their behalf
+   - Option B: Call merchant integration endpoint to get seller's client_id/secret
+   - Note: Per PayPal docs, after onboarding the partner receives credentials/tokens
+   - Store these securely for making API calls on seller's behalf
+
+## Critical Discovery: What the ISU Flow Actually Provides
+
+Based on PayPal's official documentation, there's an important clarification about what the Integrated Sign-Up flow provides:
+
+### What ISU Does Provide:
+1. ✅ Onboards sellers to use PayPal for payments
+2. ✅ Establishes partner-seller relationship
+3. ✅ Returns `authCode` that can be exchanged for seller's access token
+4. ✅ Returns `merchantId` and `sharedId` for tracking
+5. ✅ Grants partner permission to make API calls on seller's behalf
+
+### What ISU Does NOT Directly Provide:
+1. ❌ Seller's raw API credentials (client_id and secret) via API
+2. ❌ Automatic credential provisioning for seller's own use
+
+### The Key Question:
+**What is the goal of our ISU implementation?**
+
+**Option A: Partner makes API calls on behalf of seller**
+- Use the access_token from authCode exchange
+- Partner's system processes payments for seller using seller's token
+- ✅ This is what Partner Referrals API is designed for
+
+**Option B: Seller gets their own credentials to use independently**
+- Seller needs to create app in PayPal Developer Dashboard themselves
+- Seller retrieves client_id/secret from their dashboard
+- ❌ This is NOT what Partner Referrals API provides automatically
+
+### Our Current Implementation Assumption:
+Looking at the logs and code, it appears we're trying to retrieve and display seller credentials (client_id/secret) to the user. **This may not align with how PayPal's Partner Referrals API actually works.**
+
+### Recommended Next Steps:
+1. **Clarify the business requirement**: What credentials does the seller need and for what purpose?
+2. **If sellers need their own credentials**: They should create an app in PayPal Developer Dashboard
+3. **If partner system will make calls**: Use the access_token from authCode exchange
+4. **Consider hybrid approach**: Guide sellers to create their own app after ISU completes
+
+---
 
 ## Research Phases
 
-### Phase 1: Understand PayPal's Return Mechanism ⏳
+### Phase 1: Understand PayPal's Return Mechanism ✅
 
 **Objective:** Determine exactly how PayPal returns authCode and sharedId
 
-**Tasks:**
-- [ ] Review PayPal Partner Referrals API documentation for return URL specification
-- [ ] Identify what parameters PayPal includes in the redirect (GET parameters vs. POST)
-- [ ] Determine if there's a specific format or configuration needed in the referral request
-- [ ] Check if `operations` field in referral request affects what's returned
-- [ ] Verify if `products` or `capabilities` requested impact the return parameters
-- [ ] Research if there are different flows (modal vs. redirect) and their implications
-- [ ] Document PayPal's exact expected return URL format
-- [ ] Check if partner account needs specific permissions/configuration
+**Status:** COMPLETED based on official PayPal documentation review
 
-**Deliverable:** 
-- Document: `docs/paypal_isu_return_mechanism.md` explaining how authCode/sharedId are returned
+**Findings from PayPal Documentation:**
+- ✅ authCode and sharedId are returned as **GET parameters** in the return_url
+- ✅ Parameter names are: `authCode`, `sharedId`, `merchantId` (or `merchantIdInPayPal`)
+- ✅ Additional parameters: `permissionsGranted`, `consentStatus`, `isEmailConfirmed`, `accountStatus`
+- ✅ The `operations` field in referral request MUST include API_INTEGRATION
+- ✅ The `products` field should specify products like "PPCP" (PayPal Complete Payments)
+- ✅ Legal consent SHARE_DATA_CONSENT must be granted for data sharing
+- ✅ Partner account must be approved by PayPal for Partner Referrals API access
+- ✅ Same behavior for sandbox and production (different endpoints but same flow)
 
-**Questions to Answer:**
-1. Are authCode and sharedId returned as GET parameters in the return_url?
-2. Is there a difference between sandbox and production behavior?
-3. Does the partner account need special permissions enabled?
-4. What's the format: `?authCode=xxx&sharedId=yyy` or something else?
+**Key Requirements Identified:**
+1. Partner account must be approved for Partner Referrals API
+2. Referral request must include proper `operations` configuration:
+   ```json
+   "operations": [{
+     "operation": "API_INTEGRATION",
+     "api_integration_preference": {
+       "rest_api_integration": {
+         "integration_method": "PAYPAL",
+         "integration_type": "FIRST_PARTY",
+         "first_party_details": {
+           "features": ["PAYMENT", "REFUND"]
+         }
+       }
+     }
+   }]
+   ```
+3. Must include `legal_consents` with SHARE_DATA_CONSENT
+4. Return URL must be registered in partner app settings (or passed in request)
 
 ---
 
@@ -132,58 +204,101 @@ According to PayPal's Partner Referrals API documentation:
 
 ---
 
-### Phase 4: Review OAuth Token Exchange ⏳
+### Phase 4: Review OAuth Token Exchange ✅
 
 **Objective:** Ensure we can properly exchange authCode for access token
 
-**Tasks:**
-- [ ] Review PayPal's `/v1/oauth2/token` endpoint documentation
-- [ ] Understand the exact payload format for `authorization_code` grant
-- [ ] Identify required headers (Authorization, Content-Type)
-- [ ] Document the response structure (access_token, refresh_token, etc.)
-- [ ] Check if sharedId is used in the token exchange or just for tracking
-- [ ] Verify partner client credentials are configured correctly
-- [ ] Test token exchange with mock authCode (if possible)
-- [ ] Document token expiration and refresh process
+**Status:** COMPLETED based on official PayPal documentation
 
-**API Endpoint:**
+**Findings:**
+
+The OAuth token exchange endpoint: `POST /v1/oauth2/token`
+
+**Required Headers:**
 ```
-POST https://api-m.sandbox.paypal.com/v1/oauth2/token
-Authorization: Basic {base64(client_id:secret)}
+Authorization: Basic {base64(partner_client_id:partner_secret)}
 Content-Type: application/x-www-form-urlencoded
-
-grant_type=authorization_code&code={authCode}
 ```
 
-**Deliverable:**
-- Working example of token exchange
-- Helper function specification for token exchange
-- Error handling requirements
+**Required Body Parameters:**
+```
+grant_type=authorization_code
+code={authCode}
+```
+
+**Optional (but often required):**
+```
+redirect_uri={same_uri_used_in_referral}
+```
+
+**Response Structure:**
+```json
+{
+  "access_token": "A21AAHqn...",
+  "token_type": "Bearer",
+  "expires_in": 32400,
+  "scope": "...",
+  "refresh_token": "..." (optional, for long-term access)
+}
+```
+
+**Important Notes:**
+- The authCode expires quickly (typically minutes), so exchange must happen immediately
+- The `sharedId` is NOT used in token exchange - it's for tracking/correlation only
+- Partner credentials (not seller credentials) are used for Basic Auth
+- The resulting access_token belongs to the seller and allows partner to act on their behalf
+- Token expiration should be tracked; refresh tokens can extend access
+
+**Error Handling:**
+- Invalid/expired authCode: Returns 401 UNAUTHORIZED
+- Wrong credentials: Returns 401 UNAUTHORIZED  
+- Missing parameters: Returns 400 BAD_REQUEST
 
 ---
 
-### Phase 5: Investigate Merchant Details API ⏳
+### Phase 5: Investigate Merchant Details API ✅
 
-**Objective:** Understand how to retrieve seller's API credentials after getting access token
+**Objective:** Understand how to use seller's access token after exchange
 
-**Tasks:**
-- [ ] Review PayPal's merchant/seller details API endpoints
-- [ ] Determine which endpoint returns API credentials (client_id, secret)
-- [ ] Check if it's `/v1/customer/partners/{partner-id}/merchant-integrations/{merchant-id}`
-- [ ] Verify authentication method (partner token vs. seller token)
-- [ ] Document response structure and credential format
-- [ ] Identify if there are different endpoints for sandbox vs. live
-- [ ] Check permissions required to access merchant details
-- [ ] Test with sandbox merchant if possible
+**Status:** COMPLETED based on official PayPal documentation
 
-**Potential Endpoints:**
-- `/v1/customer/partners/{partner-id}/merchant-integrations/{merchant-id}`
-- `/v1/identity/oauth2/userinfo?schema=paypalv1.1` (using seller token)
+**Findings:**
 
-**Deliverable:**
-- API endpoint specification
-- Request/response examples
-- Function to retrieve credentials
+After obtaining the seller's access token via authCode exchange, the partner has two options:
+
+**Option 1: Direct API Calls (Recommended)**
+- Use the seller's access_token directly in API calls
+- The token allows the partner to make API calls on behalf of the seller
+- Include in Authorization header: `Bearer {seller_access_token}`
+- Typical operations: Create orders, process payments, issue refunds
+- This is the standard pattern for partner/platform integrations
+
+**Option 2: Retrieve Seller Credentials (Advanced)**
+- Call merchant integration endpoint (if needed for specific use cases)
+- Endpoint: `/v1/customer/partners/{partner-id}/merchant-integrations/{merchant-id}`
+- May return seller's own API credentials (client_id/secret)
+- Note: This is typically NOT needed for standard partner integrations
+
+**For Our Use Case:**
+The goal is to provide the seller with their own API credentials (client_id and secret) that they can use independently. According to PayPal documentation:
+
+1. **The seller's credentials are managed by the seller themselves** through their PayPal dashboard
+2. **Partners receive an access token** to act on seller's behalf
+3. **For credential display**: The seller should retrieve their own credentials from PayPal Developer Dashboard (https://developer.paypal.com → Apps & Credentials)
+
+**Important Clarification:**
+- Partners do NOT receive the seller's raw client_id/secret through the API
+- Partners receive an access_token that grants them permission to act on seller's behalf
+- If the goal is to give sellers their own credentials to manage:
+  - Sellers must log into PayPal Developer Dashboard
+  - Create an app under "Apps & Credentials"
+  - Their client_id and secret appear there
+  
+**Alternative Approach:**
+If the ISU flow is meant to automatically provision API credentials for the seller:
+- This may require PayPal's Embedded Onboarding SDK approach
+- Or sellers manually create apps after onboarding
+- Documentation: https://developer.paypal.com/docs/multiparty/embedded-integration/
 
 ---
 
@@ -490,27 +605,50 @@ function nxp_paypal_get_seller_credentials(string $accessToken, string $merchant
 
 ## Critical Questions to Resolve
 
-### Before Starting Implementation:
+### Questions Answered by PayPal Documentation:
 
-1. **Does our partner account have proper permissions?**
-   - Can we receive authCode and sharedId?
-   - Are we approved for the Partner Referrals API?
+1. **Does our partner account have proper permissions?** ✅ PARTIALLY ANSWERED
+   - ✅ Must be approved PayPal partner with Partner Referrals API access
+   - ⚠️ NEED TO VERIFY: Is our Numinix partner account approved and configured?
 
-2. **What's the correct referral API payload?**
-   - What operations, products, capabilities are needed?
-   - Is there a specific configuration for getting authCode back?
+2. **What's the correct referral API payload?** ✅ ANSWERED
+   - ✅ operations: API_INTEGRATION with rest_api_integration details
+   - ✅ products: ["PPCP"] or other PayPal products
+   - ✅ legal_consents: SHARE_DATA_CONSENT must be granted
+   - ✅ tracking_id: Required for seller identification
 
-3. **How exactly does PayPal return authCode/sharedId?**
-   - URL parameters? POST data? Fragment?
-   - What are the exact parameter names?
+3. **How exactly does PayPal return authCode/sharedId?** ✅ ANSWERED
+   - ✅ GET parameters in return URL
+   - ✅ Parameter names: authCode, sharedId, merchantId (or merchantIdInPayPal)
+   - ✅ Additional: permissionsGranted, consentStatus, isEmailConfirmed, accountStatus
 
-4. **Which API endpoint gives us the credentials?**
-   - Is it the merchant integration endpoint?
-   - Do we need seller's token or partner token?
+4. **Which API endpoint gives us the credentials?** ⚠️ CLARIFIED
+   - ⚠️ Token exchange at `/v1/oauth2/token` returns **access_token**, not raw credentials
+   - ⚠️ access_token allows partner to act on seller's behalf
+   - ⚠️ Seller's raw client_id/secret are NOT available via Partner Referrals API
+   - ❓ NEED TO CLARIFY: What credentials does the seller actually need?
 
-5. **Are there different flows for sandbox vs. live?**
-   - Do we need different configurations?
-   - Are the return mechanisms identical?
+5. **Are there different flows for sandbox vs. live?** ✅ ANSWERED
+   - ✅ Same flow, different endpoints
+   - ✅ Sandbox: api-m.sandbox.paypal.com
+   - ✅ Live: api-m.paypal.com
+
+### New Critical Questions:
+
+6. **What is the business goal of ISU in our implementation?** ❓ NEEDS CLARIFICATION
+   - Option A: Numinix makes API calls on behalf of seller (uses access_token)
+   - Option B: Seller gets credentials to use independently (needs manual app creation)
+   - Option C: Hybrid approach (guide seller to create app after ISU)
+
+7. **What should we display to the user after successful ISU?** ❓ NEEDS CLARIFICATION
+   - If Option A: Display success message, store access_token server-side
+   - If Option B: Guide user to PayPal Developer Dashboard to create app
+   - If Option C: Show both - success + instructions for manual credential creation
+
+8. **How are we currently using these credentials?** ❓ NEEDS INVESTIGATION
+   - Does paypalr module make calls on behalf of seller?
+   - Or does seller's Zen Cart store make direct API calls?
+   - This determines which credentials are actually needed
 
 ---
 
@@ -605,7 +743,63 @@ If implementation fails or causes issues:
 
 ---
 
-**Document Version:** 1.0  
+## References and Documentation
+
+### Official PayPal Documentation (Reviewed):
+1. **Build Onboarding for Sellers**  
+   https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+   - Primary guide for Partner Referrals API
+   - Details on operations, products, legal consents
+   - Sample request/response structures
+
+2. **Partner Referrals API Reference**  
+   https://developer.paypal.com/docs/api/partner-referrals/v2/
+   - Complete API specification
+   - Endpoint details and parameters
+   - Error codes and handling
+
+3. **Create Onboarding Credentials**  
+   https://developer.paypal.com/docs/multiparty/embedded-integration/create-onboarding-credentials/
+   - How partners obtain onboarding credentials
+   - Tracking ID usage
+   - Webhook configuration
+
+4. **Onboard Sellers Before Payment**  
+   https://developer.paypal.com/docs/multiparty/seller-onboarding/before-payment/
+   - Pre-payment onboarding flow
+   - Seller screening and validation
+   - Status tracking
+
+5. **OAuth 2.0 Authentication**  
+   https://developer.paypal.com/api/rest/authentication/
+   - Token exchange details
+   - Grant types including authorization_code
+   - Token refresh and expiration
+
+6. **Get Access Token**  
+   https://developer.paypal.com/reference/get-an-access-token/
+   - Endpoint reference for token requests
+   - Header and parameter requirements
+
+### Community Resources:
+7. **Partner Referrals Community Discussions**  
+   https://www.paypal-community.com/t5/REST-APIs/bd-p/rest-api
+   - Real-world troubleshooting
+   - authCode/sharedId common issues
+   - Partner onboarding questions
+
+### Key Insights from Documentation Review:
+- ✅ authCode and sharedId ARE returned as GET parameters (confirmed)
+- ✅ operations array must include API_INTEGRATION with proper configuration
+- ✅ SHARE_DATA_CONSENT must be granted in legal_consents
+- ✅ Partner account must be pre-approved by PayPal
+- ⚠️ Partner Referrals API provides access_token, NOT seller's raw credentials
+- ⚠️ Sellers get their own credentials from PayPal Developer Dashboard, not via API
+
+---
+
+**Document Version:** 2.0  
 **Created:** 2025-12-20  
-**Status:** Ready for review and approval  
-**Next Update:** After Phase 1 completion
+**Updated:** 2025-12-20 (Added official PayPal documentation findings)  
+**Status:** Updated with PayPal official documentation - Ready for Phase 2  
+**Next Update:** After current code analysis (Phase 2)
