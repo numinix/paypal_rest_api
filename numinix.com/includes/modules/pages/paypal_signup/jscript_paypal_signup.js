@@ -827,12 +827,21 @@
         }
 
         function handlePopupMessage(event) {
+            console.log('[CALLBACK TEST - Numinix] handlePopupMessage called', {
+                hasPopup: !!state.popup,
+                hasEvent: !!event,
+                hasEventSource: !!(event && event.source),
+                sourcesMatch: !!(event && event.source && state.popup && event.source === state.popup)
+            });
+
             if (!state.popup || (event && event.source && event.source !== state.popup)) {
+                console.log('[CALLBACK TEST - Numinix] Ignoring message - not from our popup');
                 return;
             }
 
             var rawData = event && event.data;
             if (!rawData) {
+                console.log('[CALLBACK TEST - Numinix] No data in message');
                 return;
             }
 
@@ -846,8 +855,11 @@
             }
 
             if (!payload || typeof payload !== 'object') {
+                console.log('[CALLBACK TEST - Numinix] Payload is not an object');
                 return;
             }
+
+            console.log('[CALLBACK TEST - Numinix] Received postMessage payload:', payload);
 
             var eventName = '';
             if (typeof payload.event === 'string') {
@@ -862,7 +874,18 @@
                 || payload.paypal_onboarding_complete === true
                 || payload.paypalOnboardingComplete === true;
 
+            console.log('[CALLBACK TEST - Numinix] Event analysis:', {
+                eventName: eventName,
+                normalized: normalized,
+                isCompletionEvent: completionEvent,
+                hasTrackingId: !!state.session.tracking_id,
+                authCode: payload.authCode,
+                sharedId: payload.sharedId,
+                merchantId: payload.merchantId
+            });
+
             if (!completionEvent || !state.session.tracking_id) {
+                console.log('[CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring');
                 return;
             }
 
@@ -877,6 +900,7 @@
                 state.session.sharedId = payload.sharedId;
             }
 
+            console.log('[CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding');
             setStatus('Processing your PayPal account details…', 'info');
             finalizeOnboarding();
         }
@@ -886,6 +910,7 @@
         });
 
         window.addEventListener('message', handlePopupMessage);
+        console.log('[CALLBACK TEST - Numinix] Message event listener attached - ready to receive postMessage');
 
         disableStartButtons(false);
 
