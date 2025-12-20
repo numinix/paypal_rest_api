@@ -57,6 +57,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                     'environment' => (string)($result['environment'] ?? $payload['environment'] ?? 'sandbox'),
                     'tracking_id' => $trackingId,
                     'partner_referral_id' => (string)($result['partner_referral_id'] ?? ''),
+                    'seller_nonce' => (string)($result['seller_nonce'] ?? ''),
                     'redirect_url' => $actionUrl,
                     'action_url' => $actionUrl,
                     'links' => is_array($result['links'] ?? null) ? $result['links'] : [],
@@ -105,6 +106,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $trackingId = $this->sanitizeTrackingId($payload['tracking_id'] ?? null);
             $partnerReferralId = $this->sanitizePartnerReferralId($payload['partner_referral_id'] ?? null);
             $merchantId = $this->sanitizeMerchantId($payload['merchant_id'] ?? null);
+            $sellerNonce = $this->sanitizeSellerNonce($payload['seller_nonce'] ?? null);
             
             // Extract authCode and sharedId for credential exchange per PayPal docs
             $authCode = $this->sanitizeAuthCode($payload['auth_code'] ?? null);
@@ -133,13 +135,15 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                     'tracking_id' => $trackingId,
                     'has_auth_code' => 'yes',
                     'has_shared_id' => 'yes',
+                    'has_seller_nonce' => $sellerNonce !== '' ? 'yes' : 'no',
                 ]);
                 $credentials = $this->exchangeAuthCodeForCredentials(
                     $apiBase,
                     $clientId,
                     $clientSecret,
                     $authCode,
-                    $sharedId
+                    $sharedId,
+                    $sellerNonce
                 );
 
                 if (is_array($credentials) && isset($credentials['access_token'])) {
@@ -239,6 +243,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @param string $partnerClientSecret
      * @param string $authCode
      * @param string $sharedId
+     * @param string $sellerNonce
      * @return array{
      *   client_id: string,
      *   client_secret: string,
@@ -251,7 +256,8 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         string $partnerClientId,
         string $partnerClientSecret,
         string $authCode,
-        string $sharedId
+        string $sharedId,
+        string $sellerNonce
     ): ?array {
         if ($authCode === '' || $sharedId === '') {
             return null;
@@ -275,16 +281,17 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $tokenBody = http_build_query([
                 'grant_type' => 'authorization_code',
                 'code' => $authCode,
+                'code_verifier' => $sellerNonce,
             ], '', '&', PHP_QUERY_RFC3986);
 
             // Per PayPal docs: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
-            // OAuth token exchange must use sharedId as the username with an empty password
-            // curl -u SHARED-ID: -d 'grant_type=authorization_code&code=AUTH-CODE'
+            // OAuth token exchange must use the partner's client credentials with the seller_nonce
+            // supplied as the PKCE code_verifier.
             $tokenResponse = $this->performHttpCall(
                 'POST',
                 $tokenUrl,
                 $tokenHeaders,
-                ['basic_auth' => $sharedId . ':'],
+                ['basic_auth' => $partnerClientId . ':' . $partnerClientSecret],
                 $tokenBody
             );
 
@@ -385,6 +392,21 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @return string
      */
     private function sanitizeSharedId($value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        return trim($value);
+    }
+
+    /**
+     * Sanitizes the seller nonce used for PKCE code verification.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function sanitizeSellerNonce($value): string
     {
         if (!is_string($value)) {
             return '';
