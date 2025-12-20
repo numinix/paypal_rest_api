@@ -513,7 +513,12 @@ function paypalr_render_onboarding_page(): void
                     pollInterval: 4000,
                     pollAttempts: 0,
                     maxCredentialPolls: 15,
-                    environment: null
+                    environment: null,
+                    prepareEnvironment: null,
+                    prepareVersion: 0,
+                    preparePromise: null,
+                    signupUrl: null,
+                    signupLinkElement: null
                 };
 
                 var startButton = document.getElementById('start-button');
@@ -543,6 +548,20 @@ function paypalr_render_onboarding_page(): void
                 state.environment = resolveEnvironmentSelection();
                 if (environmentSelect) {
                     environmentSelect.value = state.environment;
+                }
+
+                function resetPreparationState() {
+                    state.signupUrl = null;
+                    state.trackingId = null;
+                    state.partnerReferralId = null;
+                    state.merchantId = null;
+                    state.authCode = null;
+                    state.sharedId = null;
+                    state.pollAttempts = 0;
+                    if (state.pollTimer) {
+                        clearTimeout(state.pollTimer);
+                        state.pollTimer = null;
+                    }
                 }
                 
                 function proxyRequest(action, data) {
@@ -891,11 +910,16 @@ function paypalr_render_onboarding_page(): void
                 function loadPartnerJs(env) {
                     return new Promise(function(resolve, reject) {
                         var existing = document.getElementById('paypal-partner-js');
+                        if (existing && existing.getAttribute('data-paypal-env') === env) {
+                            resolve();
+                            return;
+                        }
                         if (existing) existing.remove();
 
                         var s = document.createElement('script');
                         s.id = 'paypal-partner-js';
                         s.async = true;
+                        s.setAttribute('data-paypal-env', env);
                         s.src = (env === 'sandbox'
                             ? 'https://www.sandbox.paypal.com/webapps/merchantboarding/js/lib/lightbox/partner.js'
                             : 'https://www.paypal.com/webapps/merchantboarding/js/lib/lightbox/partner.js'
@@ -913,135 +937,162 @@ function paypalr_render_onboarding_page(): void
                     });
                 }
                 
+                function getSignupRedirectUrl(data) {
+                    var redirectUrl = data.redirect_url || data.action_url;
+                    if (!redirectUrl && data.links) {
+                        for (var i = 0; i < data.links.length; i++) {
+                            if (data.links[i].rel === 'action_url') {
+                                redirectUrl = data.links[i].href;
+                                break;
+                            }
+                        }
+                    }
+
+                    return redirectUrl;
+                }
+
+                function ensurePayPalSignupLink(signupUrl) {
+                    var url = signupUrl;
+                    url += (url.indexOf('?') === -1 ? '?' : '&') + 'displayMode=minibrowser';
+
+                    if (!state.signupLinkElement) {
+                        state.signupLinkElement = document.createElement('a');
+                        state.signupLinkElement.id = 'paypal-signup-link';
+                        state.signupLinkElement.style.position = 'absolute';
+                        state.signupLinkElement.style.left = '-9999px';
+                        state.signupLinkElement.style.top = 'auto';
+                        state.signupLinkElement.style.display = 'block';
+                        document.body.appendChild(state.signupLinkElement);
+                    } else if (!document.body.contains(state.signupLinkElement)) {
+                        document.body.appendChild(state.signupLinkElement);
+                    }
+
+                    state.signupLinkElement.href = url;
+                    state.signupLinkElement.setAttribute('data-paypal-onboard-complete', 'paypalOnboardedCallback');
+                    state.signupLinkElement.setAttribute('data-paypal-button', 'true');
+
+                    return state.signupLinkElement;
+                }
+
+                function prepareOnboarding() {
+                    var prepareEnvironment = resolveEnvironmentSelection();
+                    if (state.preparePromise && state.prepareEnvironment === prepareEnvironment) {
+                        return state.preparePromise;
+                    }
+
+                    state.prepareVersion += 1;
+                    var prepareVersion = state.prepareVersion;
+                    state.prepareEnvironment = prepareEnvironment;
+
+                    resetPreparationState();
+                    state.environment = prepareEnvironment;
+                    startButton.disabled = true;
+                    setStatus('Preparing your PayPal signup link...', 'info');
+
+                    state.preparePromise = loadPartnerJs(prepareEnvironment)
+                        .then(function() {
+                            return proxyRequest('start', {nonce: state.nonce || ''});
+                        })
+                        .then(function(response) {
+                            // Ignore outdated preparations if a newer environment selection was made
+                            if (state.prepareEnvironment !== prepareEnvironment || state.prepareVersion !== prepareVersion) {
+                                return prepareOnboarding();
+                            }
+
+                            var data = response.data || {};
+                            state.trackingId = data.tracking_id;
+                            state.partnerReferralId = data.partner_referral_id || null;
+                            state.merchantId = data.merchant_id || null;
+                            if (data.environment && allowedEnvironments.indexOf(data.environment.toLowerCase()) !== -1) {
+                                state.environment = data.environment.toLowerCase();
+                                if (environmentSelect) {
+                                    environmentSelect.value = state.environment;
+                                }
+                            }
+
+                            state.nonce = data.nonce;
+                            if (!state.nonce) {
+                                throw new Error('Session error. Please refresh and try again.');
+                            }
+
+                            var redirectUrl = getSignupRedirectUrl(data);
+                            if (!redirectUrl) {
+                                throw new Error('No PayPal signup URL received');
+                            }
+
+                            state.signupUrl = redirectUrl;
+                            state.environment = state.environment || prepareEnvironment;
+                            startButton.disabled = false;
+                            setStatus('Ready. Click Start PayPal Signup to open PayPal.', 'info');
+                            state.preparePromise = null;
+                            state.prepareEnvironment = null;
+                            return state.signupUrl;
+                        })
+                        .catch(function(error) {
+                            if (state.prepareEnvironment !== prepareEnvironment || state.prepareVersion !== prepareVersion) {
+                                return prepareOnboarding();
+                            }
+
+                            state.preparePromise = null;
+                            state.prepareEnvironment = null;
+                            startButton.disabled = false;
+                            setStatus(error.message || 'Failed to prepare onboarding', 'error');
+                            throw error;
+                        });
+
+                    return state.preparePromise;
+                }
+
+                function ensureSignupPrepared() {
+                    if (state.signupUrl && !state.preparePromise) {
+                        return Promise.resolve(state.signupUrl);
+                    }
+
+                    return prepareOnboarding();
+                }
+
                 function startOnboarding() {
                     startButton.disabled = true;
                     state.pollAttempts = 0;
-                    state.environment = resolveEnvironmentSelection();
-                    state.partnerReferralId = null;
-                    state.merchantId = null;
-                    setStatus('Loading PayPal signup...', 'info');
-
-                    // First, load partner.js for the current environment
-                    loadPartnerJs(state.environment).then(function() {
-                        console.log('[PayPal ISU] partner.js loaded, getting signup URL...');
-                        
-                        // Now get the signup URL from the server
-                        return proxyRequest('start', {nonce: state.nonce || ''});
-                    })
-                    .then(function(response) {
-                        var data = response.data || {};
-                        state.trackingId = data.tracking_id;
-                        state.partnerReferralId = data.partner_referral_id || null;
-                        state.merchantId = data.merchant_id || null;
-                        if (data.environment && allowedEnvironments.indexOf(data.environment.toLowerCase()) !== -1) {
-                            state.environment = data.environment.toLowerCase();
-                            if (environmentSelect) {
-                                environmentSelect.value = state.environment;
+                    ensureSignupPrepared()
+                        .then(function(signupUrl) {
+                            if (!signupUrl) {
+                                throw new Error('PayPal signup link is not ready yet. Please try again in a moment.');
                             }
-                        }
-                        // Use nonce from server response, or generate a cryptographically secure one
-                        state.nonce = data.nonce;
-                        if (!state.nonce) {
-                            setStatus('Session error. Please refresh and try again.', 'error');
+
+                            var signupLink = ensurePayPalSignupLink(signupUrl);
+
+                            if (window.PAYPAL && PAYPAL.apps && PAYPAL.apps.Signup) {
+                                PAYPAL.apps.Signup.render();
+                                console.log('[PayPal ISU] Called PAYPAL.apps.Signup.render()');
+                            } else {
+                                throw new Error('PayPal Signup SDK not available after loading partner.js');
+                            }
+
+                            setStatus('Opening PayPal signup...', 'info');
+                            signupLink.click();
+                            pollStatus();
+                        })
+                        .catch(function(error) {
+                            setStatus(error.message || 'Failed to start onboarding', 'error');
                             startButton.disabled = false;
-                            return;
-                        }
-                        
-                        var redirectUrl = data.redirect_url || data.action_url;
-                        if (!redirectUrl && data.links) {
-                            for (var i = 0; i < data.links.length; i++) {
-                                if (data.links[i].rel === 'action_url') {
-                                    redirectUrl = data.links[i].href;
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        if (!redirectUrl) {
-                            throw new Error('No PayPal signup URL received');
-                        }
-                        
-                        // Replace the Start button with a PayPal mini-browser link
-                        // This preserves the user gesture from the original click
-                        var newLink = transformButtonToPayPalLink(redirectUrl);
-                        
-                        // Call render() to activate the SDK's link processing
-                        if (window.PAYPAL && PAYPAL.apps && PAYPAL.apps.Signup) {
-                            PAYPAL.apps.Signup.render();
-                            console.log('[PayPal ISU] Called PAYPAL.apps.Signup.render()');
-                        } else {
-                            throw new Error('PayPal Signup SDK not available after loading partner.js');
-                        }
-                        
-                        // Trigger the click on the transformed link immediately
-                        // This works because we're still in the user gesture context
-                        newLink.click();
-                        
-                        setStatus('Opening PayPal signup...', 'info');
-                        pollStatus();
-                    })
-                    .catch(function(error) {
-                        setStatus(error.message || 'Failed to start onboarding', 'error');
-                        startButton.disabled = false;
-                    });
+                        });
                 }
-                
-                /**
-                 * Replaces the Start button with a PayPal mini-browser link.
-                 * 
-                 * This function creates a new <a> tag with the PayPal signup URL and replaces
-                 * the original button while preserving the user gesture context from the original click.
-                 * 
-                 * Per PayPal docs: The link MUST have:
-                 * - data-paypal-onboard-complete="callbackName" for the callback
-                 * - data-paypal-button="true" to be processed by partner.js
-                 * - displayMode=minibrowser in the URL
-                 * 
-                 * @param {string} signupUrl - The PayPal action_url for signup
-                 * @returns {HTMLAnchorElement} The new link element
-                 */
-                function transformButtonToPayPalLink(signupUrl) {
-                    // Ensure minibrowser mode per PayPal docs
-                    var url = signupUrl;
-                    url += (url.indexOf('?') === -1 ? '?' : '&') + 'displayMode=minibrowser';
-                    
-                    // Create a new anchor element styled as the button
-                    var link = document.createElement('a');
-                    link.id = 'start-button';
-                    link.href = url;
-                    link.textContent = 'Start PayPal Signup';
-                    link.className = 'button'; // Use existing button styles
-                    link.style.cssText = startButton.style.cssText; // Copy any inline styles
-                    
-                    // REQUIRED by PayPal to trigger callback with authCode/sharedId
-                    link.setAttribute('data-paypal-onboard-complete', 'paypalOnboardedCallback');
-                    link.setAttribute('data-paypal-button', 'true');
-                    
-                    // Do NOT set target="_blank" - partner.js needs to intercept the click
-                    
-                    // Replace the button with the link
-                    startButton.parentNode.replaceChild(link, startButton);
-                    
-                    // Update the global reference
-                    startButton = link;
-                    
-                    console.log('[PayPal ISU] Replaced start button with PayPal mini-browser link');
-                    
-                    return link;
-                }
-                
-
-                startButton.addEventListener('click', startOnboarding);
-                 * instead of requiring the user to click twice.
-                 */
 
                 startButton.addEventListener('click', startOnboarding);
                 if (environmentSelect) {
                     environmentSelect.addEventListener('change', function() {
                         state.environment = resolveEnvironmentSelection();
+                        prepareOnboarding().catch(function() {
+                            // Errors are surfaced via setStatus; swallow to avoid unhandled promise rejection.
+                        });
                     });
                 }
                 window.addEventListener('message', handlePopupMessage);
+
+                prepareOnboarding().catch(function(error) {
+                    console.error('[PayPal ISU] Failed to prepare onboarding on load', error);
+                });
                 
                 /**
                  * Listen for PayPal partner.js callback event.
