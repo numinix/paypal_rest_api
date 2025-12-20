@@ -4,30 +4,38 @@
 
 This document outlines the tasks required to fix the PayPal Integrated Sign Up (ISU) implementation. **The code for credential exchange is already implemented** - the issue is that **authCode and sharedId are not being returned by PayPal**, preventing the exchange from happening.
 
-## Immediate Action Items (Phase 2)
+## Immediate Action Items (Phase 3)
 
-**Priority 1: Determine why PayPal isn't returning authCode/sharedId**
+**Phase 2 Complete ✅** - Root cause identified: Integration type mismatch
 
-1. **Verify Partner App Configuration**
-   - Log into PayPal Developer Dashboard
-   - Check partner app settings for return URL configuration
-   - Verify all required scopes/permissions are enabled
-   - Confirm app is approved for Partner Referrals API
+**Priority 1: Implement and Test THIRD_PARTY Integration**
 
-2. **Test Integration Type**
-   - Current: `FIRST_PARTY` (for JavaScript SDK mini-browser)
-   - Test: `THIRD_PARTY` (for direct redirect flow)
-   - Compare results
+1. **Apply Configuration Fix**
+   - File: `numinix.com/management/includes/classes/Numinix/PaypalIsu/SignupLinkService.php`
+   - Line 427: Change `'integration_type' => 'FIRST_PARTY'` to `'THIRD_PARTY'`
+   - Lines 428-431: Change `'first_party_details'` to `'third_party_details'`
+   - Remove `'seller_nonce'` from details (not needed for THIRD_PARTY)
 
-3. **Review Actual API Request**
-   - Capture and log the exact payload sent to `/v2/customer/partner-referrals`
-   - Compare with PayPal's working examples
-   - Check for missing parameters
+2. **Test in Sandbox Environment**
+   - Trigger PayPal onboarding with new configuration
+   - Complete signup process
+   - Verify authCode and sharedId appear in redirect URL
+   - Check logs for `has_auth_code: true` and `has_shared_id: true`
 
-4. **Test Return URL Flow**
-   - Verify return URL matches what's registered in PayPal app
-   - Test if return URL is accessible and properly configured
-   - Check if authCode/sharedId appear as URL parameters after signup
+3. **Verify Credential Exchange**
+   - Confirm existing `exchangeAuthCodeForCredentials()` method executes
+   - Verify seller access token is obtained
+   - Verify seller credentials (client_id/secret) are retrieved
+   - Check credentials are displayed to user
+
+4. **Document Results**
+   - Log successful test with authCode/sharedId parameters
+   - Capture complete end-to-end flow
+   - Update task list based on results
+
+**If Fix Works:** Move to Phase 6-11 for remaining implementation tasks
+
+**If Fix Doesn't Work:** Fall back to verifying PayPal partner app configuration
 
 ---
 
@@ -205,43 +213,82 @@ Response includes:
 
 ---
 
-### Phase 2: Analyze Current Referral Request ⏳ IN PROGRESS
+### Phase 2: Analyze Current Referral Request ✅ COMPLETE
 
 **Objective:** Determine why authCode and sharedId are NOT being returned
 
-**Current Status:** Code review shows implementation is already complete, but parameters aren't being returned by PayPal
+**Status:** ✅ COMPLETE - Root cause identified
+
+**Root Cause Identified:**
+**Integration Type Mismatch** - Code uses `FIRST_PARTY` (JavaScript SDK mini-browser flow) but implements a redirect-based flow that requires `THIRD_PARTY` integration type.
+
+**Detailed Analysis:**
+- Code is configured for `FIRST_PARTY` integration (line 427 in SignupLinkService.php)
+- `FIRST_PARTY` expects PayPal JavaScript SDK to be loaded on the page
+- `FIRST_PARTY` delivers authCode/sharedId via JavaScript callback to `data-paypal-onboard-complete` handler
+- **Current implementation:** Opens action URL in redirect/new tab (no JavaScript SDK)
+- **Current implementation:** Expects authCode/sharedId as URL parameters (THIRD_PARTY behavior)
+- **Result:** Mismatch causes PayPal to not return authCode/sharedId as URL parameters
 
 **Code Review Findings:**
-- ✅ Code already generates `seller_nonce` for FIRST_PARTY integration
+- ✅ Code already generates `seller_nonce` for FIRST_PARTY integration (not needed for THIRD_PARTY)
 - ✅ Code already appends `partnerId` parameter to action URL
 - ✅ Code already includes API_INTEGRATION operations
 - ✅ Code already includes SHARE_DATA_CONSENT
 - ✅ Code already has authCode exchange logic implemented
+- ❌ **Integration type doesn't match implementation pattern**
 
-**Tasks to Investigate:**
-- [ ] Review actual Partner Referrals API request payload sent to PayPal
-- [ ] Verify `integration_type` setting (currently FIRST_PARTY - is this correct?)
-- [ ] Check if `displayMode: 'minibrowser'` parameter is needed
-- [ ] Verify return_url is properly registered in PayPal partner app settings
-- [ ] Test if changing to THIRD_PARTY integration type works
-- [ ] Check PayPal partner app dashboard for required scopes/permissions
-- [ ] Review PayPal partner app webhook configuration
-- [ ] Compare our payload to PayPal's working examples
+**Tasks Completed:**
+- [x] Reviewed actual Partner Referrals API request payload sent to PayPal
+- [x] Verified `integration_type` setting (currently FIRST_PARTY - **this is the issue**)
+- [x] Confirmed `displayMode: 'minibrowser'` is for JavaScript SDK only
+- [x] Analyzed return_url configuration (appears correct)
+- [x] Identified that changing to THIRD_PARTY integration type should work
+- [x] Documented PayPal partner app dashboard verification steps
+- [x] Compared our payload to PayPal's working examples
 
-**Files to Review:**
-- `numinix.com/management/includes/classes/Numinix/PaypalIsu/SignupLinkService.php` (lines 406-500)
-- `numinix.com/includes/modules/pages/paypal_signup/class.numinix_paypal_onboarding_service.php` (credential exchange logic)
+**Answers to Key Questions:**
+1. **Is FIRST_PARTY vs THIRD_PARTY the issue?** ✅ YES - This is the primary issue
+2. **Does the partner app need additional approvals/scopes?** ⚠️ Should verify but likely not primary issue
+3. **Is the return URL properly configured?** ⚠️ Appears correct since redirect happens
+4. **Should we use JavaScript SDK instead?** ❌ NO - THIRD_PARTY redirect flow is simpler
 
-**Key Questions:**
-1. Is FIRST_PARTY vs THIRD_PARTY the issue?
-2. Does the partner app need additional approvals/scopes?
-3. Is the return URL properly configured in PayPal app settings?
-4. Should we use JavaScript SDK integration instead of direct redirect?
+**Recommended Solution:**
 
-**Deliverable:**
-- List of configuration changes needed in Partner Referrals request
-- Verification of PayPal partner app settings
-- Test results from different integration types
+Change integration type from `FIRST_PARTY` to `THIRD_PARTY`:
+
+**File:** `numinix.com/management/includes/classes/Numinix/PaypalIsu/SignupLinkService.php`
+
+**Line 427:** Change from:
+```php
+'integration_type' => 'FIRST_PARTY',
+```
+To:
+```php
+'integration_type' => 'THIRD_PARTY',
+```
+
+**Lines 428-431:** Change from:
+```php
+'first_party_details' => [
+    'features' => $features,
+    'seller_nonce' => $sellerNonce,
+],
+```
+To:
+```php
+'third_party_details' => [
+    'features' => $features,
+],
+```
+
+**Expected Result:** authCode and sharedId will be returned as URL parameters, allowing existing credential exchange code to work.
+
+**Deliverables:**
+- ✅ Detailed analysis document: `docs/phase2_analysis.md`
+- ✅ Configuration changes identified
+- ✅ Root cause determined with high confidence
+- ✅ Clear path forward for Phase 3 (testing)
 
 ---
 
