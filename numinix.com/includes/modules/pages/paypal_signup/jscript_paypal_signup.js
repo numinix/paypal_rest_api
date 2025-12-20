@@ -888,19 +888,28 @@
             }
 
             var normalized = eventName.toLowerCase();
+            
+            // PayPal returns authCode as 'onboardedCompleteToken' in their callback
+            var authCode = payload.authCode || payload.onboardedCompleteToken;
+            var sharedId = payload.sharedId;
+            
+            // Check if this is a completion event from PayPal
+            // PayPal's direct callback includes onboardedCompleteToken and sharedId (no event property)
             var completionEvent = normalized === 'paypal_onboarding_complete'
                 || normalized === 'paypal_partner_onboarding_complete'
                 || payload.paypal_onboarding_complete === true
-                || payload.paypalOnboardingComplete === true;
+                || payload.paypalOnboardingComplete === true
+                || (payload.onboardedCompleteToken && payload.sharedId); // PayPal's direct callback format
 
             console.log('[CALLBACK TEST - Numinix] Event analysis:', {
                 eventName: eventName,
                 normalized: normalized,
                 isCompletionEvent: completionEvent,
                 hasTrackingId: !!state.session.tracking_id,
-                authCode: payload.authCode,
-                sharedId: payload.sharedId,
-                merchantId: payload.merchantId
+                authCode: authCode,
+                sharedId: sharedId,
+                merchantId: payload.merchantId,
+                hasOnboardedCompleteToken: !!payload.onboardedCompleteToken
             });
 
             if (!completionEvent || !state.session.tracking_id) {
@@ -912,11 +921,13 @@
             if (payload.merchantId) {
                 state.session.merchant_id = payload.merchantId;
             }
-            if (payload.authCode) {
-                state.session.authCode = payload.authCode;
+            if (authCode) {
+                state.session.authCode = authCode;
+                console.log('[CALLBACK TEST - Numinix] Captured authCode:', authCode);
             }
-            if (payload.sharedId) {
-                state.session.sharedId = payload.sharedId;
+            if (sharedId) {
+                state.session.sharedId = sharedId;
+                console.log('[CALLBACK TEST - Numinix] Captured sharedId:', sharedId);
             }
 
             console.log('[CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding');
