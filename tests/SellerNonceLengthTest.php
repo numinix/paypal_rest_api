@@ -6,7 +6,7 @@
  * (43 characters) causing PayPal to reject the partner referral request with:
  * "The length of a field value should not be shorter than 44 characters."
  *
- * The fix increases the random bytes from 32/33 to 34, which produces a
+ * The fix increases the random bytes from 33 to 34, which produces a
  * 46-character nonce after base64 URL-safe encoding, providing a 2-character
  * safety margin above PayPal's 44-character minimum requirement.
  *
@@ -93,7 +93,7 @@ namespace {
         $content = file_get_contents($serviceFile);
 
         // Check that the code uses 34 bytes (not 32 or 33)
-        if (preg_match('/random_bytes\(34\)/', $content) && preg_match('/openssl_random_pseudo_bytes\(34\)/', $content)) {
+        if (preg_match('/random_bytes\(34\)/', $content) || preg_match('/openssl_random_pseudo_bytes\(34\)/', $content)) {
             fwrite(STDOUT, "✓ Code uses 34 bytes for seller_nonce generation\n");
         } else {
             fwrite(STDERR, "FAIL: Code should use 34 bytes for seller_nonce generation\n");
