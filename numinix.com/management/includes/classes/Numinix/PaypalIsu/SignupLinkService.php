@@ -417,17 +417,15 @@ class NuminixPaypalIsuSignupLinkService
         $returnUrl = $this->sanitizeUrl($options['return_url'] ?? $this->getOnboardingUrl('return'));
         $websiteUrls = $this->resolveWebsiteUrls($options['website_urls'] ?? null);
 
-        // Generate seller_nonce for FIRST_PARTY ISU integration
-        // This is required for the JavaScript SDK mini-browser callback flow
-        // The nonce is used as code_verifier during authCode/sharedId token exchange
-        $sellerNonce = $this->generateSellerNonce();
-
+        // Use THIRD_PARTY integration for redirect-based flow
+        // THIRD_PARTY returns authCode and sharedId as URL parameters in the redirect
+        // This matches our redirect-based implementation (no JavaScript SDK required)
+        // See Phase 2 analysis: docs/phase2_analysis.md for details
         $restIntegration = [
             'integration_method' => 'PAYPAL',
-            'integration_type' => 'FIRST_PARTY',
-            'first_party_details' => [
+            'integration_type' => 'THIRD_PARTY',
+            'third_party_details' => [
                 'features' => $features,
-                'seller_nonce' => $sellerNonce,
             ],
         ];
 
