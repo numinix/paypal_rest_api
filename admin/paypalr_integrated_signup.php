@@ -477,6 +477,7 @@ function paypalr_render_onboarding_page(): void
              * @param {string} sharedId - The shared ID used as code_verifier in PKCE flow
              */
             function paypalOnboardedCallback(authCode, sharedId) {
+                console.log('[CALLBACK TEST] paypalOnboardedCallback called!', { authCode: authCode, sharedId: sharedId });
                 // Dispatch a custom event that the main script can listen for
                 var event = new CustomEvent('paypalOnboardingComplete', {
                     detail: {
@@ -487,6 +488,9 @@ function paypalr_render_onboarding_page(): void
                 });
                 window.dispatchEvent(event);
             }
+            
+            console.log('[CALLBACK TEST] paypalOnboardedCallback function defined and ready');
+            window.paypalOnboardedCallback = paypalOnboardedCallback; // Ensure it's global
         </script>
         
         <script>
