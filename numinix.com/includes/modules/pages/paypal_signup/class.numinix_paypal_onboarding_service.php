@@ -57,6 +57,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                     'environment' => (string)($result['environment'] ?? $payload['environment'] ?? 'sandbox'),
                     'tracking_id' => $trackingId,
                     'partner_referral_id' => (string)($result['partner_referral_id'] ?? ''),
+                    'seller_nonce' => (string)($result['seller_nonce'] ?? ''),
                     'redirect_url' => $actionUrl,
                     'action_url' => $actionUrl,
                     'links' => is_array($result['links'] ?? null) ? $result['links'] : [],
@@ -105,6 +106,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $trackingId = $this->sanitizeTrackingId($payload['tracking_id'] ?? null);
             $partnerReferralId = $this->sanitizePartnerReferralId($payload['partner_referral_id'] ?? null);
             $merchantId = $this->sanitizeMerchantId($payload['merchant_id'] ?? null);
+            $sellerNonce = $this->sanitizeSellerNonce($payload['seller_nonce'] ?? null);
             
             // Extract authCode and sharedId for credential exchange per PayPal docs
             $authCode = $this->sanitizeAuthCode($payload['auth_code'] ?? null);
@@ -133,13 +135,15 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                     'tracking_id' => $trackingId,
                     'has_auth_code' => 'yes',
                     'has_shared_id' => 'yes',
+                    'has_seller_nonce' => $sellerNonce !== '' ? 'yes' : 'no',
                 ]);
                 $credentials = $this->exchangeAuthCodeForCredentials(
                     $apiBase,
                     $clientId,
                     $clientSecret,
                     $authCode,
-                    $sharedId
+                    $sharedId,
+                    $sellerNonce
                 );
 
                 if (is_array($credentials) && isset($credentials['access_token'])) {
@@ -239,6 +243,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @param string $partnerClientSecret
      * @param string $authCode
      * @param string $sharedId
+     * @param string $sellerNonce
      * @return array{
      *   client_id: string,
      *   client_secret: string,
@@ -251,13 +256,39 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         string $partnerClientId,
         string $partnerClientSecret,
         string $authCode,
-        string $sharedId
+        string $sharedId,
+        string $sellerNonce
     ): ?array {
         if ($authCode === '' || $sharedId === '') {
             return null;
         }
 
-        try {
+        $attempts = [
+            [
+                'label' => 'partner_credentials',
+                'basic_auth' => $partnerClientId . ':' . $partnerClientSecret,
+                'body' => http_build_query([
+                    'grant_type' => 'authorization_code',
+                    'code' => $authCode,
+                    'code_verifier' => $sellerNonce,
+                ], '', '&', PHP_QUERY_RFC3986),
+                'include_verifier' => true,
+            ],
+            [
+                // PayPal documentation also describes using sharedId with an empty password
+                // for the authorization_code exchange. Retry with that approach if the
+                // partner credential attempt fails.
+                'label' => 'shared_id',
+                'basic_auth' => $sharedId . ':',
+                'body' => http_build_query([
+                    'grant_type' => 'authorization_code',
+                    'code' => $authCode,
+                ], '', '&', PHP_QUERY_RFC3986),
+                'include_verifier' => false,
+            ],
+        ];
+
+        foreach ($attempts as $attempt) {
             // Step 1: Exchange authCode for seller access token
             // Per PayPal Partner Referrals API, after onboarding completes, the seller's browser
             // receives authCode and sharedId. The sharedId acts as the code_verifier for PKCE flow
@@ -267,24 +298,18 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 'Accept: application/json',
                 'Accept-Language: en_US',
                 'Content-Type: application/x-www-form-urlencoded',
+                'Authorization: Basic ' . base64_encode($attempt['basic_auth']),
             ];
             
-            // PayPal's third-party integration uses authorization_code grant
-            // Note: code_verifier is NOT required for PayPal's partner onboarding flow
-            // PayPal expects only grant_type and code parameters
-            $tokenBody = http_build_query([
-                'grant_type' => 'authorization_code',
-                'code' => $authCode,
-            ], '', '&', PHP_QUERY_RFC3986);
+            // PayPal's third-party integration uses authorization_code grant.
+            $tokenBody = $attempt['body'];
 
             // Per PayPal docs: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
-            // OAuth token exchange must use sharedId as the username with an empty password
-            // curl -u SHARED-ID: -d 'grant_type=authorization_code&code=AUTH-CODE'
             $tokenResponse = $this->performHttpCall(
                 'POST',
                 $tokenUrl,
                 $tokenHeaders,
-                ['basic_auth' => $sharedId . ':'],
+                ['basic_auth' => $attempt['basic_auth']],
                 $tokenBody
             );
 
@@ -296,7 +321,12 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                     'status' => $tokenResponse['status'],
                     'error' => $tokenDecoded['error'] ?? 'unknown',
                     'error_description' => $tokenDecoded['error_description'] ?? '',
+                    'attempt' => $attempt['label'],
                 ]);
+                // Try next strategy if available
+                if ($attempt !== end($attempts)) {
+                    continue;
+                }
                 return null;
             }
 
@@ -305,7 +335,11 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             if ($sellerAccessToken === '') {
                 $this->logDebug('Auth code exchange response missing access_token', [
                     'response_keys' => array_keys($tokenDecoded),
+                    'attempt' => $attempt['label'],
                 ]);
+                if ($attempt !== end($attempts)) {
+                    continue;
+                }
                 return null;
             }
 
@@ -351,16 +385,16 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 return $payload;
             }
 
-            $this->logDebug('Auth code exchange completed but no credentials returned');
-            return null;
-        } catch (Throwable $e) {
-            // Log the exception for debugging
-            $this->logDebug('Auth code exchange threw exception', [
-                'exception' => get_class($e),
-                'message' => $e->getMessage(),
+            $this->logDebug('Auth code exchange completed but no credentials returned', [
+                'attempt' => $attempt['label'],
             ]);
-            return null;
+
+            if ($attempt === end($attempts)) {
+                return null;
+            }
         }
+
+        return null;
     }
 
     /**
@@ -385,6 +419,21 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @return string
      */
     private function sanitizeSharedId($value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        return trim($value);
+    }
+
+    /**
+     * Sanitizes the seller nonce used for PKCE code verification.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function sanitizeSellerNonce($value): string
     {
         if (!is_string($value)) {
             return '';
@@ -710,8 +759,9 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             return null;
         }
 
-        // Validate merchantId - should only contain alphanumeric characters (PayPal merchant IDs are typically 13 uppercase chars)
-        if ($merchantId === '' || !preg_match('/^[A-Za-z0-9]+$/', $merchantId)) {
+        // Validate merchantId - allow alphanumeric plus dashes/underscores because some partner flows
+        // surface prefixed identifiers (e.g., nxp-*) before the final PayPal merchant ID is known.
+        if ($merchantId === '' || !preg_match('/^[A-Za-z0-9_-]+$/', $merchantId)) {
             $this->logDebug('Invalid merchantId format for merchant integration lookup', [
                 'merchantId_length' => strlen($merchantId),
             ]);
