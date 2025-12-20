@@ -1,30 +1,12 @@
-[2025-12-20T14:40:16-08:00] Received AJAX action request {
-    "action": "telemetry",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:40:16-08:00] Numinix PayPal ISU event: start {
-    "event": "start",
-    "timestamp": 1766270416,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62"
-    }
-}
-[2025-12-20T14:40:16-08:00] Received AJAX action request {
+[2025-12-20T14:52:12-08:00] Received AJAX action request {
     "action": "start",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:40:16-08:00] Numinix PayPal ISU event: start {
+[2025-12-20T14:52:12-08:00] Numinix PayPal ISU event: start {
     "event": "start",
-    "timestamp": 1766270416,
+    "timestamp": 1766271132,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -34,16 +16,34 @@
         "tracking_id": "nxp-d061e6188d855101be62"
     }
 }
-[2025-12-20T14:40:16-08:00] Processing start action {
+[2025-12-20T14:52:12-08:00] Processing start action {
     "environment": "live",
     "tracking_id": "nxp-d061e6188d855101be62",
     "origin": "https://www.numinix.com",
     "return_url": "https://www.numinix.com/index.php?main_page=paypal_signup&tracking_id=nxp-d061e6188d855101be62&env=live",
     "has_client_return_url": false
 }
-[2025-12-20T14:40:17-08:00] Numinix PayPal ISU event: start_success {
+[2025-12-20T14:52:12-08:00] Received AJAX action request {
+    "action": "telemetry",
+    "has_nonce": true,
+    "has_tracking_id": true,
+    "remote_addr": "75.156.8.210"
+}
+[2025-12-20T14:52:12-08:00] Numinix PayPal ISU event: start {
+    "event": "start",
+    "timestamp": 1766271132,
+    "environment": "live",
+    "zen_cart_version": "2.0.1",
+    "plugin_version": "1.0.7",
+    "tracking_id": "nxp-d061e6188d855101be62",
+    "step": "waiting",
+    "context": {
+        "tracking_id": "nxp-d061e6188d855101be62"
+    }
+}
+[2025-12-20T14:52:12-08:00] Numinix PayPal ISU event: start_success {
     "event": "start_success",
-    "timestamp": 1766270417,
+    "timestamp": 1766271132,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -51,7 +51,7 @@
     "step": "waiting",
     "context": {
         "tracking_id": "nxp-d061e6188d855101be62",
-        "redirect_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YTlhYmU2N2YtZWE2MC00YWE0LThiZmEtODU3NzFlMmQwNzk5VkVvTkJGUS9aUHhKay9UVTd3d1Bqb3lYVzRmRXNSRTFqWEJxVlFzY1c1ND12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
+        "redirect_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YWQwNzFiNzMtMTQ2MS00YzVjLTk4YWYtMmU0YTQwOGFhNTk2RWI4alBFVXkzRVArZ3E5SjV6UTMzdjB4VnZEZzR3bWVkT3BtQjJwTGZtOD12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
         "step": "waiting",
         "request": {
             "environment": "live",
@@ -66,17 +66,18 @@
                 "environment": "live",
                 "tracking_id": "nxp-d061e6188d855101be62",
                 "partner_referral_id": "",
-                "redirect_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YTlhYmU2N2YtZWE2MC00YWE0LThiZmEtODU3NzFlMmQwNzk5VkVvTkJGUS9aUHhKay9UVTd3d1Bqb3lYVzRmRXNSRTFqWEJxVlFzY1c1ND12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
-                "action_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YTlhYmU2N2YtZWE2MC00YWE0LThiZmEtODU3NzFlMmQwNzk5VkVvTkJGUS9aUHhKay9UVTd3d1Bqb3lYVzRmRXNSRTFqWEJxVlFzY1c1ND12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
+                "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw",
+                "redirect_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YWQwNzFiNzMtMTQ2MS00YzVjLTk4YWYtMmU0YTQwOGFhNTk2RWI4alBFVXkzRVArZ3E5SjV6UTMzdjB4VnZEZzR3bWVkT3BtQjJwTGZtOD12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
+                "action_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YWQwNzFiNzMtMTQ2MS00YzVjLTk4YWYtMmU0YTQwOGFhNTk2RWI4alBFVXkzRVArZ3E5SjV6UTMzdjB4VnZEZzR3bWVkT3BtQjJwTGZtOD12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
                 "links": [
                     {
-                        "href": "https://api.paypal.com/v2/customer/partner-referrals/YTlhYmU2N2YtZWE2MC00YWE0LThiZmEtODU3NzFlMmQwNzk5VkVvTkJGUS9aUHhKay9UVTd3d1Bqb3lYVzRmRXNSRTFqWEJxVlFzY1c1ND12Mg==",
+                        "href": "https://api.paypal.com/v2/customer/partner-referrals/YWQwNzFiNzMtMTQ2MS00YzVjLTk4YWYtMmU0YTQwOGFhNTk2RWI4alBFVXkzRVArZ3E5SjV6UTMzdjB4VnZEZzR3bWVkT3BtQjJwTGZtOD12Mg==",
                         "rel": "self",
                         "method": "GET",
                         "description": "Read Referral Data shared by the Caller."
                     },
                     {
-                        "href": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YTlhYmU2N2YtZWE2MC00YWE0LThiZmEtODU3NzFlMmQwNzk5VkVvTkJGUS9aUHhKay9UVTd3d1Bqb3lYVzRmRXNSRTFqWEJxVlFzY1c1ND12Mg==",
+                        "href": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YWQwNzFiNzMtMTQ2MS00YzVjLTk4YWYtMmU0YTQwOGFhNTk2RWI4alBFVXkzRVArZ3E5SjV6UTMzdjB4VnZEZzR3bWVkT3BtQjJwTGZtOD12Mg==",
                         "rel": "action_url",
                         "method": "GET",
                         "description": "Target WEB REDIRECT URL for the next action. Customer should be redirected to this URL in the browser."
@@ -88,19 +89,19 @@
         }
     }
 }
-[2025-12-20T14:40:17-08:00] Start action completed successfully {
+[2025-12-20T14:52:12-08:00] Start action completed successfully {
     "tracking_id": "nxp-d061e6188d855101be62",
     "has_redirect_url": true
 }
-[2025-12-20T14:40:17-08:00] Received AJAX action request {
+[2025-12-20T14:52:13-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:40:17-08:00] Numinix PayPal ISU event: start_success {
+[2025-12-20T14:52:13-08:00] Numinix PayPal ISU event: start_success {
     "event": "start_success",
-    "timestamp": 1766270417,
+    "timestamp": 1766271133,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -108,19 +109,19 @@
     "step": "waiting",
     "context": {
         "tracking_id": "nxp-d061e6188d855101be62",
-        "redirect_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YTlhYmU2N2YtZWE2MC00YWE0LThiZmEtODU3NzFlMmQwNzk5VkVvTkJGUS9aUHhKay9UVTd3d1Bqb3lYVzRmRXNSRTFqWEJxVlFzY1c1ND12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
+        "redirect_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YWQwNzFiNzMtMTQ2MS00YzVjLTk4YWYtMmU0YTQwOGFhNTk2RWI4alBFVXkzRVArZ3E5SjV6UTMzdjB4VnZEZzR3bWVkT3BtQjJwTGZtOD12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
         "step": "waiting"
     }
 }
-[2025-12-20T14:40:17-08:00] Received AJAX action request {
+[2025-12-20T14:52:13-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:40:17-08:00] Numinix PayPal ISU event: popup_opened {
+[2025-12-20T14:52:13-08:00] Numinix PayPal ISU event: popup_opened {
     "event": "popup_opened",
-    "timestamp": 1766270417,
+    "timestamp": 1766271133,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -131,23 +132,23 @@
         "method": "window.open"
     }
 }
-[2025-12-20T14:40:47-08:00] Received AJAX action request {
+[2025-12-20T14:52:53-08:00] Received AJAX action request {
     "action": "finalize",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:40:47-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:52:53-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:40:47-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:52:53-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:40:47"
+    "expires_at": "2025-12-20 15:52:53"
 }
-[2025-12-20T14:40:47-08:00] Numinix PayPal ISU event: finalize_success {
+[2025-12-20T14:52:53-08:00] Numinix PayPal ISU event: finalize_success {
     "event": "finalize_success",
-    "timestamp": 1766270447,
+    "timestamp": 1766271173,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -163,8 +164,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -181,15 +183,15 @@
         }
     }
 }
-[2025-12-20T14:40:47-08:00] Received AJAX action request {
+[2025-12-20T14:52:54-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:40:47-08:00] Numinix PayPal ISU event: finalize_success {
+[2025-12-20T14:52:54-08:00] Numinix PayPal ISU event: finalize_success {
     "event": "finalize_success",
-    "timestamp": 1766270447,
+    "timestamp": 1766271174,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -201,23 +203,93 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:40:50-08:00] Received AJAX action request {
+[2025-12-20T14:52:59-08:00] Received AJAX action request {
+    "action": "status",
+    "has_nonce": true,
+    "has_tracking_id": true,
+    "remote_addr": "75.156.8.210"
+}
+[2025-12-20T14:52:59-08:00] Invalid merchant_id format for persistence {
+    "merchant_id_length": 24
+}
+[2025-12-20T14:52:59-08:00] Persisted authCode and sharedId to database for credential exchange {
+    "tracking_id": "nxp-d061e6188d855101be62",
+    "environment": "live",
+    "expires_at": "2025-12-20 15:52:59"
+}
+[2025-12-20T14:52:59-08:00] Numinix PayPal ISU event: status_success {
+    "event": "status_success",
+    "timestamp": 1766271179,
+    "environment": "live",
+    "zen_cart_version": "2.0.1",
+    "plugin_version": "1.0.7",
+    "tracking_id": "nxp-d061e6188d855101be62",
+    "step": "waiting",
+    "context": {
+        "tracking_id": "nxp-d061e6188d855101be62",
+        "step": "waiting",
+        "polling_interval": 5000,
+        "request": {
+            "tracking_id": "nxp-d061e6188d855101be62",
+            "environment": "live",
+            "partner_referral_id": null,
+            "merchant_id": "nxp-****************be62",
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
+        },
+        "response": {
+            "success": "true",
+            "message": "Waiting for PayPal to finish provisioning the merchant account.",
+            "data": {
+                "environment": "live",
+                "tracking_id": "nxp-d061e6188d855101be62",
+                "partner_referral_id": "",
+                "merchant_id": "nxp-****************be62",
+                "step": "waiting",
+                "status_hint": "provisioning",
+                "polling_interval": 5000
+            }
+        }
+    }
+}
+[2025-12-20T14:53:00-08:00] Received AJAX action request {
+    "action": "telemetry",
+    "has_nonce": true,
+    "has_tracking_id": true,
+    "remote_addr": "75.156.8.210"
+}
+[2025-12-20T14:53:00-08:00] Numinix PayPal ISU event: status_success {
+    "event": "status_success",
+    "timestamp": 1766271180,
+    "environment": "live",
+    "zen_cart_version": "2.0.1",
+    "plugin_version": "1.0.7",
+    "tracking_id": "nxp-d061e6188d855101be62",
+    "step": "waiting",
+    "context": {
+        "tracking_id": "nxp-d061e6188d855101be62",
+        "step": "waiting",
+        "polling_interval": 5000
+    }
+}
+[2025-12-20T14:53:00-08:00] Received AJAX action request {
     "action": "finalize",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:40:50-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:00-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:40:50-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:00-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:40:50"
+    "expires_at": "2025-12-20 15:53:00"
 }
-[2025-12-20T14:40:51-08:00] Numinix PayPal ISU event: finalize_success {
+[2025-12-20T14:53:00-08:00] Numinix PayPal ISU event: finalize_success {
     "event": "finalize_success",
-    "timestamp": 1766270451,
+    "timestamp": 1766271180,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -233,8 +305,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -251,15 +324,15 @@
         }
     }
 }
-[2025-12-20T14:40:51-08:00] Received AJAX action request {
+[2025-12-20T14:53:01-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:40:51-08:00] Numinix PayPal ISU event: finalize_success {
+[2025-12-20T14:53:01-08:00] Numinix PayPal ISU event: finalize_success {
     "event": "finalize_success",
-    "timestamp": 1766270451,
+    "timestamp": 1766271181,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -271,93 +344,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:40:51-08:00] Received AJAX action request {
-    "action": "finalize",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:40:51-08:00] Invalid merchant_id format for persistence {
-    "merchant_id_length": 24
-}
-[2025-12-20T14:40:51-08:00] Persisted authCode and sharedId to database for credential exchange {
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "environment": "live",
-    "expires_at": "2025-12-20 15:40:51"
-}
-[2025-12-20T14:40:52-08:00] Numinix PayPal ISU event: finalize_success {
-    "event": "finalize_success",
-    "timestamp": 1766270452,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "code": null,
-            "tracking_id": "nxp-d061e6188d855101be62",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-d061e6188d855101be62",
-                "partner_referral_id": "",
-                "merchant_id": "nxp-****************be62",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-20T14:40:52-08:00] Received AJAX action request {
-    "action": "telemetry",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:40:52-08:00] Numinix PayPal ISU event: finalize_success {
-    "event": "finalize_success",
-    "timestamp": 1766270452,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000
-    }
-}
-[2025-12-20T14:40:57-08:00] Received AJAX action request {
+[2025-12-20T14:53:06-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:40:57-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:06-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:40:57-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:06-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:40:57"
+    "expires_at": "2025-12-20 15:53:06"
 }
-[2025-12-20T14:40:58-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:06-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270458,
+    "timestamp": 1766271186,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -372,8 +375,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -390,15 +394,15 @@
         }
     }
 }
-[2025-12-20T14:40:58-08:00] Received AJAX action request {
+[2025-12-20T14:53:07-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:40:58-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:07-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270458,
+    "timestamp": 1766271187,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -410,23 +414,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:41:03-08:00] Received AJAX action request {
+[2025-12-20T14:53:12-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:03-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:12-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:41:03-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:12-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:41:03"
+    "expires_at": "2025-12-20 15:53:12"
 }
-[2025-12-20T14:41:04-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:12-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270464,
+    "timestamp": 1766271192,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -441,8 +445,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -459,15 +464,15 @@
         }
     }
 }
-[2025-12-20T14:41:04-08:00] Received AJAX action request {
+[2025-12-20T14:53:13-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:04-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:13-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270464,
+    "timestamp": 1766271193,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -479,23 +484,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:41:09-08:00] Received AJAX action request {
+[2025-12-20T14:53:18-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:09-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:18-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:41:09-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:18-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:41:09"
+    "expires_at": "2025-12-20 15:53:18"
 }
-[2025-12-20T14:41:10-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:18-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270470,
+    "timestamp": 1766271198,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -510,8 +515,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -528,15 +534,15 @@
         }
     }
 }
-[2025-12-20T14:41:10-08:00] Received AJAX action request {
+[2025-12-20T14:53:19-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:10-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:19-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270470,
+    "timestamp": 1766271199,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -548,23 +554,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:41:15-08:00] Received AJAX action request {
+[2025-12-20T14:53:24-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:15-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:24-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:41:15-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:24-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:41:15"
+    "expires_at": "2025-12-20 15:53:24"
 }
-[2025-12-20T14:41:15-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:24-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270475,
+    "timestamp": 1766271204,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -579,8 +585,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -597,15 +604,15 @@
         }
     }
 }
-[2025-12-20T14:41:16-08:00] Received AJAX action request {
+[2025-12-20T14:53:24-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:16-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:24-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270476,
+    "timestamp": 1766271204,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -617,23 +624,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:41:21-08:00] Received AJAX action request {
+[2025-12-20T14:53:29-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:21-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:29-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:41:21-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:29-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:41:21"
+    "expires_at": "2025-12-20 15:53:29"
 }
-[2025-12-20T14:41:21-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:30-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270481,
+    "timestamp": 1766271210,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -648,8 +655,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -666,15 +674,15 @@
         }
     }
 }
-[2025-12-20T14:41:22-08:00] Received AJAX action request {
+[2025-12-20T14:53:30-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:22-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:30-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270482,
+    "timestamp": 1766271210,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -686,23 +694,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:41:27-08:00] Received AJAX action request {
+[2025-12-20T14:53:35-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:27-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:35-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:41:27-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:35-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:41:27"
+    "expires_at": "2025-12-20 15:53:35"
 }
-[2025-12-20T14:41:27-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:36-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270487,
+    "timestamp": 1766271216,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -717,8 +725,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -735,15 +744,15 @@
         }
     }
 }
-[2025-12-20T14:41:28-08:00] Received AJAX action request {
+[2025-12-20T14:53:36-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:28-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:36-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270488,
+    "timestamp": 1766271216,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -755,23 +764,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:41:33-08:00] Received AJAX action request {
+[2025-12-20T14:53:41-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:33-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:41-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:41:33-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:41-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:41:33"
+    "expires_at": "2025-12-20 15:53:41"
 }
-[2025-12-20T14:41:33-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:42-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270493,
+    "timestamp": 1766271222,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -786,8 +795,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -804,15 +814,15 @@
         }
     }
 }
-[2025-12-20T14:41:34-08:00] Received AJAX action request {
+[2025-12-20T14:53:42-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:34-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:42-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270494,
+    "timestamp": 1766271222,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -824,23 +834,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:41:39-08:00] Received AJAX action request {
+[2025-12-20T14:53:47-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:39-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:47-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:41:39-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:47-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:41:39"
+    "expires_at": "2025-12-20 15:53:47"
 }
-[2025-12-20T14:41:39-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:48-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270499,
+    "timestamp": 1766271228,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -855,8 +865,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -873,15 +884,15 @@
         }
     }
 }
-[2025-12-20T14:41:39-08:00] Received AJAX action request {
+[2025-12-20T14:53:48-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:39-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:48-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270499,
+    "timestamp": 1766271228,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -893,23 +904,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:41:44-08:00] Received AJAX action request {
+[2025-12-20T14:53:53-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:44-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:53-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:41:44-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:53-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:41:44"
+    "expires_at": "2025-12-20 15:53:53"
 }
-[2025-12-20T14:41:45-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:54-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270505,
+    "timestamp": 1766271234,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -924,8 +935,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -942,15 +954,15 @@
         }
     }
 }
-[2025-12-20T14:41:45-08:00] Received AJAX action request {
+[2025-12-20T14:53:54-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:45-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:53:54-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270505,
+    "timestamp": 1766271234,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -962,23 +974,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:41:50-08:00] Received AJAX action request {
+[2025-12-20T14:53:59-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:50-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:53:59-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:41:50-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:53:59-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:41:50"
+    "expires_at": "2025-12-20 15:53:59"
 }
-[2025-12-20T14:41:51-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:00-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270511,
+    "timestamp": 1766271240,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -993,8 +1005,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -1011,15 +1024,15 @@
         }
     }
 }
-[2025-12-20T14:41:51-08:00] Received AJAX action request {
+[2025-12-20T14:54:00-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:51-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:00-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270511,
+    "timestamp": 1766271240,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1031,23 +1044,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:41:56-08:00] Received AJAX action request {
+[2025-12-20T14:54:05-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:56-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:54:05-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:41:56-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:54:05-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:41:56"
+    "expires_at": "2025-12-20 15:54:05"
 }
-[2025-12-20T14:41:57-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:06-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270517,
+    "timestamp": 1766271246,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1062,8 +1075,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -1080,15 +1094,15 @@
         }
     }
 }
-[2025-12-20T14:41:57-08:00] Received AJAX action request {
+[2025-12-20T14:54:06-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:41:57-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:06-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270517,
+    "timestamp": 1766271246,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1100,23 +1114,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:42:02-08:00] Received AJAX action request {
+[2025-12-20T14:54:12-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:42:02-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:54:12-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:42:02-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:54:12-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:42:02"
+    "expires_at": "2025-12-20 15:54:12"
 }
-[2025-12-20T14:42:03-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:12-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270523,
+    "timestamp": 1766271252,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1131,8 +1145,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -1149,15 +1164,15 @@
         }
     }
 }
-[2025-12-20T14:42:03-08:00] Received AJAX action request {
+[2025-12-20T14:54:13-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:42:03-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:13-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270523,
+    "timestamp": 1766271253,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1169,23 +1184,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:42:08-08:00] Received AJAX action request {
+[2025-12-20T14:54:19-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:42:08-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:54:19-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:42:08-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:54:19-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:42:08"
+    "expires_at": "2025-12-20 15:54:19"
 }
-[2025-12-20T14:42:09-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:19-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270529,
+    "timestamp": 1766271259,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1200,8 +1215,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -1218,15 +1234,15 @@
         }
     }
 }
-[2025-12-20T14:42:09-08:00] Received AJAX action request {
+[2025-12-20T14:54:20-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:42:09-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:20-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270529,
+    "timestamp": 1766271260,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1238,23 +1254,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:42:15-08:00] Received AJAX action request {
+[2025-12-20T14:54:26-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:42:15-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:54:26-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:42:15-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:54:26-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:42:15"
+    "expires_at": "2025-12-20 15:54:26"
 }
-[2025-12-20T14:42:15-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:27-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270535,
+    "timestamp": 1766271267,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1269,8 +1285,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -1287,15 +1304,15 @@
         }
     }
 }
-[2025-12-20T14:42:16-08:00] Received AJAX action request {
+[2025-12-20T14:54:27-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:42:16-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:27-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270536,
+    "timestamp": 1766271267,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1307,23 +1324,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:42:21-08:00] Received AJAX action request {
+[2025-12-20T14:54:33-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:42:21-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:54:33-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:42:21-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:54:33-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:42:21"
+    "expires_at": "2025-12-20 15:54:33"
 }
-[2025-12-20T14:42:21-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:33-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270541,
+    "timestamp": 1766271273,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1338,8 +1355,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -1356,15 +1374,15 @@
         }
     }
 }
-[2025-12-20T14:42:22-08:00] Received AJAX action request {
+[2025-12-20T14:54:34-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:42:22-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:34-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270542,
+    "timestamp": 1766271274,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1376,23 +1394,23 @@
         "polling_interval": 5000
     }
 }
-[2025-12-20T14:42:27-08:00] Received AJAX action request {
+[2025-12-20T14:54:40-08:00] Received AJAX action request {
     "action": "status",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:42:27-08:00] Invalid merchant_id format for persistence {
+[2025-12-20T14:54:40-08:00] Invalid merchant_id format for persistence {
     "merchant_id_length": 24
 }
-[2025-12-20T14:42:27-08:00] Persisted authCode and sharedId to database for credential exchange {
+[2025-12-20T14:54:40-08:00] Persisted authCode and sharedId to database for credential exchange {
     "tracking_id": "nxp-d061e6188d855101be62",
     "environment": "live",
-    "expires_at": "2025-12-20 15:42:27"
+    "expires_at": "2025-12-20 15:54:40"
 }
-[2025-12-20T14:42:27-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:40-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270547,
+    "timestamp": 1766271280,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1407,8 +1425,9 @@
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
+            "auth_code": "C21A*****************************************************************************************jK6A",
+            "shared_id": "BAA2KIOqBZGt4TqT-TlYWZkX0TM5azeIxLcYi-gw76ZoAd-J-dWnYeX06Ts9DErd7KtlYjLnxzfk5hibg8",
+            "seller_nonce": "JLO0SlcU3JB28RB9Rulu3OftD5DDa58b2OLVLl4Y3SGbSw"
         },
         "response": {
             "success": "true",
@@ -1425,15 +1444,15 @@
         }
     }
 }
-[2025-12-20T14:42:28-08:00] Received AJAX action request {
+[2025-12-20T14:54:41-08:00] Received AJAX action request {
     "action": "telemetry",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "75.156.8.210"
 }
-[2025-12-20T14:42:28-08:00] Numinix PayPal ISU event: status_success {
+[2025-12-20T14:54:41-08:00] Numinix PayPal ISU event: status_success {
     "event": "status_success",
-    "timestamp": 1766270548,
+    "timestamp": 1766271281,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.0.7",
@@ -1444,428 +1463,4 @@
         "step": "waiting",
         "polling_interval": 5000
     }
-}
-[2025-12-20T14:42:33-08:00] Received AJAX action request {
-    "action": "status",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:42:33-08:00] Invalid merchant_id format for persistence {
-    "merchant_id_length": 24
-}
-[2025-12-20T14:42:33-08:00] Persisted authCode and sharedId to database for credential exchange {
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "environment": "live",
-    "expires_at": "2025-12-20 15:42:33"
-}
-[2025-12-20T14:42:33-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270553,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "tracking_id": "nxp-d061e6188d855101be62",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-d061e6188d855101be62",
-                "partner_referral_id": "",
-                "merchant_id": "nxp-****************be62",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-20T14:42:34-08:00] Received AJAX action request {
-    "action": "telemetry",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:42:34-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270554,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000
-    }
-}
-[2025-12-20T14:42:39-08:00] Received AJAX action request {
-    "action": "status",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:42:39-08:00] Invalid merchant_id format for persistence {
-    "merchant_id_length": 24
-}
-[2025-12-20T14:42:39-08:00] Persisted authCode and sharedId to database for credential exchange {
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "environment": "live",
-    "expires_at": "2025-12-20 15:42:39"
-}
-[2025-12-20T14:42:39-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270559,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "tracking_id": "nxp-d061e6188d855101be62",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-d061e6188d855101be62",
-                "partner_referral_id": "",
-                "merchant_id": "nxp-****************be62",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-20T14:42:39-08:00] Received AJAX action request {
-    "action": "telemetry",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:42:39-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270559,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000
-    }
-}
-[2025-12-20T14:42:44-08:00] Received AJAX action request {
-    "action": "status",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:42:44-08:00] Invalid merchant_id format for persistence {
-    "merchant_id_length": 24
-}
-[2025-12-20T14:42:44-08:00] Persisted authCode and sharedId to database for credential exchange {
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "environment": "live",
-    "expires_at": "2025-12-20 15:42:44"
-}
-[2025-12-20T14:42:45-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270565,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "tracking_id": "nxp-d061e6188d855101be62",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-d061e6188d855101be62",
-                "partner_referral_id": "",
-                "merchant_id": "nxp-****************be62",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-20T14:42:45-08:00] Received AJAX action request {
-    "action": "telemetry",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:42:45-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270565,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000
-    }
-}
-[2025-12-20T14:42:50-08:00] Received AJAX action request {
-    "action": "status",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:42:50-08:00] Invalid merchant_id format for persistence {
-    "merchant_id_length": 24
-}
-[2025-12-20T14:42:50-08:00] Persisted authCode and sharedId to database for credential exchange {
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "environment": "live",
-    "expires_at": "2025-12-20 15:42:50"
-}
-[2025-12-20T14:42:51-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270571,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "tracking_id": "nxp-d061e6188d855101be62",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-d061e6188d855101be62",
-                "partner_referral_id": "",
-                "merchant_id": "nxp-****************be62",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-20T14:42:51-08:00] Received AJAX action request {
-    "action": "telemetry",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:42:51-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270571,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000
-    }
-}
-[2025-12-20T14:42:56-08:00] Received AJAX action request {
-    "action": "status",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:42:56-08:00] Invalid merchant_id format for persistence {
-    "merchant_id_length": 24
-}
-[2025-12-20T14:42:56-08:00] Persisted authCode and sharedId to database for credential exchange {
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "environment": "live",
-    "expires_at": "2025-12-20 15:42:56"
-}
-[2025-12-20T14:42:57-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270577,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "tracking_id": "nxp-d061e6188d855101be62",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-d061e6188d855101be62",
-                "partner_referral_id": "",
-                "merchant_id": "nxp-****************be62",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-20T14:42:57-08:00] Received AJAX action request {
-    "action": "telemetry",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:42:57-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270577,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000
-    }
-}
-[2025-12-20T14:43:03-08:00] Received AJAX action request {
-    "action": "status",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:43:03-08:00] Invalid merchant_id format for persistence {
-    "merchant_id_length": 24
-}
-[2025-12-20T14:43:03-08:00] Persisted authCode and sharedId to database for credential exchange {
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "environment": "live",
-    "expires_at": "2025-12-20 15:43:03"
-}
-[2025-12-20T14:43:03-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270583,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "tracking_id": "nxp-d061e6188d855101be62",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": "nxp-****************be62",
-            "auth_code": "C21A*****************************************************************************************mVNw",
-            "shared_id": "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-d061e6188d855101be62",
-                "partner_referral_id": "",
-                "merchant_id": "nxp-****************be62",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-20T14:43:04-08:00] Received AJAX action request {
-    "action": "telemetry",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:43:04-08:00] Numinix PayPal ISU event: status_success {
-    "event": "status_success",
-    "timestamp": 1766270584,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.0.7",
-    "tracking_id": "nxp-d061e6188d855101be62",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-d061e6188d855101be62",
-        "step": "waiting",
-        "polling_interval": 5000
-    }
-}
-[2025-12-20T14:43:04-08:00] Received AJAX action request {
-    "action": "telemetry",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "75.156.8.210"
-}
-[2025-12-20T14:43:04-08:00] Returning JSON error response {
-    "message": "Unsupported telemetry event.",
-    "status_code": 400
 }
