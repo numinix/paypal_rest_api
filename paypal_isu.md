@@ -2,7 +2,34 @@
 
 ## Executive Summary
 
-This document outlines the tasks required to fix the PayPal Integrated Sign Up (ISU) implementation to properly follow PayPal's Partner Referrals API documentation. The current implementation is not working because **authCode and sharedId are not being captured from PayPal's redirect**, which are required to exchange for API credentials.
+This document outlines the tasks required to fix the PayPal Integrated Sign Up (ISU) implementation. **The code for credential exchange is already implemented** - the issue is that **authCode and sharedId are not being returned by PayPal**, preventing the exchange from happening.
+
+## Immediate Action Items (Phase 2)
+
+**Priority 1: Determine why PayPal isn't returning authCode/sharedId**
+
+1. **Verify Partner App Configuration**
+   - Log into PayPal Developer Dashboard
+   - Check partner app settings for return URL configuration
+   - Verify all required scopes/permissions are enabled
+   - Confirm app is approved for Partner Referrals API
+
+2. **Test Integration Type**
+   - Current: `FIRST_PARTY` (for JavaScript SDK mini-browser)
+   - Test: `THIRD_PARTY` (for direct redirect flow)
+   - Compare results
+
+3. **Review Actual API Request**
+   - Capture and log the exact payload sent to `/v2/customer/partner-referrals`
+   - Compare with PayPal's working examples
+   - Check for missing parameters
+
+4. **Test Return URL Flow**
+   - Verify return URL matches what's registered in PayPal app
+   - Test if return URL is accessible and properly configured
+   - Check if authCode/sharedId appear as URL parameters after signup
+
+---
 
 ## Current State Analysis
 
@@ -75,42 +102,66 @@ According to PayPal's Partner Referrals API documentation (https://developer.pay
    - Note: Per PayPal docs, after onboarding the partner receives credentials/tokens
    - Store these securely for making API calls on seller's behalf
 
-## Critical Discovery: What the ISU Flow Actually Provides
+## Critical Discovery: Business Model & Implementation Status
 
-Based on PayPal's official documentation, there's an important clarification about what the Integrated Sign-Up flow provides:
+### Business Model Clarification (per @jefflew):
+1. ✅ **Clients make API calls themselves** (not Numinix)
+2. ✅ **Numinix facilitates onboarding** using special partner API keys
+3. ✅ **Goal: Exchange authCode for seller's API credentials** (client_id/secret)
+4. ✅ **Clients use these credentials** in their own Zen Cart stores
 
-### What ISU Does Provide:
-1. ✅ Onboards sellers to use PayPal for payments
-2. ✅ Establishes partner-seller relationship
-3. ✅ Returns `authCode` that can be exchanged for seller's access token
-4. ✅ Returns `merchantId` and `sharedId` for tracking
-5. ✅ Grants partner permission to make API calls on seller's behalf
+### Current Implementation Status:
 
-### What ISU Does NOT Directly Provide:
-1. ❌ Seller's raw API credentials (client_id and secret) via API
-2. ❌ Automatic credential provisioning for seller's own use
+**Good News - Code is Already Implemented:**
+1. ✅ Code appends `partnerId` to action URL (enables mini-browser callback)
+2. ✅ Code generates `seller_nonce` for FIRST_PARTY integration
+3. ✅ Code has `exchangeAuthCodeForCredentials()` method implemented
+4. ✅ Code supports two credential retrieval methods:
+   - Method 1: Exchange authCode → seller access token → credentials endpoint
+   - Method 2: Extract from merchant integration oauth_integrations
+5. ✅ Code logs authCode/sharedId status for debugging
 
-### The Key Question:
-**What is the goal of our ISU implementation?**
+**The Problem:**
+❌ **authCode and sharedId are NOT being returned by PayPal** (per logs)
 
-**Option A: Partner makes API calls on behalf of seller**
-- Use the access_token from authCode exchange
-- Partner's system processes payments for seller using seller's token
-- ✅ This is what Partner Referrals API is designed for
+### Root Cause Analysis:
 
-**Option B: Seller gets their own credentials to use independently**
-- Seller needs to create app in PayPal Developer Dashboard themselves
-- Seller retrieves client_id/secret from their dashboard
-- ❌ This is NOT what Partner Referrals API provides automatically
+Based on code review and PayPal documentation, the most likely causes are:
 
-### Our Current Implementation Assumption:
-Looking at the logs and code, it appears we're trying to retrieve and display seller credentials (client_id/secret) to the user. **This may not align with how PayPal's Partner Referrals API actually works.**
+1. **Integration Type Mismatch**: 
+   - Code uses `FIRST_PARTY` integration type (line 427 in SignupLinkService.php)
+   - This expects JavaScript SDK mini-browser flow
+   - May need `THIRD_PARTY` for redirect-based flow
 
-### Recommended Next Steps:
-1. **Clarify the business requirement**: What credentials does the seller need and for what purpose?
-2. **If sellers need their own credentials**: They should create an app in PayPal Developer Dashboard
-3. **If partner system will make calls**: Use the access_token from authCode exchange
-4. **Consider hybrid approach**: Guide sellers to create their own app after ISU completes
+2. **Missing `displayMode` Parameter**:
+   - PayPal docs mention `displayMode: 'minibrowser'` for SDK integration
+   - May need to be specified in Partner Referral request or action URL
+
+3. **Return URL Configuration**:
+   - Return URL may not be properly configured in PayPal partner app settings
+   - PayPal may be using a different return URL than expected
+
+4. **Partner App Permissions**:
+   - Partner app may not be approved for full authCode/sharedId flow
+   - May need additional scopes or permissions enabled
+
+### API Endpoint for Credentials (Confirmed):
+
+Per PayPal documentation, after token exchange, credentials can be retrieved from:
+```
+GET /v1/customer/partners/{partner_id}/merchant-integrations/credentials
+Authorization: Bearer {seller_access_token}
+```
+
+Response includes:
+```json
+{
+  "client_id": "seller_client_id_here",
+  "client_secret": "seller_secret_here"
+}
+```
+
+**This endpoint is already implemented in the code** (line 315 in NuminixPaypalOnboardingService.php)
 
 ---
 
@@ -154,29 +205,43 @@ Looking at the logs and code, it appears we're trying to retrieve and display se
 
 ---
 
-### Phase 2: Analyze Current Referral Request ⏳
+### Phase 2: Analyze Current Referral Request ⏳ IN PROGRESS
 
-**Objective:** Examine our current Partner Referrals API call to identify missing pieces
+**Objective:** Determine why authCode and sharedId are NOT being returned
 
-**Tasks:**
-- [ ] Review the current payload sent to `/v2/customer/partner-referrals`
-- [ ] Check if `return_url` is properly formatted and includes tracking_id
-- [ ] Verify `operations` array includes correct API_INTEGRATION setup
-- [ ] Confirm `products` array includes necessary products (e.g., EXPRESS_CHECKOUT)
-- [ ] Check if `capabilities` should be specified
-- [ ] Validate `partner_config_override` if needed
-- [ ] Compare our request to PayPal's example requests in documentation
-- [ ] Review Numinix.com's onboarding service implementation
+**Current Status:** Code review shows implementation is already complete, but parameters aren't being returned by PayPal
 
-**Files to Examine:**
-- `numinix.com/includes/modules/pages/paypal_signup/class.numinix_paypal_onboarding_service.php`
-- `numinix.com/api/paypal_onboarding.php`
-- `numinix.com/includes/modules/pages/paypal_signup/includes/nxp_paypal_helpers.php`
+**Code Review Findings:**
+- ✅ Code already generates `seller_nonce` for FIRST_PARTY integration
+- ✅ Code already appends `partnerId` parameter to action URL
+- ✅ Code already includes API_INTEGRATION operations
+- ✅ Code already includes SHARE_DATA_CONSENT
+- ✅ Code already has authCode exchange logic implemented
+
+**Tasks to Investigate:**
+- [ ] Review actual Partner Referrals API request payload sent to PayPal
+- [ ] Verify `integration_type` setting (currently FIRST_PARTY - is this correct?)
+- [ ] Check if `displayMode: 'minibrowser'` parameter is needed
+- [ ] Verify return_url is properly registered in PayPal partner app settings
+- [ ] Test if changing to THIRD_PARTY integration type works
+- [ ] Check PayPal partner app dashboard for required scopes/permissions
+- [ ] Review PayPal partner app webhook configuration
+- [ ] Compare our payload to PayPal's working examples
+
+**Files to Review:**
+- `numinix.com/management/includes/classes/Numinix/PaypalIsu/SignupLinkService.php` (lines 406-500)
+- `numinix.com/includes/modules/pages/paypal_signup/class.numinix_paypal_onboarding_service.php` (credential exchange logic)
+
+**Key Questions:**
+1. Is FIRST_PARTY vs THIRD_PARTY the issue?
+2. Does the partner app need additional approvals/scopes?
+3. Is the return URL properly configured in PayPal app settings?
+4. Should we use JavaScript SDK integration instead of direct redirect?
 
 **Deliverable:**
-- Document current referral request structure
-- List of discrepancies vs. PayPal documentation
-- Specific fields that need to be added/modified
+- List of configuration changes needed in Partner Referrals request
+- Verification of PayPal partner app settings
+- Test results from different integration types
 
 ---
 
