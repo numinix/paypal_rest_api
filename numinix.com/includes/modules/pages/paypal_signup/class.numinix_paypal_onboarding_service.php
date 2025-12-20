@@ -269,17 +269,17 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 'Content-Type: application/x-www-form-urlencoded',
             ];
             
-            // PayPal's third-party integration uses authorization_code grant with shared_id
-            // The exact parameter name may vary based on PayPal's documentation updates
+            // PayPal's third-party integration uses authorization_code grant
+            // Note: code_verifier is NOT required for PayPal's partner onboarding flow
+            // PayPal expects only grant_type and code parameters
             $tokenBody = http_build_query([
                 'grant_type' => 'authorization_code',
                 'code' => $authCode,
-                'code_verifier' => $sharedId,
             ], '', '&', PHP_QUERY_RFC3986);
 
             // Per PayPal docs: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
             // OAuth token exchange must use sharedId as the username with an empty password
-            // curl -u SHARED-ID: -d 'grant_type=authorization_code&code=AUTH-CODE&code_verifier=SELLER-TOKEN'
+            // curl -u SHARED-ID: -d 'grant_type=authorization_code&code=AUTH-CODE'
             $tokenResponse = $this->performHttpCall(
                 'POST',
                 $tokenUrl,
