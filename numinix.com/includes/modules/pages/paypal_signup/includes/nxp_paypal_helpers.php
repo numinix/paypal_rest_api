@@ -453,6 +453,12 @@ function nxp_paypal_handle_finalize(array $session): void
         ?? ($session['shared_id'] ?? null)
     );
 
+    $sellerNonce = nxp_paypal_filter_string(
+        $_REQUEST['seller_nonce']
+        ?? $_REQUEST['sellerNonce']
+        ?? ($session['seller_nonce'] ?? null)
+    );
+
     if (empty($trackingId)) {
         nxp_paypal_json_error('Missing tracking reference.');
     }
@@ -465,6 +471,7 @@ function nxp_paypal_handle_finalize(array $session): void
         'merchant_id' => $merchantId,
         'auth_code' => $authCode,
         'shared_id' => $sharedId,
+        'seller_nonce' => $sellerNonce,
     ];
 
     // Persist identifiers that arrive via finalize to make credential exchange resilient
@@ -479,6 +486,9 @@ function nxp_paypal_handle_finalize(array $session): void
         $_SESSION['nxp_paypal']['auth_code'] = $authCode;
         $_SESSION['nxp_paypal']['shared_id'] = $sharedId;
         nxp_paypal_persist_auth_code($trackingId, $authCode, $sharedId, $session['env'] ?? 'sandbox');
+    }
+    if ($sellerNonce !== null && $sellerNonce !== '') {
+        $_SESSION['nxp_paypal']['seller_nonce'] = $sellerNonce;
     }
 
     try {
@@ -595,6 +605,12 @@ function nxp_paypal_handle_status(array $session): void
         ?? ($session['shared_id'] ?? null)
     );
 
+    $sellerNonce = nxp_paypal_filter_string(
+        $_REQUEST['seller_nonce']
+        ?? $_REQUEST['sellerNonce']
+        ?? ($session['seller_nonce'] ?? null)
+    );
+
     // If merchant_id is not provided in the request or session, try to retrieve it
     // from the database. This handles the cross-session case where the PayPal redirect
     // (in the popup) stored the merchant_id but the status poll comes from a different session.
@@ -643,6 +659,7 @@ function nxp_paypal_handle_status(array $session): void
         'merchant_id' => $merchantId,
         'auth_code' => $authCode,
         'shared_id' => $sharedId,
+        'seller_nonce' => $sellerNonce,
     ];
 
     try {
