@@ -850,19 +850,19 @@ class NuminixPaypalIsuSignupLinkService
      * Generates a cryptographically secure seller_nonce for FIRST_PARTY ISU integration.
      * 
      * The seller_nonce is used as the code_verifier during the authCode/sharedId token exchange.
-     * Per PayPal ISU documentation, this must be a cryptographically random string.
+     * Per PayPal ISU documentation, this must be a cryptographically random string of at least 44 characters.
      *
      * @return string
      */
     protected function generateSellerNonce(): string
     {
         try {
-            // Generate 32 bytes (256 bits) of cryptographically secure random data
-            // Base64 URL-safe encoding produces a ~43 character string
-            return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+            // Generate 33 bytes (264 bits) of cryptographically secure random data
+            // Base64 URL-safe encoding produces a 44 character string (meets PayPal's minimum requirement)
+            return rtrim(strtr(base64_encode(random_bytes(33)), '+/', '-_'), '=');
         } catch (Throwable $exception) {
             // Fallback for systems without random_bytes
-            return rtrim(strtr(base64_encode(openssl_random_pseudo_bytes(32)), '+/', '-_'), '=');
+            return rtrim(strtr(base64_encode(openssl_random_pseudo_bytes(33)), '+/', '-_'), '=');
         }
     }
 
