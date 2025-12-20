@@ -51,6 +51,11 @@ class NuminixPaypalIsuSignupLinkService
             throw new RuntimeException('PayPal did not return an onboarding link.');
         }
 
+        // Append partnerId parameter for JavaScript SDK mini-browser integration
+        // Per PayPal docs: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+        // The partnerId enables the mini-browser callback flow which returns authCode and sharedId
+        $actionUrl = $this->appendPartnerIdToUrl($actionUrl, $clientId);
+
         $result = [
             'environment' => $environment,
             'tracking_id' => (string) $payload['tracking_id'],
@@ -502,6 +507,27 @@ class NuminixPaypalIsuSignupLinkService
         }
 
         return '';
+    }
+
+    /**
+     * Appends partnerId parameter to the signup URL for mini-browser integration.
+     *
+     * Per PayPal documentation, the partnerId parameter enables the JavaScript SDK's
+     * mini-browser callback flow which returns authCode and sharedId immediately.
+     * See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+     *
+     * @param string $url         The signup URL from PayPal
+     * @param string $partnerId   The partner's client ID
+     * @return string
+     */
+    protected function appendPartnerIdToUrl(string $url, string $partnerId): string
+    {
+        if ($url === '' || $partnerId === '') {
+            return $url;
+        }
+
+        $separator = (strpos($url, '?') === false) ? '?' : '&';
+        return $url . $separator . 'partnerId=' . rawurlencode($partnerId);
     }
 
     /**
