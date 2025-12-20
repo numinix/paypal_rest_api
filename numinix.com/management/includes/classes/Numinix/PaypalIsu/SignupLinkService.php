@@ -1135,12 +1135,7 @@ class NuminixPaypalIsuSignupLinkService
 
         $this->lastDebugSnapshot['log_entry'] = '[' . $timestamp . '] ' . $logMessage;
 
-        if (function_exists('zen_record_admin_activity')) {
-            zen_record_admin_activity($logMessage, 'info');
-        } else {
-            trigger_error($logMessage, E_USER_NOTICE);
-        }
-
+        // Only write to debug log, not PHP error log (already in debug log)
         $this->writeDebugLog($this->lastDebugSnapshot['log_entry']);
     }
 

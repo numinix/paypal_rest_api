@@ -661,6 +661,13 @@
         }
 
         function displayCredentialsIfAvailable(data) {
+            console.log('[CALLBACK TEST - Numinix] displayCredentialsIfAvailable called with data:', {
+                hasCredentials: !!(data && data.credentials),
+                hasClientId: !!(data && data.credentials && data.credentials.client_id),
+                hasClientSecret: !!(data && data.credentials && data.credentials.client_secret),
+                credentials: data && data.credentials ? data.credentials : null
+            });
+            
             if (data.credentials && data.credentials.client_id && data.credentials.client_secret) {
                 var env = formatEnvironment(data.environment || (state.session && state.session.env) || 'sandbox');
                 
@@ -678,9 +685,11 @@
                     credentialsHtml += '</div>';
                     statusNode.innerHTML = credentialsHtml;
                     statusNode.setAttribute('data-tone', 'success');
+                    console.log('[CALLBACK TEST - Numinix] Credentials displayed successfully');
                 }
             } else {
                 setStatus('PayPal account connected. You\'re all set.', 'success');
+                console.log('[CALLBACK TEST - Numinix] No credentials to display, showing success message');
             }
         }
 
@@ -802,6 +811,8 @@
                 payload.sharedId = state.session.sharedId;
             }
 
+            console.log('[CALLBACK TEST - Numinix] Finalize payload being sent:', payload);
+
             if (!payload.code && !payload.tracking_id) {
                 return;
             }
@@ -809,6 +820,7 @@
             state.finalizing = true;
             postAction('finalize', payload)
                 .then(function (response) {
+                    console.log('[CALLBACK TEST - Numinix] Finalize response received:', response);
                     handleFinalizeResponse(response.data || {});
                     sendTelemetry('finalize_success', {
                         tracking_id: state.session.tracking_id || undefined,
@@ -817,6 +829,7 @@
                     });
                 })
                 .catch(function (error) {
+                    console.log('[CALLBACK TEST - Numinix] Finalize error:', error);
                     setStatus(error && error.message ? error.message : 'We could not finalize your PayPal signup. Please try again.', 'error');
                     disableStartButtons(false);
                     sendTelemetry('finalize_failed', {
@@ -931,6 +944,12 @@
             }
 
             console.log('[CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding');
+            console.log('[CALLBACK TEST - Numinix] Session state before finalize:', {
+                tracking_id: state.session.tracking_id,
+                authCode: state.session.authCode,
+                sharedId: state.session.sharedId,
+                merchant_id: state.session.merchant_id
+            });
             setStatus('Processing your PayPal account details…', 'info');
             finalizeOnboarding();
         }
