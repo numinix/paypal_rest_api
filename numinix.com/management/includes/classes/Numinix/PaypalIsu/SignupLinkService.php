@@ -1007,23 +1007,24 @@ class NuminixPaypalIsuSignupLinkService
     }
 
     /**
-     * Resolves features for the third_party_details in the referral payload.
+     * Resolves features for the first_party_details in the referral payload.
      *
-     * Features specify the permissions that the partner can use in PayPal on behalf of the seller.
+     * Features specify the permissions that the seller's credentials will have.
      * Valid values include: PAYMENT, REFUND, PARTNER_FEE, VAULT, BILLING_AGREEMENT, etc.
      *
-     * Default features are PAYMENT and REFUND (core commerce features). PARTNER_FEE is
-     * intentionally excluded from the default because it requires special PayPal partner
-     * account configuration that is not universally available - particularly on production
-     * accounts. Attempting to use PARTNER_FEE without the proper account setup results in
-     * a FEATURES_UNAUTHORIZED error from PayPal's Partner Referrals API.
+     * Default features are PAYMENT, REFUND, and ADVANCED_VAULTING (core commerce features).
+     * ADVANCED_VAULTING enables JavaScript SDK v6 support for vaulting payment methods.
+     * PARTNER_FEE is intentionally excluded from the default because it requires special
+     * PayPal partner account configuration that is not universally available - particularly
+     * on production accounts. Attempting to use PARTNER_FEE without the proper account setup
+     * results in a FEATURES_UNAUTHORIZED error from PayPal's Partner Referrals API.
      *
      * @param mixed $value
      * @return array<int, string>
      */
     protected function resolveFeatures($value): array
     {
-        return $this->sanitizeStringList($value, ['PAYMENT', 'REFUND']);
+        return $this->sanitizeStringList($value, ['PAYMENT', 'REFUND', 'ADVANCED_VAULTING']);
     }
 
     /**

@@ -277,11 +277,14 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 'code_verifier' => $sharedId,
             ], '', '&', PHP_QUERY_RFC3986);
 
+            // Per PayPal docs: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+            // OAuth token exchange must use sharedId as the username with an empty password
+            // curl -u SHARED-ID: -d 'grant_type=authorization_code&code=AUTH-CODE&code_verifier=SELLER-TOKEN'
             $tokenResponse = $this->performHttpCall(
                 'POST',
                 $tokenUrl,
                 $tokenHeaders,
-                ['basic_auth' => $partnerClientId . ':' . $partnerClientSecret],
+                ['basic_auth' => $sharedId . ':'],
                 $tokenBody
             );
 
