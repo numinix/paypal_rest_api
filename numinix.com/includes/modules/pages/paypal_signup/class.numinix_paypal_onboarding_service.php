@@ -118,49 +118,16 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $apiBase = $this->resolveApiBase($environment);
             $accessToken = $this->obtainAccessToken($apiBase, $clientId, $clientSecret);
 
-            $integration = $this->fetchMerchantIntegration(
-                $apiBase,
-                $accessToken,
-                $clientId,
-                $trackingId,
-                $partnerReferralId,
-                $merchantId,
-                $environment
-            );
-            if ($integration === null) {
-                return $this->waitingResponse($environment, $trackingId, $partnerReferralId, $merchantId);
-            }
-
-            $step = $this->mapIntegrationToStep($integration);
-            $data = [
-                'environment' => $environment,
-                'tracking_id' => $trackingId,
-                'partner_referral_id' => $partnerReferralId,
-                'merchant_id' => (string)($integration['merchant_id'] ?? ''),
-                'merchant_id_in_paypal' => (string)($integration['merchant_id_in_paypal'] ?? ($integration['merchant_id'] ?? '')),
-                'payments_receivable' => (bool)($integration['payments_receivable'] ?? false),
-                'primary_email_confirmed' => (bool)($integration['primary_email_confirmed'] ?? false),
-                'capabilities' => $this->extractCapabilities($integration),
-                'step' => $step,
-                'polling_interval' => self::DEFAULT_POLLING_INTERVAL_MS,
-            ];
-
-            if ($step === 'waiting') {
-                $data['status_hint'] = 'provisioning';
-            }
-
-            if (!empty($integration['links']) && is_array($integration['links'])) {
-                $data['links'] = $integration['links'];
-            }
-
             // Extract merchant credentials - try multiple methods:
             // 1. First, try to use authCode and sharedId to exchange for seller credentials (PayPal recommended flow)
-            // 2. Fall back to extracting from oauth_integrations in the merchant integration response
+            // 2. Fall back to merchant integration lookup and extract from oauth_integrations
             $credentials = null;
             $sellerToken = [];
+            $integration = null;
 
             // Method 1: Exchange authCode + sharedId for seller credentials (PayPal recommended flow)
             // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+            // When authCode and sharedId are available, skip merchant integration lookup and go straight to exchange
             if ($authCode !== '' && $sharedId !== '') {
                 $this->logDebug('Attempting authCode/sharedId credential exchange', [
                     'tracking_id' => $trackingId,
@@ -183,28 +150,62 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                     $sellerToken['access_token_expires_at'] = (int)$credentials['access_token_expires_at'];
                     unset($credentials['access_token_expires_at']);
                 }
-            } else {
-                $this->logDebug('AuthCode/sharedId missing; skipping credential exchange', [
+            }
+
+            // Method 2: Fall back to merchant integration lookup when authCode/sharedId not available
+            if ($credentials === null) {
+                $this->logDebug('AuthCode/sharedId not available; falling back to merchant integration lookup', [
                     'tracking_id' => $trackingId,
                     'has_auth_code' => $authCode !== '' ? 'yes' : 'no',
                     'has_shared_id' => $sharedId !== '' ? 'yes' : 'no',
                 ]);
+
+                $integration = $this->fetchMerchantIntegration(
+                    $apiBase,
+                    $accessToken,
+                    $clientId,
+                    $trackingId,
+                    $partnerReferralId,
+                    $merchantId,
+                    $environment
+                );
+
+                if ($integration === null) {
+                    return $this->waitingResponse($environment, $trackingId, $partnerReferralId, $merchantId);
+                }
+
+                $step = $this->mapIntegrationToStep($integration);
+                if ($step === 'completed') {
+                    $credentials = $this->extractMerchantCredentials($integration);
+                }
             }
 
-            // Method 2: Fall back to extracting from merchant integration response
-            if ($credentials === null && $step === 'completed') {
-                $credentials = $this->extractMerchantCredentials($integration);
+            // Build response data
+            $data = [
+                'environment' => $environment,
+                'tracking_id' => $trackingId,
+                'partner_referral_id' => $partnerReferralId,
+                'merchant_id' => $integration !== null ? (string)($integration['merchant_id'] ?? '') : $merchantId,
+                'merchant_id_in_paypal' => $integration !== null ? (string)($integration['merchant_id_in_paypal'] ?? ($integration['merchant_id'] ?? '')) : '',
+                'payments_receivable' => $integration !== null ? (bool)($integration['payments_receivable'] ?? false) : false,
+                'primary_email_confirmed' => $integration !== null ? (bool)($integration['primary_email_confirmed'] ?? false) : false,
+                'capabilities' => $integration !== null ? $this->extractCapabilities($integration) : [],
+                'step' => $credentials !== null ? 'completed' : ($integration !== null ? $this->mapIntegrationToStep($integration) : 'waiting'),
+                'polling_interval' => self::DEFAULT_POLLING_INTERVAL_MS,
+            ];
+
+            if ($data['step'] === 'waiting') {
+                $data['status_hint'] = 'provisioning';
+            }
+
+            if ($integration !== null && !empty($integration['links']) && is_array($integration['links'])) {
+                $data['links'] = $integration['links'];
             }
 
             if ($credentials !== null) {
                 $data['credentials'] = $credentials;
                 if (!empty($sellerToken)) {
                     $data['seller_token'] = $sellerToken;
-                }
-
-                // If credentials are present, we can mark the flow as completed to unlock auto-save
-                if ($data['step'] !== 'completed') {
-                    $data['step'] = 'completed';
                 }
             }
 
