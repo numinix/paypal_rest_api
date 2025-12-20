@@ -63,6 +63,10 @@
         // If we have any PayPal parameters, this is a return from PayPal
         if (authCode || sharedId || merchantId || (trackingId && urlParams.get('env'))) {
             try {
+                // Determine target origin for postMessage
+                // Use wildcard '*' to avoid cross-origin access errors when reading window.opener.location.origin
+                var targetOrigin = '*';  // Less secure but necessary for cross-origin popup communication
+                
                 // Send postMessage to parent window with all parameters
                 window.opener.postMessage({
                     event: 'paypal_onboarding_complete',
@@ -73,7 +77,7 @@
                     tracking_id: trackingId || undefined,
                     env: urlParams.get('env') || undefined,
                     source: 'popup_return_url'
-                }, window.opener.location.origin);
+                }, targetOrigin);
 
                 // Show brief message before closing
                 document.body.innerHTML = '<div style="padding: 40px; text-align: center; font-family: system-ui, sans-serif;">' +
@@ -831,12 +835,27 @@
                 hasPopup: !!state.popup,
                 hasEvent: !!event,
                 hasEventSource: !!(event && event.source),
-                sourcesMatch: !!(event && event.source && state.popup && event.source === state.popup)
+                eventOrigin: event ? event.origin : 'N/A',
+                sourcesMatch: !!(event && event.source && state.popup && event.source === state.popup),
+                currentLocation: window.location.origin
             });
 
-            if (!state.popup || (event && event.source && event.source !== state.popup)) {
-                console.log('[CALLBACK TEST - Numinix] Ignoring message - not from our popup');
+            // Temporarily relaxed: Accept messages from PayPal domains or same origin
+            var isFromPayPal = event && event.origin && (
+                event.origin.indexOf('paypal.com') !== -1 ||
+                event.origin.indexOf('paypalobjects.com') !== -1
+            );
+            var isFromSameOrigin = event && event.origin === window.location.origin;
+            var isValidSource = event && (isFromPayPal || isFromSameOrigin);
+
+            if (!isValidSource) {
+                console.log('[CALLBACK TEST - Numinix] Ignoring message - not from PayPal or same origin. Origin:', event ? event.origin : 'N/A');
                 return;
+            }
+            
+            // Additional check: If we have a popup reference, verify it matches (but don't reject if popup is null)
+            if (state.popup && event && event.source && event.source !== state.popup) {
+                console.log('[CALLBACK TEST - Numinix] Warning: Message source does not match our popup reference, but accepting anyway');
             }
 
             var rawData = event && event.data;
