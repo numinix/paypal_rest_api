@@ -857,13 +857,20 @@ class NuminixPaypalIsuSignupLinkService
     protected function generateSellerNonce(): string
     {
         try {
-            // Generate 33 bytes (264 bits) of cryptographically secure random data
-            // Base64 URL-safe encoding produces a 44 character string (meets PayPal's minimum requirement)
-            return rtrim(strtr(base64_encode(random_bytes(33)), '+/', '-_'), '=');
+            // Generate 34 bytes (272 bits) of cryptographically secure random data
+            // Base64 URL-safe encoding produces a 46 character string (exceeds PayPal's 44-character minimum with safety margin)
+            $nonce = rtrim(strtr(base64_encode(random_bytes(34)), '+/', '-_'), '=');
         } catch (Throwable $exception) {
             // Fallback for systems without random_bytes
-            return rtrim(strtr(base64_encode(openssl_random_pseudo_bytes(33)), '+/', '-_'), '=');
+            $nonce = rtrim(strtr(base64_encode(openssl_random_pseudo_bytes(34)), '+/', '-_'), '=');
         }
+
+        // Validate that the nonce meets PayPal's minimum length requirement
+        if (strlen($nonce) < 44) {
+            throw new RuntimeException('Generated seller_nonce is too short (' . strlen($nonce) . ' characters). PayPal requires at least 44 characters.');
+        }
+
+        return $nonce;
     }
 
     /**
