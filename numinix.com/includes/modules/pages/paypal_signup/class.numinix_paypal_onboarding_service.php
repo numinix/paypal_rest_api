@@ -263,7 +263,32 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             return null;
         }
 
-        try {
+        $attempts = [
+            [
+                'label' => 'partner_credentials',
+                'basic_auth' => $partnerClientId . ':' . $partnerClientSecret,
+                'body' => http_build_query([
+                    'grant_type' => 'authorization_code',
+                    'code' => $authCode,
+                    'code_verifier' => $sellerNonce,
+                ], '', '&', PHP_QUERY_RFC3986),
+                'include_verifier' => true,
+            ],
+            [
+                // PayPal documentation also describes using sharedId with an empty password
+                // for the authorization_code exchange. Retry with that approach if the
+                // partner credential attempt fails.
+                'label' => 'shared_id',
+                'basic_auth' => $sharedId . ':',
+                'body' => http_build_query([
+                    'grant_type' => 'authorization_code',
+                    'code' => $authCode,
+                ], '', '&', PHP_QUERY_RFC3986),
+                'include_verifier' => false,
+            ],
+        ];
+
+        foreach ($attempts as $attempt) {
             // Step 1: Exchange authCode for seller access token
             // Per PayPal Partner Referrals API, after onboarding completes, the seller's browser
             // receives authCode and sharedId. The sharedId acts as the code_verifier for PKCE flow
@@ -275,23 +300,15 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 'Content-Type: application/x-www-form-urlencoded',
             ];
             
-            // PayPal's third-party integration uses authorization_code grant
-            // Note: code_verifier is NOT required for PayPal's partner onboarding flow
-            // PayPal expects only grant_type and code parameters
-            $tokenBody = http_build_query([
-                'grant_type' => 'authorization_code',
-                'code' => $authCode,
-                'code_verifier' => $sellerNonce,
-            ], '', '&', PHP_QUERY_RFC3986);
+            // PayPal's third-party integration uses authorization_code grant.
+            $tokenBody = $attempt['body'];
 
             // Per PayPal docs: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
-            // OAuth token exchange must use the partner's client credentials with the seller_nonce
-            // supplied as the PKCE code_verifier.
             $tokenResponse = $this->performHttpCall(
                 'POST',
                 $tokenUrl,
                 $tokenHeaders,
-                ['basic_auth' => $partnerClientId . ':' . $partnerClientSecret],
+                ['basic_auth' => $attempt['basic_auth']],
                 $tokenBody
             );
 
@@ -303,7 +320,12 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                     'status' => $tokenResponse['status'],
                     'error' => $tokenDecoded['error'] ?? 'unknown',
                     'error_description' => $tokenDecoded['error_description'] ?? '',
+                    'attempt' => $attempt['label'],
                 ]);
+                // Try next strategy if available
+                if ($attempt !== end($attempts)) {
+                    continue;
+                }
                 return null;
             }
 
@@ -312,7 +334,11 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             if ($sellerAccessToken === '') {
                 $this->logDebug('Auth code exchange response missing access_token', [
                     'response_keys' => array_keys($tokenDecoded),
+                    'attempt' => $attempt['label'],
                 ]);
+                if ($attempt !== end($attempts)) {
+                    continue;
+                }
                 return null;
             }
 
@@ -358,16 +384,16 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                 return $payload;
             }
 
-            $this->logDebug('Auth code exchange completed but no credentials returned');
-            return null;
-        } catch (Throwable $e) {
-            // Log the exception for debugging
-            $this->logDebug('Auth code exchange threw exception', [
-                'exception' => get_class($e),
-                'message' => $e->getMessage(),
+            $this->logDebug('Auth code exchange completed but no credentials returned', [
+                'attempt' => $attempt['label'],
             ]);
-            return null;
+
+            if ($attempt === end($attempts)) {
+                return null;
+            }
         }
+
+        return null;
     }
 
     /**
