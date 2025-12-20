@@ -62,6 +62,7 @@ class NuminixPaypalIsuSignupLinkService
             'partner_referral_id' => (string) ($response['partner_referral_id'] ?? ''),
             'action_url' => $actionUrl,
             'links' => $links,
+            'seller_nonce' => $payload['operations'][0]['api_integration_preference']['rest_api_integration']['first_party_details']['seller_nonce'] ?? '',
             'payload' => $payload,
             'raw_response' => $response,
         ];
@@ -416,11 +417,17 @@ class NuminixPaypalIsuSignupLinkService
         $returnUrl = $this->sanitizeUrl($options['return_url'] ?? $this->getOnboardingUrl('return'));
         $websiteUrls = $this->resolveWebsiteUrls($options['website_urls'] ?? null);
 
+        // Generate seller_nonce for FIRST_PARTY ISU integration
+        // This is required for the JavaScript SDK mini-browser callback flow
+        // The nonce is used as code_verifier during authCode/sharedId token exchange
+        $sellerNonce = $this->generateSellerNonce();
+
         $restIntegration = [
             'integration_method' => 'PAYPAL',
-            'integration_type' => 'THIRD_PARTY',
-            'third_party_details' => [
+            'integration_type' => 'FIRST_PARTY',
+            'first_party_details' => [
                 'features' => $features,
+                'seller_nonce' => $sellerNonce,
             ],
         ];
 
@@ -836,6 +843,26 @@ class NuminixPaypalIsuSignupLinkService
             return 'nxp-' . bin2hex(random_bytes(10));
         } catch (Throwable $exception) {
             return 'nxp-' . str_replace('.', '-', uniqid('', true));
+        }
+    }
+
+    /**
+     * Generates a cryptographically secure seller_nonce for FIRST_PARTY ISU integration.
+     * 
+     * The seller_nonce is used as the code_verifier during the authCode/sharedId token exchange.
+     * Per PayPal ISU documentation, this must be a cryptographically random string.
+     *
+     * @return string
+     */
+    protected function generateSellerNonce(): string
+    {
+        try {
+            // Generate 32 bytes (256 bits) of cryptographically secure random data
+            // Base64 URL-safe encoding produces a ~43 character string
+            return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        } catch (Throwable $exception) {
+            // Fallback for systems without random_bytes
+            return rtrim(strtr(base64_encode(openssl_random_pseudo_bytes(32)), '+/', '-_'), '=');
         }
     }
 

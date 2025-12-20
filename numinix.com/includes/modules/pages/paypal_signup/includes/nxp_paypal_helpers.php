@@ -399,6 +399,9 @@ function nxp_paypal_handle_start(array $session): void
     if (!empty($response['data']['partner_referral_id'])) {
         $_SESSION['nxp_paypal']['partner_referral_id'] = $response['data']['partner_referral_id'];
     }
+    if (!empty($response['data']['seller_nonce'])) {
+        $_SESSION['nxp_paypal']['seller_nonce'] = $response['data']['seller_nonce'];
+    }
     $_SESSION['nxp_paypal']['step'] = !empty($response['data']['step']) ? $response['data']['step'] : 'waiting';
     $_SESSION['nxp_paypal']['updated_at'] = time();
 
