@@ -1,4 +1,8 @@
  [CALLBACK TEST - Numinix] Message event listener attached - ready to receive postMessage
+ [CALLBACK TEST - Numinix] handlePopupMessage called Object
+ [CALLBACK TEST - Numinix] Received postMessage payload: Object
+ [CALLBACK TEST - Numinix] Event analysis: Object
+ [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
 www.googletagmanager.com/:1 Framing 'https://www.googletagmanager.com/' violates the following Content Security Policy directive: "frame-src *.numinix.com bid.g.doubleclick.net *.google.com *.facebook.com www.youtube.com *.tawk.to platform.twitter.com https://calendly.com". The request has been blocked.
 
 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
@@ -23,11 +27,8 @@ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<UR
 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
  [CALLBACK TEST - Numinix] handlePopupMessage called Object
- [CALLBACK TEST - Numinix] Received postMessage payload: Object
- [CALLBACK TEST - Numinix] Event analysis: Object
- [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
- [CALLBACK TEST - Numinix] handlePopupMessage called Object
  [CALLBACK TEST - Numinix] Ignoring message - not from PayPal or same origin. Origin: https://www.google.com
+paypal_signup:1 <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">
  [CALLBACK TEST - Numinix] handlePopupMessage called Object
  [CALLBACK TEST - Numinix] Received postMessage payload: Object
  [CALLBACK TEST - Numinix] Event analysis: Object
@@ -41,10 +42,10 @@ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<UR
  [CALLBACK TEST - Numinix] Event analysis: Object
  [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
  [CALLBACK TEST - Numinix] handlePopupMessage called Object
- [CALLBACK TEST - Numinix] Received postMessage payload: Object
- [CALLBACK TEST - Numinix] Event analysis: Object
- [CALLBACK TEST - Numinix] Captured authCode: C21AAPHCzuVlKIQksQCODDzrF1DrUNMU8rZEYXF2rUv8qN5rbyvSpHeqQ02G-qnxvcKU-lrUgNbQzDmwZ2fxXOoTp_9Q8vMGg
- [CALLBACK TEST - Numinix] Captured sharedId: BAAaSphy6kF9PTMvhYKKZSj5JAGBezJ7gETtYI0pp9Jb89XES-5XV7g5F7Ntt8yxZFLZ3qSFBSD73CAAu0
+ [CALLBACK TEST - Numinix] Received postMessage payload: ObjectonboardedCompleteToken: "C21AAM6ILPBnAg3FCSGcFLiOHkO7N7rvpCk8Fc_8_EBZxylGysytDtwXC3r0LXeZCuzjQhH1EPKF397VM67KoKTqlFCpfmVNw"sharedId: "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"[[Prototype]]: Objectconstructor: ƒ Object()hasOwnProperty: ƒ hasOwnProperty()isPrototypeOf: ƒ isPrototypeOf()propertyIsEnumerable: ƒ propertyIsEnumerable()toLocaleString: ƒ toLocaleString()toString: ƒ toString()valueOf: ƒ valueOf()__defineGetter__: ƒ __defineGetter__()__defineSetter__: ƒ __defineSetter__()__lookupGetter__: ƒ __lookupGetter__()__lookupSetter__: ƒ __lookupSetter__()__proto__: (...)get __proto__: ƒ __proto__()set __proto__: ƒ __proto__()
+ [CALLBACK TEST - Numinix] Event analysis: ObjectauthCode: "C21AAM6ILPBnAg3FCSGcFLiOHkO7N7rvpCk8Fc_8_EBZxylGysytDtwXC3r0LXeZCuzjQhH1EPKF397VM67KoKTqlFCpfmVNw"eventName: ""hasOnboardedCompleteToken: truehasTrackingId: trueisCompletionEvent: "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"merchantId: undefinednormalized: ""sharedId: "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"[[Prototype]]: Object
+ [CALLBACK TEST - Numinix] Captured authCode: C21AAM6ILPBnAg3FCSGcFLiOHkO7N7rvpCk8Fc_8_EBZxylGysytDtwXC3r0LXeZCuzjQhH1EPKF397VM67KoKTqlFCpfmVNw
+ [CALLBACK TEST - Numinix] Captured sharedId: BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74
  [CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding
  [CALLBACK TEST - Numinix] Session state before finalize: Object
  [CALLBACK TEST - Numinix] Finalize payload being sent: Object
@@ -53,7 +54,7 @@ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<UR
  [CALLBACK TEST - Numinix] Received postMessage payload: Object
  [CALLBACK TEST - Numinix] Event analysis: Object
  [CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding
- [CALLBACK TEST - Numinix] Session state before finalize: Object
+ [CALLBACK TEST - Numinix] Session state before finalize: ObjectauthCode: "C21AAM6ILPBnAg3FCSGcFLiOHkO7N7rvpCk8Fc_8_EBZxylGysytDtwXC3r0LXeZCuzjQhH1EPKF397VM67KoKTqlFCpfmVNw"merchant_id: "nxp-d061e6188d855101be62"sharedId: "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"tracking_id: "nxp-d061e6188d855101be62"[[Prototype]]: Object
  [CALLBACK TEST - Numinix] Finalize payload being sent: Object
  Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.google.com') does not match the recipient window's origin ('https://www.numinix.com').
 Du @ js:600
@@ -61,6 +62,6 @@ Du @ js:600
 Du @ js:600
  Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://m.youtube.com') does not match the recipient window's origin ('https://www.numinix.com').
 Du @ js:600
- [CALLBACK TEST - Numinix] Finalize response received: Objectdata: {environment: 'live', tracking_id: 'nxp-5484c6a2f6748d491abe', partner_referral_id: '', merchant_id: 'nxp-5484c6a2f6748d491abe', step: 'waiting', …}success: true[[Prototype]]: Object
- [CALLBACK TEST - Numinix] Finalize payload being sent: ObjectauthCode: "C21AAPHCzuVlKIQksQCODDzrF1DrUNMU8rZEYXF2rUv8qN5rbyvSpHeqQ02G-qnxvcKU-lrUgNbQzDmwZ2fxXOoTp_9Q8vMGg"merchant_id: "nxp-5484c6a2f6748d491abe"sharedId: "BAAaSphy6kF9PTMvhYKKZSj5JAGBezJ7gETtYI0pp9Jb89XES-5XV7g5F7Ntt8yxZFLZ3qSFBSD73CAAu0"tracking_id: "nxp-5484c6a2f6748d491abe"[[Prototype]]: Object
- [CALLBACK TEST - Numinix] Finalize response received: Objectdata: environment: "live"merchant_id: "nxp-5484c6a2f6748d491abe"partner_referral_id: ""polling_interval: 5000status_hint: "provisioning"step: "waiting"tracking_id: "nxp-5484c6a2f6748d491abe"[[Prototype]]: Objectsuccess: true[[Prototype]]: Objectconstructor: ƒ Object()hasOwnProperty: ƒ hasOwnProperty()isPrototypeOf: ƒ isPrototypeOf()propertyIsEnumerable: ƒ propertyIsEnumerable()toLocaleString: ƒ toLocaleString()toString: ƒ toString()valueOf: ƒ valueOf()__defineGetter__: ƒ __defineGetter__()__defineSetter__: ƒ __defineSetter__()__lookupGetter__: ƒ __lookupGetter__()__lookupSetter__: ƒ __lookupSetter__()__proto__: (...)get __proto__: ƒ __proto__()set __proto__: ƒ __proto__()
+ [CALLBACK TEST - Numinix] Finalize response received: Object
+ [CALLBACK TEST - Numinix] Finalize payload being sent: ObjectauthCode: "C21AAM6ILPBnAg3FCSGcFLiOHkO7N7rvpCk8Fc_8_EBZxylGysytDtwXC3r0LXeZCuzjQhH1EPKF397VM67KoKTqlFCpfmVNw"merchant_id: "nxp-d061e6188d855101be62"sharedId: "BAAQ3o1OACJYlmPWKJbwzDT9gNFNcJngiFc_d0lN0oN3OVIOhLwU8yzYBYNvwYaItMQdtZYl1bJ1S6im74"tracking_id: "nxp-d061e6188d855101be62"[[Prototype]]: Objectconstructor: ƒ Object()hasOwnProperty: ƒ hasOwnProperty()isPrototypeOf: ƒ isPrototypeOf()propertyIsEnumerable: ƒ propertyIsEnumerable()toLocaleString: ƒ toLocaleString()toString: ƒ toString()valueOf: ƒ valueOf()__defineGetter__: ƒ __defineGetter__()__defineSetter__: ƒ __defineSetter__()__lookupGetter__: ƒ __lookupGetter__()__lookupSetter__: ƒ __lookupSetter__()__proto__: (...)get __proto__: ƒ __proto__()set __proto__: ƒ __proto__()
+ [CALLBACK TEST - Numinix] Finalize response received: Objectdata: {environment: 'live', tracking_id: 'nxp-d061e6188d855101be62', partner_referral_id: '', merchant_id: 'nxp-d061e6188d855101be62', step: 'waiting', …}success: true[[Prototype]]: Object
