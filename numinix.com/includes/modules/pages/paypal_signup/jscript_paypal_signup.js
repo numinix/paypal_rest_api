@@ -31,6 +31,78 @@
         window.dataLayer.push(Object.assign({ event: eventName }, payload || {}));
     }
 
+    /**
+     * Handle PayPal return URL when page opens in popup after signup completion.
+     * 
+     * When PayPal redirects back to this page in the popup window, we need to:
+     * 1. Extract authCode/sharedId from URL parameters
+     * 2. Send postMessage to parent window with the credentials
+     * 3. Close the popup
+     * 
+     * This enables the parent window to receive the credentials and finalize onboarding.
+     */
+    function handlePopupReturn() {
+        // Only run if this page is loaded in a popup (has window.opener)
+        if (!window.opener || window.opener.closed) {
+            return false;
+        }
+
+        var urlParams;
+        try {
+            urlParams = new URLSearchParams(window.location.search);
+        } catch (error) {
+            return false;
+        }
+
+        // Check for PayPal return parameters
+        var authCode = urlParams.get('authCode') || urlParams.get('auth_code');
+        var sharedId = urlParams.get('sharedId') || urlParams.get('shared_id');
+        var merchantId = urlParams.get('merchantId') || urlParams.get('merchantIdInPayPal');
+        var trackingId = urlParams.get('tracking_id');
+
+        // If we have any PayPal parameters, this is a return from PayPal
+        if (authCode || sharedId || merchantId || (trackingId && urlParams.get('env'))) {
+            try {
+                // Send postMessage to parent window with all parameters
+                window.opener.postMessage({
+                    event: 'paypal_onboarding_complete',
+                    paypalOnboardingComplete: true,
+                    authCode: authCode || undefined,
+                    sharedId: sharedId || undefined,
+                    merchantId: merchantId || undefined,
+                    tracking_id: trackingId || undefined,
+                    env: urlParams.get('env') || undefined,
+                    source: 'popup_return_url'
+                }, window.opener.location.origin);
+
+                // Show brief message before closing
+                document.body.innerHTML = '<div style="padding: 40px; text-align: center; font-family: system-ui, sans-serif;">' +
+                    '<h2>PayPal Setup Complete</h2>' +
+                    '<p>Processing your account details...</p>' +
+                    '<p style="color: #666; font-size: 14px;">This window will close automatically.</p>' +
+                    '</div>';
+
+                // Close popup after brief delay to ensure postMessage is received
+                setTimeout(function () {
+                    window.close();
+                }, 1000);
+
+                return true;
+            } catch (error) {
+                console.error('[PayPal Return] Failed to send postMessage:', error);
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    // Try to handle popup return immediately (before heavy page load)
+    if (handlePopupReturn()) {
+        // Stop further page initialization if we're handling popup return
+        return;
+    }
+
     ready(function () {
         var page = document.querySelector('.nxp-ps-page');
         if (!page) {
