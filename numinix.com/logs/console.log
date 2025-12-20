@@ -1,0 +1,67 @@
+ [CALLBACK TEST - Numinix] Message event listener attached - ready to receive postMessage
+ [CALLBACK TEST - Numinix] handlePopupMessage called Object
+ [CALLBACK TEST - Numinix] Received postMessage payload: Object
+ [CALLBACK TEST - Numinix] Event analysis: Object
+ [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
+ [CALLBACK TEST - Numinix] handlePopupMessage called Object
+ [CALLBACK TEST - Numinix] Ignoring message - not from PayPal or same origin. Origin: https://www.google.com
+www.googletagmanager.com/:1 Framing 'https://www.googletagmanager.com/' violates the following Content Security Policy directive: "frame-src *.numinix.com bid.g.doubleclick.net *.google.com *.facebook.com www.youtube.com *.tawk.to platform.twitter.com https://calendly.com". The request has been blocked.
+
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+paypal_signup:1 <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">
+ [CALLBACK TEST - Numinix] handlePopupMessage called Object
+ [CALLBACK TEST - Numinix] Received postMessage payload: Object
+ [CALLBACK TEST - Numinix] Event analysis: Object
+ [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
+ [CALLBACK TEST - Numinix] handlePopupMessage called Object
+ [CALLBACK TEST - Numinix] Received postMessage payload: Object
+ [CALLBACK TEST - Numinix] Event analysis: Object
+ [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
+ [CALLBACK TEST - Numinix] handlePopupMessage called Object
+ [CALLBACK TEST - Numinix] Received postMessage payload: Object
+ [CALLBACK TEST - Numinix] Event analysis: Object
+ [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
+ [CALLBACK TEST - Numinix] handlePopupMessage called Object
+ [CALLBACK TEST - Numinix] Received postMessage payload: Object
+ [CALLBACK TEST - Numinix] Event analysis: Object
+ [CALLBACK TEST - Numinix] Captured authCode: C21AAMK5bx7iSWDv3unO42AEiZFdk87AiC5GrpV1K1Tn7z31qRIhNMDPzDk7Qvx90F4E6DHdClnZ75mdnc-vDbnNspu4H49bw
+ [CALLBACK TEST - Numinix] Captured sharedId: BAAppLIua65n9u5XVfN9DX3DqaCFHnlO4oqv-h3l7_ugwK4-dxJ1ui2wmyZB2zKCznJqIDvnJTk9q-lr4s
+ [CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding
+ [CALLBACK TEST - Numinix] Session state before finalize: Object
+ [CALLBACK TEST - Numinix] Finalize payload being sent: Object
+ [CALLBACK TEST - Numinix] Finalize response received: Object
+ [CALLBACK TEST - Numinix] handlePopupMessage called Object
+ [CALLBACK TEST - Numinix] Received postMessage payload: Object
+ [CALLBACK TEST - Numinix] Event analysis: Object
+ [CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding
+ [CALLBACK TEST - Numinix] Session state before finalize: Object
+ [CALLBACK TEST - Numinix] Finalize payload being sent: Object
+ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.google.com') does not match the recipient window's origin ('https://www.numinix.com').
+Du @ js:600
+ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube.com') does not match the recipient window's origin ('https://www.numinix.com').
+Du @ js:600
+ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://m.youtube.com') does not match the recipient window's origin ('https://www.numinix.com').
+Du @ js:600
+ [CALLBACK TEST - Numinix] Finalize response received: Object
+ [CALLBACK TEST - Numinix] Finalize payload being sent: Object
+ [CALLBACK TEST - Numinix] Finalize response received: Objectdata: {environment: 'live', tracking_id: 'nxp-d061e6188d855101be62', partner_referral_id: '', merchant_id: 'nxp-d061e6188d855101be62', step: 'waiting', …}success: true[[Prototype]]: Object
