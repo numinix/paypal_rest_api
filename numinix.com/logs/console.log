@@ -1,10 +1,4 @@
- [CALLBACK TEST - Numinix] Message event listener attached - ready to receive postMessage
- [CALLBACK TEST - Numinix] handlePopupMessage called Object
- [CALLBACK TEST - Numinix] Received postMessage payload: Object
- [CALLBACK TEST - Numinix] Event analysis: Object
- [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
- [CALLBACK TEST - Numinix] handlePopupMessage called Object
- [CALLBACK TEST - Numinix] Ignoring message - not from PayPal or same origin. Origin: https://www.google.com
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:105 [CALLBACK TEST - Numinix] Message event listener attached - ready to receive postMessage
 www.googletagmanager.com/:1 Framing 'https://www.googletagmanager.com/' violates the following Content Security Policy directive: "frame-src *.numinix.com bid.g.doubleclick.net *.google.com *.facebook.com www.youtube.com *.tawk.to platform.twitter.com https://calendly.com". The request has been blocked.
 
 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
@@ -28,40 +22,130 @@ Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<UR
 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('null').
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:94 [CALLBACK TEST - Numinix] handlePopupMessage called Object
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:99 [CALLBACK TEST - Numinix] Received postMessage payload: Object
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:100 [CALLBACK TEST - Numinix] Event analysis: Object
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:100 [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:94 [CALLBACK TEST - Numinix] handlePopupMessage called Object
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:94 [CALLBACK TEST - Numinix] Ignoring message - not from PayPal or same origin. Origin: https://www.google.com
 paypal_signup:1 <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">
- [CALLBACK TEST - Numinix] handlePopupMessage called Object
- [CALLBACK TEST - Numinix] Received postMessage payload: Object
- [CALLBACK TEST - Numinix] Event analysis: Object
- [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
- [CALLBACK TEST - Numinix] handlePopupMessage called Object
- [CALLBACK TEST - Numinix] Received postMessage payload: Object
- [CALLBACK TEST - Numinix] Event analysis: Object
- [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
- [CALLBACK TEST - Numinix] handlePopupMessage called Object
- [CALLBACK TEST - Numinix] Received postMessage payload: Object
- [CALLBACK TEST - Numinix] Event analysis: Object
- [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
- [CALLBACK TEST - Numinix] handlePopupMessage called Object
- [CALLBACK TEST - Numinix] Received postMessage payload: Object
- [CALLBACK TEST - Numinix] Event analysis: Object
- [CALLBACK TEST - Numinix] Captured authCode: C21AAMK5bx7iSWDv3unO42AEiZFdk87AiC5GrpV1K1Tn7z31qRIhNMDPzDk7Qvx90F4E6DHdClnZ75mdnc-vDbnNspu4H49bw
- [CALLBACK TEST - Numinix] Captured sharedId: BAAppLIua65n9u5XVfN9DX3DqaCFHnlO4oqv-h3l7_ugwK4-dxJ1ui2wmyZB2zKCznJqIDvnJTk9q-lr4s
- [CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding
- [CALLBACK TEST - Numinix] Session state before finalize: Object
- [CALLBACK TEST - Numinix] Finalize payload being sent: Object
- [CALLBACK TEST - Numinix] Finalize response received: Object
- [CALLBACK TEST - Numinix] handlePopupMessage called Object
- [CALLBACK TEST - Numinix] Received postMessage payload: Object
- [CALLBACK TEST - Numinix] Event analysis: Object
- [CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding
- [CALLBACK TEST - Numinix] Session state before finalize: Object
- [CALLBACK TEST - Numinix] Finalize payload being sent: Object
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:94 [CALLBACK TEST - Numinix] handlePopupMessage called {hasPopup: true, hasEvent: true, hasEventSource: true, eventOrigin: 'https://www.paypal.com', sourcesMatch: true, …}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:99 [CALLBACK TEST - Numinix] Received postMessage payload: {__post_robot_10_0_44__: Array(1)}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:100 [CALLBACK TEST - Numinix] Event analysis: {eventName: '', normalized: '', isCompletionEvent: undefined, hasTrackingId: true, authCode: undefined, …}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:100 [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:94 [CALLBACK TEST - Numinix] handlePopupMessage called {hasPopup: true, hasEvent: true, hasEventSource: true, eventOrigin: 'https://www.paypal.com', sourcesMatch: true, …}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:99 [CALLBACK TEST - Numinix] Received postMessage payload: {__post_robot_11_0_0__: Array(1)}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:100 [CALLBACK TEST - Numinix] Event analysis: {eventName: '', normalized: '', isCompletionEvent: undefined, hasTrackingId: true, authCode: undefined, …}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:100 [CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:94 [CALLBACK TEST - Numinix] handlePopupMessage called {hasPopup: true, hasEvent: true, hasEventSource: true, eventOrigin: 'https://www.paypal.com', sourcesMatch: true, …}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:99 [CALLBACK TEST - Numinix] Received postMessage payload: {onboardedCompleteToken: 'C21AAOagtg2mdEDpthfT4dLoDnOUyrUyacdXNiCYisQG71Y_mLR2dHvYB-Dti2SqIYi-dg2HartTzuooRhV1YvWfI_GUDY4pw', sharedId: 'BAAxkRJQGBKd7EymM50YK6BJIEWnh3sD_MNJp3BcfVSNxCdH4TK9bJUpq6PVPEW3XJz6f1-DYL-SFtfTdw'}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:100 [CALLBACK TEST - Numinix] Event analysis: {eventName: '', normalized: '', isCompletionEvent: 'BAAxkRJQGBKd7EymM50YK6BJIEWnh3sD_MNJp3BcfVSNxCdH4TK9bJUpq6PVPEW3XJz6f1-DYL-SFtfTdw', hasTrackingId: true, authCode: 'C21AAOagtg2mdEDpthfT4dLoDnOUyrUyacdXNiCYisQG71Y_mLR2dHvYB-Dti2SqIYi-dg2HartTzuooRhV1YvWfI_GUDY4pw', …}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:102 [CALLBACK TEST - Numinix] Captured authCode: C21AAOagtg2mdEDpthfT4dLoDnOUyrUyacdXNiCYisQG71Y_mLR2dHvYB-Dti2SqIYi-dg2HartTzuooRhV1YvWfI_GUDY4pw
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:103 [CALLBACK TEST - Numinix] Captured sharedId: BAAxkRJQGBKd7EymM50YK6BJIEWnh3sD_MNJp3BcfVSNxCdH4TK9bJUpq6PVPEW3XJz6f1-DYL-SFtfTdw
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:104 [CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:104 [CALLBACK TEST - Numinix] Session state before finalize: {tracking_id: 'nxp-d061e6188d855101be62', authCode: 'C21AAOagtg2mdEDpthfT4dLoDnOUyrUyacdXNiCYisQG71Y_mLR2dHvYB-Dti2SqIYi-dg2HartTzuooRhV1YvWfI_GUDY4pw', sharedId: 'BAAxkRJQGBKd7EymM50YK6BJIEWnh3sD_MNJp3BcfVSNxCdH4TK9bJUpq6PVPEW3XJz6f1-DYL-SFtfTdw', merchant_id: ''}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:92 [CALLBACK TEST - Numinix] Finalize payload being sent: {tracking_id: 'nxp-d061e6188d855101be62', authCode: 'C21AAOagtg2mdEDpthfT4dLoDnOUyrUyacdXNiCYisQG71Y_mLR2dHvYB-Dti2SqIYi-dg2HartTzuooRhV1YvWfI_GUDY4pw', sharedId: 'BAAxkRJQGBKd7EymM50YK6BJIEWnh3sD_MNJp3BcfVSNxCdH4TK9bJUpq6PVPEW3XJz6f1-DYL-SFtfTdw'}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:93 [CALLBACK TEST - Numinix] Finalize response received: {data: {…}, success: true}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:94 [CALLBACK TEST - Numinix] handlePopupMessage called {hasPopup: true, hasEvent: true, hasEventSource: true, eventOrigin: 'https://www.numinix.com', sourcesMatch: true, …}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:99 [CALLBACK TEST - Numinix] Received postMessage payload: {event: 'paypal_onboarding_complete', paypalOnboardingComplete: true, authCode: undefined, sharedId: undefined, merchantId: undefined, …}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:100 [CALLBACK TEST - Numinix] Event analysis: {eventName: 'paypal_onboarding_complete', normalized: 'paypal_onboarding_complete', isCompletionEvent: true, hasTrackingId: true, authCode: undefined, …}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:104 [CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:104 [CALLBACK TEST - Numinix] Session state before finalize: {tracking_id: 'nxp-d061e6188d855101be62', authCode: 'C21AAOagtg2mdEDpthfT4dLoDnOUyrUyacdXNiCYisQG71Y_mLR2dHvYB-Dti2SqIYi-dg2HartTzuooRhV1YvWfI_GUDY4pw', sharedId: 'BAAxkRJQGBKd7EymM50YK6BJIEWnh3sD_MNJp3BcfVSNxCdH4TK9bJUpq6PVPEW3XJz6f1-DYL-SFtfTdw', merchant_id: 'nxp-d061e6188d855101be62'}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:92 [CALLBACK TEST - Numinix] Finalize payload being sent: {tracking_id: 'nxp-d061e6188d855101be62', merchant_id: 'nxp-d061e6188d855101be62', authCode: 'C21AAOagtg2mdEDpthfT4dLoDnOUyrUyacdXNiCYisQG71Y_mLR2dHvYB-Dti2SqIYi-dg2HartTzuooRhV1YvWfI_GUDY4pw', sharedId: 'BAAxkRJQGBKd7EymM50YK6BJIEWnh3sD_MNJp3BcfVSNxCdH4TK9bJUpq6PVPEW3XJz6f1-DYL-SFtfTdw'}
  Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.google.com') does not match the recipient window's origin ('https://www.numinix.com').
-Du @ js:600
+Du @ js?id=G-BLQM5BHSXJ:600
+Fu @ js?id=G-BLQM5BHSXJ:603
+TO @ js?id=G-BLQM5BHSXJ:996
+k.Or @ js?id=G-BLQM5BHSXJ:992
+(anonymous) @ js?id=G-BLQM5BHSXJ:990
+Vl @ js?id=G-BLQM5BHSXJ:455
+Un @ js?id=G-BLQM5BHSXJ:474
+(anonymous) @ js?id=G-BLQM5BHSXJ:990
+c @ js?id=G-BLQM5BHSXJ:917
+uJ @ js?id=G-BLQM5BHSXJ:917
+k.Nr @ js?id=G-BLQM5BHSXJ:990
+b @ js?id=G-BLQM5BHSXJ:1004
+v @ js?id=G-BLQM5BHSXJ:498
+dm @ js?id=G-BLQM5BHSXJ:457
+Xp @ js?id=G-BLQM5BHSXJ:498
+Wp.flush @ js?id=G-BLQM5BHSXJ:502
+Wp.push @ js?id=G-BLQM5BHSXJ:500
+config @ js?id=G-BLQM5BHSXJ:770
+oB @ js?id=G-BLQM5BHSXJ:779
+qB @ js?id=G-BLQM5BHSXJ:782
+setTimeout
+Uc @ js?id=G-BLQM5BHSXJ:280
+rB @ js?id=G-BLQM5BHSXJ:785
+Lm @ js?id=G-BLQM5BHSXJ:1090
+(anonymous) @ js?id=G-BLQM5BHSXJ:1094
+c @ js?id=G-BLQM5BHSXJ:1092
+(anonymous) @ js?id=G-BLQM5BHSXJ:1094
+(anonymous) @ js?id=G-BLQM5BHSXJ:1094
+(anonymous) @ js?id=G-BLQM5BHSXJ:1096
  Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube.com') does not match the recipient window's origin ('https://www.numinix.com').
-Du @ js:600
+Du @ js?id=G-BLQM5BHSXJ:600
+Fu @ js?id=G-BLQM5BHSXJ:603
+TO @ js?id=G-BLQM5BHSXJ:996
+k.Or @ js?id=G-BLQM5BHSXJ:992
+(anonymous) @ js?id=G-BLQM5BHSXJ:990
+Vl @ js?id=G-BLQM5BHSXJ:455
+Un @ js?id=G-BLQM5BHSXJ:474
+(anonymous) @ js?id=G-BLQM5BHSXJ:990
+c @ js?id=G-BLQM5BHSXJ:917
+uJ @ js?id=G-BLQM5BHSXJ:917
+k.Nr @ js?id=G-BLQM5BHSXJ:990
+b @ js?id=G-BLQM5BHSXJ:1004
+v @ js?id=G-BLQM5BHSXJ:498
+dm @ js?id=G-BLQM5BHSXJ:457
+Xp @ js?id=G-BLQM5BHSXJ:498
+Wp.flush @ js?id=G-BLQM5BHSXJ:502
+Wp.push @ js?id=G-BLQM5BHSXJ:500
+config @ js?id=G-BLQM5BHSXJ:770
+oB @ js?id=G-BLQM5BHSXJ:779
+qB @ js?id=G-BLQM5BHSXJ:782
+setTimeout
+Uc @ js?id=G-BLQM5BHSXJ:280
+rB @ js?id=G-BLQM5BHSXJ:785
+Lm @ js?id=G-BLQM5BHSXJ:1090
+(anonymous) @ js?id=G-BLQM5BHSXJ:1094
+c @ js?id=G-BLQM5BHSXJ:1092
+(anonymous) @ js?id=G-BLQM5BHSXJ:1094
+(anonymous) @ js?id=G-BLQM5BHSXJ:1094
+(anonymous) @ js?id=G-BLQM5BHSXJ:1096
  Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://m.youtube.com') does not match the recipient window's origin ('https://www.numinix.com').
-Du @ js:600
- [CALLBACK TEST - Numinix] Finalize response received: Object
- [CALLBACK TEST - Numinix] Finalize payload being sent: Object
- [CALLBACK TEST - Numinix] Finalize response received: Objectdata: {environment: 'live', tracking_id: 'nxp-d061e6188d855101be62', partner_referral_id: '', merchant_id: 'nxp-d061e6188d855101be62', step: 'waiting', …}success: true[[Prototype]]: Object
+Du @ js?id=G-BLQM5BHSXJ:600
+Fu @ js?id=G-BLQM5BHSXJ:603
+TO @ js?id=G-BLQM5BHSXJ:996
+k.Or @ js?id=G-BLQM5BHSXJ:992
+(anonymous) @ js?id=G-BLQM5BHSXJ:990
+Vl @ js?id=G-BLQM5BHSXJ:455
+Un @ js?id=G-BLQM5BHSXJ:474
+(anonymous) @ js?id=G-BLQM5BHSXJ:990
+c @ js?id=G-BLQM5BHSXJ:917
+uJ @ js?id=G-BLQM5BHSXJ:917
+k.Nr @ js?id=G-BLQM5BHSXJ:990
+b @ js?id=G-BLQM5BHSXJ:1004
+v @ js?id=G-BLQM5BHSXJ:498
+dm @ js?id=G-BLQM5BHSXJ:457
+Xp @ js?id=G-BLQM5BHSXJ:498
+Wp.flush @ js?id=G-BLQM5BHSXJ:502
+Wp.push @ js?id=G-BLQM5BHSXJ:500
+config @ js?id=G-BLQM5BHSXJ:770
+oB @ js?id=G-BLQM5BHSXJ:779
+qB @ js?id=G-BLQM5BHSXJ:782
+setTimeout
+Uc @ js?id=G-BLQM5BHSXJ:280
+rB @ js?id=G-BLQM5BHSXJ:785
+Lm @ js?id=G-BLQM5BHSXJ:1090
+(anonymous) @ js?id=G-BLQM5BHSXJ:1094
+c @ js?id=G-BLQM5BHSXJ:1092
+(anonymous) @ js?id=G-BLQM5BHSXJ:1094
+(anonymous) @ js?id=G-BLQM5BHSXJ:1094
+(anonymous) @ js?id=G-BLQM5BHSXJ:1096
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:93 [CALLBACK TEST - Numinix] Finalize response received: {data: {…}, success: true}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:92 [CALLBACK TEST - Numinix] Finalize payload being sent: {tracking_id: 'nxp-d061e6188d855101be62', merchant_id: 'nxp-d061e6188d855101be62', authCode: 'C21AAOagtg2mdEDpthfT4dLoDnOUyrUyacdXNiCYisQG71Y_mLR2dHvYB-Dti2SqIYi-dg2HartTzuooRhV1YvWfI_GUDY4pw', sharedId: 'BAAxkRJQGBKd7EymM50YK6BJIEWnh3sD_MNJp3BcfVSNxCdH4TK9bJUpq6PVPEW3XJz6f1-DYL-SFtfTdw'}
+min/?f=/includes/modules/pages/paypal_signup/jscript_paypal_signup.js,/includes/templates/nmn/jscript/jquery/jquery-1.12.0.min.js,/includes/templates/nmn/jscript/jquery/jquery-1.11.3.min.js,/includes/templates/nmn/jscript/jquery/jquery-migrate-1.2.1.min.js,/includes/templates/nmn/jscript/jquery/jquery-ui-1.12.1.custom.min.js,/includes/templates/nmn/jscript/jquery/jquery_ajax_search.js&1766217265:93 [CALLBACK TEST - Numinix] Finalize response received: {data: {…}, success: true}data: {environment: 'live', tracking_id: 'nxp-d061e6188d855101be62', partner_referral_id: '', merchant_id: 'nxp-d061e6188d855101be62', step: 'waiting', …}success: true[[Prototype]]: Objectconstructor: ƒ Object()hasOwnProperty: ƒ hasOwnProperty()isPrototypeOf: ƒ isPrototypeOf()propertyIsEnumerable: ƒ propertyIsEnumerable()toLocaleString: ƒ toLocaleString()toString: ƒ toString()valueOf: ƒ valueOf()__defineGetter__: ƒ __defineGetter__()__defineSetter__: ƒ __defineSetter__()__lookupGetter__: ƒ __lookupGetter__()__lookupSetter__: ƒ __lookupSetter__()__proto__: (...)get __proto__: ƒ __proto__()set __proto__: ƒ __proto__()
+paypal_signup:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+paypal_signup:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+paypal_signup:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+paypal_signup:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
