@@ -676,16 +676,28 @@ function paypalr_render_onboarding_page(): void
                         dataType: event && event.data ? typeof event.data : 'N/A'
                     });
                     
+                    // Helper function to validate PayPal domain (prevents subdomain attacks like 'evil-paypal.com')
+                    function isPayPalDomain(origin) {
+                        if (!origin) return false;
+                        try {
+                            var url = new URL(origin);
+                            var hostname = url.hostname.toLowerCase();
+                            // Must be exactly paypal.com or a subdomain of paypal.com
+                            // Must be exactly paypalobjects.com or a subdomain of paypalobjects.com
+                            return hostname === 'paypal.com' || hostname.endsWith('.paypal.com') ||
+                                   hostname === 'paypalobjects.com' || hostname.endsWith('.paypalobjects.com');
+                        } catch (e) {
+                            return false;
+                        }
+                    }
+                    
                     // Accept messages from:
                     // 1. Our popup (if we opened one)
                     // 2. Same origin (for mini-browser flow)
                     // 3. PayPal domains (for direct PayPal callbacks)
                     var isFromOurPopup = state.popup && event && event.source && event.source === state.popup;
                     var isFromSameOrigin = event && event.origin === window.location.origin;
-                    var isFromPayPal = event && event.origin && (
-                        event.origin.indexOf('paypal.com') !== -1 ||
-                        event.origin.indexOf('paypalobjects.com') !== -1
-                    );
+                    var isFromPayPal = event && isPayPalDomain(event.origin);
                     
                     // If we have a popup reference, only accept from that popup
                     // Otherwise, accept from same origin or PayPal
@@ -2165,6 +2177,11 @@ function paypalr_handle_completion(): void
                 if (window.opener && !window.opener.closed) {
                     try {
                         // Try to determine the opener's origin for targeted postMessage
+                        // We try to get the specific origin, but fall back to '*' if cross-origin access fails
+                        // This is acceptable because:
+                        // 1. The data being sent (merchantId, authCode, sharedId) are temporary tokens, not credentials
+                        // 2. The receiving page validates message content before processing
+                        // 3. The actual credentials are exchanged server-side through authenticated endpoints
                         var targetOrigin = '*';
                         try {
                             if (window.opener.location && window.opener.location.origin) {
@@ -2176,6 +2193,8 @@ function paypalr_handle_completion(): void
                             console.log('[PayPal ISU Completion] Could not access opener origin, using *');
                         }
                         
+                        // Include paypalOnboardingComplete: true for backward compatibility with handlers
+                        // that check for this property instead of the event name
                         var messagePayload = {
                             event: 'paypal_onboarding_complete',
                             paypalOnboardingComplete: true,

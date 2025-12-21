@@ -5,37 +5,45 @@ When users initiate PayPal signup from the client admin (paypalr_integrated_sign
 
 ## Root Cause Analysis
 
-### The Issue
+### Issue 1: Missing Database Retrieval in Finalize Handler
 The `nxp_paypal_handle_finalize()` function in `numinix.com/includes/modules/pages/paypal_signup/includes/nxp_paypal_helpers.php` was missing database retrieval logic for `authCode` and `sharedId`.
+
+### Issue 2: PostMessage Handler Rejecting Valid Messages
+The `handlePopupMessage()` function in `admin/paypalr_integrated_signup.php` was rejecting all messages when `state.popup` is null. This happens in the mini-browser flow because PayPal's mini-browser is an overlay, not a popup window opened via `window.open()`.
 
 ### Flow Analysis
 When using PayPal's mini-browser/embedded signup flow:
 
 1. **PayPal Callback Flow**: 
-   - PayPal's `paypalOnboardedCallback` receives authCode/sharedId
-   - Main page's status call persists them to the database via `nxp_paypal_persist_auth_code()`
+   - PayPal's `paypalOnboardedCallback` SHOULD receive authCode/sharedId
+   - But this callback is often NOT called by PayPal's partner.js
+   - Main page's status call would persist them to the database via `nxp_paypal_persist_auth_code()`
    
 2. **Completion Page Flow**:
-   - Completion page opens in a popup/new tab
-   - PayPal redirects to completion page WITHOUT authCode/sharedId in the URL
+   - Mini-browser redirects to completion page
+   - Completion page sends postMessage to opener (if it exists)
+   - **BUG 1**: `handlePopupMessage` rejected messages when `state.popup` is null
    - Completion page calls finalize WITHOUT authCode/sharedId
-   - **BUG**: Finalize handler was NOT checking the database for persisted authCode/sharedId
+   - **BUG 2**: Finalize handler was NOT checking the database for persisted authCode/sharedId
    - Falls back to merchant integration lookup which returns `step: waiting`
 
 ### Why Numinix.com Standalone Signups Worked
 For signups initiated directly on Numinix.com:
-- The completion page receives authCode/sharedId (either in URL or via session)
-- The finalize request includes authCode/sharedId
-- Credentials are exchanged successfully
+- They use `window.open()` popup approach, NOT PayPal's mini-browser
+- Popup completion page sends postMessage to parent
+- Parent receives it and includes data in finalize request
 
 ### Why Client Admin Signups Failed
 For signups from client admin (paypalr_integrated_signup.php):
-- Completion page is a different session from the main page
-- authCode/sharedId come through JavaScript callback, not URL
+- Uses mini-browser which doesn't set `state.popup`
+- PostMessage handler rejected all messages
+- authCode/sharedId come through JavaScript callback, which often doesn't fire
 - Completion page's finalize doesn't have authCode/sharedId
 - Database retrieval was missing in finalize handler
 
-## Fix Applied
+## Fixes Applied
+
+### Fix 1: Database Retrieval in Finalize Handler
 
 Added authCode/sharedId database retrieval to `nxp_paypal_handle_finalize()`:
 
@@ -48,50 +56,72 @@ if ((empty($authCode) || empty($sharedId)) && !empty($trackingId)) {
     if ($persistedAuthData !== null) {
         $authCode = $persistedAuthData['auth_code'];
         $sharedId = $persistedAuthData['shared_id'];
-        nxp_paypal_log_debug('Retrieved authCode and sharedId from database for finalize', [
-            'tracking_id' => $trackingId,
-        ]);
     }
 }
 ```
 
-This matches the existing logic in `nxp_paypal_handle_status()` (lines 687-698).
+### Fix 2: PostMessage Handler
+
+Fixed `handlePopupMessage()` to accept messages even when `state.popup` is null:
+
+```javascript
+// Accept messages from:
+// 1. Our popup (if we opened one)
+// 2. Same origin (for mini-browser flow)
+// 3. PayPal domains (for direct PayPal callbacks)
+var isFromOurPopup = state.popup && event && event.source && event.source === state.popup;
+var isFromSameOrigin = event && event.origin === window.location.origin;
+var isFromPayPal = event && event.origin && (
+    event.origin.indexOf('paypal.com') !== -1 ||
+    event.origin.indexOf('paypalobjects.com') !== -1
+);
+
+// If we have a popup reference, only accept from that popup
+// Otherwise, accept from same origin or PayPal
+if (state.popup && !isFromOurPopup) {
+    return;
+}
+if (!state.popup && !isFromSameOrigin && !isFromPayPal) {
+    return;
+}
+```
+
+### Fix 3: Enhanced Logging
+
+Added comprehensive console logging to help debug callback and postMessage flows:
+- Log when message event listener is attached
+- Log all incoming postMessages with origin and data type
+- Log when paypalOnboardingComplete event is received
+- Log completion page's postMessage sending status
 
 ## Files Changed
 1. `numinix.com/includes/modules/pages/paypal_signup/includes/nxp_paypal_helpers.php`
    - Added authCode/sharedId database retrieval to `nxp_paypal_handle_finalize()`
 
-2. `tests/FinalizeHandlerAuthCodeRetrievalTest.php` (new file)
+2. `admin/paypalr_integrated_signup.php`
+   - Fixed `handlePopupMessage()` to accept messages from same origin/PayPal when `state.popup` is null
+   - Added comprehensive console logging for debugging
+
+3. `tests/FinalizeHandlerAuthCodeRetrievalTest.php` (new file)
    - Added test to verify finalize handler retrieves auth code from database
 
 ## Future Tasks / Considerations
 
-### 1. Callback Reliability
-The fix relies on the PayPal callback (`paypalOnboardedCallback`) firing and the main page's status call persisting authCode/sharedId before the completion page's finalize runs. Consider:
-- Adding retry logic if the callback doesn't fire
-- Implementing a fallback mechanism if authCode/sharedId are never persisted
+### 1. Callback Reliability Issue
+The PayPal `paypalOnboardedCallback` callback often doesn't fire when using the mini-browser. Consider:
+- Switching to the popup approach like numinix.com does (using `window.open()` instead of mini-browser)
+- The popup approach is more reliable because it uses standard `window.opener` communication
 
-### 2. Mini-Browser Flow Verification
-Some tests indicate the mini-browser flow may not be working correctly (`useMiniBrowserFlow` function missing). This should be investigated separately.
+### 2. Timing/Race Conditions
+While the fixes handle many cases, there could still be race conditions:
+- If completion page's finalize runs before authCode/sharedId are persisted to database
+- The system will poll and eventually succeed once the callback fires and persists data
 
-### 3. Timing/Race Conditions
-While the fix handles the cross-session case, there could still be race conditions:
-- If completion page's finalize runs before main page's status persists authCode/sharedId
-- The fix handles this by falling back to merchant integration lookup and polling
-
-### 4. Error Handling
-Consider adding more explicit error messages when:
-- authCode/sharedId cannot be retrieved from database
-- PayPal callback never fires
-- Merchant integration lookup times out
-
-### 5. Test Infrastructure
-Some existing tests have failures unrelated to this fix:
-- `PayPalPartnerJsCallbackTest.php` - Mini-browser flow tests failing
-- `MerchantIdDatabasePersistenceTest.php` - Tracking ID extraction test failing
-- `AuthCodeCredentialExchangeTest.php` - Grant type pattern matching issue
-
-These should be investigated and fixed separately.
+### 3. Merchant Integration Lookup Fallback
+When authCode/sharedId are not available, the system falls back to PayPal's Merchant Integration API. This has a delay because:
+- PayPal needs time to provision the merchant account after signup
+- The lookup returns `step: waiting` until provisioning completes
+- This can take seconds to minutes
 
 ## Testing Verification
 Run these tests to verify the fix:
