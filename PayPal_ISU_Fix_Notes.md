@@ -5,43 +5,55 @@ When users initiate PayPal signup from the client admin (paypalr_integrated_sign
 
 ## Root Cause Analysis
 
-### Issue 1: Missing Database Retrieval in Finalize Handler
-The `nxp_paypal_handle_finalize()` function in `numinix.com/includes/modules/pages/paypal_signup/includes/nxp_paypal_helpers.php` was missing database retrieval logic for `authCode` and `sharedId`.
+The fundamental issue is that PayPal's mini-browser (embedded overlay) flow doesn't work reliably:
+1. The `paypalOnboardedCallback` function is often NOT called by PayPal's partner.js
+2. The mini-browser doesn't create a proper `window.opener` relationship
+3. PostMessage communication fails because there's no popup reference
 
-### Issue 2: PostMessage Handler Rejecting Valid Messages
-The `handlePopupMessage()` function in `admin/paypalr_integrated_signup.php` was rejecting all messages when `state.popup` is null. This happens in the mini-browser flow because PayPal's mini-browser is an overlay, not a popup window opened via `window.open()`.
-
-### Flow Analysis
-When using PayPal's mini-browser/embedded signup flow:
-
-1. **PayPal Callback Flow**: 
-   - PayPal's `paypalOnboardedCallback` SHOULD receive authCode/sharedId
-   - But this callback is often NOT called by PayPal's partner.js
-   - Main page's status call would persist them to the database via `nxp_paypal_persist_auth_code()`
-   
-2. **Completion Page Flow**:
-   - Mini-browser redirects to completion page
-   - Completion page sends postMessage to opener (if it exists)
-   - **BUG 1**: `handlePopupMessage` rejected messages when `state.popup` is null
-   - Completion page calls finalize WITHOUT authCode/sharedId
-   - **BUG 2**: Finalize handler was NOT checking the database for persisted authCode/sharedId
-   - Falls back to merchant integration lookup which returns `step: waiting`
-
-### Why Numinix.com Standalone Signups Worked
+### Why Numinix.com Standalone Signups Work
 For signups initiated directly on Numinix.com:
 - They use `window.open()` popup approach, NOT PayPal's mini-browser
-- Popup completion page sends postMessage to parent
+- The SAME page serves as both main page AND popup return handler
+- Popup completion page detects `window.opener`, sends postMessage, and closes
 - Parent receives it and includes data in finalize request
 
 ### Why Client Admin Signups Failed
 For signups from client admin (paypalr_integrated_signup.php):
-- Uses mini-browser which doesn't set `state.popup`
-- PostMessage handler rejected all messages
-- authCode/sharedId come through JavaScript callback, which often doesn't fire
-- Completion page's finalize doesn't have authCode/sharedId
-- Database retrieval was missing in finalize handler
+- Uses PayPal's mini-browser which doesn't create proper window relationships
+- The mini-browser's JavaScript callbacks often don't fire
+- No reliable way to communicate between mini-browser and parent page
 
-## Fixes Applied
+## Solution: New Simplified Admin Page
+
+Created a new **simplified admin page** (`admin/paypalr_signup.php`) that follows the same approach as the working numinix.com paypal_signup page:
+
+### Key Features
+
+1. **Popup-based flow** - Uses `window.open()` instead of mini-browser
+2. **Same page for main and return** - The page serves dual purpose:
+   - When loaded normally: Shows the signup form and handles the flow
+   - When loaded in popup with PayPal params: Sends postMessage to parent and closes
+3. **Automatic credential saving** - Once credentials are received, saves them to the configuration table
+
+### Flow
+
+1. User clicks "Start PayPal Setup"
+2. Page calls Numinix API to get redirect URL
+3. PayPal opens in a popup window via `window.open()`
+4. User completes PayPal signup in the popup
+5. PayPal redirects popup back to this same page with tracking params
+6. Popup page detects `window.opener`, sends postMessage with params, closes
+7. Parent page receives message, calls finalize API with all params
+8. Credentials are returned and displayed
+9. User clicks "Save to Configuration" - credentials saved to DB
+
+### Files
+
+- **`admin/paypalr_signup.php`** - New simplified signup page
+- Uses the same Numinix API endpoints as the original
+- Saves credentials to `MODULE_PAYMENT_PAYPALR_CLIENTID_*` and `MODULE_PAYMENT_PAYPALR_SECRET_*` config keys
+
+## Previous Fix Attempts (For Reference)
 
 ### Fix 1: Database Retrieval in Finalize Handler
 
