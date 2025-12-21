@@ -441,11 +441,14 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             }
         }
 
-        if ($partnerMerchantId !== '' && !preg_match('/^[A-Za-z0-9]+$/', $partnerMerchantId)) {
-            $this->logDebug('Partner merchant ID format invalid', [
-                'length' => strlen($partnerMerchantId),
-            ]);
-            return '';
+        if ($partnerMerchantId !== '') {
+            $length = strlen($partnerMerchantId);
+            if (!preg_match('/^[A-Za-z0-9]+$/', $partnerMerchantId) || $length < 10 || $length > 20) {
+                $this->logDebug('Partner merchant ID format invalid', [
+                    'length' => $length,
+                ]);
+                return '';
+            }
         }
 
         return $partnerMerchantId;

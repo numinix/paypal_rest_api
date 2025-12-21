@@ -13,6 +13,10 @@
         return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
+    function isValidMerchantId(value) {
+        return typeof value === 'string' && /^[A-Za-z0-9]{10,20}$/.test(value);
+    }
+
     function smoothScrollTo(target) {
         if (!target) {
             return;
@@ -58,6 +62,9 @@
         var authCode = urlParams.get('authCode') || urlParams.get('auth_code');
         var sharedId = urlParams.get('sharedId') || urlParams.get('shared_id');
         var merchantId = urlParams.get('merchantId') || urlParams.get('merchantIdInPayPal');
+        if (!isValidMerchantId(merchantId)) {
+            merchantId = null;
+        }
         var trackingId = urlParams.get('tracking_id');
 
         // If we have any PayPal parameters, this is a return from PayPal
@@ -574,7 +581,7 @@
             if (data.step) {
                 state.session.step = data.step;
             }
-            if (data.merchant_id) {
+            if (data.merchant_id && isValidMerchantId(data.merchant_id)) {
                 state.session.merchant_id = data.merchant_id;
             }
             if (data.auth_code || data.authCode) {
@@ -605,7 +612,7 @@
             if (data.step) {
                 state.session.step = data.step;
             }
-            if (data.merchant_id) {
+            if (data.merchant_id && isValidMerchantId(data.merchant_id)) {
                 state.session.merchant_id = data.merchant_id;
             }
             if (data.auth_code || data.authCode) {
@@ -931,7 +938,7 @@
             }
 
             // Capture authCode/sharedId/merchantId from PayPal postMessage for credential exchange
-            if (payload.merchantId) {
+            if (payload.merchantId && isValidMerchantId(payload.merchantId)) {
                 state.session.merchant_id = payload.merchantId;
             }
             if (authCode) {

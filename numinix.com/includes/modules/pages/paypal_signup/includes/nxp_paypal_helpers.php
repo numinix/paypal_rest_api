@@ -62,7 +62,7 @@ function nxp_paypal_bootstrap_session(): array
         $state['partner_referral_id'] = $input['partner_referral_id'];
     }
 
-    if (!empty($input['merchant_id'])) {
+    if (nxp_paypal_is_valid_merchant_id($input['merchant_id'])) {
         $state['merchant_id'] = $input['merchant_id'];
     }
 
@@ -84,6 +84,28 @@ function nxp_paypal_bootstrap_session(): array
     $_SESSION['nxp_paypal'] = $state;
 
     return $state;
+}
+
+/**
+ * Validates a PayPal merchant identifier.
+ *
+ * PayPal merchant IDs are typically 13+ alphanumeric characters with no dashes.
+ *
+ * @param string|null $value
+ * @return bool
+ */
+function nxp_paypal_is_valid_merchant_id(?string $value): bool
+{
+    if ($value === null) {
+        return false;
+    }
+
+    $trimmed = trim($value);
+    if ($trimmed === '') {
+        return false;
+    }
+
+    return preg_match('/^[A-Za-z0-9]{10,20}$/', $trimmed) === 1;
 }
 
 /**
@@ -475,7 +497,7 @@ function nxp_paypal_handle_finalize(array $session): void
     ];
 
     // Persist identifiers that arrive via finalize to make credential exchange resilient
-    if ($merchantId !== null) {
+    if ($merchantId !== null && nxp_paypal_is_valid_merchant_id($merchantId)) {
         $_SESSION['nxp_paypal']['merchant_id'] = $merchantId;
         if (!empty($trackingId)) {
             nxp_paypal_persist_merchant_id($trackingId, $merchantId, $session['env'] ?? 'sandbox');
@@ -626,7 +648,7 @@ function nxp_paypal_handle_status(array $session): void
     }
 
     // Persist merchant/authCode/sharedId data from the status request into the session and DB
-    if (!empty($merchantId)) {
+    if (!empty($merchantId) && nxp_paypal_is_valid_merchant_id($merchantId)) {
         $_SESSION['nxp_paypal']['merchant_id'] = $merchantId;
         if (!empty($trackingId)) {
             nxp_paypal_persist_merchant_id($trackingId, $merchantId, $session['env'] ?? 'sandbox');
@@ -1449,10 +1471,11 @@ function nxp_paypal_persist_merchant_id(string $trackingId, string $merchantId, 
         return false;
     }
 
-    // Validate merchant_id format (alphanumeric only, max 32 chars - PayPal merchant IDs are typically 13 chars)
-    if (!preg_match('/^[A-Z0-9]{1,32}$/i', $merchantId)) {
+    // Validate merchant_id format (PayPal merchant IDs are alphanumeric without dashes)
+    if (!nxp_paypal_is_valid_merchant_id($merchantId)) {
         nxp_paypal_log_debug('Invalid merchant_id format for persistence', [
             'merchant_id_length' => strlen($merchantId),
+            'merchant_id_preview' => substr($merchantId, 0, 6) . '...',
         ]);
         return false;
     }
@@ -1480,6 +1503,8 @@ function nxp_paypal_persist_merchant_id(string $trackingId, string $merchantId, 
         $checkSql = $db->bindVars($checkSql, ':trackingId', $trackingId, 'string');
         $result = $db->Execute($checkSql);
 
+        $persisted = false;
+
         if ($result && !$result->EOF) {
             // Update existing record
             $updateSql = "UPDATE " . $tableName . " SET "
@@ -1493,6 +1518,7 @@ function nxp_paypal_persist_merchant_id(string $trackingId, string $merchantId, 
             $updateSql = $db->bindVars($updateSql, ':expiresAt', $expiresAt, 'string');
             $updateSql = $db->bindVars($updateSql, ':trackingId', $trackingId, 'string');
             $db->Execute($updateSql);
+            $persisted = true;
         } else {
             // Insert new record
             $insertSql = "INSERT INTO " . $tableName . " "
@@ -1503,6 +1529,7 @@ function nxp_paypal_persist_merchant_id(string $trackingId, string $merchantId, 
             $insertSql = $db->bindVars($insertSql, ':environment', $environment, 'string');
             $insertSql = $db->bindVars($insertSql, ':expiresAt', $expiresAt, 'string');
             $db->Execute($insertSql);
+            $persisted = true;
         }
 
         nxp_paypal_log_debug('Persisted merchant_id to database for cross-session retrieval', [
@@ -1512,6 +1539,10 @@ function nxp_paypal_persist_merchant_id(string $trackingId, string $merchantId, 
             'expires_at' => $expiresAt,
         ]);
 
+        if ($persisted) {
+            nxp_paypal_store_partner_merchant_id($merchantId, $environment);
+        }
+
         return true;
     } catch (Throwable $e) {
         nxp_paypal_log_debug('Failed to persist merchant_id to database', [
@@ -1520,6 +1551,44 @@ function nxp_paypal_persist_merchant_id(string $trackingId, string $merchantId, 
         ]);
         return false;
     }
+}
+
+/**
+ * Stores the partner merchant ID in configuration for the detected environment.
+ *
+ * @param string $merchantId
+ * @param string $environment
+ * @return void
+ */
+function nxp_paypal_store_partner_merchant_id(string $merchantId, string $environment): void
+{
+    if ($merchantId === '' || $environment === '') {
+        return;
+    }
+
+    if (!defined('TABLE_CONFIGURATION')) {
+        return;
+    }
+
+    global $db;
+    if (!isset($db) || !is_object($db) || !method_exists($db, 'bindVars') || !method_exists($db, 'Execute')) {
+        return;
+    }
+
+    $envSuffix = strtolower($environment) === 'live' ? 'LIVE' : 'SANDBOX';
+    $configKey = 'NUMINIX_PPCP_' . $envSuffix . '_PARTNER_MERCHANT_ID';
+
+    $updateSql = "UPDATE " . TABLE_CONFIGURATION
+        . " SET configuration_value = :merchantId, last_modified = NOW()"
+        . " WHERE configuration_key = :configKey";
+    $updateSql = $db->bindVars($updateSql, ':merchantId', $merchantId, 'string');
+    $updateSql = $db->bindVars($updateSql, ':configKey', $configKey, 'string');
+    $db->Execute($updateSql);
+
+    nxp_paypal_log_debug('Stored partner merchant ID in configuration', [
+        'config_key' => $configKey,
+        'merchant_id_prefix' => substr($merchantId, 0, 4) . '...',
+    ]);
 }
 
 /**
