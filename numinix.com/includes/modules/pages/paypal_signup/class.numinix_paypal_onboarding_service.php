@@ -275,12 +275,11 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             'Content-Type: application/x-www-form-urlencoded',
         ];
 
+        // Per PayPal docs: For onboarded Complete Token flow, only grant_type and code are required
+        // Do NOT include code_verifier - it will cause "Code verifier does not match" error
         $tokenBody = http_build_query([
             'grant_type'    => 'authorization_code',
             'code'          => $authCode,
-            // IMPORTANT: for ISU, PayPal expects the seller_nonce (your single-use token)
-            // as code_verifier in the token exchange.
-            'code_verifier' => $sellerNonce,
         ], '', '&', PHP_QUERY_RFC3986);
 
         // IMPORTANT: for ISU, PayPal expects sharedId as the Basic auth username (password empty).
