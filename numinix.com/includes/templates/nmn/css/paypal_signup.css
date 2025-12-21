@@ -322,8 +322,11 @@ ul {
 
 .nxp-ps-hero__env {
     position: absolute;
-    top: 0;
-    right: 0;
+    inset-inline: 0;
+    top: clamp(16px, 4vw, 28px);
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 clamp(20px, 5vw, 48px);
 }
 
 .nxp-ps-header.is-condensed {
@@ -344,10 +347,12 @@ ul {
     justify-content: center;
     gap: 24px;
     padding: 80px 24px;
+    position: relative;
 }
 
 .nxp-ps-hero__content {
     max-width: 960px;
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -940,6 +945,18 @@ ul {
         display: none;
     }
 
+    .nxp-ps-hero {
+        align-items: stretch;
+        justify-content: flex-start;
+        padding: 72px 16px;
+    }
+
+    .nxp-ps-hero__content {
+        width: min(780px, 100%);
+        margin: 0 auto;
+        padding-top: 0;
+    }
+
     .nxp-ps-header__inner {
         padding: 12px 16px;
     }
@@ -950,7 +967,9 @@ ul {
 
     .nxp-ps-hero__env {
         position: static;
-        align-self: center;
+        justify-content: center;
+        padding: 0;
+        margin-bottom: 12px;
     }
 }
 
@@ -986,16 +1005,31 @@ ul {
 
     .nxp-ps-hero {
         padding: 60px 16px;
+        gap: 16px;
     }
 
     .nxp-ps-hero__subtitle {
         font-size: 18px;
+        max-width: 720px;
     }
 
     .nxp-ps-cta,
     .nxp-ps-cta--secondary,
     .nxp-ps-hero__secondary {
         width: 100%;
+    }
+
+    .nxp-ps-hero__actions {
+        width: 100%;
+    }
+
+    .nxp-ps-proof {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .nxp-ps-proof__control {
+        align-self: center;
     }
 
     .nxp-ps-journey__strip,
