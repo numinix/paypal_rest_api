@@ -108,37 +108,6 @@ $organizationSchema = [
     data-action-url="<?php echo htmlspecialchars($actionUrl, ENT_QUOTES, 'UTF-8'); ?>"
 >
     <a href="#nxp-ps-main" class="nxp-ps-skip">Skip to content</a>
-    <header class="nxp-ps-header" data-component="sticky-header">
-        <div class="nxp-ps-header__inner">
-            <nav class="nxp-ps-nav" aria-label="PayPal setup sections">
-                <a
-                    href="<?php echo htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8'); ?>#nxp-ps-benefits"
-                    data-scroll-target="#nxp-ps-benefits"
-                >What you get</a>
-                <a
-                    href="<?php echo htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8'); ?>#nxp-ps-comparison"
-                    data-scroll-target="#nxp-ps-comparison"
-                >DIY vs. Numinix</a>
-                <a
-                    href="<?php echo htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8'); ?>#nxp-ps-process"
-                    data-scroll-target="#nxp-ps-process"
-                >Process</a>
-                <a
-                    href="<?php echo htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8'); ?>#nxp-ps-faq"
-                    data-scroll-target="#nxp-ps-faq"
-                >FAQs</a>
-            </nav>
-            <a
-                href="<?php echo htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8'); ?>#nxp-ps-onboarding"
-                class="nxp-ps-cta"
-                data-scroll-target="#nxp-ps-onboarding"
-                data-analytics-id="sticky-start"
-                data-onboarding-start
-            >
-                Start PayPal Signup
-            </a>
-        </div>
-    </header>
 
     <main id="nxp-ps-main" class="nxp-ps-main" role="main">
         <section class="nxp-ps-hero" aria-labelledby="nxp-ps-hero-title">
