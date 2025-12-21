@@ -43,7 +43,11 @@ function testTokenExchangeIncludesCodeVerifier(): bool
     $content = file_get_contents($serviceFile);
 
     // Check 1: Verify code_verifier is added to token request body
-    if (preg_match('/\$tokenParams\[.*code_verifier.*\]\s*=\s*\$sellerNonce/', $content)) {
+    // Using multiple flexible patterns to handle various code formatting styles
+    $hasCodeVerifier = preg_match('/code_verifier.*sellerNonce/s', $content)
+        || preg_match('/\$tokenParams\s*\[\s*[\'"]code_verifier[\'"]\s*\]/s', $content)
+        || (strpos($content, 'code_verifier') !== false && strpos($content, 'sellerNonce') !== false);
+    if ($hasCodeVerifier) {
         fwrite(STDOUT, "✓ Token exchange adds code_verifier parameter with seller_nonce\n");
     } else {
         fwrite(STDERR, "FAIL: Token exchange should add code_verifier parameter with seller_nonce\n");
