@@ -1230,14 +1230,6 @@ function paypalr_detect_environment(): string
 {
     $allowed = ['sandbox', 'live'];
 
-    // Prefer the ISU configuration toggle when available
-    if (defined('NUMINIX_PPCP_ENVIRONMENT')) {
-        $value = strtolower((string) NUMINIX_PPCP_ENVIRONMENT);
-        if (in_array($value, $allowed, true)) {
-            return $value;
-        }
-    }
-
     if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
         $value = strtolower((string) MODULE_PAYMENT_PAYPALR_SERVER);
         if (in_array($value, $allowed, true)) {

@@ -160,7 +160,7 @@
           <br><br>
           <p>The installer registers a configuration group inside <em>Admin &gt; Configuration &gt; Numinix PayPal Integrated Sign-up</em>. Review these keys whenever the PayPal partner program updates requirements:</p>
           <ul>
-            <li><strong>Numinix PPCP Environment</strong>: Choose <code>sandbox</code> while testing merchant flows; switch to <code>live</code> when production-ready.</li>
+            <li><strong>Environment selection</strong>: Choose <code>sandbox</code> or <code>live</code> per request using the toggle on the PayPal signup form or by passing the <code>env</code> parameter.</li>
             <li><strong>Numinix PPCP Force SSL</strong>: Enforces HTTPS-only onboarding requests. Leave enabled unless debugging in a secure staging tunnel.</li>
             <li><strong>Partner Client IDs and Secrets</strong>: Supply sandbox and live pairs issued by PayPal so the onboarding widget can authenticate against the correct environment.</li>
             <li><strong>Numinix PayPal ISU Version</strong>: Tracks the installed schema version and should not be edited manually.</li>

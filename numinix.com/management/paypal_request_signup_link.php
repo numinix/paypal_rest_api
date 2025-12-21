@@ -112,16 +112,13 @@ function nxp_resolve_stored_referral_link(string $environment): string
 $messages = [];
 $result = [];
 $debugSnapshot = null;
-$defaultEnvironment = defined('NUMINIX_PPCP_ENVIRONMENT') ? (string) NUMINIX_PPCP_ENVIRONMENT : 'sandbox';
-$defaultEnvironment = strtolower($defaultEnvironment) === 'live' ? 'live' : 'sandbox';
+$defaultEnvironment = 'sandbox';
 
-// Use POST-submitted environment if valid, otherwise fall back to configured default
+// Use request-provided environment when available
 $environment = $defaultEnvironment;
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $submittedEnv = strtolower(trim((string) ($_POST['environment'] ?? '')));
-    if (in_array($submittedEnv, ['sandbox', 'live'], true)) {
-        $environment = $submittedEnv;
-    }
+$submittedEnv = strtolower(trim((string) ($_REQUEST['environment'] ?? '')));
+if (in_array($submittedEnv, ['sandbox', 'live'], true)) {
+    $environment = $submittedEnv;
 }
 
 $storedReferralLink = nxp_resolve_stored_referral_link($environment);

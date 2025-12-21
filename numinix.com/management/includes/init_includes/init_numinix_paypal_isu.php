@@ -42,15 +42,19 @@ if ($currentVersion === '') {
 }
 
 if ($configurationGroupId <= 0) {
-    $groupLookup = $db->Execute(
-        "SELECT configuration_group_id"
-        . " FROM " . TABLE_CONFIGURATION
-        . " WHERE configuration_key = 'NUMINIX_PPCP_ENVIRONMENT'"
-        . " LIMIT 1"
-    );
+    $groupKeys = ['NUMINIX_PPCP_VERSION', 'NUMINIX_PPCP_BACKEND_URL', 'NUMINIX_PPCP_PLUGIN_MODE'];
+    foreach ($groupKeys as $groupKey) {
+        $groupLookup = $db->Execute(
+            "SELECT configuration_group_id"
+            . " FROM " . TABLE_CONFIGURATION
+            . " WHERE configuration_key = '" . zen_db_input($groupKey) . "'"
+            . " LIMIT 1"
+        );
 
-    if ($groupLookup && !$groupLookup->EOF) {
-        $configurationGroupId = (int) $groupLookup->fields['configuration_group_id'];
+        if ($groupLookup && !$groupLookup->EOF) {
+            $configurationGroupId = (int) $groupLookup->fields['configuration_group_id'];
+            break;
+        }
     }
 }
 
@@ -85,15 +89,19 @@ foreach ($installerFiles as $installerFile) {
     if ($groupRefresh && !$groupRefresh->EOF) {
         $configurationGroupId = (int) $groupRefresh->fields['configuration_group_id'];
     } elseif ($configurationGroupId <= 0) {
-        $groupRefresh = $db->Execute(
-            "SELECT configuration_group_id"
-            . " FROM " . TABLE_CONFIGURATION
-            . " WHERE configuration_key = 'NUMINIX_PPCP_ENVIRONMENT'"
-            . " LIMIT 1"
-        );
+        $groupKeys = ['NUMINIX_PPCP_VERSION', 'NUMINIX_PPCP_BACKEND_URL', 'NUMINIX_PPCP_PLUGIN_MODE'];
+        foreach ($groupKeys as $groupKey) {
+            $groupRefresh = $db->Execute(
+                "SELECT configuration_group_id"
+                . " FROM " . TABLE_CONFIGURATION
+                . " WHERE configuration_key = '" . zen_db_input($groupKey) . "'"
+                . " LIMIT 1"
+            );
 
-        if ($groupRefresh && !$groupRefresh->EOF) {
-            $configurationGroupId = (int) $groupRefresh->fields['configuration_group_id'];
+            if ($groupRefresh && !$groupRefresh->EOF) {
+                $configurationGroupId = (int) $groupRefresh->fields['configuration_group_id'];
+                break;
+            }
         }
     }
 

@@ -26,7 +26,7 @@ function nxp_paypal_bootstrap_session(): array
     }
 
     $input = [
-        'env' => nxp_paypal_filter_string($_REQUEST['env'] ?? null),
+        'env' => nxp_paypal_filter_string($_REQUEST['env'] ?? $_REQUEST['environment'] ?? null),
         'step' => nxp_paypal_filter_string($_REQUEST['step'] ?? null),
         'code' => nxp_paypal_filter_string($_REQUEST['code'] ?? null),
         'tracking_id' => nxp_paypal_filter_string($_REQUEST['tracking_id'] ?? null),
@@ -2161,10 +2161,17 @@ function nxp_paypal_onboarding_service(): NuminixPaypalOnboardingService
  */
 function nxp_paypal_default_environment(): string
 {
-    if (defined('NUMINIX_PPCP_ENVIRONMENT')) {
-        $env = strtolower((string)NUMINIX_PPCP_ENVIRONMENT);
-        if (in_array($env, ['sandbox', 'live'], true)) {
-            return $env;
+    $allowed = ['sandbox', 'live'];
+
+    $requestEnv = strtolower((string)($_REQUEST['env'] ?? $_REQUEST['environment'] ?? ''));
+    if (in_array($requestEnv, $allowed, true)) {
+        return $requestEnv;
+    }
+
+    if (!empty($_SESSION['nxp_paypal']['env'])) {
+        $sessionEnv = strtolower((string)$_SESSION['nxp_paypal']['env']);
+        if (in_array($sessionEnv, $allowed, true)) {
+            return $sessionEnv;
         }
     }
 

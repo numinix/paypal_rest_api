@@ -28,6 +28,14 @@
         return str === '' ? '' : str;
     }
 
+    function normalizeEnvironmentValue(value) {
+        var normalized = String(value || '').toLowerCase();
+        if (normalized === 'sandbox' || normalized === 'live') {
+            return normalized;
+        }
+        return '';
+    }
+
     function ensureMiniBrowserDisplayMode(url) {
         if (!url || typeof url !== 'string') {
             return url;
@@ -472,6 +480,14 @@
 
         var session = Object.assign({}, sessionDefaults, initialSession);
 
+        var envToggle = document.querySelector('[data-env-toggle]');
+        var envToggleButtons = envToggle ? envToggle.querySelectorAll('[data-env-option]') : [];
+        var initialEnvironment = normalizeEnvironmentValue(session.env) || normalizeEnvironmentValue(page.getAttribute('data-env')) || 'sandbox';
+        session.env = initialEnvironment || 'sandbox';
+        if (page) {
+            page.setAttribute('data-env', session.env);
+        }
+
         var state = {
             session: session,
             loading: false,
@@ -516,10 +532,77 @@
             }
         }
 
+        function updateEnvironmentToggle(env) {
+            if (!envToggle) {
+                return;
+            }
+            envToggle.setAttribute('data-selected-env', env);
+            envToggleButtons.forEach(function (button) {
+                var option = normalizeEnvironmentValue(button.getAttribute('data-env-option'));
+                var isActive = option === env;
+                if (isActive) {
+                    button.classList.add('is-active');
+                    button.setAttribute('aria-pressed', 'true');
+                } else {
+                    button.classList.remove('is-active');
+                    button.setAttribute('aria-pressed', 'false');
+                }
+            });
+        }
+
+        function setEnvironment(env, options) {
+            var normalized = normalizeEnvironmentValue(env) || 'sandbox';
+            state.session.env = normalized;
+            if (page) {
+                page.setAttribute('data-env', normalized);
+            }
+            if (envToggle) {
+                var statusLabel = envToggle.querySelector('.nxp-ps-env-toggle__status');
+                if (statusLabel) {
+                    statusLabel.textContent = normalized === 'live' ? 'Live mode' : 'Sandbox mode';
+                }
+            }
+            updateEnvironmentToggle(normalized);
+            if (options && options.announce) {
+                setStatus('Using PayPal ' + formatEnvironment(normalized) + ' environment.', 'info');
+            }
+        }
+
+        function applyEnvironmentFromPayload(value) {
+            var normalized = normalizeEnvironmentValue(value);
+            if (!normalized) {
+                return;
+            }
+            setEnvironment(normalized);
+        }
+
+        if (envToggleButtons && envToggleButtons.length) {
+            envToggleButtons.forEach(function (button) {
+                button.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    var option = normalizeEnvironmentValue(button.getAttribute('data-env-option'));
+                    if (!option) {
+                        return;
+                    }
+                    if (option === state.session.env) {
+                        updateEnvironmentToggle(option);
+                        return;
+                    }
+                    setEnvironment(option, { announce: true });
+                    sendTelemetry('environment_switched', { environment: option });
+                });
+            });
+        }
+
+        setEnvironment(state.session.env);
+
         function postAction(action, extra) {
             var payload = new URLSearchParams();
             payload.append('nxp_paypal_action', action);
             payload.append('nonce', state.session.nonce || '');
+            var environment = normalizeEnvironmentValue(state.session.env) || normalizeEnvironmentValue(page && page.getAttribute('data-env')) || 'sandbox';
+            payload.append('env', environment);
+            payload.append('environment', environment);
             if (extra && typeof extra === 'object') {
                 Object.keys(extra).forEach(function (key) {
                     var value = extra[key];
@@ -690,9 +773,7 @@
         }
 
         function handleFinalizeResponse(data) {
-            if (data.environment) {
-                state.session.env = data.environment;
-            }
+            applyEnvironmentFromPayload(data.environment);
             if (data.step) {
                 state.session.step = data.step;
             }
@@ -721,9 +802,7 @@
         }
 
         function handleStatusResponse(data) {
-            if (data.environment) {
-                state.session.env = data.environment;
-            }
+            applyEnvironmentFromPayload(data.environment);
             if (data.step) {
                 state.session.step = data.step;
             }
@@ -1227,9 +1306,7 @@
                 state.session.tracking_id = trackingId;
                 console.log('[CALLBACK TEST - Numinix] Captured tracking_id from payload:', trackingId);
             }
-            if (environment) {
-                state.session.env = environment;
-            }
+            applyEnvironmentFromPayload(environment);
 
             console.log('[CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding');
             console.log('[CALLBACK TEST - Numinix] Session state before finalize:', {

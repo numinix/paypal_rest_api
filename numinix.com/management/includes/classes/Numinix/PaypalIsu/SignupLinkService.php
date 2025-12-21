@@ -166,11 +166,9 @@ class NuminixPaypalIsuSignupLinkService
             }
         }
 
-        if (defined('NUMINIX_PPCP_ENVIRONMENT')) {
-            $config = strtolower((string) NUMINIX_PPCP_ENVIRONMENT);
-            if (in_array($config, ['sandbox', 'live'], true)) {
-                return $config;
-            }
+        $requestEnv = strtolower((string)($_REQUEST['env'] ?? $_REQUEST['environment'] ?? ''));
+        if (in_array($requestEnv, ['sandbox', 'live'], true)) {
+            return $requestEnv;
         }
 
         return 'sandbox';
@@ -741,9 +739,11 @@ class NuminixPaypalIsuSignupLinkService
     protected function detectConfigurationGroupId(): int
     {
         if (function_exists('zen_get_configuration_group_id')) {
-            $groupId = zen_get_configuration_group_id('NUMINIX_PPCP_ENVIRONMENT');
-            if (is_numeric($groupId) && (int) $groupId > 0) {
-                return (int) $groupId;
+            foreach (['NUMINIX_PPCP_VERSION', 'NUMINIX_PPCP_BACKEND_URL', 'NUMINIX_PPCP_PLUGIN_MODE'] as $configKey) {
+                $groupId = zen_get_configuration_group_id($configKey);
+                if (is_numeric($groupId) && (int) $groupId > 0) {
+                    return (int) $groupId;
+                }
             }
         }
 
