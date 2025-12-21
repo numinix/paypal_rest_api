@@ -148,6 +148,14 @@ function paypalr_handle_proxy_request(): void
             ]);
         }
 
+        // Store seller_nonce in session for credential exchange (used as code_verifier)
+        if ($proxyAction === 'start' && !empty($data['seller_nonce'])) {
+            $_SESSION['paypalr_isu_seller_nonce'] = $data['seller_nonce'];
+            paypalr_log_debug('Stored seller_nonce in session for credential exchange', [
+                'tracking_id' => $data['tracking_id'] ?? null,
+            ]);
+        }
+
         // Provide a sanitized view of the full response for debugging when polling/finalizing
         if (in_array($proxyAction, ['status', 'finalize'], true)) {
             $logContext['sanitized_data'] = paypalr_redact_sensitive($data);
@@ -511,6 +519,7 @@ function paypalr_render_onboarding_page(): void
                     merchantId: null,
                     authCode: null,
                     sharedId: null,
+                    sellerNonce: null,
                     nonce: null,
                     popup: null,
                     pollTimer: null,
@@ -561,6 +570,7 @@ function paypalr_render_onboarding_page(): void
                     state.merchantId = null;
                     state.authCode = null;
                     state.sharedId = null;
+                    state.sellerNonce = null;
                     state.pollAttempts = 0;
                     if (state.pollTimer) {
                         clearTimeout(state.pollTimer);
@@ -759,6 +769,7 @@ function paypalr_render_onboarding_page(): void
                             sharedId: state.sharedId || '',
                             auth_code: state.authCode || '',
                             shared_id: state.sharedId || '',
+                            seller_nonce: state.sellerNonce || '',
                             nonce: state.nonce
                         })
                         .then(function(response) {
@@ -1007,6 +1018,7 @@ function paypalr_render_onboarding_page(): void
                             state.trackingId = data.tracking_id;
                             state.partnerReferralId = data.partner_referral_id || null;
                             state.merchantId = data.merchant_id || null;
+                            state.sellerNonce = data.seller_nonce || null;
                             if (data.environment && allowedEnvironments.indexOf(data.environment.toLowerCase()) !== -1) {
                                 state.environment = data.environment.toLowerCase();
                                 if (environmentSelect) {
@@ -1697,6 +1709,9 @@ function paypalr_handle_completion(): void
     // Retrieve nonce from session (stored during start request)
     $nonce = trim((string)($_SESSION['paypalr_isu_nonce'] ?? ''));
     
+    // Retrieve seller_nonce from session (needed for code_verifier in credential exchange)
+    $sellerNonce = trim((string)($_SESSION['paypalr_isu_seller_nonce'] ?? ''));
+    
     // Store in session for retrieval
     if ($merchantId !== '') {
         $_SESSION['paypalr_isu_merchant_id'] = $merchantId;
@@ -1900,6 +1915,7 @@ function paypalr_handle_completion(): void
                 var trackingId = <?php echo json_encode($trackingId); ?>;
                 var environment = <?php echo json_encode($environment); ?>;
                 var nonce = <?php echo json_encode($nonce); ?>;
+                var sellerNonce = <?php echo json_encode($sellerNonce); ?>;
                 
                 var credentialsDisplay = document.getElementById('credentials-display');
                 var autoSaveStatus = document.getElementById('auto-save-status');
@@ -2008,6 +2024,7 @@ function paypalr_handle_completion(): void
                         merchant_id: merchantId,
                         authCode: authCode,
                         sharedId: sharedId,
+                        seller_nonce: sellerNonce,
                         env: environment,
                         nonce: nonce
                     };
