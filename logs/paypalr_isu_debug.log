@@ -1,4 +1,4 @@
-[2025-12-21T19:54:38+00:00] Handling proxy request {
+[2025-12-21T20:22:04+00:00] Handling proxy request {
     "proxy_action": "start",
     "numinix_url": "https://www.numinix.com/api/paypal_onboarding.php",
     "post_keys": [
@@ -11,7 +11,7 @@
     ],
     "store_environment": "live"
 }
-[2025-12-21T19:54:38+00:00] Proxy request to Numinix API {
+[2025-12-21T20:22:04+00:00] Proxy request to Numinix API {
     "action": "start",
     "url": "https://www.numinix.com/api/paypal_onboarding.php",
     "environment": "live",
@@ -23,18 +23,18 @@
         "nxp_paypal_action"
     ]
 }
-[2025-12-21T19:54:39+00:00] Numinix API response received {
+[2025-12-21T20:22:05+00:00] Numinix API response received {
     "action": "start",
     "http_code": 200,
     "response_length": 1453
 }
-[2025-12-21T19:54:39+00:00] Stored nonce in session for completion page {
-    "tracking_id": "nxp-85d3c7d413dabfc6f610"
+[2025-12-21T20:22:05+00:00] Stored nonce in session for completion page {
+    "tracking_id": "nxp-d210421eb01e2c9d9fcb"
 }
-[2025-12-21T19:54:39+00:00] Stored seller_nonce in session for credential exchange {
-    "tracking_id": "nxp-85d3c7d413dabfc6f610"
+[2025-12-21T20:22:05+00:00] Stored seller_nonce in session for credential exchange {
+    "tracking_id": "nxp-d210421eb01e2c9d9fcb"
 }
-[2025-12-21T19:54:39+00:00] Proxy request completed {
+[2025-12-21T20:22:05+00:00] Proxy request completed {
     "proxy_action": "start",
     "success": true,
     "has_data": true,
@@ -42,7 +42,7 @@
     "remote_environment": "live",
     "environment_mismatch": false,
     "step": "waiting",
-    "tracking_id": "nxp-85d3c7d413dabfc6f610",
+    "tracking_id": "nxp-d210421eb01e2c9d9fcb",
     "partner_referral_id": "",
     "has_credentials": false,
     "message": null,
@@ -59,7 +59,7 @@
         "nonce"
     ]
 }
-[2025-12-21T19:55:22+00:00] Completion handler called {
+[2025-12-21T20:22:56+00:00] Completion handler called {
     "has_merchant_id": true,
     "has_auth_code": false,
     "has_shared_id": false,
@@ -80,7 +80,7 @@
     ],
     "merchant_id_value": "WW75U29QM8276"
 }
-[2025-12-21T19:55:23+00:00] Handling proxy request {
+[2025-12-21T20:22:57+00:00] Handling proxy request {
     "proxy_action": "finalize",
     "numinix_url": "https://www.numinix.com/api/paypal_onboarding.php",
     "post_keys": [
@@ -97,7 +97,7 @@
     ],
     "store_environment": "live"
 }
-[2025-12-21T19:55:23+00:00] Proxy request to Numinix API {
+[2025-12-21T20:22:57+00:00] Proxy request to Numinix API {
     "action": "finalize",
     "url": "https://www.numinix.com/api/paypal_onboarding.php",
     "environment": "live",
@@ -113,12 +113,12 @@
         "nxp_paypal_action"
     ]
 }
-[2025-12-21T19:55:33+00:00] Numinix API response received {
+[2025-12-21T20:22:58+00:00] Numinix API response received {
     "action": "finalize",
     "http_code": 200,
     "response_length": 212
 }
-[2025-12-21T19:55:33+00:00] Proxy request completed {
+[2025-12-21T20:22:58+00:00] Proxy request completed {
     "proxy_action": "finalize",
     "success": true,
     "has_data": true,
@@ -126,7 +126,7 @@
     "remote_environment": "live",
     "environment_mismatch": false,
     "step": "waiting",
-    "tracking_id": "nxp-85d3c7d413dabfc6f610",
+    "tracking_id": "nxp-d210421eb01e2c9d9fcb",
     "partner_referral_id": "",
     "has_credentials": false,
     "message": null,
@@ -141,7 +141,7 @@
     ],
     "sanitized_data": {
         "environment": "live",
-        "tracking_id": "nxp-85d3c7d413dabfc6f610",
+        "tracking_id": "nxp-d210421eb01e2c9d9fcb",
         "partner_referral_id": "",
         "merchant_id": "WW75U29QM8276",
         "step": "waiting",
@@ -149,7 +149,7 @@
         "polling_interval": 5000
     }
 }
-[2025-12-21T19:55:39+00:00] Handling proxy request {
+[2025-12-21T20:23:03+00:00] Handling proxy request {
     "proxy_action": "finalize",
     "numinix_url": "https://www.numinix.com/api/paypal_onboarding.php",
     "post_keys": [
@@ -166,7 +166,7 @@
     ],
     "store_environment": "live"
 }
-[2025-12-21T19:55:39+00:00] Proxy request to Numinix API {
+[2025-12-21T20:23:03+00:00] Proxy request to Numinix API {
     "action": "finalize",
     "url": "https://www.numinix.com/api/paypal_onboarding.php",
     "environment": "live",
@@ -182,12 +182,12 @@
         "nxp_paypal_action"
     ]
 }
-[2025-12-21T19:55:40+00:00] Numinix API response received {
+[2025-12-21T20:23:04+00:00] Numinix API response received {
     "action": "finalize",
     "http_code": 200,
     "response_length": 212
 }
-[2025-12-21T19:55:40+00:00] Proxy request completed {
+[2025-12-21T20:23:04+00:00] Proxy request completed {
     "proxy_action": "finalize",
     "success": true,
     "has_data": true,
@@ -195,7 +195,7 @@
     "remote_environment": "live",
     "environment_mismatch": false,
     "step": "waiting",
-    "tracking_id": "nxp-85d3c7d413dabfc6f610",
+    "tracking_id": "nxp-d210421eb01e2c9d9fcb",
     "partner_referral_id": "",
     "has_credentials": false,
     "message": null,
@@ -210,7 +210,7 @@
     ],
     "sanitized_data": {
         "environment": "live",
-        "tracking_id": "nxp-85d3c7d413dabfc6f610",
+        "tracking_id": "nxp-d210421eb01e2c9d9fcb",
         "partner_referral_id": "",
         "merchant_id": "WW75U29QM8276",
         "step": "waiting",
@@ -218,7 +218,7 @@
         "polling_interval": 5000
     }
 }
-[2025-12-21T19:55:45+00:00] Handling proxy request {
+[2025-12-21T20:23:10+00:00] Handling proxy request {
     "proxy_action": "finalize",
     "numinix_url": "https://www.numinix.com/api/paypal_onboarding.php",
     "post_keys": [
@@ -235,7 +235,7 @@
     ],
     "store_environment": "live"
 }
-[2025-12-21T19:55:45+00:00] Proxy request to Numinix API {
+[2025-12-21T20:23:10+00:00] Proxy request to Numinix API {
     "action": "finalize",
     "url": "https://www.numinix.com/api/paypal_onboarding.php",
     "environment": "live",
@@ -251,12 +251,12 @@
         "nxp_paypal_action"
     ]
 }
-[2025-12-21T19:55:46+00:00] Numinix API response received {
+[2025-12-21T20:23:11+00:00] Numinix API response received {
     "action": "finalize",
     "http_code": 200,
     "response_length": 212
 }
-[2025-12-21T19:55:46+00:00] Proxy request completed {
+[2025-12-21T20:23:11+00:00] Proxy request completed {
     "proxy_action": "finalize",
     "success": true,
     "has_data": true,
@@ -264,7 +264,7 @@
     "remote_environment": "live",
     "environment_mismatch": false,
     "step": "waiting",
-    "tracking_id": "nxp-85d3c7d413dabfc6f610",
+    "tracking_id": "nxp-d210421eb01e2c9d9fcb",
     "partner_referral_id": "",
     "has_credentials": false,
     "message": null,
@@ -279,7 +279,7 @@
     ],
     "sanitized_data": {
         "environment": "live",
-        "tracking_id": "nxp-85d3c7d413dabfc6f610",
+        "tracking_id": "nxp-d210421eb01e2c9d9fcb",
         "partner_referral_id": "",
         "merchant_id": "WW75U29QM8276",
         "step": "waiting",
@@ -287,7 +287,7 @@
         "polling_interval": 5000
     }
 }
-[2025-12-21T19:55:52+00:00] Handling proxy request {
+[2025-12-21T20:23:16+00:00] Handling proxy request {
     "proxy_action": "finalize",
     "numinix_url": "https://www.numinix.com/api/paypal_onboarding.php",
     "post_keys": [
@@ -304,7 +304,7 @@
     ],
     "store_environment": "live"
 }
-[2025-12-21T19:55:52+00:00] Proxy request to Numinix API {
+[2025-12-21T20:23:16+00:00] Proxy request to Numinix API {
     "action": "finalize",
     "url": "https://www.numinix.com/api/paypal_onboarding.php",
     "environment": "live",
@@ -320,12 +320,12 @@
         "nxp_paypal_action"
     ]
 }
-[2025-12-21T19:55:53+00:00] Numinix API response received {
+[2025-12-21T20:23:17+00:00] Numinix API response received {
     "action": "finalize",
     "http_code": 200,
     "response_length": 212
 }
-[2025-12-21T19:55:53+00:00] Proxy request completed {
+[2025-12-21T20:23:17+00:00] Proxy request completed {
     "proxy_action": "finalize",
     "success": true,
     "has_data": true,
@@ -333,7 +333,7 @@
     "remote_environment": "live",
     "environment_mismatch": false,
     "step": "waiting",
-    "tracking_id": "nxp-85d3c7d413dabfc6f610",
+    "tracking_id": "nxp-d210421eb01e2c9d9fcb",
     "partner_referral_id": "",
     "has_credentials": false,
     "message": null,
@@ -348,7 +348,7 @@
     ],
     "sanitized_data": {
         "environment": "live",
-        "tracking_id": "nxp-85d3c7d413dabfc6f610",
+        "tracking_id": "nxp-d210421eb01e2c9d9fcb",
         "partner_referral_id": "",
         "merchant_id": "WW75U29QM8276",
         "step": "waiting",
