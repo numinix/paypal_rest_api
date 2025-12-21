@@ -508,6 +508,21 @@ function nxp_paypal_handle_finalize(array $session): void
         }
     }
 
+    // If authCode and sharedId are not provided in the request, try to retrieve them
+    // from the database. This handles the cross-session case where the main page's
+    // callback persisted authCode/sharedId but the completion page's finalize doesn't have them.
+    // Per PayPal docs, these are needed to exchange for seller credentials.
+    if ((empty($authCode) || empty($sharedId)) && !empty($trackingId)) {
+        $persistedAuthData = nxp_paypal_retrieve_auth_code($trackingId);
+        if ($persistedAuthData !== null) {
+            $authCode = $persistedAuthData['auth_code'];
+            $sharedId = $persistedAuthData['shared_id'];
+            nxp_paypal_log_debug('Retrieved authCode and sharedId from database for finalize', [
+                'tracking_id' => $trackingId,
+            ]);
+        }
+    }
+
     $payload = [
         'code' => $code,
         'tracking_id' => $trackingId,
