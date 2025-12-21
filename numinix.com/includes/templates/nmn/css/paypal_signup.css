@@ -321,8 +321,9 @@ ul {
 }
 
 .nxp-ps-hero__env {
-    align-self: flex-end;
-    margin-bottom: 12px;
+    position: absolute;
+    top: 0;
+    right: 0;
 }
 
 .nxp-ps-header.is-condensed {
@@ -350,6 +351,8 @@ ul {
     display: flex;
     flex-direction: column;
     align-items: center;
+    position: relative;
+    padding-top: 12px;
 }
 
 .nxp-ps-eyebrow {
@@ -946,6 +949,7 @@ ul {
     }
 
     .nxp-ps-hero__env {
+        position: static;
         align-self: center;
     }
 }
