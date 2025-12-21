@@ -110,9 +110,6 @@ $organizationSchema = [
     <a href="#nxp-ps-main" class="nxp-ps-skip">Skip to content</a>
     <header class="nxp-ps-header" data-component="sticky-header">
         <div class="nxp-ps-header__inner">
-            <a href="https://www.numinix.com/" class="nxp-ps-brand">
-                <img src="<?php echo htmlspecialchars($logoPath, ENT_QUOTES, 'UTF-8'); ?>" alt="Numinix" />
-            </a>
             <nav class="nxp-ps-nav" aria-label="PayPal setup sections">
                 <a
                     href="<?php echo htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8'); ?>#nxp-ps-benefits"
@@ -131,27 +128,6 @@ $organizationSchema = [
                     data-scroll-target="#nxp-ps-faq"
                 >FAQs</a>
             </nav>
-            <div class="nxp-ps-env-toggle" data-env-toggle role="group" aria-label="Select PayPal environment">
-                <div class="nxp-ps-env-toggle__header">
-                    <span class="nxp-ps-env-toggle__label">Environment</span>
-                    <span class="nxp-ps-env-toggle__status"><?php echo $environment === 'live' ? 'Live mode' : 'Sandbox mode'; ?></span>
-                </div>
-                <div class="nxp-ps-env-toggle__controls">
-                    <button
-                        type="button"
-                        class="nxp-ps-env-toggle__option<?php echo $environment === 'sandbox' ? ' is-active' : ''; ?>"
-                        data-env-option="sandbox"
-                        aria-pressed="<?php echo $environment === 'sandbox' ? 'true' : 'false'; ?>"
-                    >Sandbox</button>
-                    <button
-                        type="button"
-                        class="nxp-ps-env-toggle__option<?php echo $environment === 'live' ? ' is-active' : ''; ?>"
-                        data-env-option="live"
-                        aria-pressed="<?php echo $environment === 'live' ? 'true' : 'false'; ?>"
-                    >Live</button>
-                </div>
-                <p class="nxp-ps-env-toggle__hint">Choose whether to test in the PayPal sandbox or connect to your live business account.</p>
-            </div>
             <a
                 href="<?php echo htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8'); ?>#nxp-ps-onboarding"
                 class="nxp-ps-cta"
@@ -167,6 +143,24 @@ $organizationSchema = [
     <main id="nxp-ps-main" class="nxp-ps-main" role="main">
         <section class="nxp-ps-hero" aria-labelledby="nxp-ps-hero-title">
             <div class="nxp-ps-hero__content">
+                <div class="nxp-ps-hero__env">
+                    <div class="nxp-ps-env-toggle" data-env-toggle role="group" aria-label="Select PayPal environment">
+                        <div class="nxp-ps-env-toggle__controls">
+                            <button
+                                type="button"
+                                class="nxp-ps-env-toggle__option<?php echo $environment === 'sandbox' ? ' is-active' : ''; ?>"
+                                data-env-option="sandbox"
+                                aria-pressed="<?php echo $environment === 'sandbox' ? 'true' : 'false'; ?>"
+                            >Sandbox</button>
+                            <button
+                                type="button"
+                                class="nxp-ps-env-toggle__option<?php echo $environment === 'live' ? ' is-active' : ''; ?>"
+                                data-env-option="live"
+                                aria-pressed="<?php echo $environment === 'live' ? 'true' : 'false'; ?>"
+                            >Live</button>
+                        </div>
+                    </div>
+                </div>
                 <p class="nxp-ps-eyebrow">Ecommerce PayPal onboarding experts</p>
                 <h1 id="nxp-ps-hero-title" data-variant="headline">
                     Launch PayPal the right way for your store.
