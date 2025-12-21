@@ -1,10 +1,20 @@
-[2025-12-21T11:11:05-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
-    "tracking_id": "nxp-4aef93b97abb65f9fefa",
+[2025-12-21T11:55:32-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-85d3c7d413dabfc6f610",
     "has_auth_code": "no",
     "has_shared_id": "no"
 }
-[2025-12-21T11:11:12-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
-    "tracking_id": "nxp-4aef93b97abb65f9fefa",
+[2025-12-21T11:55:39-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-85d3c7d413dabfc6f610",
+    "has_auth_code": "no",
+    "has_shared_id": "no"
+}
+[2025-12-21T11:55:46-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-85d3c7d413dabfc6f610",
+    "has_auth_code": "no",
+    "has_shared_id": "no"
+}
+[2025-12-21T11:55:52-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-85d3c7d413dabfc6f610",
     "has_auth_code": "no",
     "has_shared_id": "no"
 }
