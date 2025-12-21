@@ -137,9 +137,10 @@ namespace {
             $passed = false;
         }
 
-        // Check 2: Verify merchant_id format validation
-        if (strpos($content, "preg_match('/^[A-Z0-9]{1,32}\$/i'") !== false) {
-            fwrite(STDOUT, "✓ Validates merchant_id format (alphanumeric, max 32 chars)\n");
+        // Check 2: Verify merchant_id format validation (PayPal merchant IDs are 10-20 alphanumeric chars, no dashes)
+        if (strpos($content, "preg_match('/^[A-Za-z0-9]{10,20}\$/'") !== false
+            || strpos($content, 'nxp_paypal_is_valid_merchant_id') !== false) {
+            fwrite(STDOUT, "✓ Validates merchant_id format (10-20 alphanumeric chars, no dashes)\n");
         } else {
             fwrite(STDERR, "FAIL: Should validate merchant_id format\n");
             $passed = false;
