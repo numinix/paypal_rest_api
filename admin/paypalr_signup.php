@@ -43,9 +43,28 @@ if (file_exists($languageFile)) {
 
 $action = strtolower(trim($_REQUEST['action'] ?? ''));
 
+// CSRF token validation for AJAX requests
+function validateSecurityToken(): bool
+{
+    $sessionToken = $_SESSION['securityToken'] ?? '';
+    $requestToken = $_POST['securityToken'] ?? $_GET['securityToken'] ?? '';
+    
+    if (empty($sessionToken) || empty($requestToken)) {
+        return false;
+    }
+    
+    return hash_equals($sessionToken, $requestToken);
+}
+
 // Handle AJAX actions
 if ($isAjaxRequest) {
     header('Content-Type: application/json');
+    
+    // Validate CSRF token for all AJAX actions
+    if (!validateSecurityToken()) {
+        echo json_encode(['success' => false, 'message' => 'Invalid security token. Please refresh the page.']);
+        exit;
+    }
     
     if ($action === 'start') {
         handleStartAction();
@@ -201,6 +220,12 @@ function handleSaveCredentials(): void
         return;
     }
     
+    // Validate credential format (basic sanity check)
+    if (!preg_match('/^[A-Za-z0-9_-]+$/', $clientId)) {
+        echo json_encode(['success' => false, 'message' => 'Invalid client ID format']);
+        return;
+    }
+    
     // Determine which config keys to update based on environment
     if ($env === 'live') {
         $clientIdKey = 'MODULE_PAYMENT_PAYPALR_CLIENTID_LIVE';
@@ -210,20 +235,26 @@ function handleSaveCredentials(): void
         $clientSecretKey = 'MODULE_PAYMENT_PAYPALR_SECRET_SANDBOX';
     }
     
+    // Sanitize values for database using zen_db_input if available
+    if (function_exists('zen_db_input')) {
+        $clientId = zen_db_input($clientId);
+        $clientSecret = zen_db_input($clientSecret);
+        $clientIdKey = zen_db_input($clientIdKey);
+        $clientSecretKey = zen_db_input($clientSecretKey);
+    }
+    
     // Update configuration values
     global $db;
     
     try {
         // Update client ID
         $db->Execute(
-            "UPDATE " . TABLE_CONFIGURATION . " SET configuration_value = :value, last_modified = NOW() WHERE configuration_key = :key",
-            [':value' => $clientId, ':key' => $clientIdKey]
+            "UPDATE " . TABLE_CONFIGURATION . " SET configuration_value = '" . $clientId . "', last_modified = NOW() WHERE configuration_key = '" . $clientIdKey . "'"
         );
         
         // Update client secret
         $db->Execute(
-            "UPDATE " . TABLE_CONFIGURATION . " SET configuration_value = :value, last_modified = NOW() WHERE configuration_key = :key",
-            [':value' => $clientSecret, ':key' => $clientSecretKey]
+            "UPDATE " . TABLE_CONFIGURATION . " SET configuration_value = '" . $clientSecret . "', last_modified = NOW() WHERE configuration_key = '" . $clientSecretKey . "'"
         );
         
         // Clear session data
@@ -492,6 +523,9 @@ function renderSignupPage(): void
     (function() {
         'use strict';
         
+        // Security token for AJAX requests
+        var securityToken = <?php echo json_encode($securityToken); ?>;
+        
         // Check if this is a popup return from PayPal
         var urlParams = new URLSearchParams(window.location.search);
         var merchantId = urlParams.get('merchantIdInPayPal') || urlParams.get('merchantId');
@@ -565,6 +599,7 @@ function renderSignupPage(): void
         function apiCall(action, data) {
             var formData = new FormData();
             formData.append('action', action);
+            formData.append('securityToken', securityToken); // CSRF protection
             Object.keys(data).forEach(function(key) {
                 formData.append(key, data[key]);
             });
