@@ -131,6 +131,27 @@ $organizationSchema = [
                     data-scroll-target="#nxp-ps-faq"
                 >FAQs</a>
             </nav>
+            <div class="nxp-ps-env-toggle" data-env-toggle role="group" aria-label="Select PayPal environment">
+                <div class="nxp-ps-env-toggle__header">
+                    <span class="nxp-ps-env-toggle__label">Environment</span>
+                    <span class="nxp-ps-env-toggle__status"><?php echo $environment === 'live' ? 'Live mode' : 'Sandbox mode'; ?></span>
+                </div>
+                <div class="nxp-ps-env-toggle__controls">
+                    <button
+                        type="button"
+                        class="nxp-ps-env-toggle__option<?php echo $environment === 'sandbox' ? ' is-active' : ''; ?>"
+                        data-env-option="sandbox"
+                        aria-pressed="<?php echo $environment === 'sandbox' ? 'true' : 'false'; ?>"
+                    >Sandbox</button>
+                    <button
+                        type="button"
+                        class="nxp-ps-env-toggle__option<?php echo $environment === 'live' ? ' is-active' : ''; ?>"
+                        data-env-option="live"
+                        aria-pressed="<?php echo $environment === 'live' ? 'true' : 'false'; ?>"
+                    >Live</button>
+                </div>
+                <p class="nxp-ps-env-toggle__hint">Choose whether to test in the PayPal sandbox or connect to your live business account.</p>
+            </div>
             <a
                 href="<?php echo htmlspecialchars($pageUrl, ENT_QUOTES, 'UTF-8'); ?>#nxp-ps-onboarding"
                 class="nxp-ps-cta"
