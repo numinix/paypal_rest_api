@@ -556,12 +556,6 @@
             if (page) {
                 page.setAttribute('data-env', normalized);
             }
-            if (envToggle) {
-                var statusLabel = envToggle.querySelector('.nxp-ps-env-toggle__status');
-                if (statusLabel) {
-                    statusLabel.textContent = normalized === 'live' ? 'Live mode' : 'Sandbox mode';
-                }
-            }
             updateEnvironmentToggle(normalized);
             if (options && options.announce) {
                 setStatus('Using PayPal ' + formatEnvironment(normalized) + ' environment.', 'info');
@@ -892,7 +886,6 @@
                     credentialsHtml += '<span class="nxp-ps-credentials__badge" aria-label="Environment ' + htmlEscape(env) + '">' + htmlEscape(env) + '</span>';
                     credentialsHtml += '</div>';
                     credentialsHtml += '<div class="nxp-ps-credentials__list" role="list">';
-                    credentialsHtml += renderCredentialRow('Environment', env, { copyLabel: 'Environment' });
                     credentialsHtml += renderCredentialRow('Client ID', data.credentials.client_id, { copyLabel: 'Client ID' });
                     credentialsHtml += renderCredentialRow('Client Secret', data.credentials.client_secret, { mask: true, copyLabel: 'Client Secret' });
                     credentialsHtml += '</div>';
