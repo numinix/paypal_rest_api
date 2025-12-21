@@ -1738,20 +1738,73 @@ function nxp_paypal_persist_credentials(
     $expiresAt = date('Y-m-d H:i:s', time() + 3600);
 
     try {
+        // Check which columns exist in a single query
+        // This handles the case where the 1.0.7 installer hasn't been run yet
+        $allColumnsToCheck = [
+            'seller_client_id',
+            'seller_client_secret', 
+            'seller_access_token',
+            'seller_access_token_expires_at',
+        ];
+        
+        $existingColumns = [];
+        $checkSql = "SHOW COLUMNS FROM " . $tableName;
+        $result = $db->Execute($checkSql);
+        while (!$result->EOF) {
+            $fieldName = $result->fields['Field'] ?? '';
+            if (in_array($fieldName, $allColumnsToCheck, true)) {
+                $existingColumns[] = $fieldName;
+            }
+            $result->MoveNext();
+        }
+        
+        // Check if required columns exist
+        $requiredColumns = ['seller_client_id', 'seller_client_secret'];
+        $missingRequired = array_diff($requiredColumns, $existingColumns);
+        
+        if (!empty($missingRequired)) {
+            nxp_paypal_log_debug('Cannot persist credentials: required columns missing from tracking table', [
+                'tracking_id' => $trackingId,
+                'missing_columns' => array_values($missingRequired),
+                'hint' => 'Run the PayPal ISU installer to add the required columns',
+            ]);
+            // Return true to allow the flow to continue - credentials are still available in memory
+            return true;
+        }
+
+        // Build dynamic UPDATE query based on available columns
+        $setClauses = [
+            "seller_client_id = :clientId",
+            "seller_client_secret = :clientSecret",
+            "environment = :environment",
+            "expires_at = :expiresAt",
+            "updated_at = NOW()",
+        ];
+        
+        // Check for optional columns and include them if they exist
+        $hasAccessTokenCol = in_array('seller_access_token', $existingColumns, true);
+        $hasTokenExpiresCol = in_array('seller_access_token_expires_at', $existingColumns, true);
+        
+        if ($hasAccessTokenCol) {
+            $setClauses[] = "seller_access_token = :accessToken";
+        }
+        
+        if ($hasTokenExpiresCol) {
+            $setClauses[] = "seller_access_token_expires_at = :tokenExpiresAt";
+        }
+        
         $updateSql = "UPDATE " . $tableName . " SET "
-            . "seller_client_id = :clientId, "
-            . "seller_client_secret = :clientSecret, "
-            . "seller_access_token = :accessToken, "
-            . "seller_access_token_expires_at = :tokenExpiresAt, "
-            . "environment = :environment, "
-            . "expires_at = :expiresAt, "
-            . "updated_at = NOW() "
-            . "WHERE tracking_id = :trackingId";
+            . implode(", ", $setClauses)
+            . " WHERE tracking_id = :trackingId";
 
         $updateSql = $db->bindVars($updateSql, ':clientId', $clientId, 'string');
         $updateSql = $db->bindVars($updateSql, ':clientSecret', $clientSecret, 'string');
-        $updateSql = $db->bindVars($updateSql, ':accessToken', $accessToken, 'string');
-        $updateSql = $db->bindVars($updateSql, ':tokenExpiresAt', $tokenExpiresAt, 'string');
+        if ($hasAccessTokenCol) {
+            $updateSql = $db->bindVars($updateSql, ':accessToken', $accessToken, 'string');
+        }
+        if ($hasTokenExpiresCol) {
+            $updateSql = $db->bindVars($updateSql, ':tokenExpiresAt', $tokenExpiresAt, 'string');
+        }
         $updateSql = $db->bindVars($updateSql, ':environment', $environment, 'string');
         $updateSql = $db->bindVars($updateSql, ':expiresAt', $expiresAt, 'string');
         $updateSql = $db->bindVars($updateSql, ':trackingId', $trackingId, 'string');
