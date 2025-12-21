@@ -100,6 +100,48 @@
         window.dataLayer.push(Object.assign({ event: eventName }, payload || {}));
     }
 
+    function htmlEscape(str) {
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function maskSecret(value) {
+        var length = (value || '').length || 8;
+        var maskLength = Math.min(Math.max(length, 12), 28);
+        return Array(maskLength + 1).join('•');
+    }
+
+    function copyToClipboard(value) {
+        if (!value) {
+            return Promise.reject(new Error('Nothing to copy'));
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(value);
+        }
+        return new Promise(function (resolve, reject) {
+            var textarea = document.createElement('textarea');
+            textarea.value = value;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                var successful = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                if (successful) {
+                    resolve();
+                } else {
+                    reject(new Error('Unable to copy'));
+                }
+            } catch (error) {
+                document.body.removeChild(textarea);
+                reject(error);
+            }
+        });
+    }
+
     /**
      * Handle PayPal return URL when page opens in popup after signup completion.
      * 
@@ -439,7 +481,8 @@
             pollInterval: 4000,
             finalizing: false,
             pollAttempts: 0,
-            pollStartTime: null
+            pollStartTime: null,
+            credentialsDisplayed: false
         };
 
         var startButtons = document.querySelectorAll('[data-onboarding-start]');
@@ -624,6 +667,11 @@
                     window.clearInterval(state.popupMonitor);
                     state.popupMonitor = null;
                     state.popup = null;
+                    if (state.credentialsDisplayed || isCompletedStep(state.session.step)) {
+                        setStatus('PayPal account connected. You\'re all set.', 'success');
+                        disableStartButtons(false);
+                        return;
+                    }
                     if (state.session.step === 'waiting' && state.session.tracking_id) {
                         setStatus('Processing your PayPal account details…', 'info');
                         finalizeOnboarding();
@@ -744,21 +792,45 @@
             
             if (data.credentials && data.credentials.client_id && data.credentials.client_secret) {
                 var env = formatEnvironment(data.environment || (state.session && state.session.env) || 'sandbox');
+                state.credentialsDisplayed = true;
                 
                 // Create credentials display in the status area
                 if (statusNode) {
-                    var credentialsHtml = '<div class="nxp-ps-credentials">';
-                    credentialsHtml += '<h3>✓ PayPal Onboarding Complete</h3>';
-                    credentialsHtml += '<p class="nxp-ps-credentials__intro">Save these credentials in your PayPal module configuration:</p>';
-                    credentialsHtml += '<dl class="nxp-ps-credentials__list">';
-                    credentialsHtml += '<dt>Environment:</dt><dd>' + env + '</dd>';
-                    credentialsHtml += '<dt>Client ID:</dt><dd><code>' + htmlEscape(data.credentials.client_id) + '</code></dd>';
-                    credentialsHtml += '<dt>Client Secret:</dt><dd><code>' + htmlEscape(data.credentials.client_secret) + '</code></dd>';
-                    credentialsHtml += '</dl>';
-                    credentialsHtml += '<p class="nxp-ps-credentials__warning">⚠️ Store these credentials securely. Do not share them publicly.</p>';
+                    var credentialsHtml = '<div class="nxp-ps-credentials" data-credentials-card>';
+                    credentialsHtml += '<div class="nxp-ps-credentials__header">';
+                    credentialsHtml += '<div class="nxp-ps-credentials__title">';
+                    credentialsHtml += '<span class="nxp-ps-credentials__icon" aria-hidden="true">';
+                    credentialsHtml += '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">';
+                    credentialsHtml += '<circle cx="10" cy="10" r="10" fill="#0B874B"></circle>';
+                    credentialsHtml += '<path d="M6 10.5 8.5 13 14 7.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>';
+                    credentialsHtml += '</svg>';
+                    credentialsHtml += '</span>';
+                    credentialsHtml += '<div>';
+                    credentialsHtml += '<h3>PayPal onboarding complete</h3>';
+                    credentialsHtml += '<p class="nxp-ps-credentials__intro">Save these credentials in your PayPal module configuration.</p>';
+                    credentialsHtml += '</div>';
+                    credentialsHtml += '</div>';
+                    credentialsHtml += '<span class="nxp-ps-credentials__badge" aria-label="Environment ' + htmlEscape(env) + '">' + htmlEscape(env) + '</span>';
+                    credentialsHtml += '</div>';
+                    credentialsHtml += '<div class="nxp-ps-credentials__list" role="list">';
+                    credentialsHtml += renderCredentialRow('Environment', env, { copyLabel: 'Environment' });
+                    credentialsHtml += renderCredentialRow('Client ID', data.credentials.client_id, { copyLabel: 'Client ID' });
+                    credentialsHtml += renderCredentialRow('Client Secret', data.credentials.client_secret, { mask: true, copyLabel: 'Client Secret' });
+                    credentialsHtml += '</div>';
+                    credentialsHtml += '<div class="nxp-ps-credentials__note" role="alert">';
+                    credentialsHtml += '<span class="nxp-ps-credentials__note-icon" aria-hidden="true">';
+                    credentialsHtml += '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">';
+                    credentialsHtml += '<path d="M8 1.33334L1.33334 14.6667H14.6667L8 1.33334Z" stroke="#92400e" stroke-width="1.5" stroke-linejoin="round"></path>';
+                    credentialsHtml += '<path d="M8 6.5V9.83334" stroke="#92400e" stroke-width="1.5" stroke-linecap="round"></path>';
+                    credentialsHtml += '<circle cx="8" cy="11.8333" r="0.666667" fill="#92400e"></circle>';
+                    credentialsHtml += '</svg>';
+                    credentialsHtml += '</span>';
+                    credentialsHtml += '<span>Store these credentials securely. Do not share them publicly.</span>';
+                    credentialsHtml += '</div>';
                     credentialsHtml += '</div>';
                     statusNode.innerHTML = credentialsHtml;
                     statusNode.setAttribute('data-tone', 'success');
+                    bindCredentialActions(statusNode);
                     console.log('[CALLBACK TEST - Numinix] Credentials displayed successfully');
                 }
                 
@@ -780,15 +852,101 @@
                     state.popupMonitor = null;
                 }
             } else {
+                state.credentialsDisplayed = true;
                 setStatus('PayPal account connected. You\'re all set.', 'success');
                 console.log('[CALLBACK TEST - Numinix] No credentials to display, showing success message');
             }
         }
 
-        function htmlEscape(str) {
-            var div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
+        function bindCredentialActions(container) {
+            if (!container || container.__nxpCredentialsBound) {
+                return;
+            }
+            container.__nxpCredentialsBound = true;
+            container.addEventListener('click', function (event) {
+                var actionButton = event.target.closest('[data-credential-action]');
+                if (!actionButton) {
+                    return;
+                }
+                var action = actionButton.getAttribute('data-credential-action');
+                var row = actionButton.closest('[data-credential-row]');
+                if (!row) {
+                    return;
+                }
+                if (action === 'copy') {
+                    var value = actionButton.getAttribute('data-copy-value') || row.getAttribute('data-value');
+                    copyToClipboard(value)
+                        .then(function () {
+                            row.setAttribute('data-copied', 'true');
+                            var feedback = row.querySelector('[data-copy-feedback]');
+                            if (feedback) {
+                                feedback.textContent = 'Copied to clipboard';
+                            }
+                            window.setTimeout(function () {
+                                row.removeAttribute('data-copied');
+                            }, 1800);
+                        })
+                        .catch(function () {
+                            var feedback = row.querySelector('[data-copy-feedback]');
+                            if (feedback) {
+                                feedback.textContent = 'Copy unavailable';
+                                row.setAttribute('data-copied', 'true');
+                                window.setTimeout(function () {
+                                    row.removeAttribute('data-copied');
+                                }, 1800);
+                            }
+                        });
+                } else if (action === 'toggle') {
+                    var textNode = row.querySelector('[data-credential-text]');
+                    if (!textNode) {
+                        return;
+                    }
+                    var currentMask = textNode.getAttribute('data-masked') === 'true';
+                    var actualValue = row.getAttribute('data-value') || textNode.textContent;
+                    if (currentMask) {
+                        textNode.textContent = actualValue;
+                        textNode.setAttribute('data-masked', 'false');
+                        actionButton.setAttribute('aria-pressed', 'true');
+                        actionButton.setAttribute('aria-label', 'Hide Client Secret');
+                        row.setAttribute('data-revealed', 'true');
+                    } else {
+                        textNode.textContent = maskSecret(actualValue);
+                        textNode.setAttribute('data-masked', 'true');
+                        actionButton.setAttribute('aria-pressed', 'false');
+                        actionButton.setAttribute('aria-label', 'Show Client Secret');
+                        row.removeAttribute('data-revealed');
+                    }
+                }
+            });
+        }
+
+        function renderCredentialRow(label, value, options) {
+            var id = 'credential-' + Math.random().toString(36).slice(2, 9);
+            var isSecret = options && options.mask;
+            var displayValue = isSecret ? maskSecret(value) : value;
+            var safeValue = htmlEscape(value);
+            var safeLabel = htmlEscape(label);
+            var copyLabel = options && options.copyLabel ? options.copyLabel : label;
+            var copyIcon = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.25 6.25h-5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5.75 11.75H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v.54" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+            var eyeIcon = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 9s2.25-4.5 7.5-4.5S16.5 9 16.5 9s-2.25 4.5-7.5 4.5S1.5 9 1.5 9Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M11.25 9a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+            var rowHtml = '<div class="nxp-ps-credential" data-credential-row data-credential-id="' + id + '" data-value="' + safeValue + '" role="listitem">';
+            rowHtml += '<div class="nxp-ps-credential__label">' + safeLabel + '</div>';
+            rowHtml += '<div class="nxp-ps-credential__value">';
+            rowHtml += '<span class="nxp-ps-credential__text" data-credential-text data-masked="' + (isSecret ? 'true' : 'false') + '">' + htmlEscape(displayValue) + '</span>';
+            rowHtml += '<div class="nxp-ps-credential__actions">';
+            if (isSecret) {
+                rowHtml += '<button type="button" class="nxp-ps-credential__icon" data-credential-action="toggle" aria-pressed="false" aria-label="Show ' + safeLabel + '">';
+                rowHtml += eyeIcon;
+                rowHtml += '</button>';
+            }
+            rowHtml += '<button type="button" class="nxp-ps-credential__icon" data-credential-action="copy" data-copy-value="' + safeValue + '" aria-label="Copy ' + htmlEscape(copyLabel) + '">';
+            rowHtml += copyIcon;
+            rowHtml += '</button>';
+            rowHtml += '</div>';
+            rowHtml += '</div>';
+            rowHtml += '<span class="nxp-ps-credential__feedback" data-copy-feedback aria-live="polite"></span>';
+            rowHtml += '</div>';
+            return rowHtml;
         }
 
         function pollStatus(delay) {
@@ -832,6 +990,7 @@
             state.pollAttempts = 0;
             state.pollStartTime = null;
             state.loading = true;
+            state.credentialsDisplayed = false;
             disableStartButtons(true);
             setStatus('Starting secure PayPal signup…', 'info');
 
