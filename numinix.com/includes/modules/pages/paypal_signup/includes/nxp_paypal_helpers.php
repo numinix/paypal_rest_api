@@ -1738,20 +1738,73 @@ function nxp_paypal_persist_credentials(
     $expiresAt = date('Y-m-d H:i:s', time() + 3600);
 
     try {
+        // Check which columns exist in a single query
+        // This handles the case where the 1.0.7 installer hasn't been run yet
+        $allColumnsToCheck = [
+            'seller_client_id',
+            'seller_client_secret', 
+            'seller_access_token',
+            'seller_access_token_expires_at',
+        ];
+        
+        $existingColumns = [];
+        $checkSql = "SHOW COLUMNS FROM " . $tableName;
+        $result = $db->Execute($checkSql);
+        while (!$result->EOF) {
+            $fieldName = $result->fields['Field'] ?? '';
+            if (in_array($fieldName, $allColumnsToCheck, true)) {
+                $existingColumns[] = $fieldName;
+            }
+            $result->MoveNext();
+        }
+        
+        // Check if required columns exist
+        $requiredColumns = ['seller_client_id', 'seller_client_secret'];
+        $missingRequired = array_diff($requiredColumns, $existingColumns);
+        
+        if (!empty($missingRequired)) {
+            nxp_paypal_log_debug('Cannot persist credentials: required columns missing from tracking table', [
+                'tracking_id' => $trackingId,
+                'missing_columns' => array_values($missingRequired),
+                'hint' => 'Run the PayPal ISU installer to add the required columns',
+            ]);
+            // Return true to allow the flow to continue - credentials are still available in memory
+            return true;
+        }
+
+        // Build dynamic UPDATE query based on available columns
+        $setClauses = [
+            "seller_client_id = :clientId",
+            "seller_client_secret = :clientSecret",
+            "environment = :environment",
+            "expires_at = :expiresAt",
+            "updated_at = NOW()",
+        ];
+        
+        // Check for optional columns and include them if they exist
+        $hasAccessTokenCol = in_array('seller_access_token', $existingColumns, true);
+        $hasTokenExpiresCol = in_array('seller_access_token_expires_at', $existingColumns, true);
+        
+        if ($hasAccessTokenCol) {
+            $setClauses[] = "seller_access_token = :accessToken";
+        }
+        
+        if ($hasTokenExpiresCol) {
+            $setClauses[] = "seller_access_token_expires_at = :tokenExpiresAt";
+        }
+        
         $updateSql = "UPDATE " . $tableName . " SET "
-            . "seller_client_id = :clientId, "
-            . "seller_client_secret = :clientSecret, "
-            . "seller_access_token = :accessToken, "
-            . "seller_access_token_expires_at = :tokenExpiresAt, "
-            . "environment = :environment, "
-            . "expires_at = :expiresAt, "
-            . "updated_at = NOW() "
-            . "WHERE tracking_id = :trackingId";
+            . implode(", ", $setClauses)
+            . " WHERE tracking_id = :trackingId";
 
         $updateSql = $db->bindVars($updateSql, ':clientId', $clientId, 'string');
         $updateSql = $db->bindVars($updateSql, ':clientSecret', $clientSecret, 'string');
-        $updateSql = $db->bindVars($updateSql, ':accessToken', $accessToken, 'string');
-        $updateSql = $db->bindVars($updateSql, ':tokenExpiresAt', $tokenExpiresAt, 'string');
+        if ($hasAccessTokenCol) {
+            $updateSql = $db->bindVars($updateSql, ':accessToken', $accessToken, 'string');
+        }
+        if ($hasTokenExpiresCol) {
+            $updateSql = $db->bindVars($updateSql, ':tokenExpiresAt', $tokenExpiresAt, 'string');
+        }
         $updateSql = $db->bindVars($updateSql, ':environment', $environment, 'string');
         $updateSql = $db->bindVars($updateSql, ':expiresAt', $expiresAt, 'string');
         $updateSql = $db->bindVars($updateSql, ':trackingId', $trackingId, 'string');
@@ -2636,8 +2689,8 @@ function nxp_paypal_show_completion_page(): void
         </div>
         <h1><?php echo htmlspecialchars($heading, ENT_QUOTES, 'UTF-8'); ?></h1>
         <p><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></p>
-        <button class="btn" onclick="window.close();">Close Window</button>
-        <p class="countdown">Closing in <span id="timer">5</span> seconds...</p>
+        <button class="btn" onclick="closeWindow();">Close Window</button>
+        <p class="countdown" id="countdown-text">Closing in <span id="timer">5</span> seconds...</p>
     </div>
     <script>
         (function() {
@@ -2652,15 +2705,54 @@ function nxp_paypal_show_completion_page(): void
                     // Ignore cross-origin errors - parent will detect popup close
                 }
             }
+            
+            // Also try posting to parent frame in case this is in an iframe
+            if (window.parent && window.parent !== window) {
+                try {
+                    window.parent.postMessage(messageData, '*');
+                } catch(e) {
+                    // Ignore cross-origin errors
+                }
+            }
+            
+            // Delay to check if window.close() worked
+            var CLOSE_CHECK_DELAY_MS = 500;
+
+            // Function to attempt to close the window
+            window.closeWindow = function() {
+                try {
+                    window.close();
+                } catch(e) {
+                    // Ignore errors
+                }
+                
+                // If window didn't close, update the message
+                setTimeout(function() {
+                    var countdownText = document.getElementById('countdown-text');
+                    if (countdownText) {
+                        countdownText.textContent = 'You can manually close this window now.';
+                    }
+                }, CLOSE_CHECK_DELAY_MS);
+            };
 
             var seconds = 5;
             var timer = document.getElementById('timer');
+            var countdownText = document.getElementById('countdown-text');
             var interval = setInterval(function() {
                 seconds--;
                 if (timer) timer.textContent = seconds;
                 if (seconds <= 0) {
                     clearInterval(interval);
-                    try { window.close(); } catch(e) {}
+                    try { 
+                        window.close(); 
+                    } catch(e) {}
+                    
+                    // If we're still here after the delay, the window didn't close
+                    setTimeout(function() {
+                        if (countdownText) {
+                            countdownText.textContent = 'You can manually close this window now.';
+                        }
+                    }, CLOSE_CHECK_DELAY_MS);
                 }
             }, 1000);
         })();

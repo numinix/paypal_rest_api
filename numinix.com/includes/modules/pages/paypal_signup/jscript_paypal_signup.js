@@ -761,6 +761,24 @@
                     statusNode.setAttribute('data-tone', 'success');
                     console.log('[CALLBACK TEST - Numinix] Credentials displayed successfully');
                 }
+                
+                // Close the popup window after credentials are displayed
+                // This allows the parent page to continue with the flow
+                if (state.popup && !state.popup.closed) {
+                    console.log('[CALLBACK TEST - Numinix] Attempting to close popup window');
+                    try {
+                        state.popup.close();
+                    } catch (e) {
+                        console.log('[CALLBACK TEST - Numinix] Could not close popup:', e);
+                    }
+                    state.popup = null;
+                }
+                
+                // Also clear the popup monitor if it's running
+                if (state.popupMonitor) {
+                    window.clearInterval(state.popupMonitor);
+                    state.popupMonitor = null;
+                }
             } else {
                 setStatus('PayPal account connected. You\'re all set.', 'success');
                 console.log('[CALLBACK TEST - Numinix] No credentials to display, showing success message');

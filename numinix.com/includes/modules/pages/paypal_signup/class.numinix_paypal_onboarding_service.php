@@ -275,12 +275,24 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             'Content-Type: application/x-www-form-urlencoded',
         ];
 
-        // Per PayPal docs: For onboarded Complete Token flow, only grant_type and code are required
-        // Do NOT include code_verifier - it will cause "Code verifier does not match" error
-        $tokenBody = http_build_query([
+        // Per PayPal ISU docs: grant_type, code, and code_verifier are required
+        // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+        // The code_verifier is the seller_nonce generated during partner referral creation
+        $tokenParams = [
             'grant_type'    => 'authorization_code',
             'code'          => $authCode,
-        ], '', '&', PHP_QUERY_RFC3986);
+        ];
+
+        // Include code_verifier (seller_nonce) as required by PayPal ISU documentation
+        if ($sellerNonce !== '') {
+            $tokenParams['code_verifier'] = $sellerNonce;
+        } else {
+            $this->logDebug('Warning: seller_nonce not available for code_verifier', [
+                'auth_code_prefix' => substr($authCode, 0, 10) . '...',
+            ]);
+        }
+
+        $tokenBody = http_build_query($tokenParams, '', '&', PHP_QUERY_RFC3986);
 
         // IMPORTANT: for ISU, PayPal expects sharedId as the Basic auth username (password empty).
         $tokenResponse = $this->performHttpCall(
