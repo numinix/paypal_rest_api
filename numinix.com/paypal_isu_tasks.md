@@ -137,15 +137,36 @@ After implementation, the token exchange should follow this flow:
 
 ---
 
+## Additional Issue: Database Column Missing
+
+After the token exchange was fixed, a second issue was discovered:
+
+### Error
+```
+MySQL error 1054: Unknown column 'seller_client_id' in 'field list'
+```
+
+### Root Cause
+The `nxp_paypal_persist_credentials` function attempts to update columns (`seller_client_id`, `seller_client_secret`, `seller_access_token`, `seller_access_token_expires_at`) that may not exist if the 1.0.7 installer hasn't been run.
+
+### Fix
+Modified `nxp_paypal_persist_credentials` in `nxp_paypal_helpers.php` to:
+1. Check which columns exist using a single `SHOW COLUMNS` query
+2. Skip credential persistence gracefully if required columns are missing
+3. Dynamically build the UPDATE query based on available columns
+4. Allow the flow to continue even if persistence fails (credentials are still available in memory)
+
+---
+
 ## Testing Checklist
 
-- [ ] Verify seller_nonce is properly generated and stored during partner referral
-- [ ] Verify seller_nonce is correctly retrieved during token exchange
-- [ ] Verify token exchange request includes all three parameters:
+- [x] Verify seller_nonce is properly generated and stored during partner referral
+- [x] Verify seller_nonce is correctly retrieved during token exchange
+- [x] Verify token exchange request includes all three parameters:
   - `grant_type=authorization_code`
   - `code={authCode}`
   - `code_verifier={seller_nonce}`
-- [ ] Verify Basic auth header uses `sharedId:` format (no secret)
-- [ ] Verify successful access_token is returned from PayPal
-- [ ] Verify credentials endpoint is called with seller access token
-- [ ] Verify merchant credentials are properly stored
+- [x] Verify Basic auth header uses `sharedId:` format (no secret)
+- [x] Verify successful access_token is returned from PayPal
+- [x] Verify credentials endpoint is called with seller access token
+- [ ] Verify merchant credentials are properly stored (requires 1.0.7 installer)
