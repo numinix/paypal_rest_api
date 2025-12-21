@@ -1,135 +1,362 @@
-[2025-12-20T18:28:43-08:00] Attempting authCode/sharedId credential exchange Context: {
+[2025-12-20T18:53:35-08:00] Attempting authCode/sharedId credential exchange Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes",
     "has_seller_nonce": "yes"
 }
-[2025-12-20T18:28:43-08:00] Auth code exchange failed Context: {
-    "status": 401,
-    "error": "invalid_request",
-    "error_description": "Authorization Header must have client_id and secret",
+[2025-12-20T18:53:51-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:53:51-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
     "attempt": "isu_shared_id"
 }
-[2025-12-20T18:28:43-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+[2025-12-20T18:53:51-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes"
 }
-[2025-12-20T18:28:46-08:00] Attempting authCode/sharedId credential exchange Context: {
+[2025-12-20T18:53:57-08:00] Attempting authCode/sharedId credential exchange Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes",
     "has_seller_nonce": "yes"
 }
-[2025-12-20T18:28:46-08:00] Auth code exchange failed Context: {
-    "status": 401,
-    "error": "invalid_request",
-    "error_description": "Authorization Header must have client_id and secret",
+[2025-12-20T18:53:57-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
     "attempt": "isu_shared_id"
 }
-[2025-12-20T18:28:46-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+[2025-12-20T18:53:57-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes"
 }
-[2025-12-20T18:28:48-08:00] Attempting authCode/sharedId credential exchange Context: {
+[2025-12-20T18:54:03-08:00] Attempting authCode/sharedId credential exchange Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes",
     "has_seller_nonce": "yes"
 }
-[2025-12-20T18:28:48-08:00] Auth code exchange failed Context: {
-    "status": 401,
-    "error": "invalid_request",
-    "error_description": "Authorization Header must have client_id and secret",
+[2025-12-20T18:54:03-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
     "attempt": "isu_shared_id"
 }
-[2025-12-20T18:28:48-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+[2025-12-20T18:54:03-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes"
 }
-[2025-12-20T18:28:54-08:00] Attempting authCode/sharedId credential exchange Context: {
+[2025-12-20T18:54:09-08:00] Attempting authCode/sharedId credential exchange Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes",
     "has_seller_nonce": "yes"
 }
-[2025-12-20T18:28:54-08:00] Auth code exchange failed Context: {
-    "status": 401,
-    "error": "invalid_request",
-    "error_description": "Authorization Header must have client_id and secret",
+[2025-12-20T18:54:10-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
     "attempt": "isu_shared_id"
 }
-[2025-12-20T18:28:54-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+[2025-12-20T18:54:10-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes"
 }
-[2025-12-20T18:29:00-08:00] Attempting authCode/sharedId credential exchange Context: {
+[2025-12-20T18:54:15-08:00] Attempting authCode/sharedId credential exchange Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes",
     "has_seller_nonce": "yes"
 }
-[2025-12-20T18:29:00-08:00] Auth code exchange failed Context: {
-    "status": 401,
-    "error": "invalid_request",
-    "error_description": "Authorization Header must have client_id and secret",
+[2025-12-20T18:54:16-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
     "attempt": "isu_shared_id"
 }
-[2025-12-20T18:29:00-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+[2025-12-20T18:54:16-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes"
 }
-[2025-12-20T18:29:07-08:00] Attempting authCode/sharedId credential exchange Context: {
+[2025-12-20T18:54:22-08:00] Attempting authCode/sharedId credential exchange Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes",
     "has_seller_nonce": "yes"
 }
-[2025-12-20T18:29:07-08:00] Auth code exchange failed Context: {
-    "status": 401,
-    "error": "invalid_request",
-    "error_description": "Authorization Header must have client_id and secret",
+[2025-12-20T18:54:22-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
     "attempt": "isu_shared_id"
 }
-[2025-12-20T18:29:07-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+[2025-12-20T18:54:22-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes"
 }
-[2025-12-20T18:29:14-08:00] Attempting authCode/sharedId credential exchange Context: {
+[2025-12-20T18:54:28-08:00] Attempting authCode/sharedId credential exchange Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes",
     "has_seller_nonce": "yes"
 }
-[2025-12-20T18:29:14-08:00] Auth code exchange failed Context: {
-    "status": 401,
-    "error": "invalid_request",
-    "error_description": "Authorization Header must have client_id and secret",
+[2025-12-20T18:54:28-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
     "attempt": "isu_shared_id"
 }
-[2025-12-20T18:29:14-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+[2025-12-20T18:54:28-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes"
 }
-[2025-12-20T18:29:21-08:00] Attempting authCode/sharedId credential exchange Context: {
+[2025-12-20T18:54:34-08:00] Attempting authCode/sharedId credential exchange Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes",
     "has_seller_nonce": "yes"
 }
-[2025-12-20T18:29:21-08:00] Auth code exchange failed Context: {
-    "status": 401,
-    "error": "invalid_request",
-    "error_description": "Authorization Header must have client_id and secret",
+[2025-12-20T18:54:34-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
     "attempt": "isu_shared_id"
 }
-[2025-12-20T18:29:21-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+[2025-12-20T18:54:34-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:54:40-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:54:40-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:54:40-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:54:46-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:54:46-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:54:46-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:54:52-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:54:53-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:54:53-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:54:59-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:54:59-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:54:59-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:55:05-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:55:05-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:55:05-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:55:11-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:55:11-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:55:11-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:55:18-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:55:18-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:55:18-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:55:25-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:55:25-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:55:25-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:55:32-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:55:32-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:55:32-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:55:38-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:55:38-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:55:38-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:55:44-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:55:44-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:55:44-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:55:51-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:55:51-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:55:51-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:55:58-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:55:58-08:00] Auth code exchange failed Context: {
+    "status": 400,
+    "error": "invalid_grant",
+    "error_description": "Authorization code not found in cache",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:55:58-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
     "tracking_id": "nxp-9e1c5c545f42d4aef585",
     "has_auth_code": "yes",
     "has_shared_id": "yes"
