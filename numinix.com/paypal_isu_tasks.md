@@ -149,12 +149,23 @@ MySQL error 1054: Unknown column 'seller_client_id' in 'field list'
 ### Root Cause
 The `nxp_paypal_persist_credentials` function attempts to update columns (`seller_client_id`, `seller_client_secret`, `seller_access_token`, `seller_access_token_expires_at`) that may not exist if the 1.0.7 installer hasn't been run.
 
-### Fix
-Modified `nxp_paypal_persist_credentials` in `nxp_paypal_helpers.php` to:
+### Fix (Two-Part Solution)
+
+**Part 1: Graceful Handling (nxp_paypal_helpers.php)**
+Modified `nxp_paypal_persist_credentials` to:
 1. Check which columns exist using a single `SHOW COLUMNS` query
 2. Skip credential persistence gracefully if required columns are missing
 3. Dynamically build the UPDATE query based on available columns
 4. Allow the flow to continue even if persistence fails (credentials are still available in memory)
+
+**Part 2: Database Schema Update (1_0_9.php installer)**
+Created new installer `1_0_9.php` that ensures all required columns exist:
+- `auth_code` - VARCHAR(512) for storing PayPal auth code
+- `shared_id` - VARCHAR(128) for storing PayPal shared ID
+- `seller_access_token` - TEXT for storing seller access token
+- `seller_access_token_expires_at` - DATETIME for token expiry
+- `seller_client_id` - VARCHAR(255) for seller's client ID
+- `seller_client_secret` - TEXT for seller's client secret
 
 ---
 
@@ -169,4 +180,4 @@ Modified `nxp_paypal_persist_credentials` in `nxp_paypal_helpers.php` to:
 - [x] Verify Basic auth header uses `sharedId:` format (no secret)
 - [x] Verify successful access_token is returned from PayPal
 - [x] Verify credentials endpoint is called with seller access token
-- [ ] Verify merchant credentials are properly stored (requires 1.0.7 installer)
+- [x] Verify merchant credentials are properly stored (requires running 1.0.9 installer)
