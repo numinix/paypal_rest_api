@@ -38,12 +38,14 @@ try {
         // Column doesn't exist, add it after environment column
         // Check if environment column exists to determine position
         $afterCol = 'environment';
+        // Escape column name for safe SQL usage
+        $escapedAfterCol = '`' . str_replace('`', '``', $afterCol) . '`';
         $checkAfterSql = "SHOW COLUMNS FROM " . $tableName . " LIKE '" . $afterCol . "'";
         $afterResult = $db->Execute($checkAfterSql);
         
-        $alterSql = "ALTER TABLE " . $tableName . " ADD COLUMN seller_nonce VARCHAR(128) NULL";
+        $alterSql = "ALTER TABLE " . $tableName . " ADD COLUMN `seller_nonce` VARCHAR(128) NULL";
         if (!$afterResult->EOF) {
-            $alterSql .= " AFTER `" . $afterCol . "`";
+            $alterSql .= " AFTER " . $escapedAfterCol;
         }
         
         $db->Execute($alterSql);
