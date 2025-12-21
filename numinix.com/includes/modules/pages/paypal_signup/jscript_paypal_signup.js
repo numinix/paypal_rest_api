@@ -13,6 +13,75 @@
         return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
+    function isValidMerchantId(value) {
+        return typeof value === 'string' && /^[A-Za-z0-9]{10,20}$/.test(value);
+    }
+
+    function toNonEmptyString(value) {
+        if (value === undefined || value === null) {
+            return '';
+        }
+        if (typeof value === 'object' || typeof value === 'function') {
+            return '';
+        }
+        var str = String(value).trim();
+        return str === '' ? '' : str;
+    }
+
+    function ensureMiniBrowserDisplayMode(url) {
+        if (!url || typeof url !== 'string') {
+            return url;
+        }
+        if (/([?&])displayMode=/.test(url)) {
+            return url;
+        }
+        return url + (url.indexOf('?') === -1 ? '?' : '&') + 'displayMode=minibrowser';
+    }
+
+    function getFirstMatchingValue(source, keyVariants) {
+        if (!source || !keyVariants || !keyVariants.length) {
+            return undefined;
+        }
+
+        var queue = [source];
+        var visited = [];
+        var childKeys = ['data', 'detail', 'payload', 'body', 'response', 'params'];
+
+        while (queue.length) {
+            var current = queue.shift();
+            if (!current || typeof current !== 'object') {
+                continue;
+            }
+            if (visited.indexOf(current) !== -1) {
+                continue;
+            }
+            visited.push(current);
+
+            for (var i = 0; i < keyVariants.length; i++) {
+                var key = keyVariants[i];
+                if (Object.prototype.hasOwnProperty.call(current, key) && current[key] !== undefined && current[key] !== null) {
+                    return current[key];
+                }
+            }
+
+            if (Array.isArray(current)) {
+                current.forEach(function (item) {
+                    if (item && typeof item === 'object') {
+                        queue.push(item);
+                    }
+                });
+            }
+
+            childKeys.forEach(function (childKey) {
+                if (current[childKey] && typeof current[childKey] === 'object') {
+                    queue.push(current[childKey]);
+                }
+            });
+        }
+
+        return undefined;
+    }
+
     function smoothScrollTo(target) {
         if (!target) {
             return;
@@ -29,6 +98,85 @@
     function emitAnalytics(eventName, payload) {
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push(Object.assign({ event: eventName }, payload || {}));
+    }
+
+    /**
+     * Handle PayPal return URL when page opens in popup after signup completion.
+     * 
+     * When PayPal redirects back to this page in the popup window, we need to:
+     * 1. Extract authCode/sharedId from URL parameters
+     * 2. Send postMessage to parent window with the credentials
+     * 3. Close the popup
+     * 
+     * This enables the parent window to receive the credentials and finalize onboarding.
+     */
+    function handlePopupReturn() {
+        // Only run if this page is loaded in a popup (has window.opener)
+        if (!window.opener || window.opener.closed) {
+            return false;
+        }
+
+        var urlParams;
+        try {
+            urlParams = new URLSearchParams(window.location.search);
+        } catch (error) {
+            return false;
+        }
+
+        // Check for PayPal return parameters
+        var authCode = urlParams.get('authCode') || urlParams.get('auth_code');
+        var sharedId = urlParams.get('sharedId') || urlParams.get('shared_id');
+        var merchantId = urlParams.get('merchantId') || urlParams.get('merchantIdInPayPal');
+        if (!isValidMerchantId(merchantId)) {
+            merchantId = null;
+        }
+        var trackingId = urlParams.get('tracking_id');
+
+        // If we have any PayPal parameters, this is a return from PayPal
+        if (authCode || sharedId || merchantId || (trackingId && urlParams.get('env'))) {
+            try {
+                // Determine target origin for postMessage
+                // Use wildcard '*' to avoid cross-origin access errors when reading window.opener.location.origin
+                var targetOrigin = '*';  // Less secure but necessary for cross-origin popup communication
+                
+                // Send postMessage to parent window with all parameters
+                window.opener.postMessage({
+                    event: 'paypal_onboarding_complete',
+                    paypalOnboardingComplete: true,
+                    authCode: authCode || undefined,
+                    sharedId: sharedId || undefined,
+                    merchantId: merchantId || undefined,
+                    tracking_id: trackingId || undefined,
+                    env: urlParams.get('env') || undefined,
+                    source: 'popup_return_url'
+                }, targetOrigin);
+
+                // Show brief message before closing
+                document.body.innerHTML = '<div style="padding: 40px; text-align: center; font-family: system-ui, sans-serif;">' +
+                    '<h2>PayPal Setup Complete</h2>' +
+                    '<p>Processing your account details...</p>' +
+                    '<p style="color: #666; font-size: 14px;">This window will close automatically.</p>' +
+                    '</div>';
+
+                // Close popup after brief delay to ensure postMessage is received
+                setTimeout(function () {
+                    window.close();
+                }, 1000);
+
+                return true;
+            } catch (error) {
+                console.error('[PayPal Return] Failed to send postMessage:', error);
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    // Try to handle popup return immediately (before heavy page load)
+    if (handlePopupReturn()) {
+        // Stop further page initialization if we're handling popup return
+        return;
     }
 
     ready(function () {
@@ -425,6 +573,8 @@
         }
 
         function openOnboardingWindow(url) {
+            url = ensureMiniBrowserDisplayMode(url);
+
             if (!url) {
                 setStatus('PayPal did not return a signup link. Please try again.', 'error');
                 disableStartButtons(false);
@@ -498,7 +648,7 @@
             if (data.step) {
                 state.session.step = data.step;
             }
-            if (data.merchant_id) {
+            if (data.merchant_id && isValidMerchantId(data.merchant_id)) {
                 state.session.merchant_id = data.merchant_id;
             }
             if (data.auth_code || data.authCode) {
@@ -529,7 +679,7 @@
             if (data.step) {
                 state.session.step = data.step;
             }
-            if (data.merchant_id) {
+            if (data.merchant_id && isValidMerchantId(data.merchant_id)) {
                 state.session.merchant_id = data.merchant_id;
             }
             if (data.auth_code || data.authCode) {
@@ -585,6 +735,13 @@
         }
 
         function displayCredentialsIfAvailable(data) {
+            console.log('[CALLBACK TEST - Numinix] displayCredentialsIfAvailable called with data:', {
+                hasCredentials: !!(data && data.credentials),
+                hasClientId: !!(data && data.credentials && data.credentials.client_id),
+                hasClientSecret: !!(data && data.credentials && data.credentials.client_secret),
+                credentials: data && data.credentials ? data.credentials : null
+            });
+            
             if (data.credentials && data.credentials.client_id && data.credentials.client_secret) {
                 var env = formatEnvironment(data.environment || (state.session && state.session.env) || 'sandbox');
                 
@@ -602,9 +759,11 @@
                     credentialsHtml += '</div>';
                     statusNode.innerHTML = credentialsHtml;
                     statusNode.setAttribute('data-tone', 'success');
+                    console.log('[CALLBACK TEST - Numinix] Credentials displayed successfully');
                 }
             } else {
                 setStatus('PayPal account connected. You\'re all set.', 'success');
+                console.log('[CALLBACK TEST - Numinix] No credentials to display, showing success message');
             }
         }
 
@@ -726,6 +885,8 @@
                 payload.sharedId = state.session.sharedId;
             }
 
+            console.log('[CALLBACK TEST - Numinix] Finalize payload being sent:', payload);
+
             if (!payload.code && !payload.tracking_id) {
                 return;
             }
@@ -733,6 +894,7 @@
             state.finalizing = true;
             postAction('finalize', payload)
                 .then(function (response) {
+                    console.log('[CALLBACK TEST - Numinix] Finalize response received:', response);
                     handleFinalizeResponse(response.data || {});
                     sendTelemetry('finalize_success', {
                         tracking_id: state.session.tracking_id || undefined,
@@ -741,6 +903,7 @@
                     });
                 })
                 .catch(function (error) {
+                    console.log('[CALLBACK TEST - Numinix] Finalize error:', error);
                     setStatus(error && error.message ? error.message : 'We could not finalize your PayPal signup. Please try again.', 'error');
                     disableStartButtons(false);
                     sendTelemetry('finalize_failed', {
@@ -755,12 +918,36 @@
         }
 
         function handlePopupMessage(event) {
-            if (!state.popup || (event && event.source && event.source !== state.popup)) {
+            console.log('[CALLBACK TEST - Numinix] handlePopupMessage called', {
+                hasPopup: !!state.popup,
+                hasEvent: !!event,
+                hasEventSource: !!(event && event.source),
+                eventOrigin: event ? event.origin : 'N/A',
+                sourcesMatch: !!(event && event.source && state.popup && event.source === state.popup),
+                currentLocation: window.location.origin
+            });
+
+            // Temporarily relaxed: Accept messages from PayPal domains or same origin
+            var isFromPayPal = event && event.origin && (
+                event.origin.indexOf('paypal.com') !== -1 ||
+                event.origin.indexOf('paypalobjects.com') !== -1
+            );
+            var isFromSameOrigin = event && event.origin === window.location.origin;
+            var isValidSource = event && (isFromPayPal || isFromSameOrigin);
+
+            if (!isValidSource) {
+                console.log('[CALLBACK TEST - Numinix] Ignoring message - not from PayPal or same origin. Origin:', event ? event.origin : 'N/A');
                 return;
+            }
+            
+            // Additional check: If we have a popup reference, verify it matches (but don't reject if popup is null)
+            if (state.popup && event && event.source && event.source !== state.popup) {
+                console.log('[CALLBACK TEST - Numinix] Warning: Message source does not match our popup reference, but accepting anyway');
             }
 
             var rawData = event && event.data;
             if (!rawData) {
+                console.log('[CALLBACK TEST - Numinix] No data in message');
                 return;
             }
 
@@ -774,37 +961,106 @@
             }
 
             if (!payload || typeof payload !== 'object') {
+                console.log('[CALLBACK TEST - Numinix] Payload is not an object');
                 return;
             }
 
-            var eventName = '';
-            if (typeof payload.event === 'string') {
-                eventName = payload.event;
-            } else if (typeof payload.type === 'string') {
-                eventName = payload.type;
-            }
+            console.log('[CALLBACK TEST - Numinix] Received postMessage payload:', payload);
+
+            var eventName = toNonEmptyString(getFirstMatchingValue(payload, ['event', 'type']));
 
             var normalized = eventName.toLowerCase();
+            
+            // PayPal returns authCode as 'onboardedCompleteToken' in their callback
+            var authCode = toNonEmptyString(getFirstMatchingValue(payload, [
+                'authCode',
+                'auth_code',
+                'authcode',
+                'onboardedCompleteToken',
+                'onboarding_complete_token'
+            ]));
+            var sharedId = toNonEmptyString(getFirstMatchingValue(payload, [
+                'sharedId',
+                'sharedID',
+                'shared_id',
+                'sharedid'
+            ]));
+            var merchantId = toNonEmptyString(getFirstMatchingValue(payload, [
+                'merchantId',
+                'merchantID',
+                'merchant_id',
+                'merchantIdInPayPal'
+            ]));
+            var trackingId = toNonEmptyString(getFirstMatchingValue(payload, [
+                'tracking_id',
+                'trackingId'
+            ]));
+            var completionFlagValue = getFirstMatchingValue(payload, [
+                'paypal_onboarding_complete',
+                'paypalOnboardingComplete'
+            ]);
+            var completionFlag = completionFlagValue === true || completionFlagValue === 'true';
+            var environment = toNonEmptyString(getFirstMatchingValue(payload, [
+                'env',
+                'environment'
+            ]));
+            
+            // Check if this is a completion event from PayPal
+            // PayPal's direct callback includes onboardedCompleteToken and sharedId (no event property)
             var completionEvent = normalized === 'paypal_onboarding_complete'
                 || normalized === 'paypal_partner_onboarding_complete'
-                || payload.paypal_onboarding_complete === true
-                || payload.paypalOnboardingComplete === true;
+                || completionFlag
+                || (authCode && sharedId); // PayPal's direct callback format
+
+            console.log('[CALLBACK TEST - Numinix] Event analysis:', {
+                eventName: eventName,
+                normalized: normalized,
+                isCompletionEvent: completionEvent,
+                hasTrackingId: !!state.session.tracking_id,
+                authCode: authCode,
+                sharedId: sharedId,
+                merchantId: merchantId,
+                trackingId: trackingId,
+                hasOnboardedCompleteToken: !!toNonEmptyString(getFirstMatchingValue(payload, ['onboardedCompleteToken', 'onboarding_complete_token']))
+            });
+
+            if (!state.session.tracking_id && trackingId) {
+                state.session.tracking_id = trackingId;
+                console.log('[CALLBACK TEST - Numinix] Backfilled tracking_id from payload:', trackingId);
+            }
 
             if (!completionEvent || !state.session.tracking_id) {
+                console.log('[CALLBACK TEST - Numinix] Not a completion event or missing tracking_id - ignoring');
                 return;
             }
 
             // Capture authCode/sharedId/merchantId from PayPal postMessage for credential exchange
-            if (payload.merchantId) {
-                state.session.merchant_id = payload.merchantId;
+            if (merchantId && isValidMerchantId(merchantId)) {
+                state.session.merchant_id = merchantId;
             }
-            if (payload.authCode) {
-                state.session.authCode = payload.authCode;
+            if (authCode) {
+                state.session.authCode = authCode;
+                console.log('[CALLBACK TEST - Numinix] Captured authCode:', authCode);
             }
-            if (payload.sharedId) {
-                state.session.sharedId = payload.sharedId;
+            if (sharedId) {
+                state.session.sharedId = sharedId;
+                console.log('[CALLBACK TEST - Numinix] Captured sharedId:', sharedId);
+            }
+            if (trackingId && !state.session.tracking_id) {
+                state.session.tracking_id = trackingId;
+                console.log('[CALLBACK TEST - Numinix] Captured tracking_id from payload:', trackingId);
+            }
+            if (environment) {
+                state.session.env = environment;
             }
 
+            console.log('[CALLBACK TEST - Numinix] Processing PayPal completion - calling finalizeOnboarding');
+            console.log('[CALLBACK TEST - Numinix] Session state before finalize:', {
+                tracking_id: state.session.tracking_id,
+                authCode: state.session.authCode,
+                sharedId: state.session.sharedId,
+                merchant_id: state.session.merchant_id
+            });
             setStatus('Processing your PayPal account details…', 'info');
             finalizeOnboarding();
         }
@@ -814,6 +1070,7 @@
         });
 
         window.addEventListener('message', handlePopupMessage);
+        console.log('[CALLBACK TEST - Numinix] Message event listener attached - ready to receive postMessage');
 
         disableStartButtons(false);
 

@@ -57,6 +57,7 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                     'environment' => (string)($result['environment'] ?? $payload['environment'] ?? 'sandbox'),
                     'tracking_id' => $trackingId,
                     'partner_referral_id' => (string)($result['partner_referral_id'] ?? ''),
+                    'seller_nonce' => (string)($result['seller_nonce'] ?? ''),
                     'redirect_url' => $actionUrl,
                     'action_url' => $actionUrl,
                     'links' => is_array($result['links'] ?? null) ? $result['links'] : [],
@@ -105,10 +106,12 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $trackingId = $this->sanitizeTrackingId($payload['tracking_id'] ?? null);
             $partnerReferralId = $this->sanitizePartnerReferralId($payload['partner_referral_id'] ?? null);
             $merchantId = $this->sanitizeMerchantId($payload['merchant_id'] ?? null);
+            $sellerNonce = $this->sanitizeSellerNonce($payload['seller_nonce'] ?? null);
             
             // Extract authCode and sharedId for credential exchange per PayPal docs
             $authCode = $this->sanitizeAuthCode($payload['auth_code'] ?? null);
             $sharedId = $this->sanitizeSharedId($payload['shared_id'] ?? null);
+            $partnerMerchantId = $this->resolvePartnerMerchantId($environment, $payload);
 
             [$clientId, $clientSecret] = $this->resolveCredentials($environment, $payload);
             if ($clientId === '' || $clientSecret === '') {
@@ -118,61 +121,31 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
             $apiBase = $this->resolveApiBase($environment);
             $accessToken = $this->obtainAccessToken($apiBase, $clientId, $clientSecret);
 
-            $integration = $this->fetchMerchantIntegration(
-                $apiBase,
-                $accessToken,
-                $clientId,
-                $trackingId,
-                $partnerReferralId,
-                $merchantId,
-                $environment
-            );
-            if ($integration === null) {
-                return $this->waitingResponse($environment, $trackingId, $partnerReferralId, $merchantId);
-            }
-
-            $step = $this->mapIntegrationToStep($integration);
-            $data = [
-                'environment' => $environment,
-                'tracking_id' => $trackingId,
-                'partner_referral_id' => $partnerReferralId,
-                'merchant_id' => (string)($integration['merchant_id'] ?? ''),
-                'merchant_id_in_paypal' => (string)($integration['merchant_id_in_paypal'] ?? ($integration['merchant_id'] ?? '')),
-                'payments_receivable' => (bool)($integration['payments_receivable'] ?? false),
-                'primary_email_confirmed' => (bool)($integration['primary_email_confirmed'] ?? false),
-                'capabilities' => $this->extractCapabilities($integration),
-                'step' => $step,
-                'polling_interval' => self::DEFAULT_POLLING_INTERVAL_MS,
-            ];
-
-            if ($step === 'waiting') {
-                $data['status_hint'] = 'provisioning';
-            }
-
-            if (!empty($integration['links']) && is_array($integration['links'])) {
-                $data['links'] = $integration['links'];
-            }
-
             // Extract merchant credentials - try multiple methods:
             // 1. First, try to use authCode and sharedId to exchange for seller credentials (PayPal recommended flow)
-            // 2. Fall back to extracting from oauth_integrations in the merchant integration response
+            // 2. Fall back to merchant integration lookup and extract from oauth_integrations
             $credentials = null;
             $sellerToken = [];
+            $integration = null;
 
             // Method 1: Exchange authCode + sharedId for seller credentials (PayPal recommended flow)
             // See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+            // When authCode and sharedId are available, skip merchant integration lookup and go straight to exchange
             if ($authCode !== '' && $sharedId !== '') {
                 $this->logDebug('Attempting authCode/sharedId credential exchange', [
                     'tracking_id' => $trackingId,
                     'has_auth_code' => 'yes',
                     'has_shared_id' => 'yes',
+                    'has_seller_nonce' => $sellerNonce !== '' ? 'yes' : 'no',
                 ]);
                 $credentials = $this->exchangeAuthCodeForCredentials(
                     $apiBase,
                     $clientId,
                     $clientSecret,
                     $authCode,
-                    $sharedId
+                    $sharedId,
+                    $partnerMerchantId,
+                    $sellerNonce
                 );
 
                 if (is_array($credentials) && isset($credentials['access_token'])) {
@@ -183,28 +156,62 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
                     $sellerToken['access_token_expires_at'] = (int)$credentials['access_token_expires_at'];
                     unset($credentials['access_token_expires_at']);
                 }
-            } else {
-                $this->logDebug('AuthCode/sharedId missing; skipping credential exchange', [
+            }
+
+            // Method 2: Fall back to merchant integration lookup when authCode/sharedId not available
+            if ($credentials === null) {
+                $this->logDebug('AuthCode/sharedId not available; falling back to merchant integration lookup', [
                     'tracking_id' => $trackingId,
                     'has_auth_code' => $authCode !== '' ? 'yes' : 'no',
                     'has_shared_id' => $sharedId !== '' ? 'yes' : 'no',
                 ]);
+
+                $integration = $this->fetchMerchantIntegration(
+                    $apiBase,
+                    $accessToken,
+                    $clientId,
+                    $trackingId,
+                    $partnerReferralId,
+                    $merchantId,
+                    $environment
+                );
+
+                if ($integration === null) {
+                    return $this->waitingResponse($environment, $trackingId, $partnerReferralId, $merchantId);
+                }
+
+                $step = $this->mapIntegrationToStep($integration);
+                if ($step === 'completed') {
+                    $credentials = $this->extractMerchantCredentials($integration);
+                }
             }
 
-            // Method 2: Fall back to extracting from merchant integration response
-            if ($credentials === null && $step === 'completed') {
-                $credentials = $this->extractMerchantCredentials($integration);
+            // Build response data
+            $data = [
+                'environment' => $environment,
+                'tracking_id' => $trackingId,
+                'partner_referral_id' => $partnerReferralId,
+                'merchant_id' => $integration !== null ? (string)($integration['merchant_id'] ?? '') : $merchantId,
+                'merchant_id_in_paypal' => $integration !== null ? (string)($integration['merchant_id_in_paypal'] ?? ($integration['merchant_id'] ?? '')) : '',
+                'payments_receivable' => $integration !== null ? (bool)($integration['payments_receivable'] ?? false) : false,
+                'primary_email_confirmed' => $integration !== null ? (bool)($integration['primary_email_confirmed'] ?? false) : false,
+                'capabilities' => $integration !== null ? $this->extractCapabilities($integration) : [],
+                'step' => $credentials !== null ? 'completed' : ($integration !== null ? $this->mapIntegrationToStep($integration) : 'waiting'),
+                'polling_interval' => self::DEFAULT_POLLING_INTERVAL_MS,
+            ];
+
+            if ($data['step'] === 'waiting') {
+                $data['status_hint'] = 'provisioning';
+            }
+
+            if ($integration !== null && !empty($integration['links']) && is_array($integration['links'])) {
+                $data['links'] = $integration['links'];
             }
 
             if ($credentials !== null) {
                 $data['credentials'] = $credentials;
                 if (!empty($sellerToken)) {
                     $data['seller_token'] = $sellerToken;
-                }
-
-                // If credentials are present, we can mark the flow as completed to unlock auto-save
-                if ($data['step'] !== 'completed') {
-                    $data['step'] = 'completed';
                 }
             }
 
@@ -238,6 +245,8 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
      * @param string $partnerClientSecret
      * @param string $authCode
      * @param string $sharedId
+     * @param string $partnerMerchantId
+     * @param string $sellerNonce
      * @return array{
      *   client_id: string,
      *   client_secret: string,
@@ -250,113 +259,109 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         string $partnerClientId,
         string $partnerClientSecret,
         string $authCode,
-        string $sharedId
+        string $sharedId,
+        string $partnerMerchantId,
+        string $sellerNonce
     ): ?array {
         if ($authCode === '' || $sharedId === '') {
             return null;
         }
 
-        try {
-            // Step 1: Exchange authCode for seller access token
-            // Per PayPal Partner Referrals API, after onboarding completes, the seller's browser
-            // receives authCode and sharedId. The sharedId acts as the code_verifier for PKCE flow
-            // or can be passed as a separate parameter depending on PayPal's integration type.
-            $tokenUrl = rtrim($apiBase, '/') . '/v1/oauth2/token';
-            $tokenHeaders = [
-                'Accept: application/json',
-                'Accept-Language: en_US',
-                'Content-Type: application/x-www-form-urlencoded',
-            ];
-            
-            // PayPal's third-party integration uses authorization_code grant with shared_id
-            // The exact parameter name may vary based on PayPal's documentation updates
-            $tokenBody = http_build_query([
-                'grant_type' => 'authorization_code',
-                'code' => $authCode,
-                'code_verifier' => $sharedId,
-            ], '', '&', PHP_QUERY_RFC3986);
+        // Step 1: Exchange authCode + sharedId for seller access token (ISU flow)
+        $tokenUrl = rtrim($apiBase, '/') . '/v1/oauth2/token';
+        $tokenHeaders = [
+            'Accept: application/json',
+            'Accept-Language: en_US',
+            'Content-Type: application/x-www-form-urlencoded',
+        ];
 
-            $tokenResponse = $this->performHttpCall(
-                'POST',
-                $tokenUrl,
-                $tokenHeaders,
-                ['basic_auth' => $partnerClientId . ':' . $partnerClientSecret],
-                $tokenBody
-            );
+        // Per PayPal docs: For onboarded Complete Token flow, only grant_type and code are required
+        // Do NOT include code_verifier - it will cause "Code verifier does not match" error
+        $tokenBody = http_build_query([
+            'grant_type'    => 'authorization_code',
+            'code'          => $authCode,
+        ], '', '&', PHP_QUERY_RFC3986);
 
-            $tokenDecoded = $this->decodeJson($tokenResponse['body']);
+        // IMPORTANT: for ISU, PayPal expects sharedId as the Basic auth username (password empty).
+        $tokenResponse = $this->performHttpCall(
+            'POST',
+            $tokenUrl,
+            $tokenHeaders,
+            ['basic_auth' => $sharedId . ':'],
+            $tokenBody
+        );
 
-            if ($tokenResponse['status'] < 200 || $tokenResponse['status'] >= 300) {
-                // Log the error details for debugging
-                $this->logDebug('Auth code exchange failed', [
-                    'status' => $tokenResponse['status'],
-                    'error' => $tokenDecoded['error'] ?? 'unknown',
-                    'error_description' => $tokenDecoded['error_description'] ?? '',
-                ]);
-                return null;
-            }
-
-            $sellerAccessToken = (string)($tokenDecoded['access_token'] ?? '');
-            $sellerAccessTokenTtl = (int)($tokenDecoded['expires_in'] ?? 0);
-            if ($sellerAccessToken === '') {
-                $this->logDebug('Auth code exchange response missing access_token', [
-                    'response_keys' => array_keys($tokenDecoded),
-                ]);
-                return null;
-            }
-
-            // Step 2: Use seller access token to get REST API credentials
-            // The seller's credentials are returned in the token response for third-party integrations
-            $clientId = (string)($tokenDecoded['client_id'] ?? '');
-            $clientSecret = (string)($tokenDecoded['client_secret'] ?? '');
-            
-            // If credentials weren't in the token response, try to get them via the credentials endpoint
-            if ($clientId === '' || $clientSecret === '') {
-                $credentialsUrl = rtrim($apiBase, '/') . '/v1/customer/partners/' . rawurlencode($partnerClientId) . '/merchant-integrations/credentials';
-                $credentialsHeaders = [
-                    'Accept: application/json',
-                    'Authorization: Bearer ' . $sellerAccessToken,
-                ];
-
-                $credentialsResponse = $this->performHttpCall('GET', $credentialsUrl, $credentialsHeaders);
-                $credentialsDecoded = $this->decodeJson($credentialsResponse['body']);
-
-                if ($credentialsResponse['status'] >= 200 && $credentialsResponse['status'] < 300) {
-                    $clientId = (string)($credentialsDecoded['client_id'] ?? '');
-                    $clientSecret = (string)($credentialsDecoded['client_secret'] ?? '');
-                } else {
-                    $this->logDebug('Credentials endpoint request failed', [
-                        'status' => $credentialsResponse['status'],
-                    ]);
-                }
-            }
-
-            if ($clientId !== '' && $clientSecret !== '') {
-                $payload = [
-                    'client_id' => $clientId,
-                    'client_secret' => $clientSecret,
-                ];
-
-                if ($sellerAccessToken !== '') {
-                    $payload['access_token'] = $sellerAccessToken;
-                    if ($sellerAccessTokenTtl > 0) {
-                        $payload['access_token_expires_at'] = time() + $sellerAccessTokenTtl;
-                    }
-                }
-
-                return $payload;
-            }
-
-            $this->logDebug('Auth code exchange completed but no credentials returned');
-            return null;
-        } catch (Throwable $e) {
-            // Log the exception for debugging
-            $this->logDebug('Auth code exchange threw exception', [
-                'exception' => get_class($e),
-                'message' => $e->getMessage(),
+        $tokenDecoded = $this->decodeJson($tokenResponse['body']);
+        if ($tokenResponse['status'] < 200 || $tokenResponse['status'] >= 300) {
+            $this->logDebug('Auth code exchange failed', [
+                'status' => $tokenResponse['status'],
+                'error' => $tokenDecoded['error'] ?? 'unknown',
+                'error_description' => $tokenDecoded['error_description'] ?? '',
+                'attempt' => 'isu_shared_id',
             ]);
             return null;
         }
+
+        $sellerAccessToken = (string)($tokenDecoded['access_token'] ?? '');
+        $sellerAccessTokenTtl = (int)($tokenDecoded['expires_in'] ?? 0);
+        if ($sellerAccessToken === '') {
+            $this->logDebug('Auth code exchange response missing access_token', [
+                'response_keys' => array_keys($tokenDecoded),
+            ]);
+            return null;
+        }
+
+        // Step 2: Use seller access token to get REST API credentials
+        // The seller's credentials are returned in the token response for third-party integrations
+        $clientId = (string)($tokenDecoded['client_id'] ?? '');
+        $clientSecret = (string)($tokenDecoded['client_secret'] ?? '');
+        
+        // If credentials weren't in the token response, try to get them via the credentials endpoint
+        if (($clientId === '' || $clientSecret === '') && $partnerMerchantId !== '') {
+            $credentialsUrl = rtrim($apiBase, '/') . '/v1/customer/partners/' . rawurlencode($partnerMerchantId) . '/merchant-integrations/credentials';
+            $credentialsHeaders = [
+                'Accept: application/json',
+                'Authorization: Bearer ' . $sellerAccessToken,
+            ];
+
+            $credentialsResponse = $this->performHttpCall('GET', $credentialsUrl, $credentialsHeaders);
+            $credentialsDecoded = $this->decodeJson($credentialsResponse['body']);
+
+            if ($credentialsResponse['status'] >= 200 && $credentialsResponse['status'] < 300) {
+                $clientId = (string)($credentialsDecoded['client_id'] ?? '');
+                $clientSecret = (string)($credentialsDecoded['client_secret'] ?? '');
+            } else {
+                $this->logDebug('Credentials endpoint request failed', [
+                    'status' => $credentialsResponse['status'],
+                ]);
+            }
+        } elseif ($clientId === '' || $clientSecret === '') {
+            $this->logDebug('Credentials endpoint skipped due to missing partner merchant ID', [
+                'partnerMerchantId_present' => $partnerMerchantId !== '' ? 'yes' : 'no',
+            ]);
+        }
+
+        if ($clientId !== '' && $clientSecret !== '') {
+            $payload = [
+                'client_id' => $clientId,
+                'client_secret' => $clientSecret,
+            ];
+
+            if ($sellerAccessToken !== '') {
+                $payload['access_token'] = $sellerAccessToken;
+                if ($sellerAccessTokenTtl > 0) {
+                    $payload['access_token_expires_at'] = time() + $sellerAccessTokenTtl;
+                }
+            }
+
+            return $payload;
+        }
+
+        $this->logDebug('Auth code exchange completed but no credentials returned', [
+            'attempt' => 'isu_shared_id',
+        ]);
+
+        return null;
     }
 
     /**
@@ -387,6 +392,65 @@ class NuminixPaypalOnboardingService extends NuminixPaypalIsuSignupLinkService
         }
 
         return trim($value);
+    }
+
+    /**
+     * Sanitizes the seller nonce used for PKCE code verification.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function sanitizeSellerNonce($value): string
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        return trim($value);
+    }
+
+    /**
+     * Resolves the configured PayPal partner merchant identifier.
+     *
+     * @param string                $environment
+     * @param array<string, mixed>  $options
+     * @return string
+     */
+    private function resolvePartnerMerchantId(string $environment, array $options): string
+    {
+        $partnerMerchantId = '';
+
+        if (!empty($options['partner_merchant_id']) && is_string($options['partner_merchant_id'])) {
+            $partnerMerchantId = trim($options['partner_merchant_id']);
+        }
+
+        if ($partnerMerchantId === '') {
+            $suffix = strtoupper($environment);
+            $envValue = getenv('PAYPAL_PARTNER_MERCHANT_ID_' . $suffix);
+            if (is_string($envValue)) {
+                $partnerMerchantId = trim($envValue);
+            }
+        }
+
+        if ($partnerMerchantId === '') {
+            $suffix = strtoupper($environment);
+            $configValue = $this->getConfigurationValue('NUMINIX_PPCP_' . $suffix . '_PARTNER_MERCHANT_ID');
+            if ($configValue !== null) {
+                $partnerMerchantId = trim($configValue);
+            }
+        }
+
+        if ($partnerMerchantId !== '') {
+            $length = strlen($partnerMerchantId);
+            if (!preg_match('/^[A-Za-z0-9]+$/', $partnerMerchantId) || $length < 10 || $length > 20) {
+                $this->logDebug('Partner merchant ID format invalid', [
+                    'length' => $length,
+                ]);
+                return '';
+            }
+        }
+
+        return $partnerMerchantId;
     }
 
     /**

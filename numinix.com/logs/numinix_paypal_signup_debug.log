@@ -1,0 +1,204 @@
+[2025-12-20T18:06:18-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:06:18-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:06:18-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:06:23-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:06:23-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:06:23-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:06:24-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:06:24-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:06:24-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:06:30-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:06:30-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:06:30-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:06:36-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:06:37-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:06:37-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:06:43-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:06:43-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:06:43-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:06:49-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:06:49-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:06:49-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:06:55-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:06:56-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:06:56-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:07:02-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:07:02-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:07:02-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:07:09-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:07:09-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:07:09-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:07:16-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:07:16-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:07:16-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}
+[2025-12-20T18:07:23-08:00] Attempting authCode/sharedId credential exchange Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes",
+    "has_seller_nonce": "yes"
+}
+[2025-12-20T18:07:23-08:00] Auth code exchange failed Context: {
+    "status": 401,
+    "error": "invalid_request",
+    "error_description": "Authorization Header must have client_id and secret",
+    "attempt": "isu_shared_id"
+}
+[2025-12-20T18:07:23-08:00] AuthCode/sharedId not available; falling back to merchant integration lookup Context: {
+    "tracking_id": "nxp-9e1c5c545f42d4aef585",
+    "has_auth_code": "yes",
+    "has_shared_id": "yes"
+}

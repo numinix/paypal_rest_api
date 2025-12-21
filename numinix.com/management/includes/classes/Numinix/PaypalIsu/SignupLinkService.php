@@ -1007,16 +1007,18 @@ class NuminixPaypalIsuSignupLinkService
     }
 
     /**
-     * Resolves features for the third_party_details in the referral payload.
+     * Resolves features for the first_party_details in the referral payload.
      *
-     * Features specify the permissions that the partner can use in PayPal on behalf of the seller.
+     * Features specify the permissions that the seller's credentials will have.
      * Valid values include: PAYMENT, REFUND, PARTNER_FEE, VAULT, BILLING_AGREEMENT, etc.
      *
-     * Default features are PAYMENT and REFUND (core commerce features). PARTNER_FEE is
-     * intentionally excluded from the default because it requires special PayPal partner
-     * account configuration that is not universally available - particularly on production
-     * accounts. Attempting to use PARTNER_FEE without the proper account setup results in
-     * a FEATURES_UNAUTHORIZED error from PayPal's Partner Referrals API.
+     * Default features are PAYMENT and REFUND (core commerce features).
+     * VAULT is available but omitted from default to avoid potential issues - it can be added
+     * via custom configuration if vaulting/SDK v6 support is specifically needed.
+     * PARTNER_FEE is intentionally excluded from the default because it requires special
+     * PayPal partner account configuration that is not universally available - particularly
+     * on production accounts. Attempting to use PARTNER_FEE without the proper account setup
+     * results in a FEATURES_UNAUTHORIZED error from PayPal's Partner Referrals API.
      *
      * @param mixed $value
      * @return array<int, string>
@@ -1029,8 +1031,8 @@ class NuminixPaypalIsuSignupLinkService
     /**
      * Resolves requested PayPal products for the referral payload.
      *
-     * Valid products: PPCP, EXPRESS_CHECKOUT, PAYMENT_METHODS, ADVANCED_VAULTING, etc.
-     * Note: VAULT is not a valid product - use ADVANCED_VAULTING for vaulting capabilities.
+     * Valid products: PPCP, EXPRESS_CHECKOUT, PAYMENT_METHODS, etc.
+     * Note: Some product values may require specific partner account approvals.
      *
      * @param mixed $value
      * @return array<int, string>
@@ -1135,12 +1137,7 @@ class NuminixPaypalIsuSignupLinkService
 
         $this->lastDebugSnapshot['log_entry'] = '[' . $timestamp . '] ' . $logMessage;
 
-        if (function_exists('zen_record_admin_activity')) {
-            zen_record_admin_activity($logMessage, 'info');
-        } else {
-            trigger_error($logMessage, E_USER_NOTICE);
-        }
-
+        // Only write to debug log, not PHP error log (already in debug log)
         $this->writeDebugLog($this->lastDebugSnapshot['log_entry']);
     }
 
