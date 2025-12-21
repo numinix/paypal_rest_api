@@ -169,6 +169,22 @@ Created new installer `1_0_9.php` that ensures all required columns exist:
 
 ---
 
+## Additional Fix: Popup Close Issue
+
+After credentials are displayed on the numinix.com page, the PayPal popup window should close automatically.
+
+### Problem
+The "Go back to Numinix Web Development Ltd." button in PayPal's mini-browser redirects to numinix.com, but the popup window wasn't closing properly.
+
+### Solution
+1. **jscript_paypal_signup.js** - Added code to explicitly close the popup after credentials are successfully retrieved and displayed
+2. **nxp_paypal_helpers.php** - Enhanced completion page with:
+   - Multiple postMessage targets (window.opener and window.parent)
+   - Fallback message when window.close() doesn't work: "You can manually close this window now."
+   - Extracted magic number (500ms delay) into a named constant
+
+---
+
 ## Testing Checklist
 
 - [x] Verify seller_nonce is properly generated and stored during partner referral
@@ -181,3 +197,5 @@ Created new installer `1_0_9.php` that ensures all required columns exist:
 - [x] Verify successful access_token is returned from PayPal
 - [x] Verify credentials endpoint is called with seller access token
 - [x] Verify merchant credentials are properly stored (requires running 1.0.9 installer)
+- [ ] Verify popup window closes automatically after credentials are displayed
+- [ ] Verify fallback message appears if popup cannot close automatically

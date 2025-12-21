@@ -2689,8 +2689,8 @@ function nxp_paypal_show_completion_page(): void
         </div>
         <h1><?php echo htmlspecialchars($heading, ENT_QUOTES, 'UTF-8'); ?></h1>
         <p><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></p>
-        <button class="btn" onclick="window.close();">Close Window</button>
-        <p class="countdown">Closing in <span id="timer">5</span> seconds...</p>
+        <button class="btn" onclick="closeWindow();">Close Window</button>
+        <p class="countdown" id="countdown-text">Closing in <span id="timer">5</span> seconds...</p>
     </div>
     <script>
         (function() {
@@ -2705,15 +2705,54 @@ function nxp_paypal_show_completion_page(): void
                     // Ignore cross-origin errors - parent will detect popup close
                 }
             }
+            
+            // Also try posting to parent frame in case this is in an iframe
+            if (window.parent && window.parent !== window) {
+                try {
+                    window.parent.postMessage(messageData, '*');
+                } catch(e) {
+                    // Ignore cross-origin errors
+                }
+            }
+            
+            // Delay to check if window.close() worked
+            var CLOSE_CHECK_DELAY_MS = 500;
+
+            // Function to attempt to close the window
+            window.closeWindow = function() {
+                try {
+                    window.close();
+                } catch(e) {
+                    // Ignore errors
+                }
+                
+                // If window didn't close, update the message
+                setTimeout(function() {
+                    var countdownText = document.getElementById('countdown-text');
+                    if (countdownText) {
+                        countdownText.textContent = 'You can manually close this window now.';
+                    }
+                }, CLOSE_CHECK_DELAY_MS);
+            };
 
             var seconds = 5;
             var timer = document.getElementById('timer');
+            var countdownText = document.getElementById('countdown-text');
             var interval = setInterval(function() {
                 seconds--;
                 if (timer) timer.textContent = seconds;
                 if (seconds <= 0) {
                     clearInterval(interval);
-                    try { window.close(); } catch(e) {}
+                    try { 
+                        window.close(); 
+                    } catch(e) {}
+                    
+                    // If we're still here after the delay, the window didn't close
+                    setTimeout(function() {
+                        if (countdownText) {
+                            countdownText.textContent = 'You can manually close this window now.';
+                        }
+                    }, CLOSE_CHECK_DELAY_MS);
                 }
             }, 1000);
         })();
