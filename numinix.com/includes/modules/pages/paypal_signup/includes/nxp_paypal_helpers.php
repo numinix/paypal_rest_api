@@ -423,6 +423,17 @@ function nxp_paypal_handle_start(array $session): void
     }
     if (!empty($response['data']['seller_nonce'])) {
         $_SESSION['nxp_paypal']['seller_nonce'] = $response['data']['seller_nonce'];
+        
+        // Persist seller_nonce to database for cross-session retrieval
+        // This is needed because the finalize/status request may come from a different session
+        $trackingId = $_SESSION['nxp_paypal']['tracking_id'] ?? $payload['tracking_id'];
+        if (!empty($trackingId)) {
+            nxp_paypal_persist_seller_nonce(
+                $trackingId,
+                $response['data']['seller_nonce'],
+                $session['env'] ?? 'sandbox'
+            );
+        }
     }
     $_SESSION['nxp_paypal']['step'] = !empty($response['data']['step']) ? $response['data']['step'] : 'waiting';
     $_SESSION['nxp_paypal']['updated_at'] = time();
@@ -483,6 +494,18 @@ function nxp_paypal_handle_finalize(array $session): void
 
     if (empty($trackingId)) {
         nxp_paypal_json_error('Missing tracking reference.');
+    }
+
+    // If seller_nonce is not provided, try to retrieve it from the database
+    // This handles the cross-session case where the start action was in a different session
+    if (empty($sellerNonce) && !empty($trackingId)) {
+        $persistedSellerNonce = nxp_paypal_retrieve_seller_nonce($trackingId);
+        if ($persistedSellerNonce !== null) {
+            $sellerNonce = $persistedSellerNonce;
+            nxp_paypal_log_debug('Retrieved seller_nonce from database for finalize', [
+                'tracking_id' => $trackingId,
+            ]);
+        }
     }
 
     $payload = [
@@ -669,6 +692,18 @@ function nxp_paypal_handle_status(array $session): void
             $authCode = $persistedAuthData['auth_code'];
             $sharedId = $persistedAuthData['shared_id'];
             nxp_paypal_log_debug('Retrieved authCode and sharedId from database for credential exchange', [
+                'tracking_id' => $trackingId,
+            ]);
+        }
+    }
+
+    // If seller_nonce is not provided, try to retrieve it from the database
+    // This handles the cross-session case where the start action was in a different session
+    if (empty($sellerNonce) && !empty($trackingId)) {
+        $persistedSellerNonce = nxp_paypal_retrieve_seller_nonce($trackingId);
+        if ($persistedSellerNonce !== null) {
+            $sellerNonce = $persistedSellerNonce;
+            nxp_paypal_log_debug('Retrieved seller_nonce from database for status', [
                 'tracking_id' => $trackingId,
             ]);
         }
@@ -1686,6 +1721,184 @@ function nxp_paypal_persist_auth_code(string $trackingId, string $authCode, stri
             'error' => $e->getMessage(),
         ]);
         return false;
+    }
+}
+
+/**
+ * Persists seller_nonce (code_verifier) keyed by tracking_id for credential exchange.
+ *
+ * Per PayPal ISU documentation, the seller_nonce generated during partner referral creation
+ * must be passed as code_verifier when exchanging the authorization code for tokens.
+ * See: https://developer.paypal.com/docs/multiparty/seller-onboarding/build-onboarding/
+ *
+ * This function stores the seller_nonce so the finalize/status endpoints can retrieve and use
+ * it during the token exchange even when called from a different session (cross-session flow).
+ *
+ * @param string $trackingId
+ * @param string $sellerNonce
+ * @param string $environment
+ * @return bool
+ */
+function nxp_paypal_persist_seller_nonce(string $trackingId, string $sellerNonce, string $environment = 'sandbox'): bool
+{
+    if ($trackingId === '' || $sellerNonce === '') {
+        return false;
+    }
+
+    // Validate tracking_id format (alphanumeric and dash only, max 64 chars)
+    if (!preg_match('/^[a-zA-Z0-9-]{1,64}$/', $trackingId)) {
+        nxp_paypal_log_debug('Invalid tracking_id format for seller_nonce persistence', [
+            'tracking_id_length' => strlen($trackingId),
+        ]);
+        return false;
+    }
+
+    global $db;
+    if (!isset($db) || !is_object($db) || !method_exists($db, 'Execute')) {
+        nxp_paypal_log_debug('Unable to persist seller_nonce: database unavailable');
+        return false;
+    }
+
+    if (!defined('TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING')) {
+        nxp_paypal_log_debug('Unable to persist seller_nonce: tracking table not defined');
+        return false;
+    }
+
+    $tableName = TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING;
+    $expiresAt = date('Y-m-d H:i:s', time() + 3600); // 1 hour expiry
+
+    try {
+        // Check which columns exist
+        $hasSellerNonceCol = false;
+        $checkSql = "SHOW COLUMNS FROM " . $tableName . " LIKE 'seller_nonce'";
+        $result = $db->Execute($checkSql);
+        $hasSellerNonceCol = !$result->EOF;
+        
+        if (!$hasSellerNonceCol) {
+            nxp_paypal_log_debug('Cannot persist seller_nonce: column does not exist', [
+                'tracking_id' => $trackingId,
+                'hint' => 'Run the PayPal ISU installer version 1.0.10 to add the required column',
+            ]);
+            return false;
+        }
+
+        // Check if record already exists for this tracking_id
+        $checkSql = "SELECT id FROM " . $tableName . " WHERE tracking_id = :trackingId LIMIT 1";
+        $checkSql = $db->bindVars($checkSql, ':trackingId', $trackingId, 'string');
+        $result = $db->Execute($checkSql);
+
+        if ($result && !$result->EOF) {
+            // Update existing record
+            $updateSql = "UPDATE " . $tableName . " SET "
+                . "seller_nonce = :sellerNonce, "
+                . "environment = :environment, "
+                . "expires_at = :expiresAt, "
+                . "updated_at = NOW() "
+                . "WHERE tracking_id = :trackingId";
+            $updateSql = $db->bindVars($updateSql, ':sellerNonce', $sellerNonce, 'string');
+            $updateSql = $db->bindVars($updateSql, ':environment', $environment, 'string');
+            $updateSql = $db->bindVars($updateSql, ':expiresAt', $expiresAt, 'string');
+            $updateSql = $db->bindVars($updateSql, ':trackingId', $trackingId, 'string');
+            $db->Execute($updateSql);
+        } else {
+            // Insert new record
+            $insertSql = "INSERT INTO " . $tableName . " "
+                . "(tracking_id, seller_nonce, environment, expires_at, created_at, updated_at) "
+                . "VALUES (:trackingId, :sellerNonce, :environment, :expiresAt, NOW(), NOW())";
+            $insertSql = $db->bindVars($insertSql, ':trackingId', $trackingId, 'string');
+            $insertSql = $db->bindVars($insertSql, ':sellerNonce', $sellerNonce, 'string');
+            $insertSql = $db->bindVars($insertSql, ':environment', $environment, 'string');
+            $insertSql = $db->bindVars($insertSql, ':expiresAt', $expiresAt, 'string');
+            $db->Execute($insertSql);
+        }
+
+        nxp_paypal_log_debug('Persisted seller_nonce to database for credential exchange', [
+            'tracking_id' => $trackingId,
+            'environment' => $environment,
+            'expires_at' => $expiresAt,
+        ]);
+
+        return true;
+    } catch (Throwable $e) {
+        nxp_paypal_log_debug('Failed to persist seller_nonce to database', [
+            'tracking_id' => $trackingId,
+            'error' => $e->getMessage(),
+        ]);
+        return false;
+    }
+}
+
+/**
+ * Retrieves persisted seller_nonce by tracking_id from the database.
+ *
+ * @param string $trackingId
+ * @return string|null The seller_nonce if found and not expired, null otherwise
+ */
+function nxp_paypal_retrieve_seller_nonce(string $trackingId): ?string
+{
+    if ($trackingId === '') {
+        return null;
+    }
+
+    // Validate tracking_id format
+    if (!preg_match('/^[a-zA-Z0-9-]{1,64}$/', $trackingId)) {
+        return null;
+    }
+
+    global $db;
+    if (!isset($db) || !is_object($db) || !method_exists($db, 'Execute')) {
+        return null;
+    }
+
+    if (!defined('TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING')) {
+        return null;
+    }
+
+    $tableName = TABLE_NUMINIX_PAYPAL_ONBOARDING_TRACKING;
+
+    try {
+        // Check if seller_nonce column exists
+        $checkColSql = "SHOW COLUMNS FROM " . $tableName . " LIKE 'seller_nonce'";
+        $colResult = $db->Execute($checkColSql);
+        if ($colResult->EOF) {
+            // Column doesn't exist
+            return null;
+        }
+
+        $sql = "SELECT seller_nonce, expires_at FROM " . $tableName 
+            . " WHERE tracking_id = :trackingId LIMIT 1";
+        $sql = $db->bindVars($sql, ':trackingId', $trackingId, 'string');
+        $result = $db->Execute($sql);
+
+        if (!$result || $result->EOF) {
+            return null;
+        }
+
+        // Check expiry
+        $currentTime = time();
+        $expiresAt = strtotime($result->fields['expires_at']);
+        if ($expiresAt !== false && $expiresAt < $currentTime) {
+            // Expired - delete the record
+            nxp_paypal_delete_tracking_record($trackingId);
+            return null;
+        }
+
+        $sellerNonce = (string)($result->fields['seller_nonce'] ?? '');
+        if ($sellerNonce === '') {
+            return null;
+        }
+
+        nxp_paypal_log_debug('Retrieved persisted seller_nonce from database', [
+            'tracking_id' => $trackingId,
+        ]);
+
+        return $sellerNonce;
+    } catch (Throwable $e) {
+        nxp_paypal_log_debug('Failed to retrieve seller_nonce from database', [
+            'tracking_id' => $trackingId,
+            'error' => $e->getMessage(),
+        ]);
+        return null;
     }
 }
 
