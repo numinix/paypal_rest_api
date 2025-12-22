@@ -9,6 +9,9 @@
  * 4. Parent receives credentials and saves them to configuration table
  */
 
+// Start output buffering to prevent any accidental output before JSON response
+ob_start();
+
 $autoloaderPath = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
 if (is_file($autoloaderPath)) {
     require_once $autoloaderPath;
@@ -28,6 +31,7 @@ $isAjaxRequest = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVE
 
 if (!$isLoggedIn) {
     if ($isAjaxRequest) {
+        ob_end_clean(); // Clear any buffered output
         header('Content-Type: application/json');
         echo json_encode(['success' => false, 'message' => 'Session expired. Please refresh and log in.']);
         exit;
@@ -58,6 +62,7 @@ function validateSecurityToken(): bool
 
 // Handle AJAX actions
 if ($isAjaxRequest) {
+    ob_end_clean(); // Clear any buffered output before JSON response
     header('Content-Type: application/json');
     
     // Validate CSRF token for all AJAX actions
@@ -89,6 +94,9 @@ if ($isAjaxRequest) {
     echo json_encode(['success' => false, 'message' => 'Unknown action']);
     exit;
 }
+
+// For page rendering, end output buffering and render page
+ob_end_clean();
 
 // Render the page - zen_draw_form handles securityToken automatically
 renderSignupPage();
