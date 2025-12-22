@@ -138,6 +138,7 @@ function handleStartAction(): void
         $_SESSION['paypalr_signup'] = [
             'tracking_id' => $data['tracking_id'],
             'seller_nonce' => $data['seller_nonce'] ?? '',
+            'nonce' => $data['nonce'] ?? '',  // Session nonce for API validation
             'env' => $env,
             'started_at' => time(),
         ];
@@ -149,6 +150,7 @@ function handleStartAction(): void
             'tracking_id' => $data['tracking_id'] ?? '',
             'redirect_url' => $data['redirect_url'] ?? $data['action_url'] ?? '',
             'seller_nonce' => $data['seller_nonce'] ?? '',
+            'nonce' => $data['nonce'] ?? '',  // Session nonce for subsequent API calls
         ],
     ]);
 }
@@ -163,6 +165,12 @@ function handleFinalizeAction(): void
     $authCode = trim($_POST['authCode'] ?? $_POST['auth_code'] ?? '');
     $sharedId = trim($_POST['sharedId'] ?? $_POST['shared_id'] ?? '');
     $env = strtolower(trim($_POST['env'] ?? 'sandbox'));
+    $nonce = trim($_POST['nonce'] ?? '');  // Session nonce from client
+    
+    // Get nonce from session if not provided by client
+    if (empty($nonce) && !empty($_SESSION['paypalr_signup']['nonce'])) {
+        $nonce = $_SESSION['paypalr_signup']['nonce'];
+    }
     
     // Get seller_nonce from session if available
     $sellerNonce = '';
@@ -177,6 +185,7 @@ function handleFinalizeAction(): void
         'authCode' => $authCode,
         'sharedId' => $sharedId,
         'seller_nonce' => $sellerNonce,
+        'nonce' => $nonce,  // Session nonce for API validation
         'env' => $env,
     ];
     
@@ -195,6 +204,12 @@ function handleStatusAction(): void
     $authCode = trim($_POST['authCode'] ?? $_POST['auth_code'] ?? '');
     $sharedId = trim($_POST['sharedId'] ?? $_POST['shared_id'] ?? '');
     $env = strtolower(trim($_POST['env'] ?? 'sandbox'));
+    $nonce = trim($_POST['nonce'] ?? '');  // Session nonce from client
+    
+    // Get nonce from session if not provided by client
+    if (empty($nonce) && !empty($_SESSION['paypalr_signup']['nonce'])) {
+        $nonce = $_SESSION['paypalr_signup']['nonce'];
+    }
     
     // Get seller_nonce from session if available
     $sellerNonce = '';
@@ -209,6 +224,7 @@ function handleStatusAction(): void
         'authCode' => $authCode,
         'sharedId' => $sharedId,
         'seller_nonce' => $sellerNonce,
+        'nonce' => $nonce,  // Session nonce for API validation
         'env' => $env,
     ];
     
@@ -580,6 +596,7 @@ function renderSignupPage(): void
         var state = {
             trackingId: '',
             sellerNonce: '',
+            nonce: '',  // Session nonce for API calls
             merchantId: '',
             authCode: '',
             sharedId: '',
@@ -646,6 +663,9 @@ function renderSignupPage(): void
                     var data = response.data || {};
                     state.trackingId = data.tracking_id || '';
                     state.sellerNonce = data.seller_nonce || '';
+                    state.nonce = data.nonce || '';  // Session nonce for subsequent API calls
+                    
+                    console.log('[PayPal Signup] Start response - tracking_id:', state.trackingId, 'has nonce:', !!state.nonce);
                     
                     var redirectUrl = data.redirect_url;
                     if (!redirectUrl) {
@@ -713,14 +733,25 @@ function renderSignupPage(): void
                 return;
             }
             
+            console.log('[PayPal Signup] Polling for credentials, attempt:', attempts + 1, 'state:', {
+                tracking_id: state.trackingId,
+                merchant_id: state.merchantId,
+                authCode: state.authCode ? '(present)' : '(empty)',
+                sharedId: state.sharedId ? '(present)' : '(empty)',
+                nonce: state.nonce ? '(present)' : '(empty)'
+            });
+            
             apiCall('finalize', {
                 tracking_id: state.trackingId,
                 merchant_id: state.merchantId,
                 authCode: state.authCode,
                 sharedId: state.sharedId,
+                nonce: state.nonce,  // Session nonce required for API validation
                 env: state.env
             })
             .then(function(response) {
+                console.log('[PayPal Signup] Finalize response:', response);
+                
                 if (!response.success) {
                     throw new Error(response.message || 'Failed to finalize');
                 }
@@ -740,6 +771,7 @@ function renderSignupPage(): void
                 }, 3000);
             })
             .catch(function(error) {
+                console.log('[PayPal Signup] Finalize error:', error.message);
                 setStatus('Error: ' + error.message + '. Retrying...', 'info');
                 setTimeout(function() {
                     pollForCredentials(attempts + 1);
@@ -774,29 +806,79 @@ function renderSignupPage(): void
             });
         }
         
-        // Listen for messages from popup
+        // Helper function to extract value from payload with multiple possible key names
+        function getPayloadValue(payload, keys) {
+            for (var i = 0; i < keys.length; i++) {
+                if (payload[keys[i]] !== undefined && payload[keys[i]] !== null && payload[keys[i]] !== '') {
+                    return payload[keys[i]];
+                }
+            }
+            return null;
+        }
+        
+        // Listen for messages from popup and PayPal
         window.addEventListener('message', function(event) {
-            console.log('[PayPal Signup] Received message:', event.data);
+            console.log('[PayPal Signup] Received message:', JSON.stringify(event.data));
             
             if (!event.data || typeof event.data !== 'object') {
                 return;
             }
             
-            if (event.data.event !== 'paypal_signup_complete') {
-                return;
+            var payload = event.data;
+            
+            // Extract values using multiple possible key names (PayPal uses various formats)
+            var authCode = getPayloadValue(payload, ['authCode', 'auth_code', 'onboardedCompleteToken', 'onboarding_complete_token']);
+            var sharedId = getPayloadValue(payload, ['sharedId', 'shared_id', 'sharedID']);
+            var merchantId = getPayloadValue(payload, ['merchantId', 'merchantID', 'merchant_id', 'merchantIdInPayPal']);
+            var trackingId = getPayloadValue(payload, ['tracking_id', 'trackingId']);
+            
+            // Check if this is our custom event from popup return
+            var isOurEvent = payload.event === 'paypal_signup_complete';
+            
+            // Check if this is PayPal's direct callback (has onboardedCompleteToken and sharedId)
+            var isPayPalCallback = !!(authCode && sharedId);
+            
+            // Check if this is PayPal's updateParent message (contains returnUrl)
+            var isUpdateParent = payload.updateParent === true;
+            
+            console.log('[PayPal Signup] Message analysis:', {
+                isOurEvent: isOurEvent,
+                isPayPalCallback: isPayPalCallback,
+                isUpdateParent: isUpdateParent,
+                hasAuthCode: !!authCode,
+                hasSharedId: !!sharedId,
+                hasMerchantId: !!merchantId,
+                hasTrackingId: !!trackingId
+            });
+            
+            // If we have authCode and sharedId from PayPal's direct callback, capture them
+            if (authCode) {
+                state.authCode = authCode;
+                console.log('[PayPal Signup] Captured authCode from PayPal callback');
+            }
+            if (sharedId) {
+                state.sharedId = sharedId;
+                console.log('[PayPal Signup] Captured sharedId from PayPal callback');
+            }
+            if (merchantId) {
+                state.merchantId = merchantId;
+            }
+            if (trackingId && !state.trackingId) {
+                state.trackingId = trackingId;
             }
             
-            // Capture data from popup
-            if (event.data.merchantId) state.merchantId = event.data.merchantId;
-            if (event.data.trackingId) state.trackingId = event.data.trackingId;
-            if (event.data.authCode) state.authCode = event.data.authCode;
-            if (event.data.sharedId) state.sharedId = event.data.sharedId;
-            if (event.data.env) state.env = event.data.env;
-            
-            console.log('[PayPal Signup] Updated state:', state);
-            
-            setStatus('PayPal setup complete. Retrieving credentials...', 'info');
-            pollForCredentials();
+            // If this is a completion event (either our custom event or PayPal's direct callback with credentials)
+            if (isOurEvent || isPayPalCallback) {
+                console.log('[PayPal Signup] Completion event detected, state:', {
+                    tracking_id: state.trackingId,
+                    merchant_id: state.merchantId,
+                    authCode: state.authCode ? '(present)' : '(empty)',
+                    sharedId: state.sharedId ? '(present)' : '(empty)'
+                });
+                
+                setStatus('PayPal setup complete. Retrieving credentials...', 'info');
+                pollForCredentials();
+            }
         });
         
         // Event listeners
