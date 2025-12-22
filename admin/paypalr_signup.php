@@ -60,8 +60,9 @@ function validateSecurityToken(): bool
     return hash_equals($sessionToken, $requestToken);
 }
 
-// Handle AJAX actions
-if ($isAjaxRequest) {
+// Handle AJAX actions - use action=ajax to avoid Zen Cart's action handling conflicts
+// The actual action is in ajax_action parameter
+if ($isAjaxRequest && $action === 'ajax') {
     ob_end_clean(); // Clear any buffered output before JSON response
     header('Content-Type: application/json');
     
@@ -71,27 +72,29 @@ if ($isAjaxRequest) {
         exit;
     }
     
-    if ($action === 'start') {
+    $ajaxAction = strtolower(trim($_POST['ajax_action'] ?? ''));
+    
+    if ($ajaxAction === 'start') {
         handleStartAction();
         exit;
     }
     
-    if ($action === 'finalize') {
+    if ($ajaxAction === 'finalize') {
         handleFinalizeAction();
         exit;
     }
     
-    if ($action === 'status') {
+    if ($ajaxAction === 'status') {
         handleStatusAction();
         exit;
     }
     
-    if ($action === 'save_credentials') {
+    if ($ajaxAction === 'save_credentials') {
         handleSaveCredentials();
         exit;
     }
     
-    echo json_encode(['success' => false, 'message' => 'Unknown action']);
+    echo json_encode(['success' => false, 'message' => 'Unknown ajax action: ' . $ajaxAction]);
     exit;
 }
 
@@ -609,9 +612,10 @@ function renderSignupPage(): void
             state.env = env;
         }
         
-        function apiCall(action, data) {
+        function apiCall(ajaxAction, data) {
             var formData = new FormData();
-            formData.append('action', action);
+            formData.append('action', 'ajax'); // Use 'ajax' to avoid Zen Cart action conflicts
+            formData.append('ajax_action', ajaxAction); // The actual action
             formData.append('securityToken', securityToken); // CSRF protection
             Object.keys(data).forEach(function(key) {
                 formData.append(key, data[key]);
