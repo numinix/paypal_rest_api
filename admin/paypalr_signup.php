@@ -612,6 +612,10 @@ function renderSignupPage(): void
             state.env = env;
         }
         
+        // Get the form's action URL - this is the safest way to POST back to this page
+        var signupForm = document.getElementById('paypal-signup-form');
+        var formActionUrl = signupForm ? signupForm.action : window.location.href;
+        
         function apiCall(ajaxAction, data) {
             var formData = new FormData();
             formData.append('action', 'ajax'); // Use 'ajax' to avoid Zen Cart action conflicts
@@ -621,7 +625,7 @@ function renderSignupPage(): void
                 formData.append(key, data[key]);
             });
             
-            return fetch(window.location.pathname, {
+            return fetch(formActionUrl, {
                 method: 'POST',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: new URLSearchParams(formData)
