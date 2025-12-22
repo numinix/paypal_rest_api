@@ -43,24 +43,17 @@ if (file_exists($languageFile)) {
 
 $action = strtolower(trim($_REQUEST['action'] ?? ''));
 
-// CSRF token validation function
+// CSRF token validation function for AJAX POST requests
 function validateSecurityToken(): bool
 {
     $sessionToken = $_SESSION['securityToken'] ?? '';
-    $requestToken = $_POST['securityToken'] ?? $_GET['securityToken'] ?? '';
+    $requestToken = $_POST['securityToken'] ?? '';
     
     if (empty($sessionToken) || empty($requestToken)) {
         return false;
     }
     
     return hash_equals($sessionToken, $requestToken);
-}
-
-// Check if this is a popup return from PayPal (has PayPal params in URL)
-function isPayPalPopupReturn(): bool
-{
-    return isset($_GET['merchantIdInPayPal']) || isset($_GET['merchantId']) || 
-           (isset($_GET['tracking_id']) && isset($_GET['env']));
 }
 
 // Handle AJAX actions
@@ -97,15 +90,7 @@ if ($isAjaxRequest) {
     exit;
 }
 
-// For non-AJAX requests: 
-// - Allow popup returns from PayPal (they have PayPal params but no security token)
-// - Require security token for initial page loads (from module button)
-if (!isPayPalPopupReturn() && !validateSecurityToken()) {
-    // Redirect to modules page if security token is missing/invalid
-    zen_redirect(zen_href_link(FILENAME_MODULES, 'set=payment&module=paypalr', 'SSL'));
-}
-
-// Render the page
+// Render the page - zen_draw_form handles securityToken automatically
 renderSignupPage();
 exit;
 
@@ -349,7 +334,6 @@ function renderSignupPage(): void
     // Detect if we're in a popup (will be checked by JavaScript)
     $isPopupReturn = !empty($merchantId) || !empty($trackingId);
     
-    $securityToken = $_SESSION['securityToken'] ?? '';
     $modulesPageUrl = zen_href_link(FILENAME_MODULES, 'set=payment&module=paypalr', 'SSL');
     
     ?>
