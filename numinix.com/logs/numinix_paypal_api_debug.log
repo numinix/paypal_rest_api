@@ -1,76 +1,4 @@
-[2025-12-22T10:20:58-08:00] PayPal API standalone endpoint called {
-    "method": "POST",
-    "action": "finalize",
-    "has_nonce": false,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81",
-    "user_agent": "unknown",
-    "origin": "none"
-}
-[2025-12-22T10:20:58-08:00] Received AJAX action request {
-    "action": "finalize",
-    "has_nonce": false,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81"
-}
-[2025-12-22T10:20:58-08:00] Request rejected: Invalid session token {
-    "action": "finalize",
-    "nonce_provided": "no",
-    "session_has_nonce": "yes"
-}
-[2025-12-22T10:20:58-08:00] Returning JSON error response {
-    "message": "Invalid session token.",
-    "status_code": 400
-}
-[2025-12-22T10:21:02-08:00] PayPal API standalone endpoint called {
-    "method": "POST",
-    "action": "finalize",
-    "has_nonce": false,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81",
-    "user_agent": "unknown",
-    "origin": "none"
-}
-[2025-12-22T10:21:02-08:00] Received AJAX action request {
-    "action": "finalize",
-    "has_nonce": false,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81"
-}
-[2025-12-22T10:21:02-08:00] Request rejected: Invalid session token {
-    "action": "finalize",
-    "nonce_provided": "no",
-    "session_has_nonce": "yes"
-}
-[2025-12-22T10:21:02-08:00] Returning JSON error response {
-    "message": "Invalid session token.",
-    "status_code": 400
-}
-[2025-12-22T10:21:06-08:00] PayPal API standalone endpoint called {
-    "method": "POST",
-    "action": "finalize",
-    "has_nonce": false,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81",
-    "user_agent": "unknown",
-    "origin": "none"
-}
-[2025-12-22T10:21:06-08:00] Received AJAX action request {
-    "action": "finalize",
-    "has_nonce": false,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81"
-}
-[2025-12-22T10:21:06-08:00] Request rejected: Invalid session token {
-    "action": "finalize",
-    "nonce_provided": "no",
-    "session_has_nonce": "yes"
-}
-[2025-12-22T10:21:06-08:00] Returning JSON error response {
-    "message": "Invalid session token.",
-    "status_code": 400
-}
-[2025-12-22T10:47:05-08:00] PayPal API standalone endpoint called {
+[2025-12-22T11:13:02-08:00] PayPal API standalone endpoint called {
     "method": "POST",
     "action": "start",
     "has_nonce": false,
@@ -79,15 +7,15 @@
     "user_agent": "unknown",
     "origin": "none"
 }
-[2025-12-22T10:47:05-08:00] Received AJAX action request {
+[2025-12-22T11:13:02-08:00] Received AJAX action request {
     "action": "start",
     "has_nonce": false,
     "has_tracking_id": false,
     "remote_addr": "67.227.191.81"
 }
-[2025-12-22T10:47:05-08:00] Numinix PayPal ISU event: start {
+[2025-12-22T11:13:02-08:00] Numinix PayPal ISU event: start {
     "event": "start",
-    "timestamp": 1766429225,
+    "timestamp": 1766430782,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.1.0",
@@ -96,59 +24,59 @@
         "tracking_id": null
     }
 }
-[2025-12-22T10:47:05-08:00] Using client-provided return URL {
+[2025-12-22T11:13:02-08:00] Using client-provided return URL {
     "client_return_url": "https://staging.stringsbymail.com/admin0A4HO6D@9V3o6Wt+Lz1a/paypalr_signup.php?env=live",
-    "enhanced_return_url": "https://staging.stringsbymail.com/admin0A4HO6D@9V3o6Wt+Lz1a/paypalr_signup.php?env=live&tracking_id=nxp-925e4eb08f127dbeda6d"
+    "enhanced_return_url": "https://staging.stringsbymail.com/admin0A4HO6D@9V3o6Wt+Lz1a/paypalr_signup.php?env=live&tracking_id=nxp-07f75ab9c004dbb469de"
 }
-[2025-12-22T10:47:05-08:00] Processing start action {
+[2025-12-22T11:13:02-08:00] Processing start action {
     "environment": "live",
-    "tracking_id": "nxp-925e4eb08f127dbeda6d",
+    "tracking_id": "nxp-07f75ab9c004dbb469de",
     "origin": "https://www.numinix.com",
-    "return_url": "https://staging.stringsbymail.com/admin0A4HO6D@9V3o6Wt+Lz1a/paypalr_signup.php?env=live&tracking_id=nxp-925e4eb08f127dbeda6d",
+    "return_url": "https://staging.stringsbymail.com/admin0A4HO6D@9V3o6Wt+Lz1a/paypalr_signup.php?env=live&tracking_id=nxp-07f75ab9c004dbb469de",
     "has_client_return_url": true
 }
-[2025-12-22T10:47:06-08:00] Persisted seller_nonce to database for credential exchange {
-    "tracking_id": "nxp-925e4eb08f127dbeda6d",
+[2025-12-22T11:13:03-08:00] Persisted seller_nonce to database for credential exchange {
+    "tracking_id": "nxp-07f75ab9c004dbb469de",
     "environment": "live",
-    "expires_at": "2025-12-22 11:47:06"
+    "expires_at": "2025-12-22 12:13:03"
 }
-[2025-12-22T10:47:06-08:00] Numinix PayPal ISU event: start_success {
+[2025-12-22T11:13:03-08:00] Numinix PayPal ISU event: start_success {
     "event": "start_success",
-    "timestamp": 1766429226,
+    "timestamp": 1766430783,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.1.0",
-    "tracking_id": "nxp-925e4eb08f127dbeda6d",
+    "tracking_id": "nxp-07f75ab9c004dbb469de",
     "step": "waiting",
     "context": {
-        "tracking_id": "nxp-925e4eb08f127dbeda6d",
-        "redirect_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=NjRlZjNhZWYtZDJlYi00ZGM4LWIwM2YtODk1ZjNjNThkMTM4VTJaek1PYVhoeXNOMElGUkFiRVVSd0hoWFplQ0RsOVJSbTAvdUx6U3M2QT12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
+        "tracking_id": "nxp-07f75ab9c004dbb469de",
+        "redirect_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YjY2ZmNlZmQtZjQ0ZS00Nzk4LWE5NjktMjBhODhmNTU5YTlkN2tsSVpJOWVqVFdra1dJUFJrSXBFR2JDNmR5aWtpYnVLQWpPN09vRjhwQT12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
         "step": "waiting",
         "request": {
             "environment": "live",
-            "tracking_id": "nxp-925e4eb08f127dbeda6d",
+            "tracking_id": "nxp-07f75ab9c004dbb469de",
             "origin": "https://www.numinix.com",
-            "return_url": "https://staging.stringsbymail.com/admin0A4HO6D@9V3o6Wt+Lz1a/paypalr_signup.php?env=live&tracking_id=nxp-925e4eb08f127dbeda6d"
+            "return_url": "https://staging.stringsbymail.com/admin0A4HO6D@9V3o6Wt+Lz1a/paypalr_signup.php?env=live&tracking_id=nxp-07f75ab9c004dbb469de"
         },
         "response": {
             "success": "true",
             "message": "PayPal onboarding started.",
             "data": {
                 "environment": "live",
-                "tracking_id": "nxp-925e4eb08f127dbeda6d",
+                "tracking_id": "nxp-07f75ab9c004dbb469de",
                 "partner_referral_id": "",
-                "seller_nonce": "Iu3ivrFJllLHKmKXKzgQjXbYT_0zROXztP-L3aJrernyeg",
-                "redirect_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=NjRlZjNhZWYtZDJlYi00ZGM4LWIwM2YtODk1ZjNjNThkMTM4VTJaek1PYVhoeXNOMElGUkFiRVVSd0hoWFplQ0RsOVJSbTAvdUx6U3M2QT12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
-                "action_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=NjRlZjNhZWYtZDJlYi00ZGM4LWIwM2YtODk1ZjNjNThkMTM4VTJaek1PYVhoeXNOMElGUkFiRVVSd0hoWFplQ0RsOVJSbTAvdUx6U3M2QT12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
+                "seller_nonce": "DC2TS7KtlaN_W2sraJf8fQobZ8TnpGZMjc-tjevemT4cgg",
+                "redirect_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YjY2ZmNlZmQtZjQ0ZS00Nzk4LWE5NjktMjBhODhmNTU5YTlkN2tsSVpJOWVqVFdra1dJUFJrSXBFR2JDNmR5aWtpYnVLQWpPN09vRjhwQT12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
+                "action_url": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YjY2ZmNlZmQtZjQ0ZS00Nzk4LWE5NjktMjBhODhmNTU5YTlkN2tsSVpJOWVqVFdra1dJUFJrSXBFR2JDNmR5aWtpYnVLQWpPN09vRjhwQT12Mg==&partnerId=Ac2Ks6o8HSmmjZ6tdFuU-mWDbo63oFX4_aEsi9ehWJsHgMQAd05ME9IML48BzPTfpAZ58prme3ZZghky",
                 "links": [
                     {
-                        "href": "https://api.paypal.com/v2/customer/partner-referrals/NjRlZjNhZWYtZDJlYi00ZGM4LWIwM2YtODk1ZjNjNThkMTM4VTJaek1PYVhoeXNOMElGUkFiRVVSd0hoWFplQ0RsOVJSbTAvdUx6U3M2QT12Mg==",
+                        "href": "https://api.paypal.com/v2/customer/partner-referrals/YjY2ZmNlZmQtZjQ0ZS00Nzk4LWE5NjktMjBhODhmNTU5YTlkN2tsSVpJOWVqVFdra1dJUFJrSXBFR2JDNmR5aWtpYnVLQWpPN09vRjhwQT12Mg==",
                         "rel": "self",
                         "method": "GET",
                         "description": "Read Referral Data shared by the Caller."
                     },
                     {
-                        "href": "https://www.paypal.com/bizsignup/partner/entry?referralToken=NjRlZjNhZWYtZDJlYi00ZGM4LWIwM2YtODk1ZjNjNThkMTM4VTJaek1PYVhoeXNOMElGUkFiRVVSd0hoWFplQ0RsOVJSbTAvdUx6U3M2QT12Mg==",
+                        "href": "https://www.paypal.com/bizsignup/partner/entry?referralToken=YjY2ZmNlZmQtZjQ0ZS00Nzk4LWE5NjktMjBhODhmNTU5YTlkN2tsSVpJOWVqVFdra1dJUFJrSXBFR2JDNmR5aWtpYnVLQWpPN09vRjhwQT12Mg==",
                         "rel": "action_url",
                         "method": "GET",
                         "description": "Target WEB REDIRECT URL for the next action. Customer should be redirected to this URL in the browser."
@@ -160,11 +88,11 @@
         }
     }
 }
-[2025-12-22T10:47:06-08:00] Start action completed successfully {
-    "tracking_id": "nxp-925e4eb08f127dbeda6d",
+[2025-12-22T11:13:03-08:00] Start action completed successfully {
+    "tracking_id": "nxp-07f75ab9c004dbb469de",
     "has_redirect_url": true
 }
-[2025-12-22T10:47:41-08:00] PayPal API standalone endpoint called {
+[2025-12-22T11:17:06-08:00] PayPal API standalone endpoint called {
     "method": "POST",
     "action": "finalize",
     "has_nonce": true,
@@ -173,253 +101,61 @@
     "user_agent": "unknown",
     "origin": "none"
 }
-[2025-12-22T10:47:41-08:00] Received AJAX action request {
+[2025-12-22T11:17:06-08:00] Received AJAX action request {
     "action": "finalize",
     "has_nonce": true,
     "has_tracking_id": true,
     "remote_addr": "67.227.191.81"
 }
-[2025-12-22T10:47:41-08:00] Numinix PayPal ISU event: finalize_success {
+[2025-12-22T11:17:06-08:00] Persisted authCode and sharedId to database for credential exchange {
+    "tracking_id": "nxp-07f75ab9c004dbb469de",
+    "environment": "live",
+    "expires_at": "2025-12-22 12:17:06"
+}
+[2025-12-22T11:17:07-08:00] Persisted seller credentials for transmission {
+    "tracking_id": "nxp-07f75ab9c004dbb469de",
+    "environment": "live",
+    "client_id_prefix": "BAAqO-...",
+    "has_access_token": "yes"
+}
+[2025-12-22T11:17:07-08:00] Numinix PayPal ISU event: finalize_success {
     "event": "finalize_success",
-    "timestamp": 1766429261,
+    "timestamp": 1766431027,
     "environment": "live",
     "zen_cart_version": "2.0.1",
     "plugin_version": "1.1.0",
-    "tracking_id": "nxp-925e4eb08f127dbeda6d",
-    "step": "waiting",
+    "tracking_id": "nxp-07f75ab9c004dbb469de",
+    "step": "completed",
     "context": {
-        "tracking_id": "nxp-925e4eb08f127dbeda6d",
-        "step": "waiting",
+        "tracking_id": "nxp-07f75ab9c004dbb469de",
+        "step": "completed",
         "polling_interval": 5000,
+        "credentials": "[REDACTED]",
         "request": {
             "code": null,
-            "tracking_id": "nxp-925e4eb08f127dbeda6d",
+            "tracking_id": "nxp-07f75ab9c004dbb469de",
             "environment": "live",
             "partner_referral_id": null,
             "merchant_id": null,
-            "auth_code": null,
-            "shared_id": null,
-            "seller_nonce": "Iu3ivrFJllLHKmKXKzgQjXbYT_0zROXztP-L3aJrernyeg"
+            "auth_code": "C21A*****************************************************************************************9U3w",
+            "shared_id": "BAAqO-CkHBV5zw5dlxhjiHPY8AqnznHdjvbtW2RxRzao4IqrzzRhWsSsW-aKpDd5FnKefIijq3LurDr97g",
+            "seller_nonce": "DC2TS7KtlaN_W2sraJf8fQobZ8TnpGZMjc-tjevemT4cgg"
         },
         "response": {
             "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
+            "message": "PayPal onboarding progress updated.",
             "data": {
                 "environment": "live",
-                "tracking_id": "nxp-925e4eb08f127dbeda6d",
+                "tracking_id": "nxp-07f75ab9c004dbb469de",
                 "partner_referral_id": "",
                 "merchant_id": "",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-22T10:47:45-08:00] PayPal API standalone endpoint called {
-    "method": "POST",
-    "action": "finalize",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81",
-    "user_agent": "unknown",
-    "origin": "none"
-}
-[2025-12-22T10:47:45-08:00] Received AJAX action request {
-    "action": "finalize",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81"
-}
-[2025-12-22T10:47:45-08:00] Numinix PayPal ISU event: finalize_success {
-    "event": "finalize_success",
-    "timestamp": 1766429265,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.1.0",
-    "tracking_id": "nxp-925e4eb08f127dbeda6d",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-925e4eb08f127dbeda6d",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "code": null,
-            "tracking_id": "nxp-925e4eb08f127dbeda6d",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": null,
-            "auth_code": null,
-            "shared_id": null,
-            "seller_nonce": "Iu3ivrFJllLHKmKXKzgQjXbYT_0zROXztP-L3aJrernyeg"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-925e4eb08f127dbeda6d",
-                "partner_referral_id": "",
-                "merchant_id": "",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-22T10:47:49-08:00] PayPal API standalone endpoint called {
-    "method": "POST",
-    "action": "finalize",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81",
-    "user_agent": "unknown",
-    "origin": "none"
-}
-[2025-12-22T10:47:49-08:00] Received AJAX action request {
-    "action": "finalize",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81"
-}
-[2025-12-22T10:47:50-08:00] Numinix PayPal ISU event: finalize_success {
-    "event": "finalize_success",
-    "timestamp": 1766429270,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.1.0",
-    "tracking_id": "nxp-925e4eb08f127dbeda6d",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-925e4eb08f127dbeda6d",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "code": null,
-            "tracking_id": "nxp-925e4eb08f127dbeda6d",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": null,
-            "auth_code": null,
-            "shared_id": null,
-            "seller_nonce": "Iu3ivrFJllLHKmKXKzgQjXbYT_0zROXztP-L3aJrernyeg"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-925e4eb08f127dbeda6d",
-                "partner_referral_id": "",
-                "merchant_id": "",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-22T10:47:54-08:00] PayPal API standalone endpoint called {
-    "method": "POST",
-    "action": "finalize",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81",
-    "user_agent": "unknown",
-    "origin": "none"
-}
-[2025-12-22T10:47:54-08:00] Received AJAX action request {
-    "action": "finalize",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81"
-}
-[2025-12-22T10:47:54-08:00] Numinix PayPal ISU event: finalize_success {
-    "event": "finalize_success",
-    "timestamp": 1766429274,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.1.0",
-    "tracking_id": "nxp-925e4eb08f127dbeda6d",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-925e4eb08f127dbeda6d",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "code": null,
-            "tracking_id": "nxp-925e4eb08f127dbeda6d",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": null,
-            "auth_code": null,
-            "shared_id": null,
-            "seller_nonce": "Iu3ivrFJllLHKmKXKzgQjXbYT_0zROXztP-L3aJrernyeg"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-925e4eb08f127dbeda6d",
-                "partner_referral_id": "",
-                "merchant_id": "",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
-            }
-        }
-    }
-}
-[2025-12-22T10:47:58-08:00] PayPal API standalone endpoint called {
-    "method": "POST",
-    "action": "finalize",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81",
-    "user_agent": "unknown",
-    "origin": "none"
-}
-[2025-12-22T10:47:58-08:00] Received AJAX action request {
-    "action": "finalize",
-    "has_nonce": true,
-    "has_tracking_id": true,
-    "remote_addr": "67.227.191.81"
-}
-[2025-12-22T10:47:59-08:00] Numinix PayPal ISU event: finalize_success {
-    "event": "finalize_success",
-    "timestamp": 1766429279,
-    "environment": "live",
-    "zen_cart_version": "2.0.1",
-    "plugin_version": "1.1.0",
-    "tracking_id": "nxp-925e4eb08f127dbeda6d",
-    "step": "waiting",
-    "context": {
-        "tracking_id": "nxp-925e4eb08f127dbeda6d",
-        "step": "waiting",
-        "polling_interval": 5000,
-        "request": {
-            "code": null,
-            "tracking_id": "nxp-925e4eb08f127dbeda6d",
-            "environment": "live",
-            "partner_referral_id": null,
-            "merchant_id": null,
-            "auth_code": null,
-            "shared_id": null,
-            "seller_nonce": "Iu3ivrFJllLHKmKXKzgQjXbYT_0zROXztP-L3aJrernyeg"
-        },
-        "response": {
-            "success": "true",
-            "message": "Waiting for PayPal to finish provisioning the merchant account.",
-            "data": {
-                "environment": "live",
-                "tracking_id": "nxp-925e4eb08f127dbeda6d",
-                "partner_referral_id": "",
-                "merchant_id": "",
-                "step": "waiting",
-                "status_hint": "provisioning",
-                "polling_interval": 5000
+                "merchant_id_in_paypal": "",
+                "payments_receivable": "false",
+                "primary_email_confirmed": "false",
+                "capabilities": [],
+                "step": "completed",
+                "polling_interval": 5000,
+                "credentials": "[REDACTED]"
             }
         }
     }

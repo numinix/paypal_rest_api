@@ -1,17 +1,25 @@
-VM49:116 [PayPal Signup] Start response - tracking_id: nxp-925e4eb08f127dbeda6d has nonce: true
-VM49:269 [PayPal Signup] Received message: "{\"__post_robot_10_0_44__\":[{\"id\":\"uid_9f9e4cf64a_mtg6ndc6mdg\",\"origin\":\"https://www.paypal.com\",\"type\":\"postrobot_message_request\",\"hash\":\"postrobot_hello_uid_6291727375_mtg6ndc6mdg\",\"name\":\"postrobot_hello\",\"data\":{\"instanceID\":\"uid_56677782a8_mtg6ndc6mdg\"},\"fireAndForget\":false}]}"
-VM49:269 [PayPal Signup] Received message: "{\"__post_robot_10_0_44__\":[{\"id\":\"uid_64f1a7b872_mtg6ndc6mzi\",\"origin\":\"https://www.paypal.com\",\"type\":\"postrobot_message_request\",\"hash\":\"postrobot_hello_uid_e9e50216dc_mtg6ndc6mzi\",\"name\":\"postrobot_hello\",\"data\":{\"instanceID\":\"uid_3ef2256aaf_mtg6ndc6mzi\"},\"fireAndForget\":false}]}"
-VM49:269 [PayPal Signup] Received message: "{\"__post_robot_11_0_0__\":[{\"id\":\"uid_fc3e78bff5_mtg6ndc6mzi\",\"origin\":\"https://www.paypal.com\",\"type\":\"postrobot_message_request\",\"hash\":\"postrobot_hello_uid_9852464a31_mtg6ndc6mzi\",\"name\":\"postrobot_hello\",\"data\":{\"instanceID\":\"uid_5d77169dda_mtg6ndc6mzi\"},\"fireAndForget\":false}]}"
-VM49:269 [PayPal Signup] Received message: "{\"onboardedCompleteToken\":\"C21AANVa4MfvOKz6dzlBOSkrpZlfm64Fgx4cwYXcvvFdOcu_axFGggjTqiH0gOk7t8tVSwmOaLWv2s_Yf_KSFIhrqj3l5GSug\",\"sharedId\":\"BAAcTk34sNhBhYmWqK9GWK-6o7f76irrRebjT9GOOmM-4UhvP5viNbLS_maRy_kTs-CSt1mgAs-AEIgxvQ\"}"
-VM49:269 [PayPal Signup] Received message: "{\"updateParent\":true,\"returnUrl\":\"https://staging.stringsbymail.com/admin0A4HO6D@9V3o6Wt+Lz1a/paypalr_signup.php?env=live&tracking_id=nxp-925e4eb08f127dbeda6d&merchantId=nxp-925e4eb08f127dbeda6d&merchantIdInPayPal=WW75U29QM8276&productIntentId=addipmt&isEmailConfirmed=true&accountStatus=BUSINESS_ACCOUNT&permissionsGranted=true&consentStatus=true&riskStatus=SUBSCRIBED_WITH_ALL_FEATURES\"}"
-VM49:184 [PayPal Signup] Polling for credentials, attempt: 1 state: Object
-VM49:201 [PayPal Signup] Finalize response: Object
-VM49:184 [PayPal Signup] Polling for credentials, attempt: 2 state: Object
-VM49:201 [PayPal Signup] Finalize response: Object
-VM49:184 [PayPal Signup] Polling for credentials, attempt: 3 state: {tracking_id: 'nxp-925e4eb08f127dbeda6d', merchant_id: '', authCode: '(empty)', sharedId: '(empty)', nonce: '(present)'}
-VM49:201 [PayPal Signup] Finalize response: {data: {…}, success: true}
-VM49:184 [PayPal Signup] Polling for credentials, attempt: 4 state: {tracking_id: 'nxp-925e4eb08f127dbeda6d', merchant_id: '', authCode: '(empty)', sharedId: '(empty)', nonce: '(present)'}
-VM49:201 [PayPal Signup] Finalize response: {data: {…}, success: true}
-VM49:184 [PayPal Signup] Polling for credentials, attempt: 5 state: {tracking_id: 'nxp-925e4eb08f127dbeda6d', merchant_id: '', authCode: '(empty)', sharedId: '(empty)', nonce: '(present)'}
-VM49:222 [PayPal Signup] Finalize error: Failed to fetch
-Navigated to https://staging.stringsbymail.com/admin0A4HO6D@9V3o6Wt+Lz1a/index.php?cmd=modules&set=payment&module=paypalr
+VM51:116 [PayPal Signup] Start response - tracking_id: nxp-07f75ab9c004dbb469de has nonce: true
+VM51:269 [PayPal Signup] Received message: "{\"__post_robot_10_0_44__\":[{\"id\":\"uid_a5660aca56_mtk6mtm6mdu\",\"origin\":\"https://www.paypal.com\",\"type\":\"postrobot_message_request\",\"hash\":\"postrobot_hello_uid_342e95d7cc_mtk6mtm6mdu\",\"name\":\"postrobot_hello\",\"data\":{\"instanceID\":\"uid_765de3cbc2_mtk6mtm6mdu\"},\"fireAndForget\":false}]}"
+VM51:280 [PayPal Signup] Parsed string payload to object: Object
+VM51:307 [PayPal Signup] Message analysis: Object
+index.php?cmd=paypalr_signup:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+index.php?cmd=paypalr_signup:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+index.php?cmd=paypalr_signup:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+index.php?cmd=paypalr_signup:1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+VM51:269 [PayPal Signup] Received message: "{\"__post_robot_10_0_44__\":[{\"id\":\"uid_9639769f9e_mtk6mtc6mdm\",\"origin\":\"https://www.paypal.com\",\"type\":\"postrobot_message_request\",\"hash\":\"postrobot_hello_uid_340c5d4920_mtk6mtc6mdm\",\"name\":\"postrobot_hello\",\"data\":{\"instanceID\":\"uid_49b15815bf_mtk6mtc6mdm\"},\"fireAndForget\":false}]}"
+VM51:280 [PayPal Signup] Parsed string payload to object: Object
+VM51:307 [PayPal Signup] Message analysis: Object
+VM51:269 [PayPal Signup] Received message: "{\"__post_robot_11_0_0__\":[{\"id\":\"uid_15b0a3e3f2_mtk6mtc6mdm\",\"origin\":\"https://www.paypal.com\",\"type\":\"postrobot_message_request\",\"hash\":\"postrobot_hello_uid_931bf18fd4_mtk6mtc6mdm\",\"name\":\"postrobot_hello\",\"data\":{\"instanceID\":\"uid_a29730c865_mtk6mtc6mdm\"},\"fireAndForget\":false}]}"
+VM51:280 [PayPal Signup] Parsed string payload to object: Object
+VM51:307 [PayPal Signup] Message analysis: Object
+VM51:269 [PayPal Signup] Received message: "{\"onboardedCompleteToken\":\"C21AAPbbui_lwvoyReh0ai_x8yyqMYVA0mvNjS4HVJFTg02vJyViYsddjxIACkTD67BM6nRnSH2LvLX4697bdE7cLUuF09U3w\",\"sharedId\":\"BAAqO-CkHBV5zw5dlxhjiHPY8AqnznHdjvbtW2RxRzao4IqrzzRhWsSsW-aKpDd5FnKefIijq3LurDr97g\"}"
+VM51:280 [PayPal Signup] Parsed string payload to object: Object
+VM51:307 [PayPal Signup] Message analysis: Object
+VM51:320 [PayPal Signup] Captured authCode from PayPal callback
+VM51:324 [PayPal Signup] Captured sharedId from PayPal callback
+VM51:335 [PayPal Signup] Completion event detected, state: Object
+VM51:184 [PayPal Signup] Polling for credentials, attempt: 1 state: Object
+VM51:201 [PayPal Signup] Finalize response: Object
+VM51:269 [PayPal Signup] Received message: "{\"updateParent\":true,\"returnUrl\":\"https://staging.stringsbymail.com/admin0A4HO6D@9V3o6Wt+Lz1a/paypalr_signup.php?env=live&tracking_id=nxp-07f75ab9c004dbb469de&merchantId=nxp-07f75ab9c004dbb469de&merchantIdInPayPal=WW75U29QM8276&productIntentId=addipmt&isEmailConfirmed=true&accountStatus=BUSINESS_ACCOUNT&permissionsGranted=true&consentStatus=true&riskStatus=SUBSCRIBED_WITH_ALL_FEATURES\"}"
+VM51:280 [PayPal Signup] Parsed string payload to object: Object
+VM51:307 [PayPal Signup] Message analysis: Object
