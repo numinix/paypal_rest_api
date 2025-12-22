@@ -820,11 +820,26 @@ function renderSignupPage(): void
         window.addEventListener('message', function(event) {
             console.log('[PayPal Signup] Received message:', JSON.stringify(event.data));
             
-            if (!event.data || typeof event.data !== 'object') {
+            if (!event.data) {
                 return;
             }
             
+            // Parse JSON string if event.data is a string (PayPal sends JSON-stringified data)
             var payload = event.data;
+            if (typeof payload === 'string') {
+                try {
+                    payload = JSON.parse(payload);
+                    console.log('[PayPal Signup] Parsed string payload to object:', payload);
+                } catch (e) {
+                    console.log('[PayPal Signup] Could not parse message as JSON, ignoring');
+                    return;
+                }
+            }
+            
+            if (typeof payload !== 'object' || payload === null) {
+                console.log('[PayPal Signup] Payload is not an object, ignoring');
+                return;
+            }
             
             // Extract values using multiple possible key names (PayPal uses various formats)
             var authCode = getPayloadValue(payload, ['authCode', 'auth_code', 'onboardedCompleteToken', 'onboarding_complete_token']);
