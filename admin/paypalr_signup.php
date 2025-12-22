@@ -496,7 +496,7 @@ function renderSignupPage(): void
                 
                 <div class="actions">
                     <button type="button" id="start-btn" class="btn">Start PayPal Setup</button>
-                    <a href="<?php echo htmlspecialchars($modulesPageUrl); ?>" class="back-link">← Back to Modules</a>
+                    <a href="<?php echo $modulesPageUrl; ?>" class="back-link">← Back to Modules</a>
                 </div>
             </div>
             
@@ -519,7 +519,7 @@ function renderSignupPage(): void
                 
                 <div class="actions">
                     <button type="button" id="save-btn" class="btn">Save to Configuration</button>
-                    <a href="<?php echo htmlspecialchars($modulesPageUrl); ?>" class="back-link">Return to Modules</a>
+                    <a href="<?php echo $modulesPageUrl; ?>" class="back-link">Return to Modules</a>
                 </div>
             </div>
         </div>
