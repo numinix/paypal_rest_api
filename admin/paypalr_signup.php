@@ -480,6 +480,10 @@ function renderSignupPage(): void
 </head>
 <body>
     <div class="container">
+        <?php 
+        // Use zen_draw_form to create a form with automatic securityToken hidden input
+        echo zen_draw_form('paypal_signup', basename($_SERVER['SCRIPT_NAME']), '', 'post', 'id="paypal-signup-form"');
+        ?>
         <div id="main-content">
             <h1>PayPal Account Setup</h1>
             <p class="subtitle">Connect your PayPal account to accept payments</p>
@@ -489,7 +493,7 @@ function renderSignupPage(): void
             <div id="start-section">
                 <div class="form-group">
                     <label for="environment">Environment</label>
-                    <select id="environment">
+                    <select id="environment" name="environment">
                         <option value="live">Production (Live)</option>
                         <option value="sandbox">Sandbox (Testing)</option>
                     </select>
@@ -532,14 +536,16 @@ function renderSignupPage(): void
                 <p style="color: #666; font-size: 14px;">This window will close automatically.</p>
             </div>
         </div>
+        </form>
     </div>
     
     <script>
     (function() {
         'use strict';
         
-        // Security token for AJAX requests
-        var securityToken = <?php echo json_encode($securityToken); ?>;
+        // Get security token from hidden form input (added by zen_draw_form)
+        var securityTokenInput = document.querySelector('input[name="securityToken"]');
+        var securityToken = securityTokenInput ? securityTokenInput.value : '';
         
         // Check if this is a popup return from PayPal
         var urlParams = new URLSearchParams(window.location.search);
