@@ -667,12 +667,52 @@ function paypalr_render_onboarding_page(): void
                 }
 
                 function handlePopupMessage(event) {
-                    if (!state.popup || (event && event.source && event.source !== state.popup)) {
+                    // Log all incoming messages for debugging
+                    console.log('[PayPal ISU] handlePopupMessage called:', {
+                        hasEvent: !!event,
+                        eventOrigin: event ? event.origin : 'N/A',
+                        hasData: !!(event && event.data),
+                        hasPopup: !!state.popup,
+                        dataType: event && event.data ? typeof event.data : 'N/A'
+                    });
+                    
+                    // Helper function to validate PayPal domain (prevents subdomain attacks like 'evil-paypal.com')
+                    function isPayPalDomain(origin) {
+                        if (!origin) return false;
+                        try {
+                            var url = new URL(origin);
+                            var hostname = url.hostname.toLowerCase();
+                            // Must be exactly paypal.com or a subdomain of paypal.com
+                            // Must be exactly paypalobjects.com or a subdomain of paypalobjects.com
+                            return hostname === 'paypal.com' || hostname.endsWith('.paypal.com') ||
+                                   hostname === 'paypalobjects.com' || hostname.endsWith('.paypalobjects.com');
+                        } catch (e) {
+                            return false;
+                        }
+                    }
+                    
+                    // Accept messages from:
+                    // 1. Our popup (if we opened one)
+                    // 2. Same origin (for mini-browser flow)
+                    // 3. PayPal domains (for direct PayPal callbacks)
+                    var isFromOurPopup = state.popup && event && event.source && event.source === state.popup;
+                    var isFromSameOrigin = event && event.origin === window.location.origin;
+                    var isFromPayPal = event && isPayPalDomain(event.origin);
+                    
+                    // If we have a popup reference, only accept from that popup
+                    // Otherwise, accept from same origin or PayPal
+                    if (state.popup && !isFromOurPopup) {
+                        console.log('[PayPal ISU] Ignoring message - not from our popup');
+                        return;
+                    }
+                    if (!state.popup && !isFromSameOrigin && !isFromPayPal) {
+                        console.log('[PayPal ISU] Ignoring message - not from same origin or PayPal');
                         return;
                     }
 
                     var payload = event && event.data;
                     if (!payload) {
+                        console.log('[PayPal ISU] Ignoring message - no data');
                         return;
                     }
 
@@ -1105,6 +1145,7 @@ function paypalr_render_onboarding_page(): void
                     });
                 }
                 window.addEventListener('message', handlePopupMessage);
+                console.log('[PayPal ISU] Message event listener attached - ready to receive postMessage from popup/mini-browser');
 
                 prepareOnboarding().catch(function(error) {
                     console.error('[PayPal ISU] Failed to prepare onboarding on load', error);
@@ -1124,17 +1165,29 @@ function paypalr_render_onboarding_page(): void
                 window.addEventListener('paypalOnboardingComplete', function(event) {
                     var detail = event.detail || {};
                     
+                    console.log('[PayPal ISU] paypalOnboardingComplete event received:', {
+                        hasAuthCode: !!detail.authCode,
+                        hasSharedId: !!detail.sharedId,
+                        source: detail.source || 'unknown',
+                        trackingId: state.trackingId
+                    });
+                    
                     if (detail.authCode) {
                         state.authCode = detail.authCode;
+                        console.log('[PayPal ISU] Captured authCode from callback');
                     }
                     if (detail.sharedId) {
                         state.sharedId = detail.sharedId;
+                        console.log('[PayPal ISU] Captured sharedId from callback');
                     }
                     
                     // If we have both authCode and sharedId, proceed with credential exchange
                     if (state.authCode && state.sharedId) {
+                        console.log('[PayPal ISU] Have both authCode and sharedId - calling pollStatus');
                         setStatus('Processing your PayPal account details…', 'info');
                         pollStatus(true);
+                    } else {
+                        console.log('[PayPal ISU] Missing authCode or sharedId - not calling pollStatus yet');
                     }
                 });
             })();
@@ -2116,9 +2169,19 @@ function paypalr_handle_completion(): void
                 // Send completion message to opener window if it exists
                 // Note: merchantId, authCode, sharedId are not sensitive credentials themselves
                 // They are temporary IDs that will be exchanged for credentials server-side
+                console.log('[PayPal ISU Completion] Checking for opener window:', {
+                    hasOpener: !!window.opener,
+                    openerClosed: window.opener ? window.opener.closed : 'N/A'
+                });
+                
                 if (window.opener && !window.opener.closed) {
                     try {
                         // Try to determine the opener's origin for targeted postMessage
+                        // We try to get the specific origin, but fall back to '*' if cross-origin access fails
+                        // This is acceptable because:
+                        // 1. The data being sent (merchantId, authCode, sharedId) are temporary tokens, not credentials
+                        // 2. The receiving page validates message content before processing
+                        // 3. The actual credentials are exchanged server-side through authenticated endpoints
                         var targetOrigin = '*';
                         try {
                             if (window.opener.location && window.opener.location.origin) {
@@ -2127,19 +2190,36 @@ function paypalr_handle_completion(): void
                         } catch(e) {
                             // Cross-origin opener - can't access location
                             // Keep targetOrigin as '*' for cross-domain compatibility
+                            console.log('[PayPal ISU Completion] Could not access opener origin, using *');
                         }
                         
-                        window.opener.postMessage({
+                        // Include paypalOnboardingComplete: true for backward compatibility with handlers
+                        // that check for this property instead of the event name
+                        var messagePayload = {
                             event: 'paypal_onboarding_complete',
+                            paypalOnboardingComplete: true,
                             merchantId: merchantId,
                             authCode: authCode,
                             sharedId: sharedId,
                             trackingId: trackingId,
                             environment: environment
-                        }, targetOrigin);
+                        };
+                        
+                        console.log('[PayPal ISU Completion] Sending postMessage to opener:', {
+                            targetOrigin: targetOrigin,
+                            hasMerchantId: !!merchantId,
+                            hasAuthCode: !!authCode,
+                            hasSharedId: !!sharedId,
+                            hasTrackingId: !!trackingId
+                        });
+                        
+                        window.opener.postMessage(messagePayload, targetOrigin);
+                        console.log('[PayPal ISU Completion] postMessage sent successfully');
                     } catch(e) {
-                        // Ignore postMessage errors
+                        console.error('[PayPal ISU Completion] Error sending postMessage:', e);
                     }
+                } else {
+                    console.log('[PayPal ISU Completion] No opener window available - this may be expected for mini-browser flow');
                 }
                 
                 // Fetch credentials immediately

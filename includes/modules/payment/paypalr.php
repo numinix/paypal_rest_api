@@ -485,8 +485,8 @@ class paypalr extends base
             return '';
         }
         
-        // Build the ISU signup URL
-        $isu_url = zen_href_link('paypalr_integrated_signup.php', 'action=start', 'NONSSL');
+        // Build the ISU signup URL - uses simplified popup-based page
+        $isu_url = zen_href_link('paypalr_signup.php', '', 'NONSSL');
         
         // Build the HTML for the ISU section
         $isu_html = '<div class="paypalr-isu-section" style="margin-top: 20px; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9;">';
