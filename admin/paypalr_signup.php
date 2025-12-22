@@ -627,6 +627,21 @@ function renderSignupPage(): void
             document.getElementById('cred-client-secret').textContent = credentials.client_secret;
             state.credentials = credentials;
             state.env = env;
+            
+            // Close popup if still open
+            if (state.popup && !state.popup.closed) {
+                console.log('[PayPal Signup] Closing popup after credentials received');
+                try {
+                    state.popup.close();
+                } catch (e) {
+                    console.log('[PayPal Signup] Could not close popup:', e);
+                }
+                state.popup = null;
+            }
+            
+            // Auto-save credentials to configuration
+            console.log('[PayPal Signup] Auto-saving credentials to configuration...');
+            saveCredentials();
         }
         
         // Get the form's action URL - this is the safest way to POST back to this page
@@ -880,6 +895,30 @@ function renderSignupPage(): void
             }
             if (trackingId && !state.trackingId) {
                 state.trackingId = trackingId;
+            }
+            
+            // Handle updateParent message - PayPal signals user clicked "Return to Merchant"
+            // This means the mini-browser should close
+            if (isUpdateParent) {
+                console.log('[PayPal Signup] updateParent message received - closing popup');
+                if (state.popup && !state.popup.closed) {
+                    try {
+                        state.popup.close();
+                    } catch (e) {
+                        console.log('[PayPal Signup] Could not close popup:', e);
+                    }
+                    state.popup = null;
+                }
+                // If we already have credentials, we're done
+                if (state.credentials) {
+                    return;
+                }
+                // Otherwise, continue polling if we have tracking data
+                if (state.trackingId && !state.credentials) {
+                    setStatus('Processing your account...', 'info');
+                    pollForCredentials();
+                }
+                return;
             }
             
             // If this is a completion event (either our custom event or PayPal's direct callback with credentials)
