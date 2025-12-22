@@ -254,12 +254,13 @@ function handleSaveCredentials(): void
     }
     
     // Determine which config keys to update based on environment
+    // Use the correct key names: _L for live, _S for sandbox
     if ($env === 'live') {
-        $clientIdKey = 'MODULE_PAYMENT_PAYPALR_CLIENTID_LIVE';
-        $clientSecretKey = 'MODULE_PAYMENT_PAYPALR_SECRET_LIVE';
+        $clientIdKey = 'MODULE_PAYMENT_PAYPALR_CLIENTID_L';
+        $clientSecretKey = 'MODULE_PAYMENT_PAYPALR_SECRET_L';
     } else {
-        $clientIdKey = 'MODULE_PAYMENT_PAYPALR_CLIENTID_SANDBOX';
-        $clientSecretKey = 'MODULE_PAYMENT_PAYPALR_SECRET_SANDBOX';
+        $clientIdKey = 'MODULE_PAYMENT_PAYPALR_CLIENTID_S';
+        $clientSecretKey = 'MODULE_PAYMENT_PAYPALR_SECRET_S';
     }
     
     // Sanitize values for database using zen_db_input if available
@@ -467,6 +468,60 @@ function renderSignupPage(): void
             border: 1px solid #ddd;
             word-break: break-all;
             font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .cred-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .cred-actions {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .cred-btn {
+            background: none;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+            color: #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cred-btn:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .cred-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+        .cred-feedback {
+            font-size: 11px;
+            color: #2e7d32;
+            margin-left: 8px;
+        }
+        .cred-note {
+            background: #fffbeb;
+            border: 1px solid #fbbf24;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 13px;
+            color: #92400e;
+        }
+        .cred-note svg {
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
         }
         .actions {
             margin-top: 24px;
@@ -521,15 +576,42 @@ function renderSignupPage(): void
                     <h3>✓ PayPal Account Connected</h3>
                     <div class="cred-row">
                         <span class="cred-label">Environment</span>
-                        <div class="cred-value" id="cred-env"></div>
+                        <div class="cred-value"><span class="cred-text" id="cred-env"></span></div>
                     </div>
-                    <div class="cred-row">
+                    <div class="cred-row" id="cred-client-id-row" data-value="">
                         <span class="cred-label">Client ID</span>
-                        <div class="cred-value" id="cred-client-id"></div>
+                        <div class="cred-value">
+                            <span class="cred-text" id="cred-client-id"></span>
+                            <div class="cred-actions">
+                                <button type="button" class="cred-btn" data-action="copy" data-target="cred-client-id" title="Copy Client ID">
+                                    <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.25 6.25h-5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5.75 11.75H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v.54" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                </button>
+                            </div>
+                            <span class="cred-feedback" id="cred-client-id-feedback"></span>
+                        </div>
                     </div>
-                    <div class="cred-row">
+                    <div class="cred-row" id="cred-client-secret-row" data-value="">
                         <span class="cred-label">Client Secret</span>
-                        <div class="cred-value" id="cred-client-secret"></div>
+                        <div class="cred-value">
+                            <span class="cred-text" id="cred-client-secret" data-masked="true"></span>
+                            <div class="cred-actions">
+                                <button type="button" class="cred-btn" data-action="reveal" data-target="cred-client-secret" title="Show/Hide Secret">
+                                    <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 9s2.25-4.5 7.5-4.5S16.5 9 16.5 9s-2.25 4.5-7.5 4.5S1.5 9 1.5 9Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M11.25 9a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                </button>
+                                <button type="button" class="cred-btn" data-action="copy" data-target="cred-client-secret" title="Copy Secret">
+                                    <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.25 6.25h-5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5.75 11.75H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v.54" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                </button>
+                            </div>
+                            <span class="cred-feedback" id="cred-client-secret-feedback"></span>
+                        </div>
+                    </div>
+                    <div class="cred-note">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 1.33334L1.33334 14.6667H14.6667L8 1.33334Z" stroke="#92400e" stroke-width="1.5" stroke-linejoin="round"></path>
+                            <path d="M8 6.5V9.83334" stroke="#92400e" stroke-width="1.5" stroke-linecap="round"></path>
+                            <circle cx="8" cy="11.8333" r="0.666667" fill="#92400e"></circle>
+                        </svg>
+                        <span>Store these credentials securely. Do not share them publicly.</span>
                     </div>
                 </div>
                 
@@ -619,12 +701,57 @@ function renderSignupPage(): void
             statusEl.className = 'status';
         }
         
+        function maskSecret(value) {
+            var length = (value || '').length || 8;
+            var maskLength = Math.min(Math.max(length, 12), 28);
+            return Array(maskLength + 1).join('•');
+        }
+        
+        function copyToClipboard(value) {
+            if (!value) {
+                return Promise.reject(new Error('Nothing to copy'));
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(value);
+            }
+            return new Promise(function (resolve, reject) {
+                var textarea = document.createElement('textarea');
+                textarea.value = value;
+                textarea.setAttribute('readonly', '');
+                textarea.style.position = 'absolute';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    var successful = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    if (successful) {
+                        resolve();
+                    } else {
+                        reject(new Error('Unable to copy'));
+                    }
+                } catch (error) {
+                    document.body.removeChild(textarea);
+                    reject(error);
+                }
+            });
+        }
+        
         function showCredentials(credentials, env) {
             document.getElementById('start-section').style.display = 'none';
             document.getElementById('credentials-section').style.display = 'block';
             document.getElementById('cred-env').textContent = env === 'live' ? 'Production' : 'Sandbox';
             document.getElementById('cred-client-id').textContent = credentials.client_id;
-            document.getElementById('cred-client-secret').textContent = credentials.client_secret;
+            
+            // Store actual values in data attributes for copy/reveal
+            document.getElementById('cred-client-id-row').setAttribute('data-value', credentials.client_id);
+            document.getElementById('cred-client-secret-row').setAttribute('data-value', credentials.client_secret);
+            
+            // Show masked secret initially
+            var secretEl = document.getElementById('cred-client-secret');
+            secretEl.textContent = maskSecret(credentials.client_secret);
+            secretEl.setAttribute('data-masked', 'true');
+            
             state.credentials = credentials;
             state.env = env;
             
@@ -643,6 +770,50 @@ function renderSignupPage(): void
             console.log('[PayPal Signup] Auto-saving credentials to configuration...');
             saveCredentials();
         }
+        
+        // Handle reveal/copy button clicks
+        document.addEventListener('click', function(event) {
+            var btn = event.target.closest('[data-action]');
+            if (!btn) return;
+            
+            var action = btn.getAttribute('data-action');
+            var target = btn.getAttribute('data-target');
+            if (!target) return;
+            
+            var row = document.getElementById(target + '-row');
+            var textEl = document.getElementById(target);
+            var feedbackEl = document.getElementById(target + '-feedback');
+            var value = row ? row.getAttribute('data-value') : '';
+            
+            if (action === 'copy') {
+                copyToClipboard(value)
+                    .then(function() {
+                        if (feedbackEl) {
+                            feedbackEl.textContent = 'Copied!';
+                            setTimeout(function() {
+                                feedbackEl.textContent = '';
+                            }, 1500);
+                        }
+                    })
+                    .catch(function() {
+                        if (feedbackEl) {
+                            feedbackEl.textContent = 'Copy failed';
+                            setTimeout(function() {
+                                feedbackEl.textContent = '';
+                            }, 1500);
+                        }
+                    });
+            } else if (action === 'reveal') {
+                var isMasked = textEl.getAttribute('data-masked') === 'true';
+                if (isMasked) {
+                    textEl.textContent = value;
+                    textEl.setAttribute('data-masked', 'false');
+                } else {
+                    textEl.textContent = maskSecret(value);
+                    textEl.setAttribute('data-masked', 'true');
+                }
+            }
+        });
         
         // Get the form's action URL - this is the safest way to POST back to this page
         var signupForm = document.getElementById('paypal-signup-form');
