@@ -1,0 +1,2 @@
+<?php
+// improved session handling
