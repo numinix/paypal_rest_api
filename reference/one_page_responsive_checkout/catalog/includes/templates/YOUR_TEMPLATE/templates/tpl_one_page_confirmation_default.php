@@ -13,32 +13,12 @@
  */
 ?>
 <?php
- $columns = "";
   if (!$_SESSION['sendto']) {
     $columns = "2";
-  }
-
-  $oprcOnePageEnabled = (defined('OPRC_ONE_PAGE') && OPRC_ONE_PAGE === 'true');
-  $oprcAutoSubmitEnabled = $oprcOnePageEnabled;
-  if (defined('OPRC_CONFIRMATION_AUTOSUBMIT')) {
-      $autoSubmitSetting = OPRC_CONFIRMATION_AUTOSUBMIT;
-      $oprcAutoSubmitEnabled = ($autoSubmitSetting === true || $autoSubmitSetting === 'true' || $autoSubmitSetting === 1 || $autoSubmitSetting === '1');
-  }
-  $oprcAutoSubmitEnabled = ($oprcAutoSubmitEnabled && $oprcOnePageEnabled);
-
-  $checkoutConfirmClasses = 'centerColumn nmx-wrapper nmx nmx-plugin nmx-plugin--oprc nmx-cf';
-  if ($oprcAutoSubmitEnabled) {
-      $checkoutConfirmClasses .= ' oprc-confirmation--autosubmit';
-  }
+  } 
 ?>
-<div class="<?php echo $checkoutConfirmClasses; ?>" id="checkoutConfirmDefault">
-  <div id="oprc-processing-overlay" class="oprc-processing-overlay<?php echo ($oprcAutoSubmitEnabled ? ' is-active' : ''); ?>" aria-hidden="<?php echo ($oprcAutoSubmitEnabled ? 'false' : 'true'); ?>">
-    <div class="oprc-processing-overlay__spinner" role="presentation"></div>
-    <span class="oprc-processing-overlay__message" role="status" aria-live="polite">
-      <?php echo zen_output_string_protected(OPRC_PROCESSING_TEXT); ?>
-    </span>
-  </div>
-  <div id="onePageCheckoutContent" class="cf"<?php echo ($oprcAutoSubmitEnabled ? ' aria-hidden="true"' : ''); ?>>
+<div class="centerColumn nmx-wrapper nmx nmx-plugin nmx-plugin--oprc nmx-cf" id="checkoutConfirmDefault">
+  <div id="onePageCheckoutContent" class="cf">
 
 <?php 
      /*
@@ -46,11 +26,11 @@
         require($template->get_template_dir('tpl_modules_oprc_order_steps.php',DIR_WS_TEMPLATE, $current_page_base,'templates/one_page_checkout'). '/tpl_modules_oprc_order_steps.php');  
       } 
 */
-require_once(DIR_FS_CATALOG . DIR_WS_LANGUAGES  . $_SESSION['language'] . '/lang.one_page_confirmation.php');
     ?>
-    <h1 id="checkoutConfirmDefaultHeading"<?php echo ($oprcOnePageEnabled ? ' class="visually-hidden"' : ''); ?>><?php echo HEADING_TITLE; ?></h1>
-    <div id="messageStackErrors" class="messageStackErrors"><?php if ($messageStack->size('redemptions') > 0) echo $messageStack->output('redemptions'); ?><?php if ($messageStack->size('checkout_confirmation') > 0) echo $messageStack->output('checkout_confirmation'); ?><?php if ($messageStack->size('checkout') > 0) echo $messageStack->output('checkout'); ?><?php  if ($flagAnyOutOfStock) { ?><?php if (STOCK_ALLOW_CHECKOUT != 'true') {  ?><div class="messageStackError"><?php echo OUT_OF_STOCK_CANT_CHECKOUT; ?></div><?php } //endif STOCK_ALLOW_CHECKOUT ?><?php } //endif flagAnyOutOfStock ?></div>
-    <div id="column1<?php echo $columns; ?>"<?php echo ($oprcOnePageEnabled ? ' aria-hidden="true"' : ''); ?>>
+
+    <h1 id="checkoutConfirmDefaultHeading"><?php echo HEADING_TITLE; ?></h1>
+    <div id="messageStackErrors"><?php if ($messageStack->size('redemptions') > 0) echo $messageStack->output('redemptions'); ?><?php if ($messageStack->size('checkout_confirmation') > 0) echo $messageStack->output('checkout_confirmation'); ?><?php if ($messageStack->size('checkout') > 0) echo $messageStack->output('checkout'); ?><?php  if ($flagAnyOutOfStock) { ?><?php if (STOCK_ALLOW_CHECKOUT != 'true') {  ?><div class="messageStackError"><?php echo OUT_OF_STOCK_CANT_CHECKOUT; ?></div><?php } //endif STOCK_ALLOW_CHECKOUT ?><?php } //endif flagAnyOutOfStock ?></div> 
+    <div id="column1<?php echo $columns; ?>">
       <div id="column2<?php echo $columns; ?>" class="nmx-row">
         <div id="oprc_column1<?php echo $columns; ?>" class="nmx-col-4">
           
@@ -188,38 +168,7 @@ require_once(DIR_FS_CATALOG . DIR_WS_LANGUAGES  . $_SESSION['language'] . '/lang
                     <table class="table--mini-cart">
                       <?php // now loop thru all products to display quantity and price ?>
                       <?php for ($i=0, $n=sizeof($order->products); $i<$n; $i++) { ?>
-                      <?php
-                        $thumbnail = zen_get_products_image($order->products[$i]['id'], 40, 42);
-                        if ($thumbnail === false || $thumbnail === '' || $thumbnail === null) {
-                          $thumbnail = zen_image(DIR_WS_IMAGES . 'no_picture.gif', $order->products[$i]['name'], 40, 42);
-                        }
-
-                        if (isset($order->products[$i]['attributes']) && is_array($order->products[$i]['attributes'])) {
-                          foreach ($order->products[$i]['attributes'] as $attribute) {
-                            if (!isset($attribute['option_id']) || !isset($attribute['value_id'])) {
-                              continue;
-                            }
-
-                            $attributes_image = $db->Execute("SELECT attributes_image
-                                                              FROM " . TABLE_PRODUCTS_ATTRIBUTES . "
-                                                              WHERE products_id = " . (int)$order->products[$i]['id'] . "
-                                                              AND options_id = " . (int)$attribute['option_id'] . "
-                                                              AND options_values_id = " . (int)$attribute['value_id'] . "
-                                                              LIMIT 1;");
-
-                            if ($attributes_image->RecordCount() > 0 && $attributes_image->fields['attributes_image'] != '') {
-                              $attributeImageFile = $attributes_image->fields['attributes_image'];
-                              $attributeThumbnail = zen_image(DIR_WS_IMAGES . $attributeImageFile, $order->products[$i]['name'], 40, 42);
-
-                              if (strpos($attributeThumbnail, $attributeImageFile) !== false) {
-                                $thumbnail = $attributeThumbnail;
-                                break;
-                              }
-                            }
-                          }
-                        }
-
-                      ?>
+                      <?php $thumbnail = zen_get_products_image($order->products[$i]['id'], 40, 42); ?>
                       <tr>
                         <td class="nmx-cart-img"><?php echo $thumbnail; ?></td>
                         <td class="nmx-cart-details"><?php echo $order->products[$i]['qty']; ?> x <?php echo $order->products[$i]['name']; ?>
@@ -261,7 +210,7 @@ require_once(DIR_FS_CATALOG . DIR_WS_LANGUAGES  . $_SESSION['language'] . '/lang
                 </div>
 
                 <?php
-                  echo zen_draw_form('checkout_confirmation', $form_action_url, 'post', 'id="checkout_confirmation"' . ($oprcAutoSubmitEnabled ? ' class="visually-hidden"' : ''));
+                  echo zen_draw_form('checkout_confirmation', $form_action_url, 'post', 'id="checkout_confirmation"');
                   if (OPRC_ONE_PAGE == 'true') {
                     echo zen_draw_hidden_field('onePageStatus', 'on', 'class="hiddenField"') . zen_draw_hidden_field('email_pref_html', 'email_format', 'class="hiddenField"');
                   }
@@ -269,7 +218,7 @@ require_once(DIR_FS_CATALOG . DIR_WS_LANGUAGES  . $_SESSION['language'] . '/lang
                     echo $payment_modules->process_button();
                   }
                 ?>
-                  <div class="nmx-buttons nmx-tar cf"<?php echo ($oprcAutoSubmitEnabled ? ' aria-hidden="true"' : ''); ?>>
+                  <div class="nmx-buttons nmx-tar cf">
                       <?php echo (OPRC_CSS_BUTTONS == 'false' ? zen_image_submit(BUTTON_IMAGE_CONFIRM_ORDER, BUTTON_CONFIRM_ORDER_ALT, 'name="btn_submit" id="btn_submit"') : zenCssButton(BUTTON_IMAGE_CONFIRM_ORDER, BUTTON_CONFIRM_ORDER_ALT, 'submit', 'button_confirm_checkout')) ;?>
                   </div>
                 </form>
@@ -294,15 +243,3 @@ require_once(DIR_FS_CATALOG . DIR_WS_LANGUAGES  . $_SESSION['language'] . '/lang
 
   </div>
 </div>
-<?php if ($oprcAutoSubmitEnabled) { ?>
-<script>
-(function() {
-  var overlay = document.getElementById('oprc-processing-overlay');
-  if (overlay) {
-    overlay.style.display = 'flex';
-    overlay.classList.add('is-active');
-    overlay.setAttribute('aria-hidden', 'false');
-  }
-})();
-</script>
-<?php } ?>

@@ -1,29 +1,23 @@
-<?php
-/**
- * Optional template override for rendering the Google reCAPTCHA widget on the OPRC registration step.
- */
-if (!defined('IS_ADMIN_FLAG')) {
-    die('Illegal Access');
-}
+             <div id="recaptcha_widget" style="display:none">
+               <div id="recaptcha_image"></div>
+               <div class="recaptcha_only_if_incorrect_sol" style="color:red">Incorrect please try again</div>
 
-$recaptchaConfigured = (trim(OPRC_RECAPTCHA_KEY) !== '' && trim(OPRC_RECAPTCHA_SECRET) !== '');
+               <span class="recaptcha_only_if_image">Enter the words above:</span>
+               <span class="recaptcha_only_if_audio">Enter the numbers you hear:</span>
 
-if ($recaptchaConfigured) {
-    if (!defined('OPRC_RECAPTCHA_SCRIPT_OUTPUT')) {
-        define('OPRC_RECAPTCHA_SCRIPT_OUTPUT', true);
-        echo '<script src="https://www.google.com/recaptcha/api.js" async defer></script>';
-    }
-    ?>
-    <div id="securityCheck" class="nmx-box">
-        <h3><?php echo ENTRY_SECURITY_CHECK; ?></h3>
-        <div class="g-recaptcha" data-sitekey="<?php echo zen_output_string_protected(OPRC_RECAPTCHA_KEY); ?>" data-theme="<?php echo zen_output_string_protected(OPRC_RECAPTCHA_THEME); ?>"></div>
-    </div>
-    <?php
-} else {
-    ?>
-    <div id="securityCheck" class="nmx-box">
-        <h3><?php echo ENTRY_SECURITY_CHECK; ?></h3>
-        <p class="information nmx-mb0"><?php echo zen_output_string_protected(ENTRY_SECURITY_CHECK_RECAPTCHA_MISCONFIGURED); ?></p>
-    </div>
-    <?php
-}
+               <input type="text" id="recaptcha_response_field" name="recaptcha_response_field" />
+
+               <div><a href="javascript:Recaptcha.reload()">Get another CAPTCHA</a></div>
+               <div class="recaptcha_only_if_image"><a href="javascript:Recaptcha.switch_type('audio')">Get an audio CAPTCHA</a></div>
+               <div class="recaptcha_only_if_audio"><a href="javascript:Recaptcha.switch_type('image')">Get an image CAPTCHA</a></div>
+
+               <div><a href="javascript:Recaptcha.showhelp()">Help</a></div>
+
+             </div>
+
+             <script type="text/javascript" src="<?php echo ($_SERVER['HTTPS'] == 'on' ? 'https' : 'http'); ?>://www.google.com/recaptcha/api/challenge?k=6Lf5csUSAAAAANpnlW6B3l8siTY_CEkWEix-sK7s"></script>
+             <noscript>
+               <iframe src="<?php echo ($_SERVER['HTTPS'] == 'on' ? 'https' : 'http'); ?>://www.google.com/recaptcha/api/noscript?k=6Lf5csUSAAAAANpnlW6B3l8siTY_CEkWEix-sK7s" height="300" width="500" frameborder="0"></iframe><br />
+               <textarea name="recaptcha_challenge_field" rows="3" cols="40"></textarea>
+               <input type="hidden" name="recaptcha_response_field" value="manual_challenge">
+             </noscript>

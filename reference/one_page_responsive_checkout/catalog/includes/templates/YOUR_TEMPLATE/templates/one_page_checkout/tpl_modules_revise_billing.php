@@ -1,13 +1,7 @@
-<?php if (isset($_SESSION['billto'])) { ?>
-      <?php
-      // ** BEGIN PAYPAL EXPRESS CHECKOUT **
-      $is_in_special_checkout = false;
-      if (isset($payment_modules) && is_object($payment_modules) && method_exists($payment_modules, 'in_special_checkout')) {
-        $is_in_special_checkout = $payment_modules->in_special_checkout();
-      }
-
-      if (!$is_in_special_checkout) {
-      // ** END PAYPAL EXPRESS CHECKOUT **
+ <?php if (isset($_SESSION['billto'])) { ?>
+      <?php // ** BEGIN PAYPAL EXPRESS CHECKOUT **
+            if (!$payment_modules->in_special_checkout()) {
+            // ** END PAYPAL EXPRESS CHECKOUT ** 
       ?>
         <div id="checkoutBillto" class="address-container">
 <?php
@@ -26,9 +20,8 @@
 				echo '<div class="nmx-buttons"><a id="linkCheckoutPaymentAddr" href="' . zen_href_link(FILENAME_OPRC_CHECKOUT_BILLING_ADDRESS, '', 'SSL') . ' #checkoutPayAddressDefault' . '">' . BUTTON_CHANGE_ADDRESS_ALT . '</a></div>';
 			  ?>
 
-      <?php
-      // ** BEGIN PAYPAL EXPRESS CHECKOUT **
-      }
-      // ** END PAYPAL EXPRESS CHECKOUT **
+      <?php // ** BEGIN PAYPAL EXPRESS CHECKOUT **
+            }
+            // ** END PAYPAL EXPRESS CHECKOUT ** 
       ?>
     <?php } ?>

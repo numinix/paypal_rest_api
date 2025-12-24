@@ -24,44 +24,42 @@
  * Observer class used to redirect to the Easy Sign-up page
  *
  */
-if (!class_exists('GiftVouchersObserver', false)) {
-    class GiftVouchersObserver extends base
-    {
-      function __construct()
-      {
-        global $zco_notifier;
-        $zco_notifier->attach($this, array('NOTIFY_LOGIN_SUCCESS'));
-        $zco_notifier->attach($this, array('NOTIFY_LOGIN_SUCCESS_VIA_NO_ACCOUNT'));
-        $zco_notifier->attach($this, array('NOTIFY_LOGIN_SUCCESS_VIA_OPRC_CREATE_ACCOUNT'));
-        $zco_notifier->attach($this, array('NOTIFY_LOGIN_SUCCESS_VIA_CREATE_ACCOUNT'));
-      }
+class GiftVouchersObserver extends base 
+{
+  function GiftVouchersObserver()
+  {
+    global $zco_notifier;
+    $zco_notifier->attach($this, array('NOTIFY_LOGIN_SUCCESS'));
+    $zco_notifier->attach($this, array('NOTIFY_LOGIN_SUCCESS_VIA_NO_ACCOUNT'));
+    $zco_notifier->attach($this, array('NOTIFY_LOGIN_SUCCESS_VIA_OPRC_CREATE_ACCOUNT'));
+    $zco_notifier->attach($this, array('NOTIFY_LOGIN_SUCCESS_VIA_CREATE_ACCOUNT'));    
+  }
+  
+  function update(&$class, $eventID, $paramsArray) {
+    global $messageStack, $db, $messageStack;
+    // if a gift voucher has been redeemed but not yet credited, credit it now
+    if (OPRC_STATUS == 'true' && isset($_SESSION['gv_id'])) {
+      // Update redeem status
+      $gv_query = "INSERT INTO  " . TABLE_COUPON_REDEEM_TRACK . "(coupon_id, customer_id, redeem_date, redeem_ip)
+                   VALUES (:couponID, :customersID, now(), :remoteADDR)";
 
-      function update(&$class, $eventID, $paramsArray) {
-        global $messageStack, $db, $messageStack;
-        // if a gift voucher has been redeemed but not yet credited, credit it now
-        if (OPRC_STATUS == 'true' && isset($_SESSION['gv_id'])) {
-          // Update redeem status
-          $gv_query = "INSERT INTO  " . TABLE_COUPON_REDEEM_TRACK . "(coupon_id, customer_id, redeem_date, redeem_ip)
-                       VALUES (:couponID, :customersID, now(), :remoteADDR)";
+      $gv_query = $db->bindVars($gv_query, ':customersID', $_SESSION['customer_id'], 'integer');
+      $gv_query = $db->bindVars($gv_query, ':couponID', $_SESSION['gv_id'], 'integer');
+      $gv_query = $db->bindVars($gv_query, ':remoteADDR', zen_get_ip_address(), 'string');
+      $db->Execute($gv_query);
 
-          $gv_query = $db->bindVars($gv_query, ':customersID', $_SESSION['customer_id'], 'integer');
-          $gv_query = $db->bindVars($gv_query, ':couponID', $_SESSION['gv_id'], 'integer');
-          $gv_query = $db->bindVars($gv_query, ':remoteADDR', zen_get_ip_address(), 'string');
-          $db->Execute($gv_query);
+      $gv_update = "UPDATE " . TABLE_COUPONS . "
+                    SET coupon_active = 'N'
+                    WHERE coupon_id = :couponID";
 
-          $gv_update = "UPDATE " . TABLE_COUPONS . "
-                        SET coupon_active = 'N'
-                        WHERE coupon_id = :couponID";
+      $gv_update = $db->bindVars($gv_update, ':couponID', $_SESSION['gv_id'], 'integer');
+      $db->Execute($gv_update);
 
-          $gv_update = $db->bindVars($gv_update, ':couponID', $_SESSION['gv_id'], 'integer');
-          $db->Execute($gv_update);
-
-          zen_gv_account_update($_SESSION['customer_id'], $_SESSION['gv_id']);
-          $_SESSION['gv_id'] = '';
-
-          $messageStack->add_session('header', VOUCHER_REDEEMED, 'success');
-        }
-      }
+      zen_gv_account_update($_SESSION['customer_id'], $_SESSION['gv_id']);
+      $_SESSION['gv_id'] = '';
+      
+      $messageStack->add_session('header', VOUCHER_REDEEMED, 'success');
     }
+  }
 }
 // eof

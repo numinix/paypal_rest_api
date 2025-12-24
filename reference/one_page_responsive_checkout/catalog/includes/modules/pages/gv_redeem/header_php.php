@@ -2,38 +2,15 @@
 /**
  * GV redeem
  *
- * @copyright Copyright 2003-2024 Zen Cart Development Team
+ * @package page
+ * @copyright Copyright 2003-2007 Zen Cart Development Team
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
- * @version $Id: Zcwilt 2024 Jan 31 Modified in v2.0.0-beta1 $
- */
-/**
- * @var queryFactory $db
- * @var messageStack $messageStack
- * @var notifier $zco_notifier
+ * @version $Id: header_php.php 3 2012-07-08 21:11:34Z numinix $
  */
 
-// added to stop guest accounts from accessing this page
-$zco_notifier->notify('NOTIFY_HEADER_REGISTERED_USERS_ONLY'); // OPRC
-
-$zco_notifier->notify('NOTIFY_HEADER_START_GV_REDEEM');
-
-require(DIR_WS_MODULES . zen_get_module_directory('require_languages.php'));
-
-$_GET['gv_no'] = $_GET['gv_no'] ?? '';
-$_GET['goback'] = '';
-
-$_GET['gv_no'] = zen_sanitize_string(trim($_GET['gv_no']));
-
-// if the customer is not logged on, redirect them to the login page
-if (!zen_is_logged_in() || zen_in_guest_checkout()) {
-  $_SESSION['navigation']->set_snapshot();
-  $messageStack->add_session('login', ERROR_GV_CREATE_ACCOUNT, 'error');
-  zen_redirect(zen_href_link(FILENAME_LOGIN, (isset($_GET['gv_no']) ? 'gv_no=' . preg_replace('/[^0-9.,%]/', '', $_GET['gv_no']) : '' ), 'SSL'));
-}
-
-$message = TEXT_INVALID_GV;
-
+// added to stop guest accounts from accessing this page 
+$zco_notifier->notify('NOTIFY_HEADER_REGISTERED_USERS_ONLY');
 
 // check for a voucher number in the url
 if (isset($_GET['gv_no'])) {
@@ -56,8 +33,8 @@ if (isset($_GET['gv_no'])) {
     $redeem = $db->Execute($redeem_query);
 
     if ($redeem->RecordCount() == 0 ) {
+      // check for required session variables
       $_SESSION['gv_id'] = $coupon->fields['coupon_id'];
-      $message = sprintf(TEXT_VALID_GV, $currencies->format($coupon->fields['coupon_amount']));
       $error = false;
     } else {
       $error = true;
@@ -66,7 +43,14 @@ if (isset($_GET['gv_no'])) {
 } else {
   zen_redirect(zen_href_link(FILENAME_DEFAULT));
 }
-if (!$error) {
+
+// if the customer is not logged on, redirect them to the login page
+if (!$_SESSION['customer_id']) {
+  $_SESSION['navigation']->set_snapshot();
+  zen_redirect(zen_href_link(FILENAME_LOGIN, '', 'SSL'));
+}
+
+if ((!$error) && ($_SESSION['customer_id'])) {
   // Update redeem status
   $gv_query = "INSERT INTO  " . TABLE_COUPON_REDEEM_TRACK . "(coupon_id, customer_id, redeem_date, redeem_ip)
                VALUES (:couponID, :customersID, now(), :remoteADDR)";
@@ -87,9 +71,16 @@ if (!$error) {
   $_SESSION['gv_id'] = '';
 }
 
-$temp = $current_page_base;
-$current_page_base = 'lang.' . $current_page_base;
 require(DIR_WS_MODULES . zen_get_module_directory('require_languages.php'));
-$current_page_base = $temp;
-
 $breadcrumb->add(NAVBAR_TITLE);
+
+// prepare message for display in template:
+$message = sprintf(TEXT_VALID_GV, $currencies->format($coupon->fields['coupon_amount']));
+
+if ($error) {
+  // if we get here then either the URL gv_no param was not set or it was invalid
+  // so output a message.
+  $message = TEXT_INVALID_GV;
+}
+
+?>

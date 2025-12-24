@@ -10,33 +10,13 @@
  */
 ?>
 <script type="text/javascript"><!--
-  var oprcSubmitWrapperSelector = '#js-submit-new-address, #js-submit-chosen-address';
-  var oprcSubmitElementSelector = 'button, input[type="submit"], input[type="image"], .cssButton';
-  var oprcCheckoutAddressForm = 'form[name="checkout_address"]';
-
-  jQuery(document).on('click', oprcSubmitWrapperSelector + ' ' + oprcSubmitElementSelector, function() {
-    var $submitWrapper = jQuery(this).closest(oprcSubmitWrapperSelector);
-
-    if (!$submitWrapper.length) {
-      return;
-    }
-
-    var wrapperId = $submitWrapper.attr('id');
-    var $form = $submitWrapper.closest(oprcCheckoutAddressForm);
-
-    if ($form.length && wrapperId) {
-      $form.data('oprcActiveSubmitWrapper', wrapperId);
-    }
-
-    if ($submitWrapper.is('#js-submit-chosen-address')) {
-      $submitWrapper.addClass('is-submitted');
-    }
+  jQuery(document).on('click', '#js-submit-chosen-address [type="submit"]', function(e) {
+    jQuery(e.target).parent().addClass('is-submitted');
   });
 
   function check_new_address(form_name) {
     jQuery('.validation').remove();
     jQuery('.missing').removeClass('missing');
-    jQuery('#newAddressContainer .js-new-address-error').remove();
     if (jQuery('#js-submit-chosen-address').hasClass('is-submitted')) {
       jQuery('#js-submit-chosen-address').removeClass('is-submitted');
       return true;
@@ -53,21 +33,13 @@
     <?php if (ACCOUNT_GENDER == 'true') echo '  check_radio("gender", "' . OPRC_ENTRY_GENDER_ERROR . '");' . "\n"; ?>
 
     if ($('.addressEntry').length == <?php echo MAX_ADDRESS_BOOK_ENTRIES; ?>) {
-      var $container = jQuery('#newAddressContainer');
-      if ($container.length) {
-        var $message = jQuery('<div/>', {
-          'class': 'disablejAlert alert validation js-new-address-error',
-          role: 'alert',
-          'aria-live': 'polite'
-        }).append(
-          jQuery('<div/>', {
-            'class': 'messageStackError',
-            text: '<?php echo OPRC_ENTRY_EXCEEDED_ACCOUNTS_ERROR; ?>'
-          })
-        );
-        $container.prepend($message);
-      }
-      error = true;
+      window.alert('<?php echo OPRC_ENTRY_EXCEEDED_ACCOUNTS_ERROR; ?>');
+      $( "#newAddressContainer" )
+          .prepend( "<div class='messageStackError larger'>" + '<?php echo OPRC_ENTRY_EXCEEDED_ACCOUNTS_ERROR; ?>' +"</div><br>");
+    }
+
+    else {
+      $( ".messageStackError").hide();
     }
 
     <?php if ((int)ENTRY_FIRST_NAME_MIN_LENGTH > 0) { ?>
@@ -88,7 +60,7 @@
     <?php if ((int)ENTRY_CITY_MIN_LENGTH > 0) { ?>
     check_input("city", <?php echo (int)ENTRY_CITY_MIN_LENGTH; ?>, "<?php echo OPRC_ENTRY_CITY_ERROR; ?>");
     <?php } ?>
-    <?php if (ACCOUNT_STATE == 'true' && (int)ENTRY_STATE_MIN_LENGTH > 0) { ?>
+    <?php if (ACCOUNT_STATE == 'true') { ?>
     if (jQuery('[name="state"]').hasClass("visibleField") && jQuery('[name="zone_id"]').val() == "") {
       check_input("state", <?php echo ENTRY_STATE_MIN_LENGTH; ?>, "<?php echo addslashes(OPRC_ENTRY_STATE_ERROR); ?>");
     } else if (jQuery('[name=state]').attr("disabled") == "disabled") {

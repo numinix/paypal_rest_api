@@ -35,7 +35,7 @@ function check_form_registration(form_name) {
   check_input("city", <?php echo ENTRY_CITY_MIN_LENGTH; ?>, "<?php echo addslashes(OPRC_ENTRY_CITY_ERROR); ?>");
 <?php } ?>
 
-<?php if (ACCOUNT_STATE == 'true' && (int)ENTRY_STATE_MIN_LENGTH > 0) echo '  if (!jQuery(\'[name="state"]\').attr("disabled") == "disabled" && jQuery(\'[name="zone_id"]\').val() == "") check_input("state", ' . ENTRY_STATE_MIN_LENGTH . ', "' . addslashes(OPRC_ENTRY_STATE_ERROR) . '")' . "\n" . '  else if (jQuery(\'[name=state]\').attr("disabled") == "disabled") check_select("zone_id", "", "' . addslashes(OPRC_ENTRY_STATE_ERROR_SELECT) . '");' . "\n"; ?>
+<?php if (ACCOUNT_STATE == 'true') echo '  if (!jQuery(\'[name="state"]\').attr("disabled") == "disabled" && jQuery(\'[name="zone_id"]\').val() == "") check_input("state", ' . ENTRY_STATE_MIN_LENGTH . ', "' . addslashes(OPRC_ENTRY_STATE_ERROR) . '")' . "\n" . '  else if (jQuery(\'[name=state]\').attr("disabled") == "disabled") check_select("zone_id", "", "' . addslashes(OPRC_ENTRY_STATE_ERROR_SELECT) . '");' . "\n"; ?>
 
   check_select("zone_country_id", "", "<?php echo addslashes(OPRC_ENTRY_COUNTRY_ERROR); ?>");
 
@@ -66,7 +66,7 @@ if (!jQuery('#shippingAddress-checkbox').is(':checked')) {
   check_input("city_shipping", <?php echo ENTRY_CITY_MIN_LENGTH; ?>, "<?php echo addslashes(OPRC_ENTRY_CITY_ERROR); ?>");
 <?php } ?>
 
-<?php if (ACCOUNT_STATE == 'true' && (int)ENTRY_STATE_MIN_LENGTH > 0) echo '  if (!jQuery(\'[name="state_shipping"]\').attr("disabled") == "disabled" && jQuery(\'[name="zone_id_shipping"]\').val() == "") check_input("state_shipping", ' . ENTRY_STATE_MIN_LENGTH . ', "' . addslashes(OPRC_ENTRY_STATE_ERROR) . '")' . "\n" . '  else if (jQuery(\'[name="state_shipping"]\').attr("disabled") == "disabled") check_select("zone_id_shipping", "", "' . addslashes(OPRC_ENTRY_STATE_ERROR_SELECT) . '");' . "\n"; ?>
+<?php if (ACCOUNT_STATE == 'true') echo '  if (!jQuery(\'[name="state_shipping"]\').attr("disabled") == "disabled" && jQuery(\'[name="zone_id_shipping"]\').val() == "") check_input("state_shipping", ' . ENTRY_STATE_MIN_LENGTH . ', "' . addslashes(OPRC_ENTRY_STATE_ERROR) . '")' . "\n" . '  else if (jQuery(\'[name="state_shipping"]\').attr("disabled") == "disabled") check_select("zone_id_shipping", "", "' . addslashes(OPRC_ENTRY_STATE_ERROR_SELECT) . '");' . "\n"; ?>
 
   check_select("zone_country_id_shipping", "", "<?php echo addslashes(OPRC_ENTRY_COUNTRY_ERROR); ?>");
 
@@ -77,62 +77,29 @@ if (!jQuery('#shippingAddress-checkbox').is(':checked')) {
 <?php } ?>
 <?php if ((int)ENTRY_PASSWORD_MIN_LENGTH > 0) { ?>
   var cowoaCheckbox = jQuery('input[name="cowoa-checkbox"]'),
-    cowoaRadioOff = jQuery('input#cowoa-radio-off'),
-    cowoaRadioOn = jQuery('input#cowoa-radio-on');
+      cowoaCheckboxChecked = false,
+      cowoaRadioOff = jQuery('input#cowoa-radio-off'),
+      cowoaRadioOffChecked = false;
 
-  var cowoaCheckboxChecked = cowoaCheckbox.length > 0 && cowoaCheckbox.is(':checked');
-  var cowoaRadioOffChecked = cowoaRadioOff.length > 0 && cowoaRadioOff.is(':checked');
-  var cowoaRadioOnChecked = cowoaRadioOn.length > 0 && cowoaRadioOn.is(':checked');
-
-  // Determine if a password is required
-  var askForPassword = false;
-
-  // If the cowoa checkbox is present and not checked, set askForPassword to true
-  if (cowoaCheckbox.length > 0 && !cowoaCheckboxChecked) {
-      askForPassword = true;
+  if(cowoaCheckbox.length > 0)  {
+    cowoaCheckboxChecked = jQuery('input[name="cowoa-checkbox"]').val() == 'true' ? false : true;
+  }
+  
+  if(cowoaRadioOff.length > 0) {
+    cowoaRadioOffChecked = cowoaRadioOff.is(':checked');
   }
 
-  // If the cowoa radio buttons are present and cowoaRadioOn is not checked,
-  // and cowoaRadioOff is checked, set askForPassword to true
-  if (cowoaRadioOn.length > 0 && cowoaRadioOff.length > 0) {
-      if (!cowoaRadioOnChecked && cowoaRadioOffChecked) {
-          askForPassword = true;
-      }
-  }
-
-  if (askForPassword == false) {
-    // clear password-register field
-    jQuery('#password-register').val('');
-    // clear password-confirmation field
-    jQuery('#password-confirmation').val('');
-  }
-
-  if (askForPassword) {
-      console.log('ask-for-pass');
-      check_password("password-register", "password-confirmation", <?php echo (int)ENTRY_PASSWORD_MIN_LENGTH; ?>, "<?php echo addslashes(ENTRY_PASSWORD_ERROR); ?>", "<?php echo addslashes(ENTRY_PASSWORD_ERROR_NOT_MATCHING); ?>");
+  // if guest is set to be the default way, 
+  if (cowoaCheckboxChecked || (cowoaRadioOffChecked && !cowoaRadioOffChecked.hasClass('hiddenField')) || (cowoaCheckbox.length == 0 && !cowoaCheckbox.hasClass('hiddenField'))) {
+    console.log('ask-for-pass');
+    check_password("password-register", "password-confirmation", <?php echo (int)ENTRY_PASSWORD_MIN_LENGTH; ?>, "<?php echo addslashes(ENTRY_PASSWORD_ERROR); ?>", "<?php echo addslashes(ENTRY_PASSWORD_ERROR_NOT_MATCHING); ?>");
   }
 <?php } ?>
   if (error == true) {
     jQuery('#hideregistrationBack').after('<div class="disablejAlert registrationError">' + oprcLoginValidationErrorMessage + '</div>');
-    
-    // Scroll to the first validation error with proper error handling
-    var $firstValidation = jQuery(".validation:first");
-    if ($firstValidation.length > 0) {
-      var $scrollTarget = $firstValidation.siblings('label:first');
-      if ($scrollTarget.length === 0) {
-        $scrollTarget = $firstValidation;
-      }
-      
-      if ($scrollTarget.length > 0) {
-        var targetOffset = $scrollTarget.offset();
-        if (targetOffset) {
-          jQuery('html, body').animate({
-            scrollTop: targetOffset.top - 100
-          }, 500);
-        }
-      }
-    }
-    
+    jQuery('html, body').animate({
+      scrollTop: jQuery(".validation:first").siblings('label:first').offset().top
+    }, 0);
     return false;
   } else {
     submitted = true;

@@ -29,10 +29,7 @@ if ($_SESSION['cart']->count_contents() <= 0) {
     }
   }
 
-  $temp = $current_page_base;
-  $current_page_base = 'lang.' . $current_page_base;
-  require(DIR_WS_MODULES . zen_get_module_directory('require_languages.php'));
-  $current_page_base = $temp;
+require(DIR_WS_MODULES . zen_get_module_directory('require_languages.php'));
 
 require(DIR_WS_CLASSES . 'order.php');
 $order = new order;

@@ -22,7 +22,7 @@ if (!$sniffer->field_exists(TABLE_CUSTOMERS, 'customers_browser')) $db->Execute(
 
 $db->Execute("INSERT INTO " . TABLE_CONFIGURATION . " (configuration_title, configuration_tab, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, last_modified, date_added, use_function, set_function) VALUES
             ('One Page Responsive Checkout', '', 'OPRC_STATUS', 'true', 'Activate One Page Responsive Checkout?', " . $configuration_group_id . ", 20, NOW(), NOW(), NULL, 'zen_cfg_select_option(array(\"true\", \"false\"),'),
-            ('One Page Checkout', '', 'OPRC_ONE_PAGE', 'true', 'Activate One Page Checkout?<br />Default = false (enables confirmation page)', " . $configuration_group_id . ", 20, NOW(), NOW(), NULL, 'zen_cfg_select_option(array(\"true\", \"false\"),'),
+            ('One Page Checkout', '', 'OPRC_ONE_PAGE', 'true', 'Activate One Page Checkout?<br />Default = false (disables confirmation page)', " . $configuration_group_id . ", 20, NOW(), NOW(), NULL, 'zen_cfg_select_option(array(\"true\", \"false\"),'),
             ('Use AJAX on Checkout Submit', '', 'OPRC_AJAX_CONFIRMATION_STATUS', 'true', 'Should OPRC use Ajax to submit the final confirmation? (Note: if having issues, try setting this to false)', " . $configuration_group_id . ", 20, NOW(), NOW(), NULL, 'zen_cfg_select_option(array(\"true\", \"false\"),'),             
             
             ('Down for Maintenance', 'Maintenance', 'OPRC_MAINTENANCE', 'false', 'Put the checkout down for maintenance?  The website will still be usable.', " . $configuration_group_id . ", 1, NOW(), NOW(), NULL, 'zen_cfg_select_option(array(\"true\", \"false\"),'),

@@ -21,19 +21,18 @@
 //  $Id: class.virtual_guest.php 3 2012-07-08 21:11:34Z numinix $
 //
 
-if (!class_exists('virtualGuestObserver')) {
 class virtualGuestObserver extends base {
-        public function __construct() {
-                global $zco_notifier;
-                $zco_notifier->attach($this, array('NOTIFY_CHECKOUT_PROCESS_AFTER_SEND_ORDER_EMAIL'));
-        }
-
-        public function update(&$class, $eventID, $paramsArray) {
-          global $messageStack, $db;
+	function virtualGuestObserver() {
+		global $zco_notifier;
+		$zco_notifier->attach($this, array('NOTIFY_CHECKOUT_PROCESS_AFTER_SEND_ORDER_EMAIL'));    
+	}
+	
+	function update(&$class, $eventID, $paramsArray) {
+   	  global $messageStack, $db;
       if (OPRC_STATUS == 'true' && isset($_SESSION['COWOA']) && $_SESSION['COWOA'] == true && $_SESSION['cart']->get_content_type() != 'physical' && OPRC_NOACCOUNT_VIRTUAL == 'false') {
         unset($_SESSION['COWOA']);
         //convert to full account
-        include_once(zen_get_file_directory(DIR_WS_LANGUAGES . $_SESSION['language'] . '/lang.', FILENAME_PASSWORD_FORGOTTEN, 'false'));
+        include_once(zen_get_file_directory(DIR_WS_LANGUAGES . $_SESSION['language'] . '/', FILENAME_PASSWORD_FORGOTTEN, 'false'));
         $new_password = zen_create_random_value( (ENTRY_PASSWORD_MIN_LENGTH > 0 ? ENTRY_PASSWORD_MIN_LENGTH : 5) );
         $crypted_password = zen_encrypt_password($new_password);
         $check_customer_query = "SELECT customers_firstname, customers_lastname, customers_password, customers_email_address
@@ -59,7 +58,6 @@ class virtualGuestObserver extends base {
 
         $messageStack->add_session('header', SUCCESS_PASSWORD_CREATED, 'success');
       }
-        }
-}
+	}
 }
 // eof

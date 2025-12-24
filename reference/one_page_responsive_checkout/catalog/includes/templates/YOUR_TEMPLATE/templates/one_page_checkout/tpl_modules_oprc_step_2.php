@@ -9,7 +9,7 @@
   }
 
   if ($hideRegistration == 'true') {
-    echo '<div id="easyLogin"' . (!isset($_GET['step']) || $_GET['step'] != 2 ? ' style="display: none"' : '') . '>';
+    echo '<div id="easyLogin"' . ($_GET['step'] != 2 ? ' style="display: none"' : '') . '>';
   } 
 ?> 
 <div id="column1<?php echo $columns; ?>">
@@ -56,31 +56,17 @@
             require($template->get_template_dir('tpl_modules_oprc_contact.php',DIR_WS_TEMPLATE, $current_page_base,'templates/one_page_checkout'). '/tpl_modules_oprc_contact.php'); 
           ?>
           <?php
-            if (OPRC_RECAPTCHA_STATUS == 'true') {
-                $recaptchaConfigured = (trim(OPRC_RECAPTCHA_KEY) !== '' && trim(OPRC_RECAPTCHA_SECRET) !== '');
-                if ($recaptchaConfigured) {
-                    if (!defined('OPRC_RECAPTCHA_SCRIPT_OUTPUT')) {
-                        define('OPRC_RECAPTCHA_SCRIPT_OUTPUT', true);
-                        echo '<script src="https://www.google.com/recaptcha/api.js" async defer></script>';
-                    }
+            if(OPRC_RECAPTCHA_STATUS == 'true') {
           ?>
 
           <!-- Google reCAPTCHA -->
           <div id="securityCheck" class="nmx-box">
             <h3><?php echo ENTRY_SECURITY_CHECK; ?></h3>
-            <div class="g-recaptcha" data-sitekey="<?php echo zen_output_string_protected(OPRC_RECAPTCHA_KEY); ?>" data-theme="<?php echo zen_output_string_protected(OPRC_RECAPTCHA_THEME); ?>"></div>
+            <div class="g-recaptcha" data-sitekey="<?php echo OPRC_RECAPTCHA_KEY; ?>" data-theme="<?php echo OPRC_RECAPTCHA_THEME; ?>"></div>
           </div>
           <!-- end Google reCAPTCHA -->
-
+          
           <?php
-                } else {
-          ?>
-          <div id="securityCheck" class="nmx-box">
-            <h3><?php echo ENTRY_SECURITY_CHECK; ?></h3>
-            <p class="information nmx-mb0"><?php echo zen_output_string_protected(ENTRY_SECURITY_CHECK_RECAPTCHA_MISCONFIGURED); ?></p>
-          </div>
-          <?php
-                }
             }
           ?>
           <?php 
@@ -104,10 +90,16 @@
                 echo zen_draw_hidden_field('oprcType', 'register', 'class="hiddenField"');
               ?>
               <div class="nmx-pull-right"><?php echo (OPRC_CSS_BUTTONS == 'false' ? zen_image_submit(BUTTON_IMAGE_CONTINUE_CHECKOUT, BUTTON_CONTINUE_ALT) : zenCssButton(BUTTON_IMAGE_CONTINUE_CHECKOUT, BUTTON_CONTINUE_ALT, 'submit', 'button_continue_checkout')); ?></div>
-
-              <div class="register-return-link">
-                <a class="register-return-link__anchor" href="<?php echo zen_href_link(FILENAME_ONE_PAGE_CHECKOUT, 'step=1', 'SSL'); ?>"><?php echo zen_output_string(TEXT_RETURN_TO_SIGN_IN); ?></a>
+              
+              <?php
+                if (OPRC_HIDE_REGISTRATION == 'true') {
+              ?>
+              <div id="hideregistrationBack" class="nmx-pull-left">
+                <a class="btn btn-secondary cssButton cssButton--outline btn-outline" href="<?php echo zen_href_link(FILENAME_ONE_PAGE_CHECKOUT, '', 'SSL'); ?>"><?php echo BUTTON_BACK_ALT; ?></a>
               </div>
+              <?php
+                }
+              ?>
           </div>
         </div>
         <!-- end panel body -->
@@ -133,14 +125,11 @@
 <?php
   if ($hideRegistration == 'true') {
     echo '</div>';
-    if (isset($_GET['step']) && $_GET['step'] != 2) {
+    if ($_GET['step'] != 2) {
 ?>
   <script type="text/javascript"><!--//
   document.addEventListener('DOMContentLoaded', function() {
-    var easyLogin = document.getElementById('easyLogin');
-    if (easyLogin) {
-      easyLogin.style.display = 'none';
-    }
+    jQuery('#easyLogin').hide();
   });
   //--></script>
 <?php 

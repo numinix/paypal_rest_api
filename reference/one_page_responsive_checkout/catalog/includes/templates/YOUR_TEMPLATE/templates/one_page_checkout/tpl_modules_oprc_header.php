@@ -11,17 +11,10 @@
 		}
 	?>
 
-        <div class="nmx-checkout-header nmx">
-                <!--bof-branding display-->
-                <div class="nmx-wrapper">
-                        <?php
-                          $checkoutHeaderLogoAlt = defined('HEADER_ALT_TEXT') ? HEADER_ALT_TEXT : STORE_NAME;
-                          $checkoutHeaderLogoSrc = $template->get_template_dir(HEADER_LOGO_IMAGE, DIR_WS_TEMPLATE, $current_page_base, 'images') . '/' . HEADER_LOGO_IMAGE;
-
-                          echo '<a class="nmx-checkout-logo" href="' . HTTP_SERVER . DIR_WS_CATALOG . '">';
-                          echo '<img src="' . $checkoutHeaderLogoSrc . '" alt="' . zen_output_string_protected($checkoutHeaderLogoAlt) . '" />';
-                          echo '</a>';
-                        ?>
+	<div class="nmx-checkout-header">
+		<!--bof-branding display-->
+		<div class="nmx-wrapper">
+			<?php echo '<a class="nmx-checkout-logo" href="' . HTTP_SERVER . DIR_WS_CATALOG . '">' . zen_image($template->get_template_dir(HEADER_LOGO_IMAGE, DIR_WS_TEMPLATE, $current_page_base,'images'). '/' . HEADER_LOGO_IMAGE, HEADER_ALT_TEXT) . '</a>'; ?>
 			<ul class="nmx-checkout-nav nmx-nav--inline">
 				<li><a class="nmx-cart-link" href="<?php echo zen_href_link(FILENAME_SHOPPING_CART, '', 'SSL'); ?>"><span class="nxm-i-cart"></span> <span id="cart-count"><?php echo $_SESSION['cart']->count_contents();?> <?php echo $items; ?>, <?php echo $currencies->format($_SESSION['cart']->show_total()); ?></span></a></li>
 			</ul>

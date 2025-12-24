@@ -1,6 +1,6 @@
 
     <!-- bof modified for STRIN: Alert for backorders in cart -->
-    <?php if (isset($_SESSION['backorders']) && zen_not_null($_SESSION['backorders'])) : ?>
+    <?php if (zen_not_null($_SESSION['backorders'])) : ?>
       <span class="backorders-in-cart-alert messageStackCaution">This cart contains back ordered items. </span>
     <?php endif; ?>
     <!-- eof modified for STRIN: Alert for backorders in cart -->
@@ -14,12 +14,15 @@
         <div id="cartProducts" class="nmx-box">
           <?php // now loop thru all products to display quantity and price ?>
           <?php
+            //echo '<pre>';
+            //print_r($order->products);
+            //echo '</pre>';
             $colspan = 3;
             $flagAnyOutOfStock = false;  
             for ($i=0; $i < sizeof($order->products); $i++) {
               if (STOCK_CHECK == 'true') {
                 $attributes = array();
-                if (isset($order->products[$i]['attributes']) && sizeof($order->products[$i]['attributes']) > 0) {
+                if (sizeof($order->products[$i]['attributes']) > 0) {
                   foreach ($order->products[$i]['attributes'] as $attribute) {
                     $attributes[$attribute['option_id']] = $attribute['value_id'];
                   }
@@ -31,32 +34,22 @@
                 $stockAvailable = zen_get_products_stock($order->products[$i]['id'], $attributes);
                 if (is_array($stockAvailable)) $stockAvailable = $stockAvailable['quantity']; // NPVIM
               }
-              $thumbnail = zen_get_products_image($order->products[$i]['id'], IMAGE_SHOPPING_CART_WIDTH, IMAGE_SHOPPING_CART_HEIGHT);
-              $customUrl = $_SESSION[$order->products[$i]['id'] . 'meta']['products_customily_meta']['previewiconUrl'] ?? '';
-
-              if ($customUrl === '' && isset($order->products[$i]['attributes']) && is_array($order->products[$i]['attributes'])) {
+              $thumbnail = zen_get_products_image($order->products[$i]['id'], 66, 63);
+              if (isset($order->products[$i]['attributes'])) {
+                //echo '<!-- ' . print_r($order->products[$i]['attributes']) . ' -->';
                 foreach ($order->products[$i]['attributes'] as $attribute) {
-                  if (!isset($attribute['option_id']) || !isset($attribute['value_id'])) {
-                    continue;
-                  }
-
-                  $attributes_image = $db->Execute("SELECT attributes_image
-                                                    FROM " . TABLE_PRODUCTS_ATTRIBUTES . "
+                  // get the attributes image using the options_id and options_values_id
+                  $attributes_image = $db->Execute("SELECT attributes_image 
+                                                    FROM " . TABLE_PRODUCTS_ATTRIBUTES . " 
                                                     WHERE products_id = " . (int)$order->products[$i]['id'] . "
                                                     AND options_id = " . (int)$attribute['option_id'] . "
                                                     AND options_values_id = " . (int)$attribute['value_id'] . "
                                                     LIMIT 1;");
-
                   if ($attributes_image->RecordCount() > 0 && $attributes_image->fields['attributes_image'] != '') {
-                    $attributeImageFile = $attributes_image->fields['attributes_image'];
-                    $attributeThumbnail = zen_image(DIR_WS_IMAGES . $attributeImageFile, $order->products[$i]['name'], IMAGE_SHOPPING_CART_WIDTH, IMAGE_SHOPPING_CART_HEIGHT);
-
-                    if (strpos($attributeThumbnail, $attributeImageFile) !== false) {
-                      $thumbnail = $attributeThumbnail;
-                      break;
-                    }
-                  }
-                }
+                    $thumbnail = zen_image(DIR_WS_IMAGES . $attributes_image->fields['attributes_image'], $order->products[$i]['name'], 66, 63);
+                    break;
+                  }  
+                }                                                                                                        
               }
 
           // bof modified for STRIN: custom code for backorders
@@ -74,7 +67,7 @@
             <span class="nmx-accordion-title js-accordion-title">
               <span class="nmx-caac--details">
                 <span>
-                  <?php echo $order->products[$i]['name'] . (($flagStockCheck && $order->products[$i]['qty'] > $stockAvailable) ? '' : ''); ?>
+                  <?php echo $order->products[$i]['qty']; ?> x <?php echo $order->products[$i]['name'] . (($flagStockCheck && $order->products[$i]['qty'] > $stockAvailable) ? '' : ''); ?>
                 </span>
                 <?php
                 // bof modified for STRIN: custom code for backorders
@@ -87,7 +80,7 @@
                 ?>
               </span>
               <span class="nmx-caac--total">
-                <?php echo $order->products[$i]['qty']; ?> x <?php echo $currencies->display_price($order->products[$i]['final_price'], $order->products[$i]['tax'], $order->products[$i]['qty']); ?>
+                <?php echo $currencies->display_price($order->products[$i]['final_price'], $order->products[$i]['tax'], $order->products[$i]['qty']); ?>
               </span>
             </span>
             <?php } ?>
@@ -98,7 +91,7 @@
                 </td>
                 <td class="nmx-cart-details">
                   <?php if(OPRC_CHECKOUT_SHOPPING_CART_DISPLAY_DEFAULT == "fully expanded") { ?>
-                    <?php echo $order->products[$i]['name'] . (($flagStockCheck && $order->products[$i]['qty'] > $stockAvailable) ? '' : ''); ?>
+                    <?php echo $order->products[$i]['qty']; ?> x <?php echo $order->products[$i]['name'] . (($flagStockCheck && $order->products[$i]['qty'] > $stockAvailable) ? '' : ''); ?>
                   
                     <?php
                     // bof modified for STRIN: custom code for backorders
@@ -127,7 +120,7 @@
                 </td>
                 <td class="nmx-tar nmx-cart-total">
                   <?php if(OPRC_CHECKOUT_SHOPPING_CART_DISPLAY_DEFAULT == "fully expanded") { ?>
-                    <?php echo $order->products[$i]['qty']; ?> x <?php echo $currencies->display_price($order->products[$i]['final_price'], $order->products[$i]['tax'], $order->products[$i]['qty']); ?>
+                    <?php echo $currencies->display_price($order->products[$i]['final_price'], $order->products[$i]['tax'], $order->products[$i]['qty']); ?>
                     <br>
                     <a class="removeProduct remove-product" href="<?php echo zen_href_link(FILENAME_ONE_PAGE_CHECKOUT, 'action=remove_product&product_id=' . $order->products[$i]['id'], 'SSL'); ?>">
                       <?php echo BUTTON_REMOVE_OPRC_REMOVE_CHECKOUT; ?>
@@ -169,7 +162,7 @@
             }
             
             //update order object with the session shipping info to display correctly in the ot_shipping box
-            if(is_object($GLOBALS['ot_shipping']) && is_object($order) && isset($_SESSION['shipping']) && zen_not_null($_SESSION['shipping'])){
+            if(is_object($GLOBALS['ot_shipping']) && is_object($order) && zen_not_null($_SESSION['shipping'])){
                 
                 $order->info['shipping_method'] = $_SESSION['shipping']['title'];
                 $order->info['shipping_module_code'] = $_SESSION['shipping']['id'];

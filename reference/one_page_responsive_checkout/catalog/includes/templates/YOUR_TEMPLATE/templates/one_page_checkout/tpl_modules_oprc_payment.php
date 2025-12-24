@@ -1,8 +1,8 @@
 <?php if ($_SESSION['cart']->count_contents() > 0 && isset($_SESSION['customer_id'])) {  ?>
 <div id="paymentMethodContainer" class="columnInner">
-<?php //if (isset($credit_covers) && !$credit_covers && (!isset($_SESSION['credit_covers']) || !$_SESSION['credit_covers'])) { ?>
+  <?php if (!$credit_covers && !$_SESSION['credit_covers']) { ?>
   <h3><?php echo TABLE_HEADING_PAYMENT_METHOD; ?></h3>
-  <div class="boxContents oprc-section-panel">
+  <div class="boxContents">
     <?php
       // GOOGLE CHECKOUT
       foreach($payment_modules->modules as $pm_code => $pm) {
@@ -41,30 +41,7 @@
           $radio_buttons = 0;
           for ($i=0, $n=sizeof($selection); $i<$n; $i++) {
         ?>
-      <?php
-        $paymentIdClass = preg_replace('/[^a-z0-9_-]/i', '', $selection[$i]['id']);
-      ?>
-      <?php
-        $hasPaymentFields = (isset($selection[$i]['fields']) && is_array($selection[$i]['fields']));
-        $isSelectedPayment = (isset($_SESSION['payment']) && $selection[$i]['id'] == $_SESSION['payment']);
-        $paymentMethodClasses = array(
-          'payment-method',
-          'payment-method-item',
-          'cf',
-          $paymentIdClass
-        );
-
-        if ($hasPaymentFields) {
-          $paymentMethodClasses[] = 'payment-method--has-form';
-        }
-
-        if ($isSelectedPayment) {
-          $paymentMethodClasses[] = 'payment-method--selected';
-        }
-
-        $paymentMethodClassAttribute = implode(' ', array_filter($paymentMethodClasses));
-      ?>
-      <div class="<?php echo zen_output_string_protected($paymentMethodClassAttribute); ?>">
+      <div class="payment-method cf">
         <?php 
           if ($messageStack->size($selection[$i]['id']) > 0) {
             echo '<div class="disablejAlert">';
@@ -87,7 +64,7 @@
             ?>
             <!-- end radio input -->
             
-            <label class="payment-method-item-label" for="<?php echo 'pmt-'. $selection[$i]['id'] .''; ?>">
+            <label for="<?php echo 'pmt-'. $selection[$i]['id'] .''; ?>">
               <!-- method name -->
               <?php echo $selection[$i]['module']; ?>
               <!-- end method name -->
@@ -160,8 +137,12 @@
           }
         ?>
     </div>
+    <div id="js-submit-payment" class="nmx-panel-footer nmx-buttons">
+      <span class="nmx-de"><?php echo (OPRC_CSS_BUTTONS == 'false' ? zen_image_submit(BUTTON_IMAGE_CONTINUE_CHECKOUT, BUTTON_CONTINUE_ALT, 'submit', $button_class) : zenCssButton(BUTTON_IMAGE_CONTINUE_CHECKOUT, BUTTON_CONTINUE_ALT, 'submit', $button_class)); ?></span>
+      <span class="nmx-ml"><?php echo (OPRC_CSS_BUTTONS == 'false' ? zen_image_submit(BUTTON_IMAGE_CONTINUE_CHECKOUT, BUTTON_CONTINUE_ALT, 'submit', $button_class) : zenCssButton(BUTTON_IMAGE_CONTINUE_CHECKOUT, BUTTON_CONTINUE_ALT, 'submit', $button_class)); ?></span>
+    </div>
   </div>
-
-  <?php //} ?>
+  
+  <?php } ?>
 </div>
 <?php } ?>

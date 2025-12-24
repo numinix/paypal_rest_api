@@ -24,39 +24,29 @@
  * Observer class used to redirect to the OPRC page
  *
  */
-if (!class_exists('OPRCLogoffObserver', false)) {
-    class OPRCLogoffObserver extends base
-    {
-            function __construct()
-            {
-                    global $zco_notifier;
-                    $zco_notifier->attach($this, array('NOTIFY_HEADER_START_LOGOFF'));
-                    $zco_notifier->attach($this, array('NOTIFY_HEADER_START_CHECKOUT_SUCCESS'));
+class OPRCLogoffObserver extends base 
+{
+	function OPRCLogoffObserver()
+	{
+		global $zco_notifier;
+		$zco_notifier->attach($this, array('NOTIFY_HEADER_START_LOGOFF'));
+        $zco_notifier->attach($this, array('NOTIFY_TEMPLATE_END_CHECKOUT_SUCCESS'));
+	}
+	
+	function update(&$class, $eventID, $paramsArray) {
+	  if (OPRC_STATUS == 'true') {
+        switch($_GET['main_page']) {
+          case FILENAME_LOGOFF:
+            setcookie('email_address', 0, time() - 3600);
+            setcookie('password', 0, time() - 3600);
+            break;
+          case FILENAME_CHECKOUT_SUCCESS:
+            if (isset($_SESSION['COWOA']) && $_SESSION['COWOA']) {
+              zen_session_destroy();
             }
-
-            function update(&$class, $eventID, $paramsArray) {
-              if (OPRC_STATUS != 'true') {
-                return;
-              }
-
-              switch ($eventID) {
-                case 'NOTIFY_HEADER_START_LOGOFF':
-                  if (isset($_GET['main_page']) && $_GET['main_page'] === FILENAME_LOGOFF) {
-                    setcookie('email_address', 0, time() - 3600);
-                    setcookie('password', 0, time() - 3600);
-                  }
-                  break;
-                case 'NOTIFY_HEADER_START_CHECKOUT_SUCCESS':
-                  if (isset($_SESSION['COWOA']) && $_SESSION['COWOA']) {
-                    register_shutdown_function(function () {
-                      if (session_status() === PHP_SESSION_ACTIVE) {
-                        zen_session_destroy();
-                      }
-                    });
-                  }
-                  break;
-              }
-            }
-    }
+            break;
+        }
+	  }
+	}
 }
 // eof

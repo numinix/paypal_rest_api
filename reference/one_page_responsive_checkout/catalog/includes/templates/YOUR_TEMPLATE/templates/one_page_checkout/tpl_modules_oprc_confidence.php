@@ -1,5 +1,5 @@
 <?php if (OPRC_CONFIDENCE == 'true') { ?>
-  <div id="confidence" class="nmx-panel nmx-wrapper nmx">
+  <div id="confidence" class="nmx-panel nmx-wrapper">
     
     <div class="nmx-panel-head">
       <?php echo HEADING_CONFIDENCE; ?>

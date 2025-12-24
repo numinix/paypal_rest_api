@@ -9,21 +9,19 @@
  * @version $Id: one_page_checkout.php 3 2012-07-08 21:11:34Z numinix $
  */
  
-if (!class_exists('oprc', false)) {
-  class oprc {
-
-    function collect_posts($post) {
-      foreach ($post as $key => $value) {
-        $_SESSION[$key] = $value;
-      }
+class oprc {
+  
+  function collect_posts($post) {
+    foreach ($post as $key => $value) {
+      $_SESSION[$key] = $value;
     }
-
-    function create_posts($session) {
-      foreach ($session as $key => $value) {
-        $_POST[$key] = $value;
-      }
-    }
-
   }
-}
+  
+  function create_posts($session) {
+    foreach ($session as $key => $value) {
+      $_POST[$key] = $value;
+    }
+  }
+  
+} 
 ?>

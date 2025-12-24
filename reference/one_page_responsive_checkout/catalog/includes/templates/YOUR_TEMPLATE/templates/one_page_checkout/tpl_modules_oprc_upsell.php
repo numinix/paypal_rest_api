@@ -3,7 +3,7 @@
     include(DIR_WS_MODULES . zen_get_module_directory(FILENAME_ONE_PAGE_CHECKOUT_UPSELL)); 
     if ($flag_show_checkout_upsell) { 
 ?>
-<div id="qcUpSell" class="nmx-panel nmx-wrapper nmx">
+<div id="qcUpSell" class="nmx-panel nmx-wrapper">
   <div class="nmx-panel-head">
     <?php echo HEADING_ONE_PAGE_CHECKOUT_UPSELL; ?>
   </div>

@@ -16,7 +16,7 @@
   require(DIR_WS_MODULES . zen_get_module_directory('checkout_address_book.php'));
 ?>
 
-<div class="nmx-row nmx-cf address-grid">
+<div class="nmx-row nmx-cf">
   <?php
     $top_addresses_start_after = 0;
     if (zen_count_customer_address_book_entries() > MAX_ADDRESS_BOOK_ENTRIES) {
@@ -33,21 +33,12 @@
         } else {
           echo '      <div class="moduleRow">' . "\n";
         }
-  ?>
-          <div class="custom-control custom-radio">
-            <?php
-              echo zen_draw_radio_field('address', $addresses->fields['address_book_id'], ($addresses->fields['address_book_id'] == $defaultSelected), 'id="name-' . $addresses->fields['address_book_id'] . '"');
-              $address_label = trim($addresses->fields['address_title']);
-              $address_label = $address_label !== '' ? zen_output_string_protected($address_label) : '';
-              $address_telephone = '';
-              if ($addresses->fields['telephone'] != '') {
-                $address_telephone = '<br />' . zen_output_string_protected($addresses->fields['telephone']);
-              }
-            ?>
+  ?>      
+          <div class="custom-control custom-checkbox">
+            <?php echo zen_draw_radio_field('address', $addresses->fields['address_book_id'], ($addresses->fields['address_book_id'] == $defaultSelected), 'id="name-' . $addresses->fields['address_book_id'] . '"'); ?>
             <label for="<?php echo 'name-' . $addresses->fields['address_book_id'] . ''; ?>">
-              <?php if ($address_label !== '') { ?>
-              <span class="address-label"><?php echo $address_label; ?></span>
-              <?php } ?>
+              <?php echo ($addresses->fields['address_title'] != '' ? zen_output_string_protected($addresses->fields['address_title']) : zen_output_string_protected($addresses->fields['firstname'] . ' ' . $addresses->fields['lastname'])); ?>
+              <?php $address_telephone = ''; if ($addresses->fields['telephone'] != '') $address_telephone = '<br />' . $addresses->fields['telephone']; ?>
               <span class="address">
                 <?php echo zen_address_format(zen_get_address_format_id($addresses->fields['country_id']), $addresses->fields, true, ' ', '<br />') . $address_telephone; ?>
               </span>
@@ -55,7 +46,7 @@
             </label>
           </div>
         </div>
-
+        
       </div>
   <?php
       }

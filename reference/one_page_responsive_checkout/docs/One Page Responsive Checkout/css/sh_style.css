@@ -1,5 +1,6 @@
 pre.sh_sourceCode {
-  color: #ffffff;
+  background-color: white;
+  color: black;
   font-style: normal;
   font-weight: normal;
 }
@@ -14,7 +15,7 @@ pre.sh_sourceCode .sh_comment { color:#808080;/*brown*/ font-style: italic; }  /
 pre.sh_sourceCode .sh_number { color: purple; }                                /* literal numbers */
 pre.sh_sourceCode .sh_preproc { color:#023550;/*darkblue*/ font-weight: bold; }          /* e.g., #include, import */
 pre.sh_sourceCode .sh_symbol { color:#04bfbf;/*darkred*/}                               /* e.g., <, >, + */
-pre.sh_sourceCode .sh_function { color: #ffffff; font-weight: bold; }            /* function calls and declarations */
+pre.sh_sourceCode .sh_function { color: black; font-weight: bold; }            /* function calls and declarations */
 pre.sh_sourceCode .sh_cbracket { color:#ff6425; /*red*/; }                     /* block brackets (e.g., {, }) */
 pre.sh_sourceCode .sh_todo { font-weight: bold; background-color: cyan; }      /* TODO and FIXME */
 

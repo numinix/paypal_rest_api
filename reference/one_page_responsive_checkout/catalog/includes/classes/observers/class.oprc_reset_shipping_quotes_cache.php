@@ -20,39 +20,33 @@
 // +----------------------------------------------------------------------+
 //  $Id: class.oprc_reset_shipping_quotes_cache.php 3 2012-07-08 21:11:34Z numinix $
 //
-require_once(DIR_FS_CATALOG . 'includes/functions/extra_functions/oprc_shipping_cache.php');
-
 /**
  * Observer class used to redirect to the Easy Sign-up page
  *
  */
-if (!class_exists('resetShippingQuotes', false)) {
-    class resetShippingQuotes extends base
-    {
-        public function __construct()
-        {
-            global $zco_notifier;
-            $zco_notifier->attach(
-                $this,
-                array(
-                    'NOTIFY_MODULE_END_CHECKOUT_NEW_ADDRESS',
-                    'NOTIFIER_CART_ADD_CART_END',
-                    'NOTIFIER_CART_UPDATE_QUANTITY_END',
-                    'NOTIFIER_CART_REMOVE_END',
-                    'NOTIFY_LOGIN_SUCCESS',
-                    'NOTIFY_LOGIN_SUCCESS_VIA_NO_ACCOUNT',
-                    'NOTIFY_LOGIN_SUCCESS_VIA_OPRC_CREATE_ACCOUNT',
-                    'NOTIFY_HEADER_START_UPDATE_AJAX_ESTIMATOR',
-                    'NOTIFY_HEADER_START_SHOPPING_CART'
-                )
-            );
-        }
-
-        public function update(&$class, $eventID, $paramsArray)
-        {
-            oprc_initialize_shipping_quotes_cache();
-            $_SESSION['shipping_quotes']['hashes'] = array();
-        }
-    }
+class resetShippingQuotes extends base 
+{
+	function resetShippingQuotes()
+	{
+		global $zco_notifier;
+		$zco_notifier->attach(
+            $this, 
+            array(
+                'NOTIFY_MODULE_END_CHECKOUT_NEW_ADDRESS', 
+                'NOTIFIER_CART_ADD_CART_END', 
+                'NOTIFIER_CART_UPDATE_QUANTITY_END', 
+                'NOTIFIER_CART_REMOVE_END', 
+                'NOTIFY_LOGIN_SUCCESS', 
+                'NOTIFY_LOGIN_SUCCESS_VIA_NO_ACCOUNT', 
+                'NOTIFY_LOGIN_SUCCESS_VIA_OPRC_CREATE_ACCOUNT',
+                'NOTIFY_HEADER_START_UPDATE_AJAX_ESTIMATOR',
+                'NOTIFY_HEADER_START_SHOPPING_CART'
+            )
+        );
+	}
+	
+	function update(&$class, $eventID, $paramsArray) {
+		unset($_SESSION['shipping_quotes']);
+	}
 }
 // eof

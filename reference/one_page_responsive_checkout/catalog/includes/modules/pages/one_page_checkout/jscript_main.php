@@ -15,9 +15,40 @@
 var selected;
 var submitter = null;
 
+function popupWindow(url) {
+  window.open(url,'popupWindow','toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,copyhistory=no,width=450,height=320,screenX=150,screenY=150,top=150,left=150')
+}
+
+function couponpopupWindow(url) {
+  window.open(url,'couponpopupWindow','toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,copyhistory=no,width=450,height=320,screenX=150,screenY=150,top=150,left=150')
+}
+
 function submitFunction(gv, total) {
   if (gv >= total) {
-    submitter = 1;
+    submitter = 1;  
+  }
+}
+
+function methodSelect(theMethod) {
+  if (document.getElementById(theMethod)) {
+    document.getElementById(theMethod).checked = 'checked';
+  }
+}
+
+function expandToWindow(element) {
+  var margin = 10; 
+
+  if (element.style.height < window.innerHeight) { 
+    element.style.height = window.innerHeight - (2 * margin) 
+  }
+}
+
+// paulm fix to only submit the form once
+function submitonce(form){
+  if (document.form.btn_submit) {
+    document.form.btn_submit.disabled = true;
+    setTimeout('button_timeout()', 4000);
+    document.form.submit();
   }
 }
 //-->

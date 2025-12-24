@@ -10,5 +10,6 @@
 // DEFINTELY DON'T EDIT THIS FILE UNLESS YOU KNOW WHAT YOU ARE DOING!
 
 // OPRC Checkout Billing Address Filename Defines
-define('FILENAME_OPRC_CHECKOUT_BILLING_ADDRESS', 'oprc_checkout_billing_address');
-define('FILENAME_DEFINE_OPRC_CHECKOUT_BILLING_ADDRESS', 'define_oprc_checkout_billing_address');
+	define('FILENAME_OPRC_CHECKOUT_BILLING_ADDRESS', 'oprc_checkout_billing_address');
+	define('FILENAME_DEFINE_OPRC_CHECKOUT_BILLING_ADDRESS', 'define_oprc_checkout_billing_address');
+?>

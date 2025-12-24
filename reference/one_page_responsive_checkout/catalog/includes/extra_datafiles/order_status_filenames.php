@@ -8,7 +8,5 @@
  */
 
 // About Us Filename Defines
-if(!defined('FILENAME_ORDER_STATUS'))
   define('FILENAME_ORDER_STATUS', 'order_status');
-
 //eof

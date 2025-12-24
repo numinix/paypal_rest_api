@@ -9,16 +9,11 @@
 */                                             
                                                             
 $loaders[] = array(
-    'name' => 'OPRC - Address Forms Styles',
-    'conditions' => array(
-        'pages' => array(
-            FILENAME_OPRC_CHECKOUT_BILLING_ADDRESS,
-            FILENAME_OPRC_CHECKOUT_SHIPPING_ADDRESS,
-        ),
-    ),
-    'jscript_files' => array(),
-    'css_files' => array(
-        'one_page_checkout.css' => array('order' => 1),
-        'auto_loaders/one_page_checkout_overrides.css' => array('order' => 99),
-    ),
-);
+	'conditions' => array('pages' => array(FILENAME_OPRC_CHECKOUT_BILLING_ADDRESS, FILENAME_OPRC_CHECKOUT_SHIPPING_ADDRESS)),
+		'jscript_files' => array(
+		),
+		'css_files' => array(
+	      	'one_page_checkout.css' => 1,
+	      	'auto_loaders/one_page_checkout_overrides.css' => 99
+	    )
+	); 

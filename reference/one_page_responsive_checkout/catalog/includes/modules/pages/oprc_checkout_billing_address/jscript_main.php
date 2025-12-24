@@ -31,86 +31,7 @@ function check_form_optional(form_name) {
 var form = "";
 var submitted = false;
 var error = false;
-var inlineFieldErrorClass = 'js-inline-field-error';
-var formLevelErrorClass = 'js-form-level-error';
-
-function clearInlineErrors(targetForm) {
-  if (!window.jQuery) {
-    return;
-  }
-
-  var $form = jQuery(targetForm);
-  if (!$form.length) {
-    return;
-  }
-
-  $form.find('.' + inlineFieldErrorClass).remove();
-  $form.find('.' + formLevelErrorClass).remove();
-  $form.find('.missing').removeClass('missing');
-}
-
-function appendFieldError($elements, message) {
-  if (!window.jQuery || !$elements || !$elements.length) {
-    return;
-  }
-
-  var $target = jQuery($elements[$elements.length - 1]);
-  $elements.addClass('missing');
-
-  var $existing = $target.next('.' + inlineFieldErrorClass);
-  if ($existing.length) {
-    $existing.remove();
-  }
-
-  var $message = jQuery('<div/>', {
-    'class': 'disablejAlert alert validation ' + inlineFieldErrorClass,
-    role: 'alert',
-    'aria-live': 'polite'
-  }).append(
-    jQuery('<div/>', {
-      'class': 'messageStackError',
-      text: message
-    })
-  );
-
-  $target.after($message);
-}
-
-function appendFormError(targetForm, messages) {
-  if (!window.jQuery || !messages || !messages.length) {
-    return;
-  }
-
-  var $form = jQuery(targetForm);
-  if (!$form.length) {
-    return;
-  }
-
-  var $container = $form.find('.' + formLevelErrorClass);
-  if (!$container.length) {
-    $container = jQuery('<div/>', {
-      'class': 'disablejAlert alert validation ' + formLevelErrorClass,
-      role: 'alert',
-      'aria-live': 'polite'
-    });
-    $form.prepend($container);
-  } else {
-    $container.empty();
-  }
-
-  for (var i = 0; i < messages.length; i++) {
-    $container.append(
-      jQuery('<div/>', {
-        'class': 'messageStackError',
-        text: messages[i]
-      })
-    );
-  }
-
-  jQuery('html, body').animate({
-    scrollTop: $container.offset().top
-  }, 0);
-}
+var error_message = "";
 
 function check_input(field_name, field_size, message) {
   if (form.elements[field_name] && (form.elements[field_name].type != "hidden")) {
@@ -118,10 +39,8 @@ function check_input(field_name, field_size, message) {
     var field_value = form.elements[field_name].value;
 
     if (field_value == '' || field_value.length < field_size) {
+      error_message = error_message + "* " + message + "\n";
       error = true;
-      if (window.jQuery) {
-        appendFieldError(jQuery(form.elements[field_name]), message);
-      }
     }
   }
 }
@@ -140,10 +59,8 @@ function check_radio(field_name, message) {
     }
 
     if (isChecked == false) {
+      error_message = error_message + "* " + message + "\n";
       error = true;
-      if (window.jQuery) {
-        appendFieldError(jQuery(radio), message);
-      }
     }
   }
 }
@@ -153,10 +70,8 @@ function check_select(field_name, field_default, message) {
     var field_value = form.elements[field_name].value;
 
     if (field_value == field_default) {
+      error_message = error_message + "* " + message + "\n";
       error = true;
-      if (window.jQuery) {
-        appendFieldError(jQuery(form.elements[field_name]), message);
-      }
     }
   }
 }
@@ -167,15 +82,11 @@ function check_password(field_name_1, field_name_2, field_size, message_1, messa
     var confirmation = form.elements[field_name_2].value;
 
     if (password == '' || password.length < field_size) {
+      error_message = error_message + "* " + message_1 + "\n";
       error = true;
-      if (window.jQuery) {
-        appendFieldError(jQuery(form.elements[field_name_1]), message_1);
-      }
     } else if (password != confirmation) {
+      error_message = error_message + "* " + message_2 + "\n";
       error = true;
-      if (window.jQuery) {
-        appendFieldError(jQuery(form.elements[field_name_2]), message_2);
-      }
     }
   }
 }
@@ -187,20 +98,14 @@ function check_password_new(field_name_1, field_name_2, field_name_3, field_size
     var password_confirmation = form.elements[field_name_3].value;
 
     if (password_current == '' ) {
+      error_message = error_message + "* " + message_1 + "\n";
       error = true;
-      if (window.jQuery) {
-        appendFieldError(jQuery(form.elements[field_name_1]), message_1);
-      }
     } else if (password_new == '' || password_new.length < field_size) {
+      error_message = error_message + "* " + message_2 + "\n";
       error = true;
-      if (window.jQuery) {
-        appendFieldError(jQuery(form.elements[field_name_2]), message_2);
-      }
     } else if (password_new != password_confirmation) {
+      error_message = error_message + "* " + message_3 + "\n";
       error = true;
-      if (window.jQuery) {
-        appendFieldError(jQuery(form.elements[field_name_3]), message_3);
-      }
     }
   }
 }
@@ -215,15 +120,13 @@ function check_state(min_length, min_message, select_message) {
 
 function check_form(form_name) {
   if (submitted == true) {
-    if (window.jQuery) {
-      appendFormError(form_name, ["<?php echo JS_ERROR_SUBMITTED; ?>"]);
-    }
+    alert("<?php echo JS_ERROR_SUBMITTED; ?>");
     return false;
   }
 
   error = false;
   form = form_name;
-  clearInlineErrors(form_name);
+  error_message = "<?php echo JS_ERROR; ?>";
 
 <?php if (ACCOUNT_GENDER == 'true') echo '  check_radio("gender", "' . ENTRY_GENDER_ERROR . '");' . "\n"; ?>
 
@@ -249,7 +152,7 @@ function check_form(form_name) {
 <?php if ((int)ENTRY_CITY_MIN_LENGTH > 0) { ?>
   check_input("city", <?php echo (int)ENTRY_CITY_MIN_LENGTH; ?>, "<?php echo ENTRY_CITY_ERROR; ?>");
 <?php } ?>
-<?php if (ACCOUNT_STATE == 'true' && (int)ENTRY_STATE_MIN_LENGTH > 0) { ?>
+<?php if (ACCOUNT_STATE == 'true') { ?>
   check_state(<?php echo (int)ENTRY_STATE_MIN_LENGTH . ', "' . ENTRY_STATE_ERROR . '", "' . ENTRY_STATE_ERROR_SELECT; ?>");
 <?php } ?>
 
@@ -265,9 +168,7 @@ function check_form(form_name) {
 <?php } ?>
 
   if (error == true) {
-    if (window.jQuery) {
-      appendFormError(form_name, ["<?php echo JS_ERROR; ?>"]);
-    }
+    alert(error_message);
     return false;
   } else {
     submitted = true;

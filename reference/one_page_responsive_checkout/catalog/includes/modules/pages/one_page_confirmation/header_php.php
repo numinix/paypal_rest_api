@@ -11,15 +11,10 @@
 
 // This should be first line of the script:
 $zco_notifier->notify('NOTIFY_HEADER_START_CHECKOUT_CONFIRMATION');
-$flag_disable_left = true;
-$flag_disable_right = true;
 require_once(DIR_WS_CLASSES . 'http_client.php');
 $messageStack->reset();
 // all action to this page are not ajax
 $_SESSION['request'] = $_POST['request'] = $_GET['request'] = 'nonajax'; // set this so that error messages from oprc_confirmation will display full html
-if (!defined('OPRC_CONFIRMATION_AUTOSUBMIT')) {
-  define('OPRC_CONFIRMATION_AUTOSUBMIT', false);
-}
 // if there is nothing in the customers cart, redirect them to the shopping cart page
 if ($_SESSION['cart']->count_contents() <= 0) {
     zen_redirect(zen_href_link(FILENAME_TIME_OUT));
@@ -223,7 +218,7 @@ $flagAnyOutOfStock = false;
 $stock_check = array();
 if (STOCK_CHECK == 'true') {
   // bof numinix products variants  - check stock
-  if( defined('NMX_PRODUCT_VARIANTS_STATUS') && NMX_PRODUCT_VARIANTS_STATUS == 'true' ){
+  if( NMX_PRODUCT_VARIANTS_STATUS == 'true' ){
     // get option_id/option_value_id array
     $products_attributes = array();
     for ($i=0, $n=sizeof($order->products); $i<$n; $i++) {
@@ -314,10 +309,7 @@ if ($order->content_type == 'virtual') {
   //zen_redirect(zen_href_link(FILENAME_OPRC_CONFIRMATION, '', 'SSL'));
 //}
 
-  $temp = $current_page_base;
-  $current_page_base = 'lang.' . $current_page_base;
-  require(DIR_WS_MODULES . zen_get_module_directory('require_languages.php'));
-  $current_page_base = $temp;
+require(DIR_WS_MODULES . zen_get_module_directory('require_languages.php'));
 $breadcrumb->add(NAVBAR_TITLE_1, zen_href_link(FILENAME_ONE_PAGE_CHECKOUT, '', 'SSL', false));
 $breadcrumb->add(NAVBAR_TITLE_2);
 

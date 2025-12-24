@@ -14,22 +14,17 @@
 ?>
 <div class="centerColumn nmx nmx-plugin nmx-plugin--oprc nmx-wrapper" id="checkoutPayAddressDefault">
 
-  <?php
-    if (!isset($addresses_count)) {
-        $addresses_count = zen_count_customer_address_book_entries();
-    }
-    $can_show_address_book = ($addresses_count > 0 && (!isset($_SESSION['COWOA']) || !$_SESSION['COWOA']));
-  ?>
-
   <?php echo zen_draw_form('checkout_address', zen_href_link(FILENAME_CHECKOUT_PAYMENT_ADDRESS, '', 'SSL'), 'post', 'onsubmit="return check_form_optional(checkout_address);"'); ?>
   <h1 id="checkoutPayAddressDefaultHeading"><?php echo HEADING_TITLE; ?></h1>
   <?php if ($messageStack->size('checkout_address') > 0) echo $messageStack->output('checkout_address'); ?>
-
+  
   <ul class="nmx-tabs-nav oprc-tabs-nav" id="nmx-tabs-nav">
-    <?php if ($can_show_address_book) { ?>
-    <li class="nmx-tac"><a class="change-address-tab" href="#nmx-panel-list-addresses"><?php echo TABLE_HEADING_NEW_PAYMENT_ADDRESS; ?></a></li>
+    <?php
+      if ($addresses_count > 1 && !$_SESSION['COWOA'] && MAX_ADDRESS_BOOK_ENTRIES > 1) {
+    ?>
+    <li class="nmx-tac"><a class="nmx-panel-head" href="#nmx-panel-list-addresses"><?php echo TABLE_HEADING_NEW_PAYMENT_ADDRESS; ?></a></li>
     <?php } ?>
-    <li class="nmx-tac"><a class="change-address-tab" href="#nmx-panel-new-address"><?php echo TITLE_PLEASE_SELECT; ?></a></li>
+    <li class="nmx-tac"><a class="nmx-panel-head" href="#nmx-panel-new-address"><?php echo TITLE_PLEASE_SELECT; ?></a></li>
   </ul>
 
   <div class="address-wrap">
@@ -46,15 +41,21 @@
     //} else {
       //echo TEXT_ADDRESS_BOOK_FULL; 
     //}
-    if ($can_show_address_book) {
+    if ($addresses_count > 1 && !$_SESSION['COWOA'] && MAX_ADDRESS_BOOK_ENTRIES > 1) {
 ?>
-        <!-- nmx panel -->
-        <div class="nmx-panel nmx-tab-content" id="nmx-panel-list-addresses">
+	<!-- nmx panel -->
+	<div class="nmx-panel nmx-tab-content" id="nmx-panel-list-addresses">
 
-        <!-- panel body -->
-            <div id="addressBook" class="nmx-panel-body">
-                <div id="addressBookContainer" class="changeAddressFormContainer">
-                                <?php
+    	<!-- panel head -->
+    	<div class="nmx-panel-head">
+    		<?php echo TABLE_HEADING_NEW_PAYMENT_ADDRESS; ?>
+    	</div>
+    	<!-- end panel head -->
+
+    	<!-- panel body -->
+	    <div id="addressBook" class="nmx-panel-body"> 
+	      	<div id="addressBookContainer">
+				<?php
 				      require($template->get_template_dir('tpl_modules_oprc_checkout_address_book.php', DIR_WS_TEMPLATE, $current_page_base,'templates'). '/' . 'tpl_modules_oprc_checkout_address_book.php');
 				?>
         <div class="nmx-buttons">
