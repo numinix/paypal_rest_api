@@ -1220,17 +1220,37 @@ class paypalr extends base
                 'current_page_base' => $current_page_base,
                 'redirect_page' => $this->determinePayerActionRedirectPage($current_page_base, $_POST),
                 'savedPosts' => $_POST,
+                'payer_action_link' => $action_link,
             ];
-            $this->log->write('pre_confirmation_check, sending the payer-action off to PayPal.', true, 'after');
-            if ($this->isOpcAjaxRequest()) {
-                header('Content-Type: application/json');
-                echo json_encode([
-                    'status' => 'redirect',
-                    'redirect_url' => $action_link,
-                ]);
-                exit;
+            $_SESSION['PayPalRestful']['Order']['status'] = $response_status;
+
+            $should_auto_redirect = true;
+            if (defined('OPRC_ONE_PAGE') && OPRC_ONE_PAGE === 'false') {
+                $oprc_confirmation_page = '';
+                if (defined('FILENAME_OPRC_CONFIRMATION')) {
+                    $oprc_confirmation_page = FILENAME_OPRC_CONFIRMATION;
+                } elseif (defined('FILENAME_ONE_PAGE_CONFIRMATION')) {
+                    $oprc_confirmation_page = FILENAME_ONE_PAGE_CONFIRMATION;
+                }
+                if ($oprc_confirmation_page !== '' && $current_page_base === $oprc_confirmation_page) {
+                    $should_auto_redirect = false;
+                }
             }
-            zen_redirect($action_link);
+
+            if ($should_auto_redirect === true) {
+                $this->log->write('pre_confirmation_check, sending the payer-action off to PayPal.', true, 'after');
+                if ($this->isOpcAjaxRequest()) {
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'status' => 'redirect',
+                        'redirect_url' => $action_link,
+                    ]);
+                    exit;
+                }
+                zen_redirect($action_link);
+            }
+
+            $this->log->write('pre_confirmation_check, deferring payer-action until confirmation submit.', true, 'after');
             return;
         }
 
@@ -1777,6 +1797,15 @@ class paypalr extends base
 
         $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
         $wallet_user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';
+        $payer_action_link = $_SESSION['PayPalRestful']['Order']['PayerAction']['payer_action_link'] ?? '';
+        if (
+            $payer_action_link !== ''
+            && empty($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'])
+            && $wallet_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED
+        ) {
+            $this->log->write('before_process, sending deferred payer-action off to PayPal.', true, 'after');
+            zen_redirect($payer_action_link);
+        }
         $payer_action_fast_path = ($wallet_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
         if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false) {
             $this->log->write('paypalr::before_process, cannot capture/authorize paypal order; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));

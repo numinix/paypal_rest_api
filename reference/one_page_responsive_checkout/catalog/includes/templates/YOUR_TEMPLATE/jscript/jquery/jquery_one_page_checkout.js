@@ -800,8 +800,9 @@ function stickySideMenu() {
 }
 
 function blockPage( reloadShippingQuotes, isCartContentChanged ) {
+  var processingText = (typeof oprcProcessingText !== 'undefined' ? oprcProcessingText : '');
   jQuery.blockUI({
-    message: oprcProcessingText, 
+    message: processingText, 
     css: { 
       border: 'none', 
       padding: '15px', 
