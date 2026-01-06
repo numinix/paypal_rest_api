@@ -283,34 +283,93 @@
               <p>When customers opt to save their cards, retrieve the vault token using <code>paypalr::getVaultedCardsForCustomer()</code> or <code>PayPalRestful\Common\VaultManager::getCustomerVaultedCards()</code> and submit subsequent captures through <code>PayPalRestful\Api\PayPalRestfulApi</code>.</p>
             </li>
           </ol>
+          <h4>Card vaulting behavior</h4>
+          <p class="bodyText"><strong>All card payments are automatically vaulted with PayPal for security and recurring billing support.</strong> The module controls card visibility separately through a <code>visible</code> flag in the vault table:</p>
+          <ul class="bodyList">
+            <li><strong>Visible cards</strong> (<code>visible = 1</code>): Customer explicitly checked &ldquo;Save this card for future checkouts&rdquo; during checkout. These cards appear in the checkout payment selection page (when <code>MODULE_PAYMENT_PAYPALR_ENABLE_VAULT</code> is enabled) and the <code>account_saved_credit_cards</code> page for customer management.</li>
+            <li><strong>Hidden cards</strong> (<code>visible = 0</code>): Customer did not check the save checkbox, but the card is still vaulted for PCI compliance and security best practices, recurring billing and subscription processing, and merchant-initiated transactions (when using <code>$activeOnly = false</code>).</li>
+          </ul>
+          <p class="bodyText">When a customer pays by card, PayPal returns a <code>payment_source.card</code> element that includes the vaulted token. The module saves that response in the vault table via <code>PayPalRestful\Common\VaultManager::saveVaultedCard</code> and raises the <code>NOTIFY_PAYPALR_VAULT_CARD_SAVED</code> observer event so other plugins can react to the new or updated token.</p>
+          <h5>Charging vaulted cards from custom code</h5>
+          <p class="bodyText">Third-party integrations can use the stored information to perform subsequent charges (for example, recurring subscriptions) without asking the customer to re-enter their card details:</p>
+          <ol>
+            <li><strong>Include the payment module&rsquo;s autoloader</strong> before referencing any of its classes:
+              <pre class="sh_php" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/pprAutoload.php';</code></pre>
+            </li>
+            <li><strong>Retrieve the customer&rsquo;s vaulted cards.</strong> The helper <code>paypalr::getVaultedCardsForCustomer($customers_id, $activeOnly = true)</code> returns an array of normalized records (vault identifier, status, masked digits, expiry, billing address, and the original <code>payment_source.card</code> payload).
+              <ul>
+                <li>Use <code>$activeOnly = true</code> (default) to get only visible cards for checkout display.</li>
+                <li>Use <code>$activeOnly = false</code> to get all cards (visible and hidden) for merchant-initiated billing.</li>
+              </ul>
+              You can also call <code>PayPalRestful\Common\VaultManager::getCustomerVaultedCards</code> directly if you prefer.
+            </li>
+            <li><strong>Build a new PayPal order with the vaulted instrument.</strong> Instantiate <code>PayPalRestful\Api\PayPalRestfulApi</code> using the environment credentials returned by <code>paypalr::getEnvironmentInfo()</code>, create an order payload that references the stored <code>vault_id</code>, and then authorize or capture the order. A minimal example that immediately captures a payment:
+              <pre class="sh_php" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>[$clientId, $clientSecret] = paypalr::getEnvironmentInfo();
+$api = new \PayPalRestful\Api\PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $clientId, $clientSecret);
+
+$card = $vaultCards[0]; // Result from step 2
+
+$orderRequest = [
+    'intent' =&gt; 'CAPTURE',
+    'purchase_units' =&gt; [[
+        'amount' =&gt; [
+            'currency_code' =&gt; 'USD',
+            'value' =&gt; '10.00',
+        ],
+    ]],
+    'payment_source' =&gt; [
+        'card' =&gt; [
+            'vault_id' =&gt; $card['vault_id'],
+            'expiry' =&gt; $card['expiry'],
+            'last_digits' =&gt; $card['last_digits'],
+            'billing_address' =&gt; $card['billing_address'],
+            'attributes' =&gt; [
+                'stored_credential' =&gt; [
+                    'payment_initiator' =&gt; 'MERCHANT',
+                    'payment_type' =&gt; 'RECURRING',
+                    'usage' =&gt; 'SUBSEQUENT',
+                ],
+            ],
+        ],
+    ],
+];
+
+$createResponse = $api-&gt;createOrder($orderRequest);
+$captureResponse = $api-&gt;captureOrder($createResponse['id']);</code></pre>
+              <p>Adjust the purchase units, intent, and stored credential attributes to match your billing use case. PayPal&rsquo;s <a href="https://developer.paypal.com/docs/multiparty/seller/checkout/facilitator/vault/" target="_blank" rel="noopener">vault documentation</a> describes additional optional fields such as previous network transaction references.</p>
+            </li>
+            <li><strong>Update the vault record.</strong> After PayPal returns the new capture or authorization, call <code>VaultManager::saveVaultedCard</code> with the updated <code>payment_source.card</code> element so the module records the <code>last_used</code> timestamp and any status changes for future reuse.</li>
+          </ol>
           <h4>Integrated Sign-Up (ISU)</h4>
           <p class="bodyText">Launch the <strong>Complete PayPal setup</strong> button on the Payment Modules page to onboard merchants directly with PayPal. The portal returns credentials to the administrator and records whether the process completed or was cancelled.</p>
           <h4>Recurring products and subscriptions</h4>
-          <p class="bodyText">Leverage PayPal Billing Plans and Subscriptions if you sell memberships or recurring services. The bundled API client exposes the full plan and subscription lifecycle.</p>
+          <p class="bodyText">PayPal Advanced Checkout does not create subscription catalog entries inside Zen Cart automatically, but it exposes the PayPal Billing Plans and Subscriptions REST endpoints so you can build recurring offers without leaving the storefront. The helper lives in <code>PayPalRestful\Api\PayPalRestfulApi</code> and supports plan creation, activation, subscription lifecycle management, and cancellations via dedicated methods.</p>
           <ol class="steps">
             <li>
-              <h4 class="step-title">Publish a PayPal plan</h4>
-              <p>Define the billing cycles using PayPal's developer dashboard or by calling <code>createPlan</code> from a short admin script. Activate the plan before promoting it to customers.</p>
+              <h4 class="step-title">Create a billing product and plan</h4>
+              <p>Use the PayPal developer dashboard or a short script that calls <code>$api-&gt;createPlan()</code> to define pricing, billing cycles, and trial periods. The API class requires the same credentials retrieved via <code>paypalr::getEnvironmentInfo()</code>, so you can reuse the bootstrap code from the vaulted-card example above. Activate the plan with <code>$api-&gt;activatePlan($planId)</code> once PayPal returns the identifier.</p>
             </li>
             <li>
               <h4 class="step-title">Map plans to Zen Cart products</h4>
-              <p>Store the PayPal plan ID in a product attribute or custom table so your checkout observer can look it up when the item is present in the cart.</p>
+              <p>Store the PayPal plan ID in a custom product field (for example, a product meta tag, an attribute, or a dedicated table) so your subscription purchase flow can retrieve it later. Update the product description to explain the billing frequency, renewal price, cancellation policy, and how the subscription appears on the customer&rsquo;s PayPal account.</p>
             </li>
             <li>
-              <h4 class="step-title">Create subscriptions at checkout</h4>
-              <p>Detect the plan-enabled product, instantiate <code>PayPalRestfulApi</code>, and call <code>createSubscription</code> with subscriber details and return URLs. Redirect shoppers to PayPal for approval.</p>
+              <h4 class="step-title">Launch the subscription sign-up</h4>
+              <p>When the customer checks out, detect the subscription product in your cart observer, instantiate <code>PayPalRestfulApi</code>, and call <code>$api-&gt;createSubscription()</code> with the plan ID, subscriber details, and <code>application_context</code> return URLs that point to a dedicated confirmation page. Redirect the customer to the approval link PayPal returns so they can accept the billing agreement.</p>
             </li>
             <li>
-              <h4 class="step-title">Process webhook callbacks</h4>
-              <p>Point PayPal's webhook destination at <code>ppr_webhook.php</code> so the module can validate events. Update your orders or membership records when activation, payment, or cancellation notices arrive.</p>
+              <h4 class="step-title">Handle webhooks and order fulfillment</h4>
+              <p>Configure PayPal to send <code>BILLING.SUBSCRIPTION.ACTIVATED</code>, <code>PAYMENT.SALE.COMPLETED</code>, and related events to <code>ppr_webhook.php</code>. The webhook controller authenticates incoming messages and dispatches them to event handlers, giving you a single place to update order status, extend service periods, or flag delinquencies.</p>
             </li>
             <li>
-              <h4 class="step-title">Offer self-service management</h4>
-              <p>Enable the optional saved-card management page (<code>account_saved_credit_cards</code>) so subscribers can update vault details that PayPal uses for subsequent charges.</p>
+              <h4 class="step-title">Let customers manage stored cards</h4>
+              <p>Direct subscribers to the optional saved-card management page (<code>account_saved_credit_cards</code>) so they can update billing addresses or remove expired cards. The page renders editable vault entries, validates address updates, and issues PATCH requests to PayPal when the customer edits a card.</p>
             </li>
           </ol>
+          <h5>Pause or cancel subscriptions</h5>
+          <p class="bodyText">To pause or cancel an active subscription, call <code>$api-&gt;suspendSubscription()</code> or <code>$api-&gt;cancelSubscription()</code> with the PayPal subscription ID and an explanatory note. Reactivations use <code>$api-&gt;activateSubscription()</code>. Each helper validates the input identifier and sends the appropriate REST call, logging the response for audit purposes.</p>
           <h5>Configure product attributes</h5>
-          <p class="bodyText">Create the subscription attributes in <strong>Catalog &rarr; Option Name Manager</strong> and assign them to each recurring product via the <strong>Attributes Controller</strong>. The observer lowercases and slugifies the option labels, so keep the exact wording shown below.</p>
+          <p class="bodyText">The checkout observer watches each line item that flows through <code>NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_CREATE_ADD_PRODUCTS</code>. A product is treated as a subscription only when it includes the attribute labels listed below. Create the option names in <strong>Catalog &rarr; Option Name Manager</strong> and assign them to the product via the <strong>Attributes Controller</strong> so the order writer copies the values into <code>orders_products_attributes</code>. The observer lowercases and slugifies the option labels, so keep the exact wording shown below.</p>
           <table class="bodyTable">
             <thead>
               <tr>
