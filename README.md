@@ -12,8 +12,6 @@ For complete installation, configuration, usage, and troubleshooting instruction
 
 ## Quick Links
 
-- **Zen Cart Support Thread:** https://www.zen-cart.com/forumdisplay.php?170-PayPal-RESTful-support
-- **Zen Cart Plugin Download:** https://www.zen-cart.com/downloads.php?do=file&id=2382
 - **Project Wiki:** https://github.com/lat9/paypalr/wiki
 
 ## Requirements
