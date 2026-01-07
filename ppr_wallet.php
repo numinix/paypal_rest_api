@@ -1,6 +1,6 @@
 <?php
 /**
- * Wallet helper endpoint for PayPal Advanced Checkout wallets (Google Pay, Apple Pay, Venmo).
+ * Wallet helper endpoint for PayPal Advanced Checkout wallets (Google Pay, Apple Pay, Venmo, Pay Later).
  */
 
 $autoloaderPath = __DIR__ . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
@@ -60,6 +60,7 @@ $moduleMap = [
     'google_pay' => 'paypalr_googlepay',
     'apple_pay' => 'paypalr_applepay',
     'venmo' => 'paypalr_venmo',
+    'paylater' => 'paypalr_paylater',
 ];
 
 if (!array_key_exists($wallet, $moduleMap)) {

@@ -48,7 +48,8 @@ class zcObserverPaypalrestful
             (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS') && MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS === 'True') ||
             (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True') ||
             (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True')
+            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS') && MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS === 'True')
         );
 
         if (!$anyModuleEnabled) {
@@ -484,10 +485,12 @@ class zcObserverPaypalrestful
         $components = ['messages'];
 
         // Add 'buttons' component if any wallet payment method is enabled that uses PayPal Buttons
-        // (Venmo uses buttons with FUNDING.VENMO, PayPal wallet uses buttons with default funding)
+        // (Venmo uses buttons with FUNDING.VENMO, PayPal wallet uses buttons with default funding,
+        // Pay Later uses buttons with FUNDING.PAYLATER)
         $needsButtonsComponent = (
             (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True')
+            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS') && MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS === 'True')
         );
         if ($needsButtonsComponent) {
             $components[] = 'buttons';
@@ -539,7 +542,8 @@ class zcObserverPaypalrestful
                     "PayPal=" . (defined('MODULE_PAYMENT_PAYPALR_STATUS') ? MODULE_PAYMENT_PAYPALR_STATUS : 'n/a') . ", " .
                     "GooglePay=" . (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS : 'n/a') . ", " .
                     "ApplePay=" . (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS : 'n/a') . ", " .
-                    "Venmo=" . (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') ? MODULE_PAYMENT_PAYPALR_VENMO_STATUS : 'n/a') . "\n" .
+                    "Venmo=" . (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') ? MODULE_PAYMENT_PAYPALR_VENMO_STATUS : 'n/a') . ", " .
+                    "PayLater=" . (defined('MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS') ? MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS : 'n/a') . "\n" .
                 "  - SDK URL: " . $sdk_url,
                 true,
                 'before'
