@@ -254,6 +254,69 @@
             <li>Send the policy header before output: <code>header("Content-Security-Policy: script-src 'self' 'nonce-" . $GLOBALS['CSP_NONCE'] . "' https://www.paypal.com https://pay.google.com https://applepay.cdn-apple.com; object-src 'none'; base-uri 'self';");</code></li>
             <li>Apply the nonce to any other inline scripts you render: <code>&lt;script nonce="&lt;?= htmlspecialchars($GLOBALS['CSP_NONCE'], ENT_QUOTES, 'UTF-8') ?&gt;"&gt;...&lt;/script&gt;</code>.</li>
           </ol>
+          <h4>Pay Later payment module</h4>
+          <p class="bodyText">The <strong>PayPal Pay Later</strong> payment module (<code>paypalr_paylater</code>) provides a dedicated checkout option for customers who want to use PayPal&rsquo;s financing options. When enabled, customers see a &ldquo;Pay Later&rdquo; button on the checkout payment page that launches directly into PayPal&rsquo;s Pay Later flow.</p>
+          <h5>Install and configure</h5>
+          <ol>
+            <li>Confirm the primary <code>paypalr</code> module is installed with valid REST credentials.</li>
+            <li>Go to <strong>Modules &rarr; Payment</strong>, select <strong>PayPal Pay Later</strong>, and click <strong>Install</strong>.</li>
+            <li>Enable the module and set its sort order. The module reads the parent API settings automatically.</li>
+            <li>Configure the <strong>PayLater Messaging</strong> setting to control where promotional messaging appears on your storefront.</li>
+          </ol>
+          <h5>How it works</h5>
+          <ul class="bodyList">
+            <li><strong>Separate checkout option:</strong> Pay Later appears as its own payment method alongside PayPal, Venmo, and credit cards.</li>
+            <li><strong>Direct Pay Later flow:</strong> When customers click the Pay Later button, they are taken directly to PayPal&rsquo;s financing options without seeing the standard PayPal wallet interface first.</li>
+            <li><strong>Automatic eligibility:</strong> PayPal determines Pay Later eligibility based on the customer&rsquo;s location, order total, and PayPal account status. The button automatically hides for ineligible customers.</li>
+            <li><strong>Supported currencies:</strong> Pay Later is available for USD, GBP, EUR, and AUD only. The module automatically disables for other currencies.</li>
+          </ul>
+          <h5>Pay Later messaging</h5>
+          <p class="bodyText">The Pay Later module also controls promotional messaging that displays &ldquo;Pay in 4&rdquo; or &ldquo;Pay Monthly&rdquo; offers on your storefront. This messaging informs customers about financing options before they reach checkout, which can accelerate buying decisions and increase conversion rates.</p>
+          <p class="bodyText">Control where Pay Later messaging appears using the <strong>PayLater Messaging</strong> setting in the module configuration:</p>
+          <ul class="bodyList">
+            <li><strong>Checkout:</strong> Displays messaging on checkout pages (payment selection).</li>
+            <li><strong>Shopping Cart:</strong> Displays messaging on the shopping cart page near the cart total.</li>
+            <li><strong>Product Pages:</strong> Displays messaging on individual product detail pages near the product price.</li>
+            <li><strong>Product Listings and Search Results:</strong> Displays messaging on category listings and search results pages.</li>
+          </ul>
+          <p class="bodyText">Select one or more options. The default configuration enables messaging on Checkout, Shopping Cart, and Product Pages.</p>
+          <h5>Template customization</h5>
+          <p class="bodyText">The module automatically detects common price elements and injects Pay Later messaging nearby. If you need custom placement, add an empty container with the ID <code>paypal-message-container</code> where you want the messaging to appear:</p>
+          <pre style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>&lt;div id="paypal-message-container"&gt;&lt;/div&gt;</code></pre>
+          <p class="bodyText">The module searches for this container first. If found, it renders messaging there instead of the default location. Supported page-specific selectors include:</p>
+          <ul class="bodyList">
+            <li><strong>Product pages:</strong> Looks for <code>#productsPriceBottom-card</code>, <code>.add-to-cart-Y</code>, or <code>#productPrices</code>.</li>
+            <li><strong>Shopping cart:</strong> Looks for <code>#shoppingCartDefault</code>, <code>#cart-total</code>, or <code>#cartSubTotal</code>.</li>
+            <li><strong>Checkout:</strong> Looks for <code>#checkout_payment</code>, <code>#checkoutPayment</code>, or <code>#checkoutOrderTotals</code>.</li>
+            <li><strong>Product listings:</strong> Looks for <code>.pl-dp</code> or <code>.list-price</code> elements containing <code>.productBasePrice</code>.</li>
+          </ul>
+          <h5>Advanced customization via observer</h5>
+          <p class="bodyText">For complete control over messaging placement and styling, use the <code>NOTIFY_PAYPAL_PAYLATER_SELECTORS</code> observer hook. Create a custom observer class in <code>includes/classes/observers/</code> (e.g., <code>auto.my_paylater_customizer.php</code>) that attaches to this notification. Your observer receives the current page type and can override the container element, price selector, output element, and message styles:</p>
+          <pre style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>// In includes/classes/observers/auto.my_paylater_customizer.php
+class zcObserverMyPaylaterCustomizer extends base
+{
+    public function __construct()
+    {
+        $this-&gt;attach($this, ['NOTIFY_PAYPAL_PAYLATER_SELECTORS']);
+    }
+
+    public function updateNotifyPaypalPaylaterSelectors(&amp;$class, $eventID, $params, &amp;$containingElement, &amp;$priceSelector, &amp;$outputElement, &amp;$messageStyles)
+    {
+        if ($params['pageType'] === 'product-details') {
+            $containingElement = '.my-custom-price-wrapper';
+            $priceSelector = '.my-price-element';
+            $outputElement = '#my-paylater-container';
+            $messageStyles['text']['align'] = 'left';
+        }
+    }
+}</code></pre>
+          <h5>Troubleshooting</h5>
+          <ul class="bodyList">
+            <li><strong>Pay Later button not appearing:</strong> Verify the store currency is USD, GBP, EUR, or AUD. Ensure the main PayPal Advanced Checkout module is installed and has valid credentials. Check that the Pay Later module is enabled.</li>
+            <li><strong>Messaging not appearing:</strong> Verify the store currency is USD, GBP, EUR, or AUD. Check that the <strong>PayLater Messaging</strong> setting includes the current page type.</li>
+            <li><strong>Messaging in wrong location:</strong> Add a <code>&lt;div id="paypal-message-container"&gt;&lt;/div&gt;</code> element where you want the messaging to appear, or use the observer hook for custom selectors.</li>
+            <li><strong>Customer not eligible:</strong> PayPal determines eligibility based on factors like location, order amount, and customer&rsquo;s PayPal account history. The button will automatically hide for ineligible customers.</li>
+          </ul>
         </div>
       </div>
       <!--EOF CONFIGURATION-->
