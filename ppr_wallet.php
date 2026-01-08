@@ -40,11 +40,7 @@ if (!function_exists('ppr_wallet_sanitize_error_message')) {
     function ppr_wallet_sanitize_error_message($message) {
         // Replace sensitive values while preserving message structure
         // Pattern: password=value becomes password=[REDACTED]
-        $sanitized = preg_replace('/(\bpassword\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $message);
-        $sanitized = preg_replace('/(\bsecret\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitized);
-        $sanitized = preg_replace('/(\bkey\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitized);
-        $sanitized = preg_replace('/(\btoken\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitized);
-        return $sanitized;
+        return preg_replace('/(\b(?:password|secret|key|token)\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $message);
     }
 }
 
