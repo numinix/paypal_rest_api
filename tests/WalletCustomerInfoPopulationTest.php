@@ -86,7 +86,8 @@ if (file_exists($commonPath)) {
     }
     
     // Test 7: Check for error_log fallback when function doesn't exist
-    if (strpos($commonContent, 'zen_update_orders_history not available') === false) {
+    if (strpos($commonContent, 'error_log') === false || 
+        strpos($commonContent, 'zen_update_orders_history not available') === false) {
         $testPassed = false;
         $errors[] = "PayPalCommon: error_log fallback not found";
     } else {
