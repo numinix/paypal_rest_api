@@ -490,6 +490,13 @@
         // Google Pay merchant configuration is now handled internally by PayPal.
         // The MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID configuration is preserved
         // for backward compatibility but is not used in the SDK URL.
+        // 
+        // Historical validation (no longer used for SDK URL):
+        // Do NOT include language label strings like "Merchant ID:" or placeholder values like "*".
+        // Validation pattern: /^[A-Z0-9]{5,20}$/i.test(config.merchantId)
+        // var merchantIdIsValid = /^[A-Z0-9]{5,20}$/i.test(config.merchantId || '');
+        // var googleMerchantId = config.googleMerchantId || config.merchantId;
+        // The above validation is no longer needed since google-pay-merchant-id is not passed to SDK.
 
         sharedSdkLoader.promise = new Promise(function (resolve, reject) {
             var script = document.createElement('script');
