@@ -660,6 +660,13 @@ class paypalr_googlepay extends base
         unset($response['links']);
         $this->orderInfo = $response;
 
+        // -----
+        // Populate customer information from PayPal response to ensure order has valid customer data.
+        // This is especially important when using Google Pay from cart/product page where
+        // customer may not have gone through the normal checkout flow.
+        //
+        $this->populateOrderCustomerInfo($order, $response);
+
         if ($this->paymentIsPending === true) {
             $pending_status = (int)MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID;
             if ($pending_status > 0) {
@@ -691,6 +698,86 @@ class paypalr_googlepay extends base
             $this->orderInfo['admin_alert_needed'] = true;
 
             $this->log->write("==> Google Pay::before_process: Payment status {$payment['status']} received from PayPal; order's status forced to pending.");
+        }
+    }
+
+    /**
+     * Populate order customer information from PayPal response.
+     * This ensures the order has valid customer data when using Google Pay
+     * from cart/product page where customer may not have gone through normal checkout.
+     *
+     * @param object $order The Zen Cart order object
+     * @param array $paypalResponse The PayPal order response from capture/authorize
+     * @return void
+     */
+    protected function populateOrderCustomerInfo($order, array $paypalResponse)
+    {
+        if (!is_object($order)) {
+            return;
+        }
+
+        // Extract customer information from PayPal response
+        $payment_source = $paypalResponse['payment_source']['google_pay'] ?? [];
+        
+        // Get name from payment source
+        $name = $payment_source['name'] ?? [];
+        $first_name = is_array($name) ? ($name['given_name'] ?? '') : '';
+        $last_name = is_array($name) ? ($name['surname'] ?? '') : '';
+        
+        // Get email from payment source
+        $email_address = $payment_source['email_address'] ?? '';
+        
+        // Get billing/shipping address from PayPal order
+        $payer = $paypalResponse['payer'] ?? [];
+        $payer_name = $payer['name'] ?? [];
+        $payer_email = $payer['email_address'] ?? '';
+        
+        // Fallback to payer information if payment_source doesn't have it
+        if ($first_name === '' && isset($payer_name['given_name'])) {
+            $first_name = $payer_name['given_name'];
+        }
+        if ($last_name === '' && isset($payer_name['surname'])) {
+            $last_name = $payer_name['surname'];
+        }
+        if ($email_address === '' && $payer_email !== '') {
+            $email_address = $payer_email;
+        }
+        
+        // Update order customer information if we have data from PayPal
+        if ($email_address !== '') {
+            if (!isset($order->customer) || !is_array($order->customer)) {
+                $order->customer = [];
+            }
+            $order->customer['email_address'] = $email_address;
+            
+            $this->log->write("Google Pay: Updated order customer email to: " . $email_address);
+        }
+        
+        if ($first_name !== '' || $last_name !== '') {
+            if (!isset($order->customer) || !is_array($order->customer)) {
+                $order->customer = [];
+            }
+            if ($first_name !== '') {
+                $order->customer['firstname'] = $first_name;
+            }
+            if ($last_name !== '') {
+                $order->customer['lastname'] = $last_name;
+            }
+            
+            $this->log->write("Google Pay: Updated order customer name to: " . $first_name . " " . $last_name);
+        }
+        
+        // Also update billing information if it's empty/minimal
+        if (isset($order->billing) && is_array($order->billing)) {
+            if (empty($order->billing['firstname']) && $first_name !== '') {
+                $order->billing['firstname'] = $first_name;
+            }
+            if (empty($order->billing['lastname']) && $last_name !== '') {
+                $order->billing['lastname'] = $last_name;
+            }
+            if (empty($order->billing['email_address']) && $email_address !== '') {
+                $order->billing['email_address'] = $email_address;
+            }
         }
     }
 
