@@ -34,6 +34,20 @@ if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart']) || $_SESSION['car
 //
 global $order, $order_total_modules;
 
+// Helper function to sanitize error messages for logging
+// Prevents information disclosure by redacting sensitive values
+if (!function_exists('ppr_wallet_sanitize_error_message')) {
+    function ppr_wallet_sanitize_error_message($message) {
+        // Replace sensitive values while preserving message structure
+        // Pattern: password=value becomes password=[REDACTED]
+        $sanitized = preg_replace('/(\bpassword\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $message);
+        $sanitized = preg_replace('/(\bsecret\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitized);
+        $sanitized = preg_replace('/(\bkey\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitized);
+        $sanitized = preg_replace('/(\btoken\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitized);
+        return $sanitized;
+    }
+}
+
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     // Only suppress non-critical errors - let fatal errors through
     // E_ERROR and E_CORE_ERROR will still halt execution as expected
@@ -46,14 +60,8 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
     }
     
     // Log but don't fail - let the fallback mechanism handle it
-    // Sanitize file path to avoid exposing full system paths
     $sanitizedFile = basename($errfile);
-    // Sanitize error string to avoid exposing sensitive data
-    // Replace sensitive values while preserving message structure
-    $sanitizedError = preg_replace('/(\bpassword\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $errstr);
-    $sanitizedError = preg_replace('/(\bsecret\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedError);
-    $sanitizedError = preg_replace('/(\bkey\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedError);
-    $sanitizedError = preg_replace('/(\btoken\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedError);
+    $sanitizedError = ppr_wallet_sanitize_error_message($errstr);
     
     error_log("PayPal Wallet: Order totals initialization notice: $sanitizedError in $sanitizedFile:$errline");
     return true; // Suppress the error
@@ -75,14 +83,7 @@ try {
     $order_total_modules->pre_confirmation_check();
 } catch (\Exception $e) {
     // Log the error but continue - the observer fallback will use $order->info
-    // Sanitize exception message to avoid exposing sensitive information
-    // Replace sensitive values while preserving message structure
-    $message = $e->getMessage();
-    $sanitizedMessage = preg_replace('/(\bpassword\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $message);
-    $sanitizedMessage = preg_replace('/(\bsecret\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedMessage);
-    $sanitizedMessage = preg_replace('/(\bkey\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedMessage);
-    $sanitizedMessage = preg_replace('/(\btoken\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedMessage);
-    
+    $sanitizedMessage = ppr_wallet_sanitize_error_message($e->getMessage());
     error_log('PayPal Wallet: Order totals initialization exception: ' . $sanitizedMessage);
     // Do not exit - allow the request to continue with the fallback mechanism
 } finally {
