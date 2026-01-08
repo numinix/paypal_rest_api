@@ -367,7 +367,7 @@
      * @returns {Promise} Promise resolving to updated transaction info and shipping options
      */
     function fetchShippingOptions(shippingAddress, selectedShippingOptionId) {
-        console.log('[Google Pay] Fetching shipping options for address:', shippingAddress);
+        console.log('[Google Pay] Fetching shipping options for address - countryCode:', shippingAddress.countryCode, 'postalCode:', shippingAddress.postalCode);
         
         // Normalize the Google Pay address format to match what the server expects
         var normalizedAddress = {
@@ -392,7 +392,11 @@
             requestData.selectedShippingOptionId = selectedShippingOptionId;
         }
         
-        return fetch('ajax/paypalr_wallet.php', {
+        // Use configurable base path for AJAX endpoint to support subdirectory installations
+        var ajaxBasePath = window.paypalrAjaxBasePath || 'ajax/';
+        var ajaxUrl = ajaxBasePath + 'paypalr_wallet.php';
+        
+        return fetch(ajaxUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestData)
@@ -400,7 +404,7 @@
             console.log('[Google Pay] Shipping options response status:', response.status);
             return parseWalletResponse(response);
         }).then(function(data) {
-            console.log('[Google Pay] Shipping options data received:', data);
+            console.log('[Google Pay] Shipping options received - shipping method count:', (data.newShippingOptionParameters && data.newShippingOptionParameters.shippingOptions) ? data.newShippingOptionParameters.shippingOptions.length : 0);
             return data;
         }).catch(function (error) {
             console.error('[Google Pay] Failed to fetch shipping options', error);
@@ -603,7 +607,7 @@
      * @returns {Promise} Promise resolving to updated payment data (newTransactionInfo, newShippingOptionParameters)
      */
     function onPaymentDataChanged(intermediatePaymentData) {
-        console.log('[Google Pay] onPaymentDataChanged called with:', intermediatePaymentData);
+        console.log('[Google Pay] onPaymentDataChanged called - callbackTrigger:', intermediatePaymentData.callbackTrigger);
         
         return new Promise(function(resolve) {
             var shippingAddress = intermediatePaymentData.shippingAddress;
@@ -614,7 +618,7 @@
             if (shippingAddress) {
                 fetchShippingOptions(shippingAddress, selectedShippingOptionId)
                     .then(function(response) {
-                        console.log('[Google Pay] Shipping update response:', response);
+                        console.log('[Google Pay] Shipping update completed - totalPrice:', response.newTransactionInfo ? response.newTransactionInfo.totalPrice : 'N/A');
                         
                         // Check for error response
                         if (response.error) {
