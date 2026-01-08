@@ -25,14 +25,16 @@
     $initialTotal = number_format($currencies->value($_SESSION['cart']->total), 2, '.', '');
     
     // Build SDK URL with components
-    $sdkComponents = 'buttons,applepay';
+    // Note: As of 2025, PayPal SDK no longer accepts merchant-id or intent parameters
+    // Intent is specified when creating the order, not when loading the SDK
+    $sdkComponents = 'buttons,googlepay,applepay';
     $sdkUrl = 'https://www.paypal.com/sdk/js?client-id=' . urlencode($clientId);
     $sdkUrl .= '&components=' . urlencode($sdkComponents);
     $sdkUrl .= '&currency=' . urlencode($currency);
-    $sdkUrl .= '&intent=' . urlencode($intent);
     
-    if (!empty($merchantId)) {
-        $sdkUrl .= '&merchant-id=' . urlencode($merchantId);
+    // Add buyer-country for sandbox mode (required for testing)
+    if ($environment === 'sandbox') {
+        $sdkUrl .= '&buyer-country=US';
     }
 ?>
 
