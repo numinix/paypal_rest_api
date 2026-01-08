@@ -36,7 +36,11 @@ global $order, $order_total_modules;
 
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     // Log but don't fail - let the fallback mechanism handle it
-    error_log("PayPal Wallet: Order totals initialization notice: $errstr in $errfile:$errline");
+    // Sanitize file path to avoid exposing full system paths
+    $sanitizedFile = basename($errfile);
+    // Sanitize error string to avoid exposing sensitive data
+    $sanitizedError = preg_replace('/\b(?:password|secret|key|token)\b.*$/i', '[REDACTED]', $errstr);
+    error_log("PayPal Wallet: Order totals initialization notice: $sanitizedError in $sanitizedFile:$errline");
     return true; // Suppress the error
 });
 
@@ -56,7 +60,9 @@ try {
     $order_total_modules->pre_confirmation_check();
 } catch (\Exception $e) {
     // Log the error but continue - the observer fallback will use $order->info
-    error_log('PayPal Wallet: Order totals initialization exception: ' . $e->getMessage());
+    // Sanitize exception message to avoid exposing sensitive information
+    $sanitizedMessage = preg_replace('/\b(?:password|secret|key|token)\b.*$/i', '[REDACTED]', $e->getMessage());
+    error_log('PayPal Wallet: Order totals initialization exception: ' . $sanitizedMessage);
     // Do not exit - allow the request to continue with the fallback mechanism
 } finally {
     restore_error_handler();
