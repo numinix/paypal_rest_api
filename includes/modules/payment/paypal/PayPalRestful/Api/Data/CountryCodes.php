@@ -234,7 +234,7 @@ class CountryCodes
         'SJ',  //- Svalbard and Jan Mayen Islands
         'SZ',  //- Swaziland
         'SE',  //- Sweden
-        'CH',  //- Switzerland
+        'CH',  //- Switzerland (NOTE: Zen Cart uses 'CH' for China, not Switzerland. See convertCountryCode())
         'SY',  //- Syria
         'TW',  //- Taiwan
         'TJ',  //- Tajikistan

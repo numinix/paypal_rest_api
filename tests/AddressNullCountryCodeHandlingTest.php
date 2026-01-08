@@ -72,8 +72,8 @@ try {
     $testPassed = false;
 }
 
-// Test 4: convertCountryCode handles the special case of CH -> C2
-echo "Test 4: convertCountryCode handles Switzerland special case (CH -> C2)...\n";
+// Test 4: convertCountryCode handles the special case of CH -> C2 (Zen Cart uses CH for China)
+echo "Test 4: convertCountryCode handles China special case (Zen Cart CH -> PayPal C2)...\n";
 try {
     $result = CountryCodes::convertCountryCode('CH');
     if ($result === 'C2') {
