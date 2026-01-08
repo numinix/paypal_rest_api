@@ -35,11 +35,26 @@ if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart']) || $_SESSION['car
 global $order, $order_total_modules;
 
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    // Only suppress non-critical errors - let fatal errors through
+    // E_ERROR and E_CORE_ERROR will still halt execution as expected
+    $suppressibleErrors = E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE | E_DEPRECATED | E_USER_DEPRECATED | E_STRICT;
+    
+    if (!($errno & $suppressibleErrors)) {
+        // This is a critical error - don't suppress it
+        restore_error_handler();
+        return false; // Let PHP handle it normally
+    }
+    
     // Log but don't fail - let the fallback mechanism handle it
     // Sanitize file path to avoid exposing full system paths
     $sanitizedFile = basename($errfile);
     // Sanitize error string to avoid exposing sensitive data
-    $sanitizedError = preg_replace('/\b(?:password|secret|key|token)\b.*$/i', '[REDACTED]', $errstr);
+    // Replace sensitive values while preserving message structure
+    $sanitizedError = preg_replace('/(\bpassword\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $errstr);
+    $sanitizedError = preg_replace('/(\bsecret\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedError);
+    $sanitizedError = preg_replace('/(\bkey\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedError);
+    $sanitizedError = preg_replace('/(\btoken\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedError);
+    
     error_log("PayPal Wallet: Order totals initialization notice: $sanitizedError in $sanitizedFile:$errline");
     return true; // Suppress the error
 });
@@ -61,7 +76,13 @@ try {
 } catch (\Exception $e) {
     // Log the error but continue - the observer fallback will use $order->info
     // Sanitize exception message to avoid exposing sensitive information
-    $sanitizedMessage = preg_replace('/\b(?:password|secret|key|token)\b.*$/i', '[REDACTED]', $e->getMessage());
+    // Replace sensitive values while preserving message structure
+    $message = $e->getMessage();
+    $sanitizedMessage = preg_replace('/(\bpassword\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $message);
+    $sanitizedMessage = preg_replace('/(\bsecret\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedMessage);
+    $sanitizedMessage = preg_replace('/(\bkey\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedMessage);
+    $sanitizedMessage = preg_replace('/(\btoken\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $sanitizedMessage);
+    
     error_log('PayPal Wallet: Order totals initialization exception: ' . $sanitizedMessage);
     // Do not exit - allow the request to continue with the fallback mechanism
 } finally {
