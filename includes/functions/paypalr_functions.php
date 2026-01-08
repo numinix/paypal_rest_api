@@ -218,7 +218,7 @@ function paypalr_wallet_get_common_instance() {
     static $instance = null;
     static $attempted = false;
 
-    if ($instance instanceof PayPalWalletCommon) {
+    if ($instance instanceof PayPal WalletCommon) {
         return $instance;
     }
 
@@ -235,7 +235,7 @@ function paypalr_wallet_get_common_instance() {
         return null;
     }
 
-    require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/braintree/lib/PayPalWallet.php');
+    require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/braintree/lib/PayPal Wallet.php');
     require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/braintree/paypalr_wallet_common.php');
 
     $config = [
@@ -248,7 +248,7 @@ function paypalr_wallet_get_common_instance() {
     ];
 
     try {
-        $instance = new PayPalWalletCommon($config);
+        $instance = new PayPal WalletCommon($config);
     } catch (\Throwable $exception) {
         error_log('PayPal Wallet configuration error: ' . $exception->getMessage());
         $instance = null;

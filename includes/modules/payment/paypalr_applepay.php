@@ -854,15 +854,6 @@ class paypalr_applepay extends base
         $this->paypalCommon->sendAlertEmail($subject_detail, $message, $force_send);
     }
 
-    public function generate_client_token(): string
-    {
-        // Note: These Apple Pay templates use Braintree SDK, but this module has been
-        // refactored to use PayPal REST API. Braintree support is not currently available.
-        // Return empty string to prevent fatal error. The JavaScript should handle this gracefully.
-        // TODO: Update templates to use PayPal SDK instead of Braintree SDK
-        return '';
-    }
-
     public function getCurrentVersion(): string
     {
         return self::CURRENT_VERSION;
