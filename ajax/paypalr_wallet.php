@@ -71,6 +71,15 @@ if (empty($_SESSION['currency'])) {
     $_SESSION['currency'] = defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : 'USD';
 }
 
+// Initialize session variables for guest checkout to prevent undefined variable warnings
+// These would normally be set for logged-in customers
+if (!isset($_SESSION['customer_id'])) {
+    $_SESSION['customer_id'] = 0; // Guest customer
+}
+if (!isset($_SESSION['customers_authorization'])) {
+    $_SESSION['customers_authorization'] = 0; // Normal authorization
+}
+
 $displayCurrency = $_SESSION['currency'];
 $displayCurrencyValue = $currencies->currencies[$displayCurrency]['value'] ?? 1;
 log_paypalr_wallet_message('Display currency: ' . $displayCurrency . ', currency value: ' . $displayCurrencyValue);
@@ -371,6 +380,14 @@ $order = new order();
 $order->info['shipping_cost'] = $_SESSION['shipping']['cost'];
 $order->info['shipping_method'] = $_SESSION['shipping']['module'] . " (" . $_SESSION['shipping']['title'] . ")";
 $order->info['shipping_module_code'] = $_SESSION['shipping']['id'];
+
+// Initialize fields expected by order processing to prevent undefined key warnings
+if (!isset($order->info['payment'])) {
+    $order->info['payment'] = '';
+}
+if (!isset($order->info['applied_stock_reduction'])) {
+    $order->info['applied_stock_reduction'] = false;
+}
 
 // Get the validated base currency - this will be used throughout order processing
 $baseCurrency = get_validated_base_currency($currencies, $order->info['currency'] ?? null);
