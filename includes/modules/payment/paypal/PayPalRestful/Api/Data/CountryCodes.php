@@ -271,11 +271,20 @@ class CountryCodes
         'ZM',  //- Zambia
         'ZW',  //- Zimbabwe
     ];
-    public static function convertCountryCode(string $country_code): string
+    public static function convertCountryCode(?string $country_code): string
     {
+        if ($country_code === null || $country_code === '') {
+            return '';
+        }
+        // -----
+        // Special handling for China: Zen Cart uses 'CH', but PayPal expects 'C2'
+        //
+        if ($country_code === 'CH') {
+            return 'C2';
+        }
         if (in_array($country_code, self::$countryCodes)) {
             return $country_code;
         }
-        return ($country_code === 'CH') ? 'C2' : '';
+        return '';
     }
 }
