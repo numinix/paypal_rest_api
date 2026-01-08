@@ -234,7 +234,7 @@ class CountryCodes
         'SJ',  //- Svalbard and Jan Mayen Islands
         'SZ',  //- Swaziland
         'SE',  //- Sweden
-        'CH',  //- Switzerland
+        'CH',  //- Switzerland (NOTE: Zen Cart uses 'CH' for China, not Switzerland. See convertCountryCode())
         'SY',  //- Syria
         'TW',  //- Taiwan
         'TJ',  //- Tajikistan
@@ -271,11 +271,24 @@ class CountryCodes
         'ZM',  //- Zambia
         'ZW',  //- Zimbabwe
     ];
-    public static function convertCountryCode(string $country_code): string
+    public static function convertCountryCode(?string $country_code): string
     {
+        if ($country_code === null || $country_code === '') {
+            return '';
+        }
+        // -----
+        // Special handling for China: Zen Cart uses 'CH' for China, but PayPal expects 'C2'.
+        // This check MUST come before the in_array() check because 'CH' also appears in the
+        // countryCodes array as Switzerland's ISO code (line 237), which would cause an
+        // incorrect early return if checked first. In practice, Zen Cart uses 'CH' for China,
+        // not Switzerland, so we convert it to PayPal's expected 'C2' code.
+        //
+        if ($country_code === 'CH') {
+            return 'C2';
+        }
         if (in_array($country_code, self::$countryCodes)) {
             return $country_code;
         }
-        return ($country_code === 'CH') ? 'C2' : '';
+        return '';
     }
 }

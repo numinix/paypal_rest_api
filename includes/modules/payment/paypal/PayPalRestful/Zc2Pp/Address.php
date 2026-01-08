@@ -21,7 +21,7 @@ class Address
             'admin_area_2' => $order_address['city'],
             'admin_area_1' => (!empty($order_address['state_code'])) ? $order_address['state_code'] : $order_address['state'],
             'postal_code' => str_replace(' ', '', $order_address['postcode']),
-            'country_code' => CountryCodes::convertCountryCode($order_address['country']['iso_code_2']),
+            'country_code' => CountryCodes::convertCountryCode($order_address['country']['iso_code_2'] ?? null),
         ];
         if (!empty($order_address['suburb'])) {
             $paypal_address['address_line_2'] = $order_address['suburb'];

@@ -525,6 +525,16 @@ class CreatePayPalOrderRequest extends ErrorInfo
     {
         global $order;
 
+        // -----
+        // For wallet payments (Google Pay, Apple Pay, etc.), the delivery address
+        // might not be populated yet when the order is initially created. Return an
+        // empty array if the country code is missing, which will prevent the shipping
+        // element from being added to the PayPal order request.
+        //
+        if (empty($order->delivery['country']['iso_code_2'])) {
+            return [];
+        }
+
         return [
             'type' => 'SHIPPING',
             'name' => Name::get($order->delivery),
