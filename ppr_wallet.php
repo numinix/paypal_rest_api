@@ -27,18 +27,13 @@ if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart']) || $_SESSION['car
 // This is necessary because the wallet modules need order total information
 // to create PayPal orders, and the fallback in the observer relies on $order->info.
 //
-global $order, $order_total_modules;
-
-// -----
-// Initialize order and order_totals to populate $order->info with proper values.
-// This is necessary because the wallet modules need order total information
-// to create PayPal orders, and the fallback in the observer relies on $order->info.
-//
 // Suppress errors that may occur when called from the cart page where some
 // order total modules expect checkout-specific session variables to be present.
 // The observer's getLastOrderValues() fallback will still retrieve basic totals
 // from $order->info even if the full order_total processing encounters issues.
 //
+global $order, $order_total_modules;
+
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     // Log but don't fail - let the fallback mechanism handle it
     error_log("PayPal Wallet: Order totals initialization notice: $errstr in $errfile:$errline");
