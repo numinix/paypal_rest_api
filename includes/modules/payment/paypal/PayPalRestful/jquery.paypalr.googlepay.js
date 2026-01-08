@@ -796,17 +796,57 @@
                     }).then(function (confirmResult) {
                         console.log('[Google Pay] confirmOrder result:', confirmResult);
                         
-                        // Build the payload with the confirmed order details
-                        // The server will retrieve the confirmed order status
-                        var payload = {
-                            orderID: orderId,
-                            confirmed: true,
-                            wallet: 'google_pay'
+                        // Extract shipping and billing addresses from Google Pay payment data
+                        var shippingAddress = paymentData.shippingAddress || {};
+                        var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
+                        var email = paymentData.email || '';
+                        
+                        // Build the complete payload for checkout
+                        var checkoutPayload = {
+                            payment_method_nonce: orderId, // Use orderID as the payment reference
+                            module: 'paypalr_googlepay',
+                            total: orderConfig.amount,
+                            currency: orderConfig.currency || 'USD',
+                            email: email,
+                            shipping_address: shippingAddress,
+                            billing_address: billingAddress,
+                            orderID: orderId
                         };
                         
-                        console.log('[Google Pay] Setting payload and submitting form');
-                        setGooglePayPayload(payload);
-                        document.dispatchEvent(new CustomEvent('paypalr:googlepay:payload', { detail: payload }));
+                        console.log('[Google Pay] Sending checkout request to ajax handler');
+                        
+                        // Send to checkout handler instead of just submitting form
+                        var ajaxBasePath = window.paypalrAjaxBasePath || 'ajax/';
+                        var checkoutUrl = ajaxBasePath + 'paypalr_wallet_checkout.php';
+                        
+                        return fetch(checkoutUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(checkoutPayload)
+                        }).then(function(response) {
+                            return response.json();
+                        }).then(function(checkoutResult) {
+                            console.log('[Google Pay] Checkout result:', checkoutResult);
+                            
+                            if (checkoutResult.status === 'success' && checkoutResult.redirect_url) {
+                                console.log('[Google Pay] Redirecting to:', checkoutResult.redirect_url);
+                                window.location.href = checkoutResult.redirect_url;
+                            } else {
+                                console.error('[Google Pay] Checkout failed:', checkoutResult);
+                                setGooglePayPayload({});
+                                if (typeof window.oprcHideProcessingOverlay === 'function') {
+                                    window.oprcHideProcessingOverlay();
+                                }
+                                alert('Checkout failed: ' + (checkoutResult.message || 'Unknown error'));
+                            }
+                        }).catch(function(checkoutError) {
+                            console.error('[Google Pay] Checkout request failed:', checkoutError);
+                            setGooglePayPayload({});
+                            if (typeof window.oprcHideProcessingOverlay === 'function') {
+                                window.oprcHideProcessingOverlay();
+                            }
+                            alert('Checkout failed. Please try again.');
+                        });
                     }).catch(function (confirmError) {
                         console.error('[Google Pay] confirmOrder failed:', confirmError);
                         setGooglePayPayload({});

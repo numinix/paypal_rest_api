@@ -874,16 +874,74 @@
                     // Only now do we tell Apple Pay the payment succeeded
                     session.completePayment(ApplePaySession.STATUS_SUCCESS);
 
-                    // Server no longer needs the token; it just needs to proceed with authorize/capture on this orderID
-                    var payload = {
-                        orderID: orderId,
-                        wallet: 'apple_pay',
-                        confirmed: true
+                    // Extract shipping and billing addresses from Apple Pay payment data
+                    var shippingContact = event.payment.shippingContact || {};
+                    var billingContact = event.payment.billingContact || {};
+                    
+                    // Build the complete payload for checkout
+                    var checkoutPayload = {
+                        payment_method_nonce: orderId, // Use orderID as the payment reference
+                        module: 'paypalr_applepay',
+                        total: config.amount,
+                        currency: config.currency || 'USD',
+                        email: shippingContact.emailAddress || billingContact.emailAddress || '',
+                        shipping_address: {
+                            name: ((shippingContact.givenName || '') + ' ' + (shippingContact.familyName || '')).trim(),
+                            address1: (shippingContact.addressLines && shippingContact.addressLines[0]) || '',
+                            address2: (shippingContact.addressLines && shippingContact.addressLines[1]) || '',
+                            locality: shippingContact.locality || '',
+                            administrativeArea: shippingContact.administrativeArea || '',
+                            postalCode: shippingContact.postalCode || '',
+                            countryCode: shippingContact.countryCode || '',
+                            phoneNumber: shippingContact.phoneNumber || ''
+                        },
+                        billing_address: {
+                            name: ((billingContact.givenName || '') + ' ' + (billingContact.familyName || '')).trim(),
+                            address1: (billingContact.addressLines && billingContact.addressLines[0]) || '',
+                            address2: (billingContact.addressLines && billingContact.addressLines[1]) || '',
+                            locality: billingContact.locality || '',
+                            administrativeArea: billingContact.administrativeArea || '',
+                            postalCode: billingContact.postalCode || '',
+                            countryCode: billingContact.countryCode || '',
+                            phoneNumber: billingContact.phoneNumber || ''
+                        },
+                        orderID: orderId
                     };
-
-                    console.log('[Apple Pay] Setting payload and submitting form');
-                    setApplePayPayload(payload);
-                    document.dispatchEvent(new CustomEvent('paypalr:applepay:payload', { detail: payload }));
+                    
+                    console.log('[Apple Pay] Sending checkout request to ajax handler');
+                    
+                    // Send to checkout handler instead of just submitting form
+                    var ajaxBasePath = window.paypalrAjaxBasePath || 'ajax/';
+                    var checkoutUrl = ajaxBasePath + 'paypalr_wallet_checkout.php';
+                    
+                    return fetch(checkoutUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(checkoutPayload)
+                    }).then(function(response) {
+                        return response.json();
+                    }).then(function(checkoutResult) {
+                        console.log('[Apple Pay] Checkout result:', checkoutResult);
+                        
+                        if (checkoutResult.status === 'success' && checkoutResult.redirect_url) {
+                            console.log('[Apple Pay] Redirecting to:', checkoutResult.redirect_url);
+                            window.location.href = checkoutResult.redirect_url;
+                        } else {
+                            console.error('[Apple Pay] Checkout failed:', checkoutResult);
+                            setApplePayPayload({});
+                            if (typeof window.oprcHideProcessingOverlay === 'function') {
+                                window.oprcHideProcessingOverlay();
+                            }
+                            alert('Checkout failed: ' + (checkoutResult.message || 'Unknown error'));
+                        }
+                    }).catch(function(checkoutError) {
+                        console.error('[Apple Pay] Checkout request failed:', checkoutError);
+                        setApplePayPayload({});
+                        if (typeof window.oprcHideProcessingOverlay === 'function') {
+                            window.oprcHideProcessingOverlay();
+                        }
+                        alert('Checkout failed. Please try again.');
+                    });
                 }).catch(function (err) {
                     console.error('[Apple Pay] confirmOrder failed:', err);
                     session.completePayment(ApplePaySession.STATUS_FAILURE);

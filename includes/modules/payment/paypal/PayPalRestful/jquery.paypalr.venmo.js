@@ -486,16 +486,78 @@
                             });
                     },
                     onApprove: function (data) {
-                        var payload = {
-                            orderID: data.orderID,
-                            payerID: data.payerID,
-                            paymentID: data.paymentID,
-                            facilitatorAccessToken: data.facilitatorAccessToken,
-                            wallet: 'venmo'
-                        };
-                        return cacheVenmoPayload(payload).finally(function () {
-                            setVenmoPayload(payload);
-                            document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: payload }));
+                        console.log('[Venmo] onApprove called with data:', data);
+                        
+                        // Get the order details from PayPal to extract shipping/billing info
+                        return actions.order.get().then(function(orderDetails) {
+                            console.log('[Venmo] Order details retrieved:', orderDetails);
+                            
+                            var purchaseUnit = orderDetails.purchase_units && orderDetails.purchase_units[0];
+                            var shippingAddress = purchaseUnit && purchaseUnit.shipping ? purchaseUnit.shipping.address : {};
+                            var shippingName = purchaseUnit && purchaseUnit.shipping ? purchaseUnit.shipping.name : {};
+                            var payer = orderDetails.payer || {};
+                            
+                            // Build the complete payload for checkout
+                            var checkoutPayload = {
+                                payment_method_nonce: data.orderID, // Use orderID as the payment reference
+                                module: 'paypalr_venmo',
+                                total: purchaseUnit && purchaseUnit.amount ? purchaseUnit.amount.value : '0.00',
+                                currency: purchaseUnit && purchaseUnit.amount ? purchaseUnit.amount.currency_code : 'USD',
+                                email: payer.email_address || '',
+                                shipping_address: {
+                                    name: (shippingName.full_name || ''),
+                                    address1: shippingAddress.address_line_1 || '',
+                                    address2: shippingAddress.address_line_2 || '',
+                                    locality: shippingAddress.admin_area_2 || '',
+                                    administrativeArea: shippingAddress.admin_area_1 || '',
+                                    postalCode: shippingAddress.postal_code || '',
+                                    countryCode: shippingAddress.country_code || ''
+                                },
+                                billing_address: {
+                                    name: payer.name ? ((payer.name.given_name || '') + ' ' + (payer.name.surname || '')).trim() : '',
+                                    address1: payer.address ? payer.address.address_line_1 : '',
+                                    address2: payer.address ? payer.address.address_line_2 : '',
+                                    locality: payer.address ? payer.address.admin_area_2 : '',
+                                    administrativeArea: payer.address ? payer.address.admin_area_1 : '',
+                                    postalCode: payer.address ? payer.address.postal_code : '',
+                                    countryCode: payer.address ? payer.address.country_code : ''
+                                },
+                                orderID: data.orderID,
+                                payerID: data.payerID
+                            };
+                            
+                            console.log('[Venmo] Sending checkout request to ajax handler');
+                            
+                            // Send to checkout handler
+                            var ajaxBasePath = window.paypalrAjaxBasePath || 'ajax/';
+                            var checkoutUrl = ajaxBasePath + 'paypalr_wallet_checkout.php';
+                            
+                            return fetch(checkoutUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(checkoutPayload)
+                            }).then(function(response) {
+                                return response.json();
+                            }).then(function(checkoutResult) {
+                                console.log('[Venmo] Checkout result:', checkoutResult);
+                                
+                                if (checkoutResult.status === 'success' && checkoutResult.redirect_url) {
+                                    console.log('[Venmo] Redirecting to:', checkoutResult.redirect_url);
+                                    window.location.href = checkoutResult.redirect_url;
+                                } else {
+                                    console.error('[Venmo] Checkout failed:', checkoutResult);
+                                    setVenmoPayload({});
+                                    alert('Checkout failed: ' + (checkoutResult.message || 'Unknown error'));
+                                }
+                            }).catch(function(checkoutError) {
+                                console.error('[Venmo] Checkout request failed:', checkoutError);
+                                setVenmoPayload({});
+                                alert('Checkout failed. Please try again.');
+                            });
+                        }).catch(function(error) {
+                            console.error('[Venmo] Failed to get order details:', error);
+                            setVenmoPayload({});
+                            alert('Failed to retrieve order details. Please try again.');
                         });
                     },
                     onCancel: function (data) {
