@@ -21,6 +21,11 @@
         paymentsClient: null
     };
 
+    // Detect if we're on the checkout page vs cart/product page
+    // On checkout page: Customer has already selected shipping, don't ask again
+    // On cart/product page: Need to collect shipping info in Google Pay modal
+    var isCheckoutPage = !!document.querySelector('form[name="checkout_payment"]');
+
     var WALLET_BUTTON_MIN_WIDTH = '200px';
     var WALLET_BUTTON_MAX_WIDTH = '320px';
 
@@ -766,16 +771,23 @@
                         currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
                         countryCode: 'US'
                     },
-                    merchantInfo: basePaymentDataRequest.merchantInfo || {},
-                    // Enable shipping address and shipping option selection in the Google Pay modal
-                    shippingAddressRequired: true,
-                    shippingAddressParameters: {
-                        phoneNumberRequired: true
-                    },
-                    shippingOptionRequired: true,
-                    // Register callbacks for address and shipping option changes
-                    callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
+                    merchantInfo: basePaymentDataRequest.merchantInfo || {}
                 };
+
+                // Only request shipping info if NOT on checkout page
+                // On checkout page: Customer already selected shipping during checkout flow
+                // On cart/product page: Need to collect shipping info in Google Pay modal
+                if (!isCheckoutPage) {
+                    paymentDataRequest.shippingAddressRequired = true;
+                    paymentDataRequest.shippingAddressParameters = {
+                        phoneNumberRequired: true
+                    };
+                    paymentDataRequest.shippingOptionRequired = true;
+                    paymentDataRequest.callbackIntents = ['SHIPPING_ADDRESS', 'SHIPPING_OPTION'];
+                    console.log('[Google Pay] Cart/Product page - requesting shipping info in modal');
+                } else {
+                    console.log('[Google Pay] Checkout page - skipping shipping info request (already selected)');
+                }
 
                 console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
 
