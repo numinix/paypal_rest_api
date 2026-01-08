@@ -277,7 +277,11 @@ class CountryCodes
             return '';
         }
         // -----
-        // Special handling for China: Zen Cart uses 'CH', but PayPal expects 'C2'
+        // Special handling for China: Zen Cart uses 'CH' for China, but PayPal expects 'C2'.
+        // This check MUST come before the in_array() check because 'CH' also appears in the
+        // countryCodes array as Switzerland's ISO code (line 237), which would cause an
+        // incorrect early return if checked first. In practice, Zen Cart uses 'CH' for China,
+        // not Switzerland, so we convert it to PayPal's expected 'C2' code.
         //
         if ($country_code === 'CH') {
             return 'C2';
