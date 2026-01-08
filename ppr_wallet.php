@@ -41,12 +41,14 @@ try {
     }
 
     // Run order totals processing to ensure $order->info is populated
-    $order_total_modules->collect_posts();
-    $order_total_modules->pre_confirmation_check();
+    // Use @ to suppress errors that might occur when called from cart page
+    // where some order total modules expect checkout-specific session variables
+    @$order_total_modules->collect_posts();
+    @$order_total_modules->pre_confirmation_check();
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Unable to initialize order totals']);
-    require DIR_WS_INCLUDES . 'application_bottom.php';
-    return;
+    // Log the error but continue - the observer fallback will use $order->info
+    error_log('PayPal Wallet: Order totals initialization warning: ' . $e->getMessage());
+    // Do not exit - allow the request to continue with the fallback mechanism
 }
 
 $requestBody = file_get_contents('php://input');
