@@ -262,6 +262,58 @@
         });
     }
 
+    /**
+     * Fetch updated shipping options and totals when address or shipping selection changes.
+     * Called by onShippingChange callback in Venmo button.
+     * 
+     * @param {Object} shippingAddress - PayPal shipping address object from onShippingChange
+     * @param {string} selectedShippingOptionId - Currently selected shipping option ID (optional)
+     * @returns {Promise} Promise resolving to updated shipping options and amount
+     */
+    function fetchShippingOptions(shippingAddress, selectedShippingOptionId) {
+        console.log('[Venmo] Fetching shipping options for address - countryCode:', shippingAddress.country_code, 'postalCode:', shippingAddress.postal_code);
+        
+        // Normalize the PayPal address format to match what the server expects
+        var normalizedAddress = {
+            name: shippingAddress.recipient_name || '',
+            address1: shippingAddress.line1 || '',
+            address2: shippingAddress.line2 || '',
+            locality: shippingAddress.city || '',
+            administrativeArea: shippingAddress.state || '',
+            postalCode: shippingAddress.postal_code || '',
+            countryCode: shippingAddress.country_code || ''
+        };
+        
+        var requestData = {
+            module: 'paypalr_venmo',
+            shippingAddress: normalizedAddress
+        };
+        
+        // Include selected shipping option if provided
+        if (selectedShippingOptionId) {
+            requestData.selectedShippingOptionId = selectedShippingOptionId;
+        }
+        
+        // Use configurable base path for AJAX endpoint to support subdirectory installations
+        var ajaxBasePath = window.paypalrAjaxBasePath || 'ajax/';
+        var ajaxUrl = ajaxBasePath + 'paypalr_wallet.php';
+        
+        return fetch(ajaxUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestData)
+        }).then(function(response) {
+            console.log('[Venmo] Shipping options response status:', response.status);
+            return parseWalletResponse(response);
+        }).then(function(data) {
+            console.log('[Venmo] Shipping options received - shipping option count:', (data.shipping_options) ? data.shipping_options.length : 0);
+            return data;
+        }).catch(function (error) {
+            console.error('[Venmo] Failed to fetch shipping options', error);
+            throw error;
+        });
+    }
+
     function buildSdkKey(config) {
         var currency = config.currency || 'USD';
         var merchantId = config.merchantId || '';
@@ -396,17 +448,116 @@
                     onClick: function () {
                         selectVenmoRadio();
                     },
+                    // Handle shipping address and option changes
+                    onShippingChange: function(data, actions) {
+                        console.log('[Venmo] onShippingChange called');
+                        
+                        // Get the selected shipping option ID if provided
+                        var selectedOptionId = data.selected_shipping_option ? data.selected_shipping_option.id : null;
+                        
+                        // Fetch updated shipping options based on the address
+                        return fetchShippingOptions(data.shipping_address, selectedOptionId)
+                            .then(function(response) {
+                                console.log('[Venmo] Shipping update completed - amount:', response.amount ? response.amount.value : 'N/A');
+                                
+                                // Check for error response
+                                if (response.error) {
+                                    console.error('[Venmo] Shipping update error:', response.error);
+                                    return actions.reject();
+                                }
+                                
+                                // Patch the order with updated amount and shipping options
+                                return actions.order.patch([
+                                    {
+                                        op: 'replace',
+                                        path: '/purchase_units/@reference_id==\'default\'/amount',
+                                        value: response.amount
+                                    },
+                                    {
+                                        op: 'replace',
+                                        path: '/purchase_units/@reference_id==\'default\'/shipping/options',
+                                        value: response.shipping_options || []
+                                    }
+                                ]);
+                            })
+                            .catch(function(error) {
+                                console.error('[Venmo] Failed to update shipping:', error);
+                                return actions.reject();
+                            });
+                    },
                     onApprove: function (data) {
-                        var payload = {
-                            orderID: data.orderID,
-                            payerID: data.payerID,
-                            paymentID: data.paymentID,
-                            facilitatorAccessToken: data.facilitatorAccessToken,
-                            wallet: 'venmo'
-                        };
-                        return cacheVenmoPayload(payload).finally(function () {
-                            setVenmoPayload(payload);
-                            document.dispatchEvent(new CustomEvent('paypalr:venmo:payload', { detail: payload }));
+                        console.log('[Venmo] onApprove called with data:', data);
+                        
+                        // Get the order details from PayPal to extract shipping/billing info
+                        return actions.order.get().then(function(orderDetails) {
+                            console.log('[Venmo] Order details retrieved:', orderDetails);
+                            
+                            var purchaseUnit = orderDetails.purchase_units && orderDetails.purchase_units[0];
+                            var shippingAddress = purchaseUnit && purchaseUnit.shipping ? purchaseUnit.shipping.address : {};
+                            var shippingName = purchaseUnit && purchaseUnit.shipping ? purchaseUnit.shipping.name : {};
+                            var payer = orderDetails.payer || {};
+                            
+                            // Build the complete payload for checkout
+                            var checkoutPayload = {
+                                payment_method_nonce: data.orderID, // Use orderID as the payment reference
+                                module: 'paypalr_venmo',
+                                total: purchaseUnit && purchaseUnit.amount ? purchaseUnit.amount.value : '0.00',
+                                currency: purchaseUnit && purchaseUnit.amount ? purchaseUnit.amount.currency_code : 'USD',
+                                email: payer.email_address || '',
+                                shipping_address: {
+                                    name: (shippingName.full_name || ''),
+                                    address1: shippingAddress.address_line_1 || '',
+                                    address2: shippingAddress.address_line_2 || '',
+                                    locality: shippingAddress.admin_area_2 || '',
+                                    administrativeArea: shippingAddress.admin_area_1 || '',
+                                    postalCode: shippingAddress.postal_code || '',
+                                    countryCode: shippingAddress.country_code || ''
+                                },
+                                billing_address: {
+                                    name: payer.name ? ((payer.name.given_name || '') + ' ' + (payer.name.surname || '')).trim() : '',
+                                    address1: payer.address ? payer.address.address_line_1 : '',
+                                    address2: payer.address ? payer.address.address_line_2 : '',
+                                    locality: payer.address ? payer.address.admin_area_2 : '',
+                                    administrativeArea: payer.address ? payer.address.admin_area_1 : '',
+                                    postalCode: payer.address ? payer.address.postal_code : '',
+                                    countryCode: payer.address ? payer.address.country_code : ''
+                                },
+                                orderID: data.orderID,
+                                payerID: data.payerID
+                            };
+                            
+                            console.log('[Venmo] Sending checkout request to ajax handler');
+                            
+                            // Send to checkout handler
+                            var ajaxBasePath = window.paypalrAjaxBasePath || 'ajax/';
+                            var checkoutUrl = ajaxBasePath + 'paypalr_wallet_checkout.php';
+                            
+                            return fetch(checkoutUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(checkoutPayload)
+                            }).then(function(response) {
+                                return response.json();
+                            }).then(function(checkoutResult) {
+                                console.log('[Venmo] Checkout result:', checkoutResult);
+                                
+                                if (checkoutResult.status === 'success' && checkoutResult.redirect_url) {
+                                    console.log('[Venmo] Redirecting to:', checkoutResult.redirect_url);
+                                    window.location.href = checkoutResult.redirect_url;
+                                } else {
+                                    console.error('[Venmo] Checkout failed:', checkoutResult);
+                                    setVenmoPayload({});
+                                    alert('Checkout failed: ' + (checkoutResult.message || 'Unknown error'));
+                                }
+                            }).catch(function(checkoutError) {
+                                console.error('[Venmo] Checkout request failed:', checkoutError);
+                                setVenmoPayload({});
+                                alert('Checkout failed. Please try again.');
+                            });
+                        }).catch(function(error) {
+                            console.error('[Venmo] Failed to get order details:', error);
+                            setVenmoPayload({});
+                            alert('Failed to retrieve order details. Please try again.');
                         });
                     },
                     onCancel: function (data) {

@@ -257,6 +257,41 @@ function paypalr_wallet_get_common_instance() {
     return $instance;
 }
 
+/**
+ * Alias for normalize_paypalr_wallet_contact for backward compatibility with Braintree code.
+ * This function normalizes contact/address data from wallet payment sources.
+ * 
+ * @param array $contact The contact/address data to normalize
+ * @param string $module The payment module name (e.g., 'paypalr_googlepay', 'paypalr_applepay')
+ * @return array The normalized contact data
+ */
+function normalize_braintree_contact($contact, $module = '') {
+    // Map module names to the expected format for normalize_paypalr_wallet_contact
+    $moduleMap = [
+        'paypalr_googlepay' => 'paypalr_wallet_googlepay',
+        'paypalr_applepay' => 'paypalr_wallet_applepay',
+        'paypalr_venmo' => 'paypalr_wallet_venmo',
+        'paypalr_paylater' => 'paypalr_wallet_paypal',
+    ];
+    
+    $mappedModule = isset($moduleMap[$module]) ? $moduleMap[$module] : $module;
+    
+    return normalize_paypalr_wallet_contact($contact, $mappedModule);
+}
+
+/**
+ * Alias for braintree_lookup_zone_id for backward compatibility.
+ * This function looks up the zone ID for a given zone name and country code.
+ * 
+ * @param string $zone_name The zone/state name
+ * @param string $country_code The country ISO code
+ * @param object $db The database object
+ * @return int The zone ID
+ */
+function braintree_lookup_zone_id($zone_name, $country_code, $db) {
+    return paypalr_wallet_lookup_zone_id($zone_name, $country_code, $db);
+}
+
 function paypalr_wallet_generate_client_token($currency = null) {
     static $cachedTokens = [];
 
