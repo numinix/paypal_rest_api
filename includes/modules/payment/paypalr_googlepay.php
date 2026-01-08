@@ -892,6 +892,12 @@ class paypalr_googlepay extends base
         $this->paypalCommon->sendAlertEmail($subject_detail, $message, $force_send);
     }
 
+    public function generate_client_token(): string
+    {
+        require_once(DIR_FS_CATALOG . DIR_WS_FUNCTIONS . 'paypalr_functions.php');
+        return paypalr_wallet_generate_client_token($_SESSION['currency'] ?? null);
+    }
+
     public function getCurrentVersion(): string
     {
         return self::CURRENT_VERSION;
