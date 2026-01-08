@@ -54,7 +54,7 @@ try {
     // Run order totals processing to ensure $order->info is populated
     $order_total_modules->collect_posts();
     $order_total_modules->pre_confirmation_check();
-} catch (Throwable $e) {
+} catch (\Exception $e) {
     // Log the error but continue - the observer fallback will use $order->info
     error_log('PayPal Wallet: Order totals initialization exception: ' . $e->getMessage());
     // Do not exit - allow the request to continue with the fallback mechanism
