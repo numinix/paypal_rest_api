@@ -892,7 +892,14 @@ class PayPalCommon {
             $message .= MODULE_PAYMENT_PAYPALR_BUYER_EMAIL . $orderInfo['payment_source'][$payment_source_type]['email_address'] . "\n";
         }
 
-        zen_update_orders_history($orderInfo['orders_id'], $message, null, -1, 0);
+        // Check if zen_update_orders_history function exists (Zen Cart core function)
+        // It may not be available in all execution contexts (e.g., when called from ppr_wallet.php)
+        if (function_exists('zen_update_orders_history')) {
+            zen_update_orders_history($orderInfo['orders_id'], $message, null, -1, 0);
+        } else {
+            // Log that order history update was skipped
+            error_log("PayPal: zen_update_orders_history not available; order history update skipped for order " . ($orderInfo['orders_id'] ?? 'unknown'));
+        }
 
         if (($orderInfo['admin_alert_needed'] ?? false) === true) {
             $this->sendAlertEmail(
