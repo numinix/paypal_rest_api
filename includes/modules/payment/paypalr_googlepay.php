@@ -894,8 +894,11 @@ class paypalr_googlepay extends base
 
     public function generate_client_token(): string
     {
-        require_once(DIR_FS_CATALOG . DIR_WS_FUNCTIONS . 'paypalr_functions.php');
-        return paypalr_wallet_generate_client_token($_SESSION['currency'] ?? null);
+        // Note: These Google Pay templates use Braintree SDK, but this module has been
+        // refactored to use PayPal REST API. Braintree support is not currently available.
+        // Return empty string to prevent fatal error. The JavaScript should handle this gracefully.
+        // TODO: Update templates to use PayPal SDK instead of Braintree SDK
+        return '';
     }
 
     public function getCurrentVersion(): string
