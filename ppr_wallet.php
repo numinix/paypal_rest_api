@@ -27,7 +27,41 @@ if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart']) || $_SESSION['car
 // This is necessary because the wallet modules need order total information
 // to create PayPal orders, and the fallback in the observer relies on $order->info.
 //
+// Suppress errors that may occur when called from the cart page where some
+// order total modules expect checkout-specific session variables to be present.
+// The observer's getLastOrderValues() fallback will still retrieve basic totals
+// from $order->info even if the full order_total processing encounters issues.
+//
 global $order, $order_total_modules;
+
+// Helper function to sanitize error messages for logging
+// Prevents information disclosure by redacting sensitive values
+if (!function_exists('ppr_wallet_sanitize_error_message')) {
+    function ppr_wallet_sanitize_error_message($message) {
+        // Replace sensitive values while preserving message structure
+        // Pattern: password=value becomes password=[REDACTED]
+        return preg_replace('/(\b(?:password|secret|key|token)\b\s*[=:]\s*)[^\s]+/i', '$1[REDACTED]', $message);
+    }
+}
+
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    // Only suppress non-critical errors - let fatal errors through
+    // E_ERROR and E_CORE_ERROR will still halt execution as expected
+    $suppressibleErrors = E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE | E_DEPRECATED | E_USER_DEPRECATED | E_STRICT;
+    
+    if (!($errno & $suppressibleErrors)) {
+        // This is a critical error - don't suppress it
+        restore_error_handler();
+        return false; // Let PHP handle it normally
+    }
+    
+    // Log but don't fail - let the fallback mechanism handle it
+    $sanitizedFile = basename($errfile);
+    $sanitizedError = ppr_wallet_sanitize_error_message($errstr);
+    
+    error_log("PayPal Wallet: Order totals initialization notice: $sanitizedError in $sanitizedFile:$errline");
+    return true; // Suppress the error
+});
 
 try {
     if (!isset($order) || !is_object($order)) {
@@ -43,10 +77,13 @@ try {
     // Run order totals processing to ensure $order->info is populated
     $order_total_modules->collect_posts();
     $order_total_modules->pre_confirmation_check();
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Unable to initialize order totals']);
-    require DIR_WS_INCLUDES . 'application_bottom.php';
-    return;
+} catch (\Exception $e) {
+    // Log the error but continue - the observer fallback will use $order->info
+    $sanitizedMessage = ppr_wallet_sanitize_error_message($e->getMessage());
+    error_log('PayPal Wallet: Order totals initialization exception: ' . $sanitizedMessage);
+    // Do not exit - allow the request to continue with the fallback mechanism
+} finally {
+    restore_error_handler();
 }
 
 $requestBody = file_get_contents('php://input');
