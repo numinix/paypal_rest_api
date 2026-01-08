@@ -395,6 +395,59 @@
         });
     }
 
+    /**
+     * Fetch updated shipping options and totals when address or shipping selection changes.
+     * Called by Apple Pay shipping contact selection and shipping method selection handlers.
+     * 
+     * @param {Object} shippingContact - Apple Pay shipping contact object
+     * @param {string} selectedShippingMethodId - Currently selected shipping method identifier (optional)
+     * @returns {Promise} Promise resolving to updated shipping methods and totals
+     */
+    function fetchShippingOptions(shippingContact, selectedShippingMethodId) {
+        console.log('[Apple Pay] Fetching shipping options for address - countryCode:', shippingContact.countryCode, 'postalCode:', shippingContact.postalCode);
+        
+        // Normalize the Apple Pay contact format to match what the server expects
+        var normalizedAddress = {
+            name: ((shippingContact.givenName || '') + ' ' + (shippingContact.familyName || '')).trim(),
+            address1: (shippingContact.addressLines && shippingContact.addressLines[0]) || '',
+            address2: (shippingContact.addressLines && shippingContact.addressLines[1]) || '',
+            locality: shippingContact.locality || '',
+            administrativeArea: shippingContact.administrativeArea || '',
+            postalCode: shippingContact.postalCode || '',
+            countryCode: shippingContact.countryCode || '',
+            phoneNumber: shippingContact.phoneNumber || ''
+        };
+        
+        var requestData = {
+            module: 'paypalr_applepay',
+            shippingAddress: normalizedAddress
+        };
+        
+        // Include selected shipping option if provided
+        if (selectedShippingMethodId) {
+            requestData.selectedShippingOptionId = selectedShippingMethodId;
+        }
+        
+        // Use configurable base path for AJAX endpoint to support subdirectory installations
+        var ajaxBasePath = window.paypalrAjaxBasePath || 'ajax/';
+        var ajaxUrl = ajaxBasePath + 'paypalr_wallet.php';
+        
+        return fetch(ajaxUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestData)
+        }).then(function(response) {
+            console.log('[Apple Pay] Shipping options response status:', response.status);
+            return parseWalletResponse(response);
+        }).then(function(data) {
+            console.log('[Apple Pay] Shipping options received - shipping method count:', (data.newShippingMethods) ? data.newShippingMethods.length : 0);
+            return data;
+        }).catch(function (error) {
+            console.error('[Apple Pay] Failed to fetch shipping options', error);
+            throw error;
+        });
+    }
+
     // -------------------------------------------------------------------------
     // SDK Loading
     // -------------------------------------------------------------------------
@@ -695,6 +748,76 @@
                     window.oprcHideProcessingOverlay();
                 }
             });
+        };
+
+        // Handle shipping contact selection (address changes)
+        session.onshippingcontactselected = function (event) {
+            console.log('[Apple Pay] onshippingcontactselected called');
+            
+            fetchShippingOptions(event.shippingContact, null)
+                .then(function(response) {
+                    console.log('[Apple Pay] Shipping contact update completed - total:', response.newTotal ? response.newTotal.amount : 'N/A');
+                    
+                    // Check for error response
+                    if (response.error) {
+                        console.error('[Apple Pay] Shipping contact update error:', response.error);
+                        session.completeShippingContactSelection(
+                            ApplePaySession.STATUS_FAILURE,
+                            [],
+                            response.newTotal || { label: 'Total', amount: '0.00' },
+                            response.newLineItems || []
+                        );
+                        return;
+                    }
+                    
+                    // Return the updated shipping methods and totals
+                    session.completeShippingContactSelection(
+                        ApplePaySession.STATUS_SUCCESS,
+                        response.newShippingMethods || [],
+                        response.newTotal || { label: 'Total', amount: '0.00' },
+                        response.newLineItems || []
+                    );
+                })
+                .catch(function(error) {
+                    console.error('[Apple Pay] Failed to fetch shipping options:', error);
+                    session.completeShippingContactSelection(
+                        ApplePaySession.STATUS_FAILURE,
+                        [],
+                        { label: 'Total', amount: '0.00' },
+                        []
+                    );
+                });
+        };
+
+        // Handle shipping method selection (shipping option changes)
+        session.onshippingmethodselected = function (event) {
+            console.log('[Apple Pay] onshippingmethodselected called - method:', event.shippingMethod.identifier);
+            
+            // Get the last shipping contact from the session
+            // Note: Apple Pay doesn't provide shipping contact in this event
+            // We need to fetch with the selected method ID
+            fetchShippingOptions({ 
+                countryCode: 'US',  // Fallback - will use session values on server
+                postalCode: ''
+            }, event.shippingMethod.identifier)
+                .then(function(response) {
+                    console.log('[Apple Pay] Shipping method update completed - total:', response.newTotal ? response.newTotal.amount : 'N/A');
+                    
+                    // Return the updated totals
+                    session.completeShippingMethodSelection(
+                        ApplePaySession.STATUS_SUCCESS,
+                        response.newTotal || { label: 'Total', amount: '0.00' },
+                        response.newLineItems || []
+                    );
+                })
+                .catch(function(error) {
+                    console.error('[Apple Pay] Failed to update totals for shipping method:', error);
+                    session.completeShippingMethodSelection(
+                        ApplePaySession.STATUS_FAILURE,
+                        { label: 'Total', amount: '0.00' },
+                        []
+                    );
+                });
         };
 
         // Step 5: Handle payment authorization
