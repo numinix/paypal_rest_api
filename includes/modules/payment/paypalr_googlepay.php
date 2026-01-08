@@ -270,7 +270,7 @@ class paypalr_googlepay extends base
                         "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
                             (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
                          VALUES
-                            ('Google Pay Merchant ID (optional)', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'Optional Google Merchant ID used for the PayPal SDK google-pay-merchant-id parameter. Must be 5-20 alphanumeric characters. Leave blank unless instructed by PayPal.', 6, 0, NULL, NULL, now())"
+                            ('Google Pay Merchant ID (deprecated)', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'DEPRECATED: This setting is no longer used. As of 2025, PayPal SDK no longer accepts the google-pay-merchant-id parameter. Leave blank.', 6, 0, NULL, NULL, now())"
                     );
                     // Fall through to add button display configuration
 
@@ -840,7 +840,7 @@ class paypalr_googlepay extends base
                 ('Enable PayPal Google Pay?', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS', 'False', 'Do you want to enable PayPal Google Pay payments?', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
                 ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
                 ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now()),
-                ('Google Pay Merchant ID (optional)', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'Optional Google Merchant ID used for the PayPal SDK google-pay-merchant-id parameter. Must be 5-20 alphanumeric characters. Leave blank unless instructed by PayPal.', 6, 0, NULL, NULL, now())" 
+                ('Google Pay Merchant ID (deprecated)', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID', '', 'DEPRECATED: This setting is no longer used. As of 2025, PayPal SDK no longer accepts the google-pay-merchant-id parameter. Leave blank.', 6, 0, NULL, NULL, now())" 
         );
         
         // Define the module's current version so that the tableCheckup method will apply all changes

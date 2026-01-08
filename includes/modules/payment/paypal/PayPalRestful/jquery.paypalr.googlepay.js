@@ -449,9 +449,8 @@
         if (existingScript) {
             var matchesClient = existingScript.src.indexOf(encodeURIComponent(config.clientId)) !== -1;
             var matchesCurrency = existingScript.src.indexOf('currency=' + encodeURIComponent(config.currency || 'USD')) !== -1;
-            var matchesMerchant = !googleMerchantId || existingScript.src.indexOf('google-pay-merchant-id=' + encodeURIComponent(googleMerchantId)) !== -1;
 
-            if (matchesClient && matchesCurrency && matchesMerchant) {
+            if (matchesClient && matchesCurrency) {
                 if (existingScript.dataset.loaded === 'true' && window.paypal && typeof window.paypal.Googlepay === 'function') {
                     sharedSdkLoader.key = desiredKey;
                     sharedSdkLoader.promise = Promise.resolve(window.paypal);
@@ -486,14 +485,11 @@
             query += '&buyer-country=US';
         }
 
-        // Include Google Pay merchant ID when provided to ensure allowedPaymentMethods are returned.
-        // Do NOT include language label strings like "Merchant ID:" or placeholder values like "*".
-        // Validation pattern: /^[A-Z0-9]{5,20}$/i.test(config.merchantId)
-        var merchantIdIsValid = /^[A-Z0-9]{5,20}$/i.test(config.merchantId || '');
-        var googleMerchantId = config.googleMerchantId || config.merchantId;
-        if (googleMerchantId && (merchantIdIsValid || /^[A-Z0-9]{5,20}$/i.test(googleMerchantId))) {
-            query += '&google-pay-merchant-id=' + encodeURIComponent(googleMerchantId);
-        }
+        // Note: The google-pay-merchant-id parameter is NO LONGER SUPPORTED by PayPal SDK.
+        // As of 2025, PayPal's SDK returns a 400 error if this parameter is included.
+        // Google Pay merchant configuration is now handled internally by PayPal.
+        // The MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID configuration is preserved
+        // for backward compatibility but is not used in the SDK URL.
 
         sharedSdkLoader.promise = new Promise(function (resolve, reject) {
             var script = document.createElement('script');
@@ -760,8 +756,8 @@
                 }
 
                 // Initialize PayPal Google Pay
-                // Note: merchantId is configured via SDK URL parameter (google-pay-merchant-id)
-                // and should NOT be passed to the Googlepay() constructor
+                // Note: As of 2025, Google Pay merchant configuration is handled internally by PayPal
+                // and should NOT be passed to the Googlepay() constructor or SDK URL
                 console.log('[Google Pay] Initializing PayPal Googlepay API');
                 var googlepay = paypal.Googlepay();
                 sdkState.googlepay = googlepay;
