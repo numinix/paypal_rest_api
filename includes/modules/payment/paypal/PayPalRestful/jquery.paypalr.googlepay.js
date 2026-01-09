@@ -767,6 +767,8 @@
                         countryCode: 'US'
                     },
                     merchantInfo: basePaymentDataRequest.merchantInfo || {},
+                    // Request email from Google Pay for guest checkout (matches Braintree implementation)
+                    emailRequired: true,
                     // Enable shipping address and shipping option selection in the Google Pay modal
                     shippingAddressRequired: true,
                     shippingAddressParameters: {
