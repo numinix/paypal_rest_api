@@ -358,60 +358,6 @@
         });
     }
 
-    /**
-     * Fetch updated shipping options and totals when address or shipping selection changes.
-     * Called by onPaymentDataChanged callback.
-     * 
-     * @param {Object} shippingAddress - Google Pay shipping address object
-     * @param {string} selectedShippingOptionId - Currently selected shipping option ID (optional)
-     * @returns {Promise} Promise resolving to updated transaction info and shipping options
-     */
-    function fetchShippingOptions(shippingAddress, selectedShippingOptionId) {
-        console.log('[Google Pay] Fetching shipping options for address - countryCode:', shippingAddress.countryCode, 'postalCode:', shippingAddress.postalCode);
-        
-        // Normalize the Google Pay address format to match what the server expects
-        var normalizedAddress = {
-            name: shippingAddress.name || '',
-            address1: shippingAddress.address1 || '',
-            address2: shippingAddress.address2 || '',
-            address3: shippingAddress.address3 || '',
-            locality: shippingAddress.locality || '',
-            administrativeArea: shippingAddress.administrativeArea || '',
-            postalCode: shippingAddress.postalCode || '',
-            countryCode: shippingAddress.countryCode || '',
-            phoneNumber: shippingAddress.phoneNumber || ''
-        };
-        
-        var requestData = {
-            module: 'paypalr_googlepay',
-            shippingAddress: normalizedAddress
-        };
-        
-        // Include selected shipping option if provided
-        if (selectedShippingOptionId) {
-            requestData.selectedShippingOptionId = selectedShippingOptionId;
-        }
-        
-        // Use configurable base path for AJAX endpoint to support subdirectory installations
-        var ajaxBasePath = window.paypalrAjaxBasePath || 'ajax/';
-        var ajaxUrl = ajaxBasePath + 'paypalr_wallet.php';
-        
-        return fetch(ajaxUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestData)
-        }).then(function(response) {
-            console.log('[Google Pay] Shipping options response status:', response.status);
-            return parseWalletResponse(response);
-        }).then(function(data) {
-            console.log('[Google Pay] Shipping options received - shipping method count:', (data.newShippingOptionParameters && data.newShippingOptionParameters.shippingOptions) ? data.newShippingOptionParameters.shippingOptions.length : 0);
-            return data;
-        }).catch(function (error) {
-            console.error('[Google Pay] Failed to fetch shipping options', error);
-            throw error;
-        });
-    }
-
     // -------------------------------------------------------------------------
     // SDK Loading
     // -------------------------------------------------------------------------
@@ -599,66 +545,6 @@
     }
 
     /**
-     * Handle changes to shipping address or shipping option in the Google Pay modal.
-     * This callback is invoked by Google Pay when the user selects/changes their address
-     * or shipping method. It must return updated transaction info and shipping options.
-     * 
-     * @param {Object} intermediatePaymentData - Contains shippingAddress and shippingOptionData
-     * @returns {Promise} Promise resolving to updated payment data (newTransactionInfo, newShippingOptionParameters)
-     */
-    function onPaymentDataChanged(intermediatePaymentData) {
-        console.log('[Google Pay] onPaymentDataChanged called - callbackTrigger:', intermediatePaymentData.callbackTrigger);
-        
-        return new Promise(function(resolve) {
-            var shippingAddress = intermediatePaymentData.shippingAddress;
-            var shippingOptionData = intermediatePaymentData.shippingOptionData;
-            var selectedShippingOptionId = shippingOptionData ? shippingOptionData.id : null;
-            
-            // If we have a shipping address, fetch updated shipping options and totals
-            if (shippingAddress) {
-                fetchShippingOptions(shippingAddress, selectedShippingOptionId)
-                    .then(function(response) {
-                        console.log('[Google Pay] Shipping update completed - totalPrice:', response.newTransactionInfo ? response.newTransactionInfo.totalPrice : 'N/A');
-                        
-                        // Check for error response
-                        if (response.error) {
-                            console.error('[Google Pay] Shipping update error:', response.error);
-                            resolve({
-                                error: {
-                                    reason: 'SHIPPING_ADDRESS_UNSERVICEABLE',
-                                    message: response.error,
-                                    intent: 'SHIPPING_ADDRESS'
-                                }
-                            });
-                            return;
-                        }
-                        
-                        // Return the updated transaction info and shipping options
-                        // The ajax endpoint returns the structure Google Pay expects
-                        resolve({
-                            newTransactionInfo: response.newTransactionInfo,
-                            newShippingOptionParameters: response.newShippingOptionParameters
-                        });
-                    })
-                    .catch(function(error) {
-                        console.error('[Google Pay] Failed to fetch shipping options:', error);
-                        resolve({
-                            error: {
-                                reason: 'SHIPPING_ADDRESS_UNSERVICEABLE',
-                                message: 'Unable to calculate shipping for this address',
-                                intent: 'SHIPPING_ADDRESS'
-                            }
-                        });
-                    });
-            } else {
-                // No shipping address provided yet, return default response
-                console.log('[Google Pay] No shipping address provided');
-                resolve({});
-            }
-        });
-    }
-
-    /**
      * Handle the Google Pay button click event.
      * Creates a PayPal order and initiates the Google Pay payment flow.
      * 
@@ -768,21 +654,11 @@
                     },
                     merchantInfo: basePaymentDataRequest.merchantInfo || {},
                     // Enable email collection from Google Pay
-                    emailRequired: true,
-                    // Enable shipping address and shipping option selection in the Google Pay modal
-                    shippingAddressRequired: true,
-                    shippingAddressParameters: {
-                        phoneNumberRequired: true
-                        // Note: emailRequired is NOT set here because PayPal SDK's confirmOrder() flow
-                        // is incompatible with Google Pay's email collection mechanism.
-                        // Email collection requires PAYMENT_AUTHORIZATION callback + onPaymentAuthorized handler,
-                        // which PayPal SDK doesn't support (it uses confirmOrder() instead).
-                        // Users must be logged in for wallet checkout with PayPal SDK + Google Pay.
-                    },
-                    shippingOptionRequired: true,
-                    // Register callbacks for address and shipping option changes
-                    // Note: PAYMENT_AUTHORIZATION is not included because PayPal SDK uses confirmOrder() API
-                    callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
+                    emailRequired: true
+                    // Note: Shipping address and shipping options are NOT collected here because
+                    // the checkout page already has its own shipping collection system.
+                    // Shipping collection is only needed on cart/product pages where there's no checkout form.
+                    // For cart/product pages, use jquery.paypalr.googlepay.native.js instead.
                 };
 
                 console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
@@ -804,22 +680,20 @@
                     }).then(function (confirmResult) {
                         console.log('[Google Pay] confirmOrder result:', confirmResult);
                         
-                        // Extract shipping and billing addresses from Google Pay payment data
-                        var shippingAddress = paymentData.shippingAddress || {};
+                        // Extract billing address and email from Google Pay payment data
+                        // Note: Shipping address is NOT collected from Google Pay on checkout page
+                        // because the checkout form already handles shipping address collection
                         var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
-                        // Email extraction: paymentData.email is typically empty with PayPal SDK since
-                        // we don't use emailRequired (incompatible with confirmOrder() flow).
-                        // For logged-in users, email comes from session on the server side.
                         var email = paymentData.email || billingAddress.emailAddress || '';
                         
                         // Build the complete payload for checkout
+                        // Note: shipping_address is omitted - it will be retrieved from the checkout form
                         var checkoutPayload = {
                             payment_method_nonce: orderId, // Use orderID as the payment reference
                             module: 'paypalr_googlepay',
                             total: orderConfig.amount,
                             currency: orderConfig.currency || 'USD',
                             email: email,
-                            shipping_address: shippingAddress,
                             billing_address: billingAddress,
                             orderID: orderId
                         };
@@ -966,11 +840,10 @@
                     googlePayEnvironment = 'PRODUCTION';
                 }
                 console.log('[Google Pay] Creating PaymentsClient with environment:', googlePayEnvironment);
+                // Note: No paymentDataCallbacks needed for checkout page since we don't collect shipping
+                // Shipping is already handled by the checkout form
                 var paymentsClient = new google.payments.api.PaymentsClient({
-                    environment: googlePayEnvironment,
-                    paymentDataCallbacks: {
-                        onPaymentDataChanged: onPaymentDataChanged
-                    }
+                    environment: googlePayEnvironment
                 });
                 sdkState.paymentsClient = paymentsClient;
 
