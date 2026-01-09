@@ -22,8 +22,27 @@ $errors = [];
 echo "Testing Google Pay Duplicate Button Prevention\n";
 echo "==============================================\n\n";
 
+// Helper function to safely read file contents
+function safeReadFile(string $relativePath): string {
+    $fullPath = __DIR__ . '/' . $relativePath;
+    if (!file_exists($fullPath)) {
+        throw new RuntimeException("File not found: {$fullPath}");
+    }
+    // Verify the path is within the expected directory
+    $realPath = realpath($fullPath);
+    $baseDir = realpath(__DIR__ . '/..');
+    if ($realPath === false || strpos($realPath, $baseDir) !== 0) {
+        throw new RuntimeException("Invalid file path: {$fullPath}");
+    }
+    return file_get_contents($realPath);
+}
+
+// Regex patterns used in tests
+$renderCallPattern = '/window\.paypalrGooglePayRender\s*\(/';
+$domContentLoadedPattern = '/DOMContentLoaded.*paypalrGooglePayRender/s';
+
 // Test 1: JavaScript file initializes the button
-$googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js');
+$googlePayJs = safeReadFile('../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js');
 
 if (strpos($googlePayJs, 'window.paypalrGooglePayRender = renderGooglePayButton;') === false) {
     $testPassed = false;
@@ -40,10 +59,10 @@ if (strpos($googlePayJs, 'renderGooglePayButton();') === false) {
 }
 
 // Test 2: Shopping cart template should NOT call window.paypalrGooglePayRender()
-$cartTemplate = file_get_contents(__DIR__ . '/../includes/templates/template_default/templates/tpl_modules_paypalr_googlepay.php');
+$cartTemplate = safeReadFile('../includes/templates/template_default/templates/tpl_modules_paypalr_googlepay.php');
 
 // Check for the problematic pattern: calling window.paypalrGooglePayRender() in template
-if (preg_match('/window\.paypalrGooglePayRender\s*\(/', $cartTemplate)) {
+if (preg_match($renderCallPattern, $cartTemplate)) {
     $testPassed = false;
     $errors[] = "Shopping cart template should NOT call window.paypalrGooglePayRender() directly (causes duplicate button)";
 } else {
@@ -51,7 +70,7 @@ if (preg_match('/window\.paypalrGooglePayRender\s*\(/', $cartTemplate)) {
 }
 
 // Check for DOMContentLoaded listener in template (another form of duplicate rendering)
-if (preg_match('/DOMContentLoaded.*paypalrGooglePayRender/s', $cartTemplate)) {
+if (preg_match($domContentLoadedPattern, $cartTemplate)) {
     $testPassed = false;
     $errors[] = "Shopping cart template should NOT add DOMContentLoaded listener for rendering (causes duplicate button)";
 } else {
@@ -59,9 +78,9 @@ if (preg_match('/DOMContentLoaded.*paypalrGooglePayRender/s', $cartTemplate)) {
 }
 
 // Test 3: Product page template should NOT call window.paypalrGooglePayRender()
-$productTemplate = file_get_contents(__DIR__ . '/../includes/templates/template_default/templates/tpl_modules_paypalr_product_googlepay.php');
+$productTemplate = safeReadFile('../includes/templates/template_default/templates/tpl_modules_paypalr_product_googlepay.php');
 
-if (preg_match('/window\.paypalrGooglePayRender\s*\(/', $productTemplate)) {
+if (preg_match($renderCallPattern, $productTemplate)) {
     $testPassed = false;
     $errors[] = "Product page template should NOT call window.paypalrGooglePayRender() directly (causes duplicate button)";
 } else {
@@ -69,7 +88,7 @@ if (preg_match('/window\.paypalrGooglePayRender\s*\(/', $productTemplate)) {
 }
 
 // Check for DOMContentLoaded listener in product template
-if (preg_match('/DOMContentLoaded.*paypalrGooglePayRender/s', $productTemplate)) {
+if (preg_match($domContentLoadedPattern, $productTemplate)) {
     $testPassed = false;
     $errors[] = "Product page template should NOT add DOMContentLoaded listener for rendering (causes duplicate button)";
 } else {
