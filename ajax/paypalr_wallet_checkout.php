@@ -84,7 +84,10 @@ register_shutdown_function(function () use ($braintreeCheckoutErrorResponder) {
 
 // Capture the payload
 $payload = json_decode(file_get_contents('php://input'), true);
-if (empty($payload['payment_method_nonce']) || empty($payload['module'])) {
+
+// Check for either payment_method_nonce (Braintree-style) or paypal_order_id (native wallet style)
+$has_payment_method = !empty($payload['payment_method_nonce']) || !empty($payload['paypal_order_id']);
+if (!$has_payment_method || empty($payload['module'])) {
     echo json_encode(['status' => 'error', 'message' => 'Missing required parameters']);
     exit;
 }
@@ -92,7 +95,7 @@ if (empty($payload['payment_method_nonce']) || empty($payload['module'])) {
 log_paypalr_wallet_message('Received checkout payload: ' . print_r($payload, true));
 
 // Ensure payload is valid
-if (empty($payload['payment_method_nonce']) || empty($payload['total']) || empty($payload['module'])) {
+if (!$has_payment_method || empty($payload['total']) || empty($payload['module'])) {
     $response = ['status' => 'error', 'message' => 'Invalid payload'];
     echo json_encode($response);
     exit;
@@ -115,7 +118,8 @@ switch ($module) {
         break;
 }
 
-$_SESSION['payment_method_nonce'] = $_POST['payment_method_nonce'] = $payment_method_nonce = $payload['payment_method_nonce'];
+$_SESSION['payment_method_nonce'] = $_POST['payment_method_nonce'] = $payment_method_nonce = $payload['payment_method_nonce'] ?? '';
+$_SESSION['paypal_order_id'] = $_POST['paypal_order_id'] = $paypal_order_id = $payload['paypal_order_id'] ?? '';
 $_SESSION['currency'] = $currency = $payload['currency'];
 $_SESSION['payment'] = $module;
 $total = $payload['total'];
@@ -125,6 +129,8 @@ $billing_address_raw  = $payload['billing_address'] ?? [];
 
 // Log the payload total for debugging potential amount mismatches
 log_paypalr_wallet_message("Payload total from client: $total (currency: $currency)");
+log_paypalr_wallet_message("Payment method nonce: " . ($payment_method_nonce ?: 'N/A'));
+log_paypalr_wallet_message("PayPal order ID: " . ($paypal_order_id ?: 'N/A'));
 
 // Normalize
 $shipping_address = normalize_braintree_contact($shipping_address_raw, $module);
