@@ -770,9 +770,7 @@
                     // Enable shipping address and shipping option selection in the Google Pay modal
                     shippingAddressRequired: true,
                     shippingAddressParameters: {
-                        phoneNumberRequired: true,
-                        // Request email in shipping address - this is how Braintree gets email
-                        emailRequired: true
+                        phoneNumberRequired: true
                     },
                     shippingOptionRequired: true,
                     // Register callbacks for address and shipping option changes
@@ -801,37 +799,7 @@
                         // Extract shipping and billing addresses from Google Pay payment data
                         var shippingAddress = paymentData.shippingAddress || {};
                         var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
-                        
-                        // Extract email from multiple possible locations
-                        // Google Pay can provide email in different places depending on configuration
-                        var email = '';
-                        
-                        // Check all possible locations for email
-                        if (paymentData.email) {
-                            email = paymentData.email;
-                            console.log('[Google Pay] Email found in paymentData.email');
-                        } else if (paymentData.shippingAddress && paymentData.shippingAddress.email) {
-                            email = paymentData.shippingAddress.email;
-                            console.log('[Google Pay] Email found in paymentData.shippingAddress.email');
-                        } else if (shippingAddress.emailAddress) {
-                            email = shippingAddress.emailAddress;
-                            console.log('[Google Pay] Email found in shippingAddress.emailAddress');
-                        } else if (shippingAddress.email) {
-                            email = shippingAddress.email;
-                            console.log('[Google Pay] Email found in shippingAddress.email');
-                        } else if (billingAddress.emailAddress) {
-                            email = billingAddress.emailAddress;
-                            console.log('[Google Pay] Email found in billingAddress.emailAddress');
-                        } else if (billingAddress.email) {
-                            email = billingAddress.email;
-                            console.log('[Google Pay] Email found in billingAddress.email');
-                        } else if (paymentData.paymentMethodData && paymentData.paymentMethodData.info && paymentData.paymentMethodData.info.email) {
-                            email = paymentData.paymentMethodData.info.email;
-                            console.log('[Google Pay] Email found in paymentData.paymentMethodData.info.email');
-                        }
-                        
-                        console.log('[Google Pay] Final extracted email:', email);
-                        console.log('[Google Pay] Full paymentData structure for debugging:', JSON.stringify(paymentData, null, 2));
+                        var email = paymentData.email || '';
                         
                         // Build the complete payload for checkout
                         var checkoutPayload = {
@@ -856,32 +824,9 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(checkoutPayload)
                         }).then(function(response) {
-                            // Check if response is OK and JSON before parsing
-                            if (!response.ok) {
-                                console.error('[Google Pay] Checkout request failed with status:', response.status);
-                                return response.text().then(function(text) {
-                                    console.error('[Google Pay] Error response:', text);
-                                    throw new Error('Checkout request failed with status ' + response.status);
-                                });
-                            }
-                            
-                            var contentType = response.headers.get('content-type');
-                            if (!contentType || contentType.indexOf('application/json') === -1) {
-                                return response.text().then(function(text) {
-                                    console.error('[Google Pay] Non-JSON response received:', text.substring(0, 500));
-                                    throw new Error('Server returned non-JSON response. Check console for details.');
-                                });
-                            }
-                            
                             return response.json();
                         }).then(function(checkoutResult) {
                             console.log('[Google Pay] Checkout result:', checkoutResult);
-                            console.log('[Google Pay] Checkout result details:', {
-                                status: checkoutResult.status,
-                                hasRedirectUrl: !!checkoutResult.redirect_url,
-                                redirectUrl: checkoutResult.redirect_url,
-                                message: checkoutResult.message
-                            });
                             
                             if (checkoutResult.status === 'success' && checkoutResult.redirect_url) {
                                 console.log('[Google Pay] Redirecting to:', checkoutResult.redirect_url);
@@ -900,7 +845,7 @@
                             if (typeof window.oprcHideProcessingOverlay === 'function') {
                                 window.oprcHideProcessingOverlay();
                             }
-                            alert('Checkout failed. Please try again. ' + checkoutError.message);
+                            alert('Checkout failed. Please try again.');
                         });
                     }).catch(function (confirmError) {
                         console.error('[Google Pay] confirmOrder failed:', confirmError);
