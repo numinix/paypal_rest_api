@@ -770,13 +770,10 @@
                     // Enable shipping address and shipping option selection in the Google Pay modal
                     shippingAddressRequired: true,
                     shippingAddressParameters: {
-                        phoneNumberRequired: true,
-                        // Request email through shipping address parameters (PayPal SDK compatible approach)
-                        emailRequired: true
+                        phoneNumberRequired: true
                     },
                     shippingOptionRequired: true,
                     // Register callbacks for address and shipping option changes
-                    // Note: PAYMENT_AUTHORIZATION is not used with PayPal SDK (PayPal uses confirmOrder() instead)
                     callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
                 };
 
@@ -802,8 +799,7 @@
                         // Extract shipping and billing addresses from Google Pay payment data
                         var shippingAddress = paymentData.shippingAddress || {};
                         var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
-                        // Email comes from shippingAddress when using shippingAddressParameters.emailRequired
-                        var email = (shippingAddress.emailAddress || paymentData.email || billingAddress.emailAddress || '');
+                        var email = paymentData.email || '';
                         
                         // Build the complete payload for checkout
                         var checkoutPayload = {
