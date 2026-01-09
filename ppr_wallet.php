@@ -71,10 +71,14 @@ try {
 
     // -----
     // Select a default shipping method if none is currently selected in the session.
-    // This ensures the initial order total includes shipping cost.
-    // Only do this if shipping is not already set and the cart requires shipping.
+    // This ensures the initial order total includes shipping cost when called from
+    // the cart or product pages (not during checkout).
+    // Only do this if:
+    // - We're NOT in checkout (sendto not set - user hasn't selected shipping address yet)
+    // - Shipping is not already set
+    // - Cart requires shipping (not virtual products)
     //
-    if (!isset($_SESSION['shipping']) && $_SESSION['cart']->get_content_type() !== 'virtual') {
+    if (!isset($_SESSION['sendto']) && !isset($_SESSION['shipping']) && $_SESSION['cart']->get_content_type() !== 'virtual') {
         require_once DIR_WS_CLASSES . 'shipping.php';
         
         // Get shipping quotes using current cart/session state
