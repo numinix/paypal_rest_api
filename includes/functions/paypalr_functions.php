@@ -357,6 +357,12 @@ if (!function_exists('zen_update_orders_history')) {
         // If status is provided and valid, update the order status
         if ($status > 0) {
             try {
+                // Check if TABLE_ORDERS is defined
+                if (!defined('TABLE_ORDERS')) {
+                    error_log("zen_update_orders_history: TABLE_ORDERS constant not defined");
+                    return;
+                }
+                
                 $db->Execute("UPDATE " . TABLE_ORDERS . " 
                              SET orders_status = " . (int)$status . ",
                                  last_modified = now()
@@ -368,12 +374,30 @@ if (!function_exists('zen_update_orders_history')) {
         
         // Insert the order status history record
         try {
+            // Check if required constants are defined
+            if (!defined('TABLE_ORDERS_STATUS_HISTORY')) {
+                error_log("zen_update_orders_history: TABLE_ORDERS_STATUS_HISTORY constant not defined");
+                return;
+            }
+            
+            // Use a default status if DEFAULT_ORDERS_STATUS_ID is not defined
+            $default_status = defined('DEFAULT_ORDERS_STATUS_ID') ? (int)DEFAULT_ORDERS_STATUS_ID : 1;
+            $status_id = ($status > 0) ? (int)$status : $default_status;
+            
+            // Use zen_db_input if available, otherwise use basic escaping
+            if (function_exists('zen_db_input')) {
+                $escaped_message = zen_db_input($message);
+            } else {
+                // Fallback to basic escaping
+                $escaped_message = $db->prepareInput($message);
+            }
+            
             $sql_data_array = [
                 'orders_id' => $order_id,
-                'orders_status_id' => ($status > 0) ? (int)$status : (int)DEFAULT_ORDERS_STATUS_ID,
+                'orders_status_id' => $status_id,
                 'date_added' => 'now()',
                 'customer_notified' => (int)$customer_notified,
-                'comments' => zen_db_input($message)
+                'comments' => $escaped_message
             ];
             
             // Build the SQL INSERT statement

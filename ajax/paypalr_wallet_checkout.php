@@ -289,6 +289,10 @@ if (!isset($_SESSION['customer_id'])) {
         // Get the new customer ID
         $customer_id = $db->Insert_ID();
         log_paypalr_wallet_message("Created new customer ID: $customer_id with email: $email");
+        
+        // Set session variables for the new customer
+        $_SESSION['customer_first_name'] = $billing_first_name;
+        $_SESSION['customer_last_name'] = $billing_last_name;
 
         // If the COWOA_account column exists, set it to 1
         $check_cowoa_account = $db->Execute("SHOW COLUMNS FROM " . TABLE_CUSTOMERS . " LIKE 'COWOA_account'");
