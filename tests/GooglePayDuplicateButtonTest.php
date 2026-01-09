@@ -30,15 +30,17 @@ echo "==============================================\n\n";
 // Helper function to safely read file contents
 function safeReadFile(string $relativePath): string {
     $fullPath = __DIR__ . '/' . $relativePath;
-    if (!file_exists($fullPath)) {
-        throw new RuntimeException("File not found: {$fullPath}");
-    }
-    // Verify the path is within the expected directory
     $realPath = realpath($fullPath);
     $baseDir = realpath(__DIR__ . '/..');
-    if ($realPath === false || !str_starts_with($realPath, $baseDir . DIRECTORY_SEPARATOR)) {
-        throw new RuntimeException("Invalid file path: {$fullPath}");
+    
+    // Validate path exists and is within expected directory
+    if ($realPath === false) {
+        throw new RuntimeException("File not found or inaccessible: {$fullPath}");
     }
+    if (!str_starts_with($realPath, $baseDir . DIRECTORY_SEPARATOR)) {
+        throw new RuntimeException("Invalid file path (outside base directory): {$fullPath}");
+    }
+    
     return file_get_contents($realPath);
 }
 
