@@ -3,7 +3,9 @@
  * tpl_modules_paypalr_product_applepay.php
  * Apple Pay button template for product page
  * 
- * Apple Pay uses PayPal SDK with native Apple Pay integration.
+ * Uses native ApplePaySession API to retrieve user email addresses,
+ * then processes payment through PayPal REST API.
+ * Based on Braintree implementation pattern.
  */
     require_once(DIR_WS_LANGUAGES . $_SESSION['language'] . '/modules/payment/paypalr_applepay.php');
     require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr_applepay.php');
@@ -27,13 +29,12 @@
     $productId = (int)$_GET['products_id'];
     $initialTotal = number_format($currencies->value(zen_get_products_base_price($productId)), 2, '.', '');
     
-    // Build SDK URL with components
-    // Note: As of 2025, PayPal SDK no longer accepts merchant-id or intent parameters
-    // Intent is specified when creating the order, not when loading the SDK
-    //
-    // All wallet components (buttons,googlepay,applepay) are loaded together to ensure
-    // compatibility when multiple payment methods are enabled. This prevents SDK reload
-    // issues when users have both Google Pay and Apple Pay available.
+    // Get store country code for Apple Pay
+    $country_query = "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES . " WHERE countries_id = " . (int)STORE_COUNTRY;
+    $country_result = $db->Execute($country_query);
+    $storeCountryCode = $country_result->fields['countries_iso_code_2'] ?? 'US';
+    
+    // Build PayPal SDK URL - still needed for order creation/capture
     $sdkComponents = 'buttons,googlepay,applepay';
     $sdkUrl = 'https://www.paypal.com/sdk/js?client-id=' . urlencode($clientId);
     $sdkUrl .= '&components=' . urlencode($sdkComponents);
@@ -48,28 +49,47 @@
 <script src="<?php echo $sdkUrl; ?>"></script>
 
 <?php
-    // Load the PayPal Apple Pay JavaScript
-    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.applepay.js';
+    // Load the native Apple Pay JavaScript integration
+    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.applepay.native.js';
     if (file_exists($scriptPath)) {
         echo '<script>' . file_get_contents($scriptPath) . '</script>';
+    } else {
+        // Fallback to original implementation if native version doesn't exist yet
+        $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.applepay.js';
+        if (file_exists($scriptPath)) {
+            echo '<script>' . file_get_contents($scriptPath) . '</script>';
+        }
     }
 ?>
 
 <script>
 "use strict";
 
-window.paypalrApplePaySessionAppend = window.paypalrApplePaySessionAppend || "<?php echo zen_session_id() ? ('?' . zen_session_name() . '=' . zen_session_id()) : ''; ?>";
+// Configuration for native Apple Pay integration
+window.paypalrApplePayConfig = {
+    clientId: "<?php echo addslashes($clientId); ?>",
+    merchantId: "<?php echo addslashes($merchantId); ?>",
+    storeCountryCode: "<?php echo $storeCountryCode; ?>",
+    currencyCode: "<?php echo $currency; ?>",
+    initialTotal: "<?php echo $initialTotal; ?>",
+    storeName: "<?php echo addslashes(STORE_NAME); ?>",
+    environment: "<?php echo $environment; ?>",
+    sessionAppend: "<?php echo zen_session_id() ? ('?' . zen_session_name() . '=' . zen_session_id()) : ''; ?>",
+    context: 'product',
+    productId: <?php echo $productId; ?>
+};
 
-// Initialize Apple Pay when PayPal SDK is loaded
-if (window.paypal) {
-    var applePayContainer = document.getElementById('paypalr-applepay-button');
-    if (applePayContainer) {
-        applePayContainer.style.minHeight = '50px';
-        // Mark this as a product page context
-        applePayContainer.setAttribute('data-context', 'product');
-    }
+// Initialize Apple Pay when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof window.initPayPalRApplePay === 'function') {
+            window.initPayPalRApplePay();
+        }
+    });
 } else {
-    console.error('PayPal SDK not loaded for Apple Pay');
+    if (typeof window.initPayPalRApplePay === 'function') {
+        window.initPayPalRApplePay();
+    }
 }
 </script>
 
