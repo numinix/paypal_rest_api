@@ -261,15 +261,47 @@ if (!function_exists('braintree_calculate_tax_inclusive_amount')) {
 // Determine selected shipping method
 // Treat "shipping_option_unselected" the same as empty/unset - this is sent by Google Pay during INITIALIZE
 if (!isset($data['selectedShippingOptionId']) || empty($data['selectedShippingOptionId']) || $data['selectedShippingOptionId'] === 'shipping_option_unselected') {
+    // Try to get the cheapest shipping method from Zen Cart
     $cheapest = $shipping_modules->cheapest();
     log_paypalr_wallet_message('Cheapest shipping method returned: ' . print_r($cheapest, true));
     
+    $selectedShippingOption = null;
+    
+    // Check if cheapest() returned a valid result
     if (!empty($cheapest) && !empty($cheapest['id'])) {
         $selectedShippingOption = $cheapest['id'];
-        log_paypalr_wallet_message('Selected cheapest shipping method: ' . $selectedShippingOption);
-    } elseif (!empty($quotes)) {
-        // fallback: pick first valid shipping method as default
-        log_paypalr_wallet_message('Cheapest method not available, falling back to first method');
+        log_paypalr_wallet_message('Selected cheapest shipping method from cheapest(): ' . $selectedShippingOption);
+    }
+    
+    // If cheapest() didn't work, manually find the cheapest from quotes
+    if ($selectedShippingOption === null && !empty($quotes)) {
+        log_paypalr_wallet_message('cheapest() did not return valid result, manually finding cheapest from quotes');
+        $lowestCost = null;
+        $lowestOptionId = null;
+        
+        foreach ($quotes as $quote) {
+            if (!empty($quote['error']) || empty($quote['methods'])) continue;
+            
+            foreach ($quote['methods'] as $method) {
+                $cost = (float)($method['cost'] ?? 0);
+                $optionId = "{$quote['id']}_{$method['id']}";
+                
+                if ($lowestCost === null || $cost < $lowestCost) {
+                    $lowestCost = $cost;
+                    $lowestOptionId = $optionId;
+                }
+            }
+        }
+        
+        if ($lowestOptionId !== null) {
+            $selectedShippingOption = $lowestOptionId;
+            log_paypalr_wallet_message('Selected cheapest shipping method manually: ' . $selectedShippingOption . ' (cost: ' . $lowestCost . ')');
+        }
+    }
+    
+    // Final fallback: use first method if we still don't have one
+    if ($selectedShippingOption === null && !empty($quotes)) {
+        log_paypalr_wallet_message('No cheapest method found, falling back to first method');
         foreach ($quotes as $quote) {
             if (!empty($quote['error']) || empty($quote['methods'])) continue;
             $firstMethod = $quote['methods'][0];
@@ -277,8 +309,9 @@ if (!isset($data['selectedShippingOptionId']) || empty($data['selectedShippingOp
             log_paypalr_wallet_message('Selected first available shipping method: ' . $selectedShippingOption);
             break;
         }
-    } else {
-        $selectedShippingOption = null;
+    }
+    
+    if ($selectedShippingOption === null) {
         log_paypalr_wallet_message('No shipping methods available');
     }
 } else {
