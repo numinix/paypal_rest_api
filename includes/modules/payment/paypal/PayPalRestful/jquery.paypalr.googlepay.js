@@ -804,22 +804,34 @@
                         
                         // Extract email from multiple possible locations
                         // Google Pay can provide email in different places depending on configuration
-                        var email = paymentData.email || '';
-                        if (!email && shippingAddress.emailAddress) {
+                        var email = '';
+                        
+                        // Check all possible locations for email
+                        if (paymentData.email) {
+                            email = paymentData.email;
+                            console.log('[Google Pay] Email found in paymentData.email');
+                        } else if (paymentData.shippingAddress && paymentData.shippingAddress.email) {
+                            email = paymentData.shippingAddress.email;
+                            console.log('[Google Pay] Email found in paymentData.shippingAddress.email');
+                        } else if (shippingAddress.emailAddress) {
                             email = shippingAddress.emailAddress;
-                        }
-                        if (!email && billingAddress.emailAddress) {
+                            console.log('[Google Pay] Email found in shippingAddress.emailAddress');
+                        } else if (shippingAddress.email) {
+                            email = shippingAddress.email;
+                            console.log('[Google Pay] Email found in shippingAddress.email');
+                        } else if (billingAddress.emailAddress) {
                             email = billingAddress.emailAddress;
+                            console.log('[Google Pay] Email found in billingAddress.emailAddress');
+                        } else if (billingAddress.email) {
+                            email = billingAddress.email;
+                            console.log('[Google Pay] Email found in billingAddress.email');
+                        } else if (paymentData.paymentMethodData && paymentData.paymentMethodData.info && paymentData.paymentMethodData.info.email) {
+                            email = paymentData.paymentMethodData.info.email;
+                            console.log('[Google Pay] Email found in paymentData.paymentMethodData.info.email');
                         }
                         
-                        console.log('[Google Pay] Extracted email:', email);
-                        console.log('[Google Pay] Payment data structure:', {
-                            hasTopLevelEmail: !!paymentData.email,
-                            hasShippingEmail: !!(shippingAddress && shippingAddress.emailAddress),
-                            hasBillingEmail: !!(billingAddress && billingAddress.emailAddress),
-                            shippingAddress: shippingAddress,
-                            billingAddress: billingAddress
-                        });
+                        console.log('[Google Pay] Final extracted email:', email);
+                        console.log('[Google Pay] Full paymentData structure for debugging:', JSON.stringify(paymentData, null, 2));
                         
                         // Build the complete payload for checkout
                         var checkoutPayload = {
