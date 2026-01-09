@@ -305,11 +305,11 @@ if (!isset($_SESSION['customer_id'])) {
     $_SESSION['customer_first_name'] = $existing_first;
     $_SESSION['customer_last_name'] = $existing_last;
     $_SESSION['customer_email_address'] = $email;
+    
     // Set session variables based on whether guest checkout is used
     if ($isGuestCheckout) {
-        // Treat the Google/Apple Pay flow as a guest checkout but still set the core customer id
+        // Treat the Google/Apple Pay flow as a guest checkout
         $_SESSION['customer_guest_id'] = $customer_id;
-        $_SESSION['customer_id'] = $customer_id;
         $_SESSION['COWOA'] = true;
         $_SESSION['customer_loggedin_type'] = 'guest';
 
@@ -317,7 +317,6 @@ if (!isset($_SESSION['customer_id'])) {
             $_SESSION['braintree_express_checkout'] = $module;
         }
     } else {
-        $_SESSION['customer_id'] = $customer_id;
         $_SESSION['customer_loggedin_type'] = "customer";
     }
 } else {
