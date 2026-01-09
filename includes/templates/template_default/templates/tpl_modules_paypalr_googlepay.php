@@ -12,43 +12,25 @@
 
     $googlePayModule = new paypalr_googlepay();
     
-    // Get wallet configuration
+    // Get wallet configuration to verify Google Pay is enabled
     $walletConfig = $googlePayModule->ajaxGetWalletConfig();
     if (empty($walletConfig['success']) || empty($walletConfig['clientId'])) {
         // If configuration fails, don't show the button
         return;
-    }
-    
-    $clientId = $walletConfig['clientId'];
-    $googleMerchantId = $walletConfig['googleMerchantId'] ?? '';
-    $intent = $walletConfig['intent'] ?? 'capture';
-    $currency = $_SESSION['currency'] ?? DEFAULT_CURRENCY;
-    $googlePayEnvironment = $walletConfig['environment'] === 'sandbox' ? 'TEST' : 'PRODUCTION';
-    $initialTotal = number_format($currencies->value($_SESSION['cart']->total), 2, '.', '');
-    
-    // Get store country code for Google Pay
-    $country_query = "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES . " WHERE countries_id = " . (int)STORE_COUNTRY;
-    $country_result = $db->Execute($country_query);
-    $storeCountryCode = $country_result->fields['countries_iso_code_2'] ?? 'US';
-    
-    // Build PayPal SDK URL - still needed for order creation/capture
-    $sdkComponents = 'buttons,googlepay,applepay';
-    $sdkUrl = 'https://www.paypal.com/sdk/js?client-id=' . urlencode($clientId);
-    $sdkUrl .= '&components=' . urlencode($sdkComponents);
-    $sdkUrl .= '&currency=' . urlencode($currency);
-    
-    // Add buyer-country for sandbox mode (required for testing)
-    if ($walletConfig['environment'] === 'sandbox') {
-        $sdkUrl .= '&buyer-country=US';
     }
 ?>
 
 <?php
     // Load the PayPal SDK Google Pay JavaScript integration
     // This uses paypal.Googlepay().config() to get proper tokenization specification
+    // The JS file handles all SDK loading and initialization internally
     $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js';
     if (file_exists($scriptPath)) {
         echo '<script>' . file_get_contents($scriptPath) . '</script>';
+    } else {
+        // Log error if the required JavaScript file is missing
+        error_log('Google Pay Error: jquery.paypalr.googlepay.js not found at: ' . $scriptPath);
+        return;
     }
 ?>
 
