@@ -119,7 +119,7 @@ $_SESSION['payment_method_nonce'] = $_POST['payment_method_nonce'] = $payment_me
 $_SESSION['currency'] = $currency = $payload['currency'];
 $_SESSION['payment'] = $module;
 $total = $payload['total'];
-$email = $payload['email'];
+$email = $payload['email'] ?? '';
 $shipping_address_raw = $payload['shipping_address'] ?? [];
 $billing_address_raw  = $payload['billing_address'] ?? [];
 
@@ -129,6 +129,27 @@ log_paypalr_wallet_message("Payload total from client: $total (currency: $curren
 // Normalize
 $shipping_address = normalize_braintree_contact($shipping_address_raw, $module);
 $billing_address  = normalize_braintree_contact($billing_address_raw, $module);
+
+// Extract email from billing address if not provided in payload
+if (empty($email)) {
+    $email = $billing_address['emailAddress'] ?? $billing_address['email'] ?? '';
+    log_paypalr_wallet_message("Email extracted from billing address: $email");
+}
+
+// Validate that we have an email address
+if (empty($email)) {
+    log_paypalr_wallet_message("ERROR: No email address provided in payload or billing address");
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Email address is required for checkout'
+    ]);
+    exit;
+}
+
+// Store email in session for later use
+$_SESSION['customer_email_address'] = $email;
+
+log_paypalr_wallet_message("Processing order for email: $email");
 
 function incomplete_address_fields($addr) {
     $missing = [];

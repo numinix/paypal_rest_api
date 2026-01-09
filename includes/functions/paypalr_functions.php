@@ -324,3 +324,77 @@ function paypalr_wallet_get_tokenization_key() {
 
     return (string) $common->get_tokenization_key();
 }
+
+/**
+ * Fallback implementation of zen_update_orders_history for when it's not available
+ * This is typically provided by Zen Cart core, but we provide a stub for wallet checkout contexts
+ * 
+ * @param int $order_id The order ID
+ * @param string $message The status message to add
+ * @param string|null $updated_by Who updated the order (e.g., 'webhook', null for admin)
+ * @param int $status The new order status ID (-1 means no change)
+ * @param int $customer_notified Whether customer was notified (0=no, 1=yes, -1=hidden, -2=admin only)
+ * @return void
+ */
+if (!function_exists('zen_update_orders_history')) {
+    function zen_update_orders_history($order_id, $message, $updated_by = null, $status = -1, $customer_notified = 0) {
+        global $db;
+        
+        // If database is not available, log and return
+        if (!isset($db) || !is_object($db)) {
+            error_log("zen_update_orders_history: Database not available for order $order_id");
+            return;
+        }
+        
+        // If order ID is not valid, return
+        if (empty($order_id) || !is_numeric($order_id)) {
+            error_log("zen_update_orders_history: Invalid order ID: " . var_export($order_id, true));
+            return;
+        }
+        
+        $order_id = (int)$order_id;
+        
+        // If status is provided and valid, update the order status
+        if ($status > 0) {
+            try {
+                $db->Execute("UPDATE " . TABLE_ORDERS . " 
+                             SET orders_status = " . (int)$status . ",
+                                 last_modified = now()
+                             WHERE orders_id = " . $order_id);
+            } catch (Exception $e) {
+                error_log("zen_update_orders_history: Failed to update order status: " . $e->getMessage());
+            }
+        }
+        
+        // Insert the order status history record
+        try {
+            $sql_data_array = [
+                'orders_id' => $order_id,
+                'orders_status_id' => ($status > 0) ? (int)$status : (int)DEFAULT_ORDERS_STATUS_ID,
+                'date_added' => 'now()',
+                'customer_notified' => (int)$customer_notified,
+                'comments' => zen_db_input($message)
+            ];
+            
+            // Build the SQL INSERT statement
+            $fields = [];
+            $values = [];
+            foreach ($sql_data_array as $key => $value) {
+                $fields[] = $key;
+                if ($value === 'now()') {
+                    $values[] = 'now()';
+                } else {
+                    $values[] = "'" . $value . "'";
+                }
+            }
+            
+            $sql = "INSERT INTO " . TABLE_ORDERS_STATUS_HISTORY . " 
+                    (" . implode(', ', $fields) . ") 
+                    VALUES (" . implode(', ', $values) . ")";
+            
+            $db->Execute($sql);
+        } catch (Exception $e) {
+            error_log("zen_update_orders_history: Failed to insert order history: " . $e->getMessage());
+        }
+    }
+}
