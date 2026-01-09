@@ -16,6 +16,11 @@
  */
 declare(strict_types=1);
 
+// File paths for testing
+const JS_FILE_PATH = '../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js';
+const CART_TEMPLATE_PATH = '../includes/templates/template_default/templates/tpl_modules_paypalr_googlepay.php';
+const PRODUCT_TEMPLATE_PATH = '../includes/templates/template_default/templates/tpl_modules_paypalr_product_googlepay.php';
+
 $testPassed = true;
 $errors = [];
 
@@ -31,7 +36,7 @@ function safeReadFile(string $relativePath): string {
     // Verify the path is within the expected directory
     $realPath = realpath($fullPath);
     $baseDir = realpath(__DIR__ . '/..');
-    if ($realPath === false || strpos($realPath, $baseDir) !== 0) {
+    if ($realPath === false || !str_starts_with($realPath, $baseDir . DIRECTORY_SEPARATOR)) {
         throw new RuntimeException("Invalid file path: {$fullPath}");
     }
     return file_get_contents($realPath);
@@ -42,7 +47,7 @@ $renderCallPattern = '/window\.paypalrGooglePayRender\s*\(/';
 $domContentLoadedPattern = '/DOMContentLoaded.*paypalrGooglePayRender/s';
 
 // Test 1: JavaScript file initializes the button
-$googlePayJs = safeReadFile('../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js');
+$googlePayJs = safeReadFile(JS_FILE_PATH);
 
 if (strpos($googlePayJs, 'window.paypalrGooglePayRender = renderGooglePayButton;') === false) {
     $testPassed = false;
@@ -59,7 +64,7 @@ if (strpos($googlePayJs, 'renderGooglePayButton();') === false) {
 }
 
 // Test 2: Shopping cart template should NOT call window.paypalrGooglePayRender()
-$cartTemplate = safeReadFile('../includes/templates/template_default/templates/tpl_modules_paypalr_googlepay.php');
+$cartTemplate = safeReadFile(CART_TEMPLATE_PATH);
 
 // Check for the problematic pattern: calling window.paypalrGooglePayRender() in template
 if (preg_match($renderCallPattern, $cartTemplate)) {
@@ -78,7 +83,7 @@ if (preg_match($domContentLoadedPattern, $cartTemplate)) {
 }
 
 // Test 3: Product page template should NOT call window.paypalrGooglePayRender()
-$productTemplate = safeReadFile('../includes/templates/template_default/templates/tpl_modules_paypalr_product_googlepay.php');
+$productTemplate = safeReadFile(PRODUCT_TEMPLATE_PATH);
 
 if (preg_match($renderCallPattern, $productTemplate)) {
     $testPassed = false;
