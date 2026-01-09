@@ -826,6 +826,23 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(checkoutPayload)
                         }).then(function(response) {
+                            // Check if response is OK and JSON before parsing
+                            if (!response.ok) {
+                                console.error('[Google Pay] Checkout request failed with status:', response.status);
+                                return response.text().then(function(text) {
+                                    console.error('[Google Pay] Error response:', text);
+                                    throw new Error('Checkout request failed with status ' + response.status);
+                                });
+                            }
+                            
+                            var contentType = response.headers.get('content-type');
+                            if (!contentType || contentType.indexOf('application/json') === -1) {
+                                return response.text().then(function(text) {
+                                    console.error('[Google Pay] Non-JSON response received:', text.substring(0, 500));
+                                    throw new Error('Server returned non-JSON response. Check console for details.');
+                                });
+                            }
+                            
                             return response.json();
                         }).then(function(checkoutResult) {
                             console.log('[Google Pay] Checkout result:', checkoutResult);
@@ -847,7 +864,7 @@
                             if (typeof window.oprcHideProcessingOverlay === 'function') {
                                 window.oprcHideProcessingOverlay();
                             }
-                            alert('Checkout failed. Please try again.');
+                            alert('Checkout failed. Please try again. ' + checkoutError.message);
                         });
                     }).catch(function (confirmError) {
                         console.error('[Google Pay] confirmOrder failed:', confirmError);
