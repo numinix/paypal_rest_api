@@ -767,12 +767,12 @@
                         countryCode: 'US'
                     },
                     merchantInfo: basePaymentDataRequest.merchantInfo || {},
-                    // Request email from Google Pay for guest checkout (matches Braintree implementation)
-                    emailRequired: true,
                     // Enable shipping address and shipping option selection in the Google Pay modal
                     shippingAddressRequired: true,
                     shippingAddressParameters: {
-                        phoneNumberRequired: true
+                        phoneNumberRequired: true,
+                        // Request email through shipping address parameters (PayPal SDK compatible approach)
+                        emailRequired: true
                     },
                     shippingOptionRequired: true,
                     // Register callbacks for address and shipping option changes
@@ -802,7 +802,8 @@
                         // Extract shipping and billing addresses from Google Pay payment data
                         var shippingAddress = paymentData.shippingAddress || {};
                         var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
-                        var email = paymentData.email || '';
+                        // Email comes from shippingAddress when using shippingAddressParameters.emailRequired
+                        var email = (shippingAddress.emailAddress || paymentData.email || billingAddress.emailAddress || '');
                         
                         // Build the complete payload for checkout
                         var checkoutPayload = {
