@@ -773,6 +773,8 @@
                         phoneNumberRequired: true
                     },
                     shippingOptionRequired: true,
+                    // Request email address from the user
+                    emailRequired: true,
                     // Register callbacks for address and shipping option changes
                     callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
                 };
