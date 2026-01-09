@@ -81,51 +81,61 @@ try {
         $shipping_modules = new shipping();
         $quotes = $shipping_modules->quote();
         
-        // Select the cheapest shipping method as the default
+        // Select the cheapest shipping method as the default, or use first available
         $cheapest = $shipping_modules->cheapest();
         $selectedShippingId = null;
+        $selectedQuote = null;
+        $selectedMethod = null;
         
+        // First try to use the cheapest method
         if (!empty($cheapest) && !empty($cheapest['id'])) {
             $selectedShippingId = $cheapest['id'];
-        } elseif (!empty($quotes)) {
-            // Fallback: pick first valid shipping method as default
+            // Find the corresponding quote and method details
+            foreach ($quotes as $quote) {
+                if (empty($quote['error']) && !empty($quote['methods'])) {
+                    foreach ($quote['methods'] as $method) {
+                        $optionId = "{$quote['id']}_{$method['id']}";
+                        if ($optionId === $selectedShippingId) {
+                            $selectedQuote = $quote;
+                            $selectedMethod = $method;
+                            break 2;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: pick first valid shipping method if cheapest not found
+        if ($selectedQuote === null && !empty($quotes)) {
             foreach ($quotes as $quote) {
                 if (empty($quote['error']) && !empty($quote['methods'])) {
                     $firstMethod = $quote['methods'][0];
                     $selectedShippingId = "{$quote['id']}_{$firstMethod['id']}";
+                    $selectedQuote = $quote;
+                    $selectedMethod = $firstMethod;
                     break;
                 }
             }
         }
         
         // Set the default shipping method in the session if found
-        if ($selectedShippingId !== null) {
-            foreach ($quotes as $quote) {
-                if (empty($quote['error']) && !empty($quote['methods'])) {
-                    foreach ($quote['methods'] as $method) {
-                        $optionId = "{$quote['id']}_{$method['id']}";
-                        if ($optionId === $selectedShippingId) {
-                            $_SESSION['shipping'] = [
-                                'id' => $optionId,
-                                'title' => $quote['module'],
-                                'module' => $method['title'],
-                                'cost' => (float)($method['cost'] ?? 0)
-                            ];
-                            if (array_key_exists('tax', $quote)) {
-                                $_SESSION['shipping']['tax'] = $quote['tax'];
-                            }
-                            if (array_key_exists('tax_id', $quote)) {
-                                $_SESSION['shipping']['tax_id'] = $quote['tax_id'];
-                            }
-                            if (array_key_exists('tax_description', $quote)) {
-                                $_SESSION['shipping']['tax_description'] = $quote['tax_description'];
-                            }
-                            error_log("PayPal Wallet: Selected default shipping method: {$optionId}");
-                            break 2; // Break out of both loops
-                        }
-                    }
-                }
+        if ($selectedQuote !== null && $selectedMethod !== null && $selectedShippingId !== null) {
+            $_SESSION['shipping'] = [
+                'id' => $selectedShippingId,
+                'title' => $selectedQuote['module'],
+                'module' => $selectedMethod['title'],
+                'cost' => (float)($selectedMethod['cost'] ?? 0)
+            ];
+            if (array_key_exists('tax', $selectedQuote)) {
+                $_SESSION['shipping']['tax'] = $selectedQuote['tax'];
             }
+            if (array_key_exists('tax_id', $selectedQuote)) {
+                $_SESSION['shipping']['tax_id'] = $selectedQuote['tax_id'];
+            }
+            if (array_key_exists('tax_description', $selectedQuote)) {
+                $_SESSION['shipping']['tax_description'] = $selectedQuote['tax_description'];
+            }
+            error_log("PayPal Wallet: Selected default shipping method: {$selectedShippingId}");
         }
     }
 
