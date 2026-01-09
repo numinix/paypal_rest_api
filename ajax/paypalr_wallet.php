@@ -624,12 +624,6 @@ log_paypalr_wallet_message('Order delivery address before order_totals->process(
     'zone_id' => $order->delivery['zone_id'] ?? 'N/A',
 ], true));
 $order_total_modules = new order_total();
-// Initialize order totals before processing:
-// - collect_posts(): Collects and processes any posted form data
-// - pre_confirmation_check(): Validates and prepares order totals (including shipping)
-// These methods must be called before process() to ensure shipping is included in totals
-$order_total_modules->collect_posts();
-$order_total_modules->pre_confirmation_check();
 $order_totals = $order_total_modules->process();
 
 // If ot_tax only includes shipping tax, add the missing product tax so totals
