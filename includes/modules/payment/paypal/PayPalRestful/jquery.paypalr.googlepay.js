@@ -771,9 +771,15 @@
                     shippingAddressRequired: true,
                     shippingAddressParameters: {
                         phoneNumberRequired: true
+                        // Note: emailRequired is NOT set here because PayPal SDK's confirmOrder() flow
+                        // is incompatible with Google Pay's email collection mechanism.
+                        // Email collection requires PAYMENT_AUTHORIZATION callback + onPaymentAuthorized handler,
+                        // which PayPal SDK doesn't support (it uses confirmOrder() instead).
+                        // Users must be logged in for wallet checkout with PayPal SDK + Google Pay.
                     },
                     shippingOptionRequired: true,
                     // Register callbacks for address and shipping option changes
+                    // Note: PAYMENT_AUTHORIZATION is not included because PayPal SDK uses confirmOrder() API
                     callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
                 };
 
@@ -799,7 +805,10 @@
                         // Extract shipping and billing addresses from Google Pay payment data
                         var shippingAddress = paymentData.shippingAddress || {};
                         var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
-                        var email = paymentData.email || '';
+                        // Email extraction: paymentData.email is typically empty with PayPal SDK since
+                        // we don't use emailRequired (incompatible with confirmOrder() flow).
+                        // For logged-in users, email comes from session on the server side.
+                        var email = paymentData.email || billingAddress.emailAddress || '';
                         
                         // Build the complete payload for checkout
                         var checkoutPayload = {
