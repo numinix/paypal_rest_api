@@ -301,10 +301,9 @@ class paypalr_googlepay extends base
         }
         
         // Record the current version of the payment module into its database configuration setting
-        $safe_version = $db->prepare_input($current_version);
         $db->Execute(
             "UPDATE " . TABLE_CONFIGURATION . "
-                SET configuration_value = '$safe_version',
+                SET configuration_value = '$current_version',
                     last_modified = now()
               WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION'
               LIMIT 1"
