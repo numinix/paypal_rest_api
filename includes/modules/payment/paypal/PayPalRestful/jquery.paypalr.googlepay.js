@@ -655,11 +655,12 @@
                     merchantInfo: basePaymentDataRequest.merchantInfo || {},
                     // Enable email collection from Google Pay
                     emailRequired: true
-                    // Note: Shipping address and shipping options are NOT collected here because
-                    // the checkout page already has its own shipping collection system.
-                    // Shipping collection is only needed on cart/product pages where there's no checkout form.
-                    // For cart/product pages, use jquery.paypalr.googlepay.native.js instead.
                 };
+                
+                // Note: Shipping address and shipping options are NOT collected here because
+                // the checkout page already has its own shipping collection system.
+                // Shipping collection is only needed on cart/product pages where there's no checkout form.
+                // For cart/product pages, use jquery.paypalr.googlepay.native.js instead.
 
                 console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
 
