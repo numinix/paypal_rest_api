@@ -388,9 +388,10 @@ if (!function_exists('zen_update_orders_history')) {
             if (function_exists('zen_db_input')) {
                 $escaped_message = zen_db_input($message);
             } else {
-                // Fallback to basic escaping
-                // Note: This is less secure than zen_db_input. In production, zen_db_input should always be available
-                // since this function is only called when the Zen Cart environment is loaded.
+                // WARNING: Fallback to basic escaping - less secure than zen_db_input
+                // In production, zen_db_input should always be available since this function
+                // is only called when the Zen Cart environment is loaded.
+                // Prepared statements would be more secure but are not available in Zen Cart's queryFactory.
                 $escaped_message = $db->prepareInput($message);
             }
             
