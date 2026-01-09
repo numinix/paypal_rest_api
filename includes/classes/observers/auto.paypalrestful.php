@@ -502,6 +502,12 @@ class zcObserverPaypalrestful
         if (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True') {
             $components[] = 'applepay';
         }
+        
+        // Add 'card-fields' component for saved credit cards page (for adding new cards)
+        if (defined('FILENAME_ACCOUNT_SAVED_CREDIT_CARDS') && $current_page === FILENAME_ACCOUNT_SAVED_CREDIT_CARDS) {
+            $components[] = 'card-fields';
+        }
+        
         $js_fields['components'] = implode(',', array_unique($components));
 
         $js_page_type = $this->getMessagesPageType();

@@ -567,6 +567,83 @@ class PayPalRestfulApi extends ErrorInfo
     }
 
     /**
+     * Create a setup token for vaulting a payment method without a purchase.
+     * 
+     * @param array $payment_source The payment source to vault (e.g., card details)
+     * @param string|null $customer_id Optional PayPal customer ID
+     * @return false|array The setup token response or false on failure
+     */
+    public function createSetupToken(array $payment_source, ?string $customer_id = null)
+    {
+        $this->log->write("==> Start createSetupToken", true);
+
+        $payload = [
+            'payment_source' => $payment_source,
+        ];
+
+        if ($customer_id !== null && trim($customer_id) !== '') {
+            $payload['customer'] = [
+                'id' => trim($customer_id),
+            ];
+        }
+
+        $response = $this->curlPost('v3/vault/setup-tokens', $payload);
+        $this->log->write('==> End createSetupToken', true);
+
+        return $response;
+    }
+
+    /**
+     * Retrieve details for a setup token.
+     * 
+     * @param string $setup_token_id The setup token ID
+     * @return false|array The setup token details or false on failure
+     */
+    public function getSetupToken(string $setup_token_id)
+    {
+        $setup_token_id = trim($setup_token_id);
+        if ($setup_token_id === '') {
+            return false;
+        }
+
+        $this->log->write("==> Start getSetupToken($setup_token_id)", true);
+        $response = $this->curlGet('v3/vault/setup-tokens/' . rawurlencode($setup_token_id));
+        $this->log->write('==> End getSetupToken', true);
+
+        return $response;
+    }
+
+    /**
+     * Create a payment token from an approved setup token.
+     * 
+     * @param string $setup_token_id The approved setup token ID
+     * @return false|array The payment token response or false on failure
+     */
+    public function createPaymentTokenFromSetup(string $setup_token_id)
+    {
+        $setup_token_id = trim($setup_token_id);
+        if ($setup_token_id === '') {
+            return false;
+        }
+
+        $this->log->write("==> Start createPaymentTokenFromSetup($setup_token_id)", true);
+
+        $payload = [
+            'payment_source' => [
+                'token' => [
+                    'id' => $setup_token_id,
+                    'type' => 'SETUP_TOKEN',
+                ],
+            ],
+        ];
+
+        $response = $this->curlPost('v3/vault/payment-tokens', $payload);
+        $this->log->write('==> End createPaymentTokenFromSetup', true);
+
+        return $response;
+    }
+
+    /**
      * Send package tracking details to PayPal for a given PayPal Transaction ID
      *
      * @param string $paypal_txnid

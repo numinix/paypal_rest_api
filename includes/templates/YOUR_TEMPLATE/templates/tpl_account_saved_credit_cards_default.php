@@ -21,9 +21,14 @@
           <h2 class="card-title h4 mb-3"><?php echo HEADING_TITLE_DELETE_CARD; ?></h2>
           <p class="mb-4"><?php echo sprintf(TEXT_DELETE_CARD_CONFIRMATION, zen_output_string_protected($delete_card['brand']), zen_output_string_protected($delete_card['last_digits'])); ?></p>
           <div class="saved-card__actions">
+            <?php
+              $deleteAction = isset($delete_card['confirm_action']) ? $delete_card['confirm_action'] : 'delete-card';
+              $cardIdField = ($delete_card['source'] ?? 'vault') === 'payflow' ? 'payflow_card_id' : 'paypal_vault_id';
+              $cardIdValue = ($delete_card['source'] ?? 'vault') === 'payflow' ? (int)$delete_card['payflow_card_id'] : (int)$delete_card['paypal_vault_id'];
+            ?>
             <?php echo zen_draw_form('delete_card', zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'), 'post', 'class="saved-card__form"'); ?>
-              <?php echo zen_draw_hidden_field('action', 'delete-card'); ?>
-              <?php echo zen_draw_hidden_field('paypal_vault_id', (int)$delete_card['paypal_vault_id']); ?>
+              <?php echo zen_draw_hidden_field('action', $deleteAction); ?>
+              <?php echo zen_draw_hidden_field($cardIdField, $cardIdValue); ?>
               <?php echo zen_draw_hidden_field('securityToken', $_SESSION['securityToken']); ?>
               <button type="submit" class="btn btn-danger"><?php echo TEXT_SAVED_CARD_DELETE_BUTTON; ?></button>
             </form>
@@ -176,6 +181,139 @@
       </section>
     <?php } ?>
 
+    <?php if ($add_card_mode === true) { ?>
+      <script>
+        // Expose PayPal client ID for JavaScript
+        window.PAYPAL_CLIENT_ID = '<?php echo MODULE_PAYMENT_PAYPALR_SERVER === "live" ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S; ?>';
+      </script>
+      <section class="saved-cards-add-form card mb-4">
+        <div class="card-body">
+          <h2 class="card-title h4 mb-3"><?php echo HEADING_TITLE_ADD_CARD; ?></h2>
+          <p class="text-muted mb-4"><?php echo TEXT_ADD_CARD_INTRO; ?></p>
+
+          <?php if (!empty($add_card_errors)) { ?>
+            <div class="alert alert-danger" role="alert">
+              <ul class="mb-0">
+                <?php foreach ($add_card_errors as $errorMessage) { ?>
+                  <li><?php echo zen_output_string_protected($errorMessage); ?></li>
+                <?php } ?>
+              </ul>
+            </div>
+          <?php } ?>
+
+          <?php echo zen_draw_form('add_card', zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'), 'post', 'class="saved-card__form" id="add-card-form"'); ?>
+            <?php echo zen_draw_hidden_field('action', 'add-card'); ?>
+            <?php echo zen_draw_hidden_field('setup_token_id', '', 'id="setup_token_id"'); ?>
+            <?php echo zen_draw_hidden_field('securityToken', $_SESSION['securityToken']); ?>
+
+            <div class="row g-3">
+              <div class="col-12">
+                <fieldset class="saved-card-add__billing">
+                  <legend class="form-label"><?php echo TEXT_ADD_CARD_BILLING_ADDRESS; ?></legend>
+
+                  <?php
+                    $addressModeExisting = (count($address_book_options) > 0);
+                    $existingId = 'add_address_mode_existing';
+                    $newId = 'add_address_mode_new';
+                  ?>
+
+                  <div class="form-check">
+                    <?php
+                      $existingAttributes = 'id="' . $existingId . '" class="form-check-input" data-add-address-toggle="existing"';
+                      if (empty($address_book_options)) {
+                          $existingAttributes .= ' disabled="disabled"';
+                      }
+                      echo zen_draw_radio_field('add_address_mode', 'existing', $addressModeExisting, $existingAttributes);
+                    ?>
+                    <label class="form-check-label" for="<?php echo $existingId; ?>"><?php echo TEXT_ADD_CARD_USE_EXISTING_ADDRESS; ?></label>
+                  </div>
+
+                  <div class="saved-card-add__address saved-card-add__address--existing <?php echo $addressModeExisting ? '' : 'd-none'; ?>" data-add-address-target="existing">
+                    <?php if (!empty($address_book_options)) { ?>
+                      <?php
+                        $addressOptions = [];
+                        foreach ($address_book_options as $option) {
+                            $addressOptions[] = ['id' => $option['id'], 'text' => $option['label']];
+                        }
+                      ?>
+                      <div class="mt-3">
+                        <label class="form-label" for="add_address_book_id"><?php echo TEXT_ADD_CARD_ADDRESS_BOOK_SELECT; ?></label>
+                        <?php echo zen_draw_pull_down_menu('add_address_book_id', $addressOptions, '', 'class="form-select" id="add_address_book_id"'); ?>
+                      </div>
+                    <?php } else { ?>
+                      <p class="text-muted mt-3 mb-0"><?php echo TEXT_ADD_CARD_NO_ADDRESS_BOOK; ?></p>
+                    <?php } ?>
+                  </div>
+
+                  <div class="form-check mt-3">
+                    <?php echo zen_draw_radio_field('add_address_mode', 'new', !$addressModeExisting, 'id="' . $newId . '" class="form-check-input" data-add-address-toggle="new"'); ?>
+                    <label class="form-check-label" for="<?php echo $newId; ?>"><?php echo TEXT_ADD_CARD_USE_NEW_ADDRESS; ?></label>
+                  </div>
+
+                  <div class="saved-card-add__address saved-card-add__address--new mt-3 <?php echo !$addressModeExisting ? '' : 'd-none'; ?>" data-add-address-target="new">
+                    <div class="row g-3">
+                      <div class="col-12">
+                        <label class="form-label" for="add_new_street_address"><?php echo TEXT_ADD_CARD_NEW_STREET_ADDRESS; ?></label>
+                        <?php echo zen_draw_input_field('add_new_street_address', '', 'class="form-control" id="add_new_street_address"'); ?>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label" for="add_new_street_address_2"><?php echo TEXT_ADD_CARD_NEW_STREET_ADDRESS_2; ?></label>
+                        <?php echo zen_draw_input_field('add_new_street_address_2', '', 'class="form-control" id="add_new_street_address_2"'); ?>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label" for="add_new_city"><?php echo TEXT_ADD_CARD_NEW_CITY; ?></label>
+                        <?php echo zen_draw_input_field('add_new_city', '', 'class="form-control" id="add_new_city"'); ?>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label" for="add_new_state"><?php echo TEXT_ADD_CARD_NEW_STATE; ?></label>
+                        <?php echo zen_draw_input_field('add_new_state', '', 'class="form-control" id="add_new_state"'); ?>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label" for="add_new_postcode"><?php echo TEXT_ADD_CARD_NEW_POSTCODE; ?></label>
+                        <?php echo zen_draw_input_field('add_new_postcode', '', 'class="form-control" id="add_new_postcode"'); ?>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label class="form-label" for="add_new_country"><?php echo TEXT_ADD_CARD_NEW_COUNTRY; ?></label>
+                        <select name="add_new_country_id" class="form-select" id="add_new_country">
+                          <?php foreach ($country_dropdown as $country) { ?>
+                            <option value="<?php echo $country['id']; ?>" data-iso2="<?php echo zen_output_string_protected($country['iso2']); ?>">
+                              <?php echo $country['text']; ?>
+                            </option>
+                          <?php } ?>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+
+              <div class="col-12">
+                <div id="card-fields-container" class="mb-3">
+                  <!-- PayPal Advanced Card Fields will be inserted here by JavaScript -->
+                  <div class="alert alert-info">
+                    <span id="card-fields-loading"><?php echo TEXT_ADD_CARD_PROCESSING; ?></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-4">
+              <button type="submit" class="btn btn-primary" id="submit-card-btn" disabled><?php echo TEXT_ADD_CARD_SUBMIT_BUTTON; ?></button>
+              <a class="btn btn-outline-secondary" href="<?php echo zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'); ?>"><?php echo TEXT_ADD_CARD_CANCEL_BUTTON; ?></a>
+            </div>
+          </form>
+        </div>
+      </section>
+    <?php } ?>
+
+    <?php if ($delete_card === null && $edit_card === null && $add_card_mode === false) { ?>
+      <div class="mb-4">
+        <a class="btn btn-primary" href="<?php echo zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, 'add=1', 'SSL'); ?>">
+          <?php echo TEXT_ADD_CARD_BUTTON; ?>
+        </a>
+      </div>
+    <?php } ?>
+
     <?php if (empty($saved_credit_cards)) { ?>
       <p class="saved-cards-empty lead"><?php echo TEXT_NO_SAVED_CARDS; ?></p>
     <?php } else { ?>
@@ -188,6 +326,9 @@
                 <span class="saved-card__brand"><?php echo zen_output_string_protected($card['brand']); ?></span>
                 <?php if ($card['last_digits'] !== '') { ?>
                   <span class="saved-card__digits"><?php echo sprintf(TEXT_CARD_ENDING_IN, zen_output_string_protected($card['last_digits'])); ?></span>
+                <?php } ?>
+                <?php if (($card['source'] ?? 'vault') === 'payflow') { ?>
+                  <small class="text-muted ms-2" title="Legacy Payflow card">(Payflow)</small>
                 <?php } ?>
               </div>
               <span class="saved-card__status badge <?php echo zen_output_string_protected($card['status_class']); ?>"><?php echo zen_output_string_protected($card['status_label']); ?></span>

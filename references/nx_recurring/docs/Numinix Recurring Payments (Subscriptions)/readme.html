@@ -1,0 +1,466 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width">
+  <title>Numinix Recurring Payments (Subscriptions) for Zen Cart</title>
+
+  <!-- FONTS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- FONTS -->
+
+  <link href="css/stylesheet.css" rel="stylesheet" type="text/css" />
+  <link href="css/sh_style.css" rel="stylesheet" type="text/css" />
+  <script
+    src="https://code.jquery.com/jquery-3.7.1.min.js"
+    integrity="sha256-7N0x4zTz9Fq6ZtJECprd2qfBWFdOCOG2fE/6H2y9CJo="
+    crossorigin="anonymous"></script>
+  <script type="text/javascript" src="js/sh_main.min.js"></script>
+  <script type="text/javascript" src="js/sh_html.min.js"></script>
+  <script type="text/javascript" src="js/sh_php.min.js"></script>
+  <script type="text/javascript" src="js/sh_javascript.min.js"></script>
+  <script type="text/javascript" src="js/sh_sql.min.js"></script>
+  <script type="text/javascript" src="js/sh_css.min.js"></script>
+  <script type="text/javascript" src="js/documentation.js"></script>
+</head>
+<body>
+  
+  <div id="wrapper" class="tk-museo-slab">
+    <!--BOF Header-->
+    <div id="headerContainer">
+      <div id="mainMenu" class="headerWrapper">
+
+        <div class="logoWrapper">
+          <a href="https://www.numinix.com/"><img src="images/logo.png" alt="Numinix.com" title="Numinix" id="logo" class="headerLogo" /></a>
+          <span class="nav-icon" id="js-nav-icon">
+            <img src="images/nav-icon.png" alt="nav icon">
+          </span>
+        </div>
+
+        <!--BOF Links-->
+        <div class="contentMenu">
+          <ul>
+            <li><a href="#Overview" id="btnOverview" class="btn" title="Overview" data-target="Overview">Overview</a></li>
+            <li><a href="#Installation" id="btnInstallation" class="btn" title="Installation" data-target="Installation">Installation</a></li>
+            <li><a href="#Configuration" id="btnConfiguration" class="btn" title="Configuration" data-target="Configuration">Configuration</a></li>
+            <li><a href="#Usage" id="btnUsage" class="btn" title="Usage" data-target="Usage">Usage</a></li>
+            <li><a href="#Automation" id="btnAutomation" class="btn" title="Automation" data-target="Automation">Automation</a></li>
+            <li><a href="#Uninstall" id="btnUninstall" class="btn" title="Uninstall" data-target="Uninstall">Uninstall</a></li>
+            <li><a href="#Troubleshooting" id="btnTroubleshooting" class="btn" title="Troubleshooting" data-target="Troubleshooting">Troubleshooting</a></li>
+            <li><a href="#Support" id="btnSupport" class="btn" title="Support" data-target="Support">Support</a></li>
+            <li><a href="#License" id="btnLicense" class="btn" title="License" data-target="License">License</a></li>
+            <li><a href="#Disclaimer" id="btnDisclaimer" class="btn" title="Disclaimer" data-target="Disclaimer">Disclaimer</a></li>
+          </ul>
+        </div>
+        <!--EOF Links-->
+
+      </div>
+    </div>
+    <div id="headerTitle">
+      <h1 class="clearBoth">Numinix Recurring Payments (Subscriptions) for Zen Cart</h1>
+      <p>by <span>Numinix</span></p>
+    </div>
+    <br class="clearBoth" />
+    <!--EOF Header-->
+
+    <div class="contentWrapper">
+
+      <!--BOF OVERVIEW-->
+      <div class="bodyHeaderContainer" id="Overview">
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Overview</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Numinix Recurring Payments (Subscriptions) extends Zen Cart with automated subscription billing, saved-card renewals, and tools for operators to manage PayPal agreements at scale. The plugin bundles cron utilities, admin dashboards, storefront helpers, and cache infrastructure to keep subscriber data current without slowing down shoppers.</p>
+          <p class="bodyText">Use this guide to install the plugin, connect the PayPal APIs, configure saved-card flows, automate cache warming, and maintain your recurring portfolio.</p>
+          <h4>Key components</h4>
+          <ul class="bodyList">
+            <li><strong>cron/</strong> &ndash; Billing, reminder, cache refresh, and worker scripts that execute from the command line to process subscriptions on schedule.</li>
+            <li><strong>includes/classes/</strong> &ndash; Core PHP orchestrators such as <code>paypalSavedCardRecurring.php</code> that communicate with PayPal, generate orders, and adjust customer group pricing.</li>
+            <li><strong>includes/modules/pages/my_subscriptions/</strong> &ndash; Storefront experience and helper functions that hydrate subscription cards, enqueue refreshes, and surface metrics to shoppers.</li>
+            <li><strong>management/</strong> &ndash; Admin tools and installers that register menu entries, SQL schema, and configuration settings for saved-card recurring flows.</li>
+            <li><strong>docs/</strong> &ndash; Operational notes on cache retention, queue processing, gateway selection, and quality assurance that are consolidated throughout this document.</li>
+          </ul>
+          <h4>Optimization workstreams delivered</h4>
+          <ul class="bodyList">
+            <li><strong>Cache hardening and prefetching</strong> &ndash; Environment-aware TTLs, invalidation hooks, and queue-based refresh keep <code>paypal_recurring_profile_cache</code> warm without blocking page loads.</li>
+            <li><strong>Gateway selection improvements</strong> &ndash; New heuristics and persisted hints let <code>PayPalProfileManager</code> choose the correct API client with high confidence while logging fallbacks for tuning.</li>
+            <li><strong>Rendering and UX refactors</strong> &ndash; Bulk-prefetch helpers, parallel refresh tooling, and UX polishing reduce wait times and improve visibility for both admin and customer subscription pages.</li>
+            <li><strong>Background infrastructure</strong> &ndash; Queue workers, monitoring hooks, and automation guidance streamline refresh throughput while surfacing actionable metrics to operators.</li>
+          </ul>
+        </div>
+      </div>
+      <!--EOF OVERVIEW-->
+
+      <!--BOF INSTALLATION-->
+      <div class="bodyHeaderContainer" id="Installation">
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Installation</span>
+        </div>
+        <div class="bodyWrapper">
+          <h4>Prerequisites</h4>
+          <ol>
+            <li>Back up your Zen Cart database and catalog files before deploying the plugin.</li>
+            <li>Verify your server meets the PHP requirements for PayPal Website Payments Pro (WPP) and the REST SDK (PHP 7.3+, cURL, JSON).</li>
+            <li>Ensure the PayPal REST PHP library is installed and autoloadable so <code>PayPalRestfulApi</code> classes can be resolved by <code>includes/modules/payment/paypal/pprAutoload.php</code>.</li>
+            <li>Collect PayPal API credentials for both the classic (NVP/SOAP) and REST clients, along with webhook endpoints for subscription lifecycle events.</li>
+          </ol>
+          <h4>Uploading files</h4>
+          <ol>
+            <li>Unzip the distribution package locally.</li>
+            <li>Rename the <code>YOUR_ADMIN/</code> directory in the package to match your protected admin folder.</li>
+            <li>Upload the <code>includes/</code>, <code>cron/</code>, <code>management/</code>, and renamed admin directories into your Zen Cart installation, merging when prompted.</li>
+          </ol>
+          <h4>Database and configuration bootstrap</h4>
+          <ol>
+            <li>Log into Zen Cart admin and navigate to <strong>Tools &rarr; Install SQL Patches</strong>.</li>
+            <li>Run the installer scripts shipped with the plugin (for example, <code>management/includes/installers/saved_credit_cards_recurring/*.php</code>) if they have not executed automatically.</li>
+            <li>Confirm the new configuration group <strong>Configuration &rarr; Saved Credit Cards Recurring</strong> is present alongside <strong>Customers &rarr; PayPal Subscriptions</strong> in the menu.</li>
+          </ol>
+          <h4>PayPal REST setup</h4>
+          <ol>
+            <li>Open <strong>Configuration &rarr; PayPal</strong> and enter the REST Client ID, Client Secret, and environment constants used by <code>MODULE_PAYMENT_PAYPALR_*</code> definitions.</li>
+            <li>Register PayPal webhooks for <code>BILLING.SUBSCRIPTION.*</code>, <code>PAYMENT.SALE.*</code>, and <code>VAULT.PAYMENT-TOKEN.*</code>, pointing to the same endpoint handled by the PayPal REST payment module so saved-card edits and reminders stay in sync.</li>
+            <li>Verify cron users share access to the same credentials and SDK files so background jobs can hydrate REST profiles without falling back to legacy flows.</li>
+          </ol>
+          <p class="bodyText">Once files and configuration are in place, the admin menu exposes <strong>Customers &rarr; PayPal Subscriptions</strong> for operators and the storefront renders a refreshed <strong>My Subscriptions</strong> page for customers.</p>
+        </div>
+      </div>
+      <!--EOF INSTALLATION-->
+
+      <!--BOF CONFIGURATION-->
+      <div class="bodyHeaderContainer" id="Configuration">
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Configuration</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Configuration spans classic PayPal subscriptions, REST saved-card renewals, and the cache infrastructure that supports both. Review each group after installation.</p>
+          <ol class="steps">
+            <li>
+              <h4 class="step-title">Saved Credit Cards Recurring</h4>
+              <ul>
+                <li>Enable or disable recurring billing globally and choose whether new subscriptions default to PayPal REST (<code>paypalr</code>) or classic WPP depending on your merchant account capabilities.</li>
+                <li>Set retry rules, reminder schedules, and debug logging destinations to control how aggressively the system follows up on missed payments.</li>
+              </ul>
+            </li>
+            <li>
+              <h4 class="step-title">PayPal REST credentials</h4>
+              <ul>
+                <li>Populate <code>MODULE_PAYMENT_PAYPALR_CLIENT_ID</code>, <code>MODULE_PAYMENT_PAYPALR_CLIENT_SECRET</code>, and <code>MODULE_PAYMENT_PAYPALR_MODE</code>. Missing credentials force the module to skip REST-only features such as inline card updates.</li>
+                <li>Map webhook events to the profile manager so subscription edits and payment notifications remain synchronized across the storefront, admin, and cron contexts.</li>
+              </ul>
+            </li>
+            <li>
+              <h4 class="step-title">Profile cache retention</h4>
+              <ul>
+                <li>Review the automatic TTL applied based on environment keywords (sandbox, staging, production). Override the TTL with <code>ZEN_PAYPAL_SUBSCRIPTION_PROFILE_CACHE_TTL</code> if local requirements differ.</li>
+                <li>Confirm cleanup jobs align with your data retention policies; the plugin purges rows older than the environment-specific horizon and resets the in-request cache to prevent stale reads.</li>
+              </ul>
+            </li>
+            <li>
+              <h4 class="step-title">Gateway hinting and fallbacks</h4>
+              <ul>
+                <li>Leave <code>preferred_gateway</code> persistence enabled so future profile lookups reuse the last known-good API client without re-running heuristics.</li>
+                <li>Monitor the admin logs for fallback events; repeated fallbacks indicate mismatched credentials or stale cache records that may need manual refresh.</li>
+              </ul>
+            </li>
+            <li>
+              <h4 class="step-title">Debug logging</h4>
+              <ul>
+                <li>Enable <strong>My Subscriptions Debug Logging</strong> to emit timing, query counts, and API responses to <code>DIR_FS_LOGS . 'my_subscriptions_debug.log'</code> when troubleshooting storefront latency.</li>
+                <li>Define <code>MY_SUBSCRIPTIONS_DEBUG</code> and <code>MY_SUBSCRIPTIONS_DEBUG_LOG</code> in <code>includes/configure.php</code> to override the admin toggle for ad-hoc investigations.</li>
+              </ul>
+            </li>
+          </ol>
+        </div>
+      </div>
+      <!--EOF CONFIGURATION-->
+
+      <!--BOF USAGE-->
+      <div class="bodyHeaderContainer" id="Usage">
+        <div class="bodyHeader" id="green">
+          <span class="bodyHeaderTxt">Usage</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Once credentials are verified, operators and customers can manage subscriptions without leaving Zen Cart.</p>
+          <ol class="steps">
+            <li>
+              <h4 class="step-title">Admin: Customers &rarr; PayPal Subscriptions</h4>
+              <p>Administrators can edit active profiles inline. Legacy NVP/SOAP agreements continue to expose the full recurring profile form, while REST profiles support amount, payment source, and next-billing-date adjustments via <code>PayPalProfileManager</code>. Validation errors from PayPal surface directly in the UI so staff can retry quickly.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Admin: Monitor refresh health</h4>
+              <p>Run <strong>Customers &rarr; PayPal Subscriptions</strong> alongside queue metrics to review pending refreshes, queue depth, and last-run timestamps. The grid highlights stale entries so operators can trigger manual refreshes or investigate PayPal API issues.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Storefront: My Subscriptions</h4>
+              <p>The storefront page consumes cached classifications to render subscription cards quickly. Helper functions batch fetch cache rows, hydrate plan details, and respect manual refresh flags without issuing redundant API calls.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Direct refresh controls</h4>
+              <p>Operators can enqueue specific subscriptions for refresh via the admin or storefront triggers. Queue helpers manage locking, retries, and context metadata so background workers can hydrate both <code>paypal_recurring_profile_cache</code> and <code>paypal_recurring</code> entries efficiently.</p>
+            </li>
+          </ol>
+          <h4>Retired workflows</h4>
+          <p class="bodyText">Legacy customer-driven refresh buttons have been removed. Subscription status now updates through PayPal IPN notifications, admin edits, or background queue processing. Ensure any historic monitoring or automation relying on the retired endpoints is cleaned up to avoid confusion.</p>
+        </div>
+      </div>
+      <!--EOF USAGE-->
+
+      <!--BOF AUTOMATION-->
+      <div class="bodyHeaderContainer" id="Automation">
+        <div class="bodyHeader" id="blue">
+          <span class="bodyHeaderTxt">Automation</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Schedule cron jobs to process renewals, reminders, and cache refreshes without manual intervention. All scripts assume your Zen Cart root is the working directory.</p>
+          <h4>Core jobs</h4>
+          <ul class="bodyList">
+            <li><code>php cron/paypal_wpp_recurring_billing.php</code> &ndash; Captures due subscriptions using the configured gateway and creates new Zen Cart orders.</li>
+            <li><code>php cron/paypal_wpp_recurring_reminders.php</code> &ndash; Emails reminder notices and logs retry attempts for delinquent accounts.</li>
+            <li><code>php cron/paypal_profile_cache_refresh.php</code> &ndash; Scans for stale cache rows, enqueues up to 100 refresh jobs per run, and emits queue-depth metrics to stdout.</li>
+            <li><code>php cron/paypal_profile_refresh_worker.php [batchSize]</code> &ndash; Claims queued refresh jobs, hydrates profile cache data, and records success/failure statistics for monitoring.</li>
+          </ul>
+          <h4>Sample crontab entries</h4>
+          <div class="code">
+            <div class="codeTitle">/etc/cron.d/zen-cart-recurring</div>
+            <pre class="sh_php sh_sourceCode"><code>*/15 * * * * www-data /usr/bin/php /var/www/html/cron/paypal_wpp_recurring_billing.php
+0 * * * * www-data /usr/bin/php /var/www/html/cron/paypal_wpp_recurring_reminders.php
+*/10 * * * * www-data /usr/bin/php /var/www/html/cron/paypal_profile_cache_refresh.php
+*/5 * * * * www-data /usr/bin/php /var/www/html/cron/paypal_profile_refresh_worker.php 200</code></pre>
+          </div>
+          <p class="bodyText">Adjust cadences to match subscription volume and API rate limits. Running multiple workers in parallel significantly decreases refresh wall-clock time; staging benchmarks showed three workers processing 90 profiles in 8 minutes 45 seconds versus 27 minutes sequentially.</p>
+        </div>
+      </div>
+      <!--EOF AUTOMATION-->
+
+      <!--BOF UNINSTALL-->
+      <div class="bodyHeaderContainer" id="Uninstall">
+        <div class="bodyHeader" id="blue">
+          <span class="bodyHeaderTxt">Uninstall</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Follow these steps to safely remove the plugin while retaining historical subscription data for audit purposes.</p>
+          <ol class="steps">
+            <li>
+              <h4 class="step-title">Prepare the store</h4>
+              <p>Disable cron entries related to PayPal recurring billing, reminders, cache refresh, and queue workers. Inform staff that subscription management will be paused during removal.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Disable modules</h4>
+              <p>In Zen Cart admin, set the Saved Credit Cards Recurring configuration group to disabled and remove menu permissions for <strong>Customers &rarr; PayPal Subscriptions</strong> so operators cannot initiate new edits during teardown.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Run uninstall SQL</h4>
+              <p>Use <strong>Tools &rarr; Install SQL Patches</strong> to execute the following script. The destructive <code>DROP TABLE</code> statements are commented out to protect data; uncomment them only if you intend to remove subscription history.</p>
+              <div class="code">
+                <div class="codeTitle">uninstall_paypal_recurring.sql</div>
+<pre class="sh_sql sh_sourceCode"><code>-- Remove configuration and admin page registrations
+DELETE FROM configuration WHERE configuration_key LIKE 'MODULE_PAYMENT_PAYPALR_%';
+DELETE FROM configuration WHERE configuration_key LIKE 'MY_SUBSCRIPTIONS_DEBUG%';
+DELETE FROM configuration_group WHERE configuration_group_title = 'Saved Credit Cards Recurring';
+DELETE FROM admin_pages WHERE page_key IN ('paypalsubs', 'configSavedCreditCardsRecurring');
+
+-- Optional: drop cache/queue tables (uncomment to delete data)
+-- DROP TABLE IF EXISTS paypal_recurring_profile_cache;
+-- DROP TABLE IF EXISTS paypal_recurring_refresh_queue;
+-- DROP TABLE IF EXISTS paypal_recurring; -- removes all subscription records
+</code></pre>
+              </div>
+            </li>
+            <li>
+              <h4 class="step-title">Remove files</h4>
+              <p>Delete plugin-specific directories from <code>includes/modules/payment/</code>, <code>includes/classes/</code>, <code>includes/modules/pages/my_subscriptions/</code>, <code>cron/</code>, and <code>management/</code>. Clear any cached templates referencing the subscription helpers.</p>
+            </li>
+            <li>
+              <h4 class="step-title">Validate cleanup</h4>
+              <p>Load the storefront and confirm the My Subscriptions page is no longer accessible. Review cron logs to ensure no recurring scripts continue to run, and verify there are no fatal errors referencing removed classes.</p>
+            </li>
+          </ol>
+        </div>
+      </div>
+      <!--EOF UNINSTALL-->
+
+      <!--BOF TROUBLESHOOTING-->
+      <div class="bodyHeaderContainer" id="Troubleshooting">
+        <div class="bodyHeader" id="blue">
+          <span class="bodyHeaderTxt">Troubleshooting</span>
+        </div>
+        <div class="bodyWrapper">
+          <ul class="bodyList">
+            <li><strong>REST updates are skipped?</strong> Confirm the PayPal REST SDK is installed and credentials are configured. When credentials are missing the module logs failures and falls back to legacy pathways.</li>
+            <li><strong>Customer page is slow?</strong> Enable My Subscriptions debug logging to capture timing details and confirm cache prefetching is active. Look for repeated cache misses or slow API responses in <code>my_subscriptions_debug.log</code>.</li>
+            <li><strong>Queue backlog growing?</strong> Review <code>paypal_profile_refresh_worker.php</code> logs for repeated failures and inspect the <code>paypal_recurring_refresh_queue</code> table for stuck locks or high retry counts. Increase worker concurrency or adjust TTL thresholds if pending jobs continually exceed capacity.</li>
+            <li><strong>Gateway mismatch errors?</strong> Clear or refresh cache rows where <code>preferred_gateway</code> no longer matches the active API credentials. Re-run the gateway heuristics by forcing a refresh from the admin grid.</li>
+            <li><strong>Legacy refresh tools appear?</strong> Ensure obsolete automation referencing the retired customer refresh workflow has been removed so templates and cron jobs do not reintroduce deprecated UI elements.</li>
+          </ul>
+        </div>
+      </div>
+      <!--EOF TROUBLESHOOTING-->
+
+      <!--BOF SUPPORT-->
+      <div class="bodyHeaderContainer" id="Support">
+        <div class="bodyHeader" id="blue">
+          <span class="bodyHeaderTxt">Support</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Need assistance operating Numinix Recurring Payments? Reach out with detailed replication steps so we can help tune your subscription pipeline.</p>
+          <ul class="bodyList">
+            <li>Email <a href="mailto:support@numinix.com">support@numinix.com</a> and include recent log excerpts from billing, reminder, and refresh cron jobs.</li>
+            <li>Provide your Zen Cart version, PHP version, PayPal environment (sandbox/live), and whether REST credentials are active.</li>
+            <li>Attach screenshots from <strong>Customers &rarr; PayPal Subscriptions</strong> or the <strong>My Subscriptions</strong> page if UI anomalies appear.</li>
+          </ul>
+        </div>
+      </div>
+      <!--EOF SUPPORT-->
+
+      <!--BOF LICENSE-->
+      <div class="bodyHeaderContainer" id="License">
+        <div class="bodyHeader" id="grey">
+          <span class="bodyHeaderTxt">License</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">Numinix Recurring Payments is licensed for use on a single Zen Cart installation per purchase. Redistribution, resale, or sharing of the codebase without written consent from Numinix is prohibited. Refer to <a href="license.txt">license.txt</a> for the complete terms.</p>
+        </div>
+      </div>
+      <!--EOF LICENSE-->
+
+      <!--BOF DISCLAIMER-->
+      <div class="bodyHeaderContainer" id="Disclaimer">
+        <div class="bodyHeader" id="grey">
+          <span class="bodyHeaderTxt">Disclaimer</span>
+        </div>
+        <div class="bodyWrapper">
+          <p class="bodyText">PayPal integrations are subject to PayPal&rsquo;s merchant agreement, API rate limits, and local financial regulations. Monitor cron logs, webhook health, and subscription outcomes regularly to ensure compliance with card network policies. Numinix is not liable for damages arising from misconfiguration, expired credentials, or unsupported customizations of this plugin.</p>
+        </div>
+      </div>
+      <!--EOF DISCLAIMER-->
+
+    </div>
+    <footer class="readme-footer" aria-label="Numinix contact and resources">
+      <div class="readme-footer-container">
+        <div class="footer-column footer-column-1">
+          <h2 class="title">Need a hand with recurring billing?</h2>
+          <p class="paragraph">Partner with the Numinix team to optimize subscription cashflow, automate background refreshes, and keep your Zen Cart customers informed.</p>
+          <a class="connect-link" href="https://www.numinix.com/contact" target="_blank" rel="noopener">Connect with Numinix</a>
+          <div class="details">
+            <img src="images/numinix-emblem.png" alt="Numinix emblem" />
+            <ul>
+              <li>
+                <span aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                  </svg>
+                </span>
+                <div>
+                  <strong>Email</strong><br />
+                  <a href="mailto:support@numinix.com">support@numinix.com</a>
+                </div>
+              </li>
+              <li>
+                <span aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.86 19.86 0 0 1 11.09 18a19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2 4.18 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.72 12.8 12.8 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8 9l3 3 1.34-1.29a2 2 0 0 1 2.11-.45 12.8 12.8 0 0 0 2.81.7A2 2 0 0 1 19 13h3a2 2 0 0 1 2 2.18z" />
+                  </svg>
+                </span>
+                <div>
+                  <strong>Phone</strong><br />
+                  <a href="tel:+16043100027">+1 (604) 310-0027</a>
+                </div>
+              </li>
+              <li>
+                <span aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 21s-6-5.686-6-10A6 6 0 1 1 18 11c0 4.314-6 10-6 10z" />
+                    <circle cx="12" cy="11" r="2.5" />
+                  </svg>
+                </span>
+                <div>
+                  <strong>Address</strong><br />
+                  Vancouver, British Columbia
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-column footer-column-2">
+          <div class="links-group">
+            <div class="links">
+              <h4>Documentation</h4>
+              <div class="links-list">
+                <a href="#Overview">Overview</a>
+                <a href="#Installation">Installation</a>
+                <a href="#Configuration">Configuration</a>
+                <a href="#Usage">Usage</a>
+                <a href="#Automation">Automation</a>
+                <a href="#Uninstall">Uninstall</a>
+              </div>
+            </div>
+            <div class="links">
+              <h4>Operations</h4>
+              <div class="links-list">
+                <a href="#Troubleshooting">Troubleshooting</a>
+                <a href="#Support">Support</a>
+              </div>
+            </div>
+            <div class="links">
+              <h4>Policies</h4>
+              <div class="links-list">
+                <a href="#License">License</a>
+                <a href="#Disclaimer">Disclaimer</a>
+                <a href="license.txt">License file</a>
+              </div>
+            </div>
+            <div class="links">
+              <h4>Numinix</h4>
+              <div class="links-list">
+                <a href="https://www.numinix.com/zen-cart-services" target="_blank" rel="noopener">Zen Cart services</a>
+                <a href="https://www.numinix.com/portfolio" target="_blank" rel="noopener">Case studies</a>
+                <a href="https://www.numinix.com/blog" target="_blank" rel="noopener">Insights</a>
+              </div>
+            </div>
+          </div>
+          <div class="socials" aria-label="Follow Numinix">
+            <a href="https://www.facebook.com/numinix" aria-label="Numinix on Facebook" target="_blank" rel="noopener">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#1877F2" aria-hidden="true">
+                <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.988H7.898v-2.89h2.54V9.845c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.261c-1.243 0-1.63.772-1.63 1.562v1.875h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
+              </svg>
+            </a>
+            <a href="https://www.linkedin.com/company/numinix/" aria-label="Numinix on LinkedIn" target="_blank" rel="noopener">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#0A66C2" aria-hidden="true">
+                <path d="M20.447 20.452H16.89V15.84c0-1.099-.02-2.511-1.533-2.511-1.535 0-1.77 1.197-1.77 2.431v4.692H10.03V9h3.41v1.561h.049c.476-.9 1.637-1.848 3.37-1.848 3.602 0 4.268 2.37 4.268 5.455v6.284zM5.337 7.433a1.975 1.975 0 1 1 0-3.95 1.975 1.975 0 0 1 0 3.95zM7.119 20.452H3.554V9H7.12v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.226.792 24 1.771 24h20.451C23.2 24 24 23.226 24 22.271V1.73C24 .774 23.2 0 22.222 0h.003z" />
+              </svg>
+            </a>
+            <a href="https://twitter.com/numinix" aria-label="Numinix on X" target="_blank" rel="noopener">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#171717" aria-hidden="true">
+                <path d="M17.21 3H20.5l-7.61 8.69L21.5 21h-6.69l-5.23-6.11L3.69 21H.4l8.18-9.36L.5 3h6.78l4.73 5.52L17.21 3zm-1.18 16.2h1.86L7.9 4.69H5.91l10.12 14.51z" />
+              </svg>
+            </a>
+          </div>
+          <div class="payment-methods" aria-label="Accepted payment methods">
+            <a href="https://www.numinix.com/" target="_blank" rel="noopener"><img src="images/visa.png" alt="Visa" /></a>
+            <a href="https://www.numinix.com/" target="_blank" rel="noopener"><img src="images/american-express.png" alt="American Express" /></a>
+            <a href="https://www.numinix.com/" target="_blank" rel="noopener"><img src="images/discover.png" alt="Discover" /></a>
+            <a href="https://www.numinix.com/" target="_blank" rel="noopener"><img src="images/maestro.png" alt="Maestro" /></a>
+            <a href="https://www.numinix.com/" target="_blank" rel="noopener"><img src="images/paypal.png" alt="PayPal" /></a>
+          </div>
+        </div>
+      </div>
+      <div class="readme-footer-bottom">
+        <p class="copyright">&copy; 2024 Numinix Web Design Inc.</p>
+        <p class="madewith">Made with
+          <span aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#E63946">
+              <path d="M12 21s-6.716-4.568-9.192-9.192C.565 8.43 2.112 4 6.322 4c2.055 0 3.23 1.232 3.83 2.219C10.448 5.232 11.623 4 13.678 4c4.21 0 5.757 4.43 3.514 7.808C18.716 16.432 12 21 12 21z" />
+            </svg>
+          </span>
+          by <a href="https://www.numinix.com/" target="_blank" rel="noopener">Numinix</a>
+        </p>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
