@@ -259,13 +259,15 @@ if (!function_exists('braintree_calculate_tax_inclusive_amount')) {
 }
 
 // Determine selected shipping method
-if (!isset($data['selectedShippingOptionId']) || empty($data['selectedShippingOptionId'])) {
+// Treat "shipping_option_unselected" the same as empty/unset - this is sent by Google Pay during INITIALIZE
+if (!isset($data['selectedShippingOptionId']) || empty($data['selectedShippingOptionId']) || $data['selectedShippingOptionId'] === 'shipping_option_unselected') {
     $cheapest = $shipping_modules->cheapest();
     if (!empty($cheapest) && !empty($cheapest['id'])) {
         $selectedShippingOption = $cheapest['id'];
     } elseif (!empty($quotes)) {
         // fallback: pick first valid shipping method as default
         foreach ($quotes as $quote) {
+            if (!empty($quote['error']) || empty($quote['methods'])) continue;
             if (!empty($quote['methods'])) {
                 $firstMethod = $quote['methods'][0];
                 $selectedShippingOption = "{$quote['id']}_{$firstMethod['id']}";
