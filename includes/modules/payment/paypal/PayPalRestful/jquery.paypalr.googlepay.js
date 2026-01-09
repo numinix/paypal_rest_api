@@ -801,7 +801,25 @@
                         // Extract shipping and billing addresses from Google Pay payment data
                         var shippingAddress = paymentData.shippingAddress || {};
                         var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
+                        
+                        // Extract email from multiple possible locations
+                        // Google Pay can provide email in different places depending on configuration
                         var email = paymentData.email || '';
+                        if (!email && shippingAddress.emailAddress) {
+                            email = shippingAddress.emailAddress;
+                        }
+                        if (!email && billingAddress.emailAddress) {
+                            email = billingAddress.emailAddress;
+                        }
+                        
+                        console.log('[Google Pay] Extracted email:', email);
+                        console.log('[Google Pay] Payment data structure:', {
+                            hasTopLevelEmail: !!paymentData.email,
+                            hasShippingEmail: !!(shippingAddress && shippingAddress.emailAddress),
+                            hasBillingEmail: !!(billingAddress && billingAddress.emailAddress),
+                            shippingAddress: shippingAddress,
+                            billingAddress: billingAddress
+                        });
                         
                         // Build the complete payload for checkout
                         var checkoutPayload = {
@@ -846,6 +864,12 @@
                             return response.json();
                         }).then(function(checkoutResult) {
                             console.log('[Google Pay] Checkout result:', checkoutResult);
+                            console.log('[Google Pay] Checkout result details:', {
+                                status: checkoutResult.status,
+                                hasRedirectUrl: !!checkoutResult.redirect_url,
+                                redirectUrl: checkoutResult.redirect_url,
+                                message: checkoutResult.message
+                            });
                             
                             if (checkoutResult.status === 'success' && checkoutResult.redirect_url) {
                                 console.log('[Google Pay] Redirecting to:', checkoutResult.redirect_url);
