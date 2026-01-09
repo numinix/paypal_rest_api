@@ -635,11 +635,10 @@
                 amount: orderTotal.amount,
                 type: 'final'
             },
-            // Request billing contact fields required by PayPal's API
+            // Note: Shipping contact is NOT requested here because the checkout page
+            // already has its own shipping collection system. Only billing contact is needed.
             requiredBillingContactFields: ['postalAddress', 'name', 'email']
         };
-        
-        // Note: Shipping contact is NOT requested - checkout form handles shipping
 
         // Step 3: Create ApplePaySession synchronously in the click handler
         // This MUST happen synchronously to maintain user gesture context
