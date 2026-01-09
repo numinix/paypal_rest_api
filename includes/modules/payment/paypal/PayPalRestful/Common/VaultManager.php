@@ -74,7 +74,7 @@ class VaultManager
      * Store or update a vaulted card for the supplied customer/order combination.
      *
      * @param int   $customers_id The Zen Cart customer's identifier.
-     * @param int   $orders_id    The order identifier that produced the vault token.
+     * @param int   $orders_id    The order identifier that produced the vault token. Use 0 for cards added without a purchase.
      * @param array $cardSource   The card payment_source element returned by PayPal.
      * @param bool  $visible      Whether the card should be visible in checkout/account (default: true for backward compatibility).
      *
@@ -82,7 +82,7 @@ class VaultManager
      */
     public static function saveVaultedCard(int $customers_id, int $orders_id, array $cardSource, bool $visible = true): ?array
     {
-        if ($customers_id <= 0 || $orders_id <= 0) {
+        if ($customers_id <= 0 || $orders_id < 0) {
             return null;
         }
 

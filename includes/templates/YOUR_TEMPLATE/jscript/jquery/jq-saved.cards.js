@@ -81,17 +81,18 @@
 
     // Handle PayPal Advanced Card Fields for adding cards
     var $addCardForm = $('#add-card-form');
-    if ($addCardForm.length && typeof paypal !== 'undefined') {
+    if ($addCardForm.length) {
       var initializeCardFields = function() {
         var $fieldsContainer = $('#card-fields-container');
         var $submitBtn = $('#submit-card-btn');
         var $setupTokenInput = $('#setup_token_id');
         var $loadingMsg = $('#card-fields-loading');
 
-        // Get PayPal client ID from the module configuration
-        var clientId = window.PAYPAL_CLIENT_ID || '';
-        if (!clientId) {
-          $loadingMsg.text('PayPal configuration error. Please contact support.');
+        // Get PayPal SDK from the namespaced global
+        var paypal = window.PayPalSDK || window.paypal;
+        
+        if (!paypal) {
+          $loadingMsg.text('PayPal SDK not loaded. Please refresh the page.');
           return;
         }
 
@@ -273,13 +274,15 @@
       };
 
       // Initialize when PayPal SDK is ready
-      if (typeof paypal !== 'undefined' && paypal.CardFields) {
+      var paypal = window.PayPalSDK || window.paypal;
+      if (paypal && paypal.CardFields) {
         initializeCardFields();
       } else {
         $('#card-fields-loading').text('Loading PayPal card fields...');
         // Wait for PayPal SDK to load
         var checkPayPal = setInterval(function() {
-          if (typeof paypal !== 'undefined' && paypal.CardFields) {
+          paypal = window.PayPalSDK || window.paypal;
+          if (paypal && paypal.CardFields) {
             clearInterval(checkPayPal);
             initializeCardFields();
           }
@@ -287,6 +290,7 @@
         // Timeout after 10 seconds
         setTimeout(function() {
           clearInterval(checkPayPal);
+          paypal = window.PayPalSDK || window.paypal;
           if (!paypal || !paypal.CardFields) {
             $('#card-fields-loading').text('Failed to load PayPal. Please refresh the page.');
           }
