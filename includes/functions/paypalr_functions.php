@@ -392,29 +392,10 @@ if (!function_exists('zen_update_orders_history')) {
                 $escaped_message = $db->prepareInput($message);
             }
             
-            $sql_data_array = [
-                'orders_id' => $order_id,
-                'orders_status_id' => $status_id,
-                'date_added' => 'now()',
-                'customer_notified' => (int)$customer_notified,
-                'comments' => $escaped_message
-            ];
-            
-            // Build the SQL INSERT statement
-            $fields = [];
-            $values = [];
-            foreach ($sql_data_array as $key => $value) {
-                $fields[] = $key;
-                if ($value === 'now()') {
-                    $values[] = 'now()';
-                } else {
-                    $values[] = "'" . $value . "'";
-                }
-            }
-            
+            // Build the SQL INSERT statement with properly escaped values
             $sql = "INSERT INTO " . TABLE_ORDERS_STATUS_HISTORY . " 
-                    (" . implode(', ', $fields) . ") 
-                    VALUES (" . implode(', ', $values) . ")";
+                    (orders_id, orders_status_id, date_added, customer_notified, comments) 
+                    VALUES (" . (int)$order_id . ", " . (int)$status_id . ", now(), " . (int)$customer_notified . ", '" . $escaped_message . "')";
             
             $db->Execute($sql);
         } catch (Exception $e) {
