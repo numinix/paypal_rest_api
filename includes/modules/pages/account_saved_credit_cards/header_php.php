@@ -465,6 +465,9 @@ $delete_card = null;
 $edit_card = null;
 $edit_card_errors = [];
 $edit_form_values = [];
+$add_card_mode = false;
+$add_card_errors = [];
+$add_form_values = [];
 $address_book_options = [];
 $country_dropdown = [];
 $expiry_month_options = [];
@@ -497,7 +500,7 @@ if ($hide_saved_cards_page === false) {
 
     global $db;
     $countryRecords = $db->Execute(
-        "SELECT countries_id, countries_name" .
+        "SELECT countries_id, countries_name, countries_iso_code_2" .
         "   FROM " . TABLE_COUNTRIES .
         "  ORDER BY countries_name"
     );
@@ -506,6 +509,7 @@ if ($hide_saved_cards_page === false) {
             $country_dropdown[] = [
                 'id' => (int)$countryRecords->fields['countries_id'],
                 'text' => zen_output_string_protected($countryRecords->fields['countries_name']),
+                'iso2' => strtoupper(trim((string)$countryRecords->fields['countries_iso_code_2'])),
             ];
             $countryRecords->MoveNext();
         }
@@ -716,7 +720,66 @@ if ($hide_saved_cards_page === false) {
                     }
                 }
             }
+        } elseif ($action === 'add-card') {
+            if (!isset($_POST['securityToken']) || $_POST['securityToken'] !== $_SESSION['securityToken']) {
+                $messageStack->add('saved_credit_cards', ERROR_SECURITY_TOKEN, 'error');
+            } else {
+                $setup_token_id = trim((string)zen_db_prepare_input($_POST['setup_token_id'] ?? ''));
+                
+                if ($setup_token_id === '') {
+                    $messageStack->add('saved_credit_cards', TEXT_ADD_CARD_ERROR_GENERAL, 'error');
+                } else {
+                    // Create a payment token from the setup token
+                    $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER);
+                    $paymentTokenResponse = $api->createPaymentTokenFromSetup($setup_token_id);
+                    
+                    if ($paymentTokenResponse === false) {
+                        $errorInfo = $api->getErrorInfo();
+                        error_log('PayPal add card error: ' . print_r($errorInfo, true));
+                        $messageStack->add('saved_credit_cards', TEXT_ADD_CARD_ERROR_GENERAL, 'error');
+                    } else {
+                        // Get the vault token details
+                        $vaultId = $paymentTokenResponse['id'] ?? '';
+                        if ($vaultId !== '') {
+                            $tokenDetails = $api->getVaultPaymentToken($vaultId);
+                            if (is_array($tokenDetails)) {
+                                // Extract card info from payment source
+                                $paymentSource = $tokenDetails['payment_source'] ?? [];
+                                $cardSource = $paymentSource['card'] ?? [];
+                                
+                                if (!empty($cardSource)) {
+                                    // Add vault metadata
+                                    $cardSource['vault'] = [
+                                        'id' => $vaultId,
+                                        'status' => $tokenDetails['status'] ?? 'APPROVED',
+                                    ];
+                                    
+                                    // Save to our database with orders_id = 0 (no associated order)
+                                    $savedCard = VaultManager::saveVaultedCard($customers_id, 0, $cardSource, true);
+                                    
+                                    if ($savedCard !== null) {
+                                        $messageStack->add_session('saved_credit_cards', TEXT_ADD_CARD_SUCCESS, 'success');
+                                        zen_redirect(zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'));
+                                    } else {
+                                        $messageStack->add('saved_credit_cards', TEXT_ADD_CARD_ERROR_GENERAL, 'error');
+                                    }
+                                } else {
+                                    $messageStack->add('saved_credit_cards', TEXT_ADD_CARD_ERROR_GENERAL, 'error');
+                                }
+                            } else {
+                                $messageStack->add('saved_credit_cards', TEXT_ADD_CARD_ERROR_GENERAL, 'error');
+                            }
+                        } else {
+                            $messageStack->add('saved_credit_cards', TEXT_ADD_CARD_ERROR_GENERAL, 'error');
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    if (isset($_GET['add'])) {
+        $add_card_mode = true;
     }
 
     if (isset($_GET['delete'])) {
