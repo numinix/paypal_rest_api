@@ -770,11 +770,11 @@
                     // Enable shipping address and shipping option selection in the Google Pay modal
                     shippingAddressRequired: true,
                     shippingAddressParameters: {
-                        phoneNumberRequired: true
+                        phoneNumberRequired: true,
+                        // Request email in shipping address - this is how Braintree gets email
+                        emailRequired: true
                     },
                     shippingOptionRequired: true,
-                    // Request email address from the user
-                    emailRequired: true,
                     // Register callbacks for address and shipping option changes
                     callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
                 };
