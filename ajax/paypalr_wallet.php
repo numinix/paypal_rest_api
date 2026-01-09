@@ -268,11 +268,9 @@ if (!isset($data['selectedShippingOptionId']) || empty($data['selectedShippingOp
         // fallback: pick first valid shipping method as default
         foreach ($quotes as $quote) {
             if (!empty($quote['error']) || empty($quote['methods'])) continue;
-            if (!empty($quote['methods'])) {
-                $firstMethod = $quote['methods'][0];
-                $selectedShippingOption = "{$quote['id']}_{$firstMethod['id']}";
-                break;
-            }
+            $firstMethod = $quote['methods'][0];
+            $selectedShippingOption = "{$quote['id']}_{$firstMethod['id']}";
+            break;
         }
     } else {
         $selectedShippingOption = null;
