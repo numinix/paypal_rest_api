@@ -301,9 +301,10 @@ class paypalr_googlepay extends base
         }
         
         // Record the current version of the payment module into its database configuration setting
+        $safe_version = $db->prepare_input($current_version);
         $db->Execute(
             "UPDATE " . TABLE_CONFIGURATION . "
-                SET configuration_value = '$current_version',
+                SET configuration_value = '$safe_version',
                     last_modified = now()
               WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION'
               LIMIT 1"
@@ -453,9 +454,11 @@ class paypalr_googlepay extends base
             : 'authorize';
 
         // Get Google Pay environment setting (independent of PayPal sandbox/live)
-        $googlePayEnvironment = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENVIRONMENT') 
+        // Validate to ensure only TEST or PRODUCTION values
+        $rawGooglePayEnv = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENVIRONMENT') 
             ? MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENVIRONMENT 
             : 'TEST';
+        $googlePayEnvironment = ($rawGooglePayEnv === 'PRODUCTION') ? 'PRODUCTION' : 'TEST';
 
         // -----
         // Log wallet configuration request for debugging SDK 400 errors

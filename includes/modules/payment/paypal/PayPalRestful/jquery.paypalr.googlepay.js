@@ -952,11 +952,19 @@
                 console.log('[Google Pay] Eligibility check passed');
 
                 // Create Google Payments Client
-                // Use googlePayEnvironment from config if available (allows independent TEST/PRODUCTION setting)
+                // Determine Google Pay environment (allows independent TEST/PRODUCTION setting)
                 // This is needed for Google Pay merchant verification which requires TEST mode screenshots
-                var googlePayEnvironment = (sdkState.config && sdkState.config.googlePayEnvironment) 
-                    ? sdkState.config.googlePayEnvironment 
-                    : ((sdkState.config && sdkState.config.environment === 'sandbox') ? 'TEST' : 'PRODUCTION');
+                var googlePayEnvironment = 'TEST'; // Default to TEST for safety
+                if (sdkState.config && sdkState.config.googlePayEnvironment) {
+                    // Use explicit googlePayEnvironment setting if available
+                    googlePayEnvironment = sdkState.config.googlePayEnvironment;
+                } else if (sdkState.config && sdkState.config.environment === 'sandbox') {
+                    // Fall back to TEST if PayPal is in sandbox
+                    googlePayEnvironment = 'TEST';
+                } else if (sdkState.config && sdkState.config.environment === 'live') {
+                    // Fall back to PRODUCTION if PayPal is in live mode
+                    googlePayEnvironment = 'PRODUCTION';
+                }
                 console.log('[Google Pay] Creating PaymentsClient with environment:', googlePayEnvironment);
                 var paymentsClient = new google.payments.api.PaymentsClient({
                     environment: googlePayEnvironment,
