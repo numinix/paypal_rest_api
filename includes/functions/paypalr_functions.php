@@ -324,3 +324,85 @@ function paypalr_wallet_get_tokenization_key() {
 
     return (string) $common->get_tokenization_key();
 }
+
+/**
+ * Fallback implementation of zen_update_orders_history for when it's not available
+ * This is typically provided by Zen Cart core, but we provide a stub for wallet checkout contexts
+ * 
+ * @param int $order_id The order ID
+ * @param string $message The status message to add
+ * @param string|null $updated_by Who updated the order (e.g., 'webhook', null for admin)
+ * @param int $status The new order status ID (-1 means no change)
+ * @param int $customer_notified Whether customer was notified (0=no, 1=yes, -1=hidden, -2=admin only)
+ * @return void
+ */
+if (!function_exists('zen_update_orders_history')) {
+    function zen_update_orders_history($order_id, $message, $updated_by = null, $status = -1, $customer_notified = 0) {
+        global $db;
+        
+        // If database is not available, log and return
+        if (!isset($db) || !is_object($db)) {
+            error_log("zen_update_orders_history: Database not available for order $order_id");
+            return;
+        }
+        
+        // If order ID is not valid, return
+        if (empty($order_id) || !is_numeric($order_id)) {
+            error_log("zen_update_orders_history: Invalid order ID: " . var_export($order_id, true));
+            return;
+        }
+        
+        $order_id = (int)$order_id;
+        
+        // If status is provided and valid, update the order status
+        if ($status > 0) {
+            try {
+                // Check if TABLE_ORDERS is defined
+                if (!defined('TABLE_ORDERS')) {
+                    error_log("zen_update_orders_history: TABLE_ORDERS constant not defined");
+                    return;
+                }
+                
+                $db->Execute("UPDATE " . TABLE_ORDERS . " 
+                             SET orders_status = " . (int)$status . ",
+                                 last_modified = now()
+                             WHERE orders_id = " . $order_id);
+            } catch (Exception $e) {
+                error_log("zen_update_orders_history: Failed to update order status: " . $e->getMessage());
+            }
+        }
+        
+        // Insert the order status history record
+        try {
+            // Check if required constants are defined
+            if (!defined('TABLE_ORDERS_STATUS_HISTORY')) {
+                error_log("zen_update_orders_history: TABLE_ORDERS_STATUS_HISTORY constant not defined");
+                return;
+            }
+            
+            // Use a default status if DEFAULT_ORDERS_STATUS_ID is not defined
+            $default_status = defined('DEFAULT_ORDERS_STATUS_ID') ? (int)DEFAULT_ORDERS_STATUS_ID : 1;
+            $status_id = ($status > 0) ? (int)$status : $default_status;
+            
+            // Use zen_db_input if available, otherwise use basic escaping
+            if (function_exists('zen_db_input')) {
+                $escaped_message = zen_db_input($message);
+            } else {
+                // WARNING: Fallback to basic escaping - less secure than zen_db_input
+                // In production, zen_db_input should always be available since this function
+                // is only called when the Zen Cart environment is loaded.
+                // Prepared statements would be more secure but are not available in Zen Cart's queryFactory.
+                $escaped_message = $db->prepareInput($message);
+            }
+            
+            // Build the SQL INSERT statement with properly escaped values
+            $sql = "INSERT INTO " . TABLE_ORDERS_STATUS_HISTORY . " 
+                    (orders_id, orders_status_id, date_added, customer_notified, comments) 
+                    VALUES (" . (int)$order_id . ", " . (int)$status_id . ", now(), " . (int)$customer_notified . ", '" . $escaped_message . "')";
+            
+            $db->Execute($sql);
+        } catch (Exception $e) {
+            error_log("zen_update_orders_history: Failed to insert order history: " . $e->getMessage());
+        }
+    }
+}

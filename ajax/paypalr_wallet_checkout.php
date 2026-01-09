@@ -119,7 +119,7 @@ $_SESSION['payment_method_nonce'] = $_POST['payment_method_nonce'] = $payment_me
 $_SESSION['currency'] = $currency = $payload['currency'];
 $_SESSION['payment'] = $module;
 $total = $payload['total'];
-$email = $payload['email'];
+$email = $payload['email'] ?? '';
 $shipping_address_raw = $payload['shipping_address'] ?? [];
 $billing_address_raw  = $payload['billing_address'] ?? [];
 
@@ -129,6 +129,24 @@ log_paypalr_wallet_message("Payload total from client: $total (currency: $curren
 // Normalize
 $shipping_address = normalize_braintree_contact($shipping_address_raw, $module);
 $billing_address  = normalize_braintree_contact($billing_address_raw, $module);
+
+// Extract email from billing address if not provided in payload
+if (empty($email)) {
+    $email = $billing_address['emailAddress'] ?? $billing_address['email'] ?? '';
+    log_paypalr_wallet_message("Email extracted from billing address: $email");
+}
+
+// Validate that we have an email address and it's in proper format
+if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    log_paypalr_wallet_message("ERROR: Invalid or missing email address: " . var_export($email, true));
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'A valid email address is required for checkout'
+    ]);
+    exit;
+}
+
+log_paypalr_wallet_message("Processing order for email: $email");
 
 function incomplete_address_fields($addr) {
     $missing = [];
@@ -250,19 +268,26 @@ $guestModules = ['paypalr_googlepay', 'paypalr_applepay'];
 $isGuestCheckout = in_array($module, $guestModules, true);
 
 // Check if customer exists by email
-$customer_query = $db->Execute("SELECT customers_id FROM " . TABLE_CUSTOMERS . " WHERE customers_email_address = '" . zen_db_input($email) . "'");
+$customer_query = $db->Execute("SELECT customers_id, customers_firstname, customers_lastname FROM " . TABLE_CUSTOMERS . " WHERE customers_email_address = '" . zen_db_input($email) . "'");
 
 if (!isset($_SESSION['customer_id'])) {
     if ($customer_query->RecordCount() > 0) {
-        // If customer exists, use existing customer ID and set session variables for security
+        // If customer exists, use existing customer ID and set session variables
         $customer_id = $customer_query->fields['customers_id'];
+        $existing_first = $customer_query->fields['customers_firstname'];
+        $existing_last = $customer_query->fields['customers_lastname'];
+        log_paypalr_wallet_message("Using existing customer ID: $customer_id");
     } else {
-        // Create the new customer record (simplified for example purposes)
+        // Create the new customer record
         $db->Execute("INSERT INTO " . TABLE_CUSTOMERS . " (customers_email_address, customers_firstname, customers_lastname)
-                      VALUES ('" . zen_db_input($email ?? '') . "', '" . zen_db_input($billing_first_name ?? '') . "', '" . zen_db_input($billing_last_name ?? '') . "')");
+                      VALUES ('" . zen_db_input($email) . "', '" . zen_db_input($billing_first_name) . "', '" . zen_db_input($billing_last_name) . "')");
 
         // Get the new customer ID
         $customer_id = $db->Insert_ID();
+        log_paypalr_wallet_message("Created new customer ID: $customer_id with email: $email");
+        
+        $existing_first = $billing_first_name;
+        $existing_last = $billing_last_name;
 
         // If the COWOA_account column exists, set it to 1
         $check_cowoa_account = $db->Execute("SHOW COLUMNS FROM " . TABLE_CUSTOMERS . " LIKE 'COWOA_account'");
@@ -274,11 +299,17 @@ if (!isset($_SESSION['customer_id'])) {
         $db->Execute("INSERT INTO " . TABLE_CUSTOMERS_INFO . " (customers_info_id, customers_info_date_of_last_logon, customers_info_number_of_logons, customers_info_date_account_created, customers_info_date_account_last_modified)
                       VALUES ($customer_id, now(), 1, now(), now())");
     }
+    
+    // Set all customer session variables consistently
+    $_SESSION['customer_id'] = $customer_id;
+    $_SESSION['customer_first_name'] = $existing_first;
+    $_SESSION['customer_last_name'] = $existing_last;
+    $_SESSION['customer_email_address'] = $email;
+    
     // Set session variables based on whether guest checkout is used
     if ($isGuestCheckout) {
-        // Treat the Google/Apple Pay flow as a guest checkout but still set the core customer id
+        // Treat the Google/Apple Pay flow as a guest checkout
         $_SESSION['customer_guest_id'] = $customer_id;
-        $_SESSION['customer_id'] = $customer_id;
         $_SESSION['COWOA'] = true;
         $_SESSION['customer_loggedin_type'] = 'guest';
 
@@ -286,7 +317,6 @@ if (!isset($_SESSION['customer_id'])) {
             $_SESSION['braintree_express_checkout'] = $module;
         }
     } else {
-        $_SESSION['customer_id'] = $customer_id;
         $_SESSION['customer_loggedin_type'] = "customer";
     }
 } else {
