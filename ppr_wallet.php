@@ -69,6 +69,66 @@ try {
         $order = new order();
     }
 
+    // -----
+    // Select a default shipping method if none is currently selected in the session.
+    // This ensures the initial order total includes shipping cost.
+    // Only do this if shipping is not already set and the cart requires shipping.
+    //
+    if (!isset($_SESSION['shipping']) && $_SESSION['cart']->get_content_type() !== 'virtual') {
+        require_once DIR_WS_CLASSES . 'shipping.php';
+        
+        // Get shipping quotes using current cart/session state
+        $shipping_modules = new shipping();
+        $quotes = $shipping_modules->quote();
+        
+        // Select the cheapest shipping method as the default
+        $cheapest = $shipping_modules->cheapest();
+        $selectedShippingId = null;
+        
+        if (!empty($cheapest) && !empty($cheapest['id'])) {
+            $selectedShippingId = $cheapest['id'];
+        } elseif (!empty($quotes)) {
+            // Fallback: pick first valid shipping method as default
+            foreach ($quotes as $quote) {
+                if (empty($quote['error']) && !empty($quote['methods'])) {
+                    $firstMethod = $quote['methods'][0];
+                    $selectedShippingId = "{$quote['id']}_{$firstMethod['id']}";
+                    break;
+                }
+            }
+        }
+        
+        // Set the default shipping method in the session if found
+        if ($selectedShippingId !== null) {
+            foreach ($quotes as $quote) {
+                if (empty($quote['error']) && !empty($quote['methods'])) {
+                    foreach ($quote['methods'] as $method) {
+                        $optionId = "{$quote['id']}_{$method['id']}";
+                        if ($optionId === $selectedShippingId) {
+                            $_SESSION['shipping'] = [
+                                'id' => $optionId,
+                                'title' => $quote['module'],
+                                'module' => $method['title'],
+                                'cost' => (float)($method['cost'] ?? 0)
+                            ];
+                            if (array_key_exists('tax', $quote)) {
+                                $_SESSION['shipping']['tax'] = $quote['tax'];
+                            }
+                            if (array_key_exists('tax_id', $quote)) {
+                                $_SESSION['shipping']['tax_id'] = $quote['tax_id'];
+                            }
+                            if (array_key_exists('tax_description', $quote)) {
+                                $_SESSION['shipping']['tax_description'] = $quote['tax_description'];
+                            }
+                            error_log("PayPal Wallet: Selected default shipping method: {$optionId}");
+                            break 2; // Break out of both loops
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (!isset($order_total_modules) || !is_object($order_total_modules)) {
         require_once DIR_WS_CLASSES . 'order_total.php';
         $order_total_modules = new order_total();
