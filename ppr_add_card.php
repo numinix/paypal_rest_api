@@ -19,18 +19,31 @@ header('Content-Type: application/json');
 if (empty($_SESSION['customer_id'])) {
     echo json_encode(['success' => false, 'message' => 'Not authenticated']);
     require DIR_WS_INCLUDES . 'application_bottom.php';
-    return;
+    exit;
 }
 
 // Validate that PayPal REST module is enabled
 if (!defined('MODULE_PAYMENT_PAYPALR_STATUS') || MODULE_PAYMENT_PAYPALR_STATUS !== 'True') {
     echo json_encode(['success' => false, 'message' => 'Payment module not available']);
     require DIR_WS_INCLUDES . 'application_bottom.php';
-    return;
+    exit;
 }
 
 $requestBody = file_get_contents('php://input');
 $requestData = json_decode($requestBody, true) ?: [];
+
+// Validate JSON input size and structure
+if (strlen($requestBody) > 10240) { // 10KB max
+    echo json_encode(['success' => false, 'message' => 'Request too large']);
+    require DIR_WS_INCLUDES . 'application_bottom.php';
+    exit;
+}
+
+if (json_last_error() !== JSON_ERROR_NONE) {
+    echo json_encode(['success' => false, 'message' => 'Invalid JSON']);
+    require DIR_WS_INCLUDES . 'application_bottom.php';
+    exit;
+}
 
 $action = $requestData['action'] ?? '';
 
@@ -45,7 +58,7 @@ if ($action === 'create_setup_token') {
         empty($billingAddress['country_code'])) {
         echo json_encode(['success' => false, 'message' => 'Invalid billing address']);
         require DIR_WS_INCLUDES . 'application_bottom.php';
-        return;
+        exit;
     }
 
     require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/pprAutoload.php';
@@ -68,7 +81,7 @@ if ($action === 'create_setup_token') {
         error_log('PayPal setup token creation error: ' . print_r($errorInfo, true));
         echo json_encode(['success' => false, 'message' => 'Failed to create setup token']);
     } else {
-        // Return the setup token ID and client token for the SDK
+        // Return the setup token ID
         $setupTokenId = $setupTokenResponse['id'] ?? '';
         if ($setupTokenId !== '') {
             echo json_encode([

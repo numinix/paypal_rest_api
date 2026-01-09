@@ -12,9 +12,9 @@ $define = [
     'HEADING_TITLE_EDIT_CARD' => 'Edit saved card',
 
     'TEXT_SAVED_CARDS_DISABLED' => 'Saved cards are currently unavailable. Please contact us if you need assistance with your payment details.',
-    'TEXT_SAVED_CARDS_INTRO' => 'Manage the cards you have saved with PayPal Vault. You can remove cards that you no longer use and review their billing details.',
+    'TEXT_SAVED_CARDS_INTRO' => 'Manage the cards you have saved with PayPal Vault. You can add new cards, remove cards that you no longer use, and review their billing details.',
     'TEXT_EDIT_CARD_INTRO' => 'Update the billing address and expiry details for this saved card.',
-    'TEXT_NO_SAVED_CARDS' => 'You have not saved any cards yet. A card will appear here the next time you choose to save it during checkout.',
+    'TEXT_NO_SAVED_CARDS' => 'You have not saved any cards yet. Click "Add a new card" above to save a card for future purchases and subscriptions.',
 
     'TEXT_SAVED_CARD_STATUS_ACTIVE' => 'Active',
     'TEXT_SAVED_CARD_STATUS_INACTIVE' => 'Inactive',

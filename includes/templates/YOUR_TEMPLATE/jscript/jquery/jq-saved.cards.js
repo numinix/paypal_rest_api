@@ -227,14 +227,11 @@
         var billingAddress = {};
 
         if (addressMode === 'existing') {
-          var addressBookId = $('#add_address_book_id').val();
-          if (!addressBookId) {
-            return null;
-          }
-          // Need to get the address data from the selected address book entry
-          // For simplicity, we'll use the new address fields approach
-          // In production, you'd fetch the address via AJAX or embed it in the page
-          return null; // This will trigger the new address path
+          // For the initial implementation, we require users to enter a new address
+          // because we need to pass the address directly to PayPal's API.
+          // Future enhancement: Fetch the full address via AJAX from the selected address book entry
+          alert('Please use "Enter a new billing address" option for adding cards.');
+          return null;
         }
 
         // Get new address fields
@@ -252,8 +249,9 @@
         // Get country code from the select option
         var countryCode = $('#add_new_country option:selected').attr('data-iso2');
         if (!countryCode) {
-          // Fallback: try to get from a data attribute or default to US
-          countryCode = 'US';
+          // Country code is required - alert user if not available
+          alert('Please select a country from the dropdown.');
+          return null;
         }
 
         billingAddress = {
