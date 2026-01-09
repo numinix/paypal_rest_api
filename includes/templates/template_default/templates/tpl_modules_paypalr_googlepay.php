@@ -24,6 +24,7 @@
     // Load the PayPal SDK Google Pay JavaScript integration
     // This uses paypal.Googlepay().config() to get proper tokenization specification
     // The JS file handles all SDK loading and initialization internally
+    // Note: The JS file automatically renders the button at the end, so no additional calls needed
     $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js';
     if (file_exists($scriptPath)) {
         echo '<script>' . file_get_contents($scriptPath) . '</script>';
@@ -33,24 +34,6 @@
         return;
     }
 ?>
-
-<script>
-"use strict";
-
-// Initialize Google Pay button when DOM is ready
-// The PayPal SDK implementation handles all initialization internally
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof window.paypalrGooglePayRender === 'function') {
-            window.paypalrGooglePayRender();
-        }
-    });
-} else {
-    if (typeof window.paypalrGooglePayRender === 'function') {
-        window.paypalrGooglePayRender();
-    }
-}
-</script>
 
 <!-- Google Pay Button Container -->
 <div id="paypalr-googlepay-button" class="paypalr-googlepay-button"></div>
