@@ -3,7 +3,9 @@
  * tpl_modules_paypalr_googlepay.php
  * Google Pay button template for shopping cart page
  * 
- * Google Pay uses PayPal SDK with native Google Pay integration.
+ * Uses native google.payments.api to retrieve user email addresses,
+ * then processes payment through PayPal REST API.
+ * Based on Braintree implementation pattern.
  */
     require_once(DIR_WS_LANGUAGES . $_SESSION['language'] . '/modules/payment/paypalr_googlepay.php');
     require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr_googlepay.php');
@@ -18,26 +20,25 @@
     }
     
     $clientId = $walletConfig['clientId'];
-    $merchantId = $walletConfig['googleMerchantId'] ?? '';
+    $googleMerchantId = $walletConfig['googleMerchantId'] ?? '';
     $intent = $walletConfig['intent'] ?? 'capture';
     $currency = $_SESSION['currency'] ?? DEFAULT_CURRENCY;
-    $environment = $walletConfig['environment'] ?? 'sandbox';
+    $googlePayEnvironment = $walletConfig['environment'] === 'sandbox' ? 'TEST' : 'PRODUCTION';
     $initialTotal = number_format($currencies->value($_SESSION['cart']->total), 2, '.', '');
     
-    // Build SDK URL with components
-    // Note: As of 2025, PayPal SDK no longer accepts google-pay-merchant-id or intent parameters
-    // Intent is specified when creating the order, not when loading the SDK
-    //
-    // All wallet components (buttons,googlepay,applepay) are loaded together to ensure
-    // compatibility when multiple payment methods are enabled. This prevents SDK reload
-    // issues when users have both Google Pay and Apple Pay available.
+    // Get store country code for Google Pay
+    $country_query = "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES . " WHERE countries_id = " . (int)STORE_COUNTRY;
+    $country_result = $db->Execute($country_query);
+    $storeCountryCode = $country_result->fields['countries_iso_code_2'] ?? 'US';
+    
+    // Build PayPal SDK URL - still needed for order creation/capture
     $sdkComponents = 'buttons,googlepay,applepay';
     $sdkUrl = 'https://www.paypal.com/sdk/js?client-id=' . urlencode($clientId);
     $sdkUrl .= '&components=' . urlencode($sdkComponents);
     $sdkUrl .= '&currency=' . urlencode($currency);
     
     // Add buyer-country for sandbox mode (required for testing)
-    if ($environment === 'sandbox') {
+    if ($walletConfig['environment'] === 'sandbox') {
         $sdkUrl .= '&buyer-country=US';
     }
 ?>
@@ -46,26 +47,46 @@
 <script src="https://pay.google.com/gp/p/js/pay.js"></script>
 
 <?php
-    // Load the PayPal Google Pay JavaScript
-    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js';
+    // Load the native Google Pay JavaScript integration
+    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.native.js';
     if (file_exists($scriptPath)) {
         echo '<script>' . file_get_contents($scriptPath) . '</script>';
+    } else {
+        // Fallback to original implementation if native version doesn't exist yet
+        $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js';
+        if (file_exists($scriptPath)) {
+            echo '<script>' . file_get_contents($scriptPath) . '</script>';
+        }
     }
 ?>
 
 <script>
 "use strict";
 
-window.paypalrGooglePaySessionAppend = window.paypalrGooglePaySessionAppend || "<?php echo zen_session_id() ? ('?' . zen_session_name() . '=' . zen_session_id()) : ''; ?>";
+// Configuration for native Google Pay integration
+window.paypalrGooglePayConfig = {
+    clientId: "<?php echo addslashes($clientId); ?>",
+    googleMerchantId: "<?php echo addslashes($googleMerchantId); ?>",
+    storeCountryCode: "<?php echo $storeCountryCode; ?>",
+    currencyCode: "<?php echo $currency; ?>",
+    initialTotal: "<?php echo $initialTotal; ?>",
+    storeName: "<?php echo addslashes(STORE_NAME); ?>",
+    environment: "<?php echo $googlePayEnvironment; ?>",
+    sessionAppend: "<?php echo zen_session_id() ? ('?' . zen_session_name() . '=' . zen_session_id()) : ''; ?>",
+    context: 'cart'
+};
 
-// Initialize Google Pay when PayPal SDK is loaded
-if (window.paypal) {
-    var googlePayContainer = document.getElementById('paypalr-googlepay-button');
-    if (googlePayContainer) {
-        googlePayContainer.style.minHeight = '50px';
-    }
+// Initialize Google Pay when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof window.initPayPalRGooglePay === 'function') {
+            window.initPayPalRGooglePay();
+        }
+    });
 } else {
-    console.error('PayPal SDK not loaded for Google Pay');
+    if (typeof window.initPayPalRGooglePay === 'function') {
+        window.initPayPalRGooglePay();
+    }
 }
 </script>
 
