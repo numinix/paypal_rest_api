@@ -445,6 +445,144 @@ if (!function_exists('paypalr_normalize_vault_card')) {
     }
 }
 
+// Define Payflow saved cards table if it exists
+if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
+    define('TABLE_SAVED_CREDIT_CARDS', DB_PREFIX . 'saved_credit_cards');
+}
+
+if (!function_exists('paypalr_get_payflow_cards')) {
+    /**
+     * Retrieve Payflow saved credit cards for a customer
+     *
+     * @param int $customers_id
+     * @return array
+     */
+    function paypalr_get_payflow_cards(int $customers_id): array
+    {
+        if ($customers_id <= 0) {
+            return [];
+        }
+
+        global $db;
+
+        // Check if table exists
+        $tableCheck = $db->Execute("SHOW TABLES LIKE '" . TABLE_SAVED_CREDIT_CARDS . "'");
+        if ($tableCheck->EOF) {
+            return [];
+        }
+
+        $sql = "SELECT scc.saved_credit_card_id, scc.type, scc.last_digits, scc.expiry,
+                       scc.name_on_card, scc.is_primary, scc.api_type
+                FROM " . TABLE_SAVED_CREDIT_CARDS . " scc
+                WHERE scc.customers_id = " . (int)$customers_id . "
+                  AND scc.is_deleted = '0'
+                  AND LAST_DAY(STR_TO_DATE(scc.expiry, '%m%y')) > CURDATE()
+                ORDER BY scc.is_primary DESC, scc.saved_credit_card_id DESC";
+
+        $result = $db->Execute($sql);
+        $cards = [];
+
+        if (!is_object($result)) {
+            return [];
+        }
+
+        while (!$result->EOF) {
+            $cards[] = [
+                'saved_credit_card_id' => (int)$result->fields['saved_credit_card_id'],
+                'type' => (string)$result->fields['type'],
+                'last_digits' => (string)$result->fields['last_digits'],
+                'expiry' => (string)$result->fields['expiry'],
+                'name_on_card' => (string)$result->fields['name_on_card'],
+                'is_primary' => (int)$result->fields['is_primary'],
+                'api_type' => (string)($result->fields['api_type'] ?? 'payflow'),
+            ];
+            $result->MoveNext();
+        }
+
+        return $cards;
+    }
+}
+
+if (!function_exists('paypalr_normalize_payflow_card')) {
+    /**
+     * Normalize Payflow card to match vault card format for display
+     *
+     * @param array $payflowCard
+     * @return array
+     */
+    function paypalr_normalize_payflow_card(array $payflowCard): array
+    {
+        $cardId = (int)($payflowCard['saved_credit_card_id'] ?? 0);
+        $brand = (string)($payflowCard['type'] ?? '');
+        $lastDigits = (string)($payflowCard['last_digits'] ?? '');
+        $expiry = (string)($payflowCard['expiry'] ?? '');
+        $cardholderName = (string)($payflowCard['name_on_card'] ?? '');
+        $apiType = (string)($payflowCard['api_type'] ?? 'payflow');
+
+        // Format expiry from MMYY to MM/YYYY
+        $formattedExpiry = paypalr_format_vault_expiry($expiry);
+
+        return [
+            'paypal_vault_id' => 0, // Not a vault card
+            'payflow_card_id' => $cardId,
+            'source' => 'payflow',
+            'vault_id' => '',
+            'brand' => $brand,
+            'last_digits' => $lastDigits,
+            'expiry' => $formattedExpiry,
+            'cardholder_name' => $cardholderName,
+            'status_label' => TEXT_SAVED_CARD_STATUS_ACTIVE,
+            'status_class' => 'is-active',
+            'status_raw' => 'ACTIVE',
+            'last_used' => '',
+            'updated' => '',
+            'created' => '',
+            'billing_address' => [],
+            'details_id' => 'saved-card-details-payflow-' . $cardId,
+            'edit_href' => '', // Payflow cards cannot be edited via this page
+            'delete_href' => ($cardId > 0)
+                ? zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, 'delete_payflow=' . $cardId, 'SSL')
+                : '',
+            'api_type' => $apiType,
+        ];
+    }
+}
+
+if (!function_exists('paypalr_delete_payflow_card')) {
+    /**
+     * Delete a Payflow saved credit card
+     *
+     * @param int $customers_id
+     * @param int $card_id
+     * @return bool
+     */
+    function paypalr_delete_payflow_card(int $customers_id, int $card_id): bool
+    {
+        if ($customers_id <= 0 || $card_id <= 0) {
+            return false;
+        }
+
+        global $db;
+
+        // Check if table exists
+        $tableCheck = $db->Execute("SHOW TABLES LIKE '" . TABLE_SAVED_CREDIT_CARDS . "'");
+        if ($tableCheck->EOF) {
+            return false;
+        }
+
+        // Soft delete the card
+        $sql = "UPDATE " . TABLE_SAVED_CREDIT_CARDS . "
+                SET is_deleted = '1'
+                WHERE saved_credit_card_id = " . (int)$card_id . "
+                  AND customers_id = " . (int)$customers_id . "
+                LIMIT 1";
+
+        $db->Execute($sql);
+
+        return true;
+    }
+}
+
 $zco_notifier->notify('NOTIFY_HEADER_START_ACCOUNT_SAVED_CREDIT_CARDS');
 
 if (empty($_SESSION['customer_id'])) {
@@ -782,6 +920,44 @@ if ($hide_saved_cards_page === false) {
         $add_card_mode = true;
     }
 
+    // Handle Payflow card deletion
+    if (isset($_GET['delete_payflow'])) {
+        $requested_id = (int)zen_db_prepare_input($_GET['delete_payflow']);
+        if ($requested_id > 0) {
+            // Get the Payflow card for confirmation
+            $payflowCards = paypalr_get_payflow_cards($customers_id);
+            foreach ($payflowCards as $payflowCard) {
+                if ((int)$payflowCard['saved_credit_card_id'] === $requested_id) {
+                    $delete_card = paypalr_normalize_payflow_card($payflowCard);
+                    $delete_card['confirm_action'] = 'delete_payflow_confirm';
+                    break;
+                }
+            }
+            if ($delete_card === null) {
+                $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
+            }
+        }
+    }
+
+    // Handle Payflow card deletion confirmation
+    if (isset($_POST['action']) && $_POST['action'] === 'delete_payflow_confirm') {
+        if (!isset($_POST['securityToken']) || $_POST['securityToken'] !== $_SESSION['securityToken']) {
+            $messageStack->add('saved_credit_cards', ERROR_SECURITY_TOKEN, 'error');
+        } else {
+            $payflow_card_id = (int)zen_db_prepare_input($_POST['payflow_card_id'] ?? 0);
+            if ($payflow_card_id <= 0) {
+                $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
+            } else {
+                if (paypalr_delete_payflow_card($customers_id, $payflow_card_id)) {
+                    $messageStack->add_session('saved_credit_cards', TEXT_DELETE_CARD_SUCCESS, 'success');
+                    zen_redirect(zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'));
+                } else {
+                    $messageStack->add('saved_credit_cards', TEXT_DELETE_CARD_ERROR, 'error');
+                }
+            }
+        }
+    }
+
     if (isset($_GET['delete'])) {
         $requested_id = (int)zen_db_prepare_input($_GET['delete']);
         if ($requested_id > 0) {
@@ -844,12 +1020,20 @@ if ($hide_saved_cards_page === false) {
         }
     }
 
+    // Get PayPal Vault cards
     $rawCards = VaultManager::getCustomerVaultedCards($customers_id, false);
     foreach ($rawCards as $rawCard) {
         $normalized = paypalr_normalize_vault_card($rawCard, $statusMap);
         if ($normalized['paypal_vault_id'] > 0) {
+            $normalized['source'] = 'vault';
             $saved_credit_cards[] = $normalized;
         }
+    }
+
+    // Get Payflow cards if they exist
+    $payflowCards = paypalr_get_payflow_cards($customers_id);
+    foreach ($payflowCards as $payflowCard) {
+        $saved_credit_cards[] = paypalr_normalize_payflow_card($payflowCard);
     }
 }
 

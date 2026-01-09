@@ -21,9 +21,14 @@
           <h2 class="card-title h4 mb-3"><?php echo HEADING_TITLE_DELETE_CARD; ?></h2>
           <p class="mb-4"><?php echo sprintf(TEXT_DELETE_CARD_CONFIRMATION, zen_output_string_protected($delete_card['brand']), zen_output_string_protected($delete_card['last_digits'])); ?></p>
           <div class="saved-card__actions">
+            <?php
+              $deleteAction = isset($delete_card['confirm_action']) ? $delete_card['confirm_action'] : 'delete-card';
+              $cardIdField = ($delete_card['source'] ?? 'vault') === 'payflow' ? 'payflow_card_id' : 'paypal_vault_id';
+              $cardIdValue = ($delete_card['source'] ?? 'vault') === 'payflow' ? (int)$delete_card['payflow_card_id'] : (int)$delete_card['paypal_vault_id'];
+            ?>
             <?php echo zen_draw_form('delete_card', zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'), 'post', 'class="saved-card__form"'); ?>
-              <?php echo zen_draw_hidden_field('action', 'delete-card'); ?>
-              <?php echo zen_draw_hidden_field('paypal_vault_id', (int)$delete_card['paypal_vault_id']); ?>
+              <?php echo zen_draw_hidden_field('action', $deleteAction); ?>
+              <?php echo zen_draw_hidden_field($cardIdField, $cardIdValue); ?>
               <?php echo zen_draw_hidden_field('securityToken', $_SESSION['securityToken']); ?>
               <button type="submit" class="btn btn-danger"><?php echo TEXT_SAVED_CARD_DELETE_BUTTON; ?></button>
             </form>
@@ -321,6 +326,9 @@
                 <span class="saved-card__brand"><?php echo zen_output_string_protected($card['brand']); ?></span>
                 <?php if ($card['last_digits'] !== '') { ?>
                   <span class="saved-card__digits"><?php echo sprintf(TEXT_CARD_ENDING_IN, zen_output_string_protected($card['last_digits'])); ?></span>
+                <?php } ?>
+                <?php if (($card['source'] ?? 'vault') === 'payflow') { ?>
+                  <small class="text-muted ms-2" title="Legacy Payflow card">(Payflow)</small>
                 <?php } ?>
               </div>
               <span class="saved-card__status badge <?php echo zen_output_string_protected($card['status_class']); ?>"><?php echo zen_output_string_protected($card['status_label']); ?></span>
