@@ -775,8 +775,9 @@
                         phoneNumberRequired: true
                     },
                     shippingOptionRequired: true,
-                    // Register callbacks for address, shipping option, and payment authorization
-                    callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION', 'PAYMENT_AUTHORIZATION']
+                    // Register callbacks for address and shipping option changes
+                    // Note: PAYMENT_AUTHORIZATION is not used with PayPal SDK (PayPal uses confirmOrder() instead)
+                    callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
                 };
 
                 console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
