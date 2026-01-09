@@ -271,19 +271,24 @@ $guestModules = ['paypalr_googlepay', 'paypalr_applepay'];
 $isGuestCheckout = in_array($module, $guestModules, true);
 
 // Check if customer exists by email
-$customer_query = $db->Execute("SELECT customers_id FROM " . TABLE_CUSTOMERS . " WHERE customers_email_address = '" . zen_db_input($email) . "'");
+$customer_query = $db->Execute("SELECT customers_id, customers_firstname, customers_lastname FROM " . TABLE_CUSTOMERS . " WHERE customers_email_address = '" . zen_db_input($email) . "'");
 
 if (!isset($_SESSION['customer_id'])) {
     if ($customer_query->RecordCount() > 0) {
         // If customer exists, use existing customer ID and set session variables for security
         $customer_id = $customer_query->fields['customers_id'];
+        // Update session with existing customer info
+        $_SESSION['customer_first_name'] = $customer_query->fields['customers_firstname'];
+        $_SESSION['customer_last_name'] = $customer_query->fields['customers_lastname'];
+        log_paypalr_wallet_message("Using existing customer ID: $customer_id");
     } else {
-        // Create the new customer record (simplified for example purposes)
+        // Create the new customer record
         $db->Execute("INSERT INTO " . TABLE_CUSTOMERS . " (customers_email_address, customers_firstname, customers_lastname)
-                      VALUES ('" . zen_db_input($email ?? '') . "', '" . zen_db_input($billing_first_name ?? '') . "', '" . zen_db_input($billing_last_name ?? '') . "')");
+                      VALUES ('" . zen_db_input($email) . "', '" . zen_db_input($billing_first_name) . "', '" . zen_db_input($billing_last_name) . "')");
 
         // Get the new customer ID
         $customer_id = $db->Insert_ID();
+        log_paypalr_wallet_message("Created new customer ID: $customer_id with email: $email");
 
         // If the COWOA_account column exists, set it to 1
         $check_cowoa_account = $db->Execute("SHOW COLUMNS FROM " . TABLE_CUSTOMERS . " LIKE 'COWOA_account'");
