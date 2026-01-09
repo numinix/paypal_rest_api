@@ -584,6 +584,10 @@ log_paypalr_wallet_message('Order delivery address before order_totals->process(
     'zone_id' => $order->delivery['zone_id'] ?? 'N/A',
 ], true));
 $order_total_modules = new order_total();
+// Call collect_posts() and pre_confirmation_check() before process() to ensure
+// all order totals (including shipping) are properly initialized
+$order_total_modules->collect_posts();
+$order_total_modules->pre_confirmation_check();
 $order_totals = $order_total_modules->process();
 
 // If ot_tax only includes shipping tax, add the missing product tax so totals
