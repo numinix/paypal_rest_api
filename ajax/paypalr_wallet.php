@@ -262,21 +262,28 @@ if (!function_exists('braintree_calculate_tax_inclusive_amount')) {
 // Treat "shipping_option_unselected" the same as empty/unset - this is sent by Google Pay during INITIALIZE
 if (!isset($data['selectedShippingOptionId']) || empty($data['selectedShippingOptionId']) || $data['selectedShippingOptionId'] === 'shipping_option_unselected') {
     $cheapest = $shipping_modules->cheapest();
+    log_paypalr_wallet_message('Cheapest shipping method returned: ' . print_r($cheapest, true));
+    
     if (!empty($cheapest) && !empty($cheapest['id'])) {
         $selectedShippingOption = $cheapest['id'];
+        log_paypalr_wallet_message('Selected cheapest shipping method: ' . $selectedShippingOption);
     } elseif (!empty($quotes)) {
         // fallback: pick first valid shipping method as default
+        log_paypalr_wallet_message('Cheapest method not available, falling back to first method');
         foreach ($quotes as $quote) {
             if (!empty($quote['error']) || empty($quote['methods'])) continue;
             $firstMethod = $quote['methods'][0];
             $selectedShippingOption = "{$quote['id']}_{$firstMethod['id']}";
+            log_paypalr_wallet_message('Selected first available shipping method: ' . $selectedShippingOption);
             break;
         }
     } else {
         $selectedShippingOption = null;
+        log_paypalr_wallet_message('No shipping methods available');
     }
 } else {
     $selectedShippingOption = $data['selectedShippingOptionId'];
+    log_paypalr_wallet_message('Using provided shipping option: ' . $selectedShippingOption);
 }
 
 // Populate shipping options and set the selected one
