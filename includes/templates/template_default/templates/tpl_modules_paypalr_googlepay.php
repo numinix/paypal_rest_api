@@ -3,9 +3,9 @@
  * tpl_modules_paypalr_googlepay.php
  * Google Pay button template for shopping cart page
  * 
- * Uses native google.payments.api to retrieve user email addresses,
- * then processes payment through PayPal REST API.
- * Based on Braintree implementation pattern.
+ * Uses PayPal SDK's paypal.Googlepay() API for proper tokenization.
+ * The SDK provides the correct tokenization specification and handles
+ * Google Pay integration through PayPal's REST API.
  */
     require_once(DIR_WS_LANGUAGES . $_SESSION['language'] . '/modules/payment/paypalr_googlepay.php');
     require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr_googlepay.php');
@@ -43,56 +43,35 @@
     }
 ?>
 
-<script src="<?php echo $sdkUrl; ?>"></script>
-<script src="https://pay.google.com/gp/p/js/pay.js"></script>
-
 <?php
-    // Load the native Google Pay JavaScript integration
-    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.native.js';
+    // Load the PayPal SDK Google Pay JavaScript integration
+    // This uses paypal.Googlepay().config() to get proper tokenization specification
+    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js';
     if (file_exists($scriptPath)) {
         echo '<script>' . file_get_contents($scriptPath) . '</script>';
-    } else {
-        // Fallback to original implementation if native version doesn't exist yet
-        $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js';
-        if (file_exists($scriptPath)) {
-            echo '<script>' . file_get_contents($scriptPath) . '</script>';
-        }
     }
 ?>
 
 <script>
 "use strict";
 
-// Configuration for native Google Pay integration
-window.paypalrGooglePayConfig = {
-    clientId: "<?php echo addslashes($clientId); ?>",
-    googleMerchantId: "<?php echo addslashes($googleMerchantId); ?>",
-    storeCountryCode: "<?php echo $storeCountryCode; ?>",
-    currencyCode: "<?php echo $currency; ?>",
-    initialTotal: "<?php echo $initialTotal; ?>",
-    storeName: "<?php echo addslashes(STORE_NAME); ?>",
-    environment: "<?php echo $googlePayEnvironment; ?>",
-    sessionAppend: "<?php echo zen_session_id() ? ('?' . zen_session_name() . '=' . zen_session_id()) : ''; ?>",
-    context: 'cart'
-};
-
-// Initialize Google Pay when DOM is ready
+// Initialize Google Pay button when DOM is ready
+// The PayPal SDK implementation handles all initialization internally
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-        if (typeof window.initPayPalRGooglePay === 'function') {
-            window.initPayPalRGooglePay();
+        if (typeof window.paypalrGooglePayRender === 'function') {
+            window.paypalrGooglePayRender();
         }
     });
 } else {
-    if (typeof window.initPayPalRGooglePay === 'function') {
-        window.initPayPalRGooglePay();
+    if (typeof window.paypalrGooglePayRender === 'function') {
+        window.paypalrGooglePayRender();
     }
 }
 </script>
 
 <!-- Google Pay Button Container -->
 <div id="paypalr-googlepay-button" class="paypalr-googlepay-button"></div>
-<div id="paypalr-googlepay-error" style="display:none; color:red; margin-top:10px;"></div>
 
 <style>
 #paypalr-googlepay-button {
