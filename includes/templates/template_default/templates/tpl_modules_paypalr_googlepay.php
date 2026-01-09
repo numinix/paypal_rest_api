@@ -72,7 +72,8 @@ window.paypalrGooglePayConfig = {
     initialTotal: "<?php echo $initialTotal; ?>",
     storeName: "<?php echo addslashes(STORE_NAME); ?>",
     environment: "<?php echo $googlePayEnvironment; ?>",
-    sessionAppend: "<?php echo zen_session_id() ? ('?' . zen_session_name() . '=' . zen_session_id()) : ''; ?>"
+    sessionAppend: "<?php echo zen_session_id() ? ('?' . zen_session_name() . '=' . zen_session_id()) : ''; ?>",
+    context: 'cart'
 };
 
 // Initialize Google Pay when DOM is ready
