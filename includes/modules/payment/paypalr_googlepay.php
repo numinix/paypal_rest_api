@@ -52,7 +52,7 @@ class paypalr_googlepay extends base
         return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.9';
+    protected const CURRENT_VERSION = '1.3.10';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -283,6 +283,17 @@ class paypalr_googlepay extends base
                             ('Enable on Shopping Cart Page?', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SHOPPING_CART', 'True', 'Do you want to display the Google Pay button on the shopping cart page?', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now()),
                             ('Enable on Product Page?', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE', 'True', 'Do you want to display the Google Pay button on product pages?', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now())"
                     );
+                    // Fall through to add Google Pay environment setting
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.10', '<'):
+                    // Add Google Pay environment setting (independent of PayPal sandbox/live)
+                    // This allows completing Google Pay merchant verification in TEST mode
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Google Pay Environment', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENVIRONMENT', 'TEST', 'Set Google Pay environment for merchant verification. Use TEST for initial setup and screenshots, then switch to PRODUCTION after Google Pay approval. This setting is independent of PayPal sandbox/live mode.', 6, 0, 'zen_cfg_select_option([''TEST'', ''PRODUCTION''], ', NULL, now())"
+                    );
 
                 default:
                     break;
@@ -441,6 +452,11 @@ class paypalr_googlepay extends base
             ? 'capture'
             : 'authorize';
 
+        // Get Google Pay environment setting (independent of PayPal sandbox/live)
+        $googlePayEnvironment = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENVIRONMENT') 
+            ? MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENVIRONMENT 
+            : 'TEST';
+
         // -----
         // Log wallet configuration request for debugging SDK 400 errors
         //
@@ -449,7 +465,8 @@ class paypalr_googlepay extends base
             : ($client_id === '' ? '(empty)' : $client_id);
         $this->log->write(
             "Google Pay ajaxGetWalletConfig:\n" .
-            "  - Environment: " . MODULE_PAYMENT_PAYPALR_SERVER . "\n" .
+            "  - PayPal Environment: " . MODULE_PAYMENT_PAYPALR_SERVER . "\n" .
+            "  - Google Pay Environment: " . $googlePayEnvironment . "\n" .
             "  - Client ID: " . $loggedClientId . "\n" .
             "  - Currency: " . ($_SESSION['currency'] ?? 'USD') . "\n" .
             "  - Intent: " . $intent . "\n" .
@@ -472,6 +489,7 @@ class paypalr_googlepay extends base
             'currency' => $_SESSION['currency'] ?? 'USD',
             'intent' => $intent,
             'environment' => MODULE_PAYMENT_PAYPALR_SERVER,
+            'googlePayEnvironment' => $googlePayEnvironment,
         ];
     }
 
@@ -856,6 +874,7 @@ class paypalr_googlepay extends base
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID',
+            'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENVIRONMENT',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SHOPPING_CART',
             'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE',
         ];
