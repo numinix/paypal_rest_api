@@ -323,6 +323,9 @@ if (!isset($_SESSION['customer_id'])) {
     $customer_id = $_SESSION['customer_id'];
 }
 
+// Ensure email is always set in session (critical for order processing)
+$_SESSION['customer_email_address'] = $email;
+
 log_paypalr_wallet_message("Customer ID: $customer_id");
 
 // Check if the shipping address already exists in the database
