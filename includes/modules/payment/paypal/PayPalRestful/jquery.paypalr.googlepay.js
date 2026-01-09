@@ -767,6 +767,8 @@
                         countryCode: 'US'
                     },
                     merchantInfo: basePaymentDataRequest.merchantInfo || {},
+                    // Enable email collection from Google Pay
+                    emailRequired: true,
                     // Enable shipping address and shipping option selection in the Google Pay modal
                     shippingAddressRequired: true,
                     shippingAddressParameters: {
