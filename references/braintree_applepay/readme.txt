@@ -1,0 +1,1 @@
+See /docs/Braintree Apple Pay/readme.html for documentation
