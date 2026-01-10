@@ -803,7 +803,9 @@
                         var email = paymentData.email || billingAddress.emailAddress || '';
                         
                         // Build the payload for the hidden form field
+                        // Set confirmed: true to indicate client-side confirmation was successful
                         var checkoutPayload = {
+                            confirmed: true,
                             orderID: orderId,
                             email: email,
                             confirmResult: confirmResult
