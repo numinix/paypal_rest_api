@@ -1,11 +1,19 @@
 <?php
 // Initialize Zen Cart environment
+// Start output buffering to capture any unwanted output from application_top.php
+// This prevents HTML from being mixed with JSON responses
+ob_start();
+
 require('../includes/configure.php');
 ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'));
 chdir(DIR_FS_CATALOG);
 $current_page_base = 'paypalr_wallet_ajax'; // or similar unique name
 $loaderPrefix = 'paypalr_wallet_ajax';
 require('includes/application_top.php');
+
+// Discard any output from application_top.php
+ob_end_clean();
+
 require_once(DIR_WS_CLASSES . 'currencies.php');
 require_once(DIR_WS_CLASSES . 'order.php');
 require_once(DIR_WS_CLASSES . 'shipping.php');
@@ -55,7 +63,10 @@ function get_validated_base_currency($currencies, $preferredCurrency = null) {
     return 'USD'; // Return USD as absolute last resort even if not configured
 }
 
-header('Content-Type: application/json');
+// Set Content-Type header early to ensure JSON response
+if (!headers_sent()) {
+    header('Content-Type: application/json; charset=UTF-8');
+}
 
 $rawData = file_get_contents('php://input');
 $data = json_decode($rawData, true);

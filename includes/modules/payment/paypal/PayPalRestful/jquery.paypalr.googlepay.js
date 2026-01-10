@@ -768,21 +768,13 @@
                     },
                     merchantInfo: basePaymentDataRequest.merchantInfo || {},
                     // Enable email collection from Google Pay
-                    emailRequired: true,
-                    // Enable shipping address and shipping option selection in the Google Pay modal
-                    shippingAddressRequired: true,
-                    shippingAddressParameters: {
-                        phoneNumberRequired: true
-                        // Note: emailRequired is NOT set here because PayPal SDK's confirmOrder() flow
-                        // is incompatible with Google Pay's email collection mechanism.
-                        // Email collection requires PAYMENT_AUTHORIZATION callback + onPaymentAuthorized handler,
-                        // which PayPal SDK doesn't support (it uses confirmOrder() instead).
-                        // Users must be logged in for wallet checkout with PayPal SDK + Google Pay.
-                    },
-                    shippingOptionRequired: true,
-                    // Register callbacks for address and shipping option changes
-                    // Note: PAYMENT_AUTHORIZATION is not included because PayPal SDK uses confirmOrder() API
-                    callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
+                    emailRequired: true
+                    // NOTE: Shipping address and shipping option selection are handled
+                    // outside the Google Pay modal in the checkout flow.
+                    // The customer has already selected shipping address and method before
+                    // reaching the payment step, so we do NOT need to collect them again.
+                    // shippingAddressRequired: false (omitted - defaults to false)
+                    // shippingOptionRequired: false (omitted - defaults to false)
                 };
 
                 console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
@@ -804,60 +796,28 @@
                     }).then(function (confirmResult) {
                         console.log('[Google Pay] confirmOrder result:', confirmResult);
                         
-                        // Extract shipping and billing addresses from Google Pay payment data
-                        var shippingAddress = paymentData.shippingAddress || {};
+                        // For checkout flow: Store payment data and submit form
+                        // The checkout form submission goes to normal checkout processing
+                        // No AJAX request needed - everything handled by payment module
                         var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
-                        // Email extraction: paymentData.email is typically empty with PayPal SDK since
-                        // we don't use emailRequired (incompatible with confirmOrder() flow).
-                        // For logged-in users, email comes from session on the server side.
                         var email = paymentData.email || billingAddress.emailAddress || '';
                         
-                        // Build the complete payload for checkout
+                        // Build the payload for the hidden form field
+                        // Set confirmed: true to indicate client-side confirmation was successful
                         var checkoutPayload = {
-                            payment_method_nonce: orderId, // Use orderID as the payment reference
-                            module: 'paypalr_googlepay',
-                            total: orderConfig.amount,
-                            currency: orderConfig.currency || 'USD',
+                            confirmed: true,
+                            orderID: orderId,
                             email: email,
-                            shipping_address: shippingAddress,
-                            billing_address: billingAddress,
-                            orderID: orderId
+                            confirmResult: confirmResult
+                            // Note: No shipping_address or billing_address
+                            // Checkout uses addresses already in session
                         };
                         
-                        console.log('[Google Pay] Sending checkout request to ajax handler');
+                        console.log('[Google Pay] Storing payload and submitting checkout form');
                         
-                        // Send to checkout handler instead of just submitting form
-                        var ajaxBasePath = window.paypalrAjaxBasePath || 'ajax/';
-                        var checkoutUrl = ajaxBasePath + 'paypalr_wallet_checkout.php';
-                        
-                        return fetch(checkoutUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(checkoutPayload)
-                        }).then(function(response) {
-                            return response.json();
-                        }).then(function(checkoutResult) {
-                            console.log('[Google Pay] Checkout result:', checkoutResult);
-                            
-                            if (checkoutResult.status === 'success' && checkoutResult.redirect_url) {
-                                console.log('[Google Pay] Redirecting to:', checkoutResult.redirect_url);
-                                window.location.href = checkoutResult.redirect_url;
-                            } else {
-                                console.error('[Google Pay] Checkout failed:', checkoutResult);
-                                setGooglePayPayload({});
-                                if (typeof window.oprcHideProcessingOverlay === 'function') {
-                                    window.oprcHideProcessingOverlay();
-                                }
-                                alert('Checkout failed: ' + (checkoutResult.message || 'Unknown error'));
-                            }
-                        }).catch(function(checkoutError) {
-                            console.error('[Google Pay] Checkout request failed:', checkoutError);
-                            setGooglePayPayload({});
-                            if (typeof window.oprcHideProcessingOverlay === 'function') {
-                                window.oprcHideProcessingOverlay();
-                            }
-                            alert('Checkout failed. Please try again.');
-                        });
+                        // Store payload in hidden field and submit form
+                        // This triggers normal checkout processing via payment module
+                        setGooglePayPayload(checkoutPayload);
                     }).catch(function (confirmError) {
                         console.error('[Google Pay] confirmOrder failed:', confirmError);
                         setGooglePayPayload({});
@@ -955,11 +915,9 @@
                 // Use environment from config (stored in sdkState) to determine Google Pay environment
                 var googlePayEnvironment = (sdkState.config && sdkState.config.environment === 'sandbox') ? 'TEST' : 'PRODUCTION';
                 console.log('[Google Pay] Creating PaymentsClient with environment:', googlePayEnvironment);
+                // Note: No paymentDataCallbacks for checkout since we don't collect shipping in the modal
                 var paymentsClient = new google.payments.api.PaymentsClient({
-                    environment: googlePayEnvironment,
-                    paymentDataCallbacks: {
-                        onPaymentDataChanged: onPaymentDataChanged
-                    }
+                    environment: googlePayEnvironment
                 });
                 sdkState.paymentsClient = paymentsClient;
 

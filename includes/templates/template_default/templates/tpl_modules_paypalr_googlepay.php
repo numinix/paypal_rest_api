@@ -18,13 +18,34 @@
         // If configuration fails, don't show the button
         return;
     }
+    
+    // Check if user is logged in
+    $isLoggedIn = isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0;
+    
+    // If user is not logged in and guest wallet is disabled, don't show the button
+    if (!$isLoggedIn && isset($walletConfig['enableGuestWallet']) && $walletConfig['enableGuestWallet'] === false) {
+        // Guest wallet is disabled and user is not logged in - don't render button
+        return;
+    }
+    
+    // For logged-in users, show Google Pay button rendered via PayPal SDK
+    // For guests, show Google Pay button rendered via Google Pay SDK (requires merchant verification)
 ?>
+
+<script>
+"use strict";
+
+// Check if customer is logged in to determine which SDK approach to use
+// IMPORTANT: This must be set BEFORE loading jquery.paypalr.googlepay.wallet.js
+// because the wallet script reads this value immediately when it loads (IIFE execution)
+window.paypalrWalletIsLoggedIn = <?php echo (isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0) ? 'true' : 'false'; ?>;
+</script>
 
 <?php
     // Load the PayPal SDK Google Pay JavaScript integration for cart page
     // This uses paypal.Googlepay().config() to get proper tokenization specification
     // The JS file handles all SDK loading and initialization internally
-    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.wallet.js';
+    $scriptPath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.wallet.js';
     if (file_exists($scriptPath)) {
         echo '<script>' . file_get_contents($scriptPath) . '</script>';
     } else {
@@ -36,9 +57,6 @@
 
 <script>
 "use strict";
-
-// Check if customer is logged in to determine which SDK approach to use
-window.paypalrWalletIsLoggedIn = <?php echo (isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0) ? 'true' : 'false'; ?>;
 
 // Initialize Google Pay button when DOM is ready
 // The PayPal SDK implementation handles all initialization internally
