@@ -319,8 +319,19 @@
     /**
      * Fetch SDK configuration only (no order creation).
      * Used during initial button rendering.
+     * 
+     * First checks if configuration was provided inline via window.paypalrGooglePayCheckoutConfig
+     * (set by the PHP module on the checkout page). If not found, falls back to AJAX call.
      */
     function fetchWalletConfig() {
+        // Check if configuration was injected inline by the PHP module (checkout page)
+        if (typeof window.paypalrGooglePayCheckoutConfig !== 'undefined' && window.paypalrGooglePayCheckoutConfig) {
+            console.log('[Google Pay] Using inline configuration from checkout page');
+            return Promise.resolve(window.paypalrGooglePayCheckoutConfig);
+        }
+        
+        // Fallback to AJAX call (cart/product pages)
+        console.log('[Google Pay] Fetching configuration via AJAX');
         return fetch('ppr_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

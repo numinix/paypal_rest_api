@@ -456,6 +456,16 @@ class paypalr_googlepay extends base
             zen_draw_hidden_field('paypalr_googlepay_payload', '', 'id="paypalr-googlepay-payload"') .
             zen_draw_hidden_field('paypalr_googlepay_status', '', 'id="paypalr-googlepay-status"');
 
+        // Get wallet configuration to inject inline
+        // This allows the JavaScript to initialize immediately without waiting for an AJAX call
+        $walletConfig = $this->ajaxGetWalletConfig();
+        $configJson = json_encode($walletConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+        
+        // Inject configuration inline before loading the JavaScript
+        // The JavaScript will check for window.paypalrGooglePayCheckoutConfig first
+        // and use it if available, falling back to AJAX only if needed
+        $inlineConfig = '<script>window.paypalrGooglePayCheckoutConfig = ' . $configJson . ';</script>';
+
         $script = $this->getWalletAssets('jquery.paypalr.googlepay.js');
 
         return [
@@ -464,7 +474,7 @@ class paypalr_googlepay extends base
             'fields' => [
                 [
                     'title' => $buttonContainer,
-                    'field' => $hiddenFields . $script,
+                    'field' => $hiddenFields . $inlineConfig . $script,
                 ],
             ],
         ];
