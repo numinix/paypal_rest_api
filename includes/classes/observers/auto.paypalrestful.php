@@ -517,13 +517,12 @@ class zcObserverPaypalrestful
             $components[] = 'buttons';
         }
 
-        // Only load Google Pay SDK component if:
-        // 1. User is logged in (uses PayPal SDK only, no Google merchant verification needed), OR
-        // 2. User is not logged in AND guest wallet is enabled (uses both PayPal SDK and native Google Pay SDK)
-        // This prevents OR_BIBED_06 errors when guest mode is disabled and user is logged in.
+        // Only load Google Pay SDK component when guest wallet is enabled
+        // This ensures Google Pay is only available when the merchant has proper Google merchant verification
+        // This prevents OR_BIBED_06 errors when guest wallet is disabled
         if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True') {
-            // Load googlepay component if user is logged in OR guest wallet is enabled
-            if ($this->isUserLoggedIn() || $this->isGuestWalletEnabled()) {
+            // Load googlepay component only if guest wallet is enabled
+            if ($this->isGuestWalletEnabled()) {
                 $components[] = 'googlepay';
             }
         }

@@ -59,19 +59,19 @@ namespace {
 
         // Test 3: Check that googlepay component is conditionally added
         // Should have both the MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS check AND
-        // the conditional logic using helper methods
+        // the conditional logic that only loads when guest wallet is enabled
         $hasGooglePayStatusCheck = strpos($content, 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') !== false;
-        $hasConditionalLogic = preg_match('/if\s*\(\s*\$this->isUserLoggedIn\(\)\s*\|\|\s*\$this->isGuestWalletEnabled\(\)\s*\)/', $content);
+        $hasConditionalLogic = preg_match('/if\s*\(\s*\$this->isGuestWalletEnabled\(\)\s*\)/', $content);
         
         if ($hasGooglePayStatusCheck && $hasConditionalLogic) {
-            fwrite(STDOUT, "✓ Observer conditionally adds googlepay component using helper methods\n");
+            fwrite(STDOUT, "✓ Observer conditionally adds googlepay component when guest wallet is enabled\n");
         } else {
-            fwrite(STDERR, "FAIL: Observer should conditionally add googlepay component using helper methods\n");
+            fwrite(STDERR, "FAIL: Observer should conditionally add googlepay component when guest wallet is enabled\n");
             if (!$hasGooglePayStatusCheck) {
                 fwrite(STDERR, "  Missing: MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS check\n");
             }
             if (!$hasConditionalLogic) {
-                fwrite(STDERR, "  Missing: Conditional logic using \$this->isUserLoggedIn() || \$this->isGuestWalletEnabled()\n");
+                fwrite(STDERR, "  Missing: Conditional logic using \$this->isGuestWalletEnabled()\n");
             }
             $passed = false;
         }
@@ -115,11 +115,11 @@ namespace {
         echo "\nScenario 2: User logged in, guest wallet disabled\n";
         $isLoggedIn = true;
         $guestWalletEnabled = false;
-        $shouldLoadGooglePay = $isLoggedIn || $guestWalletEnabled;
-        if ($shouldLoadGooglePay) {
-            echo "  ✓ Google Pay SDK component should be loaded (user is logged in)\n";
+        $shouldLoadGooglePay = $guestWalletEnabled;  // Only load if guest wallet enabled
+        if (!$shouldLoadGooglePay) {
+            echo "  ✓ Google Pay SDK component should NOT be loaded (prevents OR_BIBED_06 error)\n";
         } else {
-            echo "  ✗ FAIL: Google Pay SDK component should be loaded for logged in users\n";
+            echo "  ✗ FAIL: Google Pay SDK component should NOT be loaded when guest wallet is disabled\n";
             $passed = false;
         }
         
@@ -127,7 +127,7 @@ namespace {
         echo "\nScenario 3: User not logged in, guest wallet enabled\n";
         $isLoggedIn = false;
         $guestWalletEnabled = true;
-        $shouldLoadGooglePay = $isLoggedIn || $guestWalletEnabled;
+        $shouldLoadGooglePay = $guestWalletEnabled;  // Only load if guest wallet enabled
         if ($shouldLoadGooglePay) {
             echo "  ✓ Google Pay SDK component should be loaded (guest wallet enabled)\n";
         } else {
@@ -139,11 +139,11 @@ namespace {
         echo "\nScenario 4: User not logged in, guest wallet disabled\n";
         $isLoggedIn = false;
         $guestWalletEnabled = false;
-        $shouldLoadGooglePay = $isLoggedIn || $guestWalletEnabled;
+        $shouldLoadGooglePay = $guestWalletEnabled;  // Only load if guest wallet enabled
         if (!$shouldLoadGooglePay) {
             echo "  ✓ Google Pay SDK component should NOT be loaded (prevents OR_BIBED_06 error)\n";
         } else {
-            echo "  ✗ FAIL: Google Pay SDK component should NOT be loaded when user is not logged in and guest wallet is disabled\n";
+            echo "  ✗ FAIL: Google Pay SDK component should NOT be loaded when guest wallet is disabled\n";
             $passed = false;
         }
         
@@ -176,12 +176,10 @@ namespace {
     } else {
         fwrite(STDOUT, "\n✓ All Google Pay SDK conditional loading tests passed!\n");
         fwrite(STDOUT, "\nFix summary:\n");
-        fwrite(STDOUT, "1. Observer now checks user login status before loading googlepay component\n");
-        fwrite(STDOUT, "2. Observer checks MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET setting\n");
-        fwrite(STDOUT, "3. Google Pay SDK component is only loaded when:\n");
-        fwrite(STDOUT, "   - User is logged in (no Google merchant verification needed), OR\n");
-        fwrite(STDOUT, "   - User is not logged in AND guest wallet is enabled\n");
-        fwrite(STDOUT, "4. This prevents OR_BIBED_06 errors when guest mode is disabled\n");
+        fwrite(STDOUT, "1. Observer checks MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET setting\n");
+        fwrite(STDOUT, "2. Google Pay SDK component is ONLY loaded when guest wallet is enabled\n");
+        fwrite(STDOUT, "3. This prevents OR_BIBED_06 errors when guest wallet is disabled\n");
+        fwrite(STDOUT, "4. Google Pay button is hidden when guest wallet is disabled (both logged in and guest users)\n");
         exit(0);
     }
 }

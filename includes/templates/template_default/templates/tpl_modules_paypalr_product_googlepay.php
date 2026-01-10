@@ -21,10 +21,14 @@
     
     // Check if user is logged in
     $isLoggedIn = isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0;
+    $guestWalletEnabled = isset($walletConfig['enableGuestWallet']) && $walletConfig['enableGuestWallet'] === true;
     
-    // If user is not logged in and guest wallet is disabled, don't show the button
-    if (!$isLoggedIn && isset($walletConfig['enableGuestWallet']) && $walletConfig['enableGuestWallet'] === false) {
-        // Guest wallet is disabled and user is not logged in - don't render button
+    // Only show Google Pay button if:
+    // 1. User is logged in AND guest wallet is enabled (uses PayPal SDK with Google merchant verification)
+    // 2. User is NOT logged in AND guest wallet is enabled (uses native Google Pay SDK)
+    // This prevents OR_BIBED_06 errors when guest wallet is disabled
+    if (!$guestWalletEnabled) {
+        // Guest wallet is disabled - don't show Google Pay button for anyone
         return;
     }
     
