@@ -52,7 +52,7 @@ class paypalr_googlepay extends base
         return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.11';
+    protected const CURRENT_VERSION = '1.3.12';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -322,6 +322,17 @@ class paypalr_googlepay extends base
                                 last_modified = now()
                           WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE'
                           LIMIT 1"
+                    );
+                    // Fall through to add guest wallet button control
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.12', '<'):
+                    // Add configuration to enable/disable Google Pay wallet buttons for guests
+                    // This allows stores that haven't completed Google Pay verification to still show buttons for logged-in users only
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Enable Wallet Buttons for Guests?', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET', 'True', 'Enable Google Pay wallet buttons on cart/product pages for guest users (not logged in)? If set to False, buttons will only show for logged-in users. Note: Guest wallet buttons require Google Pay merchant verification and a valid Merchant ID.', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now())"
                     );
                     // Fall through to update version
 
