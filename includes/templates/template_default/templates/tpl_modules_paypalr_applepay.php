@@ -46,16 +46,14 @@
 <script src="<?php echo $sdkUrl; ?>"></script>
 
 <?php
-    // Load the native Apple Pay JavaScript integration
-    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.applepay.native.js';
+    // Load the native Apple Pay JavaScript integration for cart page
+    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.applepay.wallet.js';
     if (file_exists($scriptPath)) {
         echo '<script>' . file_get_contents($scriptPath) . '</script>';
     } else {
-        // Fallback to original implementation if native version doesn't exist yet
-        $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.applepay.js';
-        if (file_exists($scriptPath)) {
-            echo '<script>' . file_get_contents($scriptPath) . '</script>';
-        }
+        // Log error if the required JavaScript file is missing
+        error_log('Apple Pay Error: jquery.paypalr.applepay.wallet.js not found at: ' . $scriptPath);
+        return;
     }
 ?>
 
