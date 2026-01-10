@@ -29,6 +29,15 @@
     }
 ?>
 
+<script>
+"use strict";
+
+// Check if customer is logged in to determine which SDK approach to use
+// IMPORTANT: This must be set BEFORE loading jquery.paypalr.googlepay.wallet.js
+// because the wallet script reads this value immediately when it loads (IIFE execution)
+window.paypalrWalletIsLoggedIn = <?php echo (isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0) ? 'true' : 'false'; ?>;
+</script>
+
 <?php
     // Load the PayPal SDK Google Pay JavaScript integration for product/cart pages
     // This uses paypal.Googlepay().config() to get proper tokenization specification
@@ -45,9 +54,6 @@
 
 <script>
 "use strict";
-
-// Check if customer is logged in to determine which SDK approach to use
-window.paypalrWalletIsLoggedIn = <?php echo (isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0) ? 'true' : 'false'; ?>;
 
 // Initialize Google Pay button when DOM is ready
 // The PayPal SDK implementation handles all initialization internally
