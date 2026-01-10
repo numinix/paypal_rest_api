@@ -18,12 +18,20 @@ if ($incomingSessionParam !== null && !empty($_GET[$incomingSessionParam])) {
     }
 }
 
+// Start output buffering to capture any unwanted output from application_top.php
+// This prevents HTML from being mixed with JSON responses
+ob_start();
+
 require('../includes/configure.php');
 ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'));
 chdir(DIR_FS_CATALOG);
 $_GET['main_page'] = $current_page_base = 'checkout_process';
 $loaderPrefix = 'paypalr_wallet_ajax';
 require('includes/application_top.php');
+
+// Discard any output from application_top.php
+ob_end_clean();
+
 require_once(DIR_WS_FUNCTIONS . 'paypalr_functions.php');
 // Note: Customer.php does not exist in Zen Cart 1.5.6c+ and is not needed
 // The following classes are loaded via Zen Cart's autoloader or must be explicitly required
@@ -38,6 +46,12 @@ if (!class_exists('shipping')) {
 }
 if (!class_exists('order_total')) {
     require_once(DIR_WS_CLASSES . 'order_total.php');
+}
+
+// Set Content-Type header early to ensure JSON response
+// This must be done before any output to prevent HTML contamination
+if (!headers_sent()) {
+    header('Content-Type: application/json; charset=UTF-8');
 }
 
 $isAjaxRequest = (
@@ -62,8 +76,17 @@ $braintreeCheckoutErrorResponder = function ($message) use (&$braintreeCheckoutE
     }
     $braintreeCheckoutErrorHandled = true;
     paypalr_wallet_checkout_log($message);
-    header('Content-Type: application/json');
-    http_response_code(500);
+    
+    // Ensure clean JSON output by discarding any buffered content
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=UTF-8');
+        http_response_code(500);
+    }
+    
     echo json_encode([
         'status' => 'error',
         'message' => 'Checkout error: ' . $message
@@ -591,10 +614,7 @@ if (!$isAjaxRequest && isset($response['redirect_url']) && $response['redirect_u
     exit;
 }
 
-if (!headers_sent()) {
-    header('Content-Type: application/json');
-}
-
+// Header already set at the top of the file for all AJAX requests
 echo json_encode($response);
 exit;
 ?>
