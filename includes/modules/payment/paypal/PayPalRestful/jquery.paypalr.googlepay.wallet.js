@@ -42,11 +42,18 @@
     var googlePayJsPromise = null;
 
     // -------------------------------------------------------------------------
-    // Button Rendering State
+    // Button Rendering State (Global across all script executions)
     // -------------------------------------------------------------------------
     
-    var renderingInProgress = false;
-    var buttonRendered = false;
+    // Use window object to ensure flags persist across multiple script loads
+    // (e.g., when both product and cart templates include this script)
+    if (typeof window.paypalrGooglePayState === 'undefined') {
+        window.paypalrGooglePayState = {
+            renderingInProgress: false,
+            buttonRendered: false
+        };
+    }
+    var renderState = window.paypalrGooglePayState;
 
     // -------------------------------------------------------------------------
     // Utility Functions
@@ -787,14 +794,24 @@
                     merchantInfo: basePaymentDataRequest.merchantInfo || {},
                     // Email collection: Only required for guest users (not logged in)
                     // Logged-in users have email in session on server side
-                    emailRequired: !isLoggedIn
-                    // NOTE: Shipping address and shipping method selection are handled
-                    // in the checkout handler after payment authorization.
-                    // We do NOT collect them in the Google Pay modal to avoid UX complexity
-                    // and technical issues with shipping option callbacks.
-                    // The checkout handler will redirect to shipping selection if needed.
-                    // shippingAddressRequired: false (omitted - defaults to false)
-                    // shippingOptionRequired: false (omitted - defaults to false)
+                    emailRequired: !isLoggedIn,
+                    // Enable shipping address and shipping option selection in the Google Pay modal
+                    shippingAddressRequired: true,
+                    shippingAddressParameters: {
+                        phoneNumberRequired: true
+                        // Note: emailRequired in shippingAddressParameters is NOT used because
+                        // we handle email collection at the top level with emailRequired: !isLoggedIn
+                    },
+                    shippingOptionRequired: true,
+                    // Provide initial shipping options to avoid Google Pay error
+                    // These will be updated via onPaymentDataChanged callback when address changes
+                    shippingOptionParameters: {
+                        defaultSelectedOptionId: 'shipping_option_unselected',
+                        shippingOptions: []
+                    },
+                    // Register callbacks for address and shipping option changes
+                    // Note: PAYMENT_AUTHORIZATION is not included because PayPal SDK uses confirmOrder() API
+                    callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
                 };
 
                 console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
@@ -903,16 +920,16 @@
         console.log('[Google Pay] Starting button rendering');
         
         // Prevent concurrent or duplicate rendering using global flags
-        if (renderingInProgress || buttonRendered) {
+        if (renderState.renderingInProgress || renderState.buttonRendered) {
             console.log('[Google Pay] Button already rendered or rendering in progress, skipping');
             return;
         }
-        renderingInProgress = true;
+        renderState.renderingInProgress = true;
         
         var container = document.getElementById('paypalr-googlepay-button');
         if (!container) {
             console.warn('[Google Pay] Button container not found');
-            renderingInProgress = false;
+            renderState.renderState.renderingInProgress = false;
             return;
         }
 
@@ -926,7 +943,7 @@
             
             if (!config || config.success === false) {
                 console.warn('[Google Pay] Unable to load configuration', config);
-                renderingInProgress = false;
+                renderState.renderingInProgress = false;
                 hidePaymentMethodContainer();
                 return null;
             }
@@ -952,7 +969,7 @@
                 // Verify PayPal Googlepay API is available
                 if (typeof paypal.Googlepay !== 'function') {
                     console.warn('[Google Pay] PayPal Googlepay API not available');
-                    renderingInProgress = false;
+                    renderState.renderingInProgress = false;
                     hidePaymentMethodContainer();
                     return null;
                 }
@@ -967,7 +984,7 @@
                 // Check eligibility using PayPal's isEligible method
                 if (typeof googlepay.isEligible === 'function' && !googlepay.isEligible()) {
                     console.log('[Google Pay] Not eligible for this user/device');
-                    renderingInProgress = false;
+                    renderState.renderingInProgress = false;
                     hidePaymentMethodContainer();
                     return null;
                 }
@@ -979,8 +996,10 @@
                 var googlePayEnvironment = (sdkState.config && sdkState.config.environment === 'sandbox') ? 'TEST' : 'PRODUCTION';
                 console.log('[Google Pay] Creating PaymentsClient with environment:', googlePayEnvironment);
                 var paymentsClient = new google.payments.api.PaymentsClient({
-                    environment: googlePayEnvironment
-                    // Note: paymentDataCallbacks removed since we're not using shipping callbacks
+                    environment: googlePayEnvironment,
+                    paymentDataCallbacks: {
+                        onPaymentDataChanged: onPaymentDataChanged
+                    }
                 });
                 sdkState.paymentsClient = paymentsClient;
 
@@ -996,7 +1015,7 @@
                         console.error('[Google Pay] To fix: Go to PayPal Developer Dashboard > Apps & Credentials > Your App > Features > Enable Google Pay');
                         console.error('[Google Pay] For live/production mode, you must enable Google Pay in your live PayPal business account.');
                         console.error('[Google Pay] Documentation: https://developer.paypal.com/docs/checkout/apm/google-pay/');
-                        renderingInProgress = false;
+                        renderState.renderingInProgress = false;
                         hidePaymentMethodContainer();
                         return null;
                     }
@@ -1016,7 +1035,7 @@
                             
                             if (!response.result) {
                                 console.log('[Google Pay] Not ready to pay on this device');
-                                renderingInProgress = false;
+                                renderState.renderingInProgress = false;
                                 hidePaymentMethodContainer();
                                 return null;
                             }
@@ -1034,8 +1053,8 @@
 
                             normalizeWalletButton(button);
                             container.appendChild(button);
-                            buttonRendered = true;
-                            renderingInProgress = false;
+                            renderState.buttonRendered = true;
+                            renderState.renderingInProgress = false;
                             console.log('[Google Pay] Button rendered successfully');
 
                             return button;
@@ -1044,7 +1063,7 @@
             });
         }).catch(function (error) {
             console.error('[Google Pay] Failed to render button', error);
-            renderingInProgress = false;
+            renderState.renderingInProgress = false;
             hidePaymentMethodContainer();
         });
     }
