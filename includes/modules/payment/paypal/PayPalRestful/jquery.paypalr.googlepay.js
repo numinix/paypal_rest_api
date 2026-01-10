@@ -796,24 +796,21 @@
                     }).then(function (confirmResult) {
                         console.log('[Google Pay] confirmOrder result:', confirmResult);
                         
-                        // Extract shipping and billing addresses from Google Pay payment data
-                        var shippingAddress = paymentData.shippingAddress || {};
+                        // For checkout flow: Shipping and billing addresses are already in the checkout session
+                        // We only need to send the payment confirmation (order ID) and email if available
                         var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
-                        // Email extraction: paymentData.email is typically empty with PayPal SDK since
-                        // we don't use emailRequired (incompatible with confirmOrder() flow).
-                        // For logged-in users, email comes from session on the server side.
                         var email = paymentData.email || billingAddress.emailAddress || '';
                         
-                        // Build the complete payload for checkout
+                        // Build the payload for checkout - minimal data since addresses already in session
                         var checkoutPayload = {
                             payment_method_nonce: orderId, // Use orderID as the payment reference
                             module: 'paypalr_googlepay',
                             total: orderConfig.amount,
                             currency: orderConfig.currency || 'USD',
                             email: email,
-                            shipping_address: shippingAddress,
-                            billing_address: billingAddress,
                             orderID: orderId
+                            // Note: No shipping_address or billing_address sent
+                            // Checkout handler uses addresses already in session
                         };
                         
                         console.log('[Google Pay] Sending checkout request to ajax handler');
