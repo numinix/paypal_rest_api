@@ -325,10 +325,10 @@
      */
     function fetchWalletConfig() {
         // Check if configuration was injected inline by the PHP module (checkout page)
-        // Verify it's a valid configuration (success !== false) before using it
+        // Verify it's a valid configuration (success === true) before using it
         if (typeof window.paypalrGooglePayCheckoutConfig !== 'undefined' && 
             window.paypalrGooglePayCheckoutConfig && 
-            window.paypalrGooglePayCheckoutConfig.success !== false) {
+            window.paypalrGooglePayCheckoutConfig.success === true) {
             console.log('[Google Pay] Using inline configuration from checkout page');
             return Promise.resolve(window.paypalrGooglePayCheckoutConfig);
         }

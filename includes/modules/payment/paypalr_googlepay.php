@@ -463,7 +463,7 @@ class paypalr_googlepay extends base
         // Only inject configuration if it was successfully retrieved
         // If configuration failed, JavaScript will fall back to AJAX call
         $inlineConfig = '';
-        if (!empty($walletConfig['success'])) {
+        if (isset($walletConfig['success']) && $walletConfig['success'] === true) {
             $configJson = json_encode($walletConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
             
             // Inject configuration inline before loading the JavaScript
