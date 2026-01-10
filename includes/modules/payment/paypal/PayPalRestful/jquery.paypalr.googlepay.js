@@ -714,10 +714,12 @@
 
             console.log('[Google Pay] Configuration valid, allowed payment methods:', allowedPaymentMethods.length);
 
-            // Add billing address requirements to allowedPaymentMethods (similar to Braintree implementation)
-            if (allowedPaymentMethods && allowedPaymentMethods[0] && allowedPaymentMethods[0].parameters) {
-                allowedPaymentMethods[0].parameters.billingAddressRequired = true;
-                allowedPaymentMethods[0].parameters.billingAddressParameters = {
+            // Add billing address requirements to allowedPaymentMethods
+            // Create a deep copy to avoid mutating the original PayPal config
+            var modifiedPaymentMethods = JSON.parse(JSON.stringify(allowedPaymentMethods));
+            if (modifiedPaymentMethods && modifiedPaymentMethods[0] && modifiedPaymentMethods[0].parameters) {
+                modifiedPaymentMethods[0].parameters.billingAddressRequired = true;
+                modifiedPaymentMethods[0].parameters.billingAddressParameters = {
                     format: 'FULL',
                     phoneNumberRequired: true
                 };
@@ -759,7 +761,7 @@
                 var paymentDataRequest = {
                     apiVersion: basePaymentDataRequest.apiVersion || 2,
                     apiVersionMinor: basePaymentDataRequest.apiVersionMinor || 0,
-                    allowedPaymentMethods: allowedPaymentMethods,
+                    allowedPaymentMethods: modifiedPaymentMethods,
                     transactionInfo: {
                         totalPriceStatus: 'FINAL',
                         totalPrice: orderConfig.amount,
