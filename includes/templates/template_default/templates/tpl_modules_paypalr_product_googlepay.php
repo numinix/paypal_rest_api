@@ -25,13 +25,20 @@
     // This uses paypal.Googlepay().config() to get proper tokenization specification
     // The JS file handles all SDK loading and initialization internally
     // Note: The JS file automatically renders the button at the end, so no additional calls needed
-    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js';
-    if (file_exists($scriptPath)) {
-        echo '<script>' . file_get_contents($scriptPath) . '</script>';
-    } else {
-        // Log error if the required JavaScript file is missing
-        error_log('Google Pay Error: jquery.paypalr.googlepay.js not found at: ' . $scriptPath);
-        return;
+    //
+    // Guard to prevent loading the JavaScript multiple times on the same page
+    // Each load would call renderGooglePayButton(), creating duplicate buttons
+    if (!defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_JS_LOADED')) {
+        define('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_JS_LOADED', true);
+        
+        $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js';
+        if (file_exists($scriptPath)) {
+            echo '<script>' . file_get_contents($scriptPath) . '</script>';
+        } else {
+            // Log error if the required JavaScript file is missing
+            error_log('Google Pay Error: jquery.paypalr.googlepay.js not found at: ' . $scriptPath);
+            return;
+        }
     }
 ?>
 

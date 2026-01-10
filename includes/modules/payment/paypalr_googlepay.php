@@ -407,7 +407,13 @@ class paypalr_googlepay extends base
             $css = '<style>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css') . '</style>';
         }
 
-        return $css . '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/' . $scriptFilename) . '</script>';
+        $script = '';
+        if (!defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_JS_LOADED')) {
+            define('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_JS_LOADED', true);
+            $script = '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/' . $scriptFilename) . '</script>';
+        }
+
+        return $css . $script;
     }
 
     public function selection(): array
