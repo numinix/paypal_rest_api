@@ -797,11 +797,11 @@
                 sdkState.config = orderConfig;
                 var orderId = orderConfig.orderID;
 
-                // For logged-in users: Collect minimal payment data, no shipping/email
+                // For logged-in users: Collect shipping data but not email (email from session)
                 if (isLoggedIn) {
-                    console.log('[Google Pay] Logged-in user - collecting minimal payment data for confirmOrder');
+                    console.log('[Google Pay] Logged-in user - collecting shipping data for confirmOrder (email from session)');
                     
-                    // Build minimal payment data request (no email, no shipping)
+                    // Build payment data request with shipping but no email
                     var paymentDataRequest = {
                         apiVersion: basePaymentDataRequest.apiVersion || 2,
                         apiVersionMinor: basePaymentDataRequest.apiVersionMinor || 0,
@@ -814,13 +814,25 @@
                         },
                         merchantInfo: basePaymentDataRequest.merchantInfo || {},
                         emailRequired: false,
-                        shippingAddressRequired: false,
-                        shippingOptionRequired: false
+                        // Enable shipping address and shipping option selection in the Google Pay modal
+                        shippingAddressRequired: true,
+                        shippingAddressParameters: {
+                            phoneNumberRequired: true
+                        },
+                        shippingOptionRequired: true,
+                        // Provide initial shipping options to avoid Google Pay error
+                        // These will be updated via onPaymentDataChanged callback when address changes
+                        shippingOptionParameters: {
+                            defaultSelectedOptionId: 'shipping_option_unselected',
+                            shippingOptions: []
+                        },
+                        // Register callbacks for address and shipping option changes
+                        callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
                     };
                     
-                    console.log('[Google Pay] Requesting minimal payment data from Google Pay');
+                    console.log('[Google Pay] Requesting payment data with shipping from Google Pay');
                     
-                    // Collect payment data from Google Pay (but no shipping/email)
+                    // Collect payment data from Google Pay with shipping but no email
                     return paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
                         console.log('[Google Pay] Payment data received for logged-in user');
                         
@@ -832,14 +844,22 @@
                         }).then(function (confirmResult) {
                             console.log('[Google Pay] confirmOrder result for logged-in user:', confirmResult);
                             
-                            // Build the checkout payload with order ID
+                            // Extract shipping and billing addresses from Google Pay payment data
+                            var shippingAddress = paymentData.shippingAddress || {};
+                            var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
+                            var shippingOption = paymentData.shippingOptionData || {};
+                            
+                            // Build the checkout payload with order ID and shipping data
                             var checkoutPayload = {
                                 payment_method_nonce: orderId,
                                 module: 'paypalr_googlepay',
                                 total: orderConfig.amount,
                                 currency: orderConfig.currency || 'USD',
                                 orderID: orderId,
-                                isLoggedIn: true
+                                isLoggedIn: true,
+                                shipping_address: shippingAddress,
+                                billing_address: billingAddress,
+                                shipping_option: shippingOption
                             };
                             
                             console.log('[Google Pay] Sending checkout request to ajax handler for logged-in user');
@@ -1100,11 +1120,14 @@
                     return googlepay.config().then(function (googlePayConfig) {
                         console.log('[Google Pay] Got Google Pay config from PayPal SDK');
                         
-                        // Create PaymentsClient for button rendering (but minimal payment collection)
+                        // Create PaymentsClient for button rendering with shipping callbacks
                         var googleEnvironment = isSandbox ? 'TEST' : 'PRODUCTION';
                         console.log('[Google Pay] Creating PaymentsClient with environment:', googleEnvironment);
                         var paymentsClient = new google.payments.api.PaymentsClient({
-                            environment: googleEnvironment
+                            environment: googleEnvironment,
+                            paymentDataCallbacks: {
+                                onPaymentDataChanged: onPaymentDataChanged
+                            }
                         });
                         sdkState.paymentsClient = paymentsClient;
 
