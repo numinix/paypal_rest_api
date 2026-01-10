@@ -1033,14 +1033,6 @@
                 return null;
             }
 
-            // Check if guest wallet is enabled when user is not logged in
-            if (!isLoggedIn && config.enableGuestWallet === false) {
-                console.log('[Google Pay] Guest wallet is disabled and user is not logged in, hiding button');
-                renderState.renderingInProgress = false;
-                hidePaymentMethodContainer();
-                return null;
-            }
-
             var isSandbox = config.environment === 'sandbox';
             var merchantIdIsValid = /^[A-Z0-9]{5,20}$/i.test(config.merchantId || '');
             var googleMerchantId = config.googleMerchantId || config.merchantId;
@@ -1048,6 +1040,8 @@
 
             console.log('[Google Pay] Environment:', config.environment, 'Sandbox:', isSandbox, 'Has merchant ID:', hasMerchantId);
             console.log('[Google Pay] User logged in:', isLoggedIn, 'Guest wallet enabled:', config.enableGuestWallet);
+            // Note: Guest wallet availability check is now handled at PHP template level
+            // If this script is loaded, the button should be shown
 
             sdkState.config = config;
 
