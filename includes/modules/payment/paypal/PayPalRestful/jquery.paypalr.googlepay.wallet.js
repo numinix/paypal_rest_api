@@ -1172,82 +1172,87 @@
 
             sdkState.config = config;
 
-            // For logged-in users: Use PayPal SDK with Buttons component (no Google Pay SDK needed)
-            // This approach allows Google Pay without merchant verification
+            // For logged-in users: Use PayPal Googlepay API to render proper Google Pay button
+            // This approach renders a Google Pay button without requiring Google merchant verification
             if (isLoggedIn) {
-                console.log('[Google Pay] Logged-in user detected - using PayPal Buttons component only');
-                // Load only PayPal SDK, use Buttons component to render Google Pay button
-                // No Google Pay SDK needed, no merchant verification required
-                return loadPayPalSdk(config).then(function (paypal) {
-                    console.log('[Google Pay] PayPal SDK loaded successfully for logged-in user');
+                console.log('[Google Pay] Logged-in user detected - using PayPal Googlepay API');
+                // Load both PayPal SDK and Google Pay JS for button rendering
+                return Promise.all([
+                    loadPayPalSdk(config),
+                    loadGooglePayJs()
+                ]).then(function (results) {
+                    var paypal = results[0];
+                    console.log('[Google Pay] SDKs loaded successfully for logged-in user');
                     
-                    // Use PayPal Buttons component with Google Pay funding source
-                    // This does not require Google merchant ID or verification
-                    console.log('[Google Pay] Rendering Google Pay button via PayPal Buttons component');
-                    
-                    paypal.Buttons({
-                        fundingSource: paypal.FUNDING.GOOGLEPAY,
-                        
-                        createOrder: function() {
-                            console.log('[Google Pay] Creating PayPal order for logged-in user');
-                            return fetchWalletOrder().then(function(result) {
-                                if (result && result.success && result.orderID) {
-                                    console.log('[Google Pay] Order created:', result.orderID);
-                                    return result.orderID;
-                                }
-                                throw new Error('Failed to create order');
-                            });
-                        },
-                        
-                        onShippingAddressChange: function(data, actions) {
-                            console.log('[Google Pay] Shipping address changed');
-                            // Handle shipping address change via AJAX
-                            return updateShipping(data.shipping_address, null).then(function(update) {
-                                if (update.error) {
-                                    return actions.reject();
-                                }
-                                return actions.resolve();
-                            });
-                        },
-                        
-                        onShippingOptionsChange: function(data, actions) {
-                            console.log('[Google Pay] Shipping option selected:', data.selected_shipping_option);
-                            // Handle shipping method change via AJAX
-                            return updateShipping(null, data.selected_shipping_option).then(function(update) {
-                                if (update.error) {
-                                    return actions.reject();
-                                }
-                                return actions.resolve();
-                            });
-                        },
-                        
-                        onApprove: function(data, actions) {
-                            console.log('[Google Pay] Payment approved for logged-in user');
-                            // Process the payment
-                            return processWalletCheckout(data.orderID).then(function(result) {
-                                if (result && result.success) {
-                                    if (result.redirectUrl) {
-                                        window.location.href = result.redirectUrl;
-                                    }
-                                } else {
-                                    alert('Payment processing failed: ' + (result.message || 'Unknown error'));
-                                }
-                            });
-                        },
-                        
-                        onError: function(err) {
-                            console.error('[Google Pay] Payment error for logged-in user:', err);
-                            alert('Payment failed: ' + (err.message || 'An error occurred'));
-                        }
-                    }).render(container).then(function() {
-                        console.log('[Google Pay] Button rendered successfully via PayPal Buttons for logged-in user');
-                        renderState.buttonRendered = true;
-                        renderState.renderingInProgress = false;
-                    }).catch(function(err) {
-                        console.error('[Google Pay] Failed to render button:', err);
+                    // Verify PayPal Googlepay API is available
+                    if (typeof paypal.Googlepay !== 'function') {
+                        console.warn('[Google Pay] PayPal Googlepay API not available');
                         renderState.renderingInProgress = false;
                         hidePaymentMethodContainer();
+                        return;
+                    }
+                    
+                    // Initialize PayPal Google Pay
+                    console.log('[Google Pay] Initializing PayPal Googlepay API for logged-in user');
+                    var googlepay = paypal.Googlepay();
+                    sdkState.googlepay = googlepay;
+                    
+                    // Get configuration from PayPal
+                    return googlepay.config().then(function (googlepayConfig) {
+                        console.log('[Google Pay] Got Googlepay config for logged-in user');
+                        
+                        // Create Google Pay PaymentsClient for button rendering
+                        var googlePayEnvironment = config.environment === 'sandbox' ? 'TEST' : 'PRODUCTION';
+                        console.log('[Google Pay] Creating PaymentsClient with environment:', googlePayEnvironment);
+                        
+                        // Register callbacks for shipping address and option changes
+                        var paymentsClient = new google.payments.api.PaymentsClient({
+                            environment: googlePayEnvironment,
+                            paymentDataCallbacks: {
+                                onPaymentDataChanged: onPaymentDataChanged
+                            }
+                        });
+                        sdkState.paymentsClient = paymentsClient;
+                        
+                        // Check if ready to pay
+                        var allowedPaymentMethods = getAllowedPaymentMethods(googlepayConfig);
+                        var isReadyToPayRequest = {
+                            apiVersion: googlepayConfig.apiVersion || 2,
+                            apiVersionMinor: googlepayConfig.apiVersionMinor || 0,
+                            allowedPaymentMethods: allowedPaymentMethods
+                        };
+                        
+                        return paymentsClient.isReadyToPay(isReadyToPayRequest).then(function (response) {
+                            if (!response.result) {
+                                console.log('[Google Pay] Not ready to pay for logged-in user');
+                                renderState.renderingInProgress = false;
+                                hidePaymentMethodContainer();
+                                return;
+                            }
+                            
+                            console.log('[Google Pay] Device is ready to pay, creating button for logged-in user');
+                            
+                            // Create Google Pay button using PaymentsClient
+                            // This renders a proper Google Pay button without needing Google merchant verification
+                            var button = paymentsClient.createButton({
+                                onClick: onGooglePayButtonClicked,
+                                buttonColor: 'black',
+                                buttonType: 'pay',
+                                buttonRadius: 4,
+                                buttonSizeMode: 'fill'
+                            });
+                            
+                            normalizeWalletButton(button);
+                            container.appendChild(button);
+                            console.log('[Google Pay] Google Pay button rendered successfully for logged-in user');
+                            renderState.buttonRendered = true;
+                            renderState.renderingInProgress = false;
+                        });
                     });
+                }).catch(function (error) {
+                    console.error('[Google Pay] Failed to initialize for logged-in user:', error);
+                    renderState.renderingInProgress = false;
+                    hidePaymentMethodContainer();
                 });
             }
 
