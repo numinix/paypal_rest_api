@@ -213,9 +213,121 @@
           <h4>Wallet account setup and IDs</h4>
           <p class="bodyText">Each wallet module exposes its own configuration fields so you can paste the account identifiers PayPal and the wallet providers issue. Use the steps below when onboarding or updating your storefront.</p>
           <ul class="bodyList">
-            <li><strong>Google Pay.</strong> Enable Google Pay in your PayPal account before using this feature. For <strong>Sandbox/Testing</strong>: Go to the <a href="https://developer.paypal.com/" target="_blank" rel="noopener">PayPal Developer Dashboard</a>, navigate to <strong>Apps &amp; Credentials</strong>, select your Sandbox app, scroll to <strong>Features</strong>, check the <strong>Google Pay</strong> checkbox, and click <strong>Save</strong>. For <strong>Live/Production</strong>: Log into your <a href="https://www.paypal.com/businessprofile/settings" target="_blank" rel="noopener">PayPal Business account</a>, navigate to <strong>Account Settings</strong> or <strong>Payments</strong>, find <strong>Google Pay</strong> or <strong>Alternative Payment Methods</strong>, and enable it. Complete any required onboarding steps. The Google Pay integration uses your existing PayPal REST credentials. If PayPal provides you with a Google Merchant ID (a 5&ndash;20 character alphanumeric value) to improve eligibility checks, enter it in the module&rsquo;s configuration field; otherwise, leave it blank.</li>
+            <li><strong>Google Pay.</strong> Enable Google Pay in your PayPal account before using this feature. For <strong>Sandbox/Testing</strong>: Go to the <a href="https://developer.paypal.com/" target="_blank" rel="noopener">PayPal Developer Dashboard</a>, navigate to <strong>Apps &amp; Credentials</strong>, select your Sandbox app, scroll to <strong>Features</strong>, check the <strong>Google Pay</strong> checkbox, and click <strong>Save</strong>. For <strong>Live/Production</strong>: Log into your <a href="https://www.paypal.com/businessprofile/settings" target="_blank" rel="noopener">PayPal Business account</a>, navigate to <strong>Account Settings</strong> or <strong>Payments</strong>, find <strong>Google Pay</strong> or <strong>Alternative Payment Methods</strong>, and enable it. Complete any required onboarding steps. The Google Pay integration uses your existing PayPal REST credentials. <strong>Important:</strong> To display Google Pay buttons on cart/product pages when customers are <em>not</em> logged in, you must complete Google Pay merchant verification and configure your Google Merchant ID (see detailed steps below). When customers <em>are</em> logged in or during checkout, the merchant ID is not required.</li>
             <li><strong>Apple Pay.</strong> Apple requires a merchant identifier, domain verification file, and an active payment processing certificate. Sign in to the <a href="https://developer.apple.com/account/resources/identifiers/list/merchant" target="_blank" rel="noopener">Apple Developer portal</a> and create an <em>Apple Pay Merchant ID</em> for your store. Generate a payment processing certificate using the CSR provided by your PayPal/Braintree/Numinix onboarding contact (mirroring the process described in the Braintree Apple Pay module docs): upload the CSR, download the resulting <code>.cer</code>, and hand that certificate back to PayPal so it can be installed on your behalf. Finally, host the <code>.well-known/apple-developer-merchantid-domain-association</code> file that PayPal provides at your storefront root and register the domain inside the Apple Developer portal. Once the certificate and domain are active, enable the PayPal Apple Pay module.</li>
             <li><strong>Venmo.</strong> PayPal enables Venmo processing on a per-merchant basis. After Venmo is activated for your PayPal account, locate your Venmo business profile or account ID (visible in your PayPal business profile or obtainable from your PayPal account manager) and paste it into the <strong>Venmo Business Profile ID</strong> setting in the module. Venmo requires that specific business profile ID.</li>
+          </ul>
+
+          <h4>Google Pay merchant verification for cart/product pages</h4>
+          <p class="bodyText">Google Pay buttons on cart and product pages require merchant verification when customers are not logged in. This allows the native Google Pay SDK to capture the customer&rsquo;s email address for account creation. Follow these steps to complete the verification process through the Google Pay Business Console.</p>
+          
+          <h5>When is verification required?</h5>
+          <p class="bodyText">Google Pay merchant verification is required <strong>only</strong> if you want to display Google Pay buttons on cart or product pages for non-logged-in customers. The verification allows your store to capture email addresses through the native Google Pay SDK. If customers are already logged in or if you only use Google Pay during checkout, verification is not needed.</p>
+
+          <h5>Step 1: Access Google Pay Business Console</h5>
+          <ol>
+            <li>Visit the <a href="https://pay.google.com/business/console/" target="_blank" rel="noopener">Google Pay Business Console</a></li>
+            <li>Sign in with your Google account</li>
+            <li>If this is your first visit, you&rsquo;ll be prompted to create a business profile</li>
+          </ol>
+
+          <h5>Step 2: Create or select your business profile</h5>
+          <ol>
+            <li>Enter your business information (name, address, website, support email)</li>
+            <li>Accept the Google Pay API Terms of Service</li>
+            <li>Click <strong>Create Profile</strong> or <strong>Continue</strong></li>
+          </ol>
+
+          <h5>Step 3: Register your merchant ID</h5>
+          <ol>
+            <li>In the Google Pay Business Console, navigate to <strong>Integration</strong> or <strong>Merchant Info</strong></li>
+            <li>Note your <strong>Google Merchant ID</strong> (a 12&ndash;20 character alphanumeric string)</li>
+            <li>Copy this ID&mdash;you&rsquo;ll need it for your PayPal configuration</li>
+          </ol>
+
+          <h5>Step 4: Configure payment gateway integration</h5>
+          <ol>
+            <li>In the Google Pay Business Console, navigate to <strong>Gateway settings</strong> or <strong>Payment methods</strong></li>
+            <li>Select <strong>PayPal</strong> as your payment gateway</li>
+            <li>Enter your PayPal credentials or merchant information as requested</li>
+            <li>Save the configuration</li>
+          </ol>
+
+          <h5>Step 5: Domain verification</h5>
+          <ol>
+            <li>In the Console, navigate to <strong>Domain verification</strong> or <strong>Settings</strong></li>
+            <li>Add your store&rsquo;s domain (e.g., <code>www.yourstore.com</code>)</li>
+            <li>Choose a verification method:
+              <ul class="bodyList">
+                <li><strong>HTML file upload:</strong> Download a verification file and upload to your site root</li>
+                <li><strong>DNS TXT record:</strong> Add a TXT record to your domain&rsquo;s DNS settings</li>
+                <li><strong>Meta tag:</strong> Add a meta tag to your homepage</li>
+              </ul>
+            </li>
+            <li>Complete the verification and click <strong>Verify</strong></li>
+          </ol>
+
+          <h5>Step 6: Submit integration for review</h5>
+          <ol>
+            <li>In the Console, navigate to the integration review section</li>
+            <li>Complete the merchant information form:
+              <ul class="bodyList">
+                <li>Provide screenshots of your checkout flow showing the Google Pay button</li>
+                <li>Describe how Google Pay is integrated on your site</li>
+                <li>Confirm compliance with Google Pay branding guidelines</li>
+              </ul>
+            </li>
+            <li>Submit for review</li>
+          </ol>
+          <p class="bodyText"><strong>Important:</strong> Set <strong>Google Pay Environment</strong> to <code>TEST</code> in your PayPal module configuration while completing this step. This allows you to take screenshots and test the integration before going live.</p>
+
+          <h5>Step 7: Configure your PayPal module</h5>
+          <ol>
+            <li>In Zen Cart admin, navigate to <strong>Modules &rarr; Payment &rarr; PayPal Google Pay</strong></li>
+            <li>Configure the following settings:
+              <ul class="bodyList">
+                <li><strong>Google Pay Merchant ID:</strong> Enter the Merchant ID from Step 3</li>
+                <li><strong>Google Pay Environment:</strong> Set to <code>TEST</code> during verification/testing, then change to <code>PRODUCTION</code> after Google approves</li>
+                <li><strong>Enable on Shopping Cart Page:</strong> Set to <code>True</code> if desired</li>
+                <li><strong>Enable on Product Page:</strong> Set to <code>True</code> if desired</li>
+              </ul>
+            </li>
+            <li>Save the configuration</li>
+          </ol>
+
+          <h5>Step 8: Testing in TEST mode</h5>
+          <p class="bodyText">With Google Pay Environment set to <code>TEST</code>:</p>
+          <ul class="bodyList">
+            <li>Test transactions use Google&rsquo;s test environment (no real charges)</li>
+            <li>You can complete the integration flow and take screenshots for review</li>
+            <li>Verify that buttons appear correctly on cart/product pages</li>
+            <li>Complete a test purchase to ensure the flow works end-to-end</li>
+          </ul>
+
+          <h5>Step 9: Wait for Google approval</h5>
+          <p class="bodyText">Google typically reviews submissions within 1&ndash;2 business days. You&rsquo;ll receive an email when your integration is approved or if changes are needed. If changes are requested, make the updates and resubmit.</p>
+
+          <h5>Step 10: Switch to PRODUCTION mode</h5>
+          <ol>
+            <li>Once Google approves your integration, return to <strong>Modules &rarr; Payment &rarr; PayPal Google Pay</strong></li>
+            <li>Change <strong>Google Pay Environment</strong> from <code>TEST</code> to <code>PRODUCTION</code></li>
+            <li>Save the configuration</li>
+            <li>Your Google Pay buttons are now live and will process real transactions</li>
+          </ol>
+
+          <h5>Login status behavior</h5>
+          <p class="bodyText">The module automatically selects the appropriate SDK based on customer login status:</p>
+          <ul class="bodyList">
+            <li><strong>User NOT logged in + Merchant ID set:</strong> Uses native Google Pay SDK to capture email address</li>
+            <li><strong>User logged in:</strong> Uses PayPal SDK (email already known, no merchant ID needed)</li>
+            <li><strong>Checkout page:</strong> Always uses PayPal SDK regardless of login status</li>
+          </ul>
+
+          <h5>Troubleshooting</h5>
+          <ul class="bodyList">
+            <li><strong>Button doesn&rsquo;t appear on cart/product pages:</strong> Verify the Google Merchant ID is correctly entered, Google Pay Environment is set (TEST or PRODUCTION), and cart/product page options are enabled. For non-logged-in users, confirm the Merchant ID is valid.</li>
+            <li><strong>&ldquo;Merchant not found&rdquo; error:</strong> The Merchant ID may be incorrect or not yet approved by Google. Verify it matches exactly what&rsquo;s in the Google Pay Console and ensure your integration has been approved.</li>
+            <li><strong>Domain verification fails:</strong> Check that the verification file, meta tag, or DNS record is correct. DNS changes can take several hours to propagate.</li>
           </ul>
           <h4>Credit card checkout option</h4>
           <p class="bodyText">Install the companion <code>paypalr_creditcard</code> payment module when you want to present a dedicated credit card form alongside the PayPal wallet button. The add-on uses the same PayPal REST credentials and logging as the parent module but exposes its own enable/disable switch so you can manage wallet and card availability separately.</p>

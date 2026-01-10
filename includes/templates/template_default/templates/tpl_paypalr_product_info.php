@@ -16,11 +16,22 @@ if (
     defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE') &&
     MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE === 'True'
 ) {
-    $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_modules_paypalr_product_googlepay.php';
-    if (!file_exists($template_path)) {
-        $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_modules_paypalr_product_googlepay.php';
+    // Google Pay on cart/product pages requires either:
+    // 1) User to be logged in (use PayPal SDK), OR
+    // 2) Google Merchant ID to be set (use native Google Pay SDK for email capture)
+    $userLoggedIn = isset($_SESSION['customer_id']) && (int)$_SESSION['customer_id'] > 0;
+    $googleMerchantId = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID') 
+        ? trim((string)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID) 
+        : '';
+    $hasMerchantId = ($googleMerchantId !== '' && preg_match('/^[A-Z0-9]{12,20}$/i', $googleMerchantId) === 1);
+    
+    if ($userLoggedIn || $hasMerchantId) {
+        $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_modules_paypalr_product_googlepay.php';
+        if (!file_exists($template_path)) {
+            $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_modules_paypalr_product_googlepay.php';
+        }
+        include($template_path);
     }
-    include($template_path);
 }
 
 // Load Apple Pay template if enabled for product page

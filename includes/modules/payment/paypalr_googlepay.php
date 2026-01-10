@@ -52,7 +52,7 @@ class paypalr_googlepay extends base
         return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.10';
+    protected const CURRENT_VERSION = '1.3.11';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -294,6 +294,36 @@ class paypalr_googlepay extends base
                          VALUES
                             ('Google Pay Environment', 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENVIRONMENT', 'TEST', 'Set Google Pay environment for merchant verification. Use TEST for initial setup and screenshots, then switch to PRODUCTION after Google Pay approval. This setting is independent of PayPal sandbox/live mode.', 6, 0, 'zen_cfg_select_option([''TEST'', ''PRODUCTION''], ', NULL, now())"
                     );
+                    // Fall through to update configuration descriptions
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_GOOGLEPAY_VERSION, '1.3.11', '<'):
+                    // Update merchant ID description to clarify it's required for cart/product buttons when user is not logged in
+                    $db->Execute(
+                        "UPDATE " . TABLE_CONFIGURATION . "
+                            SET configuration_title = 'Google Pay Merchant ID',
+                                configuration_description = 'Optional Google Merchant ID from Google Pay Console. Required to display Google Pay buttons on cart/product pages when the user is not logged in (to capture email address). When user is logged in, the PayPal SDK is used instead. Leave blank to only show Google Pay in checkout.',
+                                last_modified = now()
+                          WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID'
+                          LIMIT 1"
+                    );
+                    
+                    // Update shopping cart and product page configuration descriptions
+                    $db->Execute(
+                        "UPDATE " . TABLE_CONFIGURATION . "
+                            SET configuration_description = 'Display the Google Pay button on the shopping cart page? NOTE: To use this when the user is not logged in, you must set the Google Pay Merchant ID above.',
+                                last_modified = now()
+                          WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_SHOPPING_CART'
+                          LIMIT 1"
+                    );
+                    
+                    $db->Execute(
+                        "UPDATE " . TABLE_CONFIGURATION . "
+                            SET configuration_description = 'Display the Google Pay button on product pages? NOTE: To use this when the user is not logged in, you must set the Google Pay Merchant ID above.',
+                                last_modified = now()
+                          WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_PRODUCT_PAGE'
+                          LIMIT 1"
+                    );
+                    // Fall through to update version
 
                 default:
                     break;
@@ -901,7 +931,7 @@ class paypalr_googlepay extends base
             return ['', 'not set'];
         }
 
-        if (preg_match('/^[A-Z0-9]{5,20}$/i', $rawMerchantId) === 1) {
+        if (preg_match('/^[A-Z0-9]{12,20}$/i', $rawMerchantId) === 1) {
             return [$rawMerchantId, $rawMerchantId];
         }
 
