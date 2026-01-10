@@ -9,7 +9,7 @@
  * Issue: PHP Fatal error when TEXT_SAVED_CARD_STATUS_ACTIVE and related
  * constants are undefined during function execution.
  *
- * @copyright Copyright 2026 Zen Cart Development Team
+ * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
 declare(strict_types=1);
@@ -36,11 +36,14 @@ namespace Tests {
 
     final class SavedCardStatusConstantsTest extends TestCase
     {
+        public static function setUpBeforeClass(): void
+        {
+            // Load the header_php.php file once for all tests
+            require_once DIR_FS_CATALOG . 'includes/modules/pages/account_saved_credit_cards/header_php.php';
+        }
+
         public function testStatusConstantsAreDefined(): void
         {
-            // Load the header_php.php file which should define the constants
-            require_once DIR_FS_CATALOG . 'includes/modules/pages/account_saved_credit_cards/header_php.php';
-
             // Verify all required constants are defined
             $this->assertTrue(defined('TEXT_SAVED_CARD_STATUS_ACTIVE'), 'TEXT_SAVED_CARD_STATUS_ACTIVE should be defined');
             $this->assertTrue(defined('TEXT_SAVED_CARD_STATUS_INACTIVE'), 'TEXT_SAVED_CARD_STATUS_INACTIVE should be defined');
@@ -52,9 +55,6 @@ namespace Tests {
 
         public function testStatusConstantsHaveValues(): void
         {
-            // Load the header_php.php file which should define the constants
-            require_once DIR_FS_CATALOG . 'includes/modules/pages/account_saved_credit_cards/header_php.php';
-
             // Verify all constants have non-empty string values
             $this->assertNotEmpty(TEXT_SAVED_CARD_STATUS_ACTIVE, 'TEXT_SAVED_CARD_STATUS_ACTIVE should have a value');
             $this->assertNotEmpty(TEXT_SAVED_CARD_STATUS_INACTIVE, 'TEXT_SAVED_CARD_STATUS_INACTIVE should have a value');
@@ -66,9 +66,6 @@ namespace Tests {
 
         public function testGetVaultStatusMapFunction(): void
         {
-            // Load the header_php.php file which defines the function
-            require_once DIR_FS_CATALOG . 'includes/modules/pages/account_saved_credit_cards/header_php.php';
-
             // Verify the function exists
             $this->assertTrue(function_exists('paypalr_get_vault_status_map'), 'paypalr_get_vault_status_map function should exist');
 
