@@ -46,21 +46,22 @@
 <script src="<?php echo $sdkUrl; ?>"></script>
 
 <?php
-    // Load the native Apple Pay JavaScript integration
-    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.applepay.native.js';
+    // Load the native Apple Pay JavaScript integration for cart page
+    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.applepay.wallet.js';
     if (file_exists($scriptPath)) {
         echo '<script>' . file_get_contents($scriptPath) . '</script>';
     } else {
-        // Fallback to original implementation if native version doesn't exist yet
-        $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.applepay.js';
-        if (file_exists($scriptPath)) {
-            echo '<script>' . file_get_contents($scriptPath) . '</script>';
-        }
+        // Log error if the required JavaScript file is missing
+        error_log('Apple Pay Error: jquery.paypalr.applepay.wallet.js not found at: ' . $scriptPath);
+        return;
     }
 ?>
 
 <script>
 "use strict";
+
+// Check if customer is logged in to determine which SDK approach to use
+window.paypalrWalletIsLoggedIn = <?php echo (isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0) ? 'true' : 'false'; ?>;
 
 // Configuration for native Apple Pay integration
 window.paypalrApplePayConfig = {
