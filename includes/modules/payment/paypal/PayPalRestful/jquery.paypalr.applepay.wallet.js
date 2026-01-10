@@ -1,10 +1,18 @@
 /**
- * PayPal Apple Pay Integration - Native API Implementation
+ * PayPal Apple Pay Integration - Wallet Button Implementation
  *
- * This module implements PayPal's native Apple Pay integration using:
- * - paypal.Applepay().config() for payment configuration
- * - ApplePaySession for native Apple Pay button and payment sheet
- * - paypal.Applepay().confirmOrder() for order confirmation
+ * This module implements Apple Pay for cart/product pages with different approaches
+ * based on user login status:
+ * 
+ * LOGGED IN USERS:
+ * - Uses PayPal SDK (paypal.Applepay()) for payment processing
+ * - User email comes from session (no need to collect from Apple Pay)
+ * - Shipping address and options fetched via ajax endpoint
+ * 
+ * GUEST USERS (NOT LOGGED IN):
+ * - Uses native Apple Pay SDK directly (ApplePaySession)
+ * - Email address collected from Apple Pay
+ * - Shipping address and options still fetched via ajax endpoint
  *
  * Reference: https://developer.paypal.com/docs/checkout/advanced/applepay/
  *
@@ -13,6 +21,9 @@
  */
 (function () {
     'use strict';
+
+    // Check if user is logged in - set by template
+    var isLoggedIn = window.paypalrWalletIsLoggedIn === true;
 
     // PayPal order status constants
     var PAYPAL_STATUS = {
@@ -675,7 +686,17 @@
         var orderPromise = null;
 
         // Create payment request with the actual order amount from the page
-        // Request contact fields that PayPal's confirmPaymentSource API requires
+        // Request contact fields based on user login status
+        var billingFields = ['postalAddress', 'name'];
+        var shippingFields = ['postalAddress', 'name', 'phone'];
+        
+        // Only request email from Apple Pay if user is NOT logged in
+        // Logged-in users have email in session on server side
+        if (!isLoggedIn) {
+            billingFields.push('email');
+            shippingFields.push('email');
+        }
+        
         var paymentRequest = {
             countryCode: applePayConfig.countryCode || 'US',
             currencyCode: orderTotal.currency || applePayConfig.currencyCode || 'USD',
@@ -686,12 +707,11 @@
                 amount: orderTotal.amount,
                 type: 'final'
             },
-            // Request billing contact fields required by PayPal's API
-            requiredBillingContactFields: ['postalAddress', 'name', 'email'],
-            // Request shipping contact for physical goods
+            // Request billing contact fields - email only for guest users
+            requiredBillingContactFields: billingFields,
+            // Request shipping contact for physical goods - email only for guest users
             // Note: Always requested because PayPal may need shipping info even for mixed carts
-            // Future enhancement: Make this conditional based on cart content type
-            requiredShippingContactFields: ['postalAddress', 'name', 'email', 'phone']
+            requiredShippingContactFields: shippingFields
         };
 
         // Step 3: Create ApplePaySession synchronously in the click handler

@@ -1,10 +1,18 @@
 /**
- * PayPal Google Pay Integration - Native API Implementation
+ * PayPal Google Pay Integration - Wallet Button Implementation
  *
- * This module implements PayPal's native Google Pay integration using:
- * - paypal.Googlepay().config() for payment configuration
- * - google.payments.api.PaymentsClient for Google Pay client
- * - paypal.Googlepay().confirmOrder() for order confirmation
+ * This module implements Google Pay for cart/product pages with different approaches
+ * based on user login status:
+ * 
+ * LOGGED IN USERS:
+ * - Uses PayPal SDK (paypal.Googlepay()) for payment processing
+ * - User email comes from session (no need to collect from Google Pay)
+ * - Shipping address and options fetched via ajax endpoint
+ * 
+ * GUEST USERS (NOT LOGGED IN):
+ * - Uses native Google Pay SDK directly (google.payments.api.PaymentsClient)
+ * - Email address collected from Google Pay
+ * - Shipping address and options still fetched via ajax endpoint
  *
  * Reference: https://developer.paypal.com/docs/checkout/advanced/googlepay/
  *
@@ -13,6 +21,9 @@
  */
 (function () {
     'use strict';
+
+    // Check if user is logged in - set by template
+    var isLoggedIn = window.paypalrWalletIsLoggedIn === true;
 
     var checkoutSubmitting = false;
     var sdkState = {
@@ -767,17 +778,15 @@
                         countryCode: 'US'
                     },
                     merchantInfo: basePaymentDataRequest.merchantInfo || {},
-                    // Enable email collection from Google Pay
-                    emailRequired: true,
+                    // Email collection: Only required for guest users (not logged in)
+                    // Logged-in users have email in session on server side
+                    emailRequired: !isLoggedIn,
                     // Enable shipping address and shipping option selection in the Google Pay modal
                     shippingAddressRequired: true,
                     shippingAddressParameters: {
                         phoneNumberRequired: true
-                        // Note: emailRequired is NOT set here because PayPal SDK's confirmOrder() flow
-                        // is incompatible with Google Pay's email collection mechanism.
-                        // Email collection requires PAYMENT_AUTHORIZATION callback + onPaymentAuthorized handler,
-                        // which PayPal SDK doesn't support (it uses confirmOrder() instead).
-                        // Users must be logged in for wallet checkout with PayPal SDK + Google Pay.
+                        // Note: emailRequired in shippingAddressParameters is NOT used because
+                        // we handle email collection at the top level with emailRequired: !isLoggedIn
                     },
                     shippingOptionRequired: true,
                     // Register callbacks for address and shipping option changes
