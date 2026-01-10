@@ -548,6 +548,13 @@ class zcObserverPaypalrestful
             $loggedClientId = (strlen($js_fields['client-id']) > 10)
                 ? substr($js_fields['client-id'], 0, 6) . '...' . substr($js_fields['client-id'], -4)
                 : $js_fields['client-id'];
+            
+            // Additional info for Google Pay conditional loading
+            $isLoggedIn = isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0;
+            $guestWalletEnabled = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET') 
+                && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET === 'True';
+            $googlePayComponentLoaded = strpos($js_fields['components'], 'googlepay') !== false;
+            
             $this->log->write(
                 "PayPal SDK Configuration for page '$current_page':\n" .
                 "  - Environment: " . MODULE_PAYMENT_PAYPALR_SERVER . "\n" .
@@ -561,6 +568,9 @@ class zcObserverPaypalrestful
                     "ApplePay=" . (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS : 'n/a') . ", " .
                     "Venmo=" . (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') ? MODULE_PAYMENT_PAYPALR_VENMO_STATUS : 'n/a') . ", " .
                     "PayLater=" . (defined('MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS') ? MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS : 'n/a') . "\n" .
+                "  - User Logged In: " . ($isLoggedIn ? 'yes' : 'no') . "\n" .
+                "  - Guest Wallet Enabled: " . ($guestWalletEnabled ? 'yes' : 'no') . "\n" .
+                "  - Google Pay Component Loaded: " . ($googlePayComponentLoaded ? 'yes' : 'no') . "\n" .
                 "  - SDK URL: " . $sdk_url,
                 true,
                 'before'
