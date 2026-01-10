@@ -321,16 +321,19 @@
      * Used during initial button rendering.
      * 
      * First checks if configuration was provided inline via window.paypalrGooglePayCheckoutConfig
-     * (set by the PHP module on the checkout page). If not found, falls back to AJAX call.
+     * (set by the PHP module on the checkout page). If not found or invalid, falls back to AJAX call.
      */
     function fetchWalletConfig() {
         // Check if configuration was injected inline by the PHP module (checkout page)
-        if (typeof window.paypalrGooglePayCheckoutConfig !== 'undefined' && window.paypalrGooglePayCheckoutConfig) {
+        // Verify it's a valid configuration (success !== false) before using it
+        if (typeof window.paypalrGooglePayCheckoutConfig !== 'undefined' && 
+            window.paypalrGooglePayCheckoutConfig && 
+            window.paypalrGooglePayCheckoutConfig.success !== false) {
             console.log('[Google Pay] Using inline configuration from checkout page');
             return Promise.resolve(window.paypalrGooglePayCheckoutConfig);
         }
         
-        // Fallback to AJAX call (cart/product pages)
+        // Fallback to AJAX call (cart/product pages, or if inline config is invalid)
         console.log('[Google Pay] Fetching configuration via AJAX');
         return fetch('ppr_wallet.php', {
             method: 'POST',
