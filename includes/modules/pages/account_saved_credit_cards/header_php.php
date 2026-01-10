@@ -373,26 +373,6 @@ if (!function_exists('paypalr_build_patch_operation')) {
     }
 }
 
-// Define status text constants if not already defined (for Zen Cart 1.5.8+ compatibility)
-if (!defined('TEXT_SAVED_CARD_STATUS_ACTIVE')) {
-    define('TEXT_SAVED_CARD_STATUS_ACTIVE', 'Active');
-}
-if (!defined('TEXT_SAVED_CARD_STATUS_INACTIVE')) {
-    define('TEXT_SAVED_CARD_STATUS_INACTIVE', 'Inactive');
-}
-if (!defined('TEXT_SAVED_CARD_STATUS_CANCELED')) {
-    define('TEXT_SAVED_CARD_STATUS_CANCELED', 'Canceled');
-}
-if (!defined('TEXT_SAVED_CARD_STATUS_SUSPENDED')) {
-    define('TEXT_SAVED_CARD_STATUS_SUSPENDED', 'Suspended');
-}
-if (!defined('TEXT_SAVED_CARD_STATUS_PENDING')) {
-    define('TEXT_SAVED_CARD_STATUS_PENDING', 'Pending');
-}
-if (!defined('TEXT_SAVED_CARD_STATUS_EXPIRED')) {
-    define('TEXT_SAVED_CARD_STATUS_EXPIRED', 'Expired');
-}
-
 if (!function_exists('paypalr_get_vault_status_map')) {
     /**
      * @return array<string,array{0:string,1:string}>

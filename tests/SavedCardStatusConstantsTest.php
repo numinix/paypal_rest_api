@@ -3,11 +3,12 @@
  * Test to verify that TEXT_SAVED_CARD_STATUS_* constants are properly defined.
  *
  * This test ensures that the status text constants used by the
- * paypalr_get_vault_status_map() function are always available, even when
- * Zen Cart 1.5.8+ loads language files as arrays instead of defining constants.
+ * paypalr_get_vault_status_map() function are properly loaded from the
+ * language file without early-return issues.
  *
- * Issue: PHP Fatal error when TEXT_SAVED_CARD_STATUS_ACTIVE and related
- * constants are undefined during function execution.
+ * Issue: The backwards compatibility language file had an early return that
+ * prevented constants from being defined when NAVBAR_TITLE_1 was already set,
+ * causing undefined constant errors.
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -38,13 +39,14 @@ namespace Tests {
     {
         public static function setUpBeforeClass(): void
         {
-            // Load the header_php.php file once for all tests
-            require_once DIR_FS_CATALOG . 'includes/modules/pages/account_saved_credit_cards/header_php.php';
+            // Load the language file to ensure constants are defined
+            require_once DIR_FS_CATALOG . 'includes/languages/english/account_saved_credit_cards.php';
         }
 
-        public function testStatusConstantsAreDefined(): void
+        public function testLanguageFileDefinesConstants(): void
         {
-            // Verify all required constants are defined
+            // Verify that the language file properly defines all status constants
+            // without being blocked by early returns
             $this->assertTrue(defined('TEXT_SAVED_CARD_STATUS_ACTIVE'), 'TEXT_SAVED_CARD_STATUS_ACTIVE should be defined');
             $this->assertTrue(defined('TEXT_SAVED_CARD_STATUS_INACTIVE'), 'TEXT_SAVED_CARD_STATUS_INACTIVE should be defined');
             $this->assertTrue(defined('TEXT_SAVED_CARD_STATUS_CANCELED'), 'TEXT_SAVED_CARD_STATUS_CANCELED should be defined');
@@ -53,19 +55,31 @@ namespace Tests {
             $this->assertTrue(defined('TEXT_SAVED_CARD_STATUS_EXPIRED'), 'TEXT_SAVED_CARD_STATUS_EXPIRED should be defined');
         }
 
-        public function testStatusConstantsHaveValues(): void
+        public function testLanguageFileNoEarlyReturn(): void
         {
-            // Verify all constants have non-empty string values
-            $this->assertNotEmpty(TEXT_SAVED_CARD_STATUS_ACTIVE, 'TEXT_SAVED_CARD_STATUS_ACTIVE should have a value');
-            $this->assertNotEmpty(TEXT_SAVED_CARD_STATUS_INACTIVE, 'TEXT_SAVED_CARD_STATUS_INACTIVE should have a value');
-            $this->assertNotEmpty(TEXT_SAVED_CARD_STATUS_CANCELED, 'TEXT_SAVED_CARD_STATUS_CANCELED should have a value');
-            $this->assertNotEmpty(TEXT_SAVED_CARD_STATUS_SUSPENDED, 'TEXT_SAVED_CARD_STATUS_SUSPENDED should have a value');
-            $this->assertNotEmpty(TEXT_SAVED_CARD_STATUS_PENDING, 'TEXT_SAVED_CARD_STATUS_PENDING should have a value');
-            $this->assertNotEmpty(TEXT_SAVED_CARD_STATUS_EXPIRED, 'TEXT_SAVED_CARD_STATUS_EXPIRED should have a value');
+            // Verify that the language file doesn't have an early return
+            // that would prevent constants from being defined
+            $languageFile = DIR_FS_CATALOG . 'includes/languages/english/account_saved_credit_cards.php';
+            $content = file_get_contents($languageFile);
+            
+            $this->assertStringNotContainsString(
+                "if (defined('NAVBAR_TITLE_1')) {\n    return;\n}",
+                $content,
+                'Language file should not have early return that blocks constant definition'
+            );
         }
 
         public function testGetVaultStatusMapFunction(): void
         {
+            // Load just the function definition (not the entire header file which requires DB)
+            $headerFile = DIR_FS_CATALOG . 'includes/modules/pages/account_saved_credit_cards/header_php.php';
+            $content = file_get_contents($headerFile);
+            
+            // Extract and evaluate just the function definition
+            if (preg_match('/if \(!function_exists\(\'paypalr_get_vault_status_map\'\)\).*?^\}/ms', $content, $matches)) {
+                eval('?>' . $matches[0]);
+            }
+
             // Verify the function exists
             $this->assertTrue(function_exists('paypalr_get_vault_status_map'), 'paypalr_get_vault_status_map function should exist');
 
