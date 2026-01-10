@@ -950,6 +950,14 @@
                 return null;
             }
 
+            // Check if guest wallet is enabled when user is not logged in
+            if (!isLoggedIn && config.enableGuestWallet === false) {
+                console.log('[Google Pay] Guest wallet is disabled and user is not logged in, hiding button');
+                renderState.renderingInProgress = false;
+                hidePaymentMethodContainer();
+                return null;
+            }
+
             var isSandbox = config.environment === 'sandbox';
             var merchantIdIsValid = /^[A-Z0-9]{5,20}$/i.test(config.merchantId || '');
             var googleMerchantId = config.googleMerchantId || config.merchantId;
