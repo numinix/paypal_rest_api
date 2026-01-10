@@ -446,6 +446,27 @@ class zcObserverPaypalrestful
         return '';
     }
 
+    /**
+     * Check if the current user is logged in.
+     * 
+     * @return bool True if user is logged in, false otherwise
+     */
+    protected function isUserLoggedIn(): bool
+    {
+        return isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0;
+    }
+
+    /**
+     * Check if guest wallet is enabled for Google Pay.
+     * 
+     * @return bool True if guest wallet is enabled, false otherwise
+     */
+    protected function isGuestWalletEnabled(): bool
+    {
+        return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET') 
+            && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET === 'True';
+    }
+
     protected function outputJsSdkHeaderAssets($current_page): void
     {
         global $current_page_base, $order, $paypalSandboxBuyerCountryCodeOverride, $paypalSandboxLocaleOverride;
@@ -501,12 +522,8 @@ class zcObserverPaypalrestful
         // 2. User is not logged in AND guest wallet is enabled (uses both PayPal SDK and native Google Pay SDK)
         // This prevents OR_BIBED_06 errors when guest mode is disabled and user is logged in.
         if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True') {
-            $isLoggedIn = isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0;
-            $guestWalletEnabled = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET') 
-                && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET === 'True';
-            
             // Load googlepay component if user is logged in OR guest wallet is enabled
-            if ($isLoggedIn || $guestWalletEnabled) {
+            if ($this->isUserLoggedIn() || $this->isGuestWalletEnabled()) {
                 $components[] = 'googlepay';
             }
         }
@@ -550,9 +567,6 @@ class zcObserverPaypalrestful
                 : $js_fields['client-id'];
             
             // Additional info for Google Pay conditional loading
-            $isLoggedIn = isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0;
-            $guestWalletEnabled = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET') 
-                && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET === 'True';
             $googlePayComponentLoaded = strpos($js_fields['components'], 'googlepay') !== false;
             
             $this->log->write(
@@ -568,8 +582,8 @@ class zcObserverPaypalrestful
                     "ApplePay=" . (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS : 'n/a') . ", " .
                     "Venmo=" . (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') ? MODULE_PAYMENT_PAYPALR_VENMO_STATUS : 'n/a') . ", " .
                     "PayLater=" . (defined('MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS') ? MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS : 'n/a') . "\n" .
-                "  - User Logged In: " . ($isLoggedIn ? 'yes' : 'no') . "\n" .
-                "  - Guest Wallet Enabled: " . ($guestWalletEnabled ? 'yes' : 'no') . "\n" .
+                "  - User Logged In: " . ($this->isUserLoggedIn() ? 'yes' : 'no') . "\n" .
+                "  - Guest Wallet Enabled: " . ($this->isGuestWalletEnabled() ? 'yes' : 'no') . "\n" .
                 "  - Google Pay Component Loaded: " . ($googlePayComponentLoaded ? 'yes' : 'no') . "\n" .
                 "  - SDK URL: " . $sdk_url,
                 true,

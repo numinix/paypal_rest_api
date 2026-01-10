@@ -39,38 +39,39 @@ namespace {
         
         $content = file_get_contents($observerPath);
 
-        // Test 1: Check that observer checks for logged in user
-        if (strpos($content, '$isLoggedIn') !== false && 
+        // Test 1: Check that observer has helper method for checking logged in user
+        if (strpos($content, 'isUserLoggedIn') !== false && 
             strpos($content, '$_SESSION[\'customer_id\']') !== false) {
-            fwrite(STDOUT, "✓ Observer checks user login status\n");
+            fwrite(STDOUT, "✓ Observer checks user login status via helper method\n");
         } else {
-            fwrite(STDERR, "FAIL: Observer should check user login status (\$_SESSION['customer_id'])\n");
+            fwrite(STDERR, "FAIL: Observer should have isUserLoggedIn() helper method\n");
             $passed = false;
         }
 
-        // Test 2: Check that observer checks for guest wallet setting
-        if (strpos($content, 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET') !== false) {
-            fwrite(STDOUT, "✓ Observer checks guest wallet setting\n");
+        // Test 2: Check that observer has helper method for checking guest wallet setting
+        if (strpos($content, 'isGuestWalletEnabled') !== false &&
+            strpos($content, 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET') !== false) {
+            fwrite(STDOUT, "✓ Observer checks guest wallet setting via helper method\n");
         } else {
-            fwrite(STDERR, "FAIL: Observer should check MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET\n");
+            fwrite(STDERR, "FAIL: Observer should have isGuestWalletEnabled() helper method\n");
             $passed = false;
         }
 
         // Test 3: Check that googlepay component is conditionally added
         // Should have both the MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS check AND
-        // the conditional logic for isLoggedIn or guestWalletEnabled
+        // the conditional logic using helper methods
         $hasGooglePayStatusCheck = strpos($content, 'MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') !== false;
-        $hasConditionalLogic = preg_match('/if\s*\(\s*\$isLoggedIn\s*\|\|\s*\$guestWalletEnabled\s*\)/', $content);
+        $hasConditionalLogic = preg_match('/if\s*\(\s*\$this->isUserLoggedIn\(\)\s*\|\|\s*\$this->isGuestWalletEnabled\(\)\s*\)/', $content);
         
         if ($hasGooglePayStatusCheck && $hasConditionalLogic) {
-            fwrite(STDOUT, "✓ Observer conditionally adds googlepay component based on login/guest status\n");
+            fwrite(STDOUT, "✓ Observer conditionally adds googlepay component using helper methods\n");
         } else {
-            fwrite(STDERR, "FAIL: Observer should conditionally add googlepay component\n");
+            fwrite(STDERR, "FAIL: Observer should conditionally add googlepay component using helper methods\n");
             if (!$hasGooglePayStatusCheck) {
                 fwrite(STDERR, "  Missing: MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS check\n");
             }
             if (!$hasConditionalLogic) {
-                fwrite(STDERR, "  Missing: Conditional logic for \$isLoggedIn || \$guestWalletEnabled\n");
+                fwrite(STDERR, "  Missing: Conditional logic using \$this->isUserLoggedIn() || \$this->isGuestWalletEnabled()\n");
             }
             $passed = false;
         }
