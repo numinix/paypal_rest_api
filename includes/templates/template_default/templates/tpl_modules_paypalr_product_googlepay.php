@@ -23,7 +23,7 @@
     $isLoggedIn = isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0;
     
     // If user is not logged in and guest wallet is disabled, don't show the button
-    if (!$isLoggedIn && !empty($walletConfig['enableGuestWallet']) && $walletConfig['enableGuestWallet'] === false) {
+    if (!$isLoggedIn && isset($walletConfig['enableGuestWallet']) && $walletConfig['enableGuestWallet'] === false) {
         // Guest wallet is disabled and user is not logged in - don't render button
         return;
     }
