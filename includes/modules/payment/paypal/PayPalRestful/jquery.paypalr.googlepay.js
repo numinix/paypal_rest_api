@@ -768,21 +768,13 @@
                     },
                     merchantInfo: basePaymentDataRequest.merchantInfo || {},
                     // Enable email collection from Google Pay
-                    emailRequired: true,
-                    // Enable shipping address and shipping option selection in the Google Pay modal
-                    shippingAddressRequired: true,
-                    shippingAddressParameters: {
-                        phoneNumberRequired: true
-                        // Note: emailRequired is NOT set here because PayPal SDK's confirmOrder() flow
-                        // is incompatible with Google Pay's email collection mechanism.
-                        // Email collection requires PAYMENT_AUTHORIZATION callback + onPaymentAuthorized handler,
-                        // which PayPal SDK doesn't support (it uses confirmOrder() instead).
-                        // Users must be logged in for wallet checkout with PayPal SDK + Google Pay.
-                    },
-                    shippingOptionRequired: true,
-                    // Register callbacks for address and shipping option changes
-                    // Note: PAYMENT_AUTHORIZATION is not included because PayPal SDK uses confirmOrder() API
-                    callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
+                    emailRequired: true
+                    // NOTE: Shipping address and shipping option selection are handled
+                    // outside the Google Pay modal in the checkout flow.
+                    // The customer has already selected shipping address and method before
+                    // reaching the payment step, so we do NOT need to collect them again.
+                    // shippingAddressRequired: false (omitted - defaults to false)
+                    // shippingOptionRequired: false (omitted - defaults to false)
                 };
 
                 console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);

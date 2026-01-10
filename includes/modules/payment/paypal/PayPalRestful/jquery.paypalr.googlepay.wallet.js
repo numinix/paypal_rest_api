@@ -905,6 +905,12 @@
             return;
         }
 
+        // Prevent duplicate rendering - check if button already exists
+        if (container.querySelector('button')) {
+            console.log('[Google Pay] Button already rendered, skipping duplicate render');
+            return;
+        }
+
         normalizeWalletContainer(container);
         container.innerHTML = '';
 
