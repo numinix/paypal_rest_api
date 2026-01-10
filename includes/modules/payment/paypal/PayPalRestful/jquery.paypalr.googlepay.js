@@ -796,57 +796,26 @@
                     }).then(function (confirmResult) {
                         console.log('[Google Pay] confirmOrder result:', confirmResult);
                         
-                        // For checkout flow: Shipping and billing addresses are already in the checkout session
-                        // We only need to send the payment confirmation (order ID) and email if available
+                        // For checkout flow: Store payment data and submit form
+                        // The checkout form submission goes to normal checkout processing
+                        // No AJAX request needed - everything handled by payment module
                         var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
                         var email = paymentData.email || billingAddress.emailAddress || '';
                         
-                        // Build the payload for checkout - minimal data since addresses already in session
+                        // Build the payload for the hidden form field
                         var checkoutPayload = {
-                            payment_method_nonce: orderId, // Use orderID as the payment reference
-                            module: 'paypalr_googlepay',
-                            total: orderConfig.amount,
-                            currency: orderConfig.currency || 'USD',
+                            orderID: orderId,
                             email: email,
-                            orderID: orderId
-                            // Note: No shipping_address or billing_address sent
-                            // Checkout handler uses addresses already in session
+                            confirmResult: confirmResult
+                            // Note: No shipping_address or billing_address
+                            // Checkout uses addresses already in session
                         };
                         
-                        console.log('[Google Pay] Sending checkout request to ajax handler');
+                        console.log('[Google Pay] Storing payload and submitting checkout form');
                         
-                        // Send to checkout handler instead of just submitting form
-                        var ajaxBasePath = window.paypalrAjaxBasePath || 'ajax/';
-                        var checkoutUrl = ajaxBasePath + 'paypalr_wallet_checkout.php';
-                        
-                        return fetch(checkoutUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(checkoutPayload)
-                        }).then(function(response) {
-                            return response.json();
-                        }).then(function(checkoutResult) {
-                            console.log('[Google Pay] Checkout result:', checkoutResult);
-                            
-                            if (checkoutResult.status === 'success' && checkoutResult.redirect_url) {
-                                console.log('[Google Pay] Redirecting to:', checkoutResult.redirect_url);
-                                window.location.href = checkoutResult.redirect_url;
-                            } else {
-                                console.error('[Google Pay] Checkout failed:', checkoutResult);
-                                setGooglePayPayload({});
-                                if (typeof window.oprcHideProcessingOverlay === 'function') {
-                                    window.oprcHideProcessingOverlay();
-                                }
-                                alert('Checkout failed: ' + (checkoutResult.message || 'Unknown error'));
-                            }
-                        }).catch(function(checkoutError) {
-                            console.error('[Google Pay] Checkout request failed:', checkoutError);
-                            setGooglePayPayload({});
-                            if (typeof window.oprcHideProcessingOverlay === 'function') {
-                                window.oprcHideProcessingOverlay();
-                            }
-                            alert('Checkout failed. Please try again.');
-                        });
+                        // Store payload in hidden field and submit form
+                        // This triggers normal checkout processing via payment module
+                        setGooglePayPayload(checkoutPayload);
                     }).catch(function (confirmError) {
                         console.error('[Google Pay] confirmOrder failed:', confirmError);
                         setGooglePayPayload({});
