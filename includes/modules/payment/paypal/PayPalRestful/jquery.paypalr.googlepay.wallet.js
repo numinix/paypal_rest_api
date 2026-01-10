@@ -1096,16 +1096,9 @@
                     var googlepay = paypal.Googlepay();
                     sdkState.googlepay = googlepay;
 
-                    // Check eligibility
-                    return googlepay.isEligible().then(function (isEligible) {
-                        if (!isEligible) {
-                            console.warn('[Google Pay] Not eligible for Google Pay');
-                            renderState.renderingInProgress = false;
-                            hidePaymentMethodContainer();
-                            return null;
-                        }
-
-                        console.log('[Google Pay] Eligibility check passed for logged-in user');
+                    // Get config first, then check eligibility
+                    return googlepay.config().then(function (googlePayConfig) {
+                        console.log('[Google Pay] Got Google Pay config from PayPal SDK');
                         
                         // Create PaymentsClient for button rendering (but minimal payment collection)
                         var googleEnvironment = isSandbox ? 'TEST' : 'PRODUCTION';
@@ -1116,7 +1109,6 @@
                         sdkState.paymentsClient = paymentsClient;
 
                         // Check if ready to pay
-                        return googlepay.config().then(function (googlePayConfig) {
                             var allowedPaymentMethods = getAllowedPaymentMethods(googlePayConfig);
                             if (!allowedPaymentMethods || allowedPaymentMethods.length === 0) {
                                 console.warn('[Google Pay] No allowed payment methods available');
@@ -1158,7 +1150,6 @@
                                     hidePaymentMethodContainer();
                                 }
                             });
-                        });
                     });
                 });
             }
