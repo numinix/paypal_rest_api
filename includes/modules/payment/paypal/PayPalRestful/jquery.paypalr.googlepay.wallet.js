@@ -883,6 +883,14 @@
                 if (isLoggedIn) {
                     console.log('[Google Pay] Logged-in user - collecting shipping data for confirmOrder (email from session)');
                     
+                    // For logged-in users, exclude merchant ID to avoid Google merchant verification requirement
+                    // Use merchantName only (doesn't require verification)
+                    var merchantInfoForLoggedIn = {};
+                    if (basePaymentDataRequest.merchantInfo && basePaymentDataRequest.merchantInfo.merchantName) {
+                        merchantInfoForLoggedIn.merchantName = basePaymentDataRequest.merchantInfo.merchantName;
+                    }
+                    console.log('[Google Pay] Using merchantInfo WITHOUT merchantId for logged-in user (no verification required)');
+                    
                     // Build payment data request with shipping but no email
                     var paymentDataRequest = {
                         apiVersion: basePaymentDataRequest.apiVersion || 2,
@@ -894,7 +902,7 @@
                             currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
                             countryCode: 'US'
                         },
-                        merchantInfo: basePaymentDataRequest.merchantInfo || {},
+                        merchantInfo: merchantInfoForLoggedIn,
                         emailRequired: false,
                         // Enable shipping address and shipping option selection in the Google Pay modal
                         shippingAddressRequired: true,
