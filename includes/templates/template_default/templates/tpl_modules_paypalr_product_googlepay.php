@@ -45,7 +45,7 @@ window.paypalrWalletIsLoggedIn = <?php echo (isset($_SESSION['customer_id']) && 
     // Load the PayPal SDK Google Pay JavaScript integration for product/cart pages
     // This uses paypal.Googlepay().config() to get proper tokenization specification
     // The JS file handles all SDK loading and initialization internally
-    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.wallet.js';
+    $scriptPath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.googlepay.wallet.js';
     if (file_exists($scriptPath)) {
         echo '<script>' . file_get_contents($scriptPath) . '</script>';
     } else {
