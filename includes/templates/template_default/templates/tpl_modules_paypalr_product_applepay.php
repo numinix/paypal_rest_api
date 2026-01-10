@@ -35,10 +35,8 @@
     $productId = (int)$_GET['products_id'];
     $initialTotal = number_format($currencies->value(zen_get_products_base_price($productId)), 2, '.', '');
     
-    // Get store country code for Apple Pay
-    $country_query = "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES . " WHERE countries_id = " . (int)STORE_COUNTRY;
-    $country_result = $db->Execute($country_query);
-    $storeCountryCode = $country_result->fields['countries_iso_code_2'] ?? 'US';
+    // Use store country code from parent template (already queried in tpl_paypalr_product_info.php)
+    // No need to query database again since $storeCountryCode is already available
 ?>
 
 <?php if ($useNativeApplePay): ?>

@@ -43,10 +43,8 @@
         $environment = $walletConfig['environment'] ?? 'sandbox';
         $initialTotal = number_format($currencies->value($_SESSION['cart']->total), 2, '.', '');
         
-        // Get store country code
-        $country_query = "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES . " WHERE countries_id = " . (int)STORE_COUNTRY;
-        $country_result = $db->Execute($country_query);
-        $storeCountryCode = $country_result->fields['countries_iso_code_2'] ?? 'US';
+        // Use store country code from parent template (already queried in tpl_paypalr_shopping_cart.php)
+        // No need to query database again since $storeCountryCode is already available
         
         // Load the native Google Pay JavaScript integration
         // Use cart-specific constant to avoid conflicts with checkout

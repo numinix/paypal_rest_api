@@ -17,7 +17,7 @@ if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR
     $googleMerchantId = defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID') 
         ? trim((string)MODULE_PAYMENT_PAYPALR_GOOGLEPAY_MERCHANT_ID) 
         : '';
-    $hasMerchantId = ($googleMerchantId !== '' && preg_match('/^[A-Z0-9]{5,20}$/i', $googleMerchantId) === 1);
+    $hasMerchantId = ($googleMerchantId !== '' && preg_match('/^[A-Z0-9]{12,20}$/i', $googleMerchantId) === 1);
     
     if ($userLoggedIn || $hasMerchantId) {
         $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_modules_paypalr_googlepay.php';

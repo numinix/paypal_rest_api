@@ -931,7 +931,7 @@ class paypalr_googlepay extends base
             return ['', 'not set'];
         }
 
-        if (preg_match('/^[A-Z0-9]{5,20}$/i', $rawMerchantId) === 1) {
+        if (preg_match('/^[A-Z0-9]{12,20}$/i', $rawMerchantId) === 1) {
             return [$rawMerchantId, $rawMerchantId];
         }
 
