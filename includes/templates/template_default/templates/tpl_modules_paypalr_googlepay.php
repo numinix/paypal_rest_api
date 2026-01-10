@@ -27,6 +27,9 @@
         // Guest wallet is disabled and user is not logged in - don't render button
         return;
     }
+    
+    // For logged-in users, show Google Pay button rendered via PayPal SDK
+    // For guests, show Google Pay button rendered via Google Pay SDK (requires merchant verification)
 ?>
 
 <script>

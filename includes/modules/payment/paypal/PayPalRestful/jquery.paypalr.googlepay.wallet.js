@@ -1172,19 +1172,83 @@
 
             sdkState.config = config;
 
-            // For logged-in users: Use PayPal SDK only (no Google Pay SDK needed)
+            // For logged-in users: Use PayPal SDK with Buttons component (no Google Pay SDK needed)
             // This approach allows Google Pay without merchant verification
             if (isLoggedIn) {
-                console.log('[Google Pay] Logged-in user detected - using PayPal SDK only (no Google Pay SDK)');
-                // Simply show the button container - we'll use standard PayPal buttons
-                // which include Google Pay as a funding option
-                renderState.buttonRendered = true;
-                renderState.renderingInProgress = false;
-                
-                // For logged-in users, we should hide the Google Pay button
-                // and rely on PayPal/Apple Pay buttons in the standard button template
-                hidePaymentMethodContainer();
-                return null;
+                console.log('[Google Pay] Logged-in user detected - using PayPal Buttons component only');
+                // Load only PayPal SDK, use Buttons component to render Google Pay button
+                // No Google Pay SDK needed, no merchant verification required
+                return loadPayPalSdk(config).then(function (paypal) {
+                    console.log('[Google Pay] PayPal SDK loaded successfully for logged-in user');
+                    
+                    // Use PayPal Buttons component with Google Pay funding source
+                    // This does not require Google merchant ID or verification
+                    console.log('[Google Pay] Rendering Google Pay button via PayPal Buttons component');
+                    
+                    paypal.Buttons({
+                        fundingSource: paypal.FUNDING.GOOGLEPAY,
+                        
+                        createOrder: function() {
+                            console.log('[Google Pay] Creating PayPal order for logged-in user');
+                            return fetchWalletOrder().then(function(result) {
+                                if (result && result.success && result.orderID) {
+                                    console.log('[Google Pay] Order created:', result.orderID);
+                                    return result.orderID;
+                                }
+                                throw new Error('Failed to create order');
+                            });
+                        },
+                        
+                        onShippingAddressChange: function(data, actions) {
+                            console.log('[Google Pay] Shipping address changed');
+                            // Handle shipping address change via AJAX
+                            return updateShipping(data.shipping_address, null).then(function(update) {
+                                if (update.error) {
+                                    return actions.reject();
+                                }
+                                return actions.resolve();
+                            });
+                        },
+                        
+                        onShippingOptionsChange: function(data, actions) {
+                            console.log('[Google Pay] Shipping option selected:', data.selected_shipping_option);
+                            // Handle shipping method change via AJAX
+                            return updateShipping(null, data.selected_shipping_option).then(function(update) {
+                                if (update.error) {
+                                    return actions.reject();
+                                }
+                                return actions.resolve();
+                            });
+                        },
+                        
+                        onApprove: function(data, actions) {
+                            console.log('[Google Pay] Payment approved for logged-in user');
+                            // Process the payment
+                            return processWalletCheckout(data.orderID).then(function(result) {
+                                if (result && result.success) {
+                                    if (result.redirectUrl) {
+                                        window.location.href = result.redirectUrl;
+                                    }
+                                } else {
+                                    alert('Payment processing failed: ' + (result.message || 'Unknown error'));
+                                }
+                            });
+                        },
+                        
+                        onError: function(err) {
+                            console.error('[Google Pay] Payment error for logged-in user:', err);
+                            alert('Payment failed: ' + (err.message || 'An error occurred'));
+                        }
+                    }).render(container).then(function() {
+                        console.log('[Google Pay] Button rendered successfully via PayPal Buttons for logged-in user');
+                        renderState.buttonRendered = true;
+                        renderState.renderingInProgress = false;
+                    }).catch(function(err) {
+                        console.error('[Google Pay] Failed to render button:', err);
+                        renderState.renderingInProgress = false;
+                        hidePaymentMethodContainer();
+                    });
+                });
             }
 
             // Guest user path - requires Google Pay SDK and merchant verification
