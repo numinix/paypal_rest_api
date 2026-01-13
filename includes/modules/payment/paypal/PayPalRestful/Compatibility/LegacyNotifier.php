@@ -100,7 +100,7 @@ trait PayPalRestfulLegacyNotifierTrait
      */
     public function notify(
         $eventID,
-        &$param1 = null,
+        $param1 = [],
         &$param2 = null,
         &$param3 = null,
         &$param4 = null,
@@ -109,7 +109,7 @@ trait PayPalRestfulLegacyNotifierTrait
         &$param7 = null,
         &$param8 = null,
         &$param9 = null
-    ): void {
+    ) {
         $observers = $this->collectObservers($eventID);
 
         if (empty($observers)) {
