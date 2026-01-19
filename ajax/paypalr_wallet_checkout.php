@@ -357,8 +357,14 @@ $_SESSION['customer_email_address'] = $email;
 
 log_paypalr_wallet_message("Customer ID: $customer_id");
 
+// Look up zone_id for the shipping address
+$shipping_zone_id = (int)braintree_lookup_zone_id($shipping_address['administrativeArea'] ?? '', $shipping_address['countryCode'] ?? '', $db);
+$shipping_zone_name = braintree_get_zone_name($shipping_zone_id, $db);
+
+log_paypalr_wallet_message("Shipping address lookup: administrativeArea='" . ($shipping_address['administrativeArea'] ?? '') . "', countryCode='" . ($shipping_address['countryCode'] ?? '') . "', resolved zone_id=$shipping_zone_id, zone_name='$shipping_zone_name'");
+
 // Check if the shipping address already exists in the database
-$address_query = $db->Execute("SELECT address_book_id
+$address_query = $db->Execute("SELECT address_book_id, entry_zone_id, entry_state
                                FROM " . TABLE_ADDRESS_BOOK . "
                                WHERE customers_id = " . (int)$customer_id . "
                                AND entry_street_address = '" . zen_db_input($shipping_address['address1']) . "'
@@ -367,22 +373,51 @@ $address_query = $db->Execute("SELECT address_book_id
                                AND entry_suburb = '" . zen_db_input($shipping_address['address2']) . "'
                                AND entry_country_id = (SELECT countries_id FROM " . TABLE_COUNTRIES . " WHERE countries_iso_code_2 = '" . zen_db_input($shipping_address['countryCode']) . "')");
 
-// If the address exists, use it. Otherwise, create a new address
+// If the address exists, check if we need to update the zone_id
 if ($address_query->RecordCount() > 0) {
     $address_id = $address_query->fields['address_book_id'];
+    $existing_zone_id = (int)$address_query->fields['entry_zone_id'];
+    $existing_state = $address_query->fields['entry_state'];
+    
+    log_paypalr_wallet_message("Found existing shipping address ID $address_id: existing zone_id=$existing_zone_id, existing state='$existing_state'");
+    
+    // Update the address if the zone_id has changed
+    if ($existing_zone_id !== $shipping_zone_id) {
+        $entry_state = ($shipping_zone_name !== '') ? $shipping_zone_name : ($shipping_address['administrativeArea'] ?? '');
+        
+        log_paypalr_wallet_message("Updating shipping address ID $address_id: changing zone_id from $existing_zone_id to $shipping_zone_id, state to '$entry_state'");
+        
+        $db->Execute("UPDATE " . TABLE_ADDRESS_BOOK . "
+                     SET entry_zone_id = " . $shipping_zone_id . ",
+                         entry_state = '" . zen_db_input($entry_state) . "'
+                     WHERE address_book_id = " . (int)$address_id);
+    }
 } else {
     // Address does not exist, create it
+    // Use zone_name if available, otherwise fall back to the administrative area code
+    // This ensures we always have something to display even if zone lookup fails
+    $entry_state = ($shipping_zone_name !== '') ? $shipping_zone_name : ($shipping_address['administrativeArea'] ?? '');
+    
+    log_paypalr_wallet_message("Creating shipping address: administrativeArea='" . ($shipping_address['administrativeArea'] ?? '') . "', countryCode='" . ($shipping_address['countryCode'] ?? '') . "', zone_id=$shipping_zone_id, zone_name='$shipping_zone_name', entry_state='$entry_state'");
+    
     $db->Execute("INSERT INTO " . TABLE_ADDRESS_BOOK . " (customers_id, entry_firstname, entry_lastname, entry_street_address,
-                  entry_suburb, entry_postcode, entry_city, entry_country_id, entry_zone_id)
+                  entry_suburb, entry_postcode, entry_city, entry_state, entry_country_id, entry_zone_id)
                   VALUES (" . (int)$customer_id . ", '" . zen_db_input($shipping_first_name ?? '') . "', '" . zen_db_input($shipping_last_name ?? '') . "', '" . zen_db_input($shipping_address['address1'] ?? '') . "',
                           '" . zen_db_input($shipping_address['address2'] ?? '') . "', '" . zen_db_input($shipping_address['postalCode'] ?? '') . "', '" . zen_db_input($shipping_address['locality'] ?? '') . "',
+                          '" . zen_db_input($entry_state) . "',
                           (SELECT countries_id FROM " . TABLE_COUNTRIES . " WHERE countries_iso_code_2 = '" . zen_db_input($shipping_address['countryCode'] ?? '') . "'),
-                          " . (int)braintree_lookup_zone_id($shipping_address['administrativeArea'] ?? '', $shipping_address['countryCode'] ?? '', $db) . ")");
+                          " . $shipping_zone_id . ")");
     $address_id = $db->Insert_ID();
 }
 
+// Look up zone_id for the billing address
+$billing_zone_id = (int)braintree_lookup_zone_id($billing_address['administrativeArea'] ?? '', $billing_address['countryCode'] ?? '', $db);
+$billing_zone_name = braintree_get_zone_name($billing_zone_id, $db);
+
+log_paypalr_wallet_message("Billing address lookup: administrativeArea='" . ($billing_address['administrativeArea'] ?? '') . "', countryCode='" . ($billing_address['countryCode'] ?? '') . "', resolved zone_id=$billing_zone_id, zone_name='$billing_zone_name'");
+
 // Check if the billing address already exists in the database
-$billing_address_query = $db->Execute("SELECT address_book_id
+$billing_address_query = $db->Execute("SELECT address_book_id, entry_zone_id, entry_state
                                       FROM " . TABLE_ADDRESS_BOOK . "
                                       WHERE customers_id = " . (int)$customer_id . "
                                       AND entry_street_address = '" . zen_db_input($billing_address['address1']) . "'
@@ -391,17 +426,40 @@ $billing_address_query = $db->Execute("SELECT address_book_id
                                       AND entry_suburb = '" . zen_db_input($billing_address['address2']) . "'
                                       AND entry_country_id = (SELECT countries_id FROM " . TABLE_COUNTRIES . " WHERE countries_iso_code_2 = '" . zen_db_input($billing_address['countryCode']) . "')");
 
-// If the billing address exists, use it. Otherwise, create a new address
+// If the billing address exists, check if we need to update the zone_id
 if ($billing_address_query->RecordCount() > 0) {
     $billing_address_id = $billing_address_query->fields['address_book_id'];
+    $existing_billing_zone_id = (int)$billing_address_query->fields['entry_zone_id'];
+    $existing_billing_state = $billing_address_query->fields['entry_state'];
+    
+    log_paypalr_wallet_message("Found existing billing address ID $billing_address_id: existing zone_id=$existing_billing_zone_id, existing state='$existing_billing_state'");
+    
+    // Update the address if the zone_id has changed
+    if ($existing_billing_zone_id !== $billing_zone_id) {
+        $billing_entry_state = ($billing_zone_name !== '') ? $billing_zone_name : ($billing_address['administrativeArea'] ?? '');
+        
+        log_paypalr_wallet_message("Updating billing address ID $billing_address_id: changing zone_id from $existing_billing_zone_id to $billing_zone_id, state to '$billing_entry_state'");
+        
+        $db->Execute("UPDATE " . TABLE_ADDRESS_BOOK . "
+                     SET entry_zone_id = " . $billing_zone_id . ",
+                         entry_state = '" . zen_db_input($billing_entry_state) . "'
+                     WHERE address_book_id = " . (int)$billing_address_id);
+    }
 } else {
     // Billing address does not exist, create it
+    // Use zone_name if available, otherwise fall back to the administrative area code
+    // This ensures we always have something to display even if zone lookup fails
+    $billing_entry_state = ($billing_zone_name !== '') ? $billing_zone_name : ($billing_address['administrativeArea'] ?? '');
+    
+    log_paypalr_wallet_message("Creating billing address: administrativeArea='" . ($billing_address['administrativeArea'] ?? '') . "', countryCode='" . ($billing_address['countryCode'] ?? '') . "', zone_id=$billing_zone_id, zone_name='$billing_zone_name', entry_state='$billing_entry_state'");
+    
     $db->Execute("INSERT INTO " . TABLE_ADDRESS_BOOK . " (customers_id, entry_firstname, entry_lastname, entry_street_address,
-                  entry_suburb, entry_postcode, entry_city, entry_country_id, entry_zone_id)
+                  entry_suburb, entry_postcode, entry_city, entry_state, entry_country_id, entry_zone_id)
                   VALUES (" . (int)$customer_id . ", '" . zen_db_input($billing_first_name ?? '') . "', '" . zen_db_input($billing_last_name ?? '') . "', '" . zen_db_input($billing_address['address1'] ?? '') . "',
                           '" . zen_db_input($billing_address['address2'] ?? '') . "', '" . zen_db_input($billing_address['postalCode'] ?? '') . "', '" . zen_db_input($billing_address['locality'] ?? '') . "',
+                          '" . zen_db_input($billing_entry_state) . "',
                           (SELECT countries_id FROM " . TABLE_COUNTRIES . " WHERE countries_iso_code_2 = '" . zen_db_input($billing_address['countryCode'] ?? '') . "'),
-                          " . (int)braintree_lookup_zone_id($billing_address['administrativeArea'] ?? '', $billing_address['countryCode'] ?? '', $db) . ")");
+                          " . $billing_zone_id . ")");
     $billing_address_id = $db->Insert_ID();
 }
 
@@ -475,6 +533,27 @@ $zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_BEGIN');
 $payment_modules = new payment($_SESSION['payment']);
 $order = new order();
 $shipping_modules = new shipping($_SESSION['shipping'] ?? '');
+
+// Ensure delivery and billing state are set to the full state name, not the code
+// Zen Cart's order class may populate delivery['state'] with the zone code instead of the full name
+// This fixes the issue where admin shows "LA" or wrong state instead of "Louisiana"
+if (isset($order->delivery['zone_id']) && $order->delivery['zone_id'] > 0) {
+    // Look up the full state name from the zone_id
+    $delivery_zone_name = braintree_get_zone_name($order->delivery['zone_id'], $db);
+    if ($delivery_zone_name !== '') {
+        $order->delivery['state'] = $delivery_zone_name;
+        log_paypalr_wallet_message("Fixed delivery state: zone_id=" . $order->delivery['zone_id'] . ", state set to '" . $delivery_zone_name . "'");
+    }
+}
+
+if (isset($order->billing['zone_id']) && $order->billing['zone_id'] > 0) {
+    // Look up the full state name from the zone_id
+    $billing_zone_name = braintree_get_zone_name($order->billing['zone_id'], $db);
+    if ($billing_zone_name !== '') {
+        $order->billing['state'] = $billing_zone_name;
+        log_paypalr_wallet_message("Fixed billing state: zone_id=" . $order->billing['zone_id'] . ", state set to '" . $billing_zone_name . "'");
+    }
+}
 
 if (sizeof($order->products) < 1) {
     echo json_encode(['status' => 'error', 'message' => 'Cart is empty.']);
