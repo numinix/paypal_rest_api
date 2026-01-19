@@ -926,6 +926,10 @@
                     return paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
                         console.log('[Google Pay] Payment data received for logged-in user');
                         
+                        // Debug logging for logged-in user payment data
+                        console.log('[Google Pay] DEBUG (Logged-in) - Full paymentData keys:', Object.keys(paymentData));
+                        console.log('[Google Pay] DEBUG (Logged-in) - paymentData.email:', paymentData.email || '(empty - expected for logged-in users)');
+                        
                         // Call confirmOrder with payment data
                         console.log('[Google Pay] Calling confirmOrder for logged-in user');
                         return googlepay.confirmOrder({
@@ -938,6 +942,9 @@
                             var shippingAddress = paymentData.shippingAddress || {};
                             var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
                             var shippingOption = paymentData.shippingOptionData || {};
+                            
+                            console.log('[Google Pay] DEBUG (Logged-in) - Shipping address:', shippingAddress);
+                            console.log('[Google Pay] DEBUG (Logged-in) - Billing address:', billingAddress);
                             
                             // Build the checkout payload with order ID and shipping data
                             var checkoutPayload = {
@@ -1034,6 +1041,9 @@
                     callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
                 };
 
+                // Debug logging for PaymentDataRequest configuration
+                console.log('[Google Pay] DEBUG - PaymentDataRequest.emailRequired:', paymentDataRequest.emailRequired);
+                console.log('[Google Pay] DEBUG - isLoggedIn:', isLoggedIn);
                 console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
 
                 // Step 2: Invoke Google Pay payment sheet with actual amount
@@ -1041,6 +1051,13 @@
                 return paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
                     console.log('[Google Pay] Payment data received from Google Pay sheet');
                     console.log('[Google Pay] Payment method data:', paymentData.paymentMethodData);
+                    
+                    // Debug logging for email collection
+                    console.log('[Google Pay] DEBUG - paymentData.email:', paymentData.email || '(empty)');
+                    console.log('[Google Pay] DEBUG - Full paymentData keys:', Object.keys(paymentData));
+                    if (paymentData.paymentMethodData && paymentData.paymentMethodData.info && paymentData.paymentMethodData.info.billingAddress) {
+                        console.log('[Google Pay] DEBUG - billingAddress.emailAddress:', paymentData.paymentMethodData.info.billingAddress.emailAddress || '(empty)');
+                    }
                     
                     // Step 3: Confirm the order using PayPal's client-side API
                     // Similar to Apple Pay, Google Pay now uses client-side confirmation via confirmOrder()
@@ -1060,6 +1077,10 @@
                         // we don't use emailRequired (incompatible with confirmOrder() flow).
                         // For logged-in users, email comes from session on the server side.
                         var email = paymentData.email || billingAddress.emailAddress || '';
+                        
+                        // Debug logging for email extraction
+                        console.log('[Google Pay] DEBUG - Extracted email:', email || '(empty)');
+                        console.log('[Google Pay] DEBUG - Email source:', paymentData.email ? 'paymentData.email' : (billingAddress.emailAddress ? 'billingAddress.emailAddress' : 'none'));
                         
                         // Build the complete payload for checkout
                         var checkoutPayload = {
