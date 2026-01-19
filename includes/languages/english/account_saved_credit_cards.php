@@ -5,11 +5,11 @@
  * Zen Cart v1.5.8+ automatically loads the lang.account_saved_credit_cards.php file. This
  * shim loads that file and defines the associated constants for earlier Zen Cart versions
  * without emitting duplicate-definition warnings on newer installations.
+ *
+ * Note: We don't use an early return based on NAVBAR_TITLE_1 because Zen Cart's
+ * require_languages.php may only partially process language arrays, potentially
+ * leaving some constants undefined even when others are defined.
  */
-
-if (defined('NAVBAR_TITLE_1')) {
-    return;
-}
 
 if (!function_exists('accountSavedCardsLanguageGetTemplateOverrideDirectory')) {
     function accountSavedCardsLanguageGetTemplateOverrideDirectory()
