@@ -280,6 +280,31 @@ function normalize_braintree_contact($contact, $module = '') {
 }
 
 /**
+ * Get zone name from zone ID.
+ * 
+ * @param int $zone_id The zone ID to look up
+ * @param object $db The database connection object
+ * @return string The zone name, or empty string if not found
+ */
+function braintree_get_zone_name($zone_id, $db) {
+    if ($zone_id <= 0) {
+        return '';
+    }
+    
+    $zone_query = $db->Execute("
+        SELECT zone_name FROM " . TABLE_ZONES . "
+        WHERE zone_id = " . (int)$zone_id . "
+        LIMIT 1
+    ");
+    
+    if ($zone_query->RecordCount() > 0) {
+        return $zone_query->fields['zone_name'];
+    }
+    
+    return '';
+}
+
+/**
  * Alias for braintree_lookup_zone_id for backward compatibility.
  * This function looks up the zone ID for a given zone name and country code.
  * 
