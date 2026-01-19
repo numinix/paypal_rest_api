@@ -1,2 +1,0 @@
-<?php
-// Stub Braintree library

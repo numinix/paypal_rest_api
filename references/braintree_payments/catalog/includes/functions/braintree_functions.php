@@ -73,8 +73,7 @@ function braintree_lookup_zone_id($zone_code, $country_code, $db) {
         ");
         $zone_id = (int)$single_zone_query->fields['zone_id'];
     } elseif ($zone_code !== '') {
-        // Try exact match on zone_code only (e.g., 'PA', 'CA', 'WA')
-        // If no match, return 0 and let Zen Cart handle the state name as-is
+        // Try exact match on zone_code first (e.g., 'PA', 'CA', 'WA', 'AL')
         $zone_query = $db->Execute("
             SELECT zone_id FROM " . TABLE_ZONES . "
             WHERE zone_country_id = " . $country_id . "
@@ -84,10 +83,72 @@ function braintree_lookup_zone_id($zone_code, $country_code, $db) {
         
         if ($zone_query->RecordCount() > 0) {
             $zone_id = (int)$zone_query->fields['zone_id'];
+        } else {
+            // Try matching against zone_name if zone_code didn't match (e.g., 'Alabama', 'California')
+            $zone_name_query = $db->Execute("
+                SELECT zone_id FROM " . TABLE_ZONES . "
+                WHERE zone_country_id = " . $country_id . "
+                AND zone_name = '" . zen_db_input($zone_code) . "'
+                LIMIT 1
+            ");
+            
+            if ($zone_name_query->RecordCount() > 0) {
+                $zone_id = (int)$zone_name_query->fields['zone_id'];
+            }
         }
     }
 
     return $zone_id;
+}
+
+/**
+ * Get zone code from zone ID.
+ * 
+ * @param int $zone_id The zone ID to look up
+ * @param object $db The database connection object
+ * @return string The zone code, or empty string if not found
+ */
+function braintree_get_zone_code($zone_id, $db) {
+    if ($zone_id <= 0) {
+        return '';
+    }
+    
+    $zone_query = $db->Execute("
+        SELECT zone_code FROM " . TABLE_ZONES . "
+        WHERE zone_id = " . (int)$zone_id . "
+        LIMIT 1
+    ");
+    
+    if ($zone_query->RecordCount() > 0) {
+        return $zone_query->fields['zone_code'];
+    }
+    
+    return '';
+}
+
+/**
+ * Get zone name from zone ID.
+ * 
+ * @param int $zone_id The zone ID to look up
+ * @param object $db The database connection object
+ * @return string The zone name, or empty string if not found
+ */
+function braintree_get_zone_name($zone_id, $db) {
+    if ($zone_id <= 0) {
+        return '';
+    }
+    
+    $zone_query = $db->Execute("
+        SELECT zone_name FROM " . TABLE_ZONES . "
+        WHERE zone_id = " . (int)$zone_id . "
+        LIMIT 1
+    ");
+    
+    if ($zone_query->RecordCount() > 0) {
+        return $zone_query->fields['zone_name'];
+    }
+    
+    return '';
 }
 
 function log_braintree_message($message, $append = true) {

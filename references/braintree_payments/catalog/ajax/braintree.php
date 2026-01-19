@@ -182,16 +182,39 @@ if ($zone_count === 1) {
     }
 }
 
+// Get the zone name from zone_id for proper display
+$zone_name = braintree_get_zone_name($zone_id, $db);
+// If we have a zone name from the database, use it; otherwise fall back to administrativeArea
+if ($zone_name !== '') {
+    $administrativeArea = $zone_name;
+}
+
 // Set session variables for the shipping
 $_SESSION['cart_country_id'] = $country_id;
 $_SESSION['country_info'] = zen_get_countries($_SESSION['cart_country_id'],true);
 // Ensure country_info is always an array to prevent foreach warnings in shipping modules
-if (!is_array($_SESSION['country_info'])) {
-    $_SESSION['country_info'] = array(
-        'countries_name' => '',
-        'countries_iso_code_2' => '',
-        'countries_iso_code_3' => ''
+if (!is_array($_SESSION['country_info']) || empty($_SESSION['country_info'])) {
+    // Query database directly if zen_get_countries fails
+    $country_info_query = $db->Execute("
+        SELECT countries_name, countries_iso_code_2, countries_iso_code_3
+        FROM " . TABLE_COUNTRIES . "
+        WHERE countries_id = " . (int)$country_id
     );
+    
+    if ($country_info_query->RecordCount() > 0) {
+        $_SESSION['country_info'] = array(
+            'countries_name' => $country_info_query->fields['countries_name'],
+            'countries_iso_code_2' => $country_info_query->fields['countries_iso_code_2'],
+            'countries_iso_code_3' => $country_info_query->fields['countries_iso_code_3']
+        );
+    } else {
+        // Fallback to empty array
+        $_SESSION['country_info'] = array(
+            'countries_name' => '',
+            'countries_iso_code_2' => '',
+            'countries_iso_code_3' => ''
+        );
+    }
 }
 $_SESSION['cart_zone'] = $zone_id;
 $_SESSION['cart_postcode'] = $_SESSION['cart_zip_code'] = $postalCode;
