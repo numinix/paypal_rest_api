@@ -1710,7 +1710,7 @@ class paypalr extends base
     public function process_button_ajax()
     {
         if ($_SESSION['PayPalRestful']['Order']['payment_source'] !== 'card') {
-            return false;
+            return [];
         }
 
         $savedCardSelection = $_POST['paypalr_saved_card'] ?? 'new';
