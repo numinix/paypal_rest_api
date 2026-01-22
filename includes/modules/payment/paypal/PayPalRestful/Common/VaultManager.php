@@ -177,9 +177,14 @@ class VaultManager
             }
         }
         
-        $insertSql = "INSERT INTO " . TABLE_PAYPAL_VAULT . " (" . implode(', ', array_map(function($c) { return "`$c`"; }, $columns)) . ")
-                      VALUES (" . implode(', ', $values) . ")
-                      ON DUPLICATE KEY UPDATE " . implode(', ', $updateClauses);
+        // Build and execute the INSERT ... ON DUPLICATE KEY UPDATE query
+        $columnList = implode(', ', array_map(function($c) { return "`$c`"; }, $columns));
+        $valueList = implode(', ', $values);
+        $updateList = implode(', ', $updateClauses);
+        
+        $insertSql = "INSERT INTO " . TABLE_PAYPAL_VAULT . " ($columnList)
+                      VALUES ($valueList)
+                      ON DUPLICATE KEY UPDATE $updateList";
         
         $db->Execute($insertSql);
 
