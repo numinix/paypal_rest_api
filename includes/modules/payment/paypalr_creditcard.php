@@ -532,16 +532,26 @@ class paypalr_creditcard extends base
         }
 
         // Load the checkout script to handle radio button selection when focusing on fields
+        // Add it as a hidden field to avoid placing script tags inside the label element
         $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+        $fields[] = [
+            'title' => '',
+            'field' => $checkoutScript,
+        ];
 
-        $moduleDisplay = $this->buildCardsAccepted();
+        // Build module display with title and card images
+        $moduleDisplay = $this->title;
+        $cardsAccepted = $this->buildCardsAccepted();
+        if (!empty($cardsAccepted)) {
+            $moduleDisplay .= ' ' . $cardsAccepted;
+        }
         if ($vaultEnabled && !empty($vaultedCards)) {
             $moduleDisplay .= $this->buildSavedCardInlineOptions($vaultedCards, $savedCardSelection, $onFocus);
         }
 
         return [
             'id' => $this->code,
-            'module' => $moduleDisplay . $checkoutScript,
+            'module' => $moduleDisplay,
             'fields' => $fields,
         ];
     }
