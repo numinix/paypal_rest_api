@@ -164,7 +164,7 @@ jQuery(document).ready(function() {
     // Handle clicks on the saved card parent radio button or its label
     // This fixes the issue where clicking on "Pay with Saved Card" doesn't select it initially
     // We use delegated event handling to ensure it works even if payment methods are loaded dynamically
-    jQuery(document).on('click', '#pmt-paypalr_savedcard, label[for="pmt-paypalr_savedcard"]', function(e) {
+    jQuery(document).on('click', '#pmt-paypalr_savedcard, label[for="pmt-paypalr_savedcard"]', function() {
         selectSavedCardParentModule(true);
     });
 
