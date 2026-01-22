@@ -110,7 +110,15 @@ jQuery(document).ready(function() {
     
     // Initialize saved card visibility
     updateSavedCardVisibility();
-    ensureSavedCardParentMatchesSelection(false);
+    ensureSavedCardParentMatchesSelection(true);
+    
+    // Re-initialize when One Page Responsive Checkout reloads payment methods
+    if (typeof document.addEventListener === 'function') {
+        document.addEventListener('onePageCheckoutReloaded', function() {
+            updateSavedCardVisibility();
+            ensureSavedCardParentMatchesSelection(true);
+        });
+    }
 
     // Ensure parent module radio is selected when payment method changes
     jQuery('input[name=payment]').on('change', function() {
