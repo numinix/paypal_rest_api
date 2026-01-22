@@ -225,7 +225,7 @@ class OrderGuidReuseStatusCheckTest
 try {
     $test = new OrderGuidReuseStatusCheckTest();
     $test->run();
-} catch (Exception $e) {
+} catch (Throwable $e) {
     echo "Error: " . $e->getMessage() . "\n";
     exit(1);
 }

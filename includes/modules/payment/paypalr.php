@@ -69,6 +69,13 @@ class paypalr extends base
         PayPalRestfulApi::STATUS_COMPLETED,
         PayPalRestfulApi::STATUS_CAPTURED,
     ];
+    
+    // -----
+    // Statuses that allow a cached PayPal order to be reused when the order GUID matches.
+    // These represent orders that haven't been fully processed/finalized yet.
+    // Orders with other statuses (COMPLETED, REFUNDED, VOIDED, etc.) should not be
+    // reused to prevent duplicate transaction issues.
+    //
     protected const REUSABLE_ORDER_STATUSES = [
         PayPalRestfulApi::STATUS_CREATED,
         PayPalRestfulApi::STATUS_APPROVED,
