@@ -112,6 +112,29 @@ namespace {
                 return new queryFactoryResult(['Field' => 'visible'], false);
             }
             
+            // Handle INSERT ... ON DUPLICATE KEY UPDATE
+            if (stripos($query, 'INSERT INTO') !== false && stripos($query, 'ON DUPLICATE KEY UPDATE') !== false) {
+                // Parse the INSERT query to extract field values
+                if (preg_match('/INSERT INTO .* \((.*?)\)\s+VALUES\s+\((.*?)\)/is', $query, $matches)) {
+                    $columns = array_map('trim', explode(',', $matches[1]));
+                    $values = array_map('trim', explode(',', $matches[2]));
+                    
+                    $data = [];
+                    foreach ($columns as $idx => $col) {
+                        $col = trim($col, '` ');
+                        $val = $values[$idx] ?? '';
+                        // Remove quotes from values
+                        $val = trim($val, "' ");
+                        $data[$col] = $val;
+                    }
+                    
+                    $this->insertedData[] = $data;
+                }
+                
+                // Return success
+                return new queryFactoryResult([], false);
+            }
+            
             // Handle SELECT for vault existence check
             if (stripos($query, 'SELECT paypal_vault_id') !== false && stripos($query, 'LIMIT 1') !== false) {
                 return $this->mockResults['vault_exists'] ?? new queryFactoryResult([], true);
@@ -148,6 +171,11 @@ namespace {
         public function clearExecutedQueries(): void
         {
             $this->executedQueries = [];
+        }
+        
+        public function clearInsertedData(): void
+        {
+            $this->insertedData = [];
         }
     }
 
@@ -195,7 +223,7 @@ namespace {
         'brand' => 'VISA',
         'last_digits' => '1234',
         'type' => 'CREDIT',
-        'expiry' => '2025-12',
+        'expiry' => '2028-12',
         'name' => 'John Doe',
         'billing_address' => [
             'address_line_1' => '123 Main St',
@@ -208,15 +236,16 @@ namespace {
     
     VaultManager::saveVaultedCard(1, 100, $cardSource, true);
     
-    // Check that visible was set to 1
+    // Check that visible was set to 1 in the INSERT query
     $found = false;
-    foreach ($GLOBALS['mockDbPerformCalls'] as $call) {
-        if ($call['table'] === TABLE_PAYPAL_VAULT && isset($call['data']['visible'])) {
-            if ($call['data']['visible'] === 1) {
+    $insertedData = $GLOBALS['db']->getInsertedData();
+    foreach ($insertedData as $data) {
+        if (isset($data['visible'])) {
+            if ($data['visible'] === '1') {
                 echo "  ✓ Card saved with visible=1 (will be shown in checkout)\n";
                 $found = true;
             } else {
-                fwrite(STDERR, "  ✗ Expected visible=1, got {$call['data']['visible']}\n");
+                fwrite(STDERR, "  ✗ Expected visible=1, got {$data['visible']}\n");
                 $failures++;
             }
             break;
@@ -229,7 +258,7 @@ namespace {
 
     echo "\nTest 2: Save card with visible=false (user did not check save card checkbox)...\n";
     
-    $GLOBALS['mockDbPerformCalls'] = [];
+    $GLOBALS['db']->clearInsertedData();
     
     $cardSource2 = [
         'vault' => [
@@ -245,21 +274,22 @@ namespace {
         'brand' => 'MASTERCARD',
         'last_digits' => '5678',
         'type' => 'CREDIT',
-        'expiry' => '2026-06',
+        'expiry' => '2027-06',
         'name' => 'Jane Smith',
     ];
     
     VaultManager::saveVaultedCard(1, 101, $cardSource2, false);
     
-    // Check that visible was set to 0
+    // Check that visible was set to 0 in the INSERT query
     $found = false;
-    foreach ($GLOBALS['mockDbPerformCalls'] as $call) {
-        if ($call['table'] === TABLE_PAYPAL_VAULT && isset($call['data']['visible'])) {
-            if ($call['data']['visible'] === 0) {
+    $insertedData = $GLOBALS['db']->getInsertedData();
+    foreach ($insertedData as $data) {
+        if (isset($data['visible'])) {
+            if ($data['visible'] === '0') {
                 echo "  ✓ Card saved with visible=0 (will NOT be shown in checkout)\n";
                 $found = true;
             } else {
-                fwrite(STDERR, "  ✗ Expected visible=0, got {$call['data']['visible']}\n");
+                fwrite(STDERR, "  ✗ Expected visible=0, got {$data['visible']}\n");
                 $failures++;
             }
             break;
@@ -273,6 +303,7 @@ namespace {
     echo "\nTest 3: getCustomerVaultedCards with activeOnly=true returns only visible cards...\n";
     
     // Mock database to return both visible and hidden cards
+    // Use future expiry dates to avoid cards being filtered as expired
     $allCards = [
         [
             'paypal_vault_id' => 1,
@@ -283,7 +314,7 @@ namespace {
             'brand' => 'VISA',
             'last_digits' => '1234',
             'card_type' => 'CREDIT',
-            'expiry' => '2025-12',
+            'expiry' => '2028-12',
             'visible' => 1,
         ],
         [
@@ -295,7 +326,7 @@ namespace {
             'brand' => 'MASTERCARD',
             'last_digits' => '5678',
             'card_type' => 'CREDIT',
-            'expiry' => '2026-06',
+            'expiry' => '2027-06',
             'visible' => 0,
         ],
     ];
@@ -310,7 +341,7 @@ namespace {
             'brand' => 'VISA',
             'last_digits' => '1234',
             'card_type' => 'CREDIT',
-            'expiry' => '2025-12',
+            'expiry' => '2028-12',
             'visible' => 1,
         ],
     ];
