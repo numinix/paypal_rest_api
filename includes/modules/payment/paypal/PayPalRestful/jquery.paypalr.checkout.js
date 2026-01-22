@@ -1,9 +1,12 @@
 // Define methodSelect function for compatibility with Zen Cart's payment method selection
 // This is called by onfocus attributes in the HTML
-function methodSelect(paymentId) {
-    var $radio = jQuery('#' + paymentId);
-    if ($radio.length && $radio.is(':radio') && !$radio.is(':checked')) {
-        $radio.prop('checked', true).trigger('change');
+// Only define if not already defined (e.g., by Zen Cart core or OPRC)
+if (typeof methodSelect !== 'function') {
+    function methodSelect(paymentId) {
+        var $radio = jQuery('#' + paymentId);
+        if ($radio.length && $radio.is(':radio') && !$radio.is(':checked')) {
+            $radio.prop('checked', true).trigger('change');
+        }
     }
 }
 
