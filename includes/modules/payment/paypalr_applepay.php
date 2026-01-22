@@ -663,13 +663,14 @@ class paypalr_applepay extends base
         $this->orderInfo['expiration_time'] = $payment['expiration_time'] ?? null;
 
         // -----
-        // If the order's PayPal status doesn't indicate successful completion (CAPTURED for captures
-        // or CREATED for authorizations), ensure that the overall order's status is set to this 
-        // payment-module's PENDING status and set a processing flag so that the after_process method 
-        // will alert the store admin if configured.
+        // If the order's PayPal status doesn't indicate successful capture, ensure that
+        // the overall order's status is set to this payment-module's PENDING status and set
+        // a processing flag so that the after_process method will alert the store admin if
+        // configured. Authorized payments (STATUS_CREATED) should use pending status since
+        // they have not been captured yet.
         //
         $this->orderInfo['admin_alert_needed'] = false;
-        if ($payment_status !== PayPalRestfulApi::STATUS_CAPTURED && $payment_status !== PayPalRestfulApi::STATUS_CREATED) {
+        if ($payment_status !== PayPalRestfulApi::STATUS_CAPTURED) {
             $this->order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
             $order->info['order_status'] = $this->order_status;
             $this->orderInfo['admin_alert_needed'] = true;

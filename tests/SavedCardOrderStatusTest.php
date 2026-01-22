@@ -1,11 +1,12 @@
 <?php
 /**
  * Test that verifies the paypalr_savedcard module correctly sets order status
- * to match the paypalr.php module's behavior.
+ * for authorized vs captured payments.
  * 
- * Bug fix: The saved card module was using HELD_STATUS_ID instead of 
- * ORDER_PENDING_STATUS_ID for non-completed payments, and checking 
- * STATUS_COMPLETED instead of STATUS_CAPTURED/STATUS_CREATED.
+ * Bug fix: The payment modules were treating STATUS_CREATED (authorized) payments
+ * as completed, when they should be treated as unpaid/pending since the funds
+ * have not been captured yet. Only STATUS_CAPTURED should use the completed
+ * order status.
  */
 
 $testPassed = true;
@@ -41,27 +42,27 @@ if (!defined('DEFAULT_ORDERS_STATUS_ID')) {
 
 /**
  * Simulates the old (buggy) order status logic from paypalr_savedcard.php
- * This checks STATUS_COMPLETED and uses HELD_STATUS_ID
+ * This treats both CAPTURED and CREATED as completed
  */
 function getOldOrderStatus(string $paymentStatus): int
 {
     // Old buggy logic:
-    // if ($payment['status'] !== 'COMPLETED') -> use HELD_STATUS_ID
-    if ($paymentStatus !== 'COMPLETED') {
-        return (int)MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID;
+    // if ($payment_status !== STATUS_CAPTURED && $payment_status !== STATUS_CREATED)
+    if ($paymentStatus !== STATUS_CAPTURED && $paymentStatus !== STATUS_CREATED) {
+        return (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
     }
     return (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
 }
 
 /**
  * Simulates the new (fixed) order status logic from paypalr_savedcard.php
- * This matches paypalr.php: checks STATUS_CAPTURED/STATUS_CREATED and uses ORDER_PENDING_STATUS_ID
+ * Only CAPTURED payments are treated as completed; CREATED (authorized) are pending
  */
 function getNewOrderStatus(string $paymentStatus): int
 {
-    // New fixed logic (matches paypalr.php):
-    // if ($payment_status !== STATUS_CAPTURED && $payment_status !== STATUS_CREATED) -> use ORDER_PENDING_STATUS_ID
-    if ($paymentStatus !== STATUS_CAPTURED && $paymentStatus !== STATUS_CREATED) {
+    // New fixed logic:
+    // if ($payment_status !== STATUS_CAPTURED) -> use ORDER_PENDING_STATUS_ID
+    if ($paymentStatus !== STATUS_CAPTURED) {
         return (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
     }
     return (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
@@ -72,9 +73,9 @@ function getNewOrderStatus(string $paymentStatus): int
  */
 function getPaypalrOrderStatus(string $paymentStatus): int
 {
-    // paypalr.php logic:
-    // if ($payment_status !== STATUS_CAPTURED && $payment_status !== STATUS_CREATED)
-    if ($paymentStatus !== STATUS_CAPTURED && $paymentStatus !== STATUS_CREATED) {
+    // paypalr.php logic (now fixed):
+    // if ($payment_status !== STATUS_CAPTURED)
+    if ($paymentStatus !== STATUS_CAPTURED) {
         return (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
     }
     return (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
@@ -119,13 +120,13 @@ if ($capturedStatus !== (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID) {
     echo "✓ CAPTURED payments use ORDER_STATUS_ID ($capturedStatus)\n";
 }
 
-// Test 3: Verify that CREATED status gets ORDER_STATUS_ID (completed for auth)
+// Test 3: Verify that CREATED status gets ORDER_PENDING_STATUS_ID (authorized but not captured)
 $createdStatus = getNewOrderStatus(STATUS_CREATED);
-if ($createdStatus !== (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID) {
+if ($createdStatus !== (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID) {
     $testPassed = false;
-    $errors[] = "CREATED status should use ORDER_STATUS_ID, got: $createdStatus";
+    $errors[] = "CREATED status should use ORDER_PENDING_STATUS_ID (authorized, not captured), got: $createdStatus";
 } else {
-    echo "✓ CREATED (authorized) payments use ORDER_STATUS_ID ($createdStatus)\n";
+    echo "✓ CREATED (authorized) payments use ORDER_PENDING_STATUS_ID ($createdStatus) - not captured yet\n";
 }
 
 // Test 4: Verify that PENDING status gets ORDER_PENDING_STATUS_ID
@@ -150,25 +151,27 @@ echo "\n";
 
 // Test 6: Demonstrate the bug fix - old logic vs new logic
 echo "Bug fix demonstration:\n";
-echo "  Old logic checked: payment['status'] !== 'COMPLETED'\n";
-echo "  New logic checks: payment_status !== STATUS_CAPTURED && payment_status !== STATUS_CREATED\n\n";
+echo "  Old logic checked: payment_status !== STATUS_CAPTURED && payment_status !== STATUS_CREATED\n";
+echo "  New logic checks: payment_status !== STATUS_CAPTURED\n";
+echo "  This ensures authorized payments (STATUS_CREATED) are marked as unpaid/pending.\n\n";
 
 // For CAPTURED status:
 $oldForCaptured = getOldOrderStatus(STATUS_CAPTURED);
 $newForCaptured = getNewOrderStatus(STATUS_CAPTURED);
 if ($oldForCaptured !== $newForCaptured) {
-    echo "  ✓ Fix applied: CAPTURED status previously used wrong status ($oldForCaptured), now correct ($newForCaptured)\n";
+    echo "  - CAPTURED status changed: old=$oldForCaptured, new=$newForCaptured\n";
 } else {
-    echo "  - CAPTURED status: old=$oldForCaptured, new=$newForCaptured (same)\n";
+    echo "  ✓ CAPTURED status unchanged: both use ORDER_STATUS_ID (completed) - correct!\n";
 }
 
 // For CREATED status:
 $oldForCreated = getOldOrderStatus(STATUS_CREATED);
 $newForCreated = getNewOrderStatus(STATUS_CREATED);
 if ($oldForCreated !== $newForCreated) {
-    echo "  ✓ Fix applied: CREATED status previously used wrong status ($oldForCreated), now correct ($newForCreated)\n";
+    echo "  ✓ Fix applied: CREATED status changed from completed ($oldForCreated) to pending ($newForCreated)\n";
+    echo "    This is correct because authorized payments should be marked unpaid until captured.\n";
 } else {
-    echo "  - CREATED status: old=$oldForCreated, new=$newForCreated (same)\n";
+    echo "  - CREATED status unchanged: old=$oldForCreated, new=$newForCreated\n";
 }
 
 echo "\n";
@@ -176,9 +179,10 @@ echo "\n";
 // Summary
 if ($testPassed) {
     echo "All order status tests passed! ✓\n";
-    echo "\nThe fix ensures saved card module uses the same order status logic as paypalr.php:\n";
-    echo "- Uses ORDER_STATUS_ID for successful captures and authorizations\n";
-    echo "- Uses ORDER_PENDING_STATUS_ID for pending/other statuses\n";
+    echo "\nThe fix ensures payment modules correctly distinguish between:\n";
+    echo "- CAPTURED payments: Use ORDER_STATUS_ID (completed) - funds are captured\n";
+    echo "- CREATED payments: Use ORDER_PENDING_STATUS_ID (unpaid) - authorized but not captured\n";
+    echo "- Other statuses: Use ORDER_PENDING_STATUS_ID (pending) - incomplete transactions\n";
     exit(0);
 } else {
     echo "Tests failed:\n";

@@ -137,7 +137,7 @@ class ApplePayAuthorizeModeOrderStatusTest
     }
     
     /**
-     * Test that before_process correctly handles CREATED status (successful authorization)
+     * Test that before_process correctly treats CREATED (authorization) as unpaid
      */
     private function testBeforeProcessHandlesCreatedStatus(): void
     {
@@ -145,27 +145,27 @@ class ApplePayAuthorizeModeOrderStatusTest
         
         $content = file_get_contents($this->applePayFile);
         
-        // Find the section that checks payment_status
-        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*&&\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CREATED\s*\)/s';
+        // Find the section that checks payment_status - should only check STATUS_CAPTURED
+        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*\)\s*\{/s';
         
         if (preg_match($pattern, $content)) {
             $this->testResults[] = [
                 'name' => 'before_process handles CREATED status',
                 'passed' => true,
-                'message' => 'before_process correctly checks for both CAPTURED and CREATED status'
+                'message' => 'before_process correctly checks only CAPTURED status, treating CREATED as unpaid'
             ];
-            echo "  ✓ PASS: before_process handles CREATED status correctly\n";
+            echo "  ✓ PASS: before_process handles CREATED status correctly (as unpaid/pending)\n";
         } else {
             // Check if the old incorrect pattern exists
-            $oldPattern = '/if\s*\(\s*\$payment\[[\'"]status[\'"]\]\s*!==\s*PayPalRestfulApi::STATUS_COMPLETED\s*\)/s';
+            $oldPattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*&&\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CREATED\s*\)/s';
             
             if (preg_match($oldPattern, $content)) {
                 $this->testResults[] = [
                     'name' => 'before_process handles CREATED status',
                     'passed' => false,
-                    'message' => 'before_process still uses old logic checking only COMPLETED status'
+                    'message' => 'before_process uses old logic checking both CAPTURED and CREATED (treats auth as completed)'
                 ];
-                echo "  ❌ FAIL: before_process uses old logic (checks COMPLETED instead of CAPTURED/CREATED)\n";
+                echo "  ❌ FAIL: before_process uses old logic (treats CREATED as completed instead of unpaid)\n";
             } else {
                 $this->testResults[] = [
                     'name' => 'before_process handles CREATED status',
@@ -178,72 +178,60 @@ class ApplePayAuthorizeModeOrderStatusTest
     }
     
     /**
-     * Test that before_process uses STATUS_CAPTURED and STATUS_CREATED in conditionals
+     * Test that before_process uses only STATUS_CAPTURED in conditionals
      */
     private function testBeforeProcessHandlesCapturedStatus(): void
     {
-        echo "Test 4: before_process checks STATUS_CAPTURED and STATUS_CREATED...\n";
+        echo "Test 4: before_process checks only STATUS_CAPTURED...\n";
         
         $content = file_get_contents($this->applePayFile);
         
-        // Check that the conditional uses both STATUS_CAPTURED and STATUS_CREATED
-        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*&&\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CREATED\s*\)/';
+        // Check that the conditional uses only STATUS_CAPTURED (CREATED should be treated as unpaid)
+        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*\)\s*\{/';
         
         if (preg_match($pattern, $content)) {
             $this->testResults[] = [
-                'name' => 'before_process uses STATUS_CAPTURED and STATUS_CREATED',
+                'name' => 'before_process uses only STATUS_CAPTURED',
                 'passed' => true,
-                'message' => 'before_process correctly uses STATUS_CAPTURED and STATUS_CREATED in conditional'
+                'message' => 'before_process correctly uses only STATUS_CAPTURED (treats auth as unpaid)'
             ];
-            echo "  ✓ PASS: Uses STATUS_CAPTURED and STATUS_CREATED correctly\n";
+            echo "  ✓ PASS: Uses only STATUS_CAPTURED correctly (auth is unpaid)\n";
         } else {
             $this->testResults[] = [
-                'name' => 'before_process uses STATUS_CAPTURED and STATUS_CREATED',
+                'name' => 'before_process uses only STATUS_CAPTURED',
                 'passed' => false,
-                'message' => 'Does not use both STATUS_CAPTURED and STATUS_CREATED in the conditional'
+                'message' => 'Does not use the correct STATUS_CAPTURED-only conditional'
             ];
-            echo "  ❌ FAIL: Missing STATUS_CAPTURED and STATUS_CREATED conditional\n";
+            echo "  ❌ FAIL: Missing STATUS_CAPTURED-only conditional\n";
         }
     }
     
     /**
-     * Test that before_process sets ORDER_PENDING_STATUS_ID for non-success cases
+     * Test that before_process sets ORDER_PENDING_STATUS_ID for non-captured payments
      */
     private function testBeforeProcessHandlesPendingStatus(): void
     {
-        echo "Test 5: before_process sets ORDER_PENDING_STATUS_ID for problematic payments...\n";
+        echo "Test 5: before_process sets ORDER_PENDING_STATUS_ID for non-captured payments...\n";
         
         $content = file_get_contents($this->applePayFile);
         
-        // Find the section where status is set for non-successful payments
-        $pattern = '/if\s*\([^)]*STATUS_CAPTURED[^)]*STATUS_CREATED[^)]*\)\s*\{[^}]*ORDER_PENDING_STATUS_ID[^}]*\}/s';
+        // Find the section where status is set for non-captured payments (including authorizations)
+        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*\)\s*\{[^}]*ORDER_PENDING_STATUS_ID[^}]*\}/s';
         
         if (preg_match($pattern, $content)) {
             $this->testResults[] = [
                 'name' => 'before_process uses ORDER_PENDING_STATUS_ID',
                 'passed' => true,
-                'message' => 'before_process correctly sets ORDER_PENDING_STATUS_ID for non-successful payments'
+                'message' => 'before_process correctly sets ORDER_PENDING_STATUS_ID for non-captured payments (including auth)'
             ];
-            echo "  ✓ PASS: Sets ORDER_PENDING_STATUS_ID for non-successful payments\n";
+            echo "  ✓ PASS: Sets ORDER_PENDING_STATUS_ID for non-captured payments\n";
         } else {
-            // Check if the old incorrect pattern exists (using HELD_STATUS_ID)
-            $oldPattern = '/if\s*\([^)]*STATUS_COMPLETED[^)]*\)\s*\{[^}]*HELD_STATUS_ID[^}]*\}/s';
-            
-            if (preg_match($oldPattern, $content)) {
-                $this->testResults[] = [
-                    'name' => 'before_process uses ORDER_PENDING_STATUS_ID',
-                    'passed' => false,
-                    'message' => 'before_process still uses old logic with HELD_STATUS_ID'
-                ];
-                echo "  ❌ FAIL: Uses HELD_STATUS_ID instead of ORDER_PENDING_STATUS_ID\n";
-            } else {
-                $this->testResults[] = [
-                    'name' => 'before_process uses ORDER_PENDING_STATUS_ID',
-                    'passed' => false,
-                    'message' => 'Could not find status assignment for non-successful payments'
-                ];
-                echo "  ❌ FAIL: Could not find status assignment\n";
-            }
+            $this->testResults[] = [
+                'name' => 'before_process uses ORDER_PENDING_STATUS_ID',
+                'passed' => false,
+                'message' => 'Could not find correct status assignment for non-captured payments'
+            ];
+            echo "  ❌ FAIL: Could not find status assignment\n";
         }
     }
     
