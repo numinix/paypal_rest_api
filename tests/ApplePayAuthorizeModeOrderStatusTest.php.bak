@@ -234,6 +234,9 @@ class ApplePayAuthorizeModeOrderStatusTest
             echo "  ❌ FAIL: Could not find status assignment\n";
         }
     }
+            }
+        }
+    }
     
     private function printResults(): void
     {

@@ -825,16 +825,17 @@ class paypalr_savedcard extends base
         $this->orderInfo['expiration_time'] = $payment['expiration_time'] ?? null;
 
         // -----
-        // If the order's PayPal status doesn't indicate successful completion, ensure that
+        // If the order's PayPal status doesn't indicate successful capture, ensure that
         // the overall order's status is set to this payment-module's PENDING status and set
         // a processing flag so that the after_process method will alert the store admin if
-        // configured.
+        // configured. Authorized payments (STATUS_CREATED) should use pending status since
+        // they have not been captured yet.
         //
         // Setting the order's overall status here, since zc158a and earlier don't acknowledge
         // a payment-module's change in status during the payment processing!
         //
         $this->orderInfo['admin_alert_needed'] = false;
-        if ($payment_status !== PayPalRestfulApi::STATUS_CAPTURED && $payment_status !== PayPalRestfulApi::STATUS_CREATED) {
+        if ($payment_status !== PayPalRestfulApi::STATUS_CAPTURED) {
             $this->order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
             $order->info['order_status'] = $this->order_status;
             $this->orderInfo['admin_alert_needed'] = true;
