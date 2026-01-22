@@ -1044,6 +1044,10 @@ class paypalr extends base
             // Load the checkout script to handle radio button selection
             // Add it as a hidden field to avoid placing script tags inside the label element
             $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+            $scriptField = [
+                'title' => '',
+                'field' => $checkoutScript,
+            ];
             
             if ($this->shippingCountryIsSupported === false) {
                 $selection['fields'] = [
@@ -1053,18 +1057,10 @@ class paypalr extends base
                             '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.disable.js"></script>' .
                             '<small>' . MODULE_PAYMENT_PAYPALR_UNSUPPORTED_SHIPPING_COUNTRY . '</small>',
                     ],
-                    [
-                        'title' => '',
-                        'field' => $checkoutScript,
-                    ],
+                    $scriptField,
                 ];
             } else {
-                $selection['fields'] = [
-                    [
-                        'title' => '',
-                        'field' => $checkoutScript,
-                    ],
-                ];
+                $selection['fields'] = [$scriptField];
             }
             return $selection;
         }

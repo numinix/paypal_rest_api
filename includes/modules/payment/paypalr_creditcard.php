@@ -543,7 +543,7 @@ class paypalr_creditcard extends base
         $moduleDisplay = $this->title;
         $cardsAccepted = $this->buildCardsAccepted();
         if (!empty($cardsAccepted)) {
-            $moduleDisplay .= ' ' . $cardsAccepted;
+            $moduleDisplay = trim($moduleDisplay . ' ' . $cardsAccepted);
         }
         if ($vaultEnabled && !empty($vaultedCards)) {
             $moduleDisplay .= $this->buildSavedCardInlineOptions($vaultedCards, $savedCardSelection, $onFocus);
