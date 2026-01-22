@@ -30,16 +30,14 @@ class zcObserverPaypalrestfulRecurring
      */
     protected const ATTRIBUTE_KEY_MAP = [
         'plan_id' => ['paypal_subscription_plan_id'],
-        'billing_period' => ['paypal_subscription_billing_period', 'billing_period'],
-        'billing_frequency' => ['paypal_subscription_billing_frequency', 'billing_frequency'],
-        'total_billing_cycles' => ['paypal_subscription_total_billing_cycles', 'total_billing_cycles'],
+        'billing_period' => ['paypal_subscription_billing_period', 'billing_period', 'billingperiod'],
+        'billing_frequency' => ['paypal_subscription_billing_frequency', 'billing_frequency', 'billingfrequency'],
+        'total_billing_cycles' => ['paypal_subscription_total_billing_cycles', 'total_billing_cycles', 'totalbillingcycles'],
         'trial_period' => ['paypal_subscription_trial_period'],
         'trial_frequency' => ['paypal_subscription_trial_frequency'],
         'trial_total_cycles' => ['paypal_subscription_trial_total_cycles'],
         'setup_fee' => ['paypal_subscription_setup_fee'],
     ];
-
-    protected const REQUIRED_FIELDS = ['plan_id', 'billing_period', 'billing_frequency'];
 
     protected const PERIOD_MAP = [
         'DAY' => 'DAY',
@@ -223,10 +221,33 @@ class zcObserverPaypalrestfulRecurring
             }
         }
 
-        foreach (self::REQUIRED_FIELDS as $requiredField) {
-            if (empty($normalized[$requiredField])) {
-                return null;
-            }
+        // Either/Or validation logic:
+        // IF plan_id is provided -> Only plan_id is required (PayPal-managed subscription)
+        // IF plan_id is NOT provided -> billing_period and billing_frequency are required (Zen Cart-managed subscription)
+        
+        $hasPlanId = !empty($normalized['plan_id']);
+        $hasBillingPeriod = !empty($normalized['billing_period']);
+        $hasBillingFrequency = !empty($normalized['billing_frequency']);
+        
+        if ($hasPlanId) {
+            // PayPal-managed subscription: plan_id is sufficient
+            // Return early with plan_id only (other attributes will be ignored by PayPal)
+            return [
+                'plan_id' => (string)$normalized['plan_id'],
+                'billing_period' => '',
+                'billing_frequency' => 0,
+                'total_billing_cycles' => 0,
+                'trial_period' => '',
+                'trial_frequency' => 0,
+                'trial_total_cycles' => 0,
+                'setup_fee' => 0.0,
+                'attributes' => $attributeMap,
+            ];
+        }
+        
+        // Zen Cart-managed subscription: billing_period and billing_frequency are required
+        if (!$hasBillingPeriod || !$hasBillingFrequency) {
+            return null;
         }
 
         $billingPeriod = $this->normalizePeriod((string)$normalized['billing_period']);
@@ -265,7 +286,7 @@ class zcObserverPaypalrestfulRecurring
         $setupFee = $this->parseAmount($normalized['setup_fee'] ?? '');
 
         return [
-            'plan_id' => (string)$normalized['plan_id'],
+            'plan_id' => '',
             'billing_period' => $billingPeriod,
             'billing_frequency' => $billingFrequency,
             'total_billing_cycles' => $totalCycles,
