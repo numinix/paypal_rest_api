@@ -437,9 +437,6 @@ class paypalr_savedcard extends base
             return [];
         }
 
-        // Load the checkout script to handle radio button selection
-        $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
-
         // Build select box options for saved cards
         $selectedVaultId = $_POST['paypalr_savedcard_vault_id'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? '');
         
@@ -481,6 +478,14 @@ class paypalr_savedcard extends base
             ],
         ];
 
+        // Load the checkout script to handle radio button selection
+        // Add it as a hidden field to avoid placing script tags inside the label element
+        $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+        $fields[] = [
+            'title' => '',
+            'field' => $checkoutScript,
+        ];
+
         // Build module display title
         $moduleTitle = defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT') 
             ? MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT 
@@ -488,7 +493,7 @@ class paypalr_savedcard extends base
 
         return [
             'id' => $this->code,
-            'module' => $moduleTitle . $checkoutScript,
+            'module' => $moduleTitle,
             'fields' => $fields,
         ];
     }

@@ -1027,13 +1027,10 @@ class paypalr extends base
         // to the customer if either their shipping or billing address' country isn't supported by
         // PayPal.
         //
-        $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
-
         $selection = [
             'id' => $this->code,
             'module' =>
-                '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">' .
-                $checkoutScript,
+                '<img src="' . $paypal_button . '" alt="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '" title="' . MODULE_PAYMENT_PAYPALR_BUTTON_ALTTEXT . '">',
         ];
 
         // -----
@@ -1044,6 +1041,14 @@ class paypalr extends base
         // Note: Since paypalr is now wallet-only (cardsAccepted = false), this condition is always true.
         //
         if ($this->cardsAccepted === false || $this->shippingCountryIsSupported === false) {
+            // Load the checkout script to handle radio button selection
+            // Add it as a hidden field to avoid placing script tags inside the label element
+            $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+            $scriptField = [
+                'title' => '',
+                'field' => $checkoutScript,
+            ];
+            
             if ($this->shippingCountryIsSupported === false) {
                 $selection['fields'] = [
                     [
@@ -1051,8 +1056,11 @@ class paypalr extends base
                         'field' =>
                             '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.disable.js"></script>' .
                             '<small>' . MODULE_PAYMENT_PAYPALR_UNSUPPORTED_SHIPPING_COUNTRY . '</small>',
-                        ],
+                    ],
+                    $scriptField,
                 ];
+            } else {
+                $selection['fields'] = [$scriptField];
             }
             return $selection;
         }
