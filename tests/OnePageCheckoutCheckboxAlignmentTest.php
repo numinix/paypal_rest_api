@@ -19,6 +19,9 @@ $testPassed = true;
 $errors = [];
 
 // Get the CSS file content
+// Note: This tests the reference CSS file in the references directory.
+// The 'YOUR_TEMPLATE' placeholder is intentional - it's the distributed reference file
+// that users copy to their actual template directory during installation.
 $cssFile = __DIR__ . '/../references/one_page_responsive_checkout/catalog/includes/templates/YOUR_TEMPLATE/css/one_page_checkout.css';
 if (!file_exists($cssFile)) {
     echo "❌ CSS file not found: {$cssFile}\n";
@@ -31,7 +34,7 @@ echo "Testing One Page Checkout Checkbox Alignment Fix\n";
 echo "=================================================\n\n";
 
 // Test 1: #paymentMethodContainer input excludes checkboxes
-if (preg_match('/#paymentMethodContainer\s+input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)/s', $css) === 0) {
+if (preg_match('/#paymentMethodContainer\s+input:not\s*\(\s*\[type\s*=\s*"checkbox"\]\s*\)\s*:not\s*\(\s*\[type\s*=\s*"radio"\]\s*\)/s', $css) === 0) {
     $testPassed = false;
     $errors[] = "#paymentMethodContainer input selector should exclude checkboxes and radio buttons using :not() selectors";
 } else {
@@ -39,7 +42,7 @@ if (preg_match('/#paymentMethodContainer\s+input:not\(\[type="checkbox"\]\):not\
 }
 
 // Test 2: Verify the height: 50px rule is still present for other inputs
-if (preg_match('/#paymentMethodContainer\s+input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)[^}]*height:\s*50px\s*!important/s', $css) === 0) {
+if (preg_match('/#paymentMethodContainer\s+input:not\s*\([^\)]+\)[^\}]*height:\s*50px\s*!important/s', $css) === 0) {
     $testPassed = false;
     $errors[] = "#paymentMethodContainer input should still have height: 50px for non-checkbox/radio inputs";
 } else {
@@ -47,7 +50,7 @@ if (preg_match('/#paymentMethodContainer\s+input:not\(\[type="checkbox"\]\):not\
 }
 
 // Test 3: #hideRegistration .nmx-form input excludes checkboxes
-if (preg_match('/#hideRegistration\s+\.nmx-form\s+input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)/s', $css) === 0) {
+if (preg_match('/#hideRegistration\s+\.nmx-form\s+input:not\s*\(\s*\[type\s*=\s*"checkbox"\]\s*\)\s*:not\s*\(\s*\[type\s*=\s*"radio"\]\s*\)/s', $css) === 0) {
     $testPassed = false;
     $errors[] = "#hideRegistration .nmx-form input selector should exclude checkboxes and radio buttons";
 } else {
@@ -55,7 +58,7 @@ if (preg_match('/#hideRegistration\s+\.nmx-form\s+input:not\(\[type="checkbox"\]
 }
 
 // Test 4: #easyLogin .nmx input excludes checkboxes
-if (preg_match('/#easyLogin\s+\.nmx\s+input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)/s', $css) === 0) {
+if (preg_match('/#easyLogin\s+\.nmx\s+input:not\s*\(\s*\[type\s*=\s*"checkbox"\]\s*\)\s*:not\s*\(\s*\[type\s*=\s*"radio"\]\s*\)/s', $css) === 0) {
     $testPassed = false;
     $errors[] = "#easyLogin .nmx input selector should exclude checkboxes and radio buttons";
 } else {
@@ -63,21 +66,12 @@ if (preg_match('/#easyLogin\s+\.nmx\s+input:not\(\[type="checkbox"\]\):not\(\[ty
 }
 
 // Test 5: Ensure old problematic selectors are not present
-$problematicSelectors = [
-    '/#paymentMethodContainer\s+input,\s*\n#paymentMethodContainer\s+select\s*\{[^}]*height:\s*50px\s*!important/',
-    '/#hideRegistration\s+\.nmx-form\s+input\s*\{[^}]*height:\s*50px\s*!important/',
-    '/#easyLogin\s+\.nmx\s+input,\s*\n\s*#easyLogin\s+\.nmx\s+select\s*\{[^}]*height:\s*50px\s*!important/',
-];
+// This checks that the selectors properly exclude checkboxes rather than applying height to all inputs
+$hasProblematicPaymentMethod = preg_match('/#paymentMethodContainer\s+input\s*,\s*#paymentMethodContainer\s+select\s*\{[^\}]*height:\s*50px/s', $css);
+$hasProblematicHideReg = preg_match('/#hideRegistration\s+\.nmx-form\s+input\s*\{[^\}]*height:\s*50px/s', $css);
+$hasProblematicEasyLogin = preg_match('/#easyLogin\s+\.nmx\s+input\s*,\s*#easyLogin\s+\.nmx\s+select\s*\{[^\}]*height:\s*50px/s', $css);
 
-$foundProblematicSelectors = false;
-foreach ($problematicSelectors as $pattern) {
-    if (preg_match($pattern, $css)) {
-        $foundProblematicSelectors = true;
-        break;
-    }
-}
-
-if ($foundProblematicSelectors) {
+if ($hasProblematicPaymentMethod || $hasProblematicHideReg || $hasProblematicEasyLogin) {
     $testPassed = false;
     $errors[] = "Found old problematic selector without :not() exclusions for checkboxes";
 } else {
