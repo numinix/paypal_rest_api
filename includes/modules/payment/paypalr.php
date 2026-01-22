@@ -69,6 +69,12 @@ class paypalr extends base
         PayPalRestfulApi::STATUS_COMPLETED,
         PayPalRestfulApi::STATUS_CAPTURED,
     ];
+    protected const REUSABLE_ORDER_STATUSES = [
+        PayPalRestfulApi::STATUS_CREATED,
+        PayPalRestfulApi::STATUS_APPROVED,
+        PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED,
+        PayPalRestfulApi::STATUS_SAVED,
+    ];
 
     /**
      * name of this module
@@ -1517,14 +1523,8 @@ class paypalr extends base
         //
         if (isset($_SESSION['PayPalRestful']['Order']['guid']) && $_SESSION['PayPalRestful']['Order']['guid'] === $order_guid) {
             $cached_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
-            $reusable_statuses = [
-                PayPalRestfulApi::STATUS_CREATED,
-                PayPalRestfulApi::STATUS_APPROVED,
-                PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED,
-                PayPalRestfulApi::STATUS_SAVED,
-            ];
             
-            if (in_array($cached_status, $reusable_statuses, true)) {
+            if (in_array($cached_status, self::REUSABLE_ORDER_STATUSES, true)) {
                 $this->log->write("\ncreatePayPalOrder($ppr_type), no change in order GUID ($order_guid) and status ($cached_status) is reusable; nothing further to do.\n");
                 return true;
             }

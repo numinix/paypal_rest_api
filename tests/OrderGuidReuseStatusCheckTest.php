@@ -60,21 +60,21 @@ class OrderGuidReuseStatusCheckTest
         
         // Look for the status check logic
         $hasStatusCheck = preg_match('/\$cached_status\s*=.*?PayPalRestful.*?Order.*?status/s', $content);
-        $hasReusableArray = preg_match('/reusable_statuses\s*=\s*\[/', $content);
-        $hasInArrayCheck = preg_match('/in_array\s*\(\s*\$cached_status\s*,\s*\$reusable_statuses/', $content);
+        $hasReusableConstant = preg_match('/const\s+REUSABLE_ORDER_STATUSES\s*=/', $content);
+        $hasInArrayCheck = preg_match('/in_array\s*\(\s*\$cached_status\s*,\s*self::REUSABLE_ORDER_STATUSES/', $content);
         
-        $passed = $hasStatusCheck && $hasReusableArray && $hasInArrayCheck;
+        $passed = $hasStatusCheck && $hasReusableConstant && $hasInArrayCheck;
         
         if ($passed) {
             echo "  ✓ Code extracts cached order status\n";
-            echo "  ✓ Code defines reusable statuses array\n";
+            echo "  ✓ Code defines REUSABLE_ORDER_STATUSES constant\n";
             echo "  ✓ Code checks if cached status is in reusable list\n";
         } else {
             if (!$hasStatusCheck) {
                 echo "  ✗ Code does NOT extract cached order status\n";
             }
-            if (!$hasReusableArray) {
-                echo "  ✗ Code does NOT define reusable statuses array\n";
+            if (!$hasReusableConstant) {
+                echo "  ✗ Code does NOT define REUSABLE_ORDER_STATUSES constant\n";
             }
             if (!$hasInArrayCheck) {
                 echo "  ✗ Code does NOT check if status is reusable\n";
@@ -98,10 +98,10 @@ class OrderGuidReuseStatusCheckTest
         
         $content = file_get_contents($this->paypalrFile);
         
-        // Extract the reusable statuses array
-        $pattern = '/reusable_statuses\s*=\s*\[(.*?)\];/s';
+        // Extract the REUSABLE_ORDER_STATUSES constant
+        $pattern = '/const\s+REUSABLE_ORDER_STATUSES\s*=\s*\[(.*?)\];/s';
         if (!preg_match($pattern, $content, $matches)) {
-            echo "  ✗ Could not find reusable_statuses array\n\n";
+            echo "  ✗ Could not find REUSABLE_ORDER_STATUSES constant\n\n";
             $this->testResults[] = [
                 'name' => 'Non-reusable statuses excluded',
                 'passed' => false
@@ -136,7 +136,7 @@ class OrderGuidReuseStatusCheckTest
         if (empty($foundNonReusable)) {
             echo "  ✓ Non-reusable statuses (COMPLETED, REFUNDED, etc.) are excluded\n";
         } else {
-            echo "  ✗ Found non-reusable statuses in array: " . implode(', ', $foundNonReusable) . "\n";
+            echo "  ✗ Found non-reusable statuses in constant: " . implode(', ', $foundNonReusable) . "\n";
         }
         
         if (empty($missingReusable)) {
