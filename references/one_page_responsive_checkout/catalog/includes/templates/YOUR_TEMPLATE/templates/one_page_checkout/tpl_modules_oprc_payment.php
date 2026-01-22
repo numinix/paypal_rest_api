@@ -134,14 +134,53 @@
         <?php
             } elseif (isset($selection[$i]['fields']) && is_array($selection[$i]['fields'])) {
         ?>
+          <?php
+            $layoutFields = [];
+            $passThroughFields = [];
+            foreach ($selection[$i]['fields'] as $field) {
+              $fieldTitle = trim(strip_tags($field['title'] ?? ''));
+              $fieldHtml = $field['field'] ?? '';
+              $isScriptField = stripos($fieldHtml, '<script') !== false;
+              $isHiddenField = stripos($fieldHtml, 'type="hidden"') !== false;
+
+              if (($isScriptField || $isHiddenField) && $fieldTitle === '') {
+                $passThroughFields[] = $field;
+              } else {
+                $layoutFields[] = $field;
+              }
+            }
+          ?>
+
+          <?php
+            foreach ($passThroughFields as $field) {
+              echo $field['field'];
+            }
+          ?>
+
+          <?php if (!empty($layoutFields)) { ?>
           <!-- credit card form -->
           <div class="creditcard-form nmx-row">
             <?php
-                  for ($j=0, $n2=sizeof($selection[$i]['fields']); $j<$n2; $j++) {
+                  for ($j=0, $n2=sizeof($layoutFields); $j<$n2; $j++) {
+                    $fieldTitle = $layoutFields[$j]['title'] ?? '';
+                    $fieldHtml = $layoutFields[$j]['field'] ?? '';
+                    $fieldTag = $layoutFields[$j]['tag'] ?? '';
+                    $isCheckboxField = (stripos($fieldHtml, 'type="checkbox"') !== false);
+                    $hasCustomCheckbox = (stripos($fieldHtml, 'custom-control') !== false);
+                    $fieldColumnClass = $isCheckboxField ? 'nmx-col-12' : 'nmx-col-6';
             ?>
-                <div class="nmx-col-6">
-                  <label <?php echo (isset($selection[$i]['fields'][$j]['tag']) ? 'for="'.$selection[$i]['fields'][$j]['tag'] . '" ' : ''); ?>><?php echo $selection[$i]['fields'][$j]['title']; ?></label>
-                  <?php echo $selection[$i]['fields'][$j]['field']; ?>
+                <div class="<?php echo $fieldColumnClass; ?>">
+                  <?php if ($isCheckboxField && !$hasCustomCheckbox) { ?>
+                    <div class="custom-control custom-checkbox">
+                      <?php echo $fieldHtml; ?>
+                      <label class="custom-control-label checkboxLabel" <?php echo ($fieldTag !== '' ? 'for="' . $fieldTag . '"' : ''); ?>>
+                        <?php echo $fieldTitle; ?>
+                      </label>
+                    </div>
+                  <?php } else { ?>
+                    <label <?php echo ($fieldTag !== '' ? 'for="' . $fieldTag . '" ' : ''); ?>><?php echo $fieldTitle; ?></label>
+                    <?php echo $fieldHtml; ?>
+                  <?php } ?>
                 </div>
                 
             <?php
@@ -149,6 +188,7 @@
             ?>
           </div>
           <!-- end credit card form -->
+          <?php } ?>
         <?php
             }
         ?>
