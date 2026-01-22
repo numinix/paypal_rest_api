@@ -149,43 +149,39 @@ class VaultManager
             $sqlData['last_used'] = $now;
         }
 
-        $existing = $db->Execute(
-            "SELECT paypal_vault_id, date_added
-               FROM " . TABLE_PAYPAL_VAULT . "
-              WHERE vault_id = '" . zen_db_input($vaultId) . "'
-              LIMIT 1"
-        );
-
-        if ($existing->EOF) {
-            $sqlData['date_added'] = $now;
-            try {
-                zen_db_perform(TABLE_PAYPAL_VAULT, $sqlData);
-            } catch (\mysqli_sql_exception $e) {
-                // Handle race condition: another process may have inserted the same vault_id
-                // between our SELECT check and this INSERT. MySQL error 1062 = duplicate key.
-                if ($e->getCode() === 1062) {
-                    // Re-fetch the record and perform an update instead
-                    $existing = $db->Execute(
-                        "SELECT paypal_vault_id, date_added
-                           FROM " . TABLE_PAYPAL_VAULT . "
-                          WHERE vault_id = '" . zen_db_input($vaultId) . "'
-                          LIMIT 1"
-                    );
-                    if (!$existing->EOF) {
-                        $paypalVaultId = (int)$existing->fields['paypal_vault_id'];
-                        unset($sqlData['date_added']);
-                        zen_db_perform(TABLE_PAYPAL_VAULT, $sqlData, 'update', 'paypal_vault_id = ' . $paypalVaultId);
-                    }
+        // Use INSERT ... ON DUPLICATE KEY UPDATE to handle race conditions at the database level
+        // This avoids the duplicate key error that occurs when multiple processes try to insert
+        // the same vault_id simultaneously.
+        $sqlData['date_added'] = $now;
+        
+        // Build the INSERT query
+        $columns = array_keys($sqlData);
+        $values = array_map(function($col) use ($sqlData) {
+            $val = $sqlData[$col];
+            if ($val === null) {
+                return 'NULL';
+            }
+            return "'" . zen_db_input($val) . "'";
+        }, $columns);
+        
+        // Build the ON DUPLICATE KEY UPDATE clause
+        // Exclude date_added from updates since we want to preserve the original value
+        $updateClauses = [];
+        foreach ($sqlData as $col => $val) {
+            if ($col !== 'date_added') {
+                if ($val === null) {
+                    $updateClauses[] = "`$col` = NULL";
                 } else {
-                    throw $e;
+                    $updateClauses[] = "`$col` = '" . zen_db_input($val) . "'";
                 }
             }
-        } else {
-            $paypalVaultId = (int)$existing->fields['paypal_vault_id'];
-            // Do not overwrite the original creation time of the database record.
-            unset($sqlData['date_added']);
-            zen_db_perform(TABLE_PAYPAL_VAULT, $sqlData, 'update', 'paypal_vault_id = ' . $paypalVaultId);
         }
+        
+        $insertSql = "INSERT INTO " . TABLE_PAYPAL_VAULT . " (" . implode(', ', array_map(function($c) { return "`$c`"; }, $columns)) . ")
+                      VALUES (" . implode(', ', $values) . ")
+                      ON DUPLICATE KEY UPDATE " . implode(', ', $updateClauses);
+        
+        $db->Execute($insertSql);
 
         $stored = $db->Execute(
             "SELECT *
