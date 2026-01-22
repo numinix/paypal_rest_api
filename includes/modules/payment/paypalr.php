@@ -1511,11 +1511,26 @@ class paypalr extends base
         // -----
         // If the PayPal order been previously created and the order's GUID
         // has not changed, the original PayPal order information can
-        // be safely used.
+        // be safely used - BUT only if the order hasn't been processed yet.
+        // Orders that have been COMPLETED, CAPTURED, REFUNDED, etc. should
+        // not be reused to prevent duplicate transaction issues.
         //
         if (isset($_SESSION['PayPalRestful']['Order']['guid']) && $_SESSION['PayPalRestful']['Order']['guid'] === $order_guid) {
-            $this->log->write("\ncreatePayPalOrder($ppr_type), no change in order GUID ($order_guid); nothing further to do.\n");
-            return true;
+            $cached_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
+            $reusable_statuses = [
+                PayPalRestfulApi::STATUS_CREATED,
+                PayPalRestfulApi::STATUS_APPROVED,
+                PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED,
+                PayPalRestfulApi::STATUS_SAVED,
+            ];
+            
+            if (in_array($cached_status, $reusable_statuses, true)) {
+                $this->log->write("\ncreatePayPalOrder($ppr_type), no change in order GUID ($order_guid) and status ($cached_status) is reusable; nothing further to do.\n");
+                return true;
+            }
+            
+            // Order has been processed (COMPLETED, REFUNDED, etc.), so create a new order
+            $this->log->write("\ncreatePayPalOrder($ppr_type), order GUID matches ($order_guid) but status ($cached_status) indicates order was processed; creating new PayPal order.\n");
         }
 
         // -----
