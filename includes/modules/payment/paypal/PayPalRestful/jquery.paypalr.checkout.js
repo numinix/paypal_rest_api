@@ -161,6 +161,24 @@ jQuery(document).ready(function() {
         selectSavedCardParentModule(true);
     });
 
+    // Handle clicks on the saved card parent radio button or its label
+    // This fixes the issue where clicking on "Pay with Saved Card" doesn't select it initially
+    jQuery(document).on('click change', '#pmt-paypalr_savedcard', function() {
+        // When the parent radio is clicked/changed, ensure it stays checked
+        // No need to call selectSavedCardParentModule since this IS the parent
+        if (!jQuery(this).is(':checked')) {
+            jQuery(this).prop('checked', true);
+        }
+    });
+
+    // Handle clicks on the label for the saved card payment module
+    jQuery(document).on('click', 'label[for="pmt-paypalr_savedcard"]', function() {
+        var $radio = jQuery('#pmt-paypalr_savedcard');
+        if ($radio.length && !$radio.is(':checked')) {
+            $radio.prop('checked', true).trigger('change');
+        }
+    });
+
     // When user interacts with credit card fields, ensure parent module is selected
     jQuery(document).on('focus click', '.ppr-card-new input, .ppr-card-new select, .ppr-creditcard-field input, .ppr-creditcard-field select', function(event) {
         // Check for main paypalr module radio
