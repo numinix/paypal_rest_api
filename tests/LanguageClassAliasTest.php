@@ -39,12 +39,12 @@ if (class_exists('language', false)) {
 }
 
 // Test 2: Verify LanguageShim DOES create the alias when needed
-echo "\nTest 2: Loading LanguageShim should create 'language' alias when not already defined...\n";
+echo "\nTest 2: Loading LanguageStub.php (contains LanguageShim) should create 'language' alias when not already defined...\n";
 
 if (class_exists('language', false)) {
     echo "  ⚠ Warning: 'language' class already exists, cannot test LanguageShim alias creation\n";
 } else {
-    // Load the LanguageShim
+    // Load LanguageStub.php which contains the LanguageShim class
     require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageStub.php';
     
     // Check if it created the alias
