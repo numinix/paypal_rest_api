@@ -1,3 +1,15 @@
+// Define methodSelect function for compatibility with Zen Cart's payment method selection
+// This is called by onfocus attributes in the HTML
+// Only define if not already defined (e.g., by Zen Cart core or OPRC)
+if (typeof methodSelect !== 'function') {
+    window.methodSelect = function(paymentId) {
+        var $radio = jQuery('#' + paymentId);
+        if ($radio.length && $radio.is(':radio') && !$radio.is(':checked')) {
+            $radio.prop('checked', true).trigger('change');
+        }
+    };
+}
+
 jQuery(document).ready(function() {
     // No toggling needed - both PayPal and Credit Card fields are always visible
     // Only handle saved card selection logic
