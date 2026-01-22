@@ -49,11 +49,13 @@
 
 /* Saved Card select box styling */
 .ppr-savedcard-select {
-    min-width: 200px;
-    max-width: 400px;
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
     padding: 0.5rem;
     font-size: 1rem;
     cursor: pointer;
+    box-sizing: border-box;
 }
 
 /* Wallet module (Google Pay, Apple Pay, Venmo) radio button hiding */
