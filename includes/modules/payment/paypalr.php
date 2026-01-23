@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.3
+ * Last updated: v1.3.5
  */
 /**
  * Load the support class' auto-loader.
@@ -63,7 +63,7 @@ class paypalr extends base
         return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.4';
+    protected const CURRENT_VERSION = '1.3.5';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -626,6 +626,51 @@ class paypalr extends base
                           WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_ENABLE_VAULT'
                           LIMIT 1"
                     );
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.5', '<'): //- Fall through from above
+                    // Register PayPal Advanced Checkout admin pages in the Zen Cart admin menu
+                    $zc150 = (PROJECT_VERSION_MAJOR > 1 || (PROJECT_VERSION_MAJOR == 1 && substr(PROJECT_VERSION_MINOR, 0, 3) >= 5));
+                    
+                    if ($zc150 && function_exists('zen_page_key_exists') && function_exists('zen_register_admin_page')) {
+                        // Register Vaulted Subscriptions under Customers menu
+                        if (!zen_page_key_exists('paypalrSubscriptions')) {
+                            zen_register_admin_page(
+                                'paypalrSubscriptions',
+                                'BOX_PAYPALR_SUBSCRIPTIONS',
+                                'FILENAME_PAYPALR_SUBSCRIPTIONS',
+                                '',
+                                'customers',
+                                'Y',
+                                10
+                            );
+                        }
+                        
+                        // Register Saved Card Subscriptions under Customers menu
+                        if (!zen_page_key_exists('paypalrSavedCardRecurring')) {
+                            zen_register_admin_page(
+                                'paypalrSavedCardRecurring',
+                                'BOX_PAYPALR_SAVED_CARD_RECURRING',
+                                'FILENAME_PAYPALR_SAVED_CARD_RECURRING',
+                                '',
+                                'customers',
+                                'Y',
+                                11
+                            );
+                        }
+                        
+                        // Register Active Subscriptions Report under Reports menu
+                        if (!zen_page_key_exists('paypalrSubscriptionsReport')) {
+                            zen_register_admin_page(
+                                'paypalrSubscriptionsReport',
+                                'BOX_PAYPALR_SUBSCRIPTIONS_REPORT',
+                                'FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT',
+                                '',
+                                'reports',
+                                'Y',
+                                100
+                            );
+                        }
+                    }
 
                 default:    //- Fall through from above
                     break;
