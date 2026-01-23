@@ -2690,7 +2690,7 @@ input[type="checkbox"].guest-default-hidden {
   margin-bottom: 9px;
 }
 
-#paymentMethodContainer input,
+#paymentMethodContainer input:not([type="checkbox"]):not([type="radio"]),
 #paymentMethodContainer select {
   height: 50px !important;
   padding-top: 0;
@@ -3085,7 +3085,7 @@ div.creditcard-form {
   margin-top: 5px;
 }
 
-#hideRegistration .nmx-form input {
+#hideRegistration .nmx-form input:not([type="checkbox"]):not([type="radio"]) {
   height: 50px !important;
   box-sizing: border-box;
 }
@@ -4400,7 +4400,7 @@ SELECT#country.m-wrap {
         display: none;
     }
 
-    #easyLogin .nmx input,
+    #easyLogin .nmx input:not([type="checkbox"]):not([type="radio"]),
     #easyLogin .nmx select {
         height: 50px !important;
         width: 100% !important;
