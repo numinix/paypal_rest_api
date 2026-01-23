@@ -18,6 +18,8 @@ class SubscriptionManager
 {
     public const STATUS_PENDING = 'pending';
     public const STATUS_AWAITING_VAULT = 'awaiting_vault';
+    
+    private const VAULT_ID_MAX_LENGTH = 64;
 
     /**
      * Ensure the subscription logging table exists.
@@ -194,5 +196,73 @@ class SubscriptionManager
         );
 
         return (int)$existing->fields['paypal_subscription_id'];
+    }
+
+    /**
+     * Link pending subscriptions with a newly vaulted payment token and activate them.
+     *
+     * This method is called when a vault card becomes available (either saved immediately
+     * after order or updated via webhook). It finds all subscriptions that are awaiting
+     * vault for the given customer/order and updates them with the vault information,
+     * changing their status from 'awaiting_vault' to 'active'.
+     *
+     * @param int $customersId The customer ID
+     * @param int $ordersId The order ID
+     * @param int $paypalVaultId The paypal_vault_id from the vault table
+     * @param string $vaultId The PayPal vault token ID
+     *
+     * @return int Number of subscriptions that were activated
+     */
+    public static function activateSubscriptionsWithVault(int $customersId, int $ordersId, int $paypalVaultId, string $vaultId): int
+    {
+        if ($customersId <= 0 || $ordersId <= 0 || $paypalVaultId <= 0 || $vaultId === '') {
+            return 0;
+        }
+
+        self::ensureSchema();
+
+        global $db;
+
+        // Find all subscriptions for this order that are awaiting vault
+        $subscriptions = $db->Execute(
+            "SELECT paypal_subscription_id, status
+               FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+              WHERE customers_id = " . (int)$customersId . "
+                AND orders_id = " . (int)$ordersId . "
+                AND (status = '" . zen_db_input(self::STATUS_AWAITING_VAULT) . "'
+                     OR (status = '" . zen_db_input(self::STATUS_PENDING) . "' AND (vault_id IS NULL OR vault_id = '')))
+                AND paypal_vault_id = 0"
+        );
+
+        if ($subscriptions->EOF) {
+            return 0;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $activatedCount = 0;
+
+        while (!$subscriptions->EOF) {
+            $subscriptionId = (int)$subscriptions->fields['paypal_subscription_id'];
+
+            // Update subscription with vault information and set status to active
+            $updateData = [
+                'paypal_vault_id' => $paypalVaultId,
+                'vault_id' => substr($vaultId, 0, self::VAULT_ID_MAX_LENGTH),
+                'status' => 'active',
+                'last_modified' => $now,
+            ];
+
+            zen_db_perform(
+                TABLE_PAYPAL_SUBSCRIPTIONS,
+                $updateData,
+                'update',
+                'paypal_subscription_id = ' . $subscriptionId
+            );
+
+            $activatedCount++;
+            $subscriptions->MoveNext();
+        }
+
+        return $activatedCount;
     }
 }

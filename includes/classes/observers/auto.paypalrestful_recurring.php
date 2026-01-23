@@ -79,7 +79,10 @@ class zcObserverPaypalrestfulRecurring
             return;
         }
 
-        $this->attach($this, ['NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_CREATE_ADD_PRODUCTS']);
+        $this->attach($this, [
+            'NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_CREATE_ADD_PRODUCTS',
+            'NOTIFY_PAYPALR_VAULT_CARD_SAVED',
+        ]);
     }
 
     public function updateNotifyCheckoutProcessAfterOrderCreateAddProducts(&$class, $eventID, $params): void
@@ -178,6 +181,51 @@ class zcObserverPaypalrestfulRecurring
         if ($loggedAny) {
             $zco_notifier->notify('NOTIFY_RECURRING_ORDER_LOGGED', [
                 'orders_id' => $ordersId,
+            ]);
+        }
+    }
+
+    /**
+     * Handle vault card save notification to activate subscriptions that were awaiting vault.
+     *
+     * When a vault card is saved (either immediately after order or later via webhook),
+     * this method finds any subscriptions for the same customer/order that are in
+     * 'awaiting_vault' status and activates them by linking them to the vault.
+     *
+     * @param object $class The calling class
+     * @param string $eventID The event identifier
+     * @param array $vaultRecord The saved vault record from VaultManager
+     */
+    public function updateNotifyPaypalrVaultCardSaved(&$class, $eventID, $vaultRecord): void
+    {
+        if (!is_array($vaultRecord) || empty($vaultRecord)) {
+            return;
+        }
+
+        $customersId = (int)($vaultRecord['customers_id'] ?? 0);
+        $ordersId = (int)($vaultRecord['orders_id'] ?? 0);
+        $paypalVaultId = (int)($vaultRecord['paypal_vault_id'] ?? 0);
+        $vaultId = (string)($vaultRecord['vault_id'] ?? '');
+
+        if ($customersId <= 0 || $ordersId <= 0 || $paypalVaultId <= 0 || $vaultId === '') {
+            return;
+        }
+
+        // Activate any subscriptions that were awaiting this vault
+        $activatedCount = SubscriptionManager::activateSubscriptionsWithVault(
+            $customersId,
+            $ordersId,
+            $paypalVaultId,
+            $vaultId
+        );
+
+        if ($activatedCount > 0) {
+            global $zco_notifier;
+            $zco_notifier->notify('NOTIFY_SUBSCRIPTIONS_ACTIVATED', [
+                'customers_id' => $customersId,
+                'orders_id' => $ordersId,
+                'vault_id' => $vaultId,
+                'activated_count' => $activatedCount,
             ]);
         }
     }
