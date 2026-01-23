@@ -9,12 +9,9 @@ if (!defined('IS_ADMIN_FLAG')) {
     die('Illegal Access');
 }
 
-// Only run installer if we're on Zen Cart 1.5.0 or later with installer support
-$zc150 = (PROJECT_VERSION_MAJOR > 1 || (PROJECT_VERSION_MAJOR == 1 && substr(PROJECT_VERSION_MINOR, 0, 3) >= 5));
-
-if ($zc150 && function_exists('zen_page_key_exists') && function_exists('zen_register_admin_page')) {
-    // Check if any of the PayPal Advanced Checkout admin pages exist
-    // If not, we need to run the installer
+// Check if any of the PayPal Advanced Checkout admin pages exist
+// If not, we need to run the installer
+if (function_exists('zen_page_key_exists')) {
     if (!zen_page_key_exists('paypalrSubscriptions') || 
         !zen_page_key_exists('paypalrSavedCardRecurring') || 
         !zen_page_key_exists('paypalrSubscriptionsReport')) {
