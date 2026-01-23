@@ -439,13 +439,19 @@ class paypalr_savedcard extends base
 
         // Build select box options for saved cards
         $selectedVaultId = $_POST['paypalr_savedcard_vault_id'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? '');
-        
-        // If no selection made, default to first card
-        if (empty($selectedVaultId) && !empty($vaultedCards)) {
-            $selectedVaultId = $vaultedCards[0]['vault_id'];
-        }
 
-        $selectOptions = [];
+        // Add "Please select" as the first option
+        $selectPrompt = defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT')
+            ? MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT
+            : 'Please select...';
+        
+        $selectOptions = [
+            [
+                'id' => '',
+                'text' => $selectPrompt,
+            ],
+        ];
+        
         foreach ($vaultedCards as $card) {
             $cardTitle = $this->buildCardTitle($card);
             $selectOptions[] = [
