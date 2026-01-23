@@ -138,12 +138,15 @@
             $layoutFields = [];
             $passThroughFields = [];
             foreach ($selection[$i]['fields'] as $field) {
-              $fieldTitle = trim(strip_tags($field['title'] ?? ''));
+              $fieldTitleRaw = $field['title'] ?? '';
+              $fieldTitle = trim(strip_tags($fieldTitleRaw));
               $fieldHtml = $field['field'] ?? '';
               $isScriptField = stripos($fieldHtml, '<script') !== false;
               $isHiddenField = stripos($fieldHtml, 'type="hidden"') !== false;
 
-              if (($isScriptField || $isHiddenField) && $fieldTitle === '') {
+              // Pass-through fields: scripts/hidden fields with no title
+              // Fields with HTML titles (like button containers) go to layoutFields for proper rendering
+              if (($isScriptField || $isHiddenField) && $fieldTitleRaw === '') {
                 $passThroughFields[] = $field;
               } else {
                 $layoutFields[] = $field;
@@ -162,15 +165,24 @@
           <div class="creditcard-form nmx-row">
             <?php
                   for ($j=0, $n2=sizeof($layoutFields); $j<$n2; $j++) {
+                    // Get original field title (may contain HTML)
                     $fieldTitle = $layoutFields[$j]['title'] ?? '';
                     $fieldHtml = $layoutFields[$j]['field'] ?? '';
                     $fieldTag = $layoutFields[$j]['tag'] ?? '';
                     $isCheckboxField = (stripos($fieldHtml, 'type="checkbox"') !== false);
                     $hasCustomCheckbox = (stripos($fieldHtml, 'custom-control') !== false);
+                    // Detect if title contains HTML by comparing before/after strip_tags
+                    $fieldTitleStripped = strip_tags($fieldTitle);
+                    $titleContainsHtml = $fieldTitle !== '' && $fieldTitle !== $fieldTitleStripped;
                     $fieldColumnClass = $isCheckboxField ? 'nmx-col-12' : 'nmx-col-6';
             ?>
                 <div class="<?php echo $fieldColumnClass; ?>">
-                  <?php if ($isCheckboxField && !$hasCustomCheckbox) { ?>
+                  <?php if ($titleContainsHtml) { ?>
+                    <?php // Field title contains HTML from payment module (e.g., button container) ?>
+                    <?php // This is trusted internal code from payment modules, not user input ?>
+                    <?php echo $fieldTitle; ?>
+                    <?php echo $fieldHtml; ?>
+                  <?php } elseif ($isCheckboxField && !$hasCustomCheckbox) { ?>
                     <div class="custom-control custom-checkbox">
                       <?php echo $fieldHtml; ?>
                       <label class="custom-control-label checkboxLabel" <?php echo ($fieldTag !== '' ? 'for="' . $fieldTag . '"' : ''); ?>>
