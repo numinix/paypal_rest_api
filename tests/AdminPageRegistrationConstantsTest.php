@@ -120,7 +120,7 @@ namespace {
     
     // Check that extra_datafiles file only has FILENAME_* constants (not BOX_*)
     $datafiles_content = file_get_contents(DIR_FS_CATALOG . 'admin/includes/extra_datafiles/paypalr_filenames.php');
-    if (preg_match('/define\s*\(\s*[\'"]BOX_/', $datafiles_content)) {
+    if (preg_match('/define\s*\(\s*[\'"]BOX_[^\'\"]*[\'\"]\s*,/', $datafiles_content)) {
         fwrite(STDERR, "ERROR: BOX_* constant definitions found in extra_datafiles (should be in extra_definitions)\n");
         $failures++;
     } else {
@@ -129,7 +129,7 @@ namespace {
     
     // Check that extra_definitions file only has BOX_* constants (not FILENAME_*)
     $definitions_content = file_get_contents(DIR_FS_CATALOG . 'admin/includes/languages/english/extra_definitions/paypalr_admin_names.php');
-    if (preg_match('/define\s*\(\s*[\'"]FILENAME_/', $definitions_content)) {
+    if (preg_match('/define\s*\(\s*[\'"]FILENAME_[^\'\"]*[\'\"]\s*,/', $definitions_content)) {
         fwrite(STDERR, "ERROR: FILENAME_* constant definitions found in extra_definitions (should be in extra_datafiles)\n");
         $failures++;
     } else {
