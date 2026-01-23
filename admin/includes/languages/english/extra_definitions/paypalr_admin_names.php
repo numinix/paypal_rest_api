@@ -8,6 +8,12 @@
  */
 
 // Admin menu labels for PayPal subscription pages
-define('BOX_PAYPALR_SUBSCRIPTIONS', 'Vaulted Subscriptions');
-define('BOX_PAYPALR_SAVED_CARD_RECURRING', 'Saved Card Subscriptions');
-define('BOX_PAYPALR_SUBSCRIPTIONS_REPORT', 'Active Subscriptions Report');
+if (!defined('BOX_PAYPALR_SUBSCRIPTIONS')) {
+    define('BOX_PAYPALR_SUBSCRIPTIONS', 'Vaulted Subscriptions');
+}
+if (!defined('BOX_PAYPALR_SAVED_CARD_RECURRING')) {
+    define('BOX_PAYPALR_SAVED_CARD_RECURRING', 'Saved Card Subscriptions');
+}
+if (!defined('BOX_PAYPALR_SUBSCRIPTIONS_REPORT')) {
+    define('BOX_PAYPALR_SUBSCRIPTIONS_REPORT', 'Active Subscriptions Report');
+}

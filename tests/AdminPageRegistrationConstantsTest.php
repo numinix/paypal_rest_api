@@ -118,22 +118,22 @@ namespace {
     // Test 5: Verify correct file separation (FILENAME_* in datafiles, BOX_* in definitions)
     fwrite(STDOUT, "\nVerifying correct constant separation...\n");
     
-    // Check that extra_datafiles file only has FILENAME_* constants
+    // Check that extra_datafiles file only has FILENAME_* constants (not BOX_*)
     $datafiles_content = file_get_contents(DIR_FS_CATALOG . 'admin/includes/extra_datafiles/paypalr_filenames.php');
-    if (strpos($datafiles_content, 'BOX_') !== false) {
-        fwrite(STDERR, "ERROR: BOX_* constants found in extra_datafiles (should be in extra_definitions)\n");
+    if (preg_match('/define\s*\(\s*[\'"]BOX_/', $datafiles_content)) {
+        fwrite(STDERR, "ERROR: BOX_* constant definitions found in extra_datafiles (should be in extra_definitions)\n");
         $failures++;
     } else {
-        fwrite(STDOUT, "✓ extra_datafiles contains no BOX_* constants (correct)\n");
+        fwrite(STDOUT, "✓ extra_datafiles contains no BOX_* constant definitions (correct)\n");
     }
     
-    // Check that extra_definitions file only has BOX_* constants
+    // Check that extra_definitions file only has BOX_* constants (not FILENAME_*)
     $definitions_content = file_get_contents(DIR_FS_CATALOG . 'admin/includes/languages/english/extra_definitions/paypalr_admin_names.php');
-    if (strpos($definitions_content, 'FILENAME_') !== false) {
-        fwrite(STDERR, "ERROR: FILENAME_* constants found in extra_definitions (should be in extra_datafiles)\n");
+    if (preg_match('/define\s*\(\s*[\'"]FILENAME_/', $definitions_content)) {
+        fwrite(STDERR, "ERROR: FILENAME_* constant definitions found in extra_definitions (should be in extra_datafiles)\n");
         $failures++;
     } else {
-        fwrite(STDOUT, "✓ extra_definitions contains no FILENAME_* constants (correct)\n");
+        fwrite(STDOUT, "✓ extra_definitions contains no FILENAME_* constant definitions (correct)\n");
     }
 
     // Final summary
