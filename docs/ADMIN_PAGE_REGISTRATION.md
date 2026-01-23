@@ -31,16 +31,31 @@ This single installer registers all three subscription pages:
 
 ### Language Definitions
 
-**`admin/includes/languages/english/paypalr_subscriptions.php`**
-```php
-define('BOX_PAYPALR_SUBSCRIPTIONS', 'Vaulted Subscriptions');
-define('BOX_PAYPALR_SAVED_CARD_RECURRING', 'Saved Card Subscriptions');
-define('BOX_PAYPALR_SUBSCRIPTIONS_REPORT', 'Active Subscriptions Report');
+Language definitions are split between two admin-wide loading directories as per Zen Cart conventions:
 
+**`admin/includes/extra_datafiles/paypalr_filenames.php`** - Filename constants
+```php
 define('FILENAME_PAYPALR_SUBSCRIPTIONS', 'paypalr_subscriptions');
 define('FILENAME_PAYPALR_SAVED_CARD_RECURRING', 'paypalr_saved_card_recurring');
 define('FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT', 'paypalr_subscriptions_report');
 ```
+
+**`admin/includes/languages/english/extra_definitions/paypalr_admin_names.php`** - Menu label constants
+```php
+define('BOX_PAYPALR_SUBSCRIPTIONS', 'Vaulted Subscriptions');
+define('BOX_PAYPALR_SAVED_CARD_RECURRING', 'Saved Card Subscriptions');
+define('BOX_PAYPALR_SUBSCRIPTIONS_REPORT', 'Active Subscriptions Report');
+```
+
+These files are automatically loaded admin-wide by Zen Cart, ensuring the constants are available when the installer runs.
+
+#### Why Split the Files?
+
+Following Zen Cart conventions:
+- **`extra_datafiles`**: Contains technical constants like filenames (`FILENAME_*`) and database table names. These are non-translatable system identifiers.
+- **`extra_definitions`**: Contains user-facing language strings like menu labels (`BOX_*`). These can be translated for multi-language support.
+
+This separation ensures that the installer has access to all required constants before any specific admin page is loaded, fixing the issue where constants were previously only available on the page itself.
 
 ## How It Works
 
