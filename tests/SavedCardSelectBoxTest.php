@@ -203,9 +203,11 @@ if (strpos($selection['fields'][0]['field'], 'methodSelect') === false) {
 }
 
 // Test 7: Contains options for all cards plus "Please select"
-if (substr_count($selection['fields'][0]['field'], '<option') !== 3) {
+$expectedOptionCount = count($testCards) + 1; // Cards + "Please select" option
+$actualOptionCount = substr_count($selection['fields'][0]['field'], '<option');
+if ($actualOptionCount !== $expectedOptionCount) {
     $testPassed = false;
-    $errors[] = 'Select should contain 3 options (Please select + 2 cards), found: ' . substr_count($selection['fields'][0]['field'], '<option');
+    $errors[] = "Select should contain {$expectedOptionCount} options (Please select + " . count($testCards) . " cards), found: {$actualOptionCount}";
 } else {
     echo "✓ Select contains options for all cards plus Please select\n";
 }
