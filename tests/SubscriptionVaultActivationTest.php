@@ -156,10 +156,6 @@ namespace {
     }
 }
 
-namespace PHPUnit\Framework\TestCase {
-    // Compatibility shim - not needed for actual test
-}
-
 namespace Tests {
     use PHPUnit\Framework\TestCase;
     use PayPalRestful\Common\SubscriptionManager;

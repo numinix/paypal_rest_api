@@ -18,6 +18,8 @@ class SubscriptionManager
 {
     public const STATUS_PENDING = 'pending';
     public const STATUS_AWAITING_VAULT = 'awaiting_vault';
+    
+    private const VAULT_ID_MAX_LENGTH = 64;
 
     /**
      * Ensure the subscription logging table exists.
@@ -228,7 +230,7 @@ class SubscriptionManager
               WHERE customers_id = " . (int)$customersId . "
                 AND orders_id = " . (int)$ordersId . "
                 AND (status = '" . zen_db_input(self::STATUS_AWAITING_VAULT) . "'
-                     OR (status = '" . zen_db_input(self::STATUS_PENDING) . "' AND vault_id = ''))
+                     OR (status = '" . zen_db_input(self::STATUS_PENDING) . "' AND (vault_id IS NULL OR vault_id = '')))
                 AND paypal_vault_id = 0"
         );
 
@@ -245,7 +247,7 @@ class SubscriptionManager
             // Update subscription with vault information and set status to active
             $updateData = [
                 'paypal_vault_id' => $paypalVaultId,
-                'vault_id' => substr($vaultId, 0, 64),
+                'vault_id' => substr($vaultId, 0, self::VAULT_ID_MAX_LENGTH),
                 'status' => 'active',
                 'last_modified' => $now,
             ];
