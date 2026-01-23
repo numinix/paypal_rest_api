@@ -24,6 +24,9 @@ if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD')) {
 if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL')) {
     define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL', 'Select Card:');
 }
+if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT')) {
+    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT', 'Please select...');
+}
 if (!defined('DIR_WS_MODULES')) {
     define('DIR_WS_MODULES', '/includes/modules/');
 }
@@ -61,12 +64,18 @@ function generateSavedCardSelectBoxSelection(array $vaultedCards, string $select
     
     $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
     
-    // If no selection made, default to first card
-    if (empty($selectedVaultId) && !empty($vaultedCards)) {
-        $selectedVaultId = $vaultedCards[0]['vault_id'];
-    }
+    // Add "Please select" as the first option
+    $selectPrompt = defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT')
+        ? MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT
+        : 'Please select...';
+    
+    $selectOptions = [
+        [
+            'id' => '',
+            'text' => $selectPrompt,
+        ],
+    ];
 
-    $selectOptions = [];
     foreach ($vaultedCards as $card) {
         $brand = $card['brand'] ?: ($card['card_type'] ?: MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD);
         $lastDigits = $card['last_digits'] ?? '****';
@@ -193,20 +202,30 @@ if (strpos($selection['fields'][0]['field'], 'methodSelect') === false) {
     echo "✓ Select includes methodSelect handler\n";
 }
 
-// Test 7: Contains options for all cards
-if (substr_count($selection['fields'][0]['field'], '<option') !== 2) {
+// Test 7: Contains options for all cards plus "Please select"
+$expectedOptionCount = count($testCards) + 1; // Cards + "Please select" option
+$actualOptionCount = substr_count($selection['fields'][0]['field'], '<option');
+if ($actualOptionCount !== $expectedOptionCount) {
     $testPassed = false;
-    $errors[] = 'Select should contain 2 options, found: ' . substr_count($selection['fields'][0]['field'], '<option');
+    $errors[] = "Select should contain {$expectedOptionCount} options (Please select + " . count($testCards) . " cards), found: {$actualOptionCount}";
 } else {
-    echo "✓ Select contains options for all cards\n";
+    echo "✓ Select contains options for all cards plus Please select\n";
 }
 
-// Test 8: First option is selected by default
-if (strpos($selection['fields'][0]['field'], 'value="vault_123" selected') === false) {
+// Test 8: "Please select" option is selected by default when no pre-selection
+if (strpos($selection['fields'][0]['field'], 'value="" selected') === false) {
     $testPassed = false;
-    $errors[] = 'First option should be selected by default';
+    $errors[] = '"Please select" option (empty value) should be selected by default';
 } else {
-    echo "✓ First option is selected by default\n";
+    echo "✓ \"Please select\" option is selected by default\n";
+}
+
+// Test 8b: "Please select" option contains the correct text
+if (strpos($selection['fields'][0]['field'], MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT) === false) {
+    $testPassed = false;
+    $errors[] = '"Please select" option should contain the prompt text';
+} else {
+    echo "✓ \"Please select\" option contains correct text\n";
 }
 
 // Test 9: Card brand is displayed in options
