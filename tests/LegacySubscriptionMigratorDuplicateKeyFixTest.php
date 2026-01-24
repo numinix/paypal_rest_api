@@ -163,12 +163,15 @@ namespace {
     } else {
         $insertedData = $insertedRecords[0];
         
-        // Test 3: Verify orders_products_id was unset (not present in insert data)
-        if (array_key_exists('orders_products_id', $insertedData)) {
-            fwrite(STDERR, "✗ orders_products_id should be unset when value is 0\n");
+        // Test 3: Verify orders_products_id was set to NULL (not unset) when value is 0
+        if (!array_key_exists('orders_products_id', $insertedData)) {
+            fwrite(STDERR, "✗ orders_products_id should be present in insert data\n");
+            $failures++;
+        } else if ($insertedData['orders_products_id'] !== null) {
+            fwrite(STDERR, "✗ orders_products_id should be NULL when value is 0, got " . var_export($insertedData['orders_products_id'], true) . "\n");
             $failures++;
         } else {
-            fwrite(STDOUT, "✓ orders_products_id is unset when value is 0 (prevents duplicate key error)\n");
+            fwrite(STDOUT, "✓ orders_products_id is set to NULL when value is 0 (prevents duplicate key error)\n");
         }
         
         // Test 4: Verify other fields are still present
