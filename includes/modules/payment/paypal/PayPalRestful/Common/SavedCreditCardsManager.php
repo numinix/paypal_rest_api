@@ -99,21 +99,4 @@ class SavedCreditCardsManager
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
     }
-
-    /**
-     * Check if a table exists in the database.
-     * 
-     * @param string $tableName The table name to check
-     * @return bool True if the table exists, false otherwise
-     */
-    private static function tableExists(string $tableName): bool
-    {
-        global $db;
-
-        $result = $db->Execute(
-            "SHOW TABLES LIKE '" . zen_db_input($tableName) . "'"
-        );
-
-        return ($result instanceof \queryFactoryResult && !$result->EOF);
-    }
 }

@@ -150,15 +150,12 @@ class SubscriptionManager
             if (!$isNullable) {
                 // First update all 0 values to NULL
                 $db->Execute(
-                    "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . " 
-                     SET orders_products_id = NULL 
-                     WHERE orders_products_id = 0"
+                    "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . " SET orders_products_id = NULL WHERE orders_products_id = 0"
                 );
                 
                 // Then modify the column to be nullable
                 $db->Execute(
-                    "ALTER TABLE " . TABLE_PAYPAL_SUBSCRIPTIONS . " 
-                     MODIFY orders_products_id INT UNSIGNED DEFAULT NULL"
+                    "ALTER TABLE " . TABLE_PAYPAL_SUBSCRIPTIONS . " MODIFY orders_products_id INT UNSIGNED DEFAULT NULL"
                 );
             }
         }
