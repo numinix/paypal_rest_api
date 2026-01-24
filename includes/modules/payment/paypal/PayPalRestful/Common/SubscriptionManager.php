@@ -35,7 +35,7 @@ class SubscriptionManager
                 paypal_subscription_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 customers_id INT UNSIGNED NOT NULL DEFAULT 0,
                 orders_id INT UNSIGNED NOT NULL DEFAULT 0,
-                orders_products_id INT UNSIGNED NOT NULL DEFAULT 0,
+                orders_products_id INT UNSIGNED DEFAULT NULL,
                 products_id INT UNSIGNED NOT NULL DEFAULT 0,
                 products_name VARCHAR(255) NOT NULL DEFAULT '',
                 products_quantity DECIMAL(15,4) NOT NULL DEFAULT 1.0000,
@@ -66,6 +66,7 @@ class SubscriptionManager
         );
 
         self::ensureLegacyColumns();
+        self::migrateOrdersProductsIdToNullable();
     }
 
     private static function ensureLegacyColumns(): void
@@ -125,6 +126,39 @@ class SubscriptionManager
         );
 
         return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+    }
+
+    /**
+     * Migrate orders_products_id column to be nullable to prevent duplicate key errors.
+     * 
+     * This is needed for legacy subscriptions where orders_products_id may be 0.
+     * With a UNIQUE constraint, multiple 0 values would cause duplicate key errors.
+     * NULL values don't violate UNIQUE constraints in MySQL.
+     */
+    private static function migrateOrdersProductsIdToNullable(): void
+    {
+        global $db;
+
+        // Check if the column is nullable already
+        $result = $db->Execute(
+            "SHOW COLUMNS FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE Field = 'orders_products_id'"
+        );
+
+        if ($result instanceof \queryFactoryResult && !$result->EOF) {
+            $isNullable = ($result->fields['Null'] === 'YES');
+            
+            if (!$isNullable) {
+                // First update all 0 values to NULL
+                $db->Execute(
+                    "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . " SET orders_products_id = NULL WHERE orders_products_id = 0"
+                );
+                
+                // Then modify the column to be nullable
+                $db->Execute(
+                    "ALTER TABLE " . TABLE_PAYPAL_SUBSCRIPTIONS . " MODIFY orders_products_id INT UNSIGNED DEFAULT NULL"
+                );
+            }
+        }
     }
 
     /**

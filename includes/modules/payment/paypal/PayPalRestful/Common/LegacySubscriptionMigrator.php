@@ -139,10 +139,10 @@ class LegacySubscriptionMigrator
             $record['attributes'] = '';
         }
 
-        // Unset orders_products_id if it's 0 to avoid UNIQUE constraint violations
+        // Set orders_products_id to NULL if it's 0 to avoid UNIQUE constraint violations
         // NULL values are allowed in UNIQUE indexes and won't cause duplicates
         if (isset($record['orders_products_id']) && (int)$record['orders_products_id'] === 0) {
-            unset($record['orders_products_id']);
+            $record['orders_products_id'] = null;
         }
 
         $existing = null;
