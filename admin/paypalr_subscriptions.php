@@ -654,7 +654,16 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                 }
             } else {
                 // Fallback for messageStack implementations without size() method
-                echo $messageStack->output($messageStackKey);
+                // Check if there are messages in the stack before outputting
+                $hasMessages = false;
+                if (isset($messageStack->messages) && is_array($messageStack->messages)) {
+                    $hasMessages = isset($messageStack->messages[$messageStackKey]) && 
+                                  is_array($messageStack->messages[$messageStackKey]) && 
+                                  count($messageStack->messages[$messageStackKey]) > 0;
+                }
+                if ($hasMessages) {
+                    echo $messageStack->output($messageStackKey);
+                }
             }
         }
         ?>
