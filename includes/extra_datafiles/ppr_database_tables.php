@@ -22,3 +22,9 @@ if (!defined('TABLE_PAYPAL_RECURRING')) {
 if (!defined('TABLE_PAYPAL_WEBHOOKS')) {
     define('TABLE_PAYPAL_WEBHOOKS', DB_PREFIX . 'paypal_webhooks');
 }
+if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
+    define('TABLE_SAVED_CREDIT_CARDS', DB_PREFIX . 'saved_credit_cards');
+}
+if (!defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+    define('TABLE_SAVED_CREDIT_CARDS_RECURRING', DB_PREFIX . 'saved_credit_cards_recurring');
+}
