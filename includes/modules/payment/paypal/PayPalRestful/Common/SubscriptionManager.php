@@ -207,12 +207,25 @@ class SubscriptionManager
             }
         }
 
-        $existing = $db->Execute(
-            "SELECT paypal_subscription_id
-               FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . "
-              WHERE orders_products_id = " . (int)$record['orders_products_id'] . "
-              LIMIT 1"
-        );
+        // Set orders_products_id to NULL if it's 0 to avoid UNIQUE constraint violations
+        // NULL values are allowed in UNIQUE indexes and won't cause duplicates
+        if (isset($record['orders_products_id']) && (int)$record['orders_products_id'] === 0) {
+            $record['orders_products_id'] = null;
+        }
+
+        // Only check for existing subscription by orders_products_id if it's not NULL
+        if ($record['orders_products_id'] !== null) {
+            $existing = $db->Execute(
+                "SELECT paypal_subscription_id
+                   FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+                  WHERE orders_products_id = " . (int)$record['orders_products_id'] . "
+                  LIMIT 1"
+            );
+        } else {
+            // When orders_products_id is NULL, don't check for existing records by this field
+            // as multiple records can have NULL values
+            $existing = new \queryFactoryResult();
+        }
 
         if ($existing->EOF) {
             $record['date_added'] = $now;
