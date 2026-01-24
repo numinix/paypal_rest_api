@@ -17,6 +17,17 @@
 
 require 'includes/application_top.php';
 
+// Load PayPal autoloader to access schema managers
+$autoloaderPath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+if (file_exists($autoloaderPath)) {
+    require_once $autoloaderPath;
+}
+
+// Ensure legacy saved credit cards tables exist for backward compatibility
+if (class_exists('PayPalRestful\\Common\\SavedCreditCardsManager')) {
+    \PayPalRestful\Common\SavedCreditCardsManager::ensureSchema();
+}
+
 // Load saved card recurring class
 require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
 
