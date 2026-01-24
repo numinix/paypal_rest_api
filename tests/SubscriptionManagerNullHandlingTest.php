@@ -187,7 +187,7 @@ namespace {
     }
 
     if ($failures > 0) {
-        fwrite(STDERR, sprintf("\n✗ Total failures: %d\n", $failures));
+        fwrite(STDERR, "\n✗ Total failures: $failures\n");
         exit(1);
     }
 

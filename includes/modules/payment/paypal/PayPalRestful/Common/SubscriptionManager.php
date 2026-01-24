@@ -224,6 +224,7 @@ class SubscriptionManager
         } else {
             // When orders_products_id is NULL, don't check for existing records by this field
             // as multiple records can have NULL values
+            // Create empty result set (queryFactoryResult defaults to EOF = true)
             $existing = new \queryFactoryResult();
         }
 
