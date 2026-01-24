@@ -13,7 +13,6 @@
 namespace PayPalRestful\Common;
 
 use function defined;
-use function zen_db_input;
 
 class SavedCreditCardsManager
 {
