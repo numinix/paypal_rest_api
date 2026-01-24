@@ -370,8 +370,15 @@ $statuses_recurring = [
     <h1><?php echo HEADING_TITLE; ?></h1>
     
     <?php
-    if (isset($messageStack) && is_object($messageStack) && $messageStack->size($messageStackKey) > 0) {
-        echo $messageStack->output($messageStackKey);
+    if (isset($messageStack) && is_object($messageStack)) {
+        if (method_exists($messageStack, 'size')) {
+            if ($messageStack->size($messageStackKey) > 0) {
+                echo $messageStack->output($messageStackKey);
+            }
+        } else {
+            // Fallback for messageStack implementations without size() method
+            echo $messageStack->output($messageStackKey);
+        }
     }
     ?>
     
