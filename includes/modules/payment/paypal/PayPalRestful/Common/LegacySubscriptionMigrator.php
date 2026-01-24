@@ -139,27 +139,33 @@ class LegacySubscriptionMigrator
             $record['attributes'] = '';
         }
 
+        // Unset orders_products_id if it's 0 to avoid UNIQUE constraint violations
+        // NULL values are allowed in UNIQUE indexes and won't cause duplicates
+        if (isset($record['orders_products_id']) && (int)$record['orders_products_id'] === 0) {
+            unset($record['orders_products_id']);
+        }
+
         $existing = null;
 
-        if ((int)$record['legacy_subscription_id'] > 0) {
+        if (isset($data['legacy_subscription_id']) && (int)$data['legacy_subscription_id'] > 0) {
             $existing = $db->Execute(
                 'SELECT paypal_subscription_id FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS
-                . ' WHERE legacy_subscription_id = ' . (int)$record['legacy_subscription_id']
+                . ' WHERE legacy_subscription_id = ' . (int)$data['legacy_subscription_id']
                 . ' LIMIT 1'
             );
         }
 
-        if (($existing === null || $existing->EOF) && $record['profile_id'] !== '') {
+        if (($existing === null || $existing->EOF) && isset($data['profile_id']) && $data['profile_id'] !== '') {
             $existing = $db->Execute(
                 "SELECT paypal_subscription_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS
-                . " WHERE profile_id = '" . zen_db_input($record['profile_id']) . "' LIMIT 1"
+                . " WHERE profile_id = '" . zen_db_input($data['profile_id']) . "' LIMIT 1"
             );
         }
 
-        if (($existing === null || $existing->EOF) && (int)$record['orders_products_id'] > 0) {
+        if (($existing === null || $existing->EOF) && isset($data['orders_products_id']) && (int)$data['orders_products_id'] > 0) {
             $existing = $db->Execute(
                 'SELECT paypal_subscription_id FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS
-                . ' WHERE orders_products_id = ' . (int)$record['orders_products_id']
+                . ' WHERE orders_products_id = ' . (int)$data['orders_products_id']
                 . ' LIMIT 1'
             );
         }
