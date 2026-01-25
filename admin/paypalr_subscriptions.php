@@ -150,6 +150,22 @@ if ($action === 'update_subscription') {
 
     if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
         $status = strtolower(trim((string) zen_db_prepare_input($_POST['set_status'])));
+        
+        // For quick status changes, only update the status field without validating other fields
+        zen_db_perform(
+            TABLE_PAYPAL_SUBSCRIPTIONS,
+            ['status' => $status, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'paypal_subscription_id = ' . (int) $subscriptionId
+        );
+        
+        $messageStack->add_session(
+            $messageStackKey,
+            sprintf('Subscription #%d status has been updated to %s.', $subscriptionId, $status),
+            'success'
+        );
+        
+        zen_redirect($redirectUrl);
     }
 
     $attributesEncoded = '';
