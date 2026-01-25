@@ -150,7 +150,6 @@ if ($action === 'update_subscription') {
 
     if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
         $status = strtolower(trim((string) zen_db_prepare_input($_POST['set_status'])));
-        
         // For quick status changes, only update the status field without validating other fields
         zen_db_perform(
             TABLE_PAYPAL_SUBSCRIPTIONS,
@@ -962,7 +961,6 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                 <?php } elseif ($currentStatus === 'cancelled') { ?>
                                     <span style="color: #999; font-size: 12px;">Subscription cancelled</span>
                                 <?php } ?>
-                                
                                 <?php if ($isArchived) { ?>
                                     <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=unarchive_subscription&subscription_id=' . $subscriptionId); ?>" 
                                        onclick="return confirm('Are you sure you want to unarchive this subscription?');"
