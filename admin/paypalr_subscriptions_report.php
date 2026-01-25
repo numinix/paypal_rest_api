@@ -674,7 +674,7 @@ foreach ($typeCounts as $count) {
     
     <div class="filter-panel">
         <div class="panel-title"><?php echo TEXT_PANEL_FILTERS; ?></div>
-        <form method="get" class="filter-form">
+        <?php echo zen_draw_form('paypalr_filter_report', FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT, '', 'get', 'class="filter-form"'); ?>
             <div class="form-group">
                 <label for="status-filter"><?php echo TEXT_FILTER_STATUS; ?></label>
                 <select name="status" id="status-filter">

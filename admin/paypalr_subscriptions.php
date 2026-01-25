@@ -666,7 +666,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
         }
         ?>
 
-        <form method="get" class="paypalr-filter-form" action="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS); ?>">
+        <?php echo zen_draw_form('paypalr_filter', FILENAME_PAYPALR_SUBSCRIPTIONS, '', 'get', 'class="paypalr-filter-form"'); ?>
             <div class="form-group">
                 <label for="filter-customers">Customer</label>
                 <select name="customers_id" id="filter-customers">
@@ -757,7 +757,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                     }
 
                     ?>
-                    <form id="<?php echo $formId; ?>" method="post" action="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS); ?>">
+                    <?php echo zen_draw_form($formId, FILENAME_PAYPALR_SUBSCRIPTIONS, '', 'post', 'id="' . $formId . '"'); ?>
                         <?php echo zen_draw_hidden_field('action', 'update_subscription'); ?>
                         <?php echo zen_draw_hidden_field('paypal_subscription_id', $subscriptionId); ?>
                         <?php echo zen_draw_hidden_field('customers_id', $customersId); ?>

@@ -392,7 +392,7 @@ $statuses_recurring = [
     ?>
     
     <div class="filter-form">
-        <form name="search_subscriptions" method="get" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+        <?php echo zen_draw_form('search_subscriptions', FILENAME_PAYPALR_SAVED_CARD_RECURRING, '', 'get', 'style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;"'); ?>
             <div class="form-group">
                 <label for="customers_id">Customer</label>
                 <?php echo zen_draw_pull_down_menu('customers_id', pull_down_format($customers), $_GET['customers_id'] ?? '', 'id="customers_id"'); ?>
