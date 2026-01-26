@@ -374,11 +374,8 @@ function renderSignupPage(): void
     <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
     <style>
         body {
-            font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             padding: 0;
-            background: #f0f2f5;
-            line-height: 1.5;
         }
         .status {
             display: none;
