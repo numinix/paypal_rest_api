@@ -18,6 +18,7 @@ class SubscriptionManager
 {
     public const STATUS_PENDING = 'pending';
     public const STATUS_AWAITING_VAULT = 'awaiting_vault';
+    public const STATUS_ACTIVE = 'active';
     
     private const VAULT_ID_MAX_LENGTH = 64;
 
@@ -298,7 +299,7 @@ class SubscriptionManager
             $updateData = [
                 'paypal_vault_id' => $paypalVaultId,
                 'vault_id' => substr($vaultId, 0, self::VAULT_ID_MAX_LENGTH),
-                'status' => 'active',
+                'status' => self::STATUS_ACTIVE,
                 'last_modified' => $now,
             ];
 

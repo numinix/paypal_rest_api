@@ -140,8 +140,13 @@ class zcObserverPaypalrestfulRecurring
             if ($vaultRecord !== null) {
                 $paypalVaultId = (int)($vaultRecord['paypal_vault_id'] ?? 0);
                 $vaultId = (string)($vaultRecord['vault_id'] ?? '');
-                if ($vaultId === '') {
+                if ($vaultId === '' || $paypalVaultId === 0) {
+                    // Vault is incomplete or not yet available
                     $status = SubscriptionManager::STATUS_AWAITING_VAULT;
+                } else {
+                    // Vault is fully available (e.g., using a saved card from a previous order)
+                    // Set status to 'active' immediately instead of 'pending'
+                    $status = SubscriptionManager::STATUS_ACTIVE;
                 }
             } else {
                 $status = SubscriptionManager::STATUS_AWAITING_VAULT;
