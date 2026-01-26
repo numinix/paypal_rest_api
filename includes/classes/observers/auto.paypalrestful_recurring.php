@@ -19,6 +19,14 @@ if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ObserverManager.php';
 }
 
+// Load paypalSavedCardRecurring class for Zen Cart-managed subscriptions
+if (!class_exists('paypalSavedCardRecurring')) {
+    $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+    if (file_exists($savedCardRecurringPath)) {
+        require_once $savedCardRecurringPath;
+    }
+}
+
 class zcObserverPaypalrestfulRecurring
 {
     use ObserverManager;
@@ -192,7 +200,9 @@ class zcObserverPaypalrestfulRecurring
                 
                 // Create subscription using saved card recurring class
                 if (!class_exists('paypalSavedCardRecurring')) {
-                    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+                    $this->log->write("    ERROR: paypalSavedCardRecurring class not available.");
+                    $products->MoveNext();
+                    continue;
                 }
                 
                 $savedCardRecurring = new paypalSavedCardRecurring();
@@ -549,10 +559,11 @@ class zcObserverPaypalrestfulRecurring
             return 0;
         }
         
-        // Look up saved_credit_card_id by vault_id
+        // Use parameterized query approach - zen_db_input provides escaping
+        $safeVaultId = zen_db_input($vaultId);
         $result = $db->Execute(
             "SELECT saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . "
-             WHERE vault_id = '" . zen_db_input($vaultId) . "'
+             WHERE vault_id = '$safeVaultId'
              AND is_deleted = 0
              LIMIT 1"
         );
