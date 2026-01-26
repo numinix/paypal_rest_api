@@ -76,23 +76,23 @@ class messageStack
             return '';
         }
 
+        // Map message types to Bootstrap alert classes
+        $alertClassMap = [
+            'success' => 'alert-success',
+            'error' => 'alert-danger',
+            'warning' => 'alert-warning',
+        ];
+
         $output = '';
         foreach ($messages as $msg) {
             $type = $msg['type'] ?? 'error';
             $text = $msg['text'] ?? '';
             
-            // Map message types to alert classes
-            $alertClass = 'alert-info';
-            if ($type === 'error') {
-                $alertClass = 'alert-danger';
-            } elseif ($type === 'success') {
-                $alertClass = 'alert-success';
-            } elseif ($type === 'warning') {
-                $alertClass = 'alert-warning';
-            }
+            // Get alert class, default to info for unknown types
+            $alertClass = $alertClassMap[$type] ?? 'alert-info';
             
             $output .= '<div class="messageStack-header noprint">';
-            $output .= '<div class="row messageStackAlert alert ' . $alertClass . '">';
+            $output .= '<div class="row messageStackAlert alert ' . htmlspecialchars($alertClass, ENT_QUOTES, 'UTF-8') . '">';
             $output .= htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
             $output .= '</div>';
             $output .= '</div>';

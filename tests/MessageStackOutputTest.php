@@ -30,12 +30,8 @@ class MessageStackOutputTest extends TestCase
         // Load the MessageStack compatibility class
         $messageStackPath = __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/Compatibility/MessageStack.php';
         if (file_exists($messageStackPath)) {
-            // Reset class check
-            if (class_exists('messageStack', false)) {
-                // Class already loaded, we'll work with it
-            } else {
-                require_once $messageStackPath;
-            }
+            // Only load if not already loaded (the class file returns early if already defined)
+            require_once $messageStackPath;
         }
     }
 
