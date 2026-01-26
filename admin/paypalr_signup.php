@@ -366,7 +366,7 @@ function renderSignupPage(): void
     
     ?>
 <!DOCTYPE html>
-<html <?php echo HTML_PARAMS; ?>>
+<html <?php echo defined('HTML_PARAMS') ? HTML_PARAMS : 'lang="en"'; ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
