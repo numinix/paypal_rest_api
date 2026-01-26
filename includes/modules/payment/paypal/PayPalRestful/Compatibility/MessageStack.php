@@ -12,6 +12,24 @@ class messageStack
     /** @var array<string, array<int, array{text: string, type: string}>> */
     protected $messages = [];
 
+    public function __construct()
+    {
+        // Load messages from session on initialization
+        if (isset($_SESSION['messageToStack']) && is_array($_SESSION['messageToStack'])) {
+            foreach ($_SESSION['messageToStack'] as $stack => $stackMessages) {
+                if (is_array($stackMessages)) {
+                    foreach ($stackMessages as $msg) {
+                        if (isset($msg['text'], $msg['type'])) {
+                            $this->messages[$stack][] = $msg;
+                        }
+                    }
+                }
+            }
+            // Clear session messages after loading
+            unset($_SESSION['messageToStack']);
+        }
+    }
+
     public function add_session($stack, $message = null, $type = 'error'): void
     {
         if ($message === null) {
@@ -47,6 +65,40 @@ class messageStack
     public function reset(): void
     {
         $this->messages = [];
+    }
+
+    public function output($stack = 'header'): string
+    {
+        $stack = $this->normaliseStackName($stack);
+        $messages = $this->messages[$stack] ?? [];
+
+        if (empty($messages)) {
+            return '';
+        }
+
+        // Map message types to Bootstrap alert classes
+        $alertClassMap = [
+            'success' => 'alert-success',
+            'error' => 'alert-danger',
+            'warning' => 'alert-warning',
+        ];
+
+        $output = '';
+        foreach ($messages as $msg) {
+            $type = $msg['type'] ?? 'error';
+            $text = $msg['text'] ?? '';
+            
+            // Get alert class, default to info for unknown types
+            $alertClass = $alertClassMap[$type] ?? 'alert-info';
+            
+            $output .= '<div class="messageStack-header noprint">';
+            $output .= '<div class="row messageStackAlert alert ' . htmlspecialchars($alertClass, ENT_QUOTES, 'UTF-8') . '">';
+            $output .= htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+            $output .= '</div>';
+            $output .= '</div>';
+        }
+
+        return $output;
     }
 
     protected function normaliseStackName($stack): string
