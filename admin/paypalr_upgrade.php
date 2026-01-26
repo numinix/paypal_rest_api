@@ -121,3 +121,44 @@ function paypalr_upgrade_redirect_to_modules(): void
     zen_redirect(zen_href_link(FILENAME_MODULES, 'set=payment&module=' . ($_GET['module'] ?? 'paypalr'), 'NONSSL'));
     exit;
 }
+
+// In case we ever need to render an upgrade confirmation page (not currently used)
+function paypalr_upgrade_render_page(): void
+{
+    ?>
+    <!doctype html>
+    <html <?php echo defined('HTML_PARAMS') ? HTML_PARAMS : 'lang="en"'; ?>>
+    <head>
+        <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
+        <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
+    </head>
+    <body>
+    <?php require DIR_WS_INCLUDES . 'header.php'; ?>
+    <div class="nmx-module">
+        <div class="nmx-container">
+            <div class="nmx-container-header">
+                <h1>Module Upgrade</h1>
+            </div>
+            <div class="nmx-panel">
+                <div class="nmx-panel-heading">
+                    <div class="nmx-panel-title">Upgrade Complete</div>
+                </div>
+                <div class="nmx-panel-body">
+                    <p>The module has been successfully upgraded.</p>
+                    <div class="nmx-btn-container">
+                        <a href="<?php echo zen_href_link(FILENAME_MODULES, 'set=payment'); ?>" class="nmx-btn nmx-btn-primary">Return to Payment Modules</a>
+                    </div>
+                </div>
+            </div>
+            <div class="nmx-footer">
+                <a href="https://www.numinix.com" target="_blank" rel="noopener noreferrer" class="nmx-footer-logo">
+                    <img src="images/numinix_logo.png" alt="Numinix">
+                </a>
+            </div>
+        </div>
+    </div>
+    <?php require DIR_WS_INCLUDES . 'footer.php'; ?>
+    </body>
+    </html>
+    <?php
+}

@@ -345,159 +345,172 @@ $statuses_recurring = [
 <html <?php echo HTML_PARAMS; ?>>
 <head>
     <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
+    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
     <style>
-        .saved-card-recurring-container { padding: 1.5rem; }
-        .saved-card-recurring-table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
-        .saved-card-recurring-table th, .saved-card-recurring-table td { border: 1px solid #ccc; padding: 0.5rem; vertical-align: top; }
-        .saved-card-recurring-table th { background: #f8f8f8; text-align: left; }
-        .filter-form { margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
-        .filter-form .form-group { min-width: 180px; }
-        .filter-form label { display: block; font-weight: bold; margin-bottom: 0.25rem; }
-        .filter-form select { width: 100%; padding: 5px; }
-        .show-edit { cursor: pointer; color: #337ab7; margin-left: 5px; font-size: 12px; }
         .edit-content { display: none; }
-        .edit-content.active { display: block; margin-top: 5px; }
-        .inline-action { cursor: pointer; color: #337ab7; margin-left: 5px; font-size: 12px; }
-        .action-btn { padding: 3px 8px; margin: 2px; text-decoration: none; border-radius: 3px; font-size: 12px; display: inline-block; }
-        .btn-cancel { background: #d9534f; color: #fff; }
-        .btn-reactivate { background: #5cb85c; color: #fff; }
-        .btn-export { background: #5bc0de; color: #fff; }
+        .edit-content.active { display: block; margin-top: 8px; padding: 8px; background: rgba(0, 97, 141, 0.05); border-radius: 8px; }
     </style>
 </head>
 <body>
 <?php require DIR_WS_INCLUDES . 'header.php'; ?>
-<div class="saved-card-recurring-container">
-    <h1><?php echo HEADING_TITLE; ?></h1>
+<div class="nmx-module">
+    <div class="nmx-container">
+        <div class="nmx-container-header">
+            <h1><?php echo HEADING_TITLE; ?></h1>
+        </div>
     
-    <?php
-    if (isset($messageStack) && is_object($messageStack)) {
-        if (method_exists($messageStack, 'size')) {
-            if ($messageStack->size($messageStackKey) > 0) {
-                echo $messageStack->output($messageStackKey);
-            }
-        } else {
-            // Fallback for messageStack implementations without size() method
-            // Check if there are messages in the stack before outputting
-            $hasMessages = false;
-            if (isset($messageStack->messages) && is_array($messageStack->messages)) {
-                $hasMessages = isset($messageStack->messages[$messageStackKey]) && 
-                              is_array($messageStack->messages[$messageStackKey]) && 
-                              count($messageStack->messages[$messageStackKey]) > 0;
-            }
-            if ($hasMessages) {
-                echo $messageStack->output($messageStackKey);
+        <div class="nmx-message-stack">
+        <?php
+        if (isset($messageStack) && is_object($messageStack)) {
+            if (method_exists($messageStack, 'size')) {
+                if ($messageStack->size($messageStackKey) > 0) {
+                    echo $messageStack->output($messageStackKey);
+                }
+            } else {
+                // Fallback for messageStack implementations without size() method
+                // Check if there are messages in the stack before outputting
+                $hasMessages = false;
+                if (isset($messageStack->messages) && is_array($messageStack->messages)) {
+                    $hasMessages = isset($messageStack->messages[$messageStackKey]) && 
+                                  is_array($messageStack->messages[$messageStackKey]) && 
+                                  count($messageStack->messages[$messageStackKey]) > 0;
+                }
+                if ($hasMessages) {
+                    echo $messageStack->output($messageStackKey);
+                }
             }
         }
-    }
-    ?>
-    
-    <div class="filter-form">
-        <?php echo zen_draw_form('search_subscriptions', FILENAME_PAYPALR_SAVED_CARD_RECURRING, '', 'get', 'style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;"'); ?>
-            <div class="form-group">
-                <label for="customers_id">Customer</label>
-                <?php echo zen_draw_pull_down_menu('customers_id', pull_down_format($customers), $_GET['customers_id'] ?? '', 'id="customers_id"'); ?>
+        ?>
+        </div>
+        
+        <div class="nmx-panel">
+            <div class="nmx-panel-heading">
+                <div class="nmx-panel-title">Filter Subscriptions</div>
             </div>
-            <div class="form-group">
-                <label for="products_id">Product</label>
-                <?php echo zen_draw_pull_down_menu('products_id', pull_down_format($products), $_GET['products_id'] ?? '', 'id="products_id"'); ?>
+            <div class="nmx-panel-body">
+                <?php echo zen_draw_form('search_subscriptions', FILENAME_PAYPALR_SAVED_CARD_RECURRING, '', 'get', 'class="nmx-form-inline"'); ?>
+                    <div class="nmx-form-group">
+                        <label for="customers_id">Customer</label>
+                        <?php echo zen_draw_pull_down_menu('customers_id', pull_down_format($customers), $_GET['customers_id'] ?? '', 'id="customers_id" class="nmx-form-control"'); ?>
+                    </div>
+                    <div class="nmx-form-group">
+                        <label for="products_id">Product</label>
+                        <?php echo zen_draw_pull_down_menu('products_id', pull_down_format($products), $_GET['products_id'] ?? '', 'id="products_id" class="nmx-form-control"'); ?>
+                    </div>
+                    <div class="nmx-form-group">
+                        <label for="status">Status</label>
+                        <?php echo zen_draw_pull_down_menu('status', pull_down_format($statuses_recurring), (isset($_GET['status']) && strlen($_GET['status']) > 0 ? $_GET['status'] : 'scheduled'), 'id="status" class="nmx-form-control"'); ?>
+                    </div>
+                    <div class="nmx-form-actions">
+                        <button type="submit" class="nmx-btn nmx-btn-primary">Search</button>
+                        <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, 'action=export_csv' . $query_string); ?>" class="nmx-btn nmx-btn-info">Export CSV</a>
+                    </div>
+                </form>
             </div>
-            <div class="form-group">
-                <label for="status">Status</label>
-                <?php echo zen_draw_pull_down_menu('status', pull_down_format($statuses_recurring), (isset($_GET['status']) && strlen($_GET['status']) > 0 ? $_GET['status'] : 'scheduled'), 'id="status"'); ?>
+        </div>
+        
+        <div class="nmx-panel">
+            <div class="nmx-panel-heading">
+                <div class="nmx-panel-title">Saved Card Subscriptions</div>
             </div>
-            <div class="form-group">
-                <button type="submit">Search</button>
+            <div class="nmx-panel-body">
+                <div class="nmx-table-responsive">
+                    <table class="nmx-table nmx-table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Product</th>
+                                <th>Customer</th>
+                                <th>Order ID</th>
+                                <th>Domain</th>
+                                <th>Amount</th>
+                                <th>Period</th>
+                                <th>Frequency</th>
+                                <th>Cycles</th>
+                                <th>Next Date</th>
+                                <th>Card</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($subscriptions as $subscription) { ?>
+                                <tr>
+                                    <td><?php echo $subscription['saved_credit_card_recurring_id']; ?></td>
+                                    <td>
+                                        <strong><?php echo zen_output_string_protected($subscription['products_name']); ?></strong>
+                                        <span class="nmx-inline-action" onclick="toggleEdit(this)">(Edit)</span>
+                                        <div class="edit-content">
+                                            <?php echo zen_draw_pull_down_menu('set_products_id_' . $subscription['saved_credit_card_recurring_id'], pull_down_format($allproducts, false), $subscription['products_id'], 'class="nmx-form-control"'); ?>
+                                            <a class="nmx-inline-action" href="javascript:void(0);" onclick="updateProduct(<?php echo $subscription['saved_credit_card_recurring_id']; ?>, <?php echo $subscription['original_orders_products_id'] ?? 0; ?>)">Save</a>
+                                            <a class="nmx-inline-action" onclick="toggleEdit(this.parentNode.previousElementSibling)">Cancel</a>
+                                        </div>
+                                    </td>
+                                    <td><?php echo zen_output_string_protected($subscription['customers_firstname'] . ' ' . $subscription['customers_lastname']); ?></td>
+                                    <td>
+                                        <?php if ($subscription['orders_id']) { ?>
+                                            <a href="<?php echo zen_href_link(FILENAME_ORDERS, 'oID=' . $subscription['orders_id'] . '&action=edit'); ?>"><?php echo $subscription['orders_id']; ?></a>
+                                        <?php } else { ?>
+                                            -
+                                        <?php } ?>
+                                    </td>
+                                    <td><?php echo zen_output_string_protected($subscription['domain']); ?></td>
+                                    <td>
+                                        $<?php echo number_format((float)$subscription['amount'], 2); ?>
+                                        <span class="nmx-inline-action" onclick="toggleEdit(this)">(Edit)</span>
+                                        <div class="edit-content">
+                                            <input type="text" id="set_amount_<?php echo $subscription['saved_credit_card_recurring_id']; ?>" value="<?php echo $subscription['amount']; ?>" size="8" class="nmx-form-control" />
+                                            <a class="nmx-inline-action" href="javascript:void(0);" onclick="updateAmount(<?php echo $subscription['saved_credit_card_recurring_id']; ?>)">Save</a>
+                                        </div>
+                                    </td>
+                                    <td><?php echo zen_output_string_protected($subscription['period']); ?></td>
+                                    <td><?php echo zen_output_string_protected($subscription['frequency']); ?></td>
+                                    <td><?php echo zen_output_string_protected($subscription['cycles']); ?></td>
+                                    <td>
+                                        <?php echo $subscription['date']; ?>
+                                        <?php if ($subscription['status'] == 'scheduled') { ?>
+                                            <span class="nmx-inline-action" onclick="toggleEdit(this)">(Edit)</span>
+                                            <div class="edit-content">
+                                                <input type="date" id="set_date_<?php echo $subscription['saved_credit_card_recurring_id']; ?>" value="<?php echo $subscription['date']; ?>" class="nmx-form-control" />
+                                                <a class="nmx-inline-action" href="javascript:void(0);" onclick="updateDate(<?php echo $subscription['saved_credit_card_recurring_id']; ?>)">Save</a>
+                                            </div>
+                                        <?php } ?>
+                                    </td>
+                                    <td>
+                                        <?php echo zen_output_string_protected($subscription['card_type'] . ' ****' . $subscription['last_digits']); ?>
+                                        <?php if ($subscription['status'] == 'scheduled' && !empty($customers_cards[$subscription['customers_id']])) { ?>
+                                            <span class="nmx-inline-action" onclick="toggleEdit(this)">(Edit)</span>
+                                            <div class="edit-content">
+                                                <?php echo zen_draw_pull_down_menu('set_card_' . $subscription['saved_credit_card_recurring_id'], pull_down_format($customers_cards[$subscription['customers_id']], false), $subscription['saved_credit_card_id'], 'class="nmx-form-control"'); ?>
+                                                <a class="nmx-inline-action" href="javascript:void(0);" onclick="updateCard(<?php echo $subscription['saved_credit_card_recurring_id']; ?>)">Save</a>
+                                            </div>
+                                        <?php } ?>
+                                    </td>
+                                    <td><?php echo zen_output_string_protected($subscription['status']); ?></td>
+                                    <td>
+                                        <?php if ($subscription['status'] == 'cancelled') { ?>
+                                            <a class="nmx-btn nmx-btn-sm nmx-btn-success" href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, $query_string . '&action=reactivate_scheduled_payment&saved_card_recurring_id=' . $subscription['saved_credit_card_recurring_id']); ?>">Reactivate</a>
+                                        <?php } elseif ($subscription['status'] == 'scheduled') { ?>
+                                            <a class="nmx-btn nmx-btn-sm nmx-btn-danger" href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, $query_string . '&action=cancel_scheduled_payment&saved_card_recurring_id=' . $subscription['saved_credit_card_recurring_id']); ?>" onclick="return confirm('Cancel this subscription?');">Cancel</a>
+                                        <?php } ?>
+                                    </td>
+                                </tr>
+                            <?php } ?>
+                            <?php if (empty($subscriptions)) { ?>
+                                <tr><td colspan="13">No subscriptions found for the selected filters.</td></tr>
+                            <?php } ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </form>
-        <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, 'action=export_csv' . $query_string); ?>" class="action-btn btn-export">Export CSV</a>
+        </div>
+        
+        <div class="nmx-footer">
+            <a href="https://www.numinix.com" target="_blank" rel="noopener noreferrer" class="nmx-footer-logo">
+                <img src="images/numinix_logo.png" alt="Numinix">
+            </a>
+        </div>
     </div>
-    
-    <table class="saved-card-recurring-table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Product</th>
-                <th>Customer</th>
-                <th>Order ID</th>
-                <th>Domain</th>
-                <th>Amount</th>
-                <th>Period</th>
-                <th>Frequency</th>
-                <th>Cycles</th>
-                <th>Next Date</th>
-                <th>Card</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($subscriptions as $subscription) { ?>
-                <tr>
-                    <td><?php echo $subscription['saved_credit_card_recurring_id']; ?></td>
-                    <td>
-                        <?php echo zen_output_string_protected($subscription['products_name']); ?>
-                        <span class="show-edit" onclick="toggleEdit(this)">(Edit)</span>
-                        <div class="edit-content">
-                            <?php echo zen_draw_pull_down_menu('set_products_id_' . $subscription['saved_credit_card_recurring_id'], pull_down_format($allproducts, false), $subscription['products_id']); ?>
-                            <a class="inline-action" href="javascript:void(0);" onclick="updateProduct(<?php echo $subscription['saved_credit_card_recurring_id']; ?>, <?php echo $subscription['original_orders_products_id'] ?? 0; ?>)">Save</a>
-                            <a class="inline-action" onclick="toggleEdit(this.parentNode.previousElementSibling)">Cancel</a>
-                        </div>
-                    </td>
-                    <td><?php echo zen_output_string_protected($subscription['customers_firstname'] . ' ' . $subscription['customers_lastname']); ?></td>
-                    <td>
-                        <?php if ($subscription['orders_id']) { ?>
-                            <a href="<?php echo zen_href_link(FILENAME_ORDERS, 'oID=' . $subscription['orders_id'] . '&action=edit'); ?>"><?php echo $subscription['orders_id']; ?></a>
-                        <?php } else { ?>
-                            -
-                        <?php } ?>
-                    </td>
-                    <td><?php echo zen_output_string_protected($subscription['domain']); ?></td>
-                    <td>
-                        $<?php echo number_format((float)$subscription['amount'], 2); ?>
-                        <span class="show-edit" onclick="toggleEdit(this)">(Edit)</span>
-                        <div class="edit-content">
-                            <input type="text" id="set_amount_<?php echo $subscription['saved_credit_card_recurring_id']; ?>" value="<?php echo $subscription['amount']; ?>" size="8" />
-                            <a class="inline-action" href="javascript:void(0);" onclick="updateAmount(<?php echo $subscription['saved_credit_card_recurring_id']; ?>)">Save</a>
-                        </div>
-                    </td>
-                    <td><?php echo zen_output_string_protected($subscription['period']); ?></td>
-                    <td><?php echo zen_output_string_protected($subscription['frequency']); ?></td>
-                    <td><?php echo zen_output_string_protected($subscription['cycles']); ?></td>
-                    <td>
-                        <?php echo $subscription['date']; ?>
-                        <?php if ($subscription['status'] == 'scheduled') { ?>
-                            <span class="show-edit" onclick="toggleEdit(this)">(Edit)</span>
-                            <div class="edit-content">
-                                <input type="date" id="set_date_<?php echo $subscription['saved_credit_card_recurring_id']; ?>" value="<?php echo $subscription['date']; ?>" />
-                                <a class="inline-action" href="javascript:void(0);" onclick="updateDate(<?php echo $subscription['saved_credit_card_recurring_id']; ?>)">Save</a>
-                            </div>
-                        <?php } ?>
-                    </td>
-                    <td>
-                        <?php echo zen_output_string_protected($subscription['card_type'] . ' ****' . $subscription['last_digits']); ?>
-                        <?php if ($subscription['status'] == 'scheduled' && !empty($customers_cards[$subscription['customers_id']])) { ?>
-                            <span class="show-edit" onclick="toggleEdit(this)">(Edit)</span>
-                            <div class="edit-content">
-                                <?php echo zen_draw_pull_down_menu('set_card_' . $subscription['saved_credit_card_recurring_id'], pull_down_format($customers_cards[$subscription['customers_id']], false), $subscription['saved_credit_card_id']); ?>
-                                <a class="inline-action" href="javascript:void(0);" onclick="updateCard(<?php echo $subscription['saved_credit_card_recurring_id']; ?>)">Save</a>
-                            </div>
-                        <?php } ?>
-                    </td>
-                    <td><?php echo zen_output_string_protected($subscription['status']); ?></td>
-                    <td>
-                        <?php if ($subscription['status'] == 'cancelled') { ?>
-                            <a class="action-btn btn-reactivate" href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, $query_string . '&action=reactivate_scheduled_payment&saved_card_recurring_id=' . $subscription['saved_credit_card_recurring_id']); ?>">Reactivate</a>
-                        <?php } elseif ($subscription['status'] == 'scheduled') { ?>
-                            <a class="action-btn btn-cancel" href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, $query_string . '&action=cancel_scheduled_payment&saved_card_recurring_id=' . $subscription['saved_credit_card_recurring_id']); ?>" onclick="return confirm('Cancel this subscription?');">Cancel</a>
-                        <?php } ?>
-                    </td>
-                </tr>
-            <?php } ?>
-            <?php if (empty($subscriptions)) { ?>
-                <tr><td colspan="13">No subscriptions found for the selected filters.</td></tr>
-            <?php } ?>
-        </tbody>
-    </table>
 </div>
 
 <?php require DIR_WS_INCLUDES . 'footer.php'; ?>
