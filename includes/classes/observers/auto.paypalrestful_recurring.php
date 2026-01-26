@@ -9,6 +9,7 @@
  * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
 
+use PayPalRestful\Common\Logger;
 use PayPalRestful\Common\SubscriptionManager;
 use PayPalRestful\Common\VaultManager;
 use Zencart\Traits\ObserverManager;
@@ -24,6 +25,9 @@ class zcObserverPaypalrestfulRecurring
 
     /** @var array<int,bool> */
     protected array $processedOrders = [];
+
+    /** @var Logger */
+    protected Logger $log;
 
     /**
      * Normalized attribute keys mapped to the values this observer understands.
@@ -72,13 +76,18 @@ class zcObserverPaypalrestfulRecurring
             (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS') && MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS === 'True') ||
             (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True') ||
             (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True')
+            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_STATUS') && MODULE_PAYMENT_PAYPALR_SAVEDCARD_STATUS === 'True')
         );
 
         if (!$anyModuleEnabled) {
             return;
         }
 
+        // Initialize logger only if we're actually going to attach to notifications
+        $this->log = new Logger('recurring-observer');
+        $this->log->write('PayPalRestful Recurring Observer: Initialized and attached to notifications.');
+        
         $this->attach($this, [
             'NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_CREATE_ADD_PRODUCTS',
             'NOTIFY_PAYPALR_VAULT_CARD_SAVED',
@@ -88,7 +97,16 @@ class zcObserverPaypalrestfulRecurring
     public function updateNotifyCheckoutProcessAfterOrderCreateAddProducts(&$class, $eventID, $params): void
     {
         $ordersId = (int)($_SESSION['order_number_created'] ?? 0);
+        
+        $this->log->write("==> Subscription Observer: NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_CREATE_ADD_PRODUCTS fired.");
+        $this->log->write("    Order ID: " . ($ordersId > 0 ? $ordersId : 'NOT SET'));
+        
         if ($ordersId <= 0 || isset($this->processedOrders[$ordersId])) {
+            if ($ordersId <= 0) {
+                $this->log->write("    Skipping: Order ID is not set or invalid.");
+            } else {
+                $this->log->write("    Skipping: Order #$ordersId already processed.");
+            }
             return;
         }
 
@@ -104,12 +122,15 @@ class zcObserverPaypalrestfulRecurring
         );
 
         if ($orderInfo->EOF) {
+            $this->log->write("    ERROR: Order #$ordersId not found in database.");
             return;
         }
 
         $customersId = (int)$orderInfo->fields['customers_id'];
         $currency = (string)($orderInfo->fields['currency'] ?? (defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : ''));
         $currencyValue = (float)($orderInfo->fields['currency_value'] ?? 1.0);
+        
+        $this->log->write("    Customer ID: $customersId, Currency: $currency, Currency Value: $currencyValue");
 
         $products = $db->Execute(
             "SELECT orders_products_id, products_id, products_name, products_quantity, final_price
@@ -118,20 +139,34 @@ class zcObserverPaypalrestfulRecurring
         );
 
         if ($products->EOF) {
+            $this->log->write("    No products found in order #$ordersId.");
             return;
         }
 
         $vaultRecord = $this->findVaultRecord($customersId, $ordersId);
         $loggedAny = false;
+        
+        if ($vaultRecord !== null) {
+            $this->log->write("    Vault record found: " . Logger::logJSON($vaultRecord));
+        } else {
+            $this->log->write("    No vault record found for customer #$customersId / order #$ordersId.");
+        }
 
         while (!$products->EOF) {
             $ordersProductsId = (int)$products->fields['orders_products_id'];
+            $this->log->write("    Checking product #$ordersProductsId: " . $products->fields['products_name']);
+            
             $attributeMap = $this->getAttributeMap($ordersProductsId);
+            $this->log->write("    Product attributes: " . Logger::logJSON($attributeMap));
+            
             $subscriptionAttributes = $this->extractSubscriptionAttributes($attributeMap);
             if ($subscriptionAttributes === null) {
+                $this->log->write("    Product #$ordersProductsId: No valid subscription attributes found, skipping.");
                 $products->MoveNext();
                 continue;
             }
+            
+            $this->log->write("    Product #$ordersProductsId: Valid subscription attributes extracted: " . Logger::logJSON($subscriptionAttributes));
 
             $status = SubscriptionManager::STATUS_PENDING;
             $paypalVaultId = 0;
@@ -143,13 +178,16 @@ class zcObserverPaypalrestfulRecurring
                 if ($vaultId === '' || $paypalVaultId === 0) {
                     // Vault is incomplete or not yet available
                     $status = SubscriptionManager::STATUS_AWAITING_VAULT;
+                    $this->log->write("    Vault incomplete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: AWAITING_VAULT");
                 } else {
                     // Vault is fully available (e.g., using a saved card from a previous order)
                     // Set status to 'active' immediately instead of 'pending'
                     $status = SubscriptionManager::STATUS_ACTIVE;
+                    $this->log->write("    Vault complete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: ACTIVE");
                 }
             } else {
                 $status = SubscriptionManager::STATUS_AWAITING_VAULT;
+                $this->log->write("    No vault record, status: AWAITING_VAULT");
             }
 
             $subscriptionId = SubscriptionManager::logSubscription([
@@ -178,15 +216,21 @@ class zcObserverPaypalrestfulRecurring
 
             if ($subscriptionId > 0) {
                 $loggedAny = true;
+                $this->log->write("    SUCCESS: Subscription #$subscriptionId created for product #$ordersProductsId.");
+            } else {
+                $this->log->write("    ERROR: Failed to create subscription for product #$ordersProductsId.");
             }
 
             $products->MoveNext();
         }
 
         if ($loggedAny) {
+            $this->log->write("    Subscription(s) created successfully, triggering NOTIFY_RECURRING_ORDER_LOGGED.");
             $zco_notifier->notify('NOTIFY_RECURRING_ORDER_LOGGED', [
                 'orders_id' => $ordersId,
             ]);
+        } else {
+            $this->log->write("    No subscriptions were created for order #$ordersId.");
         }
     }
 
@@ -203,9 +247,14 @@ class zcObserverPaypalrestfulRecurring
      */
     public function updateNotifyPaypalrVaultCardSaved(&$class, $eventID, $vaultRecord): void
     {
+        $this->log->write("==> Subscription Observer: NOTIFY_PAYPALR_VAULT_CARD_SAVED fired.");
+        
         if (!is_array($vaultRecord) || empty($vaultRecord)) {
+            $this->log->write("    ERROR: Vault record is empty or invalid.");
             return;
         }
+        
+        $this->log->write("    Vault record received: " . Logger::logJSON($vaultRecord));
 
         $customersId = (int)($vaultRecord['customers_id'] ?? 0);
         $ordersId = (int)($vaultRecord['orders_id'] ?? 0);
@@ -213,6 +262,7 @@ class zcObserverPaypalrestfulRecurring
         $vaultId = (string)($vaultRecord['vault_id'] ?? '');
 
         if ($customersId <= 0 || $ordersId <= 0 || $paypalVaultId <= 0 || $vaultId === '') {
+            $this->log->write("    ERROR: Incomplete vault record data (customers_id=$customersId, orders_id=$ordersId, paypal_vault_id=$paypalVaultId, vault_id=$vaultId).");
             return;
         }
 
@@ -223,6 +273,8 @@ class zcObserverPaypalrestfulRecurring
             $paypalVaultId,
             $vaultId
         );
+        
+        $this->log->write("    Activated $activatedCount subscription(s) with vault (customer #$customersId, order #$ordersId).");
 
         if ($activatedCount > 0) {
             global $zco_notifier;
@@ -232,6 +284,7 @@ class zcObserverPaypalrestfulRecurring
                 'vault_id' => $vaultId,
                 'activated_count' => $activatedCount,
             ]);
+            $this->log->write("    NOTIFY_SUBSCRIPTIONS_ACTIVATED notification sent.");
         }
     }
 
