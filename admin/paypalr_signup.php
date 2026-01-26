@@ -366,106 +366,53 @@ function renderSignupPage(): void
     
     ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo defined('HTML_PARAMS') ? HTML_PARAMS : 'lang="en"'; ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PayPal Signup</title>
+    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
     <style>
-        * { box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 700px;
-            margin: 40px auto;
-            padding: 20px;
-            background: #f0f2f5;
-            line-height: 1.5;
-        }
-        .container {
-            background: white;
-            border-radius: 12px;
-            padding: 32px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        h1 {
-            color: #1a1a2e;
-            margin: 0 0 8px 0;
-            font-size: 24px;
-        }
-        .subtitle {
-            color: #666;
-            margin: 0 0 24px 0;
+            margin: 0;
+            padding: 0;
         }
         .status {
-            padding: 14px 16px;
-            margin: 16px 0;
-            border-radius: 8px;
             display: none;
         }
-        .status.info { background: #e3f2fd; color: #1565c0; }
-        .status.success { background: #e8f5e9; color: #2e7d32; }
-        .status.error { background: #ffebee; color: #c62828; }
         .status.show { display: block; }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        .form-group label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 6px;
-            color: #333;
-        }
-        .form-group select {
-            width: 100%;
-            padding: 10px 12px;
-            font-size: 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-        }
-        .btn {
-            background: #0070ba;
-            color: white;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-        }
-        .btn:hover { background: #005ea6; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; }
-        .btn-secondary {
-            background: #f5f5f5;
-            color: #333;
-            margin-left: 12px;
-        }
-        .btn-secondary:hover { background: #e0e0e0; }
         .credentials {
-            background: #f8f9fa;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 20px;
+            background: rgba(4, 191, 191, 0.06);
+            border: 1px solid var(--nmx-border);
+            border-radius: 12px;
+            padding: 24px;
             margin: 20px 0;
         }
         .credentials h3 {
-            margin: 0 0 16px 0;
-            color: #2e7d32;
+            margin: 0 0 18px 0;
+            color: var(--nmx-secondary);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
         }
         .cred-row {
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         .cred-label {
             font-weight: 600;
-            color: #555;
+            color: var(--nmx-dark);
             display: block;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
         }
         .cred-value {
             font-family: 'Monaco', 'Menlo', monospace;
-            background: white;
-            padding: 8px 12px;
-            border-radius: 4px;
-            border: 1px solid #ddd;
+            background: var(--nmx-surface);
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--nmx-border);
             word-break: break-all;
             font-size: 13px;
             display: flex;
@@ -483,19 +430,21 @@ function renderSignupPage(): void
             flex-shrink: 0;
         }
         .cred-btn {
-            background: none;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 4px 8px;
+            background: var(--nmx-surface);
+            border: 1px solid var(--nmx-border);
+            border-radius: 6px;
+            padding: 6px 10px;
             cursor: pointer;
-            color: #555;
+            color: var(--nmx-secondary);
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: all 0.2s ease-in-out;
         }
         .cred-btn:hover {
-            background: #f0f0f0;
-            color: #333;
+            background: var(--nmx-secondary);
+            color: #ffffff;
+            border-color: var(--nmx-secondary);
         }
         .cred-btn svg {
             width: 16px;
@@ -503,18 +452,19 @@ function renderSignupPage(): void
         }
         .cred-feedback {
             font-size: 11px;
-            color: #2e7d32;
+            color: var(--nmx-secondary);
             margin-left: 8px;
+            font-weight: 600;
         }
         .cred-note {
-            background: #fffbeb;
+            background: rgba(255, 193, 7, 0.12);
             border: 1px solid #fbbf24;
-            border-radius: 6px;
-            padding: 12px;
-            margin-top: 16px;
+            border-radius: 8px;
+            padding: 14px;
+            margin-top: 18px;
             display: flex;
             align-items: flex-start;
-            gap: 10px;
+            gap: 12px;
             font-size: 13px;
             color: #92400e;
         }
@@ -523,101 +473,108 @@ function renderSignupPage(): void
             width: 18px;
             height: 18px;
         }
-        .actions {
-            margin-top: 24px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-        .back-link {
-            color: #0070ba;
-            text-decoration: none;
-        }
-        .back-link:hover { text-decoration: underline; }
         .popup-message {
             text-align: center;
-            padding: 40px;
+            padding: 48px;
         }
         .popup-message h2 {
-            color: #2e7d32;
-            margin-bottom: 16px;
+            color: var(--nmx-secondary);
+            margin-bottom: 18px;
+            font-weight: 700;
         }
     </style>
 </head>
 <body>
-    <div class="container">
+<div class="nmx-module">
+    <div class="nmx-container">
         <?php 
         // Use zen_draw_form to create a form with automatic securityToken hidden input
         echo zen_draw_form('paypal_signup', basename($_SERVER['SCRIPT_NAME']), '', 'post', 'id="paypal-signup-form"');
         ?>
         <div id="main-content">
-            <h1>PayPal Account Setup</h1>
-            <p class="subtitle">Connect your PayPal account to accept payments</p>
+            <div class="nmx-container-header">
+                <h1>PayPal Account Setup</h1>
+                <p class="nmx-container-subtitle">Connect your PayPal account to accept payments</p>
+            </div>
             
-            <div id="status" class="status"></div>
+            <div id="status" class="status nmx-alert"></div>
             
             <div id="start-section">
-                <div class="form-group">
-                    <label for="environment">Environment</label>
-                    <select id="environment" name="environment">
-                        <option value="live">Production (Live)</option>
-                        <option value="sandbox">Sandbox (Testing)</option>
-                    </select>
-                </div>
-                
-                <div class="actions">
-                    <button type="button" id="start-btn" class="btn">Start PayPal Setup</button>
-                    <a href="<?php echo $modulesPageUrl; ?>" class="back-link">← Back to Modules</a>
+                <div class="nmx-panel">
+                    <div class="nmx-panel-heading">
+                        <div class="nmx-panel-title">Environment Selection</div>
+                    </div>
+                    <div class="nmx-panel-body">
+                        <div class="nmx-form-group">
+                            <label for="environment">Environment</label>
+                            <select id="environment" name="environment" class="nmx-form-control">
+                                <option value="live">Production (Live)</option>
+                                <option value="sandbox">Sandbox (Testing)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="nmx-form-actions">
+                            <button type="button" id="start-btn" class="nmx-btn nmx-btn-primary">Start PayPal Setup</button>
+                            <a href="<?php echo $modulesPageUrl; ?>" class="nmx-btn nmx-btn-default">← Back to Modules</a>
+                        </div>
+                    </div>
                 </div>
             </div>
             
             <div id="credentials-section" style="display: none;">
-                <div class="credentials">
-                    <h3>✓ PayPal Account Connected</h3>
-                    <div class="cred-row">
-                        <span class="cred-label">Environment</span>
-                        <div class="cred-value"><span class="cred-text" id="cred-env"></span></div>
+                <div class="nmx-panel">
+                    <div class="nmx-panel-heading">
+                        <div class="nmx-panel-title">✓ PayPal Account Connected</div>
                     </div>
-                    <div class="cred-row" id="cred-client-id-row" data-value="">
-                        <span class="cred-label">Client ID</span>
-                        <div class="cred-value">
-                            <span class="cred-text" id="cred-client-id"></span>
-                            <div class="cred-actions">
-                                <button type="button" class="cred-btn" data-action="copy" data-target="cred-client-id" title="Copy Client ID">
-                                    <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.25 6.25h-5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5.75 11.75H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v.54" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                                </button>
+                    <div class="nmx-panel-body">
+                        <div class="credentials">
+                            <h3>API Credentials</h3>
+                            <div class="cred-row">
+                                <span class="cred-label">Environment</span>
+                                <div class="cred-value"><span class="cred-text" id="cred-env"></span></div>
                             </div>
-                            <span class="cred-feedback" id="cred-client-id-feedback"></span>
+                            <div class="cred-row" id="cred-client-id-row" data-value="">
+                                <span class="cred-label">Client ID</span>
+                                <div class="cred-value">
+                                    <span class="cred-text" id="cred-client-id"></span>
+                                    <div class="cred-actions">
+                                        <button type="button" class="cred-btn" data-action="copy" data-target="cred-client-id" title="Copy Client ID">
+                                            <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.25 6.25h-5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5.75 11.75H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v.54" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                        </button>
+                                    </div>
+                                    <span class="cred-feedback" id="cred-client-id-feedback"></span>
+                                </div>
+                            </div>
+                            <div class="cred-row" id="cred-client-secret-row" data-value="">
+                                <span class="cred-label">Client Secret</span>
+                                <div class="cred-value">
+                                    <span class="cred-text" id="cred-client-secret" data-masked="true"></span>
+                                    <div class="cred-actions">
+                                        <button type="button" class="cred-btn" data-action="reveal" data-target="cred-client-secret" title="Show/Hide Secret">
+                                            <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 9s2.25-4.5 7.5-4.5S16.5 9 16.5 9s-2.25 4.5-7.5 4.5S1.5 9 1.5 9Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M11.25 9a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                        </button>
+                                        <button type="button" class="cred-btn" data-action="copy" data-target="cred-client-secret" title="Copy Secret">
+                                            <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.25 6.25h-5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5.75 11.75H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v.54" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                        </button>
+                                    </div>
+                                    <span class="cred-feedback" id="cred-client-secret-feedback"></span>
+                                </div>
+                            </div>
+                            <div class="cred-note">
+                                <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M8 1.33334L1.33334 14.6667H14.6667L8 1.33334Z" stroke="#92400e" stroke-width="1.5" stroke-linejoin="round"></path>
+                                    <path d="M8 6.5V9.83334" stroke="#92400e" stroke-width="1.5" stroke-linecap="round"></path>
+                                    <circle cx="8" cy="11.8333" r="0.666667" fill="#92400e"></circle>
+                                </svg>
+                                <span>Store these credentials securely. Do not share them publicly.</span>
+                            </div>
+                        </div>
+                        
+                        <div class="nmx-form-actions">
+                            <button type="button" id="save-btn" class="nmx-btn nmx-btn-success">Save to Configuration</button>
+                            <a href="<?php echo $modulesPageUrl; ?>" class="nmx-btn nmx-btn-default">Return to Modules</a>
                         </div>
                     </div>
-                    <div class="cred-row" id="cred-client-secret-row" data-value="">
-                        <span class="cred-label">Client Secret</span>
-                        <div class="cred-value">
-                            <span class="cred-text" id="cred-client-secret" data-masked="true"></span>
-                            <div class="cred-actions">
-                                <button type="button" class="cred-btn" data-action="reveal" data-target="cred-client-secret" title="Show/Hide Secret">
-                                    <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 9s2.25-4.5 7.5-4.5S16.5 9 16.5 9s-2.25 4.5-7.5 4.5S1.5 9 1.5 9Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M11.25 9a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                                </button>
-                                <button type="button" class="cred-btn" data-action="copy" data-target="cred-client-secret" title="Copy Secret">
-                                    <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.25 6.25h-5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5.75 11.75H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v.54" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                                </button>
-                            </div>
-                            <span class="cred-feedback" id="cred-client-secret-feedback"></span>
-                        </div>
-                    </div>
-                    <div class="cred-note">
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M8 1.33334L1.33334 14.6667H14.6667L8 1.33334Z" stroke="#92400e" stroke-width="1.5" stroke-linejoin="round"></path>
-                            <path d="M8 6.5V9.83334" stroke="#92400e" stroke-width="1.5" stroke-linecap="round"></path>
-                            <circle cx="8" cy="11.8333" r="0.666667" fill="#92400e"></circle>
-                        </svg>
-                        <span>Store these credentials securely. Do not share them publicly.</span>
-                    </div>
-                </div>
-                
-                <div class="actions">
-                    <button type="button" id="save-btn" class="btn">Save to Configuration</button>
-                    <a href="<?php echo $modulesPageUrl; ?>" class="back-link">Return to Modules</a>
                 </div>
             </div>
         </div>
@@ -630,7 +587,14 @@ function renderSignupPage(): void
             </div>
         </div>
         </form>
+        
+        <div class="nmx-footer">
+            <a href="https://www.numinix.com" target="_blank" rel="noopener noreferrer" class="nmx-footer-logo">
+                <img src="images/numinix_logo.png" alt="Numinix">
+            </a>
+        </div>
     </div>
+</div>
     
     <script>
     (function() {
@@ -694,11 +658,15 @@ function renderSignupPage(): void
         
         function setStatus(text, type) {
             statusEl.textContent = text;
-            statusEl.className = 'status ' + (type || 'info') + ' show';
+            var alertClass = 'nmx-alert-info';
+            if (type === 'success') alertClass = 'nmx-alert-success';
+            if (type === 'error') alertClass = 'nmx-alert-error';
+            if (type === 'warning') alertClass = 'nmx-alert-warning';
+            statusEl.className = 'status nmx-alert ' + alertClass + ' show';
         }
         
         function clearStatus() {
-            statusEl.className = 'status';
+            statusEl.className = 'status nmx-alert';
         }
         
         function maskSecret(value) {

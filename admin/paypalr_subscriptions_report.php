@@ -638,101 +638,85 @@ foreach ($typeCounts as $count) {
 <html <?php echo HTML_PARAMS; ?>>
 <head>
     <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
+    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
     <title><?php echo HEADING_TITLE; ?></title>
-    <style>
-        .report-container { padding: 1.5rem; }
-        .filter-panel, .summary-panel, .results-panel { margin-bottom: 1.5rem; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
-        .panel-title { font-weight: bold; font-size: 1.1em; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #eee; }
-        .filter-form { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
-        .filter-form .form-group { min-width: 150px; }
-        .filter-form label { display: block; font-weight: bold; margin-bottom: 0.25rem; }
-        .filter-form select, .filter-form input[type="text"] { width: 100%; padding: 5px; }
-        .summary-stats { display: flex; flex-wrap: wrap; gap: 2rem; }
-        .summary-stat { }
-        .summary-stat-label { font-weight: bold; }
-        .summary-stat-value { font-size: 1.5em; color: #337ab7; }
-        .summary-list { margin: 0.5rem 0 0 1rem; padding: 0; list-style: disc; }
-        .report-table { width: 100%; border-collapse: collapse; }
-        .report-table th, .report-table td { border: 1px solid #ccc; padding: 0.5rem; vertical-align: top; }
-        .report-table th { background: #f8f8f8; text-align: left; }
-        .report-table th a { text-decoration: none; color: inherit; }
-        .report-table th a:hover { text-decoration: underline; }
-        .type-list, .status-list, .plan-list, .annual-list { margin: 0; padding: 0 0 0 1rem; list-style: disc; font-size: 0.9em; }
-        .plan-amount { font-weight: bold; }
-        .plan-billing { color: #666; }
-        .plan-count { color: #337ab7; }
-        .plan-annual { color: #5cb85c; font-size: 0.9em; }
-        .btn { padding: 5px 15px; text-decoration: none; border-radius: 3px; display: inline-block; }
-        .btn-primary { background: #337ab7; color: #fff; border: none; cursor: pointer; }
-        .btn-default { background: #f0f0f0; color: #333; border: 1px solid #ccc; }
-    </style>
 </head>
 <body>
 <?php require DIR_WS_INCLUDES . 'header.php'; ?>
-<div class="report-container">
-    <h1><?php echo HEADING_TITLE; ?></h1>
-    
-    <div class="filter-panel">
-        <div class="panel-title"><?php echo TEXT_PANEL_FILTERS; ?></div>
-        <?php echo zen_draw_form('paypalr_filter_report', FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT, '', 'get', 'class="filter-form"'); ?>
-            <div class="form-group">
-                <label for="status-filter"><?php echo TEXT_FILTER_STATUS; ?></label>
-                <select name="status" id="status-filter">
+<div class="nmx-module">
+    <div class="nmx-container">
+        <div class="nmx-container-header">
+            <h1><?php echo HEADING_TITLE; ?></h1>
+        </div>
+        
+        <div class="nmx-panel">
+            <div class="nmx-panel-heading">
+                <div class="nmx-panel-title"><?php echo TEXT_PANEL_FILTERS; ?></div>
+            </div>
+            <div class="nmx-panel-body">
+                <?php echo zen_draw_form('paypalr_filter_report', FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT, '', 'get', 'class="nmx-form-inline"'); ?>
+                    <div class="nmx-form-group">
+                        <label for="status-filter"><?php echo TEXT_FILTER_STATUS; ?></label>
+                        <select name="status" id="status-filter" class="nmx-form-control">
                     <option value="active" <?php echo $statusFilter === 'active' ? 'selected' : ''; ?>><?php echo TEXT_FILTER_STATUS_ACTIVE; ?></option>
                     <option value="suspended" <?php echo $statusFilter === 'suspended' ? 'selected' : ''; ?>><?php echo TEXT_FILTER_STATUS_SUSPENDED; ?></option>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="nmx-form-group">
                 <label for="type-filter"><?php echo TEXT_FILTER_TYPE; ?></label>
-                <select name="type" id="type-filter">
+                <select name="type" id="type-filter" class="nmx-form-control">
                     <option value="all" <?php echo $typeFilter === 'all' ? 'selected' : ''; ?>><?php echo TEXT_FILTER_TYPE_ALL; ?></option>
                     <option value="paypal" <?php echo $typeFilter === 'paypal' ? 'selected' : ''; ?>><?php echo TEXT_FILTER_TYPE_PAYPAL; ?></option>
                     <option value="savedcard" <?php echo $typeFilter === 'savedcard' ? 'selected' : ''; ?>><?php echo TEXT_FILTER_TYPE_SAVED_CARD; ?></option>
                     <option value="rest" <?php echo $typeFilter === 'rest' ? 'selected' : ''; ?>><?php echo TEXT_FILTER_TYPE_REST; ?></option>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="nmx-form-group">
                 <label for="search-filter"><?php echo TEXT_FILTER_SEARCH; ?></label>
-                <input type="text" name="search" id="search-filter" value="<?php echo zen_output_string_protected($searchTerm); ?>">
+                <input type="text" name="search" id="search-filter" value="<?php echo zen_output_string_protected($searchTerm); ?>" class="nmx-form-control">
             </div>
-            <div class="form-group">
-                <button type="submit" class="btn btn-primary"><?php echo TEXT_BUTTON_FILTER; ?></button>
-                <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT); ?>" class="btn btn-default"><?php echo TEXT_BUTTON_RESET; ?></a>
+            <div class="nmx-form-actions">
+                <button type="submit" class="nmx-btn nmx-btn-primary"><?php echo TEXT_BUTTON_FILTER; ?></button>
+                <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT); ?>" class="nmx-btn nmx-btn-default"><?php echo TEXT_BUTTON_RESET; ?></a>
             </div>
             <?php echo zen_draw_hidden_field('sort', $sortField); ?>
             <?php echo zen_draw_hidden_field('dir', $sortDirection); ?>
         </form>
     </div>
-    
-    <div class="summary-panel">
-        <div class="panel-title"><?php echo TEXT_PANEL_SUMMARY; ?></div>
-        <div class="summary-stats">
-            <div class="summary-stat">
-                <div class="summary-stat-label"><?php echo TEXT_SUBSCRIPTION_COUNT; ?></div>
-                <div class="summary-stat-value"><?php echo number_format($totalSubscriptions); ?></div>
+</div>
+
+<div class="nmx-panel">
+    <div class="nmx-panel-heading">
+        <div class="nmx-panel-title"><?php echo TEXT_PANEL_SUMMARY; ?></div>
+    </div>
+    <div class="nmx-panel-body">
+        <div style="display: flex; flex-wrap: wrap; gap: 3rem;">
+            <div>
+                <div style="font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nmx-dark); margin-bottom: 8px;"><?php echo TEXT_SUBSCRIPTION_COUNT; ?></div>
+                <div style="font-size: 2em; color: var(--nmx-primary); font-weight: 700;"><?php echo number_format($totalSubscriptions); ?></div>
             </div>
             <?php if ($totalSubscriptions > 0) { ?>
-                <div class="summary-stat">
-                    <div class="summary-stat-label"><?php echo TEXT_TOTAL_ANNUAL_VALUE; ?></div>
+                <div>
+                    <div style="font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nmx-dark); margin-bottom: 8px;"><?php echo TEXT_TOTAL_ANNUAL_VALUE; ?></div>
                     <?php if (!empty($annualTotals)) { ?>
-                        <ul class="summary-list">
+                        <ul style="margin: 0; padding: 0 0 0 1.2rem; list-style: none;">
                             <?php foreach ($annualTotals as $currencyCode => $total) { ?>
-                                <li><strong><?php echo zen_output_string_protected($currencyCode); ?>:</strong> <?php echo asr_format_currency($currencies, $total, $currencyCode); ?></li>
+                                <li style="margin-bottom: 4px;"><strong><?php echo zen_output_string_protected($currencyCode); ?>:</strong> <span style="color: var(--nmx-secondary); font-weight: 600;"><?php echo asr_format_currency($currencies, $total, $currencyCode); ?></span></li>
                             <?php } ?>
                         </ul>
                     <?php } else { ?>
                         <div><?php echo TEXT_VALUE_NOT_AVAILABLE; ?></div>
                     <?php } ?>
                 </div>
-                <div class="summary-stat">
-                    <div class="summary-stat-label"><?php echo TEXT_TYPE_BREAKDOWN; ?></div>
+                <div>
+                    <div style="font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nmx-dark); margin-bottom: 8px;"><?php echo TEXT_TYPE_BREAKDOWN; ?></div>
                     <?php if ($hasTypeBreakdown) { ?>
-                        <ul class="summary-list">
+                        <ul style="margin: 0; padding: 0 0 0 1.2rem; list-style: none;">
                             <?php foreach ($typeCounts as $typeKey => $count) {
                                 if ($count <= 0) continue;
                                 $label = isset($typeLabels[$typeKey]) ? $typeLabels[$typeKey] : ucfirst($typeKey);
                                 ?>
-                                <li><?php echo zen_output_string_protected($label); ?>: <?php echo number_format($count); ?></li>
+                                <li style="margin-bottom: 4px;"><?php echo zen_output_string_protected($label); ?>: <span style="color: var(--nmx-secondary); font-weight: 600;"><?php echo number_format($count); ?></span></li>
                             <?php } ?>
                         </ul>
                     <?php } else { ?>
@@ -742,87 +726,101 @@ foreach ($typeCounts as $count) {
             <?php } ?>
         </div>
     </div>
-    
-    <div class="results-panel">
-        <div class="panel-title"><?php echo TEXT_PANEL_RESULTS; ?></div>
+</div>
+
+<div class="nmx-panel">
+    <div class="nmx-panel-heading">
+        <div class="nmx-panel-title"><?php echo TEXT_PANEL_RESULTS; ?></div>
+    </div>
+    <div class="nmx-panel-body">
         <?php if ($totalSubscriptions === 0) { ?>
             <p><?php echo TEXT_NO_SUBSCRIPTIONS; ?></p>
         <?php } else { ?>
-            <table class="report-table">
-                <thead>
-                    <tr>
-                        <th><a href="<?php echo asr_build_sort_link('product', $sortField, $sortDirection); ?>"><?php echo TABLE_HEADING_PRODUCT . asr_sort_indicator('product', $sortField, $sortDirection); ?></a></th>
-                        <th><a href="<?php echo asr_build_sort_link('subscriptions', $sortField, $sortDirection); ?>"><?php echo TABLE_HEADING_SUBSCRIPTION_COUNT . asr_sort_indicator('subscriptions', $sortField, $sortDirection); ?></a></th>
-                        <th><?php echo TABLE_HEADING_TYPES; ?></th>
-                        <th><?php echo TABLE_HEADING_STATUSES; ?></th>
-                        <th><?php echo TABLE_HEADING_BILLING_PROFILES; ?></th>
-                        <th><a href="<?php echo asr_build_sort_link('next_billing', $sortField, $sortDirection); ?>"><?php echo TABLE_HEADING_NEXT_BILLING . asr_sort_indicator('next_billing', $sortField, $sortDirection); ?></a></th>
-                        <th><a href="<?php echo asr_build_sort_link('annual_value', $sortField, $sortDirection); ?>"><?php echo TABLE_HEADING_ANNUAL_VALUE . asr_sort_indicator('annual_value', $sortField, $sortDirection); ?></a></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($subscriptions as $subscription) { ?>
+            <div class="nmx-table-responsive">
+                <table class="nmx-table nmx-table-striped">
+                    <thead>
                         <tr>
-                            <td><?php echo zen_output_string_protected($subscription['product']); ?></td>
-                            <td><?php echo number_format((int)$subscription['subscription_count']); ?></td>
-                            <td>
-                                <?php if (!empty($subscription['type_list'])) { ?>
-                                    <ul class="type-list">
-                                        <?php foreach ($subscription['type_list'] as $typeItem) { ?>
-                                            <li><?php echo zen_output_string_protected($typeItem['label']); ?>: <?php echo number_format((int)$typeItem['count']); ?></li>
-                                        <?php } ?>
-                                    </ul>
-                                <?php } else { ?>
-                                    <?php echo TEXT_VALUE_NOT_AVAILABLE; ?>
-                                <?php } ?>
-                            </td>
-                            <td>
-                                <?php if (!empty($subscription['status_list'])) { ?>
-                                    <ul class="status-list">
-                                        <?php foreach ($subscription['status_list'] as $statusItem) { ?>
-                                            <li><?php echo zen_output_string_protected($statusItem['label']); ?>: <?php echo number_format((int)$statusItem['count']); ?></li>
-                                        <?php } ?>
-                                    </ul>
-                                <?php } else { ?>
-                                    <?php echo TEXT_VALUE_NOT_AVAILABLE; ?>
-                                <?php } ?>
-                            </td>
-                            <td>
-                                <?php if (!empty($subscription['plan_list'])) { ?>
-                                    <ul class="plan-list">
-                                        <?php foreach ($subscription['plan_list'] as $planItem) { ?>
-                                            <li>
-                                                <span class="plan-amount"><?php echo $planItem['amount_display']; ?></span>
-                                                <span class="plan-billing"><?php echo zen_output_string_protected($planItem['billing_display']); ?></span>
-                                                <span class="plan-count">&times; <?php echo number_format((int)$planItem['count']); ?></span>
-                                                <?php if ($planItem['annual_display'] !== null) { ?>
-                                                    <span class="plan-annual">(<?php echo sprintf(TEXT_PLAN_ANNUAL_VALUE, $planItem['annual_display']); ?>)</span>
-                                                <?php } ?>
-                                            </li>
-                                        <?php } ?>
-                                    </ul>
-                                <?php } else { ?>
-                                    <?php echo TEXT_VALUE_NOT_AVAILABLE; ?>
-                                <?php } ?>
-                            </td>
-                            <td><?php echo zen_output_string_protected($subscription['next_billing_display']); ?></td>
-                            <td>
-                                <?php if (!empty($subscription['annual_list'])) { ?>
-                                    <ul class="annual-list">
-                                        <?php foreach ($subscription['annual_list'] as $annualItem) { ?>
-                                            <li><strong><?php echo zen_output_string_protected($annualItem['currency']); ?>:</strong> <?php echo $annualItem['display']; ?></li>
-                                        <?php } ?>
-                                    </ul>
-                                <?php } else { ?>
-                                    <?php echo TEXT_VALUE_NOT_AVAILABLE; ?>
-                                <?php } ?>
-                            </td>
+                            <th><a href="<?php echo asr_build_sort_link('product', $sortField, $sortDirection); ?>"><?php echo TABLE_HEADING_PRODUCT . asr_sort_indicator('product', $sortField, $sortDirection); ?></a></th>
+                            <th><a href="<?php echo asr_build_sort_link('subscriptions', $sortField, $sortDirection); ?>"><?php echo TABLE_HEADING_SUBSCRIPTION_COUNT . asr_sort_indicator('subscriptions', $sortField, $sortDirection); ?></a></th>
+                            <th><?php echo TABLE_HEADING_TYPES; ?></th>
+                            <th><?php echo TABLE_HEADING_STATUSES; ?></th>
+                            <th><?php echo TABLE_HEADING_BILLING_PROFILES; ?></th>
+                            <th><a href="<?php echo asr_build_sort_link('next_billing', $sortField, $sortDirection); ?>"><?php echo TABLE_HEADING_NEXT_BILLING . asr_sort_indicator('next_billing', $sortField, $sortDirection); ?></a></th>
+                            <th><a href="<?php echo asr_build_sort_link('annual_value', $sortField, $sortDirection); ?>"><?php echo TABLE_HEADING_ANNUAL_VALUE . asr_sort_indicator('annual_value', $sortField, $sortDirection); ?></a></th>
                         </tr>
-                    <?php } ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($subscriptions as $subscription) { ?>
+                            <tr>
+                                <td><strong><?php echo zen_output_string_protected($subscription['product']); ?></strong></td>
+                                <td><?php echo number_format((int)$subscription['subscription_count']); ?></td>
+                                <td>
+                                    <?php if (!empty($subscription['type_list'])) { ?>
+                                        <ul style="margin: 0; padding: 0 0 0 1.2rem; list-style: disc; font-size: 0.9em;">
+                                            <?php foreach ($subscription['type_list'] as $typeItem) { ?>
+                                                <li><?php echo zen_output_string_protected($typeItem['label']); ?>: <?php echo number_format((int)$typeItem['count']); ?></li>
+                                            <?php } ?>
+                                        </ul>
+                                    <?php } else { ?>
+                                        <?php echo TEXT_VALUE_NOT_AVAILABLE; ?>
+                                    <?php } ?>
+                                </td>
+                                <td>
+                                    <?php if (!empty($subscription['status_list'])) { ?>
+                                        <ul style="margin: 0; padding: 0 0 0 1.2rem; list-style: disc; font-size: 0.9em;">
+                                            <?php foreach ($subscription['status_list'] as $statusItem) { ?>
+                                                <li><?php echo zen_output_string_protected($statusItem['label']); ?>: <?php echo number_format((int)$statusItem['count']); ?></li>
+                                            <?php } ?>
+                                        </ul>
+                                    <?php } else { ?>
+                                        <?php echo TEXT_VALUE_NOT_AVAILABLE; ?>
+                                    <?php } ?>
+                                </td>
+                                <td>
+                                    <?php if (!empty($subscription['plan_list'])) { ?>
+                                        <ul style="margin: 0; padding: 0 0 0 1.2rem; list-style: disc; font-size: 0.9em;">
+                                            <?php foreach ($subscription['plan_list'] as $planItem) { ?>
+                                                <li>
+                                                    <strong><?php echo $planItem['amount_display']; ?></strong>
+                                                    <span style="color: #666;"><?php echo zen_output_string_protected($planItem['billing_display']); ?></span>
+                                                    <span style="color: var(--nmx-secondary);">&times; <?php echo number_format((int)$planItem['count']); ?></span>
+                                                    <?php if ($planItem['annual_display'] !== null) { ?>
+                                                        <span style="color: #5cb85c; font-size: 0.9em;">(<?php echo sprintf(TEXT_PLAN_ANNUAL_VALUE, $planItem['annual_display']); ?>)</span>
+                                                    <?php } ?>
+                                                </li>
+                                            <?php } ?>
+                                        </ul>
+                                    <?php } else { ?>
+                                        <?php echo TEXT_VALUE_NOT_AVAILABLE; ?>
+                                    <?php } ?>
+                                </td>
+                                <td><?php echo zen_output_string_protected($subscription['next_billing_display']); ?></td>
+                                <td>
+                                    <?php if (!empty($subscription['annual_list'])) { ?>
+                                        <ul style="margin: 0; padding: 0 0 0 1.2rem; list-style: disc; font-size: 0.9em;">
+                                            <?php foreach ($subscription['annual_list'] as $annualItem) { ?>
+                                                <li><strong><?php echo zen_output_string_protected($annualItem['currency']); ?>:</strong> <?php echo $annualItem['display']; ?></li>
+                                            <?php } ?>
+                                        </ul>
+                                    <?php } else { ?>
+                                        <?php echo TEXT_VALUE_NOT_AVAILABLE; ?>
+                                    <?php } ?>
+                                </td>
+                            </tr>
+                        <?php } ?>
+                    </tbody>
+                </table>
+            </div>
         <?php } ?>
     </div>
+</div>
+
+<div class="nmx-footer">
+    <a href="https://www.numinix.com" target="_blank" rel="noopener noreferrer" class="nmx-footer-logo">
+        <img src="images/numinix_logo.png" alt="Numinix">
+    </a>
+</div>
+</div>
 </div>
 <?php require DIR_WS_INCLUDES . 'footer.php'; ?>
 </body>

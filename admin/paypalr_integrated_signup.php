@@ -335,131 +335,59 @@ function paypalr_render_onboarding_page(): void
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>PayPal Integrated Signup</title>
+        <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
         <style>
-            body {
-                font-family: Arial, sans-serif;
-                max-width: 800px;
-                margin: 40px auto;
-                padding: 20px;
-                background: #f5f5f5;
-            }
-            .isu-container {
-                background: white;
-                border-radius: 8px;
-                padding: 30px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            h1 {
-                color: #333;
-                margin-top: 0;
-            }
-            .status {
-                padding: 15px;
-                margin: 20px 0;
-                border-radius: 4px;
+            #status {
                 display: none;
             }
-            .status.info {
-                background: #e7f3ff;
-                color: #0066cc;
-                border-left: 4px solid #0066cc;
-            }
-            .status.success {
-                background: #e6f7e6;
-                color: #2d7a2d;
-                border-left: 4px solid #2d7a2d;
-            }
-            .status.error {
-                background: #ffe6e6;
-                color: #cc0000;
-                border-left: 4px solid #cc0000;
-            }
-            .credentials {
-                background: #f9f9f9;
-                padding: 20px;
-                border-radius: 4px;
-                margin: 20px 0;
-                border: 1px solid #ddd;
-            }
-            .credentials dt {
-                font-weight: bold;
-                margin-top: 10px;
-            }
-            .credentials dd {
-                margin: 5px 0 15px 0;
-                font-family: monospace;
-                background: white;
-                padding: 8px;
-                border-radius: 3px;
-                word-break: break-all;
-            }
-            button, a.button {
-                background: #0066cc;
-                color: white;
-                border: none;
-                padding: 12px 24px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 16px;
-                text-decoration: none;
-                display: inline-block;
-            }
-            button:hover, a.button:hover {
-                background: #0052a3;
-            }
-            button:disabled {
-                background: #ccc;
-                cursor: not-allowed;
-            }
-            .actions {
-                margin-top: 20px;
-            }
-            .environment-select {
-                margin: 20px 0;
-            }
-            .environment-select label {
+            #status.nmx-alert {
                 display: block;
-                font-weight: bold;
-                margin-bottom: 8px;
-            }
-            .environment-select select {
-                padding: 8px 10px;
-                font-size: 14px;
-            }
-            .actions a {
-                color: #0066cc;
-                text-decoration: none;
-                margin-left: 15px;
-            }
-            .actions a:hover {
-                text-decoration: underline;
             }
         </style>
     </head>
     <body>
-        <div class="isu-container">
-            <h1>PayPal Integrated Signup</h1>
-            <p>Click the button below to start the secure PayPal onboarding process. A popup window will guide you through connecting your PayPal account.</p>
-            
-            <div id="status" class="status"></div>
-            <div id="credentials-display"></div>
+        <div class="nmx-module">
+            <div class="nmx-container">
+                <div class="nmx-container-header">
+                    <h1>PayPal Integrated Signup</h1>
+                    <p class="nmx-container-subtitle">Connect your PayPal account to accept payments</p>
+                </div>
+                
+                <div class="nmx-panel">
+                    <div class="nmx-panel-heading">
+                        <div class="nmx-panel-title">PayPal Onboarding</div>
+                    </div>
+                    <div class="nmx-panel-body">
+                        <p>Click the button below to start the secure PayPal onboarding process. A popup window will guide you through connecting your PayPal account.</p>
+                        
+                        <div id="status" class="nmx-alert"></div>
+                        <div id="credentials-display"></div>
 
-            <div class="environment-select">
-                <label for="environment">Select onboarding mode</label>
-                <select id="environment" name="environment">
-                    <option value="live">Production</option>
-                    <option value="sandbox">Sandbox</option>
-                </select>
-                <p style="margin: 8px 0 0 0; color: #555;">Choose which PayPal environment to onboard. If you leave this unchanged, the default from your store configuration will be used.</p>
-            </div>
+                        <div class="nmx-form-group">
+                            <label for="environment">Select onboarding mode</label>
+                            <select id="environment" name="environment" class="nmx-form-control">
+                                <option value="live">Production</option>
+                                <option value="sandbox">Sandbox</option>
+                            </select>
+                            <p class="nmx-form-help">Choose which PayPal environment to onboard. If you leave this unchanged, the default from your store configuration will be used.</p>
+                        </div>
 
-            <div class="actions">
-                <button id="start-button" type="button">Start PayPal Signup</button>
-                <a href="<?php echo htmlspecialchars($modulesPageUrl, ENT_QUOTES, 'UTF-8'); ?>">Cancel and return to modules</a>
+                        <div class="nmx-form-actions">
+                            <button id="start-button" type="button" class="nmx-btn nmx-btn-primary">Start PayPal Signup</button>
+                            <a href="<?php echo htmlspecialchars($modulesPageUrl, ENT_QUOTES, 'UTF-8'); ?>" class="nmx-btn nmx-btn-default">Cancel and return to modules</a>
+                        </div>
+                        
+                        <!-- PayPal signup link container for mini-browser flow -->
+                        <div id="paypal-signup-container" style="display: none; margin-top: 20px;"></div>
+                    </div>
+                </div>
+                
+                <div class="nmx-footer">
+                    <a href="https://www.numinix.com" target="_blank" rel="noopener noreferrer" class="nmx-footer-logo">
+                        <img src="images/numinix_logo.png" alt="Numinix">
+                    </a>
+                </div>
             </div>
-            
-            <!-- PayPal signup link container for mini-browser flow -->
-            <div id="paypal-signup-container" style="display: none; margin-top: 20px;"></div>
         </div>
         
         <!-- 
@@ -538,9 +466,18 @@ function paypalr_render_onboarding_page(): void
                 var statusDiv = document.getElementById('status');
                 var credentialsDiv = document.getElementById('credentials-display');
                 
+                function getAlertClass(type) {
+                    var alertTypes = {
+                        'success': 'nmx-alert-success',
+                        'error': 'nmx-alert-error',
+                        'info': 'nmx-alert-info'
+                    };
+                    return alertTypes[type] || 'nmx-alert-info';
+                }
+                
                 function setStatus(message, type) {
                     statusDiv.textContent = message;
-                    statusDiv.className = 'status ' + (type || 'info');
+                    statusDiv.className = 'nmx-alert ' + getAlertClass(type);
                     statusDiv.style.display = message ? 'block' : 'none';
                 }
 
@@ -1779,70 +1716,36 @@ function paypalr_handle_completion(): void
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>PayPal Setup Complete</title>
+        <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
         <style>
-            body {
-                font-family: Arial, sans-serif;
-                max-width: 900px;
-                margin: 40px auto;
-                padding: 20px;
-                background: #f5f5f5;
-            }
-            .completion-container {
-                background: white;
-                border-radius: 8px;
-                padding: 30px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            h1 {
-                color: #2d7a2d;
-                margin-top: 0;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-            }
-            .icon {
+            .completion-icon {
                 font-size: 32px;
-            }
-            .status {
-                padding: 15px;
-                margin: 20px 0;
-                border-radius: 4px;
-            }
-            .status.info {
-                background: #e7f3ff;
-                color: #0066cc;
-                border-left: 4px solid #0066cc;
-            }
-            .status.success {
-                background: #e6f7e6;
-                color: #2d7a2d;
-                border-left: 4px solid #2d7a2d;
-            }
-            .status.error {
-                background: #ffe6e6;
-                color: #cc0000;
-                border-left: 4px solid #cc0000;
+                margin-right: 10px;
             }
             .credentials-box {
-                background: #f9f9f9;
+                background: rgba(0, 97, 141, 0.03);
                 padding: 20px;
-                border-radius: 4px;
+                border-radius: 12px;
                 margin: 20px 0;
-                border: 2px solid #0066cc;
+                border: 2px solid var(--nmx-secondary);
             }
             .credentials-box h2 {
                 margin-top: 0;
-                color: #333;
+                color: var(--nmx-primary);
                 font-size: 18px;
+                font-weight: 700;
             }
             .credential-row {
                 margin: 15px 0;
             }
             .credential-row label {
                 display: block;
-                font-weight: bold;
+                font-weight: 600;
                 margin-bottom: 5px;
-                color: #555;
+                color: var(--nmx-dark);
+                font-size: 13px;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
             }
             .credential-input-group {
                 display: flex;
@@ -1850,63 +1753,40 @@ function paypalr_handle_completion(): void
             }
             .credential-row input {
                 flex: 1;
-                padding: 10px;
+                padding: 12px 16px;
                 font-family: monospace;
                 font-size: 14px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
+                border: 1px solid var(--nmx-border);
+                border-radius: 12px;
                 background: white;
             }
             .copy-btn {
                 padding: 10px 20px;
-                background: #0066cc;
+                background: var(--nmx-secondary);
                 color: white;
                 border: none;
-                border-radius: 4px;
+                border-radius: 40px;
                 cursor: pointer;
-                font-size: 14px;
+                font-size: 13px;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
                 white-space: nowrap;
+                transition: all 0.2s ease-in-out;
             }
             .copy-btn:hover {
-                background: #0052a3;
+                background: var(--nmx-accent);
+                transform: translateY(-1px);
             }
             .copy-btn.copied {
-                background: #2d7a2d;
-            }
-            .actions {
-                margin-top: 30px;
-                display: flex;
-                gap: 15px;
-            }
-            .btn {
-                padding: 12px 24px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 16px;
-                text-decoration: none;
-                display: inline-block;
-            }
-            .btn-primary {
-                background: #0066cc;
-                color: white;
-            }
-            .btn-primary:hover {
-                background: #0052a3;
-            }
-            .btn-secondary {
-                background: #6b7280;
-                color: white;
-            }
-            .btn-secondary:hover {
-                background: #4b5563;
+                background: #5cb85c;
             }
             .spinner {
                 display: inline-block;
                 width: 16px;
                 height: 16px;
                 border: 2px solid #f3f3f3;
-                border-top: 2px solid #0066cc;
+                border-top: 2px solid var(--nmx-secondary);
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
                 margin-right: 8px;
@@ -1918,33 +1798,47 @@ function paypalr_handle_completion(): void
             .hidden {
                 display: none;
             }
-            #auto-save-status {
-                margin: 15px 0;
-                padding: 12px;
-                border-radius: 4px;
-                font-weight: 500;
+            #auto-save-status.nmx-alert {
+                display: block;
             }
         </style>
     </head>
     <body>
-        <div class="completion-container">
-            <h1><span class="icon">✓</span> PayPal Setup Complete!</h1>
-            
-            <div class="status info">
-                <p><strong>Your PayPal account has been successfully connected.</strong></p>
-                <p>Your API credentials are shown below. They are being saved automatically, but you can also copy them manually if needed.</p>
-            </div>
-            
-            <div id="auto-save-status" class="hidden" role="status" aria-live="polite"></div>
-            
-            <div id="credentials-display" class="credentials-box">
-                <h2>Retrieving Your PayPal Credentials...</h2>
-                <p><span class="spinner" role="status" aria-label="Loading"></span> Please wait while we fetch your credentials from PayPal...</p>
-            </div>
-            
-            <div class="actions">
-                <a href="<?php echo htmlspecialchars($modulesPageUrl, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-primary" id="return-btn">Return to PayPal Module</a>
-                <button type="button" onclick="window.close();" class="btn btn-secondary">Close Window</button>
+        <div class="nmx-module">
+            <div class="nmx-container">
+                <div class="nmx-container-header">
+                    <h1><span class="completion-icon">✓</span> PayPal Setup Complete!</h1>
+                </div>
+                
+                <div class="nmx-panel">
+                    <div class="nmx-panel-heading">
+                        <div class="nmx-panel-title">Connection Successful</div>
+                    </div>
+                    <div class="nmx-panel-body">
+                        <div class="nmx-alert nmx-alert-info">
+                            <p><strong>Your PayPal account has been successfully connected.</strong></p>
+                            <p>Your API credentials are shown below. They are being saved automatically, but you can also copy them manually if needed.</p>
+                        </div>
+                        
+                        <div id="auto-save-status" class="hidden" role="status" aria-live="polite"></div>
+                        
+                        <div id="credentials-display" class="credentials-box">
+                            <h2>Retrieving Your PayPal Credentials...</h2>
+                            <p><span class="spinner" role="status" aria-label="Loading"></span> Please wait while we fetch your credentials from PayPal...</p>
+                        </div>
+                        
+                        <div class="nmx-form-actions">
+                            <a href="<?php echo htmlspecialchars($modulesPageUrl, ENT_QUOTES, 'UTF-8'); ?>" class="nmx-btn nmx-btn-primary" id="return-btn">Return to PayPal Module</a>
+                            <button type="button" onclick="window.close();" class="nmx-btn nmx-btn-default">Close Window</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="nmx-footer">
+                    <a href="https://www.numinix.com" target="_blank" rel="noopener noreferrer" class="nmx-footer-logo">
+                        <img src="images/numinix_logo.png" alt="Numinix">
+                    </a>
+                </div>
             </div>
         </div>
         
@@ -1969,9 +1863,18 @@ function paypalr_handle_completion(): void
                 var retryCount = 0;
                 var maxRetries = 60; // Maximum 60 retries (5 minutes at 5 second intervals)
                 
+                function getAlertClass(type) {
+                    var alertTypes = {
+                        'success': 'nmx-alert-success',
+                        'error': 'nmx-alert-error',
+                        'info': 'nmx-alert-info'
+                    };
+                    return alertTypes[type] || 'nmx-alert-info';
+                }
+                
                 function setAutoSaveStatus(message, type) {
                     autoSaveStatus.textContent = message;
-                    autoSaveStatus.className = 'status ' + type;
+                    autoSaveStatus.className = 'nmx-alert ' + getAlertClass(type);
                     autoSaveStatus.classList.remove('hidden');
                 }
                 
