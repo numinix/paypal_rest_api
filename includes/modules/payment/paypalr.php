@@ -2405,6 +2405,22 @@ class paypalr extends base
                     'vault_id' => $storedVault['vault_id'],
                     'status' => $storedVault['status'],
                 ];
+            } else {
+                // -----
+                // When using an existing vaulted card, PayPal doesn't return vault info in the response.
+                // Check if there's an existing vault record for this customer/order and notify subscriptions.
+                //
+                $customers_id = $this->getCustomersIdForOrder($orders_id);
+                if ($customers_id > 0) {
+                    $existingVault = $this->findExistingVaultForOrder($customers_id, $orders_id);
+                    if ($existingVault !== null) {
+                        $this->notify('NOTIFY_PAYPALR_VAULT_CARD_SAVED', $existingVault);
+                        $memo['vault'] = [
+                            'vault_id' => $existingVault['vault_id'],
+                            'status' => 'existing',
+                        ];
+                    }
+                }
             }
         }
         if (isset($payment['seller_protection'])) {
@@ -2552,6 +2568,39 @@ class paypalr extends base
     protected function getCustomersIdForOrder(int $orders_id): int
     {
         return $this->paypalCommon->getCustomersIdForOrder($orders_id, $this->orderCustomerCache);
+    }
+
+    /**
+     * Find an existing vault record for a customer/order combination.
+     * Used when processing orders placed with an existing vaulted card.
+     *
+     * @param int $customers_id
+     * @param int $orders_id
+     * @return array|null Vault record array or null if not found
+     */
+    protected function findExistingVaultForOrder(int $customers_id, int $orders_id): ?array
+    {
+        if ($customers_id <= 0) {
+            return null;
+        }
+
+        $records = VaultManager::getCustomerVaultedCards($customers_id, false);
+        if (empty($records)) {
+            return null;
+        }
+
+        // First, try to find a vault record specifically for this order
+        foreach ($records as $record) {
+            if ((int)($record['orders_id'] ?? 0) === $orders_id) {
+                return $record;
+            }
+        }
+
+        // If no order-specific vault found, return the most recent active vault
+        // This handles the case where an existing vault was used for checkout.
+        // VaultManager::getCustomerVaultedCards() returns records ordered by last_modified DESC,
+        // so the first record is the most recently used/updated vault.
+        return $records[0] ?? null;
     }
 
     /**
