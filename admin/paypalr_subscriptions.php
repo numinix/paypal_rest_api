@@ -137,6 +137,18 @@ if ($action === 'update_subscription') {
     $billingPeriod = strtoupper(str_replace([' ', "\t"], '_', (string) zen_db_prepare_input($_POST['billing_period'] ?? '')));
     $billingFrequency = (int) zen_db_prepare_input($_POST['billing_frequency'] ?? 0);
     $totalCycles = (int) zen_db_prepare_input($_POST['total_billing_cycles'] ?? 0);
+    
+    // Validate and sanitize next_payment_date
+    $nextPaymentDate = (string) zen_db_prepare_input($_POST['next_payment_date'] ?? '');
+    if ($nextPaymentDate !== '') {
+        // Validate date format (YYYY-MM-DD)
+        $dateValidation = DateTime::createFromFormat('Y-m-d', $nextPaymentDate);
+        if (!$dateValidation || $dateValidation->format('Y-m-d') !== $nextPaymentDate) {
+            $messageStack->add_session($messageStackKey, 'Invalid date format for next payment date. Please use YYYY-MM-DD format.', 'error');
+            zen_redirect($redirectUrl);
+        }
+    }
+    
     $trialPeriod = strtoupper(str_replace([' ', "\t"], '_', (string) zen_db_prepare_input($_POST['trial_period'] ?? '')));
     $trialFrequency = (int) zen_db_prepare_input($_POST['trial_frequency'] ?? 0);
     $trialTotalCycles = (int) zen_db_prepare_input($_POST['trial_total_cycles'] ?? 0);
@@ -190,6 +202,7 @@ if ($action === 'update_subscription') {
         'billing_period' => $billingPeriod,
         'billing_frequency' => $billingFrequency,
         'total_billing_cycles' => $totalCycles,
+        'next_payment_date' => $nextPaymentDate !== '' ? $nextPaymentDate : null,
         'trial_period' => $trialPeriod,
         'trial_frequency' => $trialFrequency,
         'trial_total_cycles' => $trialTotalCycles,
@@ -888,6 +901,8 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                             <input type="number" name="billing_frequency" value="<?php echo (int) ($row['billing_frequency'] ?? 0); ?>" form="<?php echo $formId; ?>" />
                             <label>Total Billing Cycles</label>
                             <input type="number" name="total_billing_cycles" value="<?php echo (int) ($row['total_billing_cycles'] ?? 0); ?>" form="<?php echo $formId; ?>" />
+                            <label>Next Billing Date</label>
+                            <input type="date" name="next_payment_date" value="<?php echo zen_output_string_protected((string) ($row['next_payment_date'] ?? '')); ?>" form="<?php echo $formId; ?>" />
                             <label>Trial Period</label>
                             <input type="text" name="trial_period" value="<?php echo zen_output_string_protected((string) ($row['trial_period'] ?? '')); ?>" form="<?php echo $formId; ?>" />
                             <label>Trial Frequency</label>

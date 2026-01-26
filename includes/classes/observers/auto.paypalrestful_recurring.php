@@ -19,6 +19,14 @@ if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ObserverManager.php';
 }
 
+// Load paypalSavedCardRecurring class for Zen Cart-managed subscriptions
+if (!class_exists('paypalSavedCardRecurring')) {
+    $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+    if (file_exists($savedCardRecurringPath)) {
+        require_once $savedCardRecurringPath;
+    }
+}
+
 class zcObserverPaypalrestfulRecurring
 {
     use ObserverManager;
@@ -172,57 +180,111 @@ class zcObserverPaypalrestfulRecurring
             
             $this->log->write("    Product #$ordersProductsId: Valid subscription attributes extracted: " . Logger::logJSON($subscriptionAttributes));
 
-            $status = SubscriptionManager::STATUS_PENDING;
-            $paypalVaultId = 0;
-            $vaultId = '';
-
-            if ($vaultRecord !== null) {
-                $paypalVaultId = (int)($vaultRecord['paypal_vault_id'] ?? 0);
-                $vaultId = (string)($vaultRecord['vault_id'] ?? '');
-                if ($vaultId === '' || $paypalVaultId === 0) {
-                    // Vault is incomplete or not yet available
-                    $status = SubscriptionManager::STATUS_AWAITING_VAULT;
-                    $this->log->write("    Vault incomplete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: AWAITING_VAULT");
+            // Check if this is a Zen Cart-managed subscription (no plan_id)
+            // If so, use saved_credit_cards_recurring table instead of vaulted subscriptions
+            $hasPlanId = !empty($subscriptionAttributes['plan_id']);
+            
+            if (!$hasPlanId) {
+                // Zen Cart-managed subscription -> Save to saved_credit_cards_recurring table
+                $this->log->write("    Product #$ordersProductsId: Zen Cart-managed subscription (no plan_id), routing to saved_credit_cards_recurring.");
+                
+                $savedCreditCardId = $this->getSavedCreditCardId($vaultRecord);
+                if ($savedCreditCardId === 0) {
+                    $this->log->write("    WARNING: No saved_credit_card_id found for vault, subscription cannot be created yet.");
+                    $products->MoveNext();
+                    continue;
+                }
+                
+                // Calculate next billing date
+                $nextBillingDate = $this->calculateNextBillingDate($subscriptionAttributes);
+                
+                // Create subscription using saved card recurring class
+                if (!class_exists('paypalSavedCardRecurring')) {
+                    $this->log->write("    ERROR: paypalSavedCardRecurring class not available.");
+                    $products->MoveNext();
+                    continue;
+                }
+                
+                $savedCardRecurring = new paypalSavedCardRecurring();
+                $subscriptionId = $savedCardRecurring->schedule_payment(
+                    (float)$products->fields['final_price'],
+                    $nextBillingDate,
+                    $savedCreditCardId,
+                    $ordersProductsId,
+                    'Subscription created from order #' . $ordersId,
+                    [
+                        'products_id' => (int)$products->fields['products_id'],
+                        'products_name' => (string)$products->fields['products_name'],
+                        'currency_code' => $currency,
+                        'billing_period' => $subscriptionAttributes['billing_period'],
+                        'billing_frequency' => $subscriptionAttributes['billing_frequency'],
+                        'total_billing_cycles' => $subscriptionAttributes['total_billing_cycles'],
+                        'subscription_attributes' => $attributeMap,
+                    ]
+                );
+                
+                if ($subscriptionId > 0) {
+                    $loggedAny = true;
+                    $this->log->write("    SUCCESS: Saved card subscription #$subscriptionId created for product #$ordersProductsId.");
                 } else {
-                    // Vault is fully available (e.g., using a saved card from a previous order)
-                    // Set status to 'active' immediately instead of 'pending'
-                    $status = SubscriptionManager::STATUS_ACTIVE;
-                    $this->log->write("    Vault complete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: ACTIVE");
+                    $this->log->write("    ERROR: Failed to create saved card subscription for product #$ordersProductsId.");
                 }
             } else {
-                $status = SubscriptionManager::STATUS_AWAITING_VAULT;
-                $this->log->write("    No vault record, status: AWAITING_VAULT");
-            }
+                // PayPal-managed subscription (has plan_id) -> Save to paypal_subscriptions table
+                $this->log->write("    Product #$ordersProductsId: PayPal-managed subscription (has plan_id), routing to paypal_subscriptions.");
+                
+                $status = SubscriptionManager::STATUS_PENDING;
+                $paypalVaultId = 0;
+                $vaultId = '';
 
-            $subscriptionId = SubscriptionManager::logSubscription([
-                'customers_id' => $customersId,
-                'orders_id' => $ordersId,
-                'orders_products_id' => $ordersProductsId,
-                'products_id' => (int)$products->fields['products_id'],
-                'products_name' => (string)$products->fields['products_name'],
-                'products_quantity' => (float)$products->fields['products_quantity'],
-                'plan_id' => $subscriptionAttributes['plan_id'],
-                'billing_period' => $subscriptionAttributes['billing_period'],
-                'billing_frequency' => $subscriptionAttributes['billing_frequency'],
-                'total_billing_cycles' => $subscriptionAttributes['total_billing_cycles'],
-                'trial_period' => $subscriptionAttributes['trial_period'],
-                'trial_frequency' => $subscriptionAttributes['trial_frequency'],
-                'trial_total_cycles' => $subscriptionAttributes['trial_total_cycles'],
-                'setup_fee' => $subscriptionAttributes['setup_fee'],
-                'amount' => (float)$products->fields['final_price'],
-                'currency_code' => $currency,
-                'currency_value' => $currencyValue,
-                'paypal_vault_id' => $paypalVaultId,
-                'vault_id' => $vaultId,
-                'status' => $status,
-                'attributes' => $attributeMap,
-            ]);
+                if ($vaultRecord !== null) {
+                    $paypalVaultId = (int)($vaultRecord['paypal_vault_id'] ?? 0);
+                    $vaultId = (string)($vaultRecord['vault_id'] ?? '');
+                    if ($vaultId === '' || $paypalVaultId === 0) {
+                        // Vault is incomplete or not yet available
+                        $status = SubscriptionManager::STATUS_AWAITING_VAULT;
+                        $this->log->write("    Vault incomplete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: AWAITING_VAULT");
+                    } else {
+                        // Vault is fully available (e.g., using a saved card from a previous order)
+                        // Set status to 'active' immediately instead of 'pending'
+                        $status = SubscriptionManager::STATUS_ACTIVE;
+                        $this->log->write("    Vault complete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: ACTIVE");
+                    }
+                } else {
+                    $status = SubscriptionManager::STATUS_AWAITING_VAULT;
+                    $this->log->write("    No vault record, status: AWAITING_VAULT");
+                }
 
-            if ($subscriptionId > 0) {
-                $loggedAny = true;
-                $this->log->write("    SUCCESS: Subscription #$subscriptionId created for product #$ordersProductsId.");
-            } else {
-                $this->log->write("    ERROR: Failed to create subscription for product #$ordersProductsId.");
+                $subscriptionId = SubscriptionManager::logSubscription([
+                    'customers_id' => $customersId,
+                    'orders_id' => $ordersId,
+                    'orders_products_id' => $ordersProductsId,
+                    'products_id' => (int)$products->fields['products_id'],
+                    'products_name' => (string)$products->fields['products_name'],
+                    'products_quantity' => (float)$products->fields['products_quantity'],
+                    'plan_id' => $subscriptionAttributes['plan_id'],
+                    'billing_period' => $subscriptionAttributes['billing_period'],
+                    'billing_frequency' => $subscriptionAttributes['billing_frequency'],
+                    'total_billing_cycles' => $subscriptionAttributes['total_billing_cycles'],
+                    'trial_period' => $subscriptionAttributes['trial_period'],
+                    'trial_frequency' => $subscriptionAttributes['trial_frequency'],
+                    'trial_total_cycles' => $subscriptionAttributes['trial_total_cycles'],
+                    'setup_fee' => $subscriptionAttributes['setup_fee'],
+                    'amount' => (float)$products->fields['final_price'],
+                    'currency_code' => $currency,
+                    'currency_value' => $currencyValue,
+                    'paypal_vault_id' => $paypalVaultId,
+                    'vault_id' => $vaultId,
+                    'status' => $status,
+                    'attributes' => $attributeMap,
+                ]);
+
+                if ($subscriptionId > 0) {
+                    $loggedAny = true;
+                    $this->log->write("    SUCCESS: Vaulted subscription #$subscriptionId created for product #$ordersProductsId.");
+                } else {
+                    $this->log->write("    ERROR: Failed to create vaulted subscription for product #$ordersProductsId.");
+                }
             }
 
             $products->MoveNext();
@@ -464,5 +526,95 @@ class zcObserverPaypalrestfulRecurring
         $label = strtolower($label);
         $label = preg_replace('/[^a-z0-9]+/', '_', $label) ?? $label;
         return trim($label, '_');
+    }
+
+    /**
+     * Get saved_credit_card_id from vault record by looking up in TABLE_SAVED_CREDIT_CARDS.
+     * 
+     * @param array|null $vaultRecord The vault record from VaultManager
+     * @return int The saved_credit_card_id or 0 if not found
+     */
+    protected function getSavedCreditCardId(?array $vaultRecord): int
+    {
+        if ($vaultRecord === null) {
+            return 0;
+        }
+        
+        $vaultId = (string)($vaultRecord['vault_id'] ?? '');
+        if ($vaultId === '') {
+            return 0;
+        }
+        
+        global $db;
+        
+        // Ensure TABLE_SAVED_CREDIT_CARDS is defined
+        if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
+            if (class_exists('PayPalRestful\\Common\\SavedCreditCardsManager')) {
+                \PayPalRestful\Common\SavedCreditCardsManager::ensureSchema();
+            }
+        }
+        
+        if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
+            $this->log->write("    ERROR: TABLE_SAVED_CREDIT_CARDS constant not defined.");
+            return 0;
+        }
+        
+        // Use parameterized query approach - zen_db_input provides escaping
+        $safeVaultId = zen_db_input($vaultId);
+        $result = $db->Execute(
+            "SELECT saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . "
+             WHERE vault_id = '$safeVaultId'
+             AND is_deleted = 0
+             LIMIT 1"
+        );
+        
+        if ($result->EOF) {
+            $this->log->write("    No saved_credit_card found for vault_id: $vaultId");
+            return 0;
+        }
+        
+        return (int)$result->fields['saved_credit_card_id'];
+    }
+
+    /**
+     * Calculate the next billing date based on subscription attributes.
+     * 
+     * @param array $subscriptionAttributes The subscription attributes
+     * @return string The next billing date in Y-m-d format
+     */
+    protected function calculateNextBillingDate(array $subscriptionAttributes): string
+    {
+        $billingPeriod = $subscriptionAttributes['billing_period'] ?? 'MONTH';
+        $billingFrequency = (int)($subscriptionAttributes['billing_frequency'] ?? 1);
+        
+        if ($billingFrequency <= 0) {
+            $billingFrequency = 1;
+        }
+        
+        // Start from today
+        $date = new DateTime();
+        
+        // Map PayPal period to PHP DateInterval
+        switch (strtoupper($billingPeriod)) {
+            case 'DAY':
+                $date->modify('+' . $billingFrequency . ' days');
+                break;
+            case 'WEEK':
+                $date->modify('+' . ($billingFrequency * 7) . ' days');
+                break;
+            case 'SEMI_MONTH':
+                // Semi-monthly is approximately 15 days
+                $date->modify('+15 days');
+                break;
+            case 'YEAR':
+                $date->modify('+' . $billingFrequency . ' years');
+                break;
+            case 'MONTH':
+            default:
+                $date->modify('+' . $billingFrequency . ' months');
+                break;
+        }
+        
+        return $date->format('Y-m-d');
     }
 }
