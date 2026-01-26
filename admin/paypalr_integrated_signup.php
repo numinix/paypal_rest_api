@@ -466,12 +466,18 @@ function paypalr_render_onboarding_page(): void
                 var statusDiv = document.getElementById('status');
                 var credentialsDiv = document.getElementById('credentials-display');
                 
+                function getAlertClass(type) {
+                    var alertTypes = {
+                        'success': 'nmx-alert-success',
+                        'error': 'nmx-alert-error',
+                        'info': 'nmx-alert-info'
+                    };
+                    return alertTypes[type] || 'nmx-alert-info';
+                }
+                
                 function setStatus(message, type) {
                     statusDiv.textContent = message;
-                    var alertType = type === 'success' ? 'nmx-alert-success' : 
-                                   type === 'error' ? 'nmx-alert-error' : 
-                                   'nmx-alert-info';
-                    statusDiv.className = 'nmx-alert ' + alertType;
+                    statusDiv.className = 'nmx-alert ' + getAlertClass(type);
                     statusDiv.style.display = message ? 'block' : 'none';
                 }
 
@@ -1857,12 +1863,18 @@ function paypalr_handle_completion(): void
                 var retryCount = 0;
                 var maxRetries = 60; // Maximum 60 retries (5 minutes at 5 second intervals)
                 
+                function getAlertClass(type) {
+                    var alertTypes = {
+                        'success': 'nmx-alert-success',
+                        'error': 'nmx-alert-error',
+                        'info': 'nmx-alert-info'
+                    };
+                    return alertTypes[type] || 'nmx-alert-info';
+                }
+                
                 function setAutoSaveStatus(message, type) {
                     autoSaveStatus.textContent = message;
-                    var alertType = type === 'success' ? 'nmx-alert-success' : 
-                                   type === 'error' ? 'nmx-alert-error' : 
-                                   'nmx-alert-info';
-                    autoSaveStatus.className = 'nmx-alert ' + alertType;
+                    autoSaveStatus.className = 'nmx-alert ' + getAlertClass(type);
                     autoSaveStatus.classList.remove('hidden');
                 }
                 
