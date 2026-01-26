@@ -82,6 +82,7 @@ class SubscriptionManager
             'next_billing_date' => "DATE DEFAULT NULL",
             'expiration_date' => "DATE DEFAULT NULL",
             'domain' => "VARCHAR(255) NOT NULL DEFAULT ''",
+            'is_archived' => "TINYINT(1) NOT NULL DEFAULT 0",
         ];
 
         foreach ($columns as $column => $definition) {
@@ -95,6 +96,7 @@ class SubscriptionManager
         $indexes = [
             'idx_profile_id' => ['profile_id'],
             'idx_legacy_subscription' => ['legacy_subscription_id'],
+            'idx_is_archived' => ['is_archived'],
         ];
 
         foreach ($indexes as $index => $columns) {

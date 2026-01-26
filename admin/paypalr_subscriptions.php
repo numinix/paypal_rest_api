@@ -150,6 +150,21 @@ if ($action === 'update_subscription') {
 
     if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
         $status = strtolower(trim((string) zen_db_prepare_input($_POST['set_status'])));
+        // For quick status changes, only update the status field without validating other fields
+        zen_db_perform(
+            TABLE_PAYPAL_SUBSCRIPTIONS,
+            ['status' => $status, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'paypal_subscription_id = ' . (int) $subscriptionId
+        );
+        
+        $messageStack->add_session(
+            $messageStackKey,
+            sprintf('Subscription #%d status has been updated to %s.', $subscriptionId, $status),
+            'success'
+        );
+        
+        zen_redirect($redirectUrl);
     }
 
     $attributesEncoded = '';
@@ -340,6 +355,52 @@ if ($action === 'reactivate_subscription') {
     zen_redirect($redirectUrl);
 }
 
+// Archive subscription action
+if ($action === 'archive_subscription') {
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session($messageStackKey, 'Unable to archive subscription. Missing identifier.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update local record to mark as archived
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        ['is_archived' => 1, 'last_modified' => date('Y-m-d H:i:s')],
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+    
+    $messageStack->add_session($messageStackKey, sprintf('Subscription #%d has been archived.', $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// Unarchive subscription action
+if ($action === 'unarchive_subscription') {
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session($messageStackKey, 'Unable to unarchive subscription. Missing identifier.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update local record to unarchive
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        ['is_archived' => 0, 'last_modified' => date('Y-m-d H:i:s')],
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+    
+    $messageStack->add_session($messageStackKey, sprintf('Subscription #%d has been unarchived.', $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
 // CSV Export action
 if ($action === 'export_csv') {
     $exportFilters = [
@@ -347,6 +408,7 @@ if ($action === 'export_csv') {
         'products_id' => (int) ($_GET['products_id'] ?? 0),
         'status' => trim((string) ($_GET['status'] ?? '')),
         'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
+        'show_archived' => trim((string) ($_GET['show_archived'] ?? '')),
     ];
     
     $exportWhere = [];
@@ -361,6 +423,13 @@ if ($action === 'export_csv') {
     }
     if ($exportFilters['payment_module'] !== '') {
         $exportWhere[] = "o.payment_module_code = '" . zen_db_input($exportFilters['payment_module']) . "'";
+    }
+    
+    // Archive filter - by default, exclude archived subscriptions from export
+    if ($exportFilters['show_archived'] === 'only') {
+        $exportWhere[] = 'ps.is_archived = 1';
+    } elseif ($exportFilters['show_archived'] !== 'all') {
+        $exportWhere[] = 'ps.is_archived = 0';
     }
     
     $exportSql = 'SELECT ps.*, c.customers_firstname, c.customers_lastname, c.customers_email_address,'
@@ -445,6 +514,7 @@ $filters = [
     'products_id' => (int) ($_GET['products_id'] ?? 0),
     'status' => trim((string) ($_GET['status'] ?? '')),
     'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
+    'show_archived' => trim((string) ($_GET['show_archived'] ?? '')),
 ];
 
 $whereClauses = [];
@@ -460,6 +530,14 @@ if ($filters['status'] !== '') {
 }
 if ($filters['payment_module'] !== '') {
     $whereClauses[] = "o.payment_module_code = '" . zen_db_input($filters['payment_module']) . "'";
+}
+
+// Archive filter - by default, hide archived subscriptions
+if ($filters['show_archived'] === 'only') {
+    $whereClauses[] = 'ps.is_archived = 1';
+} elseif ($filters['show_archived'] !== 'all') {
+    // Default behavior: show only non-archived subscriptions
+    $whereClauses[] = 'ps.is_archived = 0';
 }
 
 $queryString = [];
@@ -696,6 +774,14 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                 </select>
             </div>
             <div class="form-group">
+                <label for="filter-archived">Archived</label>
+                <select name="show_archived" id="filter-archived">
+                    <option value="">Active Only</option>
+                    <option value="all"<?php echo ($filters['show_archived'] === 'all' ? ' selected' : ''); ?>>Show All</option>
+                    <option value="only"<?php echo ($filters['show_archived'] === 'only' ? ' selected' : ''); ?>>Archived Only</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>&nbsp;</label>
                 <button type="submit">Apply Filters</button>
             </div>
@@ -856,6 +942,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                 <?php 
                                 $currentStatus = strtolower($row['status'] ?? '');
                                 $actionParams = $activeQuery !== '' ? $activeQuery . '&' : '';
+                                $isArchived = !empty($row['is_archived']);
                                 ?>
                                 <?php if ($currentStatus === 'active' || $currentStatus === 'scheduled') { ?>
                                     <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=suspend_subscription&subscription_id=' . $subscriptionId); ?>" 
@@ -873,6 +960,15 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                        style="padding: 3px 8px; background: #d9534f; color: #fff; text-decoration: none; border-radius: 3px; font-size: 12px;">Cancel</a>
                                 <?php } elseif ($currentStatus === 'cancelled') { ?>
                                     <span style="color: #999; font-size: 12px;">Subscription cancelled</span>
+                                <?php } ?>
+                                <?php if ($isArchived) { ?>
+                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=unarchive_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                       onclick="return confirm('Are you sure you want to unarchive this subscription?');"
+                                       style="padding: 3px 8px; background: #5bc0de; color: #fff; text-decoration: none; border-radius: 3px; font-size: 12px; margin-left: 4px;">Unarchive</a>
+                                <?php } else { ?>
+                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=archive_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                       onclick="return confirm('Are you sure you want to archive this subscription? Archived subscriptions are hidden by default.');"
+                                       style="padding: 3px 8px; background: #777; color: #fff; text-decoration: none; border-radius: 3px; font-size: 12px; margin-left: 4px;">Archive</a>
                                 <?php } ?>
                             </div>
                         </td>
