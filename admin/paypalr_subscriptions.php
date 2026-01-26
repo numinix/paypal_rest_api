@@ -932,15 +932,23 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                             <select name="status" form="<?php echo $formId; ?>">
                                 <?php echo paypalr_render_select_options($availableStatuses, $row['status'] ?? ''); ?>
                             </select>
+                            <?php 
+                            $currentStatus = strtolower($row['status'] ?? '');
+                            ?>
                             <div class="paypalr-subscription-actions">
                                 <button type="submit" form="<?php echo $formId; ?>">Save Changes</button>
-                                <button type="submit" name="set_status" value="cancelled" form="<?php echo $formId; ?>">Mark Cancelled</button>
-                                <button type="submit" name="set_status" value="active" form="<?php echo $formId; ?>">Mark Active</button>
-                                <button type="submit" name="set_status" value="pending" form="<?php echo $formId; ?>">Mark Pending</button>
+                                <?php if ($currentStatus !== 'cancelled') { ?>
+                                    <button type="submit" name="set_status" value="cancelled" form="<?php echo $formId; ?>">Mark Cancelled</button>
+                                <?php } ?>
+                                <?php if ($currentStatus !== 'active') { ?>
+                                    <button type="submit" name="set_status" value="active" form="<?php echo $formId; ?>">Mark Active</button>
+                                <?php } ?>
+                                <?php if ($currentStatus !== 'pending') { ?>
+                                    <button type="submit" name="set_status" value="pending" form="<?php echo $formId; ?>">Mark Pending</button>
+                                <?php } ?>
                             </div>
                             <div class="paypalr-subscription-actions" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
-                                <?php 
-                                $currentStatus = strtolower($row['status'] ?? '');
+                                <?php
                                 $actionParams = $activeQuery !== '' ? $activeQuery . '&' : '';
                                 $isArchived = !empty($row['is_archived']);
                                 ?>
