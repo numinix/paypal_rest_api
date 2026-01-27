@@ -191,6 +191,21 @@ return $this->PayPalRestful;
               $columns[$column] = ($result && $result->RecordCount() > 0);
               return $columns[$column];
       }
+      protected function saved_cards_recurring_has_column($column)
+      {
+              static $columns = array();
+              $column = trim((string) $column);
+              if ($column === '' || !defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+                      return false;
+              }
+              if (array_key_exists($column, $columns)) {
+                      return $columns[$column];
+              }
+              global $db;
+              $result = $db->Execute("SHOW COLUMNS FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " LIKE '" . zen_db_input($column) . "'");
+              $columns[$column] = ($result && $result->RecordCount() > 0);
+              return $columns[$column];
+      }
 protected function ensure_vault_manager_loaded() {
 if (!class_exists('PayPalRestful\\Common\\VaultManager')) {
 $autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
@@ -1307,9 +1322,11 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
                         return '';
                 }
 
-                $snapshotRow = $db->Execute('SELECT domain, subscription_attributes_json FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE original_orders_products_id = ' . $orders_products_id . ' ORDER BY saved_credit_card_recurring_id DESC LIMIT 1;');
+                $hasDomainColumn = $this->saved_cards_recurring_has_column('domain');
+                $domainSelect = $hasDomainColumn ? 'domain, ' : '';
+                $snapshotRow = $db->Execute('SELECT ' . $domainSelect . 'subscription_attributes_json FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE original_orders_products_id = ' . $orders_products_id . ' ORDER BY saved_credit_card_recurring_id DESC LIMIT 1;');
                 if ($snapshotRow->RecordCount() > 0) {
-                        if (isset($snapshotRow->fields['domain']) && $snapshotRow->fields['domain'] !== '') {
+                        if ($hasDomainColumn && isset($snapshotRow->fields['domain']) && $snapshotRow->fields['domain'] !== '') {
                                 return $snapshotRow->fields['domain'];
                         }
                         $decoded = $this->get_snapshot_attributes($snapshotRow->fields);
@@ -1357,7 +1374,9 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
                         return false;
                 }
 
-                $snapshotRow = $db->Execute('SELECT subscription_attributes_json, billing_period, billing_frequency, total_billing_cycles, domain, currency_code FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE original_orders_products_id = ' . $orders_products_id . ' ORDER BY saved_credit_card_recurring_id DESC LIMIT 1;');
+                $hasDomainColumn = $this->saved_cards_recurring_has_column('domain');
+                $domainSelect = $hasDomainColumn ? 'domain, ' : '';
+                $snapshotRow = $db->Execute('SELECT subscription_attributes_json, billing_period, billing_frequency, total_billing_cycles, ' . $domainSelect . 'currency_code FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE original_orders_products_id = ' . $orders_products_id . ' ORDER BY saved_credit_card_recurring_id DESC LIMIT 1;');
                 if ($snapshotRow->RecordCount() > 0) {
                         $attributes = $this->get_snapshot_attributes($snapshotRow->fields);
                         if (is_array($attributes) && count($attributes) > 0) {
@@ -1779,6 +1798,8 @@ $this->paypalsavedcard->after_process();
         function get_payment_details($paypal_saved_card_recurring_id, $preloaded_fields = null) {
 		global $db;
                 if (!is_array($preloaded_fields)) {
+                        $hasDomainColumn = $this->saved_cards_recurring_has_column('domain');
+                        $domainSelect = $hasDomainColumn ? "\n          sccr.domain AS sccr_domain," : '';
                         $sql = "SELECT
           sccr.*,
           sccr.products_id AS sccr_products_id,
@@ -1787,8 +1808,7 @@ $this->paypalsavedcard->after_process();
           sccr.currency_code AS sccr_currency_code,
           sccr.billing_period AS sccr_billing_period,
           sccr.billing_frequency AS sccr_billing_frequency,
-          sccr.total_billing_cycles AS sccr_total_billing_cycles,
-          sccr.domain AS sccr_domain,
+          sccr.total_billing_cycles AS sccr_total_billing_cycles," . $domainSelect . "
           sccr.subscription_attributes_json AS sccr_subscription_attributes_json,
           COALESCE(scc.customers_id, c.customers_id) AS subscription_customer_id,
           scc.*,
@@ -2290,6 +2310,8 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 */
         function get_customer_subscriptions($customer_id, $category_id = null, $domain = '') {
                 global $db;
+                $hasDomainColumn = $this->saved_cards_recurring_has_column('domain');
+                $domainSelect = $hasDomainColumn ? "\n            sccr.domain AS sccr_domain," : '';
                 $sql = 'SELECT
             sccr.*,
             sccr.products_id AS sccr_products_id,
@@ -2298,8 +2320,7 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
             sccr.currency_code AS sccr_currency_code,
             sccr.billing_period AS sccr_billing_period,
             sccr.billing_frequency AS sccr_billing_frequency,
-            sccr.total_billing_cycles AS sccr_total_billing_cycles,
-            sccr.domain AS sccr_domain,
+            sccr.total_billing_cycles AS sccr_total_billing_cycles,' . $domainSelect . '
             sccr.subscription_attributes_json AS sccr_subscription_attributes_json,
             scc.customers_id AS saved_card_customer_id,
             scc.type,
