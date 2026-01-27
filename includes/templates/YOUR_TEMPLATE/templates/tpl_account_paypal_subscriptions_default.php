@@ -10,21 +10,7 @@
 
   <?php require $template->get_template_dir('tpl_modules_account_menu.php', DIR_WS_TEMPLATE, $current_page_base, 'templates') . '/tpl_modules_account_menu.php'; ?>
 
-  <?php if (!empty($paypal_subscriptions_message) && !empty($paypal_subscriptions_message_type)) { ?>
-    <?php
-      $alertClass = 'alert-info';
-      if ($paypal_subscriptions_message_type === 'success') {
-        $alertClass = 'alert-success';
-      } elseif ($paypal_subscriptions_message_type === 'error') {
-        $alertClass = 'alert-danger';
-      } elseif ($paypal_subscriptions_message_type === 'warning') {
-        $alertClass = 'alert-warning';
-      }
-    ?>
-    <div class="messageStack-header noprint">
-      <div class="row messageStackAlert alert <?php echo $alertClass; ?>"><?php echo $paypal_subscriptions_message; ?></div>
-    </div>
-  <?php } ?>
+  <?php if ($messageStack->size('paypal_subscriptions') > 0) echo $messageStack->output('paypal_subscriptions'); ?>
 
   <?php if ($hide_paypal_subscriptions_page === true) { ?>
     <div class="alert alert-info" role="status"><?php echo TEXT_SUBSCRIPTIONS_DISABLED; ?></div>

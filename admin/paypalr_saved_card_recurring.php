@@ -15,6 +15,13 @@
  * - payflow.php (Payflow)
  */
 
+// Load MessageStack compatibility class before Zen Cart's native messageStack
+// This ensures messageStack->output() method works correctly with stack names
+$messageStackPath = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/MessageStack.php';
+if (is_file($messageStackPath)) {
+    require_once $messageStackPath;
+}
+
 require 'includes/application_top.php';
 
 // Load PayPal autoloader to access schema managers
