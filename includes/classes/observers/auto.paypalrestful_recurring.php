@@ -352,6 +352,9 @@ class zcObserverPaypalrestfulRecurring
             ]);
             $this->log->write("    NOTIFY_SUBSCRIPTIONS_ACTIVATED notification sent.");
         }
+
+        // Sync vault record to saved_credit_cards table for Zen Cart-managed subscriptions
+        $this->syncVaultToSavedCreditCards($vaultRecord);
     }
 
     /**
@@ -616,5 +619,92 @@ class zcObserverPaypalrestfulRecurring
         }
         
         return $date->format('Y-m-d');
+    }
+
+    /**
+     * Sync vault record to saved_credit_cards table for Zen Cart-managed subscriptions.
+     * 
+     * This method creates a record in TABLE_SAVED_CREDIT_CARDS based on the vault record,
+     * enabling Zen Cart-managed subscriptions to reference the saved card via saved_credit_card_id.
+     * If a record with the same vault_id already exists, no action is taken.
+     * 
+     * @param array $vaultRecord The vault record from VaultManager
+     */
+    protected function syncVaultToSavedCreditCards(array $vaultRecord): void
+    {
+        global $db;
+        
+        // Ensure TABLE_SAVED_CREDIT_CARDS is defined
+        if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
+            if (class_exists('PayPalRestful\\Common\\SavedCreditCardsManager')) {
+                \PayPalRestful\Common\SavedCreditCardsManager::ensureSchema();
+            }
+        }
+        
+        if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
+            $this->log->write("    ERROR: TABLE_SAVED_CREDIT_CARDS constant not defined, cannot sync vault to saved cards.");
+            return;
+        }
+        
+        $vaultId = (string)($vaultRecord['vault_id'] ?? '');
+        if ($vaultId === '') {
+            $this->log->write("    WARNING: Cannot sync vault to saved cards - vault_id is empty.");
+            return;
+        }
+        
+        // Check if record already exists
+        $safeVaultId = zen_db_input($vaultId);
+        $existing = $db->Execute(
+            "SELECT saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . "
+             WHERE vault_id = '$safeVaultId'
+             LIMIT 1"
+        );
+        
+        if (!$existing->EOF) {
+            $this->log->write("    Saved credit card record already exists for vault_id: $vaultId (ID: " . $existing->fields['saved_credit_card_id'] . ")");
+            return;
+        }
+        
+        // Extract card data from vault record
+        $customersId = (int)($vaultRecord['customers_id'] ?? 0);
+        
+        if ($customersId <= 0) {
+            $this->log->write("    WARNING: Cannot sync vault to saved cards - customers_id is invalid.");
+            return;
+        }
+        
+        $cardType = (string)($vaultRecord['brand'] ?? $vaultRecord['card_type'] ?? '');
+        $lastDigits = (string)($vaultRecord['last_digits'] ?? '');
+        $expiry = (string)($vaultRecord['expiry'] ?? ''); // Format: YYYY-MM
+        $holderName = (string)($vaultRecord['cardholder_name'] ?? '');
+        
+        // Parse expiry into month and year
+        $expiryMonth = '';
+        $expiryYear = '';
+        if ($expiry !== '' && preg_match('/^(\d{4})-(\d{2})$/', $expiry, $matches)) {
+            $expiryYear = $matches[1];
+            $expiryMonth = $matches[2];
+        }
+        
+        // Insert into saved_credit_cards (using explicit integer for customersId for safety)
+        $now = date('Y-m-d H:i:s');
+        $safeCustomersId = (int)$customersId; // Ensure integer type
+        $safeType = zen_db_input($cardType);
+        $safeLastDigits = zen_db_input($lastDigits);
+        $safeExpiryMonth = zen_db_input($expiryMonth);
+        $safeExpiryYear = zen_db_input($expiryYear);
+        $safeHolderName = zen_db_input($holderName);
+        
+        $db->Execute(
+            "INSERT INTO " . TABLE_SAVED_CREDIT_CARDS . "
+             (customers_id, type, last_digits, expiry_month, expiry_year, holder_name, 
+              billing_address_id, is_default, is_deleted, vault_id, date_added, last_modified)
+             VALUES 
+             ($safeCustomersId, '$safeType', '$safeLastDigits', '$safeExpiryMonth', '$safeExpiryYear', 
+              '$safeHolderName', 0, 0, 0, '$safeVaultId', '$now', '$now')"
+        );
+        
+        $savedCreditCardId = $db->Insert_ID();
+        $this->log->write("    SUCCESS: Created saved_credit_card record #$savedCreditCardId for vault_id: $vaultId");
     }
 }
