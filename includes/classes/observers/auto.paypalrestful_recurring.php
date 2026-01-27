@@ -705,5 +705,4 @@ class zcObserverPaypalrestfulRecurring
         $savedCreditCardId = $db->Insert_ID();
         $this->log->write("    SUCCESS: Created saved_credit_card record #$savedCreditCardId for vault_id: $vaultId");
     }
-    }
 }

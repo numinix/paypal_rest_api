@@ -28,6 +28,18 @@ namespace {
     if (!defined('DIR_WS_MODULES')) {
         define('DIR_WS_MODULES', 'includes/modules/');
     }
+    if (!defined('DIR_WS_CLASSES')) {
+        define('DIR_WS_CLASSES', 'includes/classes/');
+    }
+
+    // Mock paypalSavedCardRecurring class
+    if (!class_exists('paypalSavedCardRecurring')) {
+        class paypalSavedCardRecurring {
+            public function schedule_payment($amount, $nextBillingDate, $savedCreditCardId, $ordersProductsId, $description, $metadata = []) {
+                return 1; // Return mock subscription ID
+            }
+        }
+    }
 
     // Mock PSR-4 Autoloader
     class mockPsr4Autoloader
