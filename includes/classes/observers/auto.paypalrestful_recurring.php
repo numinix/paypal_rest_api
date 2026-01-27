@@ -624,9 +624,9 @@ class zcObserverPaypalrestfulRecurring
     /**
      * Sync vault record to saved_credit_cards table for Zen Cart-managed subscriptions.
      * 
-     * This method creates or updates a record in TABLE_SAVED_CREDIT_CARDS based on
-     * the vault record, enabling Zen Cart-managed subscriptions to reference the
-     * saved card via saved_credit_card_id.
+     * This method creates a record in TABLE_SAVED_CREDIT_CARDS based on the vault record,
+     * enabling Zen Cart-managed subscriptions to reference the saved card via saved_credit_card_id.
+     * If a record with the same vault_id already exists, no action is taken.
      * 
      * @param array $vaultRecord The vault record from VaultManager
      */
@@ -667,6 +667,12 @@ class zcObserverPaypalrestfulRecurring
         
         // Extract card data from vault record
         $customersId = (int)($vaultRecord['customers_id'] ?? 0);
+        
+        if ($customersId <= 0) {
+            $this->log->write("    WARNING: Cannot sync vault to saved cards - customers_id is invalid.");
+            return;
+        }
+        
         $cardType = (string)($vaultRecord['brand'] ?? $vaultRecord['card_type'] ?? '');
         $lastDigits = (string)($vaultRecord['last_digits'] ?? '');
         $expiry = (string)($vaultRecord['expiry'] ?? ''); // Format: YYYY-MM
@@ -680,13 +686,9 @@ class zcObserverPaypalrestfulRecurring
             $expiryMonth = $matches[2];
         }
         
-        if ($customersId <= 0) {
-            $this->log->write("    WARNING: Cannot sync vault to saved cards - customers_id is invalid.");
-            return;
-        }
-        
-        // Insert into saved_credit_cards
+        // Insert into saved_credit_cards (using explicit integer for customersId for safety)
         $now = date('Y-m-d H:i:s');
+        $safeCustomersId = (int)$customersId; // Ensure integer type
         $safeType = zen_db_input($cardType);
         $safeLastDigits = zen_db_input($lastDigits);
         $safeExpiryMonth = zen_db_input($expiryMonth);
@@ -698,7 +700,7 @@ class zcObserverPaypalrestfulRecurring
              (customers_id, type, last_digits, expiry_month, expiry_year, holder_name, 
               billing_address_id, is_default, is_deleted, vault_id, date_added, last_modified)
              VALUES 
-             ($customersId, '$safeType', '$safeLastDigits', '$safeExpiryMonth', '$safeExpiryYear', 
+             ($safeCustomersId, '$safeType', '$safeLastDigits', '$safeExpiryMonth', '$safeExpiryYear', 
               '$safeHolderName', 0, 0, 0, '$safeVaultId', '$now', '$now')"
         );
         
