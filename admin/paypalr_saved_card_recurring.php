@@ -17,20 +17,6 @@
 
 require 'includes/application_top.php';
 
-// Load session messages into messageStack (Zen Cart's messageStack doesn't do this automatically)
-if (isset($_SESSION['messageToStack']) && is_array($_SESSION['messageToStack'])) {
-    foreach ($_SESSION['messageToStack'] as $stack => $stackMessages) {
-        if (is_array($stackMessages)) {
-            foreach ($stackMessages as $msg) {
-                if (isset($msg['text'], $msg['type'])) {
-                    $messageStack->add($stack, $msg['text'], $msg['type']);
-                }
-            }
-        }
-    }
-    unset($_SESSION['messageToStack']);
-}
-
 // Load PayPal autoloader to access schema managers
 $autoloaderPath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 if (file_exists($autoloaderPath)) {
@@ -56,7 +42,7 @@ if (!defined('HEADING_TITLE')) {
     define('HEADING_TITLE', 'Saved Card Subscriptions');
 }
 
-$messageStackKey = 'paypalr_saved_card_recurring';
+
 
 $paypalSavedCardRecurring = new paypalSavedCardRecurring();
 
@@ -83,7 +69,7 @@ switch ($action) {
     case 'cancel_scheduled_payment':
         if ($_GET['saved_card_recurring_id'] > 0) {
             $paypalSavedCardRecurring->update_payment_status($_GET['saved_card_recurring_id'], 'cancelled', 'Cancelled by admin');
-            $messageStack->add_session($messageStackKey, 'Subscription #' . $_GET['saved_card_recurring_id'] . ' has been cancelled.', 'success');
+            $messageStack->add_session('header', 'Subscription #' . $_GET['saved_card_recurring_id'] . ' has been cancelled.', 'success');
             
             // Cancel group pricing
             $subscription = $paypalSavedCardRecurring->get_payment_details($_GET['saved_card_recurring_id']);
@@ -96,7 +82,7 @@ switch ($action) {
 
     case 'reactivate_scheduled_payment':
         $paypalSavedCardRecurring->update_payment_status($_GET['saved_card_recurring_id'], 'scheduled', 'Re-activated by admin');
-        $messageStack->add_session($messageStackKey, 'Subscription #' . $_GET['saved_card_recurring_id'] . ' has been re-activated.', 'success');
+        $messageStack->add_session('header', 'Subscription #' . $_GET['saved_card_recurring_id'] . ' has been re-activated.', 'success');
         
         // Re-activate group pricing
         $subscription = $paypalSavedCardRecurring->get_payment_details($_GET['saved_card_recurring_id']);
@@ -111,7 +97,7 @@ switch ($action) {
             'saved_credit_card_id' => $_GET['set_card'],
             'comments' => '  Credit card updated by admin. '
         ]);
-        $messageStack->add_session($messageStackKey, 'Credit card has been updated for subscription #' . $_GET['saved_card_recurring_id'], 'success');
+        $messageStack->add_session('header', 'Credit card has been updated for subscription #' . $_GET['saved_card_recurring_id'], 'success');
         $redirectAfterAction = true;
         break;
 
@@ -120,7 +106,7 @@ switch ($action) {
             'date' => $_GET['set_date'],
             'comments' => '  Date updated by admin to ' . $_GET['set_date'] . '  '
         ]);
-        $messageStack->add_session($messageStackKey, 'Date has been updated for subscription #' . $_GET['saved_card_recurring_id'], 'success');
+        $messageStack->add_session('header', 'Date has been updated for subscription #' . $_GET['saved_card_recurring_id'], 'success');
         $redirectAfterAction = true;
         break;
 
@@ -129,7 +115,7 @@ switch ($action) {
             'amount' => $_GET['set_amount'],
             'comments' => '  Amount updated by admin to ' . $_GET['set_amount'] . '  '
         ]);
-        $messageStack->add_session($messageStackKey, 'Amount has been updated for subscription #' . $_GET['saved_card_recurring_id'] . ' to ' . $_GET['set_amount'], 'success');
+        $messageStack->add_session('header', 'Amount has been updated for subscription #' . $_GET['saved_card_recurring_id'] . ' to ' . $_GET['set_amount'], 'success');
         $redirectAfterAction = true;
         break;
 
@@ -139,7 +125,7 @@ switch ($action) {
             'comments' => '  Product updated by admin  ',
             'original_orders_products_id' => $_GET['original_orders_products_id']
         ]);
-        $messageStack->add_session($messageStackKey, 'Product has been updated for subscription #' . $_GET['saved_card_recurring_id'], 'success');
+        $messageStack->add_session('header', 'Product has been updated for subscription #' . $_GET['saved_card_recurring_id'], 'success');
         $redirectAfterAction = true;
         break;
         
@@ -375,24 +361,8 @@ $statuses_recurring = [
     
         <div class="nmx-message-stack">
         <?php
-        if (isset($messageStack) && is_object($messageStack)) {
-            if (method_exists($messageStack, 'size')) {
-                if ($messageStack->size($messageStackKey) > 0) {
-                    echo $messageStack->output($messageStackKey);
-                }
-            } else {
-                // Fallback for messageStack implementations without size() method
-                // Check if there are messages in the stack before outputting
-                $hasMessages = false;
-                if (isset($messageStack->messages) && is_array($messageStack->messages)) {
-                    $hasMessages = isset($messageStack->messages[$messageStackKey]) && 
-                                  is_array($messageStack->messages[$messageStackKey]) && 
-                                  count($messageStack->messages[$messageStackKey]) > 0;
-                }
-                if ($hasMessages) {
-                    echo $messageStack->output($messageStackKey);
-                }
-            }
+        if (isset($messageStack) && is_object($messageStack) && $messageStack->size() > 0) {
+            echo $messageStack->output();
         }
         ?>
         </div>
