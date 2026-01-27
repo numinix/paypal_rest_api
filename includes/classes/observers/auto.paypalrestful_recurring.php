@@ -160,6 +160,9 @@ class zcObserverPaypalrestfulRecurring
         
         if ($vaultRecord !== null) {
             $this->log->write("    Vault record found: " . Logger::logJSON($vaultRecord));
+            // Sync vault to saved_credit_cards table BEFORE attempting subscription creation
+            // This ensures saved_credit_card_id is available for Zen Cart-managed subscriptions
+            $this->syncVaultToSavedCreditCards($vaultRecord);
         } else {
             $this->log->write("    No vault record found for customer #$customersId / order #$ordersId.");
         }
