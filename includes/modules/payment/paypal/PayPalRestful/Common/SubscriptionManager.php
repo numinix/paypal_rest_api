@@ -68,7 +68,6 @@ class SubscriptionManager
 
         self::ensureLegacyColumns();
         self::migrateOrdersProductsIdToNullable();
-        self::ensureSkipNextPaymentColumn();
     }
 
     private static function ensureLegacyColumns(): void
@@ -248,27 +247,6 @@ class SubscriptionManager
         );
 
         return (int)$existing->fields['paypal_subscription_id'];
-    }
-    
-    /**
-     * Add skip_next_payment column if it doesn't exist.
-     */
-    private static function ensureSkipNextPaymentColumn(): void
-    {
-        global $db;
-        
-        // Check if column exists
-        $result = $db->Execute(
-            "SHOW COLUMNS FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " LIKE 'skip_next_payment'"
-        );
-        
-        if ($result->RecordCount() == 0) {
-            $db->Execute(
-                "ALTER TABLE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
-                ADD COLUMN skip_next_payment TINYINT(1) NOT NULL DEFAULT 0
-                AFTER status"
-            );
-        }
     }
 
     /**

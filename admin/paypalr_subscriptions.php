@@ -379,9 +379,11 @@ if ($action === 'skip_next_payment') {
         zen_redirect($redirectUrl);
     }
     
-    // Get current subscription status
+    // Get current subscription details
     $subscription = $db->Execute(
-        "SELECT status FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+        "SELECT status, billing_period, billing_frequency, next_payment_date, attributes 
+         FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " 
+         WHERE paypal_subscription_id = " . (int) $subscriptionId
     );
     
     if ($subscription->RecordCount() == 0) {
@@ -395,15 +397,92 @@ if ($action === 'skip_next_payment') {
         zen_redirect($redirectUrl);
     }
     
-    // Set skip flag
+    // Extract billing information
+    $billingPeriod = $subscription->fields['billing_period'];
+    $billingFrequency = (int)$subscription->fields['billing_frequency'];
+    
+    // Get attributes if needed
+    if ((!$billingPeriod || $billingFrequency <= 0) && !empty($subscription->fields['attributes'])) {
+        $attributes = json_decode($subscription->fields['attributes'], true);
+        if (is_array($attributes)) {
+            if (!$billingPeriod && isset($attributes['billingperiod'])) {
+                $billingPeriod = $attributes['billingperiod'];
+            }
+            if ($billingFrequency <= 0 && isset($attributes['billingfrequency'])) {
+                $billingFrequency = (int)$attributes['billingfrequency'];
+            }
+        }
+    }
+    
+    // Validate we have billing info
+    if (!$billingPeriod || $billingFrequency <= 0) {
+        $messageStack->add_session($messageStackKey, 'Cannot skip payment: missing billing schedule information.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Get current scheduled date
+    $currentDate = $subscription->fields['next_payment_date'];
+    if (!$currentDate) {
+        $currentDate = date('Y-m-d');
+    }
+    
+    $baseDate = DateTime::createFromFormat('Y-m-d', $currentDate);
+    if (!$baseDate) {
+        $baseDate = new DateTime('today');
+    }
+    $baseDate->setTime(0, 0, 0);
+    
+    // Calculate next billing date
+    $period = strtolower(trim((string)$billingPeriod));
+    $frequency = $billingFrequency;
+    
+    $nextDate = clone $baseDate;
+    try {
+        switch ($period) {
+            case 'day':
+            case 'daily':
+                $nextDate->add(new DateInterval('P' . $frequency . 'D'));
+                break;
+            case 'week':
+            case 'weekly':
+                $nextDate->add(new DateInterval('P' . $frequency . 'W'));
+                break;
+            case 'semimonth':
+            case 'semi-month':
+            case 'semi monthly':
+            case 'semi-monthly':
+            case 'bi-weekly':
+            case 'bi weekly':
+                $days = max(1, $frequency * 15);
+                $nextDate->add(new DateInterval('P' . $days . 'D'));
+                break;
+            case 'month':
+            case 'monthly':
+                $nextDate->add(new DateInterval('P' . $frequency . 'M'));
+                break;
+            case 'year':
+            case 'yearly':
+                $nextDate->add(new DateInterval('P' . $frequency . 'Y'));
+                break;
+            default:
+                $nextDate->modify('+' . $frequency . ' ' . $period);
+                break;
+        }
+    } catch (Exception $e) {
+        $messageStack->add_session($messageStackKey, 'Failed to calculate next payment date.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update the next payment date
+    $newDate = $nextDate->format('Y-m-d');
     zen_db_perform(
         TABLE_PAYPAL_SUBSCRIPTIONS,
-        ['skip_next_payment' => 1, 'last_modified' => date('Y-m-d H:i:s')],
+        ['next_payment_date' => $newDate, 'last_modified' => date('Y-m-d H:i:s')],
         'update',
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
     
-    $messageStack->add_session($messageStackKey, sprintf('Next payment for subscription #%d will be skipped. The next billing date will be calculated and updated.', $subscriptionId), 'success');
+    $messageStack->add_session($messageStackKey, sprintf('Payment skipped for subscription #%d. Next payment date updated to %s.', $subscriptionId, $newDate), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -1007,7 +1086,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                 ?>
                                 <?php if ($currentStatus === 'active' || $currentStatus === 'scheduled') { ?>
                                     <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=skip_next_payment&subscription_id=' . $subscriptionId); ?>" 
-                                       onclick="return confirm('Skip the next payment for this subscription? The next billing date will be calculated and the subscription will continue.');"
+                                       onclick="return confirm('Skip this payment? The next billing date will be automatically calculated and updated based on the subscription schedule.');"
                                        class="nmx-btn nmx-btn-sm nmx-btn-info">Skip Next</a>
                                     <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=suspend_subscription&subscription_id=' . $subscriptionId); ?>" 
                                        onclick="return confirm('Are you sure you want to suspend this subscription?');"

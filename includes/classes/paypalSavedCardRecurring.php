@@ -2019,8 +2019,7 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 	}
 	
 	/**
-	 * Skip the next payment for a subscription.
-	 * Sets the skip_next_payment flag to true.
+	 * Skip the next payment for a subscription by calculating and updating the next billing date.
 	 * 
 	 * @param int $paypal_saved_card_recurring_id Subscription ID
 	 * @param int|false $customer_id Optional customer ID for security check
@@ -2067,12 +2066,85 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 			return false;
 		}
 		
-		// Set skip flag
-		$sql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' 
-		        SET skip_next_payment = 1, 
-		            comments = CONCAT(comments, \'  Next payment will be skipped.  \') 
-		        WHERE saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id;
-		$db->Execute($sql);
+		// Extract subscription attributes
+		$attributes = array();
+		if (isset($details['subscription_attributes']) && is_array($details['subscription_attributes'])) {
+			$attributes = $details['subscription_attributes'];
+		} elseif (isset($details['subscription_attributes_json']) && $details['subscription_attributes_json'] !== '') {
+			$decoded = json_decode($details['subscription_attributes_json'], true);
+			if (is_array($decoded)) {
+				$attributes = $decoded;
+			}
+		}
+		
+		// Get billing period and frequency
+		if (!isset($attributes['billingperiod']) && isset($details['billing_period']) && $details['billing_period'] !== null) {
+			$attributes['billingperiod'] = $details['billing_period'];
+		}
+		if (!isset($attributes['billingfrequency']) && isset($details['billing_frequency']) && $details['billing_frequency'] !== null) {
+			$attributes['billingfrequency'] = $details['billing_frequency'];
+		}
+		
+		// Validate we have billing info
+		if (!isset($attributes['billingperiod']) || !isset($attributes['billingfrequency']) || 
+		    $attributes['billingperiod'] === '' || (int)$attributes['billingfrequency'] <= 0) {
+			return false;
+		}
+		
+		// Get current scheduled date
+		$currentDate = isset($details['date']) ? $details['date'] : date('Y-m-d');
+		$baseDate = DateTime::createFromFormat('Y-m-d', $currentDate);
+		if (!$baseDate) {
+			$baseDate = new DateTime('today');
+		}
+		$baseDate->setTime(0, 0, 0);
+		
+		// Calculate next billing date
+		$period = strtolower(trim((string)$attributes['billingperiod']));
+		$frequency = (int)$attributes['billingfrequency'];
+		
+		$nextDate = clone $baseDate;
+		try {
+			switch ($period) {
+				case 'day':
+				case 'daily':
+					$nextDate->add(new DateInterval('P' . $frequency . 'D'));
+					break;
+				case 'week':
+				case 'weekly':
+					$nextDate->add(new DateInterval('P' . $frequency . 'W'));
+					break;
+				case 'semimonth':
+				case 'semi-month':
+				case 'semi monthly':
+				case 'semi-monthly':
+				case 'bi-weekly':
+				case 'bi weekly':
+					$days = max(1, $frequency * 15);
+					$nextDate->add(new DateInterval('P' . $days . 'D'));
+					break;
+				case 'month':
+				case 'monthly':
+					$nextDate->add(new DateInterval('P' . $frequency . 'M'));
+					break;
+				case 'year':
+				case 'yearly':
+					$nextDate->add(new DateInterval('P' . $frequency . 'Y'));
+					break;
+				default:
+					$nextDate->modify('+' . $frequency . ' ' . $period);
+					break;
+			}
+		} catch (Exception $e) {
+			return false;
+		}
+		
+		// Update the next payment date
+		$newDate = $nextDate->format('Y-m-d');
+		$this->update_payment_info($paypal_saved_card_recurring_id, array(
+			'date' => $newDate,
+			'comments' => '  Payment skipped by admin. Next payment date updated to ' . $newDate . '.  '
+		));
 		
 		return true;
 	}

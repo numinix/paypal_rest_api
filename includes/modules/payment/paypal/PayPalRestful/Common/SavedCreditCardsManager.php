@@ -97,28 +97,5 @@ class SavedCreditCardsManager
                 KEY idx_profile_id (profile_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
-        
-        self::ensureSkipNextPaymentColumn();
-    }
-    
-    /**
-     * Add skip_next_payment column if it doesn't exist.
-     */
-    private static function ensureSkipNextPaymentColumn(): void
-    {
-        global $db;
-        
-        // Check if column exists
-        $result = $db->Execute(
-            "SHOW COLUMNS FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " LIKE 'skip_next_payment'"
-        );
-        
-        if ($result->RecordCount() == 0) {
-            $db->Execute(
-                "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
-                ADD COLUMN skip_next_payment TINYINT(1) NOT NULL DEFAULT 0
-                AFTER status"
-            );
-        }
     }
 }

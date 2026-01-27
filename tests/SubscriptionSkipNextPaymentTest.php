@@ -5,9 +5,9 @@ declare(strict_types=1);
  * Test to verify skip_next_payment functionality for subscriptions
  *
  * This test ensures that:
- * 1. The skip_next_payment flag can be set on saved card subscriptions
- * 2. The skip_next_payment column exists in both tables
- * 3. Only scheduled subscriptions can be skipped
+ * 1. The skip_next_payment method calculates and updates the next billing date
+ * 2. The admin UI provides the skip action
+ * 3. No flag is used - date is updated immediately
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -17,49 +17,17 @@ echo "Running Subscription Skip Next Payment Test...\n\n";
 
 $basePath = dirname(__DIR__);
 
-// Test 1: Verify SavedCreditCardsManager has the skip column method
-echo "Test 1: Checking SavedCreditCardsManager for skip column support...\n";
-$savedCardManagerFile = $basePath . '/includes/modules/payment/paypal/PayPalRestful/Common/SavedCreditCardsManager.php';
-if (file_exists($savedCardManagerFile)) {
-    $content = file_get_contents($savedCardManagerFile);
-    if (strpos($content, 'ensureSkipNextPaymentColumn') !== false && 
-        strpos($content, 'skip_next_payment') !== false) {
-        echo "✓ SavedCreditCardsManager has skip_next_payment column support\n\n";
-    } else {
-        echo "✗ SavedCreditCardsManager missing skip_next_payment support\n\n";
-        exit(1);
-    }
-} else {
-    echo "✗ SavedCreditCardsManager.php not found\n\n";
-    exit(1);
-}
-
-// Test 2: Verify SubscriptionManager has the skip column method
-echo "Test 2: Checking SubscriptionManager for skip column support...\n";
-$subscriptionManagerFile = $basePath . '/includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
-if (file_exists($subscriptionManagerFile)) {
-    $content = file_get_contents($subscriptionManagerFile);
-    if (strpos($content, 'ensureSkipNextPaymentColumn') !== false && 
-        strpos($content, 'skip_next_payment') !== false) {
-        echo "✓ SubscriptionManager has skip_next_payment column support\n\n";
-    } else {
-        echo "✗ SubscriptionManager missing skip_next_payment support\n\n";
-        exit(1);
-    }
-} else {
-    echo "✗ SubscriptionManager.php not found\n\n";
-    exit(1);
-}
-
-// Test 3: Verify the skip_next_payment method exists in paypalSavedCardRecurring
-echo "Test 3: Checking for skip_next_payment method...\n";
+// Test 1: Verify skip_next_payment method exists and calculates dates
+echo "Test 1: Checking for skip_next_payment method with date calculation...\n";
 $savedCardRecurringFile = $basePath . '/includes/classes/paypalSavedCardRecurring.php';
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
-    if (strpos($content, 'function skip_next_payment') !== false) {
-        echo "✓ paypalSavedCardRecurring has skip_next_payment method\n\n";
+    if (strpos($content, 'function skip_next_payment') !== false &&
+        strpos($content, 'DateInterval') !== false &&
+        strpos($content, 'update_payment_info') !== false) {
+        echo "✓ paypalSavedCardRecurring has skip_next_payment method with date calculation\n\n";
     } else {
-        echo "✗ paypalSavedCardRecurring missing skip_next_payment method\n\n";
+        echo "✗ paypalSavedCardRecurring missing complete skip_next_payment implementation\n\n";
         exit(1);
     }
 } else {
@@ -67,16 +35,36 @@ if (file_exists($savedCardRecurringFile)) {
     exit(1);
 }
 
-// Test 4: Verify cron file checks for skip flag
-echo "Test 4: Checking cron file for skip logic...\n";
+// Test 2: Verify no skip flag logic in schema managers
+echo "Test 2: Verifying skip flag removed from schema managers...\n";
+$savedCardManagerFile = $basePath . '/includes/modules/payment/paypal/PayPalRestful/Common/SavedCreditCardsManager.php';
+$subscriptionManagerFile = $basePath . '/includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
+
+if (file_exists($savedCardManagerFile) && file_exists($subscriptionManagerFile)) {
+    $savedCardContent = file_get_contents($savedCardManagerFile);
+    $subscriptionContent = file_get_contents($subscriptionManagerFile);
+    
+    if (strpos($savedCardContent, 'ensureSkipNextPaymentColumn') === false && 
+        strpos($subscriptionContent, 'ensureSkipNextPaymentColumn') === false) {
+        echo "✓ Skip flag columns removed from schema managers\n\n";
+    } else {
+        echo "✗ Skip flag logic still present in schema managers\n\n";
+        exit(1);
+    }
+} else {
+    echo "✗ Schema manager files not found\n\n";
+    exit(1);
+}
+
+// Test 3: Verify cron file has no skip flag logic
+echo "Test 3: Checking cron file has no skip flag logic...\n";
 $cronFile = $basePath . '/cron/paypal_saved_card_recurring.php';
 if (file_exists($cronFile)) {
     $content = file_get_contents($cronFile);
-    if (strpos($content, 'skip_next_payment') !== false &&
-        strpos($content, 'schedule_payment') !== false) {
-        echo "✓ Cron file contains skip_next_payment logic with next payment calculation\n\n";
+    if (strpos($content, 'skip_next_payment') === false) {
+        echo "✓ Cron file has no skip flag logic (skip handled in admin)\n\n";
     } else {
-        echo "✗ Cron file missing complete skip_next_payment logic\n\n";
+        echo "✗ Cron file still contains skip flag logic\n\n";
         exit(1);
     }
 } else {
@@ -84,8 +72,8 @@ if (file_exists($cronFile)) {
     exit(1);
 }
 
-// Test 5: Verify admin files have skip action
-echo "Test 5: Checking admin files for skip action...\n";
+// Test 4: Verify admin files have skip action with immediate date update
+echo "Test 4: Checking admin files for skip action with date calculation...\n";
 $savedCardAdminFile = $basePath . '/admin/paypalr_saved_card_recurring.php';
 $subscriptionsAdminFile = $basePath . '/admin/paypalr_subscriptions.php';
 
@@ -98,15 +86,17 @@ if (file_exists($savedCardAdminFile) && file_exists($subscriptionsAdminFile)) {
     
     $hasSubscriptionsAction = strpos($subscriptionsContent, "if (\$action === 'skip_next_payment')") !== false;
     $hasSubscriptionsButton = strpos($subscriptionsContent, 'Skip Next') !== false;
+    $hasSubscriptionsCalc = strpos($subscriptionsContent, 'DateInterval') !== false;
     
-    if ($hasSavedCardAction && $hasSavedCardButton && $hasSubscriptionsAction && $hasSubscriptionsButton) {
-        echo "✓ Both admin files have skip_next_payment action and UI buttons\n\n";
+    if ($hasSavedCardAction && $hasSavedCardButton && $hasSubscriptionsAction && 
+        $hasSubscriptionsButton && $hasSubscriptionsCalc) {
+        echo "✓ Both admin files have skip_next_payment action with date calculation\n\n";
     } else {
         if (!$hasSavedCardAction || !$hasSavedCardButton) {
             echo "✗ paypalr_saved_card_recurring.php missing skip action or button\n";
         }
-        if (!$hasSubscriptionsAction || !$hasSubscriptionsButton) {
-            echo "✗ paypalr_subscriptions.php missing skip action or button\n";
+        if (!$hasSubscriptionsAction || !$hasSubscriptionsButton || !$hasSubscriptionsCalc) {
+            echo "✗ paypalr_subscriptions.php missing skip action, button, or date calculation\n";
         }
         echo "\n";
         exit(1);
@@ -116,8 +106,8 @@ if (file_exists($savedCardAdminFile) && file_exists($subscriptionsAdminFile)) {
     exit(1);
 }
 
-// Test 6: Verify security checks in skip method
-echo "Test 6: Checking security and validation in skip method...\n";
+// Test 5: Verify security and validation in skip method
+echo "Test 5: Checking security and validation in skip method...\n";
 $content = file_get_contents($savedCardRecurringFile);
 if (strpos($content, 'Security check') !== false &&
     strpos($content, "status'] !== 'scheduled'") !== false) {
@@ -131,9 +121,9 @@ echo "========================================\n";
 echo "All skip next payment tests passed! ✓\n";
 echo "========================================\n";
 echo "\nSummary:\n";
-echo "- Database schema updates: ✓\n";
-echo "- Skip method implementation: ✓\n";
-echo "- Cron job integration: ✓\n";
+echo "- Skip method with date calculation: ✓\n";
+echo "- No skip flag in schema: ✓\n";
+echo "- No skip logic in cron: ✓\n";
 echo "- Admin UI (saved cards): ✓\n";
 echo "- Admin UI (vault subscriptions): ✓\n";
 echo "- Security and validation: ✓\n";
