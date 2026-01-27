@@ -831,7 +831,8 @@ $paypal_subscriptions_allow_api_actions = $paypal_subscriptions_allow_api;
 $paypal_subscriptions_message = '';
 $paypal_subscriptions_message_type = '';
 if (isset($_SESSION['paypal_subscriptions_message']) && isset($_SESSION['paypal_subscriptions_message_type'])) {
-    $paypal_subscriptions_message = $_SESSION['paypal_subscriptions_message'];
+    // Sanitize message content to prevent XSS
+    $paypal_subscriptions_message = zen_output_string_protected($_SESSION['paypal_subscriptions_message']);
     $paypal_subscriptions_message_type = $_SESSION['paypal_subscriptions_message_type'];
     // Clear the session message after retrieving it
     unset($_SESSION['paypal_subscriptions_message']);

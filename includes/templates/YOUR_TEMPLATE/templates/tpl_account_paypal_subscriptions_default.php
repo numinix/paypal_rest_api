@@ -10,7 +10,7 @@
 
   <?php require $template->get_template_dir('tpl_modules_account_menu.php', DIR_WS_TEMPLATE, $current_page_base, 'templates') . '/tpl_modules_account_menu.php'; ?>
 
-  <?php if ($paypal_subscriptions_message !== '') { ?>
+  <?php if (!empty($paypal_subscriptions_message) && !empty($paypal_subscriptions_message_type)) { ?>
     <?php
       $alertClass = 'alert-info';
       if ($paypal_subscriptions_message_type === 'success') {
@@ -22,7 +22,7 @@
       }
     ?>
     <div class="messageStack-header noprint">
-      <div class="row messageStackAlert alert <?php echo $alertClass; ?>"><?php echo zen_output_string_protected($paypal_subscriptions_message); ?></div>
+      <div class="row messageStackAlert alert <?php echo $alertClass; ?>"><?php echo $paypal_subscriptions_message; ?></div>
     </div>
   <?php } ?>
 
