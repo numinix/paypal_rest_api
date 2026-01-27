@@ -1075,7 +1075,13 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                 </select>
             </div>
             <div class="pagination-links">
-                <?php if ($page > 1): ?>
+                <?php 
+                // Defensive type check: ensure $page is an integer
+                if (!is_int($page)) {
+                    $page = is_array($page) ? 1 : (int)$page;
+                }
+                if ($page > 1): 
+                ?>
                     <a href="<?php echo paypalr_pagination_url(1, $perPage, $activeQuery); ?>">&laquo; First</a>
                     <a href="<?php echo paypalr_pagination_url($page - 1, $perPage, $activeQuery); ?>">&lsaquo; Prev</a>
                 <?php else: ?>
