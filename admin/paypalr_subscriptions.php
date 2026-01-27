@@ -1076,9 +1076,10 @@ function paypalr_render_select_options(array $options, $selectedValue): string
             </div>
             <div class="pagination-links">
                 <?php 
-                // Defensive type check: ensure $page is an integer
-                if (!is_int($page)) {
-                    $page = is_array($page) ? 1 : (int)$page;
+                // Defensive type check: ensure $page is a valid positive integer
+                $page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
+                if ($page === false) {
+                    $page = 1;
                 }
                 if ($page > 1): 
                 ?>
