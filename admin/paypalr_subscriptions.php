@@ -368,6 +368,45 @@ if ($action === 'reactivate_subscription') {
     zen_redirect($redirectUrl);
 }
 
+// Skip next payment action
+if ($action === 'skip_next_payment') {
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session($messageStackKey, 'Unable to skip payment. Missing identifier.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Get current subscription status
+    $subscription = $db->Execute(
+        "SELECT status FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+    );
+    
+    if ($subscription->RecordCount() == 0) {
+        $messageStack->add_session($messageStackKey, 'Subscription not found.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Only allow skipping active subscriptions
+    if ($subscription->fields['status'] !== 'active') {
+        $messageStack->add_session($messageStackKey, 'Only active subscriptions can be skipped.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Set skip flag
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        ['skip_next_payment' => 1, 'last_modified' => date('Y-m-d H:i:s')],
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+    
+    $messageStack->add_session($messageStackKey, sprintf('Next payment for subscription #%d will be skipped. A $0 order will be created to maintain membership/license.', $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
 // Archive subscription action
 if ($action === 'archive_subscription') {
     $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
@@ -967,6 +1006,9 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                 $isArchived = !empty($row['is_archived']);
                                 ?>
                                 <?php if ($currentStatus === 'active' || $currentStatus === 'scheduled') { ?>
+                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=skip_next_payment&subscription_id=' . $subscriptionId); ?>" 
+                                       onclick="return confirm('Skip the next payment for this subscription? A $0 order will be created to maintain membership/license.');"
+                                       class="nmx-btn nmx-btn-sm nmx-btn-info">Skip Next</a>
                                     <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=suspend_subscription&subscription_id=' . $subscriptionId); ?>" 
                                        onclick="return confirm('Are you sure you want to suspend this subscription?');"
                                        class="nmx-btn nmx-btn-sm nmx-btn-warning">Suspend</a>

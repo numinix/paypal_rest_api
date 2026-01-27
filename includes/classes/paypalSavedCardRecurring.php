@@ -2017,6 +2017,66 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 
 		//EOF NX mod by Jeff
 	}
+	
+	/**
+	 * Skip the next payment for a subscription.
+	 * Sets the skip_next_payment flag to true.
+	 * 
+	 * @param int $paypal_saved_card_recurring_id Subscription ID
+	 * @param int|false $customer_id Optional customer ID for security check
+	 * @return bool Success status
+	 */
+	function skip_next_payment($paypal_saved_card_recurring_id, $customer_id = false) {
+		global $db;
+		
+		$paypal_saved_card_recurring_id = (int)$paypal_saved_card_recurring_id;
+		if ($paypal_saved_card_recurring_id <= 0) {
+			return false;
+		}
+		
+		$details = $this->get_payment_details($paypal_saved_card_recurring_id);
+		if (!is_array($details)) {
+			return false;
+		}
+		
+		// Determine subscription owner
+		$subscription_owner_id = 0;
+		if (isset($details['saved_card_customer_id']) && (int) $details['saved_card_customer_id'] > 0) {
+			$subscription_owner_id = (int) $details['saved_card_customer_id'];
+		}
+		elseif (isset($details['subscription_customer_id']) && (int) $details['subscription_customer_id'] > 0) {
+			$subscription_owner_id = (int) $details['subscription_customer_id'];
+		}
+		elseif (isset($details['customers_id'])) {
+			$subscription_owner_id = (int) $details['customers_id'];
+		}
+		
+		if ($customer_id === false || (int)$customer_id <= 0) {
+			$customer_id = $subscription_owner_id;
+		}
+		
+		// Security check
+		if ($customer_id != false) {
+			if ($subscription_owner_id !== (int) $customer_id) {
+				return false;
+			}
+		}
+		
+		// Only allow skipping scheduled subscriptions
+		if (!isset($details['status']) || $details['status'] !== 'scheduled') {
+			return false;
+		}
+		
+		// Set skip flag
+		$sql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' 
+		        SET skip_next_payment = 1, 
+		            comments = CONCAT(comments, \'  Next payment will be skipped.  \') 
+		        WHERE saved_credit_card_recurring_id = ' . $paypal_saved_card_recurring_id;
+		$db->Execute($sql);
+		
+		return true;
+	}
+	
 /*
 *  Function to update payment info.  Should only be applied to scheduled or cancelled payments, so that we keep historical data in tact.
 *  Can be modified in the future to update more fields.

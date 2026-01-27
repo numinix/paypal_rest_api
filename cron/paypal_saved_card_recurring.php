@@ -381,6 +381,119 @@ foreach ($todays_payments as $payment_id) {
     $payment_details = $normalizePaymentDetails($payment_id, $paypalSavedCardRecurring->get_payment_details($payment_id));
 
     // -------------------------------------------------------------------
+    // Check if this payment should be skipped
+    // -------------------------------------------------------------------
+    $skip_payment = isset($payment_details['skip_next_payment']) && (int)$payment_details['skip_next_payment'] === 1;
+    
+    if ($skip_payment) {
+        // Create a $0 order to maintain membership/license validity
+        list($order, $order_totals) = $paypalSavedCardRecurring->prepare_order($payment_details, $payment_details['products_id'], $payment_details['original_orders_products_id']);
+        
+        // Override order total to $0
+        foreach ($order_totals as &$ot) {
+            if ($ot['code'] == 'ot_total') {
+                $ot['value'] = 0;
+                $ot['text'] = '$0.00';
+            }
+            if ($ot['code'] == 'ot_subtotal') {
+                $ot['value'] = 0;
+                $ot['text'] = '$0.00';
+            }
+        }
+        unset($ot);
+        
+        // Set payment method to indicate skipped
+        $_SESSION['payment'] = 'skipped';
+        
+        // Create the $0 order
+        $order_id = $paypalSavedCardRecurring->create_order($order, $payment_details['saved_credit_card_id']);
+        
+        // Extract subscription attributes for scheduling
+        $attributes = $extractSubscriptionAttributes($payment_details);
+        $has_schedule_context = is_array($attributes)
+            && isset($attributes['billingperiod']) && $attributes['billingperiod'] !== ''
+            && isset($attributes['billingfrequency']) && $attributes['billingfrequency'] !== '';
+        
+        if ($has_schedule_context) {
+            // Calculate next billing date
+            $todayDate = new DateTime('today');
+            $intendedBillingDate = $determineIntendedBillingDate($payment_details, $attributes, 0);
+            
+            if ($intendedBillingDate instanceof DateTime) {
+                $intendedBillingDate->setTime(0, 0, 0);
+                $nextCycleDue = $advanceBillingCycle($intendedBillingDate, $attributes);
+                
+                if ($nextCycleDue instanceof DateTime) {
+                    $nextCycleDue->setTime(0, 0, 0);
+                    $scheduledProcessingDate = clone $nextCycleDue;
+                    
+                    if ($nextCycleDue <= $todayDate) {
+                        $scheduledProcessingDate = clone $todayDate;
+                        $scheduledProcessingDate->modify('+1 day');
+                    }
+                    
+                    $next_payment = $scheduledProcessingDate->format('Y-m-d');
+                    
+                    // Build metadata for next payment
+                    $metadata = $buildSubscriptionMetadata($payment_details, $payment_details['amount']);
+                    if (!isset($metadata['subscription_attributes']) || !is_array($metadata['subscription_attributes'])) {
+                        $metadata['subscription_attributes'] = array();
+                    }
+                    $metadata['subscription_attributes']['intended_billing_date'] = $nextCycleDue->format('Y-m-d');
+                    
+                    // Schedule next payment
+                    $rescheduleOrdersProductsId = $payment_details['original_orders_products_id'] ?? ($payment_details['orders_products_id'] ?? null);
+                    $paypalSavedCardRecurring->schedule_payment($payment_details['amount'], $next_payment, $payment_details['saved_credit_card_id'], $rescheduleOrdersProductsId, 'Scheduled after skipped payment.', $metadata);
+                    
+                    // Add license with next payment date
+                    $subscription_domain = '';
+                    if (isset($payment_details['domain']) && $payment_details['domain'] !== '') {
+                        $subscription_domain = $payment_details['domain'];
+                    } elseif (isset($attributes['domain']) && $attributes['domain'] !== '') {
+                        $subscription_domain = $attributes['domain'];
+                    } else {
+                        $subscription_domain = $paypalSavedCardRecurring->get_domain(0, $payment_details);
+                    }
+                    $paypalSavedCardRecurring->add_licence($order_id, $payment_details['products_id'], $next_payment, $subscription_domain, $payment_details['products_name'], $payment_details['products_model']);
+                }
+            }
+        }
+        
+        // Maintain group pricing
+        $paypalSavedCardRecurring->create_group_pricing($payment_details['products_id'], $payment_details['customers_id']);
+        
+        // Clear the skip flag and mark as complete
+        $updatePayload = array(
+            'order_id' => $order_id,
+            'date' => date('Y-m-d')
+        );
+        $paypalSavedCardRecurring->update_payment_info($payment_id, $updatePayload);
+        $paypalSavedCardRecurring->update_payment_status($payment_id, 'complete', '  Payment skipped by admin/automation. $0 order created.  ');
+        
+        // Reset skip flag
+        global $db;
+        $db->Execute('UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' SET skip_next_payment = 0 WHERE saved_credit_card_recurring_id = ' . (int)$payment_id);
+        
+        $results['success'][] = array(
+            'subscription_id' => $payment_id,
+            'customer_name' => $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'],
+            'product_name' => $payment_details['products_name'],
+            'amount' => '0.00 (skipped)',
+            'card_brand' => 'N/A',
+            'card_last4' => 'N/A',
+            'exp_month' => '--',
+            'exp_year' => '--',
+            'txn_id' => 'SKIPPED',
+            'invoice_number' => $order_id,
+            'next_charge_date' => $next_payment ?? 'N/A',
+            'subscription_url' => 'N/A',
+        );
+        
+        $log .= "\n Skipped payment for subscription $payment_id | {$payment_details['products_name']} | \$0 order #$order_id created";
+        continue; // Skip to next subscription
+    }
+
+    // -------------------------------------------------------------------
     // If the saved card attached to this payment has expired (or was marked
     // deleted), attempt to swap in another non-expired card.  When no valid
     // card exists for the customer, skip processing this subscription.
