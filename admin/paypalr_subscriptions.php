@@ -980,8 +980,6 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                     <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=cancel_subscription&subscription_id=' . $subscriptionId); ?>" 
                                        onclick="return confirm('Are you sure you want to cancel this subscription? This action cannot be undone.');"
                                        class="nmx-btn nmx-btn-sm nmx-btn-danger">Cancel</a>
-                                <?php } elseif ($currentStatus === 'cancelled') { ?>
-                                    <span style="color: #999; font-size: 12px;">Subscription cancelled</span>
                                 <?php } ?>
                                 <?php if ($isArchived) { ?>
                                     <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=unarchive_subscription&subscription_id=' . $subscriptionId); ?>" 
