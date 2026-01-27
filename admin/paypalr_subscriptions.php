@@ -804,11 +804,13 @@ if ($paymentRecords instanceof queryFactoryResult) {
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $perPage = isset($_GET['per_page']) ? max(10, min(100, (int)$_GET['per_page'])) : 20;
 
-// Defensive type check: ensure $page is a valid positive integer
-// This protects against edge cases where $page might become an array or other invalid type
-// due to malformed URL parameters or framework-level variable extraction
+// Defensive type check: ensure $page remains a valid positive integer
+// This protects against edge cases where $page might be overwritten with an array or other invalid type
+// after initialization due to framework-level variable extraction (e.g., extract($_GET)) or other code
+// that might pollute the variable namespace. The filter_var() call will catch these cases and reset to 1.
 $page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
 if ($page === false) {
+    // filter_var returns false for arrays and other non-convertible types
     $page = 1;
 }
 
