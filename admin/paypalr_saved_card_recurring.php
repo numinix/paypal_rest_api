@@ -128,6 +128,18 @@ switch ($action) {
         $messageStack->add_session($messageStackKey, 'Product has been updated for subscription #' . $_GET['saved_card_recurring_id'], 'success');
         $redirectAfterAction = true;
         break;
+    
+    case 'skip_next_payment':
+        if ($_GET['saved_card_recurring_id'] > 0) {
+            $success = $paypalSavedCardRecurring->skip_next_payment($_GET['saved_card_recurring_id']);
+            if ($success) {
+                $messageStack->add_session($messageStackKey, 'Payment skipped for subscription #' . $_GET['saved_card_recurring_id'] . '. The next billing date has been calculated and updated.', 'success');
+            } else {
+                $messageStack->add_session($messageStackKey, 'Failed to skip payment for subscription #' . $_GET['saved_card_recurring_id'] . '. Only scheduled subscriptions can be skipped.', 'error');
+            }
+        }
+        $redirectAfterAction = true;
+        break;
         
     case 'export_csv':
         // Build query with filters
@@ -637,6 +649,7 @@ function scr_pagination_url($page, $perPage, $queryString) {
                                         <?php if ($subscription['status'] == 'cancelled') { ?>
                                             <a class="nmx-btn nmx-btn-sm nmx-btn-success" href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, $query_string . '&action=reactivate_scheduled_payment&saved_card_recurring_id=' . $subscription['saved_credit_card_recurring_id']); ?>">Reactivate</a>
                                         <?php } elseif ($subscription['status'] == 'scheduled') { ?>
+                                            <a class="nmx-btn nmx-btn-sm nmx-btn-warning" href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, $query_string . '&action=skip_next_payment&saved_card_recurring_id=' . $subscription['saved_credit_card_recurring_id']); ?>" onclick="return confirm('Skip this payment? The next billing date will be automatically calculated and updated based on the subscription schedule.');">Skip Next</a>
                                             <a class="nmx-btn nmx-btn-sm nmx-btn-danger" href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, $query_string . '&action=cancel_scheduled_payment&saved_card_recurring_id=' . $subscription['saved_credit_card_recurring_id']); ?>" onclick="return confirm('Cancel this subscription?');">Cancel</a>
                                         <?php } ?>
                                     </td>
