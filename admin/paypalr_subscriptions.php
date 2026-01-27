@@ -633,6 +633,26 @@ if ($paymentRecords instanceof queryFactoryResult) {
     }
 }
 
+// Pagination setup
+$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$perPage = isset($_GET['per_page']) ? max(10, min(100, (int)$_GET['per_page'])) : 20;
+$offset = ($page - 1) * $perPage;
+
+// Get total count for pagination
+$countSql = 'SELECT COUNT(*) as total'
+    . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
+    . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = ps.customers_id'
+    . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = ps.orders_id'
+    . ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.paypal_vault_id = ps.paypal_vault_id';
+
+if (!empty($whereClauses)) {
+    $countSql .= ' WHERE ' . implode(' AND ', $whereClauses);
+}
+
+$countResult = $db->Execute($countSql);
+$totalRecords = $countResult->fields['total'] ?? 0;
+$totalPages = ($totalRecords > 0) ? ceil($totalRecords / $perPage) : 1;
+
 $sql = 'SELECT ps.*, c.customers_firstname, c.customers_lastname, c.customers_email_address,'
     . ' o.payment_module_code, o.payment_method,'
     . ' pv.brand AS vault_brand, pv.last_digits AS vault_last_digits, pv.card_type AS vault_card_type, pv.status AS vault_status, pv.expiry AS vault_expiry'
@@ -646,6 +666,7 @@ if (!empty($whereClauses)) {
 }
 
 $sql .= ' ORDER BY ps.date_added DESC, ps.paypal_subscription_id DESC';
+$sql .= ' LIMIT ' . $perPage . ' OFFSET ' . $offset;
 
 $subscriptions = $db->Execute($sql);
 
@@ -658,6 +679,20 @@ if ($subscriptions instanceof queryFactoryResult && $subscriptions->RecordCount(
 }
 
 $vaultCache = [];
+
+/**
+ * Generate pagination URL with filters preserved
+ */
+function paypalr_pagination_url($page, $perPage, $activeQuery) {
+    $params = [];
+    if ($activeQuery !== '') {
+        parse_str($activeQuery, $params);
+    }
+    $params['page'] = $page;
+    $params['per_page'] = $perPage;
+    $queryStr = http_build_query($params);
+    return zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $queryStr);
+}
 
 function paypalr_render_select_options(array $options, $selectedValue): string
 {
@@ -711,6 +746,85 @@ function paypalr_render_select_options(array $options, $selectedValue): string
         }
         .paypalr-subscriptions-table label:first-child {
             margin-top: 0;
+        }
+        
+        /* Expand/Collapse styles */
+        .subscription-row-collapsed .details-row {
+            display: none;
+        }
+        .subscription-summary {
+            cursor: pointer;
+            user-select: none;
+        }
+        .toggle-icon {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            margin-right: 8px;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 8px solid #333;
+            transition: transform 0.2s;
+        }
+        .subscription-row-collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+        .subscription-summary:hover {
+            background-color: rgba(0, 97, 141, 0.05);
+        }
+        
+        /* Pagination styles */
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 16px 0;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .pagination-info {
+            font-size: 14px;
+            color: #555;
+        }
+        .pagination-links {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .pagination-links a,
+        .pagination-links span {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            text-decoration: none;
+            color: #333;
+            border-radius: 3px;
+        }
+        .pagination-links a:hover {
+            background: #00618d;
+            color: white;
+            border-color: #00618d;
+        }
+        .pagination-links span.current {
+            background: #00618d;
+            color: white;
+            border-color: #00618d;
+        }
+        .pagination-links span.disabled {
+            background: #f5f5f5;
+            color: #999;
+            cursor: not-allowed;
+        }
+        .per-page-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .per-page-selector select {
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
         }
     </style>
 </head>
@@ -796,6 +910,55 @@ function paypalr_render_select_options(array $options, $selectedValue): string
             </div>
         </div>
         
+        <!-- Pagination controls -->
+        <div class="pagination-controls">
+            <div class="pagination-info">
+                Showing <?php echo $totalRecords > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + $perPage, $totalRecords); ?> of <?php echo $totalRecords; ?> subscriptions
+            </div>
+            <div class="per-page-selector">
+                <label for="per-page-select">Per page:</label>
+                <select id="per-page-select" onchange="window.location.href='<?php echo paypalr_pagination_url(1, '', $activeQuery); ?>'.replace('per_page=', 'per_page=' + this.value);">
+                    <option value="10"<?php echo $perPage === 10 ? ' selected' : ''; ?>>10</option>
+                    <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
+                    <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
+                    <option value="100"<?php echo $perPage === 100 ? ' selected' : ''; ?>>100</option>
+                </select>
+            </div>
+            <div class="pagination-links">
+                <?php if ($page > 1): ?>
+                    <a href="<?php echo paypalr_pagination_url(1, $perPage, $activeQuery); ?>">&laquo; First</a>
+                    <a href="<?php echo paypalr_pagination_url($page - 1, $perPage, $activeQuery); ?>">&lsaquo; Prev</a>
+                <?php else: ?>
+                    <span class="disabled">&laquo; First</span>
+                    <span class="disabled">&lsaquo; Prev</span>
+                <?php endif; ?>
+                
+                <?php
+                // Show page numbers
+                $startPage = max(1, $page - 2);
+                $endPage = min($totalPages, $page + 2);
+                
+                for ($i = $startPage; $i <= $endPage; $i++):
+                    if ($i === $page):
+                ?>
+                    <span class="current"><?php echo $i; ?></span>
+                <?php else: ?>
+                    <a href="<?php echo paypalr_pagination_url($i, $perPage, $activeQuery); ?>"><?php echo $i; ?></a>
+                <?php
+                    endif;
+                endfor;
+                ?>
+                
+                <?php if ($page < $totalPages): ?>
+                    <a href="<?php echo paypalr_pagination_url($page + 1, $perPage, $activeQuery); ?>">Next &rsaquo;</a>
+                    <a href="<?php echo paypalr_pagination_url($totalPages, $perPage, $activeQuery); ?>">Last &raquo;</a>
+                <?php else: ?>
+                    <span class="disabled">Next &rsaquo;</span>
+                    <span class="disabled">Last &raquo;</span>
+                <?php endif; ?>
+            </div>
+        </div>
+        
         <div class="nmx-panel">
             <div class="nmx-panel-heading">
                 <div class="nmx-panel-title">Vaulted Subscriptions</div>
@@ -861,150 +1024,279 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                         <?php echo zen_draw_hidden_field('customers_id', $customersId); ?>
                         <?php echo zen_draw_hidden_field('redirect_query', $activeQuery); ?>
                     </form>
-                    <tr>
+                    
+                    <!-- Summary row (always visible, clickable to expand/collapse) -->
+                    <tr class="subscription-summary subscription-row-collapsed" onclick="toggleSubscription(<?php echo $subscriptionId; ?>)" data-subscription-id="<?php echo $subscriptionId; ?>">
                         <td>
+                            <span class="toggle-icon"></span>
                             <strong>#<?php echo (int) $row['paypal_subscription_id']; ?></strong>
-                            <div class="paypalr-subscription-meta">
-                                <?php if (!empty($row['orders_id'])) { ?>
-                                    Order: <a href="<?php echo zen_href_link(FILENAME_ORDERS, 'oID=' . (int) $row['orders_id'] . '&action=edit'); ?>">#<?php echo (int) $row['orders_id']; ?></a><br />
-                                <?php } ?>
-                                <?php if (!empty($row['orders_products_id'])) { ?>
-                                    Order Item ID: <?php echo (int) $row['orders_products_id']; ?><br />
-                                <?php } ?>
-                                <?php if (!empty($row['plan_id'])) { ?>
-                                    Plan: <?php echo zen_output_string_protected($row['plan_id']); ?><br />
-                                <?php } ?>
-                                Added: <?php echo zen_date_short($row['date_added'] ?? ''); ?><br />
-                                Updated: <?php echo zen_date_short($row['last_modified'] ?? ''); ?><br />
-                                <?php if ($paymentSummary !== '') { ?>
-                                    Paid with: <?php echo zen_output_string_protected($paymentSummary); ?><br />
-                                <?php } ?>
-                                Customer Email: <?php echo zen_output_string_protected($row['customers_email_address'] ?? ''); ?>
-                            </div>
                         </td>
+                        <td><?php echo $customerName !== '' ? zen_output_string_protected($customerName) : 'Unknown Customer'; ?></td>
+                        <td><?php echo zen_output_string_protected((string) ($row['products_name'] ?? 'N/A')); ?></td>
                         <td>
-                            <?php echo $customerName !== '' ? zen_output_string_protected($customerName) : 'Unknown Customer'; ?>
-                        </td>
-                        <td>
-                            <label>Product Name</label>
-                            <input type="text" name="products_name" value="<?php echo zen_output_string_protected((string) ($row['products_name'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Product ID</label>
-                            <input type="number" name="products_id" value="<?php echo (int) ($row['products_id'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Quantity</label>
-                            <input type="number" step="0.01" name="products_quantity" value="<?php echo (float) ($row['products_quantity'] ?? 1); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                        </td>
-                        <td>
-                            <label>Billing Period</label>
-                            <input type="text" name="billing_period" value="<?php echo zen_output_string_protected((string) ($row['billing_period'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Billing Frequency</label>
-                            <input type="number" name="billing_frequency" value="<?php echo (int) ($row['billing_frequency'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Total Billing Cycles</label>
-                            <input type="number" name="total_billing_cycles" value="<?php echo (int) ($row['total_billing_cycles'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Next Billing Date</label>
-                            <input type="date" name="next_payment_date" value="<?php echo zen_output_string_protected((string) ($row['next_payment_date'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Trial Period</label>
-                            <input type="text" name="trial_period" value="<?php echo zen_output_string_protected((string) ($row['trial_period'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Trial Frequency</label>
-                            <input type="number" name="trial_frequency" value="<?php echo (int) ($row['trial_frequency'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Trial Cycles</label>
-                            <input type="number" name="trial_total_cycles" value="<?php echo (int) ($row['trial_total_cycles'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                        </td>
-                        <td>
-                            <label>Setup Fee</label>
-                            <input type="number" step="0.01" name="setup_fee" value="<?php echo (float) ($row['setup_fee'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Amount</label>
-                            <input type="number" step="0.01" name="amount" value="<?php echo (float) ($row['amount'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Currency Code</label>
-                            <input type="text" maxlength="3" name="currency_code" value="<?php echo zen_output_string_protected((string) ($row['currency_code'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <label>Currency Value</label>
-                            <input type="number" step="0.000001" name="currency_value" value="<?php echo (float) ($row['currency_value'] ?? 1); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                        </td>
-                        <td>
-                            <label>Vault Assignment</label>
-                            <select name="paypal_vault_id" form="<?php echo $formId; ?>" class="nmx-form-control">
-                                <?php echo paypalr_render_select_options($vaultOptions, $row['paypal_vault_id'] ?? '0'); ?>
-                            </select>
-                            <label>Vault ID (manual override)</label>
-                            <input type="text" name="vault_id" value="<?php echo zen_output_string_protected((string) ($row['vault_id'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
-                            <?php if (!empty($row['vault_brand']) || !empty($row['vault_card_type'])) { ?>
-                                <div class="paypalr-subscription-meta">
-                                    Stored: <?php echo zen_output_string_protected(trim(($row['vault_card_type'] ?? '') . ' ' . ($row['vault_brand'] ?? ''))); ?><br />
-                                    <?php if (!empty($row['vault_last_digits'])) { ?>
-                                        ••••<?php echo zen_output_string_protected($row['vault_last_digits']); ?><br />
-                                    <?php } ?>
-                                    <?php if (!empty($row['vault_expiry'])) { ?>
-                                        Expires: <?php echo zen_output_string_protected($row['vault_expiry']); ?><br />
-                                    <?php } ?>
-                                    <?php if (!empty($row['vault_status'])) { ?>
-                                        Status: <?php echo zen_output_string_protected($row['vault_status']); ?>
-                                    <?php } ?>
-                                </div>
+                            Every <?php echo (int) ($row['billing_frequency'] ?? 0); ?> <?php echo zen_output_string_protected((string) ($row['billing_period'] ?? '')); ?>(s)
+                            <?php if (!empty($row['next_payment_date'])) { ?>
+                                <br><small>Next: <?php echo zen_date_short($row['next_payment_date']); ?></small>
                             <?php } ?>
                         </td>
                         <td>
-                            <label>Current Status</label>
-                            <select name="status" form="<?php echo $formId; ?>" class="nmx-form-control">
-                                <?php echo paypalr_render_select_options($availableStatuses, $row['status'] ?? ''); ?>
-                            </select>
-                            <?php 
-                            $currentStatus = strtolower($row['status'] ?? '');
-                            ?>
-                            <div class="paypalr-subscription-actions" style="margin-top: 12px;">
-                                <button type="submit" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-primary">Save Changes</button>
-                                <?php if ($currentStatus !== 'cancelled') { ?>
-                                    <button type="submit" name="set_status" value="cancelled" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-warning">Mark Cancelled</button>
+                            <?php echo zen_output_string_protected((string) ($row['currency_code'] ?? '')); ?> <?php echo number_format((float) ($row['amount'] ?? 0), 2); ?>
+                        </td>
+                        <td>
+                            <?php if (!empty($row['vault_brand']) || !empty($row['vault_card_type'])) { ?>
+                                <?php echo zen_output_string_protected(trim(($row['vault_card_type'] ?? '') . ' ' . ($row['vault_brand'] ?? ''))); ?>
+                                <?php if (!empty($row['vault_last_digits'])) { ?>
+                                    ••••<?php echo zen_output_string_protected($row['vault_last_digits']); ?>
                                 <?php } ?>
-                                <?php if ($currentStatus !== 'active') { ?>
-                                    <button type="submit" name="set_status" value="active" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-success">Mark Active</button>
-                                <?php } ?>
-                                <?php if ($currentStatus !== 'pending') { ?>
-                                    <button type="submit" name="set_status" value="pending" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-secondary">Mark Pending</button>
-                                <?php } ?>
-                            </div>
-                            <div class="paypalr-subscription-actions" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--nmx-border);">
-                                <?php
-                                $actionParams = $activeQuery !== '' ? $activeQuery . '&' : '';
-                                $isArchived = !empty($row['is_archived']);
-                                ?>
-                                <?php if ($currentStatus === 'active' || $currentStatus === 'scheduled') { ?>
-                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=suspend_subscription&subscription_id=' . $subscriptionId); ?>" 
-                                       onclick="return confirm('Are you sure you want to suspend this subscription?');"
-                                       class="nmx-btn nmx-btn-sm nmx-btn-warning">Suspend</a>
-                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=cancel_subscription&subscription_id=' . $subscriptionId); ?>" 
-                                       onclick="return confirm('Are you sure you want to cancel this subscription? This action cannot be undone.');"
-                                       class="nmx-btn nmx-btn-sm nmx-btn-danger">Cancel</a>
-                                <?php } elseif ($currentStatus === 'suspended' || $currentStatus === 'paused') { ?>
-                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=reactivate_subscription&subscription_id=' . $subscriptionId); ?>" 
-                                       onclick="return confirm('Are you sure you want to reactivate this subscription?');"
-                                       class="nmx-btn nmx-btn-sm nmx-btn-success">Reactivate</a>
-                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=cancel_subscription&subscription_id=' . $subscriptionId); ?>" 
-                                       onclick="return confirm('Are you sure you want to cancel this subscription? This action cannot be undone.');"
-                                       class="nmx-btn nmx-btn-sm nmx-btn-danger">Cancel</a>
-                                <?php } elseif ($currentStatus === 'cancelled') { ?>
-                                    <span style="color: #999; font-size: 12px;">Subscription cancelled</span>
-                                <?php } ?>
-                                <?php if ($isArchived) { ?>
-                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=unarchive_subscription&subscription_id=' . $subscriptionId); ?>" 
-                                       onclick="return confirm('Are you sure you want to unarchive this subscription?');"
-                                       class="nmx-btn nmx-btn-sm nmx-btn-info">Unarchive</a>
-                                <?php } else { ?>
-                                    <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=archive_subscription&subscription_id=' . $subscriptionId); ?>" 
-                                       onclick="return confirm('Are you sure you want to archive this subscription? Archived subscriptions are hidden by default.');"
-                                       class="nmx-btn nmx-btn-sm nmx-btn-secondary">Archive</a>
-                                <?php } ?>
-                            </div>
+                            <?php } else { ?>
+                                N/A
+                            <?php } ?>
+                        </td>
+                        <td>
+                            <span style="padding: 4px 8px; border-radius: 3px; background: <?php
+                                $currentStatus = strtolower($row['status'] ?? '');
+                                if ($currentStatus === 'active') echo '#28a745';
+                                elseif ($currentStatus === 'cancelled') echo '#dc3545';
+                                elseif ($currentStatus === 'suspended' || $currentStatus === 'paused') echo '#ffc107';
+                                else echo '#6c757d';
+                            ?>; color: white; font-size: 0.85em;">
+                                <?php echo zen_output_string_protected(ucfirst($currentStatus)); ?>
+                            </span>
                         </td>
                     </tr>
-                    <tr>
+                    
+                    <!-- Details rows (hidden by default) -->
+                    <tr class="details-row" data-subscription-id="<?php echo $subscriptionId; ?>">
                         <td colspan="7">
-                            <label for="attributes-<?php echo $subscriptionId; ?>">Attributes (JSON)</label>
-                            <textarea id="attributes-<?php echo $subscriptionId; ?>" name="attributes" form="<?php echo $formId; ?>" placeholder="{ }" class="nmx-form-control"><?php echo zen_output_string_protected($attributesPretty); ?></textarea>
+                            <div style="padding: 16px; background: #f9f9f9; border-radius: 4px;">
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                                    <!-- Subscription Details Column -->
+                                    <div>
+                                        <h4 style="margin-top: 0; color: #00618d;">Subscription Details</h4>
+                                        <div class="paypalr-subscription-meta">
+                                            <?php if (!empty($row['orders_id'])) { ?>
+                                                Order: <a href="<?php echo zen_href_link(FILENAME_ORDERS, 'oID=' . (int) $row['orders_id'] . '&action=edit'); ?>">#<?php echo (int) $row['orders_id']; ?></a><br />
+                                            <?php } ?>
+                                            <?php if (!empty($row['orders_products_id'])) { ?>
+                                                Order Item ID: <?php echo (int) $row['orders_products_id']; ?><br />
+                                            <?php } ?>
+                                            <?php if (!empty($row['plan_id'])) { ?>
+                                                Plan: <?php echo zen_output_string_protected($row['plan_id']); ?><br />
+                                            <?php } ?>
+                                            Added: <?php echo zen_date_short($row['date_added'] ?? ''); ?><br />
+                                            Updated: <?php echo zen_date_short($row['last_modified'] ?? ''); ?><br />
+                                            <?php if ($paymentSummary !== '') { ?>
+                                                Paid with: <?php echo zen_output_string_protected($paymentSummary); ?><br />
+                                            <?php } ?>
+                                            Customer Email: <?php echo zen_output_string_protected($row['customers_email_address'] ?? ''); ?>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Product Details Column -->
+                                    <div>
+                                        <h4 style="margin-top: 0; color: #00618d;">Product Information</h4>
+                                        <label>Product Name</label>
+                                        <input type="text" name="products_name" value="<?php echo zen_output_string_protected((string) ($row['products_name'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        <label>Product ID</label>
+                                        <input type="number" name="products_id" value="<?php echo (int) ($row['products_id'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        <label>Quantity</label>
+                                        <input type="number" step="0.01" name="products_quantity" value="<?php echo (float) ($row['products_quantity'] ?? 1); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                    </div>
+                                    
+                                    <!-- Vault & Status Column -->
+                                    <div>
+                                        <h4 style="margin-top: 0; color: #00618d;">Status & Vault</h4>
+                                        <label>Current Status</label>
+                                        <select name="status" form="<?php echo $formId; ?>" class="nmx-form-control">
+                                            <?php echo paypalr_render_select_options($availableStatuses, $row['status'] ?? ''); ?>
+                                        </select>
+                                        <label>Vault Assignment</label>
+                                        <select name="paypal_vault_id" form="<?php echo $formId; ?>" class="nmx-form-control">
+                                            <?php echo paypalr_render_select_options($vaultOptions, $row['paypal_vault_id'] ?? '0'); ?>
+                                        </select>
+                                        <label>Vault ID (manual override)</label>
+                                        <input type="text" name="vault_id" value="<?php echo zen_output_string_protected((string) ($row['vault_id'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                    </div>
+                                </div>
+                                
+                                <!-- Billing Details (Full Width) -->
+                                <div style="margin-top: 20px;">
+                                    <h4 style="margin-top: 0; color: #00618d;">Billing Configuration</h4>
+                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                                        <div>
+                                            <label>Billing Period</label>
+                                            <input type="text" name="billing_period" value="<?php echo zen_output_string_protected((string) ($row['billing_period'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Billing Frequency</label>
+                                            <input type="number" name="billing_frequency" value="<?php echo (int) ($row['billing_frequency'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Total Billing Cycles</label>
+                                            <input type="number" name="total_billing_cycles" value="<?php echo (int) ($row['total_billing_cycles'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Next Billing Date</label>
+                                            <input type="date" name="next_payment_date" value="<?php echo zen_output_string_protected((string) ($row['next_payment_date'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Trial Configuration -->
+                                <div style="margin-top: 16px;">
+                                    <h4 style="margin-top: 0; color: #00618d;">Trial Configuration</h4>
+                                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                                        <div>
+                                            <label>Trial Period</label>
+                                            <input type="text" name="trial_period" value="<?php echo zen_output_string_protected((string) ($row['trial_period'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Trial Frequency</label>
+                                            <input type="number" name="trial_frequency" value="<?php echo (int) ($row['trial_frequency'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Trial Cycles</label>
+                                            <input type="number" name="trial_total_cycles" value="<?php echo (int) ($row['trial_total_cycles'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Financial Details -->
+                                <div style="margin-top: 16px;">
+                                    <h4 style="margin-top: 0; color: #00618d;">Financial Details</h4>
+                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                                        <div>
+                                            <label>Setup Fee</label>
+                                            <input type="number" step="0.01" name="setup_fee" value="<?php echo (float) ($row['setup_fee'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Amount</label>
+                                            <input type="number" step="0.01" name="amount" value="<?php echo (float) ($row['amount'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Currency Code</label>
+                                            <input type="text" maxlength="3" name="currency_code" value="<?php echo zen_output_string_protected((string) ($row['currency_code'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Currency Value</label>
+                                            <input type="number" step="0.000001" name="currency_value" value="<?php echo (float) ($row['currency_value'] ?? 1); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Attributes -->
+                                <div style="margin-top: 16px;">
+                                    <label for="attributes-<?php echo $subscriptionId; ?>">Attributes (JSON)</label>
+                                    <textarea id="attributes-<?php echo $subscriptionId; ?>" name="attributes" form="<?php echo $formId; ?>" placeholder="{ }" class="nmx-form-control" style="min-height: 100px; font-family: monospace;"><?php echo zen_output_string_protected($attributesPretty); ?></textarea>
+                                </div>
+                                
+                                <!-- Actions -->
+                                <div style="margin-top: 20px; padding-top: 16px; border-top: 2px solid #ddd;">
+                                    <h4 style="margin-top: 0; color: #00618d;">Actions</h4>
+                                    <div class="paypalr-subscription-actions">
+                                        <button type="submit" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-primary">Save Changes</button>
+                                        <?php 
+                                        $currentStatus = strtolower($row['status'] ?? '');
+                                        ?>
+                                        <?php if ($currentStatus !== 'cancelled') { ?>
+                                            <button type="submit" name="set_status" value="cancelled" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-warning">Mark Cancelled</button>
+                                        <?php } ?>
+                                        <?php if ($currentStatus !== 'active') { ?>
+                                            <button type="submit" name="set_status" value="active" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-success">Mark Active</button>
+                                        <?php } ?>
+                                        <?php if ($currentStatus !== 'pending') { ?>
+                                            <button type="submit" name="set_status" value="pending" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-secondary">Mark Pending</button>
+                                        <?php } ?>
+                                    </div>
+                                    <div class="paypalr-subscription-actions" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+                                        <?php
+                                        $actionParams = $activeQuery !== '' ? $activeQuery . '&' : '';
+                                        $isArchived = !empty($row['is_archived']);
+                                        ?>
+                                        <?php if ($currentStatus === 'active' || $currentStatus === 'scheduled') { ?>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=suspend_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Are you sure you want to suspend this subscription?');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-warning">Suspend</a>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=cancel_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Are you sure you want to cancel this subscription? This action cannot be undone.');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-danger">Cancel</a>
+                                        <?php } elseif ($currentStatus === 'suspended' || $currentStatus === 'paused') { ?>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=reactivate_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Are you sure you want to reactivate this subscription?');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-success">Reactivate</a>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=cancel_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Are you sure you want to cancel this subscription? This action cannot be undone.');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-danger">Cancel</a>
+                                        <?php } elseif ($currentStatus === 'cancelled') { ?>
+                                            <span style="color: #999; font-size: 12px;">Subscription cancelled</span>
+                                        <?php } ?>
+                                        <?php if ($isArchived) { ?>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=unarchive_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Are you sure you want to unarchive this subscription?');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-info">Unarchive</a>
+                                        <?php } else { ?>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=archive_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Are you sure you want to archive this subscription? Archived subscriptions are hidden by default.');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-secondary">Archive</a>
+                                        <?php } ?>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 <?php } ?>
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Bottom Pagination controls -->
+        <div class="pagination-controls">
+            <div class="pagination-info">
+                Showing <?php echo $totalRecords > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + $perPage, $totalRecords); ?> of <?php echo $totalRecords; ?> subscriptions
+            </div>
+            <div class="per-page-selector">
+                <label for="per-page-select-bottom">Per page:</label>
+                <select id="per-page-select-bottom" onchange="window.location.href='<?php echo paypalr_pagination_url(1, '', $activeQuery); ?>'.replace('per_page=', 'per_page=' + this.value);">
+                    <option value="10"<?php echo $perPage === 10 ? ' selected' : ''; ?>>10</option>
+                    <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
+                    <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
+                    <option value="100"<?php echo $perPage === 100 ? ' selected' : ''; ?>>100</option>
+                </select>
+            </div>
+            <div class="pagination-links">
+                <?php if ($page > 1): ?>
+                    <a href="<?php echo paypalr_pagination_url(1, $perPage, $activeQuery); ?>">&laquo; First</a>
+                    <a href="<?php echo paypalr_pagination_url($page - 1, $perPage, $activeQuery); ?>">&lsaquo; Prev</a>
+                <?php else: ?>
+                    <span class="disabled">&laquo; First</span>
+                    <span class="disabled">&lsaquo; Prev</span>
+                <?php endif; ?>
+                
+                <?php
+                // Show page numbers
+                $startPage = max(1, $page - 2);
+                $endPage = min($totalPages, $page + 2);
+                
+                for ($i = $startPage; $i <= $endPage; $i++):
+                    if ($i === $page):
+                ?>
+                    <span class="current"><?php echo $i; ?></span>
+                <?php else: ?>
+                    <a href="<?php echo paypalr_pagination_url($i, $perPage, $activeQuery); ?>"><?php echo $i; ?></a>
+                <?php
+                    endif;
+                endfor;
+                ?>
+                
+                <?php if ($page < $totalPages): ?>
+                    <a href="<?php echo paypalr_pagination_url($page + 1, $perPage, $activeQuery); ?>">Next &rsaquo;</a>
+                    <a href="<?php echo paypalr_pagination_url($totalPages, $perPage, $activeQuery); ?>">Last &raquo;</a>
+                <?php else: ?>
+                    <span class="disabled">Next &rsaquo;</span>
+                    <span class="disabled">Last &raquo;</span>
+                <?php endif; ?>
             </div>
         </div>
         
@@ -1017,6 +1309,34 @@ function paypalr_render_select_options(array $options, $selectedValue): string
 </div>
 
 <?php require DIR_WS_INCLUDES . 'footer.php'; ?>
+
+<script>
+/**
+ * Toggle subscription row expand/collapse
+ */
+function toggleSubscription(subscriptionId) {
+    var summaryRow = document.querySelector('.subscription-summary[data-subscription-id="' + subscriptionId + '"]');
+    var detailsRow = document.querySelector('.details-row[data-subscription-id="' + subscriptionId + '"]');
+    
+    if (summaryRow && detailsRow) {
+        summaryRow.classList.toggle('subscription-row-collapsed');
+        
+        // Prevent form submission when clicking on inputs inside the row
+        event.stopPropagation();
+    }
+}
+
+// Prevent clicks on form elements from triggering the row toggle
+document.addEventListener('DOMContentLoaded', function() {
+    var formElements = document.querySelectorAll('.details-row input, .details-row select, .details-row textarea, .details-row button, .details-row a');
+    formElements.forEach(function(element) {
+        element.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+    });
+});
+</script>
+
 </body>
 </html>
 <?php require DIR_WS_INCLUDES . 'application_bottom.php';
