@@ -403,7 +403,7 @@ if ($action === 'skip_next_payment') {
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
     
-    $messageStack->add_session($messageStackKey, sprintf('Next payment for subscription #%d will be skipped. A $0 order will be created to maintain membership/license.', $subscriptionId), 'success');
+    $messageStack->add_session($messageStackKey, sprintf('Next payment for subscription #%d will be skipped. The next billing date will be calculated and updated.', $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -1007,7 +1007,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                 ?>
                                 <?php if ($currentStatus === 'active' || $currentStatus === 'scheduled') { ?>
                                     <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=skip_next_payment&subscription_id=' . $subscriptionId); ?>" 
-                                       onclick="return confirm('Skip the next payment for this subscription? A $0 order will be created to maintain membership/license.');"
+                                       onclick="return confirm('Skip the next payment for this subscription? The next billing date will be calculated and the subscription will continue.');"
                                        class="nmx-btn nmx-btn-sm nmx-btn-info">Skip Next</a>
                                     <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=suspend_subscription&subscription_id=' . $subscriptionId); ?>" 
                                        onclick="return confirm('Are you sure you want to suspend this subscription?');"

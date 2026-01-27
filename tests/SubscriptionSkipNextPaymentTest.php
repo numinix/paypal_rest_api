@@ -73,8 +73,8 @@ $cronFile = $basePath . '/cron/paypal_saved_card_recurring.php';
 if (file_exists($cronFile)) {
     $content = file_get_contents($cronFile);
     if (strpos($content, 'skip_next_payment') !== false &&
-        strpos($content, '$0 order') !== false) {
-        echo "✓ Cron file contains skip_next_payment logic with $0 order creation\n\n";
+        strpos($content, 'schedule_payment') !== false) {
+        echo "✓ Cron file contains skip_next_payment logic with next payment calculation\n\n";
     } else {
         echo "✗ Cron file missing complete skip_next_payment logic\n\n";
         exit(1);
