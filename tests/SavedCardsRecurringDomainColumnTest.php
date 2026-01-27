@@ -114,7 +114,18 @@ namespace {
             // Handle SELECT queries from saved_credit_cards_recurring table
             if (stripos($query, 'SELECT') !== false && stripos($query, TABLE_SAVED_CREDIT_CARDS_RECURRING) !== false) {
                 // Return result with 1 record to prevent fallback queries
-                return new mockDbResult(1, ['subscription_attributes_json' => '{}', 'billing_period' => 'MONTH', 'billing_frequency' => 1, 'total_billing_cycles' => 12, 'currency_code' => 'USD', 'domain' => 'test.com']);
+                $fields = [
+                    'subscription_attributes_json' => '{}',
+                    'billing_period' => 'MONTH',
+                    'billing_frequency' => 1,
+                    'total_billing_cycles' => 12,
+                    'currency_code' => 'USD'
+                ];
+                // Only include domain field if the column exists
+                if ($this->hasDomainColumn) {
+                    $fields['domain'] = 'test.com';
+                }
+                return new mockDbResult(1, $fields);
             }
 
             // Handle other SELECT queries
@@ -255,52 +266,31 @@ namespace {
     
     try {
         $method->invoke($recurringObj, 12345);
-        
-        // Look for the query that selects from saved_credit_cards_recurring
-        $queries = $db->getQueriesContaining(TABLE_SAVED_CREDIT_CARDS_RECURRING);
-        $found = false;
-        foreach ($queries as $query) {
-            if (stripos($query, 'SELECT') === 0) {
-                if (stripos($query, 'domain,') !== false || stripos($query, ', domain ') !== false) {
-                    fwrite(STDERR, "✗ Query should not include 'domain' column when it doesn't exist\n");
-                    fwrite(STDERR, "  Query: " . $query . "\n");
-                    $failures++;
-                    $found = true;
-                    break;
-                } else {
-                    fwrite(STDOUT, "✓ get_attributes() query correctly excludes 'domain' column when it doesn't exist\n");
-                    $found = true;
-                    break;
-                }
-            }
-        }
-        if (!$found) {
-            fwrite(STDERR, "✗ No SELECT query found for " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "\n");
-            $failures++;
-        }
     } catch (Exception $e) {
-        // Look for the query that selects from saved_credit_cards_recurring
-        $queries = $db->getQueriesContaining(TABLE_SAVED_CREDIT_CARDS_RECURRING);
-        $found = false;
-        foreach ($queries as $query) {
-            if (stripos($query, 'SELECT') === 0) {
-                if (stripos($query, 'domain,') !== false || stripos($query, ', domain ') !== false) {
-                    fwrite(STDERR, "✗ Query should not include 'domain' column when it doesn't exist\n");
-                    fwrite(STDERR, "  Query: " . $query . "\n");
-                    $failures++;
-                    $found = true;
-                    break;
-                } else {
-                    fwrite(STDOUT, "✓ get_attributes() query correctly excludes 'domain' column when it doesn't exist\n");
-                    $found = true;
-                    break;
-                }
+        // Expected to fail due to incomplete mocking, but we can still check the queries
+    }
+    
+    // Look for the query that selects from saved_credit_cards_recurring
+    $queries = $db->getQueriesContaining(TABLE_SAVED_CREDIT_CARDS_RECURRING);
+    $found = false;
+    foreach ($queries as $query) {
+        if (stripos($query, 'SELECT') === 0) {
+            if (stripos($query, 'domain,') !== false || stripos($query, ', domain ') !== false) {
+                fwrite(STDERR, "✗ Query should not include 'domain' column when it doesn't exist\n");
+                fwrite(STDERR, "  Query: " . $query . "\n");
+                $failures++;
+                $found = true;
+                break;
+            } else {
+                fwrite(STDOUT, "✓ get_attributes() query correctly excludes 'domain' column when it doesn't exist\n");
+                $found = true;
+                break;
             }
         }
-        if (!$found) {
-            fwrite(STDERR, "✗ No SELECT query found for " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "\n");
-            $failures++;
-        }
+    }
+    if (!$found) {
+        fwrite(STDERR, "✗ No SELECT query found for " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "\n");
+        $failures++;
     }
 
     // Test 5: Verify get_attributes() query includes domain column when it exists
