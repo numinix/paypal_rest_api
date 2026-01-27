@@ -1072,6 +1072,16 @@ function paypalr_render_select_options(array $options, $selectedValue): string
             </div>
         </div>
         
+        <?php
+        // Re-validate $page to protect against framework-level variable extraction that may have occurred
+        // after the initial validation (e.g., extract($_GET) in included Zen Cart framework files).
+        // This ensures $page is always a valid integer even if overwritten with an array value.
+        $page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
+        if ($page === false || !is_int($page)) {
+            $page = 1;
+        }
+        ?>
+        
         <!-- Pagination controls -->
         <div class="pagination-controls">
             <div class="pagination-info">
