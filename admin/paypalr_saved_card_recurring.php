@@ -197,6 +197,11 @@ if ($redirectAfterAction) {
     ));
 }
 
+// Pagination setup
+$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$perPage = isset($_GET['per_page']) ? max(10, min(100, (int)$_GET['per_page'])) : 20;
+$offset = ($page - 1) * $perPage;
+
 // Build subscriptions query
 $sql = "SELECT sccr.*, scc.type AS card_type, scc.last_digits, scc.is_deleted,
         scc.customers_id AS saved_card_customer_id,
@@ -223,7 +228,31 @@ if (isset($_GET['status']) && strlen($_GET['status']) > 0 && $_GET['status'] != 
     $sql .= ' AND sccr.status = "scheduled"';
 }
 
+// Get total count for pagination
+$countSql = "SELECT COUNT(DISTINCT sccr.saved_credit_card_recurring_id) as total
+    FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " sccr
+    LEFT JOIN " . TABLE_SAVED_CREDIT_CARDS . " scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id
+    LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = scc.customers_id
+    WHERE 1";
+
+if (isset($_GET['customers_id']) && $_GET['customers_id'] > 0) {
+    $countSql .= ' AND scc.customers_id = ' . (int)$_GET['customers_id'];
+}
+if (isset($_GET['products_id']) && $_GET['products_id'] > 0) {
+    $countSql .= ' AND sccr.products_id = ' . (int)$_GET['products_id'];
+}
+if (isset($_GET['status']) && strlen($_GET['status']) > 0 && $_GET['status'] != '0') {
+    $countSql .= ' AND sccr.status = "' . zen_db_input($_GET['status']) . '"';
+} elseif (!isset($_GET['status']) || $_GET['status'] != '0') {
+    $countSql .= ' AND sccr.status = "scheduled"';
+}
+
+$countResult = $db->Execute($countSql);
+$totalRecords = $countResult->fields['total'] ?? 0;
+$totalPages = ($totalRecords > 0) ? ceil($totalRecords / $perPage) : 1;
+
 $sql .= ' ORDER BY sccr.saved_credit_card_recurring_id DESC';
+$sql .= ' LIMIT ' . $perPage . ' OFFSET ' . $offset;
 
 $result = $db->Execute($sql);
 $subscriptions = [];
@@ -340,6 +369,20 @@ $statuses_recurring = [
     'scheduled' => 'Scheduled',
     'cancelled' => 'Cancelled'
 ];
+
+/**
+ * Generate pagination URL with filters preserved
+ */
+function scr_pagination_url($page, $perPage, $queryString) {
+    $params = [];
+    if ($queryString !== '') {
+        parse_str($queryString, $params);
+    }
+    $params['page'] = $page;
+    $params['per_page'] = $perPage;
+    $queryStr = http_build_query($params);
+    return zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, $queryStr);
+}
 ?>
 <!doctype html>
 <html <?php echo HTML_PARAMS; ?>>
@@ -349,6 +392,60 @@ $statuses_recurring = [
     <style>
         .edit-content { display: none; }
         .edit-content.active { display: block; margin-top: 8px; padding: 8px; background: rgba(0, 97, 141, 0.05); border-radius: 8px; }
+        
+        /* Pagination styles */
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 16px 0;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .pagination-info {
+            font-size: 14px;
+            color: #555;
+        }
+        .pagination-links {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .pagination-links a,
+        .pagination-links span {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            text-decoration: none;
+            color: #333;
+            border-radius: 3px;
+        }
+        .pagination-links a:hover {
+            background: #00618d;
+            color: white;
+            border-color: #00618d;
+        }
+        .pagination-links span.current {
+            background: #00618d;
+            color: white;
+            border-color: #00618d;
+        }
+        .pagination-links span.disabled {
+            background: #f5f5f5;
+            color: #999;
+            cursor: not-allowed;
+        }
+        .per-page-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .per-page-selector select {
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body>
@@ -406,6 +503,55 @@ $statuses_recurring = [
                         <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, 'action=export_csv' . $query_string); ?>" class="nmx-btn nmx-btn-info">Export CSV</a>
                     </div>
                 </form>
+            </div>
+        </div>
+        
+        <!-- Pagination controls -->
+        <div class="pagination-controls">
+            <div class="pagination-info">
+                Showing <?php echo $totalRecords > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + $perPage, $totalRecords); ?> of <?php echo $totalRecords; ?> subscriptions
+            </div>
+            <div class="per-page-selector">
+                <label for="per-page-select">Per page:</label>
+                <select id="per-page-select" onchange="changePerPage(this.value)">
+                    <option value="10"<?php echo $perPage === 10 ? ' selected' : ''; ?>>10</option>
+                    <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
+                    <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
+                    <option value="100"<?php echo $perPage === 100 ? ' selected' : ''; ?>>100</option>
+                </select>
+            </div>
+            <div class="pagination-links">
+                <?php if ($page > 1): ?>
+                    <a href="<?php echo scr_pagination_url(1, $perPage, $query_string); ?>">&laquo; First</a>
+                    <a href="<?php echo scr_pagination_url($page - 1, $perPage, $query_string); ?>">&lsaquo; Prev</a>
+                <?php else: ?>
+                    <span class="disabled">&laquo; First</span>
+                    <span class="disabled">&lsaquo; Prev</span>
+                <?php endif; ?>
+                
+                <?php
+                // Show page numbers
+                $startPage = max(1, $page - 2);
+                $endPage = min($totalPages, $page + 2);
+                
+                for ($i = $startPage; $i <= $endPage; $i++):
+                    if ($i === $page):
+                ?>
+                    <span class="current"><?php echo $i; ?></span>
+                <?php else: ?>
+                    <a href="<?php echo scr_pagination_url($i, $perPage, $query_string); ?>"><?php echo $i; ?></a>
+                <?php
+                    endif;
+                endfor;
+                ?>
+                
+                <?php if ($page < $totalPages): ?>
+                    <a href="<?php echo scr_pagination_url($page + 1, $perPage, $query_string); ?>">Next &rsaquo;</a>
+                    <a href="<?php echo scr_pagination_url($totalPages, $perPage, $query_string); ?>">Last &raquo;</a>
+                <?php else: ?>
+                    <span class="disabled">Next &rsaquo;</span>
+                    <span class="disabled">Last &raquo;</span>
+                <?php endif; ?>
             </div>
         </div>
         
@@ -505,6 +651,55 @@ $statuses_recurring = [
             </div>
         </div>
         
+        <!-- Bottom Pagination controls -->
+        <div class="pagination-controls">
+            <div class="pagination-info">
+                Showing <?php echo $totalRecords > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + $perPage, $totalRecords); ?> of <?php echo $totalRecords; ?> subscriptions
+            </div>
+            <div class="per-page-selector">
+                <label for="per-page-select-bottom">Per page:</label>
+                <select id="per-page-select-bottom" onchange="changePerPage(this.value)">
+                    <option value="10"<?php echo $perPage === 10 ? ' selected' : ''; ?>>10</option>
+                    <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
+                    <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
+                    <option value="100"<?php echo $perPage === 100 ? ' selected' : ''; ?>>100</option>
+                </select>
+            </div>
+            <div class="pagination-links">
+                <?php if ($page > 1): ?>
+                    <a href="<?php echo scr_pagination_url(1, $perPage, $query_string); ?>">&laquo; First</a>
+                    <a href="<?php echo scr_pagination_url($page - 1, $perPage, $query_string); ?>">&lsaquo; Prev</a>
+                <?php else: ?>
+                    <span class="disabled">&laquo; First</span>
+                    <span class="disabled">&lsaquo; Prev</span>
+                <?php endif; ?>
+                
+                <?php
+                // Show page numbers
+                $startPage = max(1, $page - 2);
+                $endPage = min($totalPages, $page + 2);
+                
+                for ($i = $startPage; $i <= $endPage; $i++):
+                    if ($i === $page):
+                ?>
+                    <span class="current"><?php echo $i; ?></span>
+                <?php else: ?>
+                    <a href="<?php echo scr_pagination_url($i, $perPage, $query_string); ?>"><?php echo $i; ?></a>
+                <?php
+                    endif;
+                endfor;
+                ?>
+                
+                <?php if ($page < $totalPages): ?>
+                    <a href="<?php echo scr_pagination_url($page + 1, $perPage, $query_string); ?>">Next &rsaquo;</a>
+                    <a href="<?php echo scr_pagination_url($totalPages, $perPage, $query_string); ?>">Last &raquo;</a>
+                <?php else: ?>
+                    <span class="disabled">Next &rsaquo;</span>
+                    <span class="disabled">Last &raquo;</span>
+                <?php endif; ?>
+            </div>
+        </div>
+        
         <div class="nmx-footer">
             <a href="https://www.numinix.com" target="_blank" rel="noopener noreferrer" class="nmx-footer-logo">
                 <img src="images/numinix_logo.png" alt="Numinix">
@@ -518,6 +713,16 @@ $statuses_recurring = [
 <script>
 var baseUrl = <?php echo json_encode(zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING)); ?>;
 var queryString = <?php echo json_encode($query_string); ?>;
+
+/**
+ * Change items per page
+ */
+function changePerPage(newPerPage) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('page', '1'); // Reset to first page when changing per page
+    params.set('per_page', newPerPage);
+    window.location.href = baseUrl + '?' + params.toString();
+}
 
 function toggleEdit(el) {
     var parent = el.parentNode;
