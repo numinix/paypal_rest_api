@@ -1026,7 +1026,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         $orders_products_id = (int) $context['orders_products_id'];
                 }
                 if ($orders_products_id > 0) {
-                        return 'original_orders_products_id = ' . $orders_products_id;
+                        return 'orders_products_id = ' . $orders_products_id;
                 }
 
                 $conditions = array();
@@ -1276,7 +1276,7 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
                         $scopeSql = $this->build_subscription_scope_sql($subscription_context);
                 }
                 if ($scopeSql === '' && $original_orders_products_id > 0) {
-                        $scopeSql = 'original_orders_products_id = ' . $original_orders_products_id;
+                        $scopeSql = 'orders_products_id = ' . $original_orders_products_id;
                 }
 
                 if ($completed_cycles === null && $scopeSql !== '') {
@@ -1324,7 +1324,7 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
 
                 $hasDomainColumn = $this->saved_cards_recurring_has_column('domain');
                 $domainSelect = $hasDomainColumn ? 'domain, ' : '';
-                $snapshotRow = $db->Execute('SELECT ' . $domainSelect . 'subscription_attributes_json FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE original_orders_products_id = ' . $orders_products_id . ' ORDER BY saved_credit_card_recurring_id DESC LIMIT 1;');
+                $snapshotRow = $db->Execute('SELECT ' . $domainSelect . 'subscription_attributes_json FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE orders_products_id = ' . $orders_products_id . ' ORDER BY saved_credit_card_recurring_id DESC LIMIT 1;');
                 if ($snapshotRow->RecordCount() > 0) {
                         if ($hasDomainColumn && isset($snapshotRow->fields['domain']) && $snapshotRow->fields['domain'] !== '') {
                                 return $snapshotRow->fields['domain'];
@@ -1376,7 +1376,7 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
 
                 $hasDomainColumn = $this->saved_cards_recurring_has_column('domain');
                 $domainSelect = $hasDomainColumn ? 'domain, ' : '';
-                $snapshotRow = $db->Execute('SELECT subscription_attributes_json, billing_period, billing_frequency, total_billing_cycles, ' . $domainSelect . 'currency_code FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE original_orders_products_id = ' . $orders_products_id . ' ORDER BY saved_credit_card_recurring_id DESC LIMIT 1;');
+                $snapshotRow = $db->Execute('SELECT subscription_attributes_json, billing_period, billing_frequency, total_billing_cycles, ' . $domainSelect . 'currency_code FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE orders_products_id = ' . $orders_products_id . ' ORDER BY saved_credit_card_recurring_id DESC LIMIT 1;');
                 if ($snapshotRow->RecordCount() > 0) {
                         $attributes = $this->get_snapshot_attributes($snapshotRow->fields);
                         if (is_array($attributes) && count($attributes) > 0) {
@@ -1923,7 +1923,7 @@ if ($new_card) {
 $new_card_details = $this->get_saved_card_details($new_card);
 }
 		$message = '';
-		$sql = 'SELECT * FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr LEFT JOIN ' . TABLE_ORDERS_PRODUCTS . ' op ON op.orders_products_id = sccr.original_orders_products_id WHERE status = \'scheduled\' and saved_credit_card_id = ' . $card_id;
+		$sql = 'SELECT * FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr LEFT JOIN ' . TABLE_ORDERS_PRODUCTS . ' op ON op.orders_products_id = sccr.orders_products_id WHERE status = \'scheduled\' and saved_credit_card_id = ' . $card_id;
 		$subscriptions = $db->Execute($sql);
 		while (!$subscriptions->EOF) {
 			if (!$new_card) {
@@ -2202,9 +2202,9 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                 if (array_key_exists('original_orders_products_id', $data)) {
                         $originalOrdersProductsId = (int) $data['original_orders_products_id'];
                         if ($originalOrdersProductsId > 0) {
-                                $sql .= ', original_orders_products_id = ' . $originalOrdersProductsId;
+                                $sql .= ', orders_products_id = ' . $originalOrdersProductsId;
                         } else {
-                                $sql .= ', original_orders_products_id = NULL';
+                                $sql .= ', orders_products_id = NULL';
                         }
                 }
 
