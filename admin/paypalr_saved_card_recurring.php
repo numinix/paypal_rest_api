@@ -15,14 +15,21 @@
  * - payflow.php (Payflow)
  */
 
-// Load MessageStack compatibility class before Zen Cart's native messageStack
-// This ensures messageStack->output() method works correctly with stack names
-$messageStackPath = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/MessageStack.php';
-if (is_file($messageStackPath)) {
-    require_once $messageStackPath;
-}
-
 require 'includes/application_top.php';
+
+// Load session messages into messageStack (Zen Cart's messageStack doesn't do this automatically)
+if (isset($_SESSION['messageToStack']) && is_array($_SESSION['messageToStack'])) {
+    foreach ($_SESSION['messageToStack'] as $stack => $stackMessages) {
+        if (is_array($stackMessages)) {
+            foreach ($stackMessages as $msg) {
+                if (isset($msg['text'], $msg['type'])) {
+                    $messageStack->add($stack, $msg['text'], $msg['type']);
+                }
+            }
+        }
+    }
+    unset($_SESSION['messageToStack']);
+}
 
 // Load PayPal autoloader to access schema managers
 $autoloaderPath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
