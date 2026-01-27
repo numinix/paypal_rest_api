@@ -255,7 +255,7 @@ if ($action === 'cancel_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', 'Unable to cancel subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_CANCEL_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -295,7 +295,7 @@ if ($action === 'suspend_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', 'Unable to suspend subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_SUSPEND_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -334,7 +334,7 @@ if ($action === 'reactivate_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', 'Unable to reactivate subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_REACTIVATE_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -362,7 +362,7 @@ if ($action === 'reactivate_subscription') {
         }
     }
     
-    $messageStack->add_session('header', sprintf('Subscription #%d has been reactivated.', $subscriptionId), 'success');
+    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_REACTIVATED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -385,7 +385,7 @@ if ($action === 'archive_subscription') {
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
     
-    $messageStack->add_session('header', sprintf('Subscription #%d has been archived.', $subscriptionId), 'success');
+    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_ARCHIVED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -396,7 +396,7 @@ if ($action === 'unarchive_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', 'Unable to unarchive subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_UNARCHIVE_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -408,7 +408,7 @@ if ($action === 'unarchive_subscription') {
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
     
-    $messageStack->add_session('header', sprintf('Subscription #%d has been unarchived.', $subscriptionId), 'success');
+    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_UNARCHIVED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
