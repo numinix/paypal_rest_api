@@ -459,14 +459,16 @@ if ($hideSubscriptionsPage === false) {
         $action = trim((string) ($_POST['action'] ?? ''));
         if ($action !== '') {
             if (!isset($_POST['securityToken']) || $_POST['securityToken'] !== $_SESSION['securityToken']) {
-                $messageStack->add_session('paypal_subscriptions', ERROR_SECURITY_TOKEN, 'error');
+                $_SESSION['paypal_subscriptions_message'] = ERROR_SECURITY_TOKEN;
+                $_SESSION['paypal_subscriptions_message_type'] = 'error';
                 zen_redirect(zen_href_link(FILENAME_ACCOUNT_PAYPAL_SUBSCRIPTIONS, '', 'SSL'));
             }
 
             $subscriptionId = (int) zen_db_prepare_input($_POST['paypal_subscription_id'] ?? 0);
             $subscriptionRecord = paypalr_subscription_fetch_record($customersId, $subscriptionId);
             if ($subscriptionRecord === null) {
-                $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_NOT_FOUND, 'error');
+                $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_NOT_FOUND;
+                $_SESSION['paypal_subscriptions_message_type'] = 'error';
                 zen_redirect(zen_href_link(FILENAME_ACCOUNT_PAYPAL_SUBSCRIPTIONS, '', 'SSL'));
             }
 
@@ -481,7 +483,8 @@ if ($hideSubscriptionsPage === false) {
                     if ($selectedVaultId > 0) {
                         $vaultCard = VaultManager::getCustomerVaultCard($customersId, $selectedVaultId);
                         if ($vaultCard === null) {
-                            $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_PAYMENT_METHOD_ERROR, 'error');
+                            $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_PAYMENT_METHOD_ERROR;
+                            $_SESSION['paypal_subscriptions_message_type'] = 'error';
                         } else {
                             $updateData = [
                                 'paypal_vault_id' => (int) $vaultCard['paypal_vault_id'],
@@ -494,7 +497,8 @@ if ($hideSubscriptionsPage === false) {
                                 'update',
                                 'paypal_subscription_id = ' . (int) $subscriptionRecord['paypal_subscription_id']
                             );
-                            $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_PAYMENT_METHOD_UPDATED, 'success');
+                            $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_PAYMENT_METHOD_UPDATED;
+                            $_SESSION['paypal_subscriptions_message_type'] = 'success';
                         }
                     } else {
                         $updateData = [
@@ -508,21 +512,24 @@ if ($hideSubscriptionsPage === false) {
                             'update',
                             'paypal_subscription_id = ' . (int) $subscriptionRecord['paypal_subscription_id']
                         );
-                        $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_PAYMENT_METHOD_UNLINKED, 'success');
+                        $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_PAYMENT_METHOD_UNLINKED;
+                        $_SESSION['paypal_subscriptions_message_type'] = 'success';
                     }
                     zen_redirect($redirectUrl);
                     break;
 
                 case 'cancel-subscription':
                     if ($api === null || $remoteId === '') {
-                        $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_NO_REMOTE_ID, 'error');
+                        $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_NO_REMOTE_ID;
+                        $_SESSION['paypal_subscriptions_message_type'] = 'error';
                         zen_redirect($redirectUrl);
                     }
 
                     $result = $api->cancelSubscription($remoteId, TEXT_SUBSCRIPTION_CANCEL_NOTE);
                     if ($result === false) {
                         $message = paypalr_subscription_format_api_error($api->getErrorInfo());
-                        $messageStack->add_session('paypal_subscriptions', sprintf(TEXT_SUBSCRIPTION_CANCEL_ERROR, zen_output_string_protected($message)), 'error');
+                        $_SESSION['paypal_subscriptions_message'] = sprintf(TEXT_SUBSCRIPTION_CANCEL_ERROR, zen_output_string_protected($message));
+                        $_SESSION['paypal_subscriptions_message_type'] = 'error';
                     } else {
                         zen_db_perform(
                             TABLE_PAYPAL_SUBSCRIPTIONS,
@@ -533,21 +540,24 @@ if ($hideSubscriptionsPage === false) {
                             'update',
                             'paypal_subscription_id = ' . (int) $subscriptionRecord['paypal_subscription_id']
                         );
-                        $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_CANCEL_SUCCESS, 'success');
+                        $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_CANCEL_SUCCESS;
+                        $_SESSION['paypal_subscriptions_message_type'] = 'success';
                     }
                     zen_redirect($redirectUrl);
                     break;
 
                 case 'suspend-subscription':
                     if ($api === null || $remoteId === '') {
-                        $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_NO_REMOTE_ID, 'error');
+                        $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_NO_REMOTE_ID;
+                        $_SESSION['paypal_subscriptions_message_type'] = 'error';
                         zen_redirect($redirectUrl);
                     }
 
                     $result = $api->suspendSubscription($remoteId, TEXT_SUBSCRIPTION_SUSPEND_NOTE);
                     if ($result === false) {
                         $message = paypalr_subscription_format_api_error($api->getErrorInfo());
-                        $messageStack->add_session('paypal_subscriptions', sprintf(TEXT_SUBSCRIPTION_SUSPEND_ERROR, zen_output_string_protected($message)), 'error');
+                        $_SESSION['paypal_subscriptions_message'] = sprintf(TEXT_SUBSCRIPTION_SUSPEND_ERROR, zen_output_string_protected($message));
+                        $_SESSION['paypal_subscriptions_message_type'] = 'error';
                     } else {
                         zen_db_perform(
                             TABLE_PAYPAL_SUBSCRIPTIONS,
@@ -558,21 +568,24 @@ if ($hideSubscriptionsPage === false) {
                             'update',
                             'paypal_subscription_id = ' . (int) $subscriptionRecord['paypal_subscription_id']
                         );
-                        $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_SUSPEND_SUCCESS, 'success');
+                        $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_SUSPEND_SUCCESS;
+                        $_SESSION['paypal_subscriptions_message_type'] = 'success';
                     }
                     zen_redirect($redirectUrl);
                     break;
 
                 case 'activate-subscription':
                     if ($api === null || $remoteId === '') {
-                        $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_NO_REMOTE_ID, 'error');
+                        $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_NO_REMOTE_ID;
+                        $_SESSION['paypal_subscriptions_message_type'] = 'error';
                         zen_redirect($redirectUrl);
                     }
 
                     $result = $api->activateSubscription($remoteId, TEXT_SUBSCRIPTION_RESUME_NOTE);
                     if ($result === false) {
                         $message = paypalr_subscription_format_api_error($api->getErrorInfo());
-                        $messageStack->add_session('paypal_subscriptions', sprintf(TEXT_SUBSCRIPTION_RESUME_ERROR, zen_output_string_protected($message)), 'error');
+                        $_SESSION['paypal_subscriptions_message'] = sprintf(TEXT_SUBSCRIPTION_RESUME_ERROR, zen_output_string_protected($message));
+                        $_SESSION['paypal_subscriptions_message_type'] = 'error';
                     } else {
                         zen_db_perform(
                             TABLE_PAYPAL_SUBSCRIPTIONS,
@@ -583,21 +596,24 @@ if ($hideSubscriptionsPage === false) {
                             'update',
                             'paypal_subscription_id = ' . (int) $subscriptionRecord['paypal_subscription_id']
                         );
-                        $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_RESUME_SUCCESS, 'success');
+                        $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_RESUME_SUCCESS;
+                        $_SESSION['paypal_subscriptions_message_type'] = 'success';
                     }
                     zen_redirect($redirectUrl);
                     break;
 
                 case 'refresh-subscription':
                     if ($api === null || $remoteId === '') {
-                        $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_NO_REMOTE_ID, 'error');
+                        $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_NO_REMOTE_ID;
+                        $_SESSION['paypal_subscriptions_message_type'] = 'error';
                         zen_redirect($redirectUrl);
                     }
 
                     $details = $api->getSubscription($remoteId);
                     if ($details === false) {
                         $message = paypalr_subscription_format_api_error($api->getErrorInfo());
-                        $messageStack->add_session('paypal_subscriptions', sprintf(TEXT_SUBSCRIPTION_REFRESH_ERROR, zen_output_string_protected($message)), 'error');
+                        $_SESSION['paypal_subscriptions_message'] = sprintf(TEXT_SUBSCRIPTION_REFRESH_ERROR, zen_output_string_protected($message));
+                        $_SESSION['paypal_subscriptions_message_type'] = 'error';
                     } else {
                         $remoteStatus = strtolower((string) ($details['status'] ?? ''));
                         $updateData = [
@@ -618,7 +634,8 @@ if ($hideSubscriptionsPage === false) {
                             'data' => $details,
                         ];
 
-                        $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_REFRESH_SUCCESS, 'success');
+                        $_SESSION['paypal_subscriptions_message'] = TEXT_SUBSCRIPTION_REFRESH_SUCCESS;
+                        $_SESSION['paypal_subscriptions_message_type'] = 'success';
                     }
                     zen_redirect($redirectUrl);
                     break;
@@ -809,6 +826,17 @@ if ($hideSubscriptionsPage === false) {
 
 $hide_paypal_subscriptions_page = $hideSubscriptionsPage;
 $paypal_subscriptions_allow_api_actions = $paypal_subscriptions_allow_api;
+
+// Prepare message from session for display (don't use messageStack in catalog templates)
+$paypal_subscriptions_message = '';
+$paypal_subscriptions_message_type = '';
+if (isset($_SESSION['paypal_subscriptions_message']) && isset($_SESSION['paypal_subscriptions_message_type'])) {
+    $paypal_subscriptions_message = $_SESSION['paypal_subscriptions_message'];
+    $paypal_subscriptions_message_type = $_SESSION['paypal_subscriptions_message_type'];
+    // Clear the session message after retrieving it
+    unset($_SESSION['paypal_subscriptions_message']);
+    unset($_SESSION['paypal_subscriptions_message_type']);
+}
 
 $breadcrumb->add(NAVBAR_TITLE_1, zen_href_link(FILENAME_ACCOUNT, '', 'SSL'));
 $breadcrumb->add(NAVBAR_TITLE_2, zen_href_link(FILENAME_ACCOUNT_PAYPAL_SUBSCRIPTIONS, '', 'SSL'));
