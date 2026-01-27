@@ -513,7 +513,7 @@ function scr_pagination_url($page, $perPage, $queryString) {
             </div>
             <div class="per-page-selector">
                 <label for="per-page-select">Per page:</label>
-                <select id="per-page-select" onchange="window.location.href='<?php echo scr_pagination_url(1, '', $query_string); ?>'.replace('per_page=', 'per_page=' + this.value);">
+                <select id="per-page-select" onchange="changePerPage(this.value)">
                     <option value="10"<?php echo $perPage === 10 ? ' selected' : ''; ?>>10</option>
                     <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
                     <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
@@ -658,7 +658,7 @@ function scr_pagination_url($page, $perPage, $queryString) {
             </div>
             <div class="per-page-selector">
                 <label for="per-page-select-bottom">Per page:</label>
-                <select id="per-page-select-bottom" onchange="window.location.href='<?php echo scr_pagination_url(1, '', $query_string); ?>'.replace('per_page=', 'per_page=' + this.value);">
+                <select id="per-page-select-bottom" onchange="changePerPage(this.value)">
                     <option value="10"<?php echo $perPage === 10 ? ' selected' : ''; ?>>10</option>
                     <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
                     <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
@@ -713,6 +713,16 @@ function scr_pagination_url($page, $perPage, $queryString) {
 <script>
 var baseUrl = <?php echo json_encode(zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING)); ?>;
 var queryString = <?php echo json_encode($query_string); ?>;
+
+/**
+ * Change items per page
+ */
+function changePerPage(newPerPage) {
+    var params = new URLSearchParams(window.location.search);
+    params.set('page', '1'); // Reset to first page when changing per page
+    params.set('per_page', newPerPage);
+    window.location.href = baseUrl + '?' + params.toString();
+}
 
 function toggleEdit(el) {
     var parent = el.parentNode;

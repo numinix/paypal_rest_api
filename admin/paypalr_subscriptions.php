@@ -758,16 +758,15 @@ function paypalr_render_select_options(array $options, $selectedValue): string
         }
         .toggle-icon {
             display: inline-block;
-            width: 0;
-            height: 0;
             margin-right: 8px;
-            border-left: 6px solid transparent;
-            border-right: 6px solid transparent;
-            border-top: 8px solid #333;
+            font-size: 12px;
             transition: transform 0.2s;
         }
-        .subscription-row-collapsed .toggle-icon {
-            transform: rotate(-90deg);
+        .toggle-icon::before {
+            content: '\25BC'; /* Down-pointing triangle */
+        }
+        .subscription-row-collapsed .toggle-icon::before {
+            content: '\25B6'; /* Right-pointing triangle */
         }
         .subscription-summary:hover {
             background-color: rgba(0, 97, 141, 0.05);
@@ -917,7 +916,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
             </div>
             <div class="per-page-selector">
                 <label for="per-page-select">Per page:</label>
-                <select id="per-page-select" onchange="window.location.href='<?php echo paypalr_pagination_url(1, '', $activeQuery); ?>'.replace('per_page=', 'per_page=' + this.value);">
+                <select id="per-page-select" onchange="changePerPage(this.value)">
                     <option value="10"<?php echo $perPage === 10 ? ' selected' : ''; ?>>10</option>
                     <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
                     <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
@@ -1026,7 +1025,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                     </form>
                     
                     <!-- Summary row (always visible, clickable to expand/collapse) -->
-                    <tr class="subscription-summary subscription-row-collapsed" onclick="toggleSubscription(<?php echo $subscriptionId; ?>)" data-subscription-id="<?php echo $subscriptionId; ?>">
+                    <tr class="subscription-summary subscription-row-collapsed" onclick="toggleSubscription(<?php echo $subscriptionId; ?>, event)" data-subscription-id="<?php echo $subscriptionId; ?>">
                         <td>
                             <span class="toggle-icon"></span>
                             <strong>#<?php echo (int) $row['paypal_subscription_id']; ?></strong>
@@ -1258,7 +1257,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
             </div>
             <div class="per-page-selector">
                 <label for="per-page-select-bottom">Per page:</label>
-                <select id="per-page-select-bottom" onchange="window.location.href='<?php echo paypalr_pagination_url(1, '', $activeQuery); ?>'.replace('per_page=', 'per_page=' + this.value);">
+                <select id="per-page-select-bottom" onchange="changePerPage(this.value)">
                     <option value="10"<?php echo $perPage === 10 ? ' selected' : ''; ?>>10</option>
                     <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
                     <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
@@ -1312,17 +1311,29 @@ function paypalr_render_select_options(array $options, $selectedValue): string
 
 <script>
 /**
+ * Change items per page
+ */
+function changePerPage(newPerPage) {
+    var params = new URLSearchParams(window.location.search);
+    params.set('page', '1'); // Reset to first page when changing per page
+    params.set('per_page', newPerPage);
+    window.location.href = '<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, ''); ?>' + '?' + params.toString();
+}
+
+/**
  * Toggle subscription row expand/collapse
  */
-function toggleSubscription(subscriptionId) {
+function toggleSubscription(subscriptionId, event) {
     var summaryRow = document.querySelector('.subscription-summary[data-subscription-id="' + subscriptionId + '"]');
     var detailsRow = document.querySelector('.details-row[data-subscription-id="' + subscriptionId + '"]');
     
     if (summaryRow && detailsRow) {
         summaryRow.classList.toggle('subscription-row-collapsed');
         
-        // Prevent form submission when clicking on inputs inside the row
-        event.stopPropagation();
+        // Prevent event bubbling to prevent conflicts with form elements
+        if (event) {
+            event.stopPropagation();
+        }
     }
 }
 
