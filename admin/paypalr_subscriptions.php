@@ -1004,7 +1004,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
     
         <div class="nmx-message-stack">
         <?php
-        if (isset($messageStack) && is_object($messageStack) && $messageStack->size() > 0) {
+        if (isset($messageStack) && is_object($messageStack) && $messageStack->size > 0) {
             echo $messageStack->output();
         }
         ?>

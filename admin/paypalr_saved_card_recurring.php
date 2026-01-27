@@ -470,7 +470,7 @@ function scr_pagination_url($page, $perPage, $queryString) {
     
         <div class="nmx-message-stack">
         <?php
-        if (isset($messageStack) && is_object($messageStack) && $messageStack->size() > 0) {
+        if (isset($messageStack) && is_object($messageStack) && $messageStack->size > 0) {
             echo $messageStack->output();
         }
         ?>
