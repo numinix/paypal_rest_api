@@ -87,16 +87,20 @@ if (file_exists($savedCardAdminFile) && file_exists($subscriptionsAdminFile)) {
     $hasSubscriptionsAction = strpos($subscriptionsContent, "if (\$action === 'skip_next_payment')") !== false;
     $hasSubscriptionsButton = strpos($subscriptionsContent, 'Skip Next') !== false;
     $hasSubscriptionsCalc = strpos($subscriptionsContent, 'DateInterval') !== false;
+    $hasPayPalAPIUpdate = strpos($subscriptionsContent, 'updateProfile') !== false;
     
     if ($hasSavedCardAction && $hasSavedCardButton && $hasSubscriptionsAction && 
-        $hasSubscriptionsButton && $hasSubscriptionsCalc) {
-        echo "✓ Both admin files have skip_next_payment action with date calculation\n\n";
+        $hasSubscriptionsButton && $hasSubscriptionsCalc && $hasPayPalAPIUpdate) {
+        echo "✓ Both admin files have skip_next_payment action with date calculation and PayPal API integration\n\n";
     } else {
         if (!$hasSavedCardAction || !$hasSavedCardButton) {
             echo "✗ paypalr_saved_card_recurring.php missing skip action or button\n";
         }
         if (!$hasSubscriptionsAction || !$hasSubscriptionsButton || !$hasSubscriptionsCalc) {
             echo "✗ paypalr_subscriptions.php missing skip action, button, or date calculation\n";
+        }
+        if (!$hasPayPalAPIUpdate) {
+            echo "✗ paypalr_subscriptions.php missing PayPal API integration for vault subscriptions\n";
         }
         echo "\n";
         exit(1);

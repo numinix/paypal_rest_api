@@ -381,7 +381,7 @@ if ($action === 'skip_next_payment') {
     
     // Get current subscription details
     $subscription = $db->Execute(
-        "SELECT status, billing_period, billing_frequency, next_payment_date, attributes 
+        "SELECT status, billing_period, billing_frequency, next_payment_date, attributes, plan_id 
          FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " 
          WHERE paypal_subscription_id = " . (int) $subscriptionId
     );
@@ -473,7 +473,7 @@ if ($action === 'skip_next_payment') {
         zen_redirect($redirectUrl);
     }
     
-    // Update the next payment date
+    // Update the next payment date locally
     $newDate = $nextDate->format('Y-m-d');
     zen_db_perform(
         TABLE_PAYPAL_SUBSCRIPTIONS,
@@ -481,6 +481,23 @@ if ($action === 'skip_next_payment') {
         'update',
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
+    
+    // Try to update via PayPal API if plan_id exists
+    if (!empty($subscription->fields['plan_id'])) {
+        $profileManager = paypalr_get_profile_manager();
+        if ($profileManager !== null) {
+            try {
+                // Update the subscription's next billing date via PayPal API
+                $profileManager->updateProfile([
+                    'profile_id' => $subscription->fields['plan_id'],
+                    'next_billing_date' => $nextDate->format('Y-m-d\TH:i:s\Z')
+                ]);
+            } catch (Exception $e) {
+                // Log but don't fail - local status is already updated
+                error_log('Failed to update PayPal subscription billing date: ' . $e->getMessage());
+            }
+        }
+    }
     
     $messageStack->add_session($messageStackKey, sprintf('Payment skipped for subscription #%d. Next payment date updated to %s.', $subscriptionId, $newDate), 'success');
     zen_redirect($redirectUrl);
