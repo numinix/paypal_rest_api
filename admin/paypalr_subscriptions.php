@@ -46,8 +46,6 @@ if (!defined('HEADING_TITLE')) {
     define('HEADING_TITLE', 'Vaulted Subscriptions');
 }
 
-$messageStackKey = 'paypalr_subscriptions';
-
 /**
  * @return array<string,string>
  */
@@ -126,7 +124,7 @@ if ($action === 'update_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
 
     if ($subscriptionId <= 0) {
-        $messageStack->add_session($messageStackKey, 'Unable to update the subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_MISSING_IDENTIFIER, 'error');
         zen_redirect($redirectUrl);
     }
 
@@ -144,7 +142,7 @@ if ($action === 'update_subscription') {
         // Validate date format (YYYY-MM-DD)
         $dateValidation = DateTime::createFromFormat('Y-m-d', $nextPaymentDate);
         if (!$dateValidation || $dateValidation->format('Y-m-d') !== $nextPaymentDate) {
-            $messageStack->add_session($messageStackKey, 'Invalid date format for next payment date. Please use YYYY-MM-DD format.', 'error');
+            $messageStack->add_session('header', ERROR_SUBSCRIPTION_INVALID_DATE_FORMAT, 'error');
             zen_redirect($redirectUrl);
         }
     }
@@ -171,8 +169,8 @@ if ($action === 'update_subscription') {
         );
         
         $messageStack->add_session(
-            $messageStackKey,
-            sprintf('Subscription #%d status has been updated to %s.', $subscriptionId, $status),
+            'header',
+            sprintf(SUCCESS_SUBSCRIPTION_STATUS_UPDATED, $subscriptionId, $status),
             'success'
         );
         
@@ -184,7 +182,7 @@ if ($action === 'update_subscription') {
     if ($rawAttributes !== '') {
         $decodedAttributes = json_decode($rawAttributes, true);
         if ($decodedAttributes === null && json_last_error() !== JSON_ERROR_NONE) {
-            $messageStack->add_session($messageStackKey, 'The attributes JSON is invalid and was not saved.', 'error');
+            $messageStack->add_session('header', ERROR_SUBSCRIPTION_INVALID_JSON, 'error');
             zen_redirect($redirectUrl);
         }
 
@@ -223,7 +221,7 @@ if ($action === 'update_subscription') {
     if ($selectedVaultId > 0) {
         $vaultRecord = VaultManager::getCustomerVaultCard($customersId, $selectedVaultId);
         if ($vaultRecord === null) {
-            $messageStack->add_session($messageStackKey, 'Unable to link the selected vaulted instrument. Please verify it still exists.', 'error');
+            $messageStack->add_session('header', ERROR_SUBSCRIPTION_VAULT_NOT_FOUND, 'error');
             zen_redirect($redirectUrl);
         }
 
@@ -276,8 +274,8 @@ if ($action === 'update_subscription') {
     }
 
     $messageStack->add_session(
-        $messageStackKey,
-        sprintf('Subscription #%d has been updated.', $subscriptionId),
+        'header',
+        sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId),
         'success'
     );
 
@@ -291,7 +289,7 @@ if ($action === 'cancel_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session($messageStackKey, 'Unable to cancel subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_CANCEL_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -320,7 +318,7 @@ if ($action === 'cancel_subscription') {
         }
     }
     
-    $messageStack->add_session($messageStackKey, sprintf('Subscription #%d has been cancelled.', $subscriptionId), 'success');
+    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -331,7 +329,7 @@ if ($action === 'suspend_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session($messageStackKey, 'Unable to suspend subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_SUSPEND_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -359,7 +357,7 @@ if ($action === 'suspend_subscription') {
         }
     }
     
-    $messageStack->add_session($messageStackKey, sprintf('Subscription #%d has been suspended.', $subscriptionId), 'success');
+    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_SUSPENDED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -370,7 +368,7 @@ if ($action === 'reactivate_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session($messageStackKey, 'Unable to reactivate subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_REACTIVATE_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -398,7 +396,7 @@ if ($action === 'reactivate_subscription') {
         }
     }
     
-    $messageStack->add_session($messageStackKey, sprintf('Subscription #%d has been reactivated.', $subscriptionId), 'success');
+    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_REACTIVATED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -544,7 +542,7 @@ if ($action === 'archive_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session($messageStackKey, 'Unable to archive subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_ARCHIVE_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -556,7 +554,7 @@ if ($action === 'archive_subscription') {
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
     
-    $messageStack->add_session($messageStackKey, sprintf('Subscription #%d has been archived.', $subscriptionId), 'success');
+    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_ARCHIVED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -567,7 +565,7 @@ if ($action === 'unarchive_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session($messageStackKey, 'Unable to unarchive subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_UNARCHIVE_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -579,7 +577,7 @@ if ($action === 'unarchive_subscription') {
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
     
-    $messageStack->add_session($messageStackKey, sprintf('Subscription #%d has been unarchived.', $subscriptionId), 'success');
+    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_UNARCHIVED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -1006,24 +1004,8 @@ function paypalr_render_select_options(array $options, $selectedValue): string
     
         <div class="nmx-message-stack">
         <?php
-        if (isset($messageStack) && is_object($messageStack)) {
-            if (method_exists($messageStack, 'size')) {
-                if ($messageStack->size($messageStackKey) > 0) {
-                    echo $messageStack->output($messageStackKey);
-                }
-            } else {
-                // Fallback for messageStack implementations without size() method
-                // Check if there are messages in the stack before outputting
-                $hasMessages = false;
-                if (isset($messageStack->messages) && is_array($messageStack->messages)) {
-                    $hasMessages = isset($messageStack->messages[$messageStackKey]) && 
-                                  is_array($messageStack->messages[$messageStackKey]) && 
-                                  count($messageStack->messages[$messageStackKey]) > 0;
-                }
-                if ($hasMessages) {
-                    echo $messageStack->output($messageStackKey);
-                }
-            }
+        if (isset($messageStack) && is_object($messageStack) && $messageStack->size() > 0) {
+            echo $messageStack->output();
         }
         ?>
         </div>
