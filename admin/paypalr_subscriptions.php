@@ -803,6 +803,18 @@ if ($paymentRecords instanceof queryFactoryResult) {
 // Pagination setup
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $perPage = isset($_GET['per_page']) ? max(10, min(100, (int)$_GET['per_page'])) : 20;
+
+// Defensive type check: ensure $page remains a valid positive integer
+// This protects against edge cases where $page might be overwritten with an array or other invalid type
+// after initialization due to framework-level variable extraction (e.g., extract($_GET)) or other code
+// that might pollute the variable namespace.
+// Note: filter_var() returns FALSE for arrays (not the default value), so the explicit check is necessary.
+$page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
+if ($page === false) {
+    // filter_var returns false for arrays and other non-scalar types
+    $page = 1;
+}
+
 $offset = ($page - 1) * $perPage;
 
 // Get total count for pagination
