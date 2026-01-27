@@ -803,6 +803,15 @@ if ($paymentRecords instanceof queryFactoryResult) {
 // Pagination setup
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $perPage = isset($_GET['per_page']) ? max(10, min(100, (int)$_GET['per_page'])) : 20;
+
+// Defensive type check: ensure $page is a valid positive integer
+// This protects against edge cases where $page might become an array or other invalid type
+// due to malformed URL parameters or framework-level variable extraction
+$page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
+if ($page === false) {
+    $page = 1;
+}
+
 $offset = ($page - 1) * $perPage;
 
 // Get total count for pagination
@@ -1075,14 +1084,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                 </select>
             </div>
             <div class="pagination-links">
-                <?php 
-                // Defensive type check: ensure $page is a valid positive integer
-                $page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
-                if ($page === false) {
-                    $page = 1;
-                }
-                if ($page > 1): 
-                ?>
+                <?php if ($page > 1): ?>
                     <a href="<?php echo paypalr_pagination_url(1, $perPage, $activeQuery); ?>">&laquo; First</a>
                     <a href="<?php echo paypalr_pagination_url($page - 1, $perPage, $activeQuery); ?>">&lsaquo; Prev</a>
                 <?php else: ?>
@@ -1475,14 +1477,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                 </select>
             </div>
             <div class="pagination-links">
-                <?php 
-                // Defensive type check: ensure $page is a valid positive integer
-                $page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
-                if ($page === false) {
-                    $page = 1;
-                }
-                if ($page > 1): 
-                ?>
+                <?php if ($page > 1): ?>
                     <a href="<?php echo paypalr_pagination_url(1, $perPage, $activeQuery); ?>">&laquo; First</a>
                     <a href="<?php echo paypalr_pagination_url($page - 1, $perPage, $activeQuery); ?>">&lsaquo; Prev</a>
                 <?php else: ?>
