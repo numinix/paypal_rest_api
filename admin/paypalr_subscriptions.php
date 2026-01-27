@@ -124,7 +124,7 @@ if ($action === 'update_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
 
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', 'Unable to update the subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_MISSING_IDENTIFIER, 'error');
         zen_redirect($redirectUrl);
     }
 
@@ -142,7 +142,7 @@ if ($action === 'update_subscription') {
         // Validate date format (YYYY-MM-DD)
         $dateValidation = DateTime::createFromFormat('Y-m-d', $nextPaymentDate);
         if (!$dateValidation || $dateValidation->format('Y-m-d') !== $nextPaymentDate) {
-            $messageStack->add_session('header', 'Invalid date format for next payment date. Please use YYYY-MM-DD format.', 'error');
+            $messageStack->add_session('header', ERROR_SUBSCRIPTION_INVALID_DATE_FORMAT, 'error');
             zen_redirect($redirectUrl);
         }
     }
@@ -170,7 +170,7 @@ if ($action === 'update_subscription') {
         
         $messageStack->add_session(
             'header',
-            sprintf('Subscription #%d status has been updated to %s.', $subscriptionId, $status),
+            sprintf(SUCCESS_SUBSCRIPTION_STATUS_UPDATED, $subscriptionId, $status),
             'success'
         );
         
@@ -182,7 +182,7 @@ if ($action === 'update_subscription') {
     if ($rawAttributes !== '') {
         $decodedAttributes = json_decode($rawAttributes, true);
         if ($decodedAttributes === null && json_last_error() !== JSON_ERROR_NONE) {
-            $messageStack->add_session('header', 'The attributes JSON is invalid and was not saved.', 'error');
+            $messageStack->add_session('header', ERROR_SUBSCRIPTION_INVALID_JSON, 'error');
             zen_redirect($redirectUrl);
         }
 
@@ -221,7 +221,7 @@ if ($action === 'update_subscription') {
     if ($selectedVaultId > 0) {
         $vaultRecord = VaultManager::getCustomerVaultCard($customersId, $selectedVaultId);
         if ($vaultRecord === null) {
-            $messageStack->add_session('header', 'Unable to link the selected vaulted instrument. Please verify it still exists.', 'error');
+            $messageStack->add_session('header', ERROR_SUBSCRIPTION_VAULT_NOT_FOUND, 'error');
             zen_redirect($redirectUrl);
         }
 
@@ -241,7 +241,7 @@ if ($action === 'update_subscription') {
 
     $messageStack->add_session(
         'header',
-        sprintf('Subscription #%d has been updated.', $subscriptionId),
+        sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId),
         'success'
     );
 
@@ -284,7 +284,7 @@ if ($action === 'cancel_subscription') {
         }
     }
     
-    $messageStack->add_session('header', sprintf('Subscription #%d has been cancelled.', $subscriptionId), 'success');
+    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -323,7 +323,7 @@ if ($action === 'suspend_subscription') {
         }
     }
     
-    $messageStack->add_session('header', sprintf('Subscription #%d has been suspended.', $subscriptionId), 'success');
+    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_SUSPENDED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -373,7 +373,7 @@ if ($action === 'archive_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', 'Unable to archive subscription. Missing identifier.', 'error');
+        $messageStack->add_session('header', ERROR_SUBSCRIPTION_ARCHIVE_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     

@@ -69,7 +69,7 @@ switch ($action) {
     case 'cancel_scheduled_payment':
         if ($_GET['saved_card_recurring_id'] > 0) {
             $paypalSavedCardRecurring->update_payment_status($_GET['saved_card_recurring_id'], 'cancelled', 'Cancelled by admin');
-            $messageStack->add_session('header', 'Subscription #' . $_GET['saved_card_recurring_id'] . ' has been cancelled.', 'success');
+            $messageStack->add_session('header', sprintf(SUCCESS_SAVED_CARD_SUBSCRIPTION_CANCELLED, $_GET['saved_card_recurring_id']), 'success');
             
             // Cancel group pricing
             $subscription = $paypalSavedCardRecurring->get_payment_details($_GET['saved_card_recurring_id']);
@@ -82,7 +82,7 @@ switch ($action) {
 
     case 'reactivate_scheduled_payment':
         $paypalSavedCardRecurring->update_payment_status($_GET['saved_card_recurring_id'], 'scheduled', 'Re-activated by admin');
-        $messageStack->add_session('header', 'Subscription #' . $_GET['saved_card_recurring_id'] . ' has been re-activated.', 'success');
+        $messageStack->add_session('header', sprintf(SUCCESS_SAVED_CARD_SUBSCRIPTION_REACTIVATED, $_GET['saved_card_recurring_id']), 'success');
         
         // Re-activate group pricing
         $subscription = $paypalSavedCardRecurring->get_payment_details($_GET['saved_card_recurring_id']);
@@ -97,7 +97,7 @@ switch ($action) {
             'saved_credit_card_id' => $_GET['set_card'],
             'comments' => '  Credit card updated by admin. '
         ]);
-        $messageStack->add_session('header', 'Credit card has been updated for subscription #' . $_GET['saved_card_recurring_id'], 'success');
+        $messageStack->add_session('header', sprintf(SUCCESS_SAVED_CARD_CREDIT_CARD_UPDATED, $_GET['saved_card_recurring_id']), 'success');
         $redirectAfterAction = true;
         break;
 
@@ -106,7 +106,7 @@ switch ($action) {
             'date' => $_GET['set_date'],
             'comments' => '  Date updated by admin to ' . $_GET['set_date'] . '  '
         ]);
-        $messageStack->add_session('header', 'Date has been updated for subscription #' . $_GET['saved_card_recurring_id'], 'success');
+        $messageStack->add_session('header', sprintf(SUCCESS_SAVED_CARD_DATE_UPDATED, $_GET['saved_card_recurring_id']), 'success');
         $redirectAfterAction = true;
         break;
 
@@ -115,7 +115,7 @@ switch ($action) {
             'amount' => $_GET['set_amount'],
             'comments' => '  Amount updated by admin to ' . $_GET['set_amount'] . '  '
         ]);
-        $messageStack->add_session('header', 'Amount has been updated for subscription #' . $_GET['saved_card_recurring_id'] . ' to ' . $_GET['set_amount'], 'success');
+        $messageStack->add_session('header', sprintf(SUCCESS_SAVED_CARD_AMOUNT_UPDATED, $_GET['saved_card_recurring_id'], $_GET['set_amount']), 'success');
         $redirectAfterAction = true;
         break;
 
@@ -125,7 +125,7 @@ switch ($action) {
             'comments' => '  Product updated by admin  ',
             'original_orders_products_id' => $_GET['original_orders_products_id']
         ]);
-        $messageStack->add_session('header', 'Product has been updated for subscription #' . $_GET['saved_card_recurring_id'], 'success');
+        $messageStack->add_session('header', sprintf(SUCCESS_SAVED_CARD_PRODUCT_UPDATED, $_GET['saved_card_recurring_id']), 'success');
         $redirectAfterAction = true;
         break;
         
