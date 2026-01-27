@@ -838,7 +838,7 @@ $sql .= ' LIMIT ' . $perPage . ' OFFSET ' . $offset;
 $subscriptions = $db->Execute($sql);
 
 $subscriptionRows = [];
-if ($subscriptions instanceof queryFactoryResult && $subscriptions->RecordCount() > 0) {
+if ($subscriptions instanceof queryFactoryResult) {
     while (!$subscriptions->EOF) {
         $subscriptionRows[] = $subscriptions->fields;
         $subscriptions->MoveNext();
