@@ -264,8 +264,8 @@ class SubscriptionManager
         
         if ($result->RecordCount() == 0) {
             $db->Execute(
-                "ALTER TABLE " . TABLE_PAYPAL_SUBSCRIPTIONS . " 
-                ADD COLUMN skip_next_payment TINYINT(1) NOT NULL DEFAULT 0 
+                "ALTER TABLE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+                ADD COLUMN skip_next_payment TINYINT(1) NOT NULL DEFAULT 0
                 AFTER status"
             );
         }

@@ -2071,7 +2071,7 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 		$sql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' 
 		        SET skip_next_payment = 1, 
 		            comments = CONCAT(comments, \'  Next payment will be skipped.  \') 
-		        WHERE saved_credit_card_recurring_id = ' . $paypal_saved_card_recurring_id;
+		        WHERE saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id;
 		$db->Execute($sql);
 		
 		return true;

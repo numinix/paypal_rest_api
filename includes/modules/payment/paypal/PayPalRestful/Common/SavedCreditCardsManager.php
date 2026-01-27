@@ -115,8 +115,8 @@ class SavedCreditCardsManager
         
         if ($result->RecordCount() == 0) {
             $db->Execute(
-                "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " 
-                ADD COLUMN skip_next_payment TINYINT(1) NOT NULL DEFAULT 0 
+                "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
+                ADD COLUMN skip_next_payment TINYINT(1) NOT NULL DEFAULT 0
                 AFTER status"
             );
         }
