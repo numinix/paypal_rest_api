@@ -1314,7 +1314,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
  * Change items per page
  */
 function changePerPage(newPerPage) {
-    var params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(window.location.search);
     params.set('page', '1'); // Reset to first page when changing per page
     params.set('per_page', newPerPage);
     window.location.href = '<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, ''); ?>' + '?' + params.toString();
@@ -1324,8 +1324,8 @@ function changePerPage(newPerPage) {
  * Toggle subscription row expand/collapse
  */
 function toggleSubscription(subscriptionId, event) {
-    var summaryRow = document.querySelector('.subscription-summary[data-subscription-id="' + subscriptionId + '"]');
-    var detailsRow = document.querySelector('.details-row[data-subscription-id="' + subscriptionId + '"]');
+    const summaryRow = document.querySelector('.subscription-summary[data-subscription-id="' + subscriptionId + '"]');
+    const detailsRow = document.querySelector('.details-row[data-subscription-id="' + subscriptionId + '"]');
     
     if (summaryRow && detailsRow) {
         summaryRow.classList.toggle('subscription-row-collapsed');
@@ -1339,7 +1339,7 @@ function toggleSubscription(subscriptionId, event) {
 
 // Prevent clicks on form elements from triggering the row toggle
 document.addEventListener('DOMContentLoaded', function() {
-    var formElements = document.querySelectorAll('.details-row input, .details-row select, .details-row textarea, .details-row button, .details-row a');
+    const formElements = document.querySelectorAll('.details-row input, .details-row select, .details-row textarea, .details-row button, .details-row a');
     formElements.forEach(function(element) {
         element.addEventListener('click', function(e) {
             e.stopPropagation();

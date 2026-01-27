@@ -718,7 +718,7 @@ var queryString = <?php echo json_encode($query_string); ?>;
  * Change items per page
  */
 function changePerPage(newPerPage) {
-    var params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(window.location.search);
     params.set('page', '1'); // Reset to first page when changing per page
     params.set('per_page', newPerPage);
     window.location.href = baseUrl + '?' + params.toString();
