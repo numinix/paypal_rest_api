@@ -241,6 +241,40 @@ if ($action === 'update_subscription') {
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
 
+    // Try to update via PayPal API if plan_id exists
+    if (!empty($planId)) {
+        $profileManager = paypalr_get_profile_manager();
+        if ($profileManager !== null) {
+            try {
+                $apiUpdateData = [];
+                
+                // Update billing amount if changed
+                if ($amount > 0) {
+                    $apiUpdateData['amount'] = $amount;
+                    if (!empty($currencyCode)) {
+                        $apiUpdateData['currency_code'] = $currencyCode;
+                    }
+                }
+                
+                // Update next billing date if provided
+                if (!empty($nextPaymentDate)) {
+                    $dateObj = DateTime::createFromFormat('Y-m-d', $nextPaymentDate);
+                    if ($dateObj) {
+                        $apiUpdateData['next_billing_date'] = $dateObj->format('Y-m-d\TH:i:s\Z');
+                    }
+                }
+                
+                if (!empty($apiUpdateData)) {
+                    $apiUpdateData['profile_id'] = $planId;
+                    $profileManager->updateProfile($apiUpdateData);
+                }
+            } catch (Exception $e) {
+                // Log but don't fail - local status is already updated
+                error_log('Failed to update PayPal subscription: ' . $e->getMessage());
+            }
+        }
+    }
+
     $messageStack->add_session(
         $messageStackKey,
         sprintf('Subscription #%d has been updated.', $subscriptionId),
