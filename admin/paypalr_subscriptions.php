@@ -1164,6 +1164,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                 foreach ($subscriptionRows as $row) {
                     $subscriptionId = (int) ($row['paypal_subscription_id'] ?? 0);
                     $formId = 'subscription-form-' . $subscriptionId;
+                    $currentStatus = strtolower($row['status'] ?? '');
                     $customerName = trim(($row['customers_firstname'] ?? '') . ' ' . ($row['customers_lastname'] ?? ''));
                     $paymentSummary = trim(($row['payment_module_code'] ?? '') . ' ' . ($row['payment_method'] ?? ''));
                     $attributes = [];
@@ -1230,7 +1231,6 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                             <?php } ?>
                         </td>
                         <td style="text-align: right; white-space: nowrap;">
-                            <?php $currentStatus = strtolower($row['status'] ?? ''); ?>
                             <span style="padding: 4px 8px; border-radius: 3px; background: <?php
                                 if ($currentStatus === 'active') echo '#28a745';
                                 elseif ($currentStatus === 'cancelled') echo '#dc3545';
@@ -1372,9 +1372,6 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                     <h4 style="margin-top: 0; color: #00618d;">Actions</h4>
                                     <div class="paypalr-subscription-actions">
                                         <button type="submit" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-primary">Save Changes</button>
-                                        <?php 
-                                        $currentStatus = strtolower($row['status'] ?? '');
-                                        ?>
                                         <?php if ($currentStatus !== 'cancelled') { ?>
                                             <button type="submit" name="set_status" value="cancelled" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-warning">Mark Cancelled</button>
                                         <?php } ?>
@@ -1391,6 +1388,9 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                         $isArchived = !empty($row['is_archived']);
                                         ?>
                                         <?php if ($currentStatus === 'active' || $currentStatus === 'scheduled') { ?>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=skip_next_payment&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Skip this payment? The next billing date will be automatically calculated and updated based on the subscription schedule.');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-info">Skip Next</a>
                                             <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=suspend_subscription&subscription_id=' . $subscriptionId); ?>" 
                                                onclick="return confirm('Are you sure you want to suspend this subscription?');"
                                                class="nmx-btn nmx-btn-sm nmx-btn-warning">Suspend</a>
