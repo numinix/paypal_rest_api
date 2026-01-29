@@ -25,6 +25,7 @@ use PayPalRestful\Api\Data\CountryCodes;
 use PayPalRestful\Common\ErrorInfo;
 use PayPalRestful\Common\Helpers;
 use PayPalRestful\Common\Logger;
+use PayPalRestful\Common\SavedCreditCardsManager;
 use PayPalRestful\Common\VaultManager;
 use PayPalRestful\Compatibility\Language as LanguageCompatibility;
 use PayPalRestful\Zc2Pp\Amount;
@@ -547,6 +548,7 @@ class paypalr extends base
         //
         $current_version = self::CURRENT_VERSION;
         VaultManager::ensureSchema();
+        SavedCreditCardsManager::ensureSchema();
         if (defined('MODULE_PAYMENT_PAYPALR_VERSION') && MODULE_PAYMENT_PAYPALR_VERSION === $current_version) {
             return;
         }
@@ -2934,6 +2936,7 @@ class paypalr extends base
         define('MODULE_PAYMENT_PAYPALR_VERSION', '0.0.0');
         $this->tableCheckup();
         VaultManager::ensureSchema();
+        SavedCreditCardsManager::ensureSchema();
 
         $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
     }
