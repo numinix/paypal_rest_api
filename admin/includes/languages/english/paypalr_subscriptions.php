@@ -7,7 +7,7 @@
  */
 
 // Page heading
-define('HEADING_TITLE', 'Vaulted Subscriptions');
+define('HEADING_TITLE', 'PayPal Subscriptions');
 
 // Error messages
 define('ERROR_SUBSCRIPTION_MISSING_IDENTIFIER', 'Unable to update the subscription. Missing identifier.');
