@@ -20,6 +20,10 @@ class SavedCreditCardsManager
     /**
      * Ensure the saved credit cards tables exist for backward compatibility.
      * 
+     * This method is automatically called by the paypalr.php payment module during:
+     * - Initial module installation (via install() method)
+     * - Module upgrades (via tableCheckup() method)
+     * 
      * These tables are used by legacy admin pages (paypalr_saved_card_recurring.php)
      * and older payment modules. For sites using the new PayPal REST API exclusively,
      * data is stored in paypal_vault and paypal_subscriptions tables instead.
