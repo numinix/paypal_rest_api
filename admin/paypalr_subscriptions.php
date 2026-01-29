@@ -998,7 +998,7 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
     $savedCardSql = 'SELECT sccr.saved_credit_card_recurring_id AS paypal_subscription_id,'
         . ' scc.customers_id, sccr.products_id, sccr.products_name,'
         . ' sccr.amount, sccr.currency_code, sccr.billing_period, sccr.billing_frequency,'
-        . ' sccr.total_billing_cycles, sccr.status, sccr.date,'
+        . ' sccr.total_billing_cycles, sccr.status, sccr.date_added AS date,'
         . ' sccr.comments, sccr.domain,'
         . ' c.customers_firstname, c.customers_lastname, c.customers_email_address,'
         . ' scc.type AS vault_card_type, scc.last_digits AS vault_last_digits,'
@@ -1018,7 +1018,7 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
             $row = $savedCardSubscriptions->fields;
             $row['subscription_type'] = 'savedcard';
             // Map saved card fields to match REST subscription structure
-            // Note: 'date' field serves as both creation date and next payment date for saved cards
+            // Note: 'date' field is aliased from 'date_added' and serves as both creation date and next payment date for saved cards
             $row['date_added'] = $row['date'];
             $row['next_payment_date'] = $row['date'];
             $row['sort_date'] = strtotime($row['date'] ?? 'now');
