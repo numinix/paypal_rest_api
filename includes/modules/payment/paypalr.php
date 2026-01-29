@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.6
+ * Last updated: v1.3.7
  */
 /**
  * Load the support class' auto-loader.
@@ -64,7 +64,7 @@ class paypalr extends base
         return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.6';
+    protected const CURRENT_VERSION = '1.3.7';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -531,7 +531,7 @@ class paypalr extends base
     //
     protected function tableCheckup()
     {
-        global $db;
+        global $db, $sniffer;
 
         // -----
         // Remove any PayPal Advanced Checkout storefront logs that were created for v1.0.3 (202408).
@@ -676,6 +676,20 @@ class paypalr extends base
                 case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.6', '<'): //- Fall through from above
                     // Ensure legacy saved credit cards tables exist for backward compatibility
                     SavedCreditCardsManager::ensureSchema();
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.7', '<'): //- Fall through from above
+                    // Ensure products_model column exists in saved_credit_cards_recurring table
+                    // This column is included in new installations but may be missing from 
+                    // tables that were created before it was added to the schema
+                    if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+                        $table_exists = $db->Execute("SHOW TABLES LIKE '" . TABLE_SAVED_CREDIT_CARDS_RECURRING . "'");
+                        if (!$table_exists->EOF && $sniffer->field_exists(TABLE_SAVED_CREDIT_CARDS_RECURRING, 'products_model') === false) {
+                            $db->Execute(
+                                "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
+                                   ADD products_model VARCHAR(255) NOT NULL DEFAULT '' AFTER products_name"
+                            );
+                        }
+                    }
 
                 default:    //- Fall through from above
                     break;
