@@ -657,7 +657,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         array('fieldName' => 'next_payment_date', 'value' => $date, 'type' => 'string'),
                         array('fieldName' => 'amount', 'value' => $amount, 'type' => 'string'),
                         array('fieldName' => 'status', 'value' => 'scheduled', 'type' => 'string'),
-                        array('fieldName' => 'original_orders_products_id', 'value' => $original_orders_products_id, 'type' => 'integer'),
+                        array('fieldName' => 'orders_products_id', 'value' => $original_orders_products_id, 'type' => 'integer'),
                         array('fieldName' => 'saved_credit_card_id', 'value' => $saved_credit_card_id, 'type' => 'integer'),
                         array('fieldName' => 'comments', 'value' => $comments, 'type' => 'string'),
                         array('fieldName' => 'products_id', 'value' => $metadata['products_id'], 'type' => 'integer'),
