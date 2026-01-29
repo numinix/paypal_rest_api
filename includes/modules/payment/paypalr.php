@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.5
+ * Last updated: v1.3.6
  */
 /**
  * Load the support class' auto-loader.
