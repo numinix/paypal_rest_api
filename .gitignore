@@ -1,3 +1,10 @@
 # Developer-specific overrides for the saved credit cards page
 includes/templates/*/css/ascc_overrides.css
 *.braintree_old
+
+# Test mock files (created by test suite)
+includes/classes/order.php
+includes/classes/order_total.php
+includes/classes/payment.php
+includes/classes/shipping.php
+includes/classes/shopping_cart.php
