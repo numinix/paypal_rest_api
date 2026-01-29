@@ -327,6 +327,12 @@ while (!$result->EOF) {
     $result->MoveNext();
 }
 
+// Convert associative array to sequential array for display
+$subscriptionRows = [];
+foreach ($subscriptions as $subscription) {
+    $subscriptionRows[] = $subscription;
+}
+
 // Get data for search select menus
 $customers_sql = "SELECT c.customers_id, c.customers_firstname, c.customers_lastname, 
         scc.saved_credit_card_id, scc.type, scc.last_digits, scc.is_deleted
@@ -576,7 +582,7 @@ function scr_pagination_url($page, $perPage, $queryString) {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($subscriptions as $subscription) { ?>
+                            <?php foreach ($subscriptionRows as $subscription) { ?>
                                 <tr>
                                     <td><?php echo $subscription['saved_credit_card_recurring_id']; ?></td>
                                     <td>
@@ -639,7 +645,7 @@ function scr_pagination_url($page, $perPage, $queryString) {
                                     </td>
                                 </tr>
                             <?php } ?>
-                            <?php if (empty($subscriptions)) { ?>
+                            <?php if (empty($subscriptionRows)) { ?>
                                 <tr><td colspan="13">No subscriptions found for the selected filters.</td></tr>
                             <?php } ?>
                         </tbody>
