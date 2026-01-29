@@ -531,7 +531,7 @@ class paypalr extends base
     //
     protected function tableCheckup()
     {
-        global $db;
+        global $db, $sniffer;
 
         // -----
         // Remove any PayPal Advanced Checkout storefront logs that were created for v1.0.3 (202408).
@@ -681,7 +681,6 @@ class paypalr extends base
                     // Ensure products_model column exists in saved_credit_cards_recurring table
                     // This column was added in the CREATE TABLE statement in 1.3.6, but existing
                     // tables from earlier versions need it added via ALTER TABLE
-                    global $sniffer;
                     if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
                         $table_exists = $db->Execute("SHOW TABLES LIKE '" . TABLE_SAVED_CREDIT_CARDS_RECURRING . "'");
                         if (!$table_exists->EOF && $sniffer->field_exists(TABLE_SAVED_CREDIT_CARDS_RECURRING, 'products_model') === false) {
