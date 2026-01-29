@@ -64,7 +64,7 @@ class paypalr extends base
         return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.5';
+    protected const CURRENT_VERSION = '1.3.6';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -548,7 +548,6 @@ class paypalr extends base
         //
         $current_version = self::CURRENT_VERSION;
         VaultManager::ensureSchema();
-        SavedCreditCardsManager::ensureSchema();
         if (defined('MODULE_PAYMENT_PAYPALR_VERSION') && MODULE_PAYMENT_PAYPALR_VERSION === $current_version) {
             return;
         }
@@ -673,6 +672,10 @@ class paypalr extends base
                             );
                         }
                     }
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.6', '<'): //- Fall through from above
+                    // Ensure legacy saved credit cards tables exist for backward compatibility
+                    SavedCreditCardsManager::ensureSchema();
 
                 default:    //- Fall through from above
                     break;
@@ -2936,7 +2939,6 @@ class paypalr extends base
         define('MODULE_PAYMENT_PAYPALR_VERSION', '0.0.0');
         $this->tableCheckup();
         VaultManager::ensureSchema();
-        SavedCreditCardsManager::ensureSchema();
 
         $this->notify('NOTIFY_PAYMENT_PAYPALR_INSTALLED');
     }
