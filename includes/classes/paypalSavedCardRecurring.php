@@ -654,7 +654,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                 $amount = preg_replace("/[^0-9\.]/", "", $amount); //remove any illegal chars from the amount so it stores properly.
                 $metadata = $this->prepare_schedule_payment_metadata($metadata, $original_orders_products_id, $amount);
                 $sql_data_array = array(
-                        array('fieldName' => 'date', 'value' => $date, 'type' => 'string'),
+                        array('fieldName' => 'next_payment_date', 'value' => $date, 'type' => 'string'),
                         array('fieldName' => 'amount', 'value' => $amount, 'type' => 'string'),
                         array('fieldName' => 'status', 'value' => 'scheduled', 'type' => 'string'),
                         array('fieldName' => 'original_orders_products_id', 'value' => $original_orders_products_id, 'type' => 'integer'),
