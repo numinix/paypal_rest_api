@@ -41,17 +41,28 @@ namespace {
     {
         public bool $EOF = true;
         public array $fields = [];
-        public int $RecordCount = 0;
+        private int $recordCount = 0;
         
         public function MoveNext(): void
         {
             $this->EOF = true;
+        }
+        
+        public function RecordCount(): int
+        {
+            return $this->recordCount;
+        }
+        
+        public function setRecordCount(int $count): void
+        {
+            $this->recordCount = $count;
         }
     }
 
     class MockDb
     {
         private array $createdTables = [];
+        private array $addedColumns = [];
         
         public function Execute($query)
         {
@@ -64,11 +75,31 @@ namespace {
                 }
             }
             
+            // Track ALTER TABLE ADD statements for legacy columns
+            if (stripos($query, 'ALTER TABLE') !== false && stripos($query, ' ADD ') !== false) {
+                if (stripos($query, TABLE_SAVED_CREDIT_CARDS_RECURRING) !== false) {
+                    if (stripos($query, 'domain') !== false) {
+                        $this->addedColumns['domain'] = true;
+                    }
+                    if (stripos($query, 'comments') !== false) {
+                        $this->addedColumns['comments'] = true;
+                    }
+                }
+            }
+            
             // Mock SHOW TABLES response
             if (stripos($query, 'SHOW TABLES') !== false) {
                 $result = new queryFactoryResult();
                 // Simulate table doesn't exist initially
                 $result->EOF = true;
+                return $result;
+            }
+            
+            // Mock SHOW COLUMNS response - columns don't exist initially
+            if (stripos($query, 'SHOW COLUMNS') !== false) {
+                $result = new queryFactoryResult();
+                $result->EOF = true;
+                $result->setRecordCount(0);
                 return $result;
             }
             
@@ -78,6 +109,11 @@ namespace {
         public function hasCreatedTable(string $tableName): bool
         {
             return isset($this->createdTables[$tableName]);
+        }
+        
+        public function hasAddedColumn(string $columnName): bool
+        {
+            return isset($this->addedColumns[$columnName]);
         }
     }
 
@@ -119,6 +155,22 @@ namespace {
         $failures++;
     } else {
         fwrite(STDOUT, "✓ saved_credit_cards_recurring table was created\n");
+    }
+
+    // Test 5: Verify domain column was added via ALTER TABLE (legacy support)
+    if (!$db->hasAddedColumn('domain')) {
+        fwrite(STDERR, "✗ domain column was not added via ALTER TABLE\n");
+        $failures++;
+    } else {
+        fwrite(STDOUT, "✓ domain column was added via ALTER TABLE for legacy support\n");
+    }
+
+    // Test 6: Verify comments column was added via ALTER TABLE (legacy support)
+    if (!$db->hasAddedColumn('comments')) {
+        fwrite(STDERR, "✗ comments column was not added via ALTER TABLE\n");
+        $failures++;
+    } else {
+        fwrite(STDOUT, "✓ comments column was added via ALTER TABLE for legacy support\n");
     }
 
     if ($failures > 0) {

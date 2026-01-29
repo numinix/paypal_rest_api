@@ -13,6 +13,7 @@
 namespace PayPalRestful\Common;
 
 use function defined;
+use function zen_db_input;
 
 class SavedCreditCardsManager
 {
@@ -87,8 +88,6 @@ class SavedCreditCardsManager
                 status VARCHAR(32) NOT NULL DEFAULT '',
                 profile_id VARCHAR(64) NOT NULL DEFAULT '',
                 next_payment_date DATE DEFAULT NULL,
-                domain VARCHAR(255) NOT NULL DEFAULT '',
-                comments TEXT,
                 subscription_attributes_json TEXT,
                 date_added DATETIME DEFAULT NULL,
                 last_modified DATETIME DEFAULT NULL,
@@ -100,5 +99,50 @@ class SavedCreditCardsManager
                 KEY idx_profile_id (profile_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+
+        self::ensureLegacyColumns();
+    }
+
+    /**
+     * Add legacy columns that may be needed for backward compatibility.
+     * 
+     * These columns are not included in the base CREATE TABLE statement so that
+     * new installations have a minimal schema. Sites upgrading from legacy payment
+     * modules get these columns added automatically during the upgrade process.
+     * 
+     * Legacy columns supported:
+     * - domain: Used by some legacy implementations to track subscription domains
+     * - comments: Used by legacy admin pages to append payment history notes
+     */
+    private static function ensureLegacyColumns(): void
+    {
+        global $db;
+
+        $columns = [
+            'domain' => "VARCHAR(255) NOT NULL DEFAULT ''",
+            'comments' => "TEXT",
+        ];
+
+        foreach ($columns as $column => $definition) {
+            if (!self::columnExists($column)) {
+                $db->Execute(
+                    'ALTER TABLE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' ADD ' . $column . ' ' . $definition
+                );
+            }
+        }
+    }
+
+    /**
+     * Check if a column exists in the saved_credit_cards_recurring table.
+     */
+    private static function columnExists(string $column): bool
+    {
+        global $db;
+
+        $result = $db->Execute(
+            "SHOW COLUMNS FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " LIKE '" . zen_db_input($column) . "'"
+        );
+
+        return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
     }
 }
