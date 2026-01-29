@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.5
+ * Last updated: v1.3.6
  */
 /**
  * Load the support class' auto-loader.
@@ -25,6 +25,7 @@ use PayPalRestful\Api\Data\CountryCodes;
 use PayPalRestful\Common\ErrorInfo;
 use PayPalRestful\Common\Helpers;
 use PayPalRestful\Common\Logger;
+use PayPalRestful\Common\SavedCreditCardsManager;
 use PayPalRestful\Common\VaultManager;
 use PayPalRestful\Compatibility\Language as LanguageCompatibility;
 use PayPalRestful\Zc2Pp\Amount;
@@ -63,7 +64,7 @@ class paypalr extends base
         return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.5';
+    protected const CURRENT_VERSION = '1.3.6';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -671,6 +672,10 @@ class paypalr extends base
                             );
                         }
                     }
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.6', '<'): //- Fall through from above
+                    // Ensure legacy saved credit cards tables exist for backward compatibility
+                    SavedCreditCardsManager::ensureSchema();
 
                 default:    //- Fall through from above
                     break;
