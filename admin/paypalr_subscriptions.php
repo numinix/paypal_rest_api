@@ -157,11 +157,11 @@ if ($action === 'update_subscription') {
         }
         
         if (!empty($updateData)) {
-            $updateData['comments'] = '  Updated by admin via unified subscriptions page.  ';
+            $updateData['comments'] = 'Updated by admin via unified subscriptions page.';
             $paypalSavedCardRecurring->update_payment_info($subscriptionId, $updateData);
+            $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId), 'success');
         }
         
-        $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId), 'success');
         zen_redirect($redirectUrl);
     }
 
@@ -494,9 +494,9 @@ if ($action === 'skip_next_payment') {
         $paypalSavedCardRecurring = new paypalSavedCardRecurring();
         $success = $paypalSavedCardRecurring->skip_next_payment($subscriptionId);
         if ($success) {
-            $messageStack->add_session($messageStackKey, 'Payment skipped for subscription #' . $subscriptionId . '. The next billing date has been calculated and updated.', 'success');
+            $messageStack->add_session('header', 'Payment skipped for subscription #' . $subscriptionId . '. The next billing date has been calculated and updated.', 'success');
         } else {
-            $messageStack->add_session($messageStackKey, 'Failed to skip payment for subscription #' . $subscriptionId . '. Only scheduled subscriptions can be skipped.', 'error');
+            $messageStack->add_session('header', 'Failed to skip payment for subscription #' . $subscriptionId . '. Only scheduled subscriptions can be skipped.', 'error');
         }
         zen_redirect($redirectUrl);
     }
@@ -788,29 +788,6 @@ $filters = [
     'subscription_type' => trim((string) ($_GET['subscription_type'] ?? '')),
 ];
 
-$whereClauses = [];
-
-if ($filters['customers_id'] > 0) {
-    $whereClauses[] = 'ps.customers_id = ' . (int) $filters['customers_id'];
-}
-if ($filters['products_id'] > 0) {
-    $whereClauses[] = 'ps.products_id = ' . (int) $filters['products_id'];
-}
-if ($filters['status'] !== '') {
-    $whereClauses[] = "ps.status = '" . zen_db_input($filters['status']) . "'";
-}
-if ($filters['payment_module'] !== '') {
-    $whereClauses[] = "o.payment_module_code = '" . zen_db_input($filters['payment_module']) . "'";
-}
-
-// Archive filter - by default, hide archived subscriptions
-if ($filters['show_archived'] === 'only') {
-    $whereClauses[] = 'ps.is_archived = 1';
-} elseif ($filters['show_archived'] !== 'all') {
-    // Default behavior: show only non-archived subscriptions
-    $whereClauses[] = 'ps.is_archived = 0';
-}
-
 $queryString = [];
 foreach ($filters as $key => $value) {
     if ($value === '' || $value === 0) {
@@ -1002,8 +979,10 @@ if ($filters['subscription_type'] === '' || $filters['subscription_type'] === 'r
 }
 
 // Fetch Saved Card subscriptions
+// Note: Saved cards don't support payment_module or is_archived filters
 if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT_CARDS') 
-    && ($filters['subscription_type'] === '' || $filters['subscription_type'] === 'savedcard')) {
+    && ($filters['subscription_type'] === '' || $filters['subscription_type'] === 'savedcard')
+    && $filters['show_archived'] !== 'only') {  // Exclude saved cards when filtering for archived only
     $savedCardWhereClauses = [];
     
     if ($filters['customers_id'] > 0) {
@@ -1038,9 +1017,12 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
         while (!$savedCardSubscriptions->EOF) {
             $row = $savedCardSubscriptions->fields;
             $row['subscription_type'] = 'savedcard';
+            // Map saved card fields to match REST subscription structure
+            // Note: 'date' field serves as both creation date and next payment date for saved cards
             $row['date_added'] = $row['date'];
             $row['next_payment_date'] = $row['date'];
             $row['sort_date'] = strtotime($row['date'] ?? 'now');
+            // Saved card subscriptions don't have quantity field, always 1
             $row['products_quantity'] = 1;
             $allSubscriptions[] = $row;
             $savedCardSubscriptions->MoveNext();
@@ -1049,6 +1031,8 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
 }
 
 // Sort by date descending
+// Note: Using in-memory sort for simplicity. For large datasets, consider using database UNION queries
+// with ORDER BY and LIMIT/OFFSET for better performance and memory efficiency.
 usort($allSubscriptions, function($a, $b) {
     return $b['sort_date'] - $a['sort_date'];
 });
