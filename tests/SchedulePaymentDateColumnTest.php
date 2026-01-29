@@ -188,7 +188,7 @@ namespace {
         }
     }
 
-    // Mock classes
+    // Mock classes - define them before any requires to prevent file loading
     if (!class_exists('order')) {
         class order {}
     }
@@ -205,7 +205,7 @@ namespace {
         class shopping_cart {}
     }
 
-    // Create mock files to avoid require errors
+    // Create mock files to avoid require errors (consistent with other tests)
     $mockFiles = [
         DIR_FS_CATALOG . DIR_WS_CLASSES . 'order.php',
         DIR_FS_CATALOG . DIR_WS_CLASSES . 'order_total.php',

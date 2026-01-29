@@ -2,7 +2,7 @@
 includes/templates/*/css/ascc_overrides.css
 *.braintree_old
 
-# Test mock files
+# Test mock files (created by test suite)
 includes/classes/order.php
 includes/classes/order_total.php
 includes/classes/payment.php
