@@ -6,7 +6,7 @@
  * @copyright Portions Copyright 2003 osCommerce
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.7
+ * Last updated: v1.3.8
  */
 /**
  * Load the support class' auto-loader.
@@ -64,7 +64,7 @@ class paypalr extends base
         return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.7';
+    protected const CURRENT_VERSION = '1.3.8';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -687,6 +687,21 @@ class paypalr extends base
                             $db->Execute(
                                 "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
                                    ADD products_model VARCHAR(255) NOT NULL DEFAULT '' AFTER products_name"
+                            );
+                        }
+                    }
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.8', '<'): //- Fall through from above
+                    // De-register the paypalrSavedCardRecurring admin page since saved card subscriptions
+                    // are now displayed together with REST subscriptions in the paypalr_subscriptions page
+                    $zc150 = (PROJECT_VERSION_MAJOR > 1 || (PROJECT_VERSION_MAJOR == 1 && substr(PROJECT_VERSION_MINOR, 0, 3) >= 5));
+                    
+                    if ($zc150 && function_exists('zen_page_key_exists') && defined('TABLE_ADMIN_PAGES')) {
+                        if (zen_page_key_exists('paypalrSavedCardRecurring')) {
+                            $db->Execute(
+                                "DELETE FROM " . TABLE_ADMIN_PAGES . "
+                                  WHERE page_key = 'paypalrSavedCardRecurring'
+                                  LIMIT 1"
                             );
                         }
                     }
