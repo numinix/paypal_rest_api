@@ -1658,10 +1658,15 @@ $payment_modules = new payment($_SESSION['payment']);
 		if (!$isPlansProduct) {
 //plans cannot be paid for with store credit (because a plan is essentially purchasing store credit.)
 //Initialize Store Credit
-			$store_credit = new storeCredit();
+			if (class_exists('storeCredit')) {
+				$store_credit = new storeCredit();
 //    define('MODULE_ORDER_TOTAL_SC_STATUS', 'true');
 //    define('STORE_CREDIT_AUTOMATICALLY_ADD', 'true');
-			$_SESSION['storecredit'] = $store_credit->retrieve_customer_credit($_SESSION['customer_id']);
+				$_SESSION['storecredit'] = $store_credit->retrieve_customer_credit($_SESSION['customer_id']);
+			} else {
+				// storeCredit class not available, default to no store credit
+				$_SESSION['storecredit'] = 0;
+			}
 //BOF NX mod: don't allow store credit for plan payments
 		}
 		else {
