@@ -1935,17 +1935,18 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		return $message;
 	}
 /*
-*  Gets a list of paypal_saved_card_recurring_id's that are status scheduled and have a next_payment_date of today or earlier. Used by cron.
+*  Gets a list of paypal_saved_card_recurring_id's that are status scheduled or failed and have a next_payment_date of today or earlier. Used by cron.
+*  Failed subscriptions are automatically retried on their next scheduled date.
 */
 	function get_scheduled_payments() {
 		global $db;
 		$today = date('Y-m-d');
-		$sql = 'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE status = \'scheduled\' AND next_payment_date <= \'' . $today . '\'';
+		$sql = 'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE (status = \'scheduled\' OR status = \'failed\') AND next_payment_date <= \'' . $today . '\'';
 		
 		// Debug logging for cron
 		if (!empty($_SESSION['in_cron'])) {
 			error_log('PayPal Cron - get_scheduled_payments() SQL: ' . $sql);
-			error_log('PayPal Cron - Looking for subscriptions with status=scheduled and next_payment_date <= ' . $today);
+			error_log('PayPal Cron - Looking for subscriptions with status IN (scheduled, failed) and next_payment_date <= ' . $today);
 		}
 		
 		$result = $db->Execute($sql);
@@ -1957,7 +1958,7 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		
 		// Debug logging for cron
 		if (!empty($_SESSION['in_cron'])) {
-			error_log('PayPal Cron - Found ' . count($payments) . ' scheduled payments: ' . implode(', ', $payments));
+			error_log('PayPal Cron - Found ' . count($payments) . ' payments to process (scheduled + failed): ' . implode(', ', $payments));
 		}
 		
 		return $payments;

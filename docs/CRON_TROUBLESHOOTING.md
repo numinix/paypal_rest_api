@@ -4,20 +4,30 @@
 
 The cron shows "Processed: 0" but subscriptions exist in the admin panel.
 
-## Common Causes
+## Automatic Retry for Failed Subscriptions
 
-### 1. Subscription Status is Not "scheduled"
+**As of the latest update, failed subscriptions are automatically retried on their next scheduled payment date.**
 
-The cron only processes subscriptions with `status = 'scheduled'`. If a subscription has failed previously, it may be stuck in `status = 'failed'`.
+The cron now processes subscriptions with:
+- `status = 'scheduled'` OR
+- `status = 'failed'` (automatic retry)
 
-**Solution:** Update the subscription status to 'scheduled' in the admin or database.
+This means if a payment fails (e.g., card declined), the cron will automatically retry it on the next scheduled date. The customer may have resolved the issue by that time (added funds, updated card, etc.).
 
-**In Admin:**
-- Go to Admin > PayPal > Saved Card Subscriptions
-- Find the subscription
-- If it shows "Failed" status, you can reactivate it or manually update the status
+## Common Causes (if subscriptions still not processing)
 
-**In Database:**
+### 1. Subscription Status is "cancelled"
+
+The cron does NOT process cancelled subscriptions. Only "scheduled" and "failed" subscriptions are processed.
+
+**Check status:**
+```sql
+SELECT saved_credit_card_recurring_id, status, next_payment_date 
+FROM saved_credit_cards_recurring 
+WHERE saved_credit_card_recurring_id = 1;
+```
+
+**Solution:** If status is "cancelled" and you want to reactivate:
 ```sql
 UPDATE saved_credit_cards_recurring 
 SET status = 'scheduled' 
@@ -65,56 +75,43 @@ As of the latest commit, the cron now shows debug output:
 ID: 1 | Status: failed | Next Payment: 2026-01-29 | Product: NEW NCRS Membership Canada
 === END DEBUG ===
 
-No payments scheduled for today (2026-01-30) or earlier.
-Subscriptions must have:
-  - status = 'scheduled'
-  - next_payment_date <= '2026-01-30'
+Recurring Payments — 2026-01-30 (America/New_York)
+Processed: 1 Paid: 0 | Failed: 1 | Skipped: 0
 ```
 
-This immediately shows:
-1. The subscription exists (ID: 1)
-2. The status is "failed" (not "scheduled")
-3. The next payment date was yesterday (2026-01-29)
-
-**To fix this specific case:**
-```sql
-UPDATE saved_credit_cards_recurring 
-SET status = 'scheduled', 
-    next_payment_date = '2026-01-30'
-WHERE saved_credit_card_recurring_id = 1;
-```
+**Note:** Failed subscriptions are now automatically retried. In the example above, subscription #1 with status "failed" and next payment date of 2026-01-29 WILL be processed because it's due and automatic retry is enabled.
 
 ## Workflow After a Failed Payment
 
-When a payment fails, the subscription status changes to "failed". The cron will NOT automatically retry failed subscriptions on subsequent runs.
+When a payment fails, the subscription status changes to "failed". **The cron will automatically retry the subscription on the next scheduled date.**
 
-**To re-enable a failed subscription:**
+This automatic retry gives customers time to:
+- Add funds to their account
+- Update their payment method
+- Resolve any card issues
 
-1. **Verify the payment method** - Make sure the credit card is valid and not expired
-2. **Update the status** - Change from "failed" to "scheduled"  
-3. **Set the next payment date** - Usually set to today or the next billing date
-4. **Run the cron** - The subscription will be picked up on the next run
+**If you want to prevent automatic retries:**
+Set the status to "cancelled" instead of leaving it as "failed".
 
-**Admin Interface:**
-- Some admin pages have a "Reactivate" button for failed subscriptions
-- This automatically sets status back to "scheduled"
+**To manually trigger an immediate retry:**
+Update the next_payment_date to today:
+```sql
+UPDATE saved_credit_cards_recurring 
+SET next_payment_date = CURDATE() 
+WHERE saved_credit_card_recurring_id = 1;
+```
 
-## Preventing Future Issues
-
-1. **Monitor failed payments** - Set up notifications for failed subscriptions
-2. **Auto-retry logic** - Consider implementing auto-retry for failed payments (with limits)
-3. **Customer notifications** - Email customers when their payment fails so they can update their card
-4. **Card expiration checks** - Proactively notify customers before cards expire
+Then run the cron.
 
 ## Testing
 
-To test if a subscription will be processed:
+To test which subscriptions will be processed:
 
 ```sql
--- This query mimics what the cron does
-SELECT saved_credit_card_recurring_id 
+-- This query mimics what the cron does (now includes failed subscriptions)
+SELECT saved_credit_card_recurring_id, status, next_payment_date
 FROM saved_credit_cards_recurring 
-WHERE status = 'scheduled' 
+WHERE (status = 'scheduled' OR status = 'failed')
   AND next_payment_date <= CURDATE();
 ```
 

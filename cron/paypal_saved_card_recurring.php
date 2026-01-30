@@ -393,9 +393,9 @@ print $debug_output;
 $todays_payments = $paypalSavedCardRecurring->get_scheduled_payments();
 
 if (count($todays_payments) == 0) {
-    $no_payments_msg = "No payments scheduled for today (" . date('Y-m-d') . ") or earlier.\n";
+    $no_payments_msg = "No payments due for processing today (" . date('Y-m-d') . ") or earlier.\n";
     $no_payments_msg .= "Subscriptions must have:\n";
-    $no_payments_msg .= "  - status = 'scheduled'\n";
+    $no_payments_msg .= "  - status = 'scheduled' OR status = 'failed' (failed subscriptions are automatically retried)\n";
     $no_payments_msg .= "  - next_payment_date <= '" . date('Y-m-d') . "'\n";
     print $no_payments_msg;
     error_log('PayPal Cron - ' . $no_payments_msg);
