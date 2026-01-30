@@ -370,10 +370,10 @@ $advanceBillingCycle = function (DateTime $baseDate, array $attributes) {
     return $next;
 };
 
-// Debug: Check what subscriptions exist in the database
-$debug_sql = 'SELECT saved_credit_card_recurring_id, status, next_payment_date, products_name FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' ORDER BY saved_credit_card_recurring_id';
+// Debug: Check what subscriptions exist in the database (excluding cancelled)
+$debug_sql = 'SELECT saved_credit_card_recurring_id, status, next_payment_date, products_name FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE status != \'cancelled\' ORDER BY saved_credit_card_recurring_id';
 $debug_result = $db->Execute($debug_sql);
-$debug_output = "\n=== DEBUG: All Subscriptions in Database ===\n";
+$debug_output = "\n=== DEBUG: Active Subscriptions in Database ===\n";
 while (!$debug_result->EOF) {
     $debug_output .= sprintf("ID: %d | Status: %s | Next Payment: %s | Product: %s\n", 
         $debug_result->fields['saved_credit_card_recurring_id'],
