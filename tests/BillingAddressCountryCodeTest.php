@@ -8,6 +8,7 @@ declare(strict_types=1);
  * 1. billing_address always includes country_code field
  * 2. country_code is added even when using vaultCard billing_address
  * 3. Helper method getCustomerCountryCode exists
+ * 4. Fallback inference from state/province works
  *
  * @copyright Copyright 2026 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -37,6 +38,16 @@ if (file_exists($savedCardRecurringFile)) {
         fwrite(STDOUT, "✓ Adds country_code when missing\n");
     } else {
         fwrite(STDERR, "✗ Does not add country_code when missing\n");
+        exit(1);
+    }
+    
+    // Check for state/province inference fallback
+    if (strpos($content, "in_array(\$stateCode") !== false &&
+        strpos($content, "'BC'") !== false &&
+        strpos($content, "'CA'") !== false) {
+        fwrite(STDOUT, "✓ Has fallback to infer country from state/province\n");
+    } else {
+        fwrite(STDERR, "✗ Missing state/province inference fallback\n");
         exit(1);
     }
     
@@ -98,4 +109,5 @@ fwrite(STDOUT, "\nVerified:\n");
 fwrite(STDOUT, "1. country_code is always included in billing_address\n");
 fwrite(STDOUT, "2. country_code is added to vault card billing_address when missing\n");
 fwrite(STDOUT, "3. Helper method retrieves country code from customer address\n");
+fwrite(STDOUT, "4. Fallback inference from state/province code (BC→CA, state→US)\n");
 fwrite(STDOUT, "\nThis satisfies PayPal's requirement for country_code in billing_address.\n");
