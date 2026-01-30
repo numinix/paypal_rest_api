@@ -1940,11 +1940,11 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		return $message;
 	}
 /*
-*  Gets a list of paypal_saved_card_recurring_id's that are status scheduled and have a date of today or earlier. Used by cron.
+*  Gets a list of paypal_saved_card_recurring_id's that are status scheduled and have a next_payment_date of today or earlier. Used by cron.
 */
 	function get_scheduled_payments() {
 		global $db;
-		$sql = 'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE status = \'scheduled\' AND date <= \'' . date('Y-m-d') . '\'';
+		$sql = 'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE status = \'scheduled\' AND next_payment_date <= \'' . date('Y-m-d') . '\'';
 		$result = $db->Execute($sql);
 		$payments = array();
 		while (!$result->EOF) {
@@ -2293,12 +2293,12 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 			return 0;
 		}
 
-		$result = $db->Execute('SELECT MAX(date) as last_success FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE " . $scopeSql . " AND status = 'complete'");
+		$result = $db->Execute('SELECT MAX(next_payment_date) as last_success FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE " . $scopeSql . " AND status = 'complete'");
 		$last_successful_payment = isset($result->fields['last_success']) ? $result->fields['last_success'] : '' ;
 
 		$sql = 'SELECT count(*) AS count FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE status = 'failed' AND " . $scopeSql;
 		if (!empty($last_successful_payment)) {
-			$sql .= " AND date > '" . $last_successful_payment . "'";
+			$sql .= " AND next_payment_date > '" . $last_successful_payment . "'";
 		}
 		$result = $db->Execute($sql);
 		return (int) $result->fields['count'];
@@ -2379,7 +2379,7 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 		global $db;
 		$subscriptions = $this->get_customer_subscriptions($customer_id, $domain);
 		foreach ($subscriptions as $subscription) {
-			if ((int) $subscription['products_id'] == (int) $product_id && $subscription['status'] == 'scheduled' && strtotime($subscription['date']) > strtotime('today')) {
+			if ((int) $subscription['products_id'] == (int) $product_id && $subscription['status'] == 'scheduled' && strtotime($subscription['next_payment_date']) > strtotime('today')) {
 				return $subscription['saved_credit_card_recurring_id'];
 			}
 		}
