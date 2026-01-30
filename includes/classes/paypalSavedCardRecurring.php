@@ -1646,33 +1646,15 @@ $payment_modules = new payment($_SESSION['payment']);
 // initiate order totals
 		$order_total_modules = new order_total();
 		$zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_BEFORE_ORDER_TOTALS_PROCESS');
-//NX mod: don't allow store credit for plans
-		$isPlansProduct = false;
-		if (defined('CATEGORY_ID_PLANS') && zen_product_in_category($products_id, CATEGORY_ID_PLANS)) {
-			$isPlansProduct = true;
-		}
-		if (defined('CATEGORY_ID_CUSTOM_PLANS') && zen_product_in_category($products_id, CATEGORY_ID_CUSTOM_PLANS)) {
-			$isPlansProduct = true;
+		
+		// Initialize store credit to 0 by default
+		// Site-specific customizations (e.g., category-based restrictions, store credit modules)
+		// should be implemented via observers listening to NOTIFY_CHECKOUT_PROCESS_BEFORE_ORDER_TOTALS_PROCESS
+		// See docs/OBSERVER_CUSTOMIZATIONS.md for examples
+		if (!isset($_SESSION['storecredit'])) {
+			$_SESSION['storecredit'] = 0;
 		}
 		
-		if (!$isPlansProduct) {
-//plans cannot be paid for with store credit (because a plan is essentially purchasing store credit.)
-//Initialize Store Credit
-			if (class_exists('storeCredit')) {
-				$store_credit = new storeCredit();
-//    define('MODULE_ORDER_TOTAL_SC_STATUS', 'true');
-//    define('STORE_CREDIT_AUTOMATICALLY_ADD', 'true');
-				$_SESSION['storecredit'] = $store_credit->retrieve_customer_credit($_SESSION['customer_id']);
-			} else {
-				// storeCredit class not available, default to no store credit
-				$_SESSION['storecredit'] = 0;
-			}
-//BOF NX mod: don't allow store credit for plan payments
-		}
-		else {
-			$_SESSION['storecredit'] = 0; //in case it was set elsewhere.
-		}
-//EOF NX mod: don't allow store credit for plan payments
 // process order totals
 		$order_totals = $order_total_modules->process();
 		$zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_TOTALS_PROCESS');
@@ -2021,34 +2003,15 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 			$message .= 'New Status: ' . $status . "\n";
 			$message .= 'Comments: ' . $comments . "\n";
 
-                        // Add instructions for updating the payment card in plain text so it renders correctly for text emails
+                        // Add instructions for updating the payment card in plain text
+                        // Note: Customize the URL for your site's payment info page
                         $message .= "\n------------------------------------------------------------";
-                        $message .= "\nTo update your card go to Payment Info:";
-                        $message .= "\nhttps://www.numinix.com/account_saved_credit_cards.html";
+                        $message .= "\nTo update your card, please log in to your account";
+                        $message .= "\nand go to your payment methods page.";
                         $message .= "\n------------------------------------------------------------\n";
 
 			$this->notify_error('Subscription ' . $status . '  for ' . $details['customers_firstname'] . ' ' . $details['customers_lastname'], $message, 'warning', $details['customers_email_address'], $details['customers_firstname']);
-			zen_mail('Numinix Support', 'support@numinix.com', 'Saved Credit Cards Recurring (warning) - ' . 'Subscription ' . $status . '  for ' . $details['customers_firstname'] . ' ' . $details['customers_lastname'], nl2br($message), STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'default');
 		}
-		//BOF NX mod by Jeff
-		// elseif ($status == 'failed') {
-		// 	$details = $this->get_payment_details($paypal_saved_card_recurring_id);
-		// 	$message = 'Customer #:' . $customer_id . "\n";
-		// 	$message .= 'Customer name: ' . $details['customers_firstname'] . ' ' . $details['customers_lastname'] . "\n";
-		// 	$message .= 'Subscription #' . $paypal_saved_card_recurring_id . "\n";
-		// 	$message .= 'Product: ' . $details['products_name'] . "\n";
-		// 	$message .= 'New Status: ' . $status . "\n";
-		// 	$message .= 'Comments: ' . $comments . "\n";
-
-		// 	// Add new line for customer email with formatting
-		// 	$message .= "\n<div style='border-bottom: 1px solid #ccc; width: 100%;'></div>";
-		// 	$message .= "\n<div style='text-align: center; width:100%;font-size:20px;line-height:32px;'><p>To update your card go to</p> <a href='https://www.numinix.com/account_saved_credit_cards.html' style='text-decoration: none;background: #0686D4;color: #fff;padding:9px 20px;display: inline-block;margin-top:15px;border-radius: 4px;'>Payment Info</a></div>";
-		// 	$message .= "\n<div style='border-bottom: 1px solid #ccc; width: 100%;'></div>\n";
-
-		// 	zen_mail('Numinix Support', 'support@numinix.com', 'Subscription Payment Failed for ' . $details['customers_firstname'] . ' ' . $details['customers_lastname'], nl2br($message), STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'default');
-		// }
-
-		//EOF NX mod by Jeff
 	}
 	
 	/**
