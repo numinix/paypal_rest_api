@@ -141,8 +141,9 @@ class LegacySubscriptionMigrator
 
         // Set orders_products_id to NULL if it's 0 to avoid UNIQUE constraint violations
         // NULL values are allowed in UNIQUE indexes and won't cause duplicates
+        // We must unset the key entirely because zen_db_perform converts null to empty string
         if (isset($record['orders_products_id']) && (int)$record['orders_products_id'] === 0) {
-            $record['orders_products_id'] = null;
+            unset($record['orders_products_id']);
         }
 
         $existing = null;
