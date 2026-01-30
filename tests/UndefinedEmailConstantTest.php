@@ -125,6 +125,41 @@ namespace {
         $failures++;
     }
 
+    // Test 5: Verify cron file also handles the constant properly
+    fwrite(STDOUT, "\nTest 5: Checking cron file email notification...\n");
+    
+    $cronFile = DIR_FS_CATALOG . 'cron/paypal_saved_card_recurring.php';
+    if (file_exists($cronFile)) {
+        $cronContent = file_get_contents($cronFile);
+        
+        // Check that cron file also uses defined() check
+        if (preg_match('/defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL[\'"]\s*\)/', $cronContent)) {
+            fwrite(STDOUT, "✓ Cron file uses defined() check for email constant\n");
+        } else {
+            fwrite(STDERR, "✗ Cron file doesn't use defined() check\n");
+            $failures++;
+        }
+        
+        // Check that cron file doesn't have bare usage
+        $cronLines = explode("\n", $cronContent);
+        $foundBareCronUsage = false;
+        foreach ($cronLines as $lineNum => $line) {
+            if (strpos($line, 'defined(') !== false) {
+                continue;
+            }
+            if (preg_match('/zen_mail\s*\(\s*MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL/', $line)) {
+                fwrite(STDERR, "✗ Found bare usage in cron at line " . ($lineNum + 1) . "\n");
+                $foundBareCronUsage = true;
+                $failures++;
+            }
+        }
+        if (!$foundBareCronUsage) {
+            fwrite(STDOUT, "✓ No bare usage in cron file\n");
+        }
+    } else {
+        fwrite(STDOUT, "⚠ Cron file not found (skipping cron test)\n");
+    }
+
     // Summary
     fwrite(STDOUT, "\n=== Test Summary ===\n");
     if ($failures > 0) {

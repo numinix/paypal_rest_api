@@ -683,16 +683,29 @@ $html_email = recurring_build_email_html(
 print $log;
 $_SESSION['in_cron'] = false;
 
-zen_mail(
-    MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL,
-    MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL,
-    'Recurring Payment Log',
-    $log,
-    STORE_NAME,
-    EMAIL_FROM,
-    array('EMAIL_MESSAGE_HTML' => $html_email),
-    'recurring_log'
-);
+// Determine email recipient with fallback chain
+$notification_email = '';
+if (defined('MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL')) {
+    $notification_email = MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL;
+} elseif (defined('STORE_OWNER_EMAIL_ADDRESS')) {
+    $notification_email = STORE_OWNER_EMAIL_ADDRESS;
+} elseif (defined('EMAIL_FROM')) {
+    $notification_email = EMAIL_FROM;
+}
+
+// Only send email if we have a valid recipient
+if (!empty($notification_email)) {
+    zen_mail(
+        $notification_email,
+        $notification_email,
+        'Recurring Payment Log',
+        $log,
+        STORE_NAME,
+        EMAIL_FROM,
+        array('EMAIL_MESSAGE_HTML' => $html_email),
+        'recurring_log'
+    );
+}
 
 $additional_failure_recipients = array();
 $raw_recipients = '';
