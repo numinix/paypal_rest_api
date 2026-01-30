@@ -294,17 +294,43 @@ return $year . '-' . $month;
 return '';
 }
 protected function build_billing_address_from_card(array $cardDetails, array $vaultCard = array()) {
+error_log('PayPal: build_billing_address_from_card called with vaultCard: ' . json_encode($vaultCard));
+error_log('PayPal: cardDetails keys: ' . implode(', ', array_keys($cardDetails)));
 if (isset($vaultCard['billing_address']) && is_array($vaultCard['billing_address']) && count($vaultCard['billing_address']) > 0) {
 // Use vault card's billing address but ensure country_code is present
 $billing = $vaultCard['billing_address'];
+error_log('PayPal: Using vault billing_address: ' . json_encode($billing));
 // If country_code is missing, try to get it from customer's address
 if (!isset($billing['country_code']) || $billing['country_code'] === '') {
+error_log('PayPal: country_code missing, attempting to retrieve from customer address');
 $customers_id = $this->determineCardCustomerId($cardDetails);
+error_log('PayPal: customers_id: ' . $customers_id);
 $countryCode = $this->getCustomerCountryCode($customers_id, $cardDetails);
+error_log('PayPal: Retrieved country_code: ' . $countryCode);
 if ($countryCode !== '') {
 $billing['country_code'] = $countryCode;
+error_log('PayPal: Added country_code to billing_address: ' . $countryCode);
+} else {
+// If we still can't get country code, try to infer from state/province
+if (isset($billing['admin_area_1'])) {
+$stateCode = $billing['admin_area_1'];
+// Canadian provinces
+if (in_array($stateCode, array('AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT'))) {
+$billing['country_code'] = 'CA';
+error_log('PayPal: Inferred country_code=CA from province: ' . $stateCode);
+}
+// US states (just checking a few common ones as example)
+elseif (in_array($stateCode, array('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'))) {
+$billing['country_code'] = 'US';
+error_log('PayPal: Inferred country_code=US from state: ' . $stateCode);
 }
 }
+if (!isset($billing['country_code']) || $billing['country_code'] === '') {
+error_log('PayPal: ERROR - Still no country_code, this will cause PayPal API error');
+}
+}
+}
+error_log('PayPal: Returning billing_address: ' . json_encode($billing));
 return $billing;
 }
 global $db;
