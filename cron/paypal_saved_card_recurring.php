@@ -297,7 +297,9 @@ $parseRecurringDate = function ($value) {
 };
 
 $determineIntendedBillingDate = function (array $paymentDetails, array $attributes, $numFailedPayments) use ($parseRecurringDate) {
-    $scheduledDateString = isset($paymentDetails['date']) ? $paymentDetails['date'] : '';
+    // Use next_payment_date as the base to maintain the original billing schedule
+    // This ensures that if a payment is late, the billing schedule doesn't shift forward
+    $scheduledDateString = isset($paymentDetails['next_payment_date']) ? $paymentDetails['next_payment_date'] : '';
     $scheduledDate = $parseRecurringDate($scheduledDateString);
 
     if (isset($attributes['intended_billing_date']) && $attributes['intended_billing_date'] !== '') {
