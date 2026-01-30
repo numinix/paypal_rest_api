@@ -750,6 +750,15 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         }
                 }
                 
+                // Add shipping fields if they exist
+                $shippingFields = array('shipping_method', 'shipping_cost');
+                foreach ($shippingFields as $field) {
+                        if (isset($metadata[$field]) && $metadata[$field] !== null && $metadata[$field] !== '') {
+                                $type = ($field === 'shipping_cost') ? 'string' : 'string'; // Decimal stored as string
+                                $sql_data_array[] = array('fieldName' => $field, 'value' => $metadata[$field], 'type' => $type);
+                        }
+                }
+                
                 $db->perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, $sql_data_array);
                 $paypal_saved_card_recurring_id = $db->insert_ID();
                 return $paypal_saved_card_recurring_id;
@@ -845,6 +854,9 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         'billing_postcode' => null,
                         'billing_country_id' => null,
                         'billing_country_code' => null,
+                        // Shipping fields
+                        'shipping_method' => null,
+                        'shipping_cost' => null,
                 );
 
                 $map = array(
@@ -866,6 +878,9 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         'billing_postcode' => array('billing_postcode'),
                         'billing_country_id' => array('billing_country_id'),
                         'billing_country_code' => array('billing_country_code'),
+                        // Shipping field mappings
+                        'shipping_method' => array('shipping_method'),
+                        'shipping_cost' => array('shipping_cost'),
                 );
 
                 foreach ($map as $target => $sources) {

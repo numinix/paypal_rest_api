@@ -25,3 +25,8 @@ ADD COLUMN IF NOT EXISTS billing_state VARCHAR(255) DEFAULT NULL COMMENT 'Billin
 ADD COLUMN IF NOT EXISTS billing_postcode VARCHAR(255) DEFAULT NULL COMMENT 'Billing postal code',
 ADD COLUMN IF NOT EXISTS billing_country_id INT(11) DEFAULT NULL COMMENT 'Billing country ID (FK to countries table)',
 ADD COLUMN IF NOT EXISTS billing_country_code CHAR(2) DEFAULT NULL COMMENT 'Billing country ISO code (CA, US, etc.)';
+
+-- Add shipping information columns
+ALTER TABLE saved_credit_cards_recurring
+ADD COLUMN IF NOT EXISTS shipping_method VARCHAR(255) DEFAULT NULL COMMENT 'Shipping method name',
+ADD COLUMN IF NOT EXISTS shipping_cost DECIMAL(15,4) DEFAULT NULL COMMENT 'Shipping cost at time of order';

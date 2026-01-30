@@ -19,7 +19,7 @@ $check = $db->Execute($upgrade_check_query);
 
 if ($check->RecordCount() == 0) {
     // Columns don't exist yet, add them
-    $messageStack->add('Adding subscription billing address columns...', 'success');
+    $messageStack->add('Adding subscription billing address and shipping columns...', 'success');
     
     $alterQueries = array(
         "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " ADD COLUMN billing_name VARCHAR(255) DEFAULT NULL COMMENT 'Billing contact name'",
@@ -30,12 +30,14 @@ if ($check->RecordCount() == 0) {
         "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " ADD COLUMN billing_state VARCHAR(255) DEFAULT NULL COMMENT 'Billing state/province'",
         "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " ADD COLUMN billing_postcode VARCHAR(255) DEFAULT NULL COMMENT 'Billing postal code'",
         "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " ADD COLUMN billing_country_id INT(11) DEFAULT NULL COMMENT 'Billing country ID'",
-        "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " ADD COLUMN billing_country_code CHAR(2) DEFAULT NULL COMMENT 'Billing country ISO code'"
+        "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " ADD COLUMN billing_country_code CHAR(2) DEFAULT NULL COMMENT 'Billing country ISO code'",
+        "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " ADD COLUMN shipping_method VARCHAR(255) DEFAULT NULL COMMENT 'Shipping method name'",
+        "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " ADD COLUMN shipping_cost DECIMAL(15,4) DEFAULT NULL COMMENT 'Shipping cost at time of order'"
     );
     
     foreach ($alterQueries as $sql) {
         $db->Execute($sql);
     }
     
-    $messageStack->add('✓ Subscription billing address columns added successfully', 'success');
+    $messageStack->add('✓ Subscription billing address and shipping columns added successfully', 'success');
 }

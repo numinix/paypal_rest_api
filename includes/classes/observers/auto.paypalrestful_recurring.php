@@ -174,6 +174,29 @@ class zcObserverPaypalrestfulRecurring
         
         $this->log->write("    Customer ID: $customersId, Currency: $currency, Currency Value: $currencyValue");
         $this->log->write("    Billing Address: " . Logger::logJSON($billingAddress));
+        
+        // Extract shipping information from order totals
+        $shippingInfo = array(
+            'shipping_method' => '',
+            'shipping_cost' => null
+        );
+        
+        // Get shipping method and cost from orders_total
+        $shippingQuery = $db->Execute(
+            "SELECT class, title, value
+               FROM " . TABLE_ORDERS_TOTAL . "
+              WHERE orders_id = " . $ordersId . "
+                AND class = 'ot_shipping'
+              LIMIT 1"
+        );
+        
+        if (!$shippingQuery->EOF) {
+            $shippingInfo['shipping_method'] = (string)$shippingQuery->fields['title'];
+            $shippingInfo['shipping_cost'] = (float)$shippingQuery->fields['value'];
+            $this->log->write("    Shipping: " . Logger::logJSON($shippingInfo));
+        } else {
+            $this->log->write("    Shipping: No shipping charge found (may be free or digital product)");
+        }
 
         $products = $db->Execute(
             "SELECT orders_products_id, products_id, products_name, products_quantity, final_price
@@ -254,7 +277,7 @@ class zcObserverPaypalrestfulRecurring
                         'billing_frequency' => $subscriptionAttributes['billing_frequency'],
                         'total_billing_cycles' => $subscriptionAttributes['total_billing_cycles'],
                         'subscription_attributes' => $attributeMap,
-                    ], $billingAddress) // Include billing address from order
+                    ], $billingAddress, $shippingInfo) // Include billing address and shipping info from order
                 );
                 
                 if ($subscriptionId > 0) {
