@@ -133,9 +133,9 @@ switch ($action) {
         if ($_GET['saved_card_recurring_id'] > 0) {
             $success = $paypalSavedCardRecurring->skip_next_payment($_GET['saved_card_recurring_id']);
             if ($success) {
-                $messageStack->add_session($messageStackKey, 'Payment skipped for subscription #' . $_GET['saved_card_recurring_id'] . '. The next billing date has been calculated and updated.', 'success');
+                $messageStack->add_session('Payment skipped for subscription #' . $_GET['saved_card_recurring_id'] . '. The next billing date has been calculated and updated.', 'success');
             } else {
-                $messageStack->add_session($messageStackKey, 'Failed to skip payment for subscription #' . $_GET['saved_card_recurring_id'] . '. Only scheduled subscriptions can be skipped.', 'error');
+                $messageStack->add_session('Failed to skip payment for subscription #' . $_GET['saved_card_recurring_id'] . '. Only scheduled subscriptions can be skipped.', 'error');
             }
         }
         $redirectAfterAction = true;
