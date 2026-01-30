@@ -999,7 +999,7 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
         . ' scc.customers_id, sccr.products_id, sccr.products_name,'
         . ' sccr.amount, sccr.currency_code, sccr.billing_period, sccr.billing_frequency,'
         . ' sccr.total_billing_cycles, sccr.status, sccr.date_added AS date,'
-        . ' sccr.comments, sccr.domain,'
+        . ' sccr.next_payment_date, sccr.comments, sccr.domain,'
         . ' c.customers_firstname, c.customers_lastname, c.customers_email_address,'
         . ' scc.type AS vault_card_type, scc.last_digits AS vault_last_digits,'
         . ' sccr.saved_credit_card_id'
@@ -1018,9 +1018,10 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
             $row = $savedCardSubscriptions->fields;
             $row['subscription_type'] = 'savedcard';
             // Map saved card fields to match REST subscription structure
-            // Note: 'date' field is aliased from 'date_added' and serves as both creation date and next payment date for saved cards
+            // Note: 'date' field is aliased from 'date_added' for compatibility with code expecting creation date
             $row['date_added'] = $row['date'];
-            $row['next_payment_date'] = $row['date'];
+            // Use actual next_payment_date from DB if available, otherwise fall back to date_added
+            $row['next_payment_date'] = $row['next_payment_date'] ?? $row['date'];
             $row['sort_date'] = strtotime($row['date'] ?? 'now');
             // Saved card subscriptions don't have quantity field, always 1
             $row['products_quantity'] = 1;

@@ -61,6 +61,7 @@ namespace {
         '/sccr\.total_billing_cycles/',
         '/sccr\.status/',
         '/sccr\.date_added\s+AS\s+date/i',
+        '/sccr\.next_payment_date/',
         '/sccr\.comments/',
         '/sccr\.domain/',
     ];
