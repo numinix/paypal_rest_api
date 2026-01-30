@@ -64,7 +64,7 @@ class paypalr extends base
         return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.8';
+    protected const CURRENT_VERSION = '1.3.9';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -702,6 +702,35 @@ class paypalr extends base
                                 "DELETE FROM " . TABLE_ADMIN_PAGES . "
                                   WHERE page_key = 'paypalrSavedCardRecurring'
                                   LIMIT 1"
+                            );
+                        }
+                    }
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.9', '<'): //- Fall through from above
+                    // Add billing address and shipping information columns to saved_credit_cards_recurring table
+                    // This allows subscriptions to be independent with their own stored addresses
+                    if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+                        // Check if columns already exist before adding
+                        $check_columns = $db->Execute(
+                            "SHOW COLUMNS FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " 
+                             LIKE 'billing_name'"
+                        );
+                        
+                        if ($check_columns->EOF) {
+                            // Add billing address columns
+                            $db->Execute(
+                                "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " ADD COLUMN
+                                    billing_name VARCHAR(255) DEFAULT NULL AFTER api_type,
+                                 ADD COLUMN billing_company VARCHAR(255) DEFAULT NULL AFTER billing_name,
+                                 ADD COLUMN billing_street_address VARCHAR(255) DEFAULT NULL AFTER billing_company,
+                                 ADD COLUMN billing_suburb VARCHAR(255) DEFAULT NULL AFTER billing_street_address,
+                                 ADD COLUMN billing_city VARCHAR(255) DEFAULT NULL AFTER billing_suburb,
+                                 ADD COLUMN billing_state VARCHAR(255) DEFAULT NULL AFTER billing_city,
+                                 ADD COLUMN billing_postcode VARCHAR(255) DEFAULT NULL AFTER billing_state,
+                                 ADD COLUMN billing_country_id INT(11) DEFAULT NULL AFTER billing_postcode,
+                                 ADD COLUMN billing_country_code CHAR(2) DEFAULT NULL AFTER billing_country_id,
+                                 ADD COLUMN shipping_method VARCHAR(255) DEFAULT NULL AFTER billing_country_code,
+                                 ADD COLUMN shipping_cost DECIMAL(15,4) DEFAULT NULL AFTER shipping_method"
                             );
                         }
                     }
