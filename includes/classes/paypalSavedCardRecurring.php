@@ -402,7 +402,7 @@ $storedDefaults = array('payment_initiator' => 'MERCHANT', 'payment_type' => 'UN
 if (isset($options['stored_credential']) && is_array($options['stored_credential'])) {
 $storedDefaults = array_merge($storedDefaults, $options['stored_credential']);
 }
-$cardPayload['attributes']['stored_credential'] = $storedDefaults;
+$cardPayload['stored_credential'] = $storedDefaults;
 return $cardPayload;
 }
        protected function find_vault_card_for_payment(array $payment_details) {
