@@ -634,21 +634,36 @@ foreach ($todays_payments as $payment_id) {
             $log .= ' | Product is not a payment plan (skipped cancellation) ';
         }
 
+        // Determine max allowed failures (0 = unlimited retries)
+        // This constant can be defined in admin configuration
+        // Default to 0 (unlimited) if not defined
+        $max_fails_allowed = defined('SAVED_CREDIT_CARDS_RECURRING_MAX_FAILS_ALLOWED') 
+            ? (int)SAVED_CREDIT_CARDS_RECURRING_MAX_FAILS_ALLOWED 
+            : 0;
+        
         $next_retry_date = 'N/A';
-        if ($num_failed_payments >= SAVED_CREDIT_CARDS_RECURRING_MAX_FAILS_ALLOWED) {
+        $has_exceeded_max_attempts = ($max_fails_allowed > 0 && $num_failed_payments >= $max_fails_allowed);
+        
+        if ($has_exceeded_max_attempts) {
+            // Max attempts reached - notify customer and don't reschedule
             $message = sprintf(SAVED_CREDIT_CARDS_RECURRING_FAILURE_EMAIL, $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['products_name'], $payment_details['last_digits'], $payment_details['products_name']);
             if (!empty($payment_details['customers_email_address'])) {
                 zen_mail($payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['customers_email_address'], SAVED_CREDIT_CARDS_RECURRING_FAILURE_EMAIL_SUBJECT, $message, STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'recurring_failure');
             }
-            $log .= ' User has been notified after ' . $num_failed_payments . ' consecutive failed attempts to process card';
-        } else { //try again tomorrow
+            $log .= ' User has been notified after ' . $num_failed_payments . ' consecutive failed attempts to process card (max: ' . $max_fails_allowed . ')';
+        } else { 
+            // Try again tomorrow (either unlimited retries or haven't hit limit yet)
             $tomorrow = date('Y-m-d', mktime(0, 0, 0, date("m"), date("d") + 1, date("Y")));
             $metadata = $buildSubscriptionMetadata($payment_details, $payment_details['amount']);
             $rescheduleOrdersProductsId = $payment_details['original_orders_products_id'] ?? ($payment_details['orders_products_id'] ?? null);
             $paypalSavedCardRecurring->schedule_payment($payment_details['amount'], $tomorrow, $payment_details['saved_credit_card_id'], $rescheduleOrdersProductsId, 'Recurring payment automatically scheduled after failure.', $metadata); //try again tomorrow
             $message = sprintf(SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL, $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['products_name'], $payment_details['last_digits'], $payment_details['products_name']);
             zen_mail($payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['customers_email_address'], SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL_SUBJECT, $message, STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'recurring_failure');
-            $log .= ' Payment failed, rescheduled for tomorrow.  Customer has been notified.';
+            if ($max_fails_allowed > 0) {
+                $log .= ' Payment failed, rescheduled for tomorrow. Customer has been notified. (attempt ' . $num_failed_payments . ' of ' . $max_fails_allowed . ')';
+            } else {
+                $log .= ' Payment failed, rescheduled for tomorrow. Customer has been notified. (unlimited retries)';
+            }
             $next_retry_date = $tomorrow;
         }
         $results['failed'][] = array(
@@ -660,7 +675,7 @@ foreach ($todays_payments as $payment_id) {
             'gateway_code' => 'N/A',
             'next_retry_date' => $next_retry_date,
             'attempt_number' => $num_failed_payments,
-            'max_attempts' => SAVED_CREDIT_CARDS_RECURRING_MAX_FAILS_ALLOWED,
+            'max_attempts' => $max_fails_allowed > 0 ? $max_fails_allowed : 'Unlimited',
             'customer_notified' => 'Yes',
             'subscription_url' => 'N/A',
         );
