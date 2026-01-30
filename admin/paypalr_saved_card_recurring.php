@@ -189,7 +189,7 @@ switch ($action) {
                     $row['billing_frequency'] ?? '',
                     $row['total_billing_cycles'] ?? '',
                     $row['domain'] ?? '',
-                    $row['date'] ?? '',
+                    $row['next_payment_date'] ?? $row['date_added'] ?? '',
                     $row['card_type'] ?? '',
                     $row['last_digits'] ?? '',
                     $row['status'] ?? '',
