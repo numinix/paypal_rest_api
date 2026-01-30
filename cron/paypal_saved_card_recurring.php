@@ -654,9 +654,11 @@ foreach ($todays_payments as $payment_id) {
         } else { 
             // Try again tomorrow (either unlimited retries or haven't hit limit yet)
             $tomorrow = date('Y-m-d', mktime(0, 0, 0, date("m"), date("d") + 1, date("Y")));
-            $metadata = $buildSubscriptionMetadata($payment_details, $payment_details['amount']);
-            $rescheduleOrdersProductsId = $payment_details['original_orders_products_id'] ?? ($payment_details['orders_products_id'] ?? null);
-            $paypalSavedCardRecurring->schedule_payment($payment_details['amount'], $tomorrow, $payment_details['saved_credit_card_id'], $rescheduleOrdersProductsId, 'Recurring payment automatically scheduled after failure.', $metadata); //try again tomorrow
+            // Update the existing subscription's next payment date instead of creating a new one
+            $paypalSavedCardRecurring->update_payment_info($payment_id, array(
+                'next_payment_date' => $tomorrow,
+                'comments' => '  Recurring payment rescheduled after failure.  '
+            ));
             $message = sprintf(SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL, $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['products_name'], $payment_details['last_digits'], $payment_details['products_name']);
             zen_mail($payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['customers_email_address'], SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL_SUBJECT, $message, STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'recurring_failure');
             if ($max_fails_allowed > 0) {
