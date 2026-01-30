@@ -1137,7 +1137,9 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         return array('success' => false, 'error' => 'Validation failed');
                 }
                 $api_type = isset($payment_details['api_type']) ? $payment_details['api_type'] : '';
-                if (in_array($api_type, array('paypalr', 'rest'))) {
+                // Fallback: if api_type is not set but there's a vault card, it's a REST API subscription
+                $has_vault_card = isset($payment_details['paypal_vault_card']) && is_array($payment_details['paypal_vault_card']) && !empty($payment_details['paypal_vault_card']);
+                if (in_array($api_type, array('paypalr', 'rest')) || ($api_type === '' && $has_vault_card)) {
                         $result = $this->process_rest_payment($payment_details, $total_to_bill);
                         if ($result['success']) {
                                 $transaction_id = $result['transaction_id'];
