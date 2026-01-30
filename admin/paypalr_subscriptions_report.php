@@ -420,7 +420,7 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && ($typeFilter === 'all' || $
         $currencyCode = $row['currency_code'] ?? $defaultCurrency;
         $billingPeriod = $row['billing_period'] ?? '';
         $billingFrequency = (int)($row['billing_frequency'] ?? 0);
-        $nextBillingRaw = $row['date'] ?? '';
+        $nextBillingRaw = $row['next_payment_date'] ?? $row['date_added'] ?? '';
         $nextBillingSort = ($nextBillingRaw !== '' && strtotime($nextBillingRaw) !== false) ? strtotime($nextBillingRaw) : null;
         
         $annualValue = asr_compute_annual_value($amount, $billingPeriod, $billingFrequency);

@@ -113,7 +113,7 @@ function paypalr_upgrade_message(string $message, string $type = 'warning'): voi
         return;
     }
 
-    $messageStack->add_session('header', $message, $type);
+    $messageStack->add_session($message, $type);
 }
 
 function paypalr_upgrade_redirect_to_modules(): void

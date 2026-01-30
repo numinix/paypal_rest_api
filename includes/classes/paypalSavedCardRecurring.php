@@ -1646,20 +1646,15 @@ $payment_modules = new payment($_SESSION['payment']);
 // initiate order totals
 		$order_total_modules = new order_total();
 		$zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_BEFORE_ORDER_TOTALS_PROCESS');
-//NX mod: don't allow store credit for plans
-		if (!zen_product_in_category($products_id, CATEGORY_ID_PLANS) && !zen_product_in_category($products_id, CATEGORY_ID_CUSTOM_PLANS)) {
-//plans cannot be paid for with store credit (because a plan is essentially purchasing store credit.)
-//Initialize Store Credit
-			$store_credit = new storeCredit();
-//    define('MODULE_ORDER_TOTAL_SC_STATUS', 'true');
-//    define('STORE_CREDIT_AUTOMATICALLY_ADD', 'true');
-			$_SESSION['storecredit'] = $store_credit->retrieve_customer_credit($_SESSION['customer_id']);
-//BOF NX mod: don't allow store credit for plan payments
+		
+		// Initialize store credit to 0 by default
+		// Site-specific customizations (e.g., category-based restrictions, store credit modules)
+		// should be implemented via observers listening to NOTIFY_CHECKOUT_PROCESS_BEFORE_ORDER_TOTALS_PROCESS
+		// See docs/OBSERVER_CUSTOMIZATIONS.md for examples
+		if (!isset($_SESSION['storecredit'])) {
+			$_SESSION['storecredit'] = 0;
 		}
-		else {
-			$_SESSION['storecredit'] = 0; //in case it was set elsewhere.
-		}
-//EOF NX mod: don't allow store credit for plan payments
+		
 // process order totals
 		$order_totals = $order_total_modules->process();
 		$zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_TOTALS_PROCESS');
@@ -1940,17 +1935,32 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		return $message;
 	}
 /*
-*  Gets a list of paypal_saved_card_recurring_id's that are status scheduled and have a date of today or earlier. Used by cron.
+*  Gets a list of paypal_saved_card_recurring_id's that are status scheduled or failed and have a next_payment_date of today or earlier. Used by cron.
+*  Failed subscriptions are automatically retried on their next scheduled date.
 */
 	function get_scheduled_payments() {
 		global $db;
-		$sql = 'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE status = \'scheduled\' AND date <= \'' . date('Y-m-d') . '\'';
+		$today = date('Y-m-d');
+		$sql = 'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE (status = \'scheduled\' OR status = \'failed\') AND next_payment_date <= \'' . $today . '\'';
+		
+		// Debug logging for cron
+		if (!empty($_SESSION['in_cron'])) {
+			error_log('PayPal Cron - get_scheduled_payments() SQL: ' . $sql);
+			error_log('PayPal Cron - Looking for subscriptions with status IN (scheduled, failed) and next_payment_date <= ' . $today);
+		}
+		
 		$result = $db->Execute($sql);
 		$payments = array();
 		while (!$result->EOF) {
 			$payments[] = $result->fields['saved_credit_card_recurring_id'];
 			$result->MoveNext();
 		}
+		
+		// Debug logging for cron
+		if (!empty($_SESSION['in_cron'])) {
+			error_log('PayPal Cron - Found ' . count($payments) . ' payments to process (scheduled + failed): ' . implode(', ', $payments));
+		}
+		
 		return $payments;
 	}
 /*
@@ -2008,34 +2018,15 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 			$message .= 'New Status: ' . $status . "\n";
 			$message .= 'Comments: ' . $comments . "\n";
 
-                        // Add instructions for updating the payment card in plain text so it renders correctly for text emails
+                        // Add instructions for updating the payment card in plain text
+                        // Note: Customize the URL for your site's payment info page
                         $message .= "\n------------------------------------------------------------";
-                        $message .= "\nTo update your card go to Payment Info:";
-                        $message .= "\nhttps://www.numinix.com/account_saved_credit_cards.html";
+                        $message .= "\nTo update your card, please log in to your account";
+                        $message .= "\nand go to your payment methods page.";
                         $message .= "\n------------------------------------------------------------\n";
 
 			$this->notify_error('Subscription ' . $status . '  for ' . $details['customers_firstname'] . ' ' . $details['customers_lastname'], $message, 'warning', $details['customers_email_address'], $details['customers_firstname']);
-			zen_mail('Numinix Support', 'support@numinix.com', 'Saved Credit Cards Recurring (warning) - ' . 'Subscription ' . $status . '  for ' . $details['customers_firstname'] . ' ' . $details['customers_lastname'], nl2br($message), STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'default');
 		}
-		//BOF NX mod by Jeff
-		// elseif ($status == 'failed') {
-		// 	$details = $this->get_payment_details($paypal_saved_card_recurring_id);
-		// 	$message = 'Customer #:' . $customer_id . "\n";
-		// 	$message .= 'Customer name: ' . $details['customers_firstname'] . ' ' . $details['customers_lastname'] . "\n";
-		// 	$message .= 'Subscription #' . $paypal_saved_card_recurring_id . "\n";
-		// 	$message .= 'Product: ' . $details['products_name'] . "\n";
-		// 	$message .= 'New Status: ' . $status . "\n";
-		// 	$message .= 'Comments: ' . $comments . "\n";
-
-		// 	// Add new line for customer email with formatting
-		// 	$message .= "\n<div style='border-bottom: 1px solid #ccc; width: 100%;'></div>";
-		// 	$message .= "\n<div style='text-align: center; width:100%;font-size:20px;line-height:32px;'><p>To update your card go to</p> <a href='https://www.numinix.com/account_saved_credit_cards.html' style='text-decoration: none;background: #0686D4;color: #fff;padding:9px 20px;display: inline-block;margin-top:15px;border-radius: 4px;'>Payment Info</a></div>";
-		// 	$message .= "\n<div style='border-bottom: 1px solid #ccc; width: 100%;'></div>\n";
-
-		// 	zen_mail('Numinix Support', 'support@numinix.com', 'Subscription Payment Failed for ' . $details['customers_firstname'] . ' ' . $details['customers_lastname'], nl2br($message), STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'default');
-		// }
-
-		//EOF NX mod by Jeff
 	}
 	
 	/**
@@ -2190,10 +2181,10 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 
                 if (isset($data['order_id']) && isset($data['date'])) {
                         $sql .= ', recurring_orders_id = ' . (int) $data['order_id'];
-                        $sql .= ", date = '" . $this->escape_db_value($data['date']) . "'";
+                        $sql .= ", next_payment_date = '" . $this->escape_db_value($data['date']) . "'";
                 }
                 elseif (isset($data['date'])) {
-                        $sql .= ", date = '" . $this->escape_db_value($data['date']) . "'";
+                        $sql .= ", next_payment_date = '" . $this->escape_db_value($data['date']) . "'";
                 }
                 elseif (isset($data['saved_credit_card_id'])) {
                         $sql .= ', saved_credit_card_id = ' . (int) $data['saved_credit_card_id'];
@@ -2293,12 +2284,12 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 			return 0;
 		}
 
-		$result = $db->Execute('SELECT MAX(date) as last_success FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE " . $scopeSql . " AND status = 'complete'");
+		$result = $db->Execute('SELECT MAX(next_payment_date) as last_success FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE " . $scopeSql . " AND status = 'complete'");
 		$last_successful_payment = isset($result->fields['last_success']) ? $result->fields['last_success'] : '' ;
 
 		$sql = 'SELECT count(*) AS count FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE status = 'failed' AND " . $scopeSql;
 		if (!empty($last_successful_payment)) {
-			$sql .= " AND date > '" . $last_successful_payment . "'";
+			$sql .= " AND next_payment_date > '" . $last_successful_payment . "'";
 		}
 		$result = $db->Execute($sql);
 		return (int) $result->fields['count'];
@@ -2379,7 +2370,7 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 		global $db;
 		$subscriptions = $this->get_customer_subscriptions($customer_id, $domain);
 		foreach ($subscriptions as $subscription) {
-			if ((int) $subscription['products_id'] == (int) $product_id && $subscription['status'] == 'scheduled' && strtotime($subscription['date']) > strtotime('today')) {
+			if ((int) $subscription['products_id'] == (int) $product_id && $subscription['status'] == 'scheduled' && strtotime($subscription['next_payment_date']) > strtotime('today')) {
 				return $subscription['saved_credit_card_recurring_id'];
 			}
 		}
@@ -2570,9 +2561,18 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 		}
 	}
         function notify_error($subject, $message, $type = 'error', $customers_email = '', $customers_name = '') {
-                $to = MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL;
+                // Use configured notification email if available, otherwise fall back to store email
+                $to = '';
+                if (defined('MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL')) {
+                        $to = MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL;
+                } elseif (defined('STORE_OWNER_EMAIL_ADDRESS')) {
+                        $to = STORE_OWNER_EMAIL_ADDRESS;
+                } elseif (defined('EMAIL_FROM')) {
+                        $to = EMAIL_FROM;
+                }
+                
                 if ($type == 'error') {
-                        $message = "The Saved Credit Cards Recurring module encountered an error.  Please contact Numinix Support if you unsure of how to resolve this issue \n\n" . $message;
+                        $message = "The Saved Credit Cards Recurring module encountered an error.  Please contact your system administrator if you are unsure of how to resolve this issue \n\n" . $message;
                 }
 
                 $htmlMessage = nl2br($message);

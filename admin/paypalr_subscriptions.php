@@ -125,7 +125,7 @@ if ($action === 'update_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
 
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', ERROR_SUBSCRIPTION_MISSING_IDENTIFIER, 'error');
+        $messageStack->add_session(ERROR_SUBSCRIPTION_MISSING_IDENTIFIER, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -137,7 +137,7 @@ if ($action === 'update_subscription') {
         if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
             $status = strtolower(trim((string) zen_db_prepare_input($_POST['set_status'])));
             $paypalSavedCardRecurring->update_payment_status($subscriptionId, $status, 'Status updated by admin');
-            $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_STATUS_UPDATED, $subscriptionId, $status), 'success');
+            $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_STATUS_UPDATED, $subscriptionId, $status), 'success');
             zen_redirect($redirectUrl);
         }
         
@@ -159,7 +159,7 @@ if ($action === 'update_subscription') {
         if (!empty($updateData)) {
             $updateData['comments'] = 'Updated by admin via unified subscriptions page.';
             $paypalSavedCardRecurring->update_payment_info($subscriptionId, $updateData);
-            $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId), 'success');
+            $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId), 'success');
         }
         
         zen_redirect($redirectUrl);
@@ -179,7 +179,7 @@ if ($action === 'update_subscription') {
         // Validate date format (YYYY-MM-DD)
         $dateValidation = DateTime::createFromFormat('Y-m-d', $nextPaymentDate);
         if (!$dateValidation || $dateValidation->format('Y-m-d') !== $nextPaymentDate) {
-            $messageStack->add_session('header', ERROR_SUBSCRIPTION_INVALID_DATE_FORMAT, 'error');
+            $messageStack->add_session(ERROR_SUBSCRIPTION_INVALID_DATE_FORMAT, 'error');
             zen_redirect($redirectUrl);
         }
     }
@@ -206,7 +206,6 @@ if ($action === 'update_subscription') {
         );
         
         $messageStack->add_session(
-            'header',
             sprintf(SUCCESS_SUBSCRIPTION_STATUS_UPDATED, $subscriptionId, $status),
             'success'
         );
@@ -219,7 +218,7 @@ if ($action === 'update_subscription') {
     if ($rawAttributes !== '') {
         $decodedAttributes = json_decode($rawAttributes, true);
         if ($decodedAttributes === null && json_last_error() !== JSON_ERROR_NONE) {
-            $messageStack->add_session('header', ERROR_SUBSCRIPTION_INVALID_JSON, 'error');
+            $messageStack->add_session(ERROR_SUBSCRIPTION_INVALID_JSON, 'error');
             zen_redirect($redirectUrl);
         }
 
@@ -258,7 +257,7 @@ if ($action === 'update_subscription') {
     if ($selectedVaultId > 0) {
         $vaultRecord = VaultManager::getCustomerVaultCard($customersId, $selectedVaultId);
         if ($vaultRecord === null) {
-            $messageStack->add_session('header', ERROR_SUBSCRIPTION_VAULT_NOT_FOUND, 'error');
+            $messageStack->add_session(ERROR_SUBSCRIPTION_VAULT_NOT_FOUND, 'error');
             zen_redirect($redirectUrl);
         }
 
@@ -311,7 +310,6 @@ if ($action === 'update_subscription') {
     }
 
     $messageStack->add_session(
-        'header',
         sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId),
         'success'
     );
@@ -327,7 +325,7 @@ if ($action === 'cancel_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', ERROR_SUBSCRIPTION_CANCEL_MISSING_ID, 'error');
+        $messageStack->add_session(ERROR_SUBSCRIPTION_CANCEL_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -341,7 +339,7 @@ if ($action === 'cancel_subscription') {
             $paypalSavedCardRecurring->remove_group_pricing($subscription['customers_id'], $subscription['products_id']);
         }
         
-        $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
+        $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
         zen_redirect($redirectUrl);
     }
     
@@ -370,7 +368,7 @@ if ($action === 'cancel_subscription') {
         }
     }
     
-    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
+    $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -382,7 +380,7 @@ if ($action === 'suspend_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', ERROR_SUBSCRIPTION_SUSPEND_MISSING_ID, 'error');
+        $messageStack->add_session(ERROR_SUBSCRIPTION_SUSPEND_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -391,7 +389,7 @@ if ($action === 'suspend_subscription') {
         $paypalSavedCardRecurring = new paypalSavedCardRecurring();
         $paypalSavedCardRecurring->update_payment_status($subscriptionId, 'suspended', 'Suspended by admin');
         
-        $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_SUSPENDED, $subscriptionId), 'success');
+        $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_SUSPENDED, $subscriptionId), 'success');
         zen_redirect($redirectUrl);
     }
     
@@ -419,7 +417,7 @@ if ($action === 'suspend_subscription') {
         }
     }
     
-    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_SUSPENDED, $subscriptionId), 'success');
+    $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_SUSPENDED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -431,7 +429,7 @@ if ($action === 'reactivate_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', ERROR_SUBSCRIPTION_REACTIVATE_MISSING_ID, 'error');
+        $messageStack->add_session(ERROR_SUBSCRIPTION_REACTIVATE_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -445,7 +443,7 @@ if ($action === 'reactivate_subscription') {
             $paypalSavedCardRecurring->create_group_pricing($subscription['products_id'], $subscription['customers_id']);
         }
         
-        $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_REACTIVATED, $subscriptionId), 'success');
+        $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_REACTIVATED, $subscriptionId), 'success');
         zen_redirect($redirectUrl);
     }
     
@@ -473,7 +471,7 @@ if ($action === 'reactivate_subscription') {
         }
     }
     
-    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_REACTIVATED, $subscriptionId), 'success');
+    $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_REACTIVATED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -485,7 +483,7 @@ if ($action === 'skip_next_payment') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session($messageStackKey, 'Unable to skip payment. Missing identifier.', 'error');
+        $messageStack->add_session( 'Unable to skip payment. Missing identifier.', 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -494,9 +492,9 @@ if ($action === 'skip_next_payment') {
         $paypalSavedCardRecurring = new paypalSavedCardRecurring();
         $success = $paypalSavedCardRecurring->skip_next_payment($subscriptionId);
         if ($success) {
-            $messageStack->add_session('header', 'Payment skipped for subscription #' . $subscriptionId . '. The next billing date has been calculated and updated.', 'success');
+            $messageStack->add_session('Payment skipped for subscription #' . $subscriptionId . '. The next billing date has been calculated and updated.', 'success');
         } else {
-            $messageStack->add_session('header', 'Failed to skip payment for subscription #' . $subscriptionId . '. Only scheduled subscriptions can be skipped.', 'error');
+            $messageStack->add_session('Failed to skip payment for subscription #' . $subscriptionId . '. Only scheduled subscriptions can be skipped.', 'error');
         }
         zen_redirect($redirectUrl);
     }
@@ -509,13 +507,13 @@ if ($action === 'skip_next_payment') {
     );
     
     if ($subscription->RecordCount() == 0) {
-        $messageStack->add_session($messageStackKey, 'Subscription not found.', 'error');
+        $messageStack->add_session( 'Subscription not found.', 'error');
         zen_redirect($redirectUrl);
     }
     
     // Only allow skipping active subscriptions
     if ($subscription->fields['status'] !== 'active') {
-        $messageStack->add_session($messageStackKey, 'Only active subscriptions can be skipped.', 'error');
+        $messageStack->add_session( 'Only active subscriptions can be skipped.', 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -538,7 +536,7 @@ if ($action === 'skip_next_payment') {
     
     // Validate we have billing info
     if (!$billingPeriod || $billingFrequency <= 0) {
-        $messageStack->add_session($messageStackKey, 'Cannot skip payment: missing billing schedule information.', 'error');
+        $messageStack->add_session( 'Cannot skip payment: missing billing schedule information.', 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -591,7 +589,7 @@ if ($action === 'skip_next_payment') {
                 break;
         }
     } catch (Exception $e) {
-        $messageStack->add_session($messageStackKey, 'Failed to calculate next payment date.', 'error');
+        $messageStack->add_session( 'Failed to calculate next payment date.', 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -621,7 +619,7 @@ if ($action === 'skip_next_payment') {
         }
     }
     
-    $messageStack->add_session($messageStackKey, sprintf('Payment skipped for subscription #%d. Next payment date updated to %s.', $subscriptionId, $newDate), 'success');
+    $messageStack->add_session( sprintf('Payment skipped for subscription #%d. Next payment date updated to %s.', $subscriptionId, $newDate), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -632,7 +630,7 @@ if ($action === 'archive_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', ERROR_SUBSCRIPTION_ARCHIVE_MISSING_ID, 'error');
+        $messageStack->add_session(ERROR_SUBSCRIPTION_ARCHIVE_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -644,7 +642,7 @@ if ($action === 'archive_subscription') {
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
     
-    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_ARCHIVED, $subscriptionId), 'success');
+    $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_ARCHIVED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -655,7 +653,7 @@ if ($action === 'unarchive_subscription') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session('header', ERROR_SUBSCRIPTION_UNARCHIVE_MISSING_ID, 'error');
+        $messageStack->add_session(ERROR_SUBSCRIPTION_UNARCHIVE_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -667,7 +665,7 @@ if ($action === 'unarchive_subscription') {
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
     
-    $messageStack->add_session('header', sprintf(SUCCESS_SUBSCRIPTION_UNARCHIVED, $subscriptionId), 'success');
+    $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_UNARCHIVED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -998,8 +996,8 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
     $savedCardSql = 'SELECT sccr.saved_credit_card_recurring_id AS paypal_subscription_id,'
         . ' scc.customers_id, sccr.products_id, sccr.products_name,'
         . ' sccr.amount, sccr.currency_code, sccr.billing_period, sccr.billing_frequency,'
-        . ' sccr.total_billing_cycles, sccr.status, sccr.date,'
-        . ' sccr.comments, sccr.domain,'
+        . ' sccr.total_billing_cycles, sccr.status, sccr.date_added AS date,'
+        . ' sccr.next_payment_date, sccr.comments, sccr.domain,'
         . ' c.customers_firstname, c.customers_lastname, c.customers_email_address,'
         . ' scc.type AS vault_card_type, scc.last_digits AS vault_last_digits,'
         . ' sccr.saved_credit_card_id'
@@ -1018,9 +1016,10 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
             $row = $savedCardSubscriptions->fields;
             $row['subscription_type'] = 'savedcard';
             // Map saved card fields to match REST subscription structure
-            // Note: 'date' field serves as both creation date and next payment date for saved cards
+            // Note: 'date' field is aliased from 'date_added' for compatibility with code expecting creation date
             $row['date_added'] = $row['date'];
-            $row['next_payment_date'] = $row['date'];
+            // Use actual next_payment_date from DB if available, otherwise fall back to date_added
+            $row['next_payment_date'] = $row['next_payment_date'] ?? $row['date'];
             $row['sort_date'] = strtotime($row['date'] ?? 'now');
             // Saved card subscriptions don't have quantity field, always 1
             $row['products_quantity'] = 1;

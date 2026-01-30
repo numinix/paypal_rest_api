@@ -297,7 +297,9 @@ $parseRecurringDate = function ($value) {
 };
 
 $determineIntendedBillingDate = function (array $paymentDetails, array $attributes, $numFailedPayments) use ($parseRecurringDate) {
-    $scheduledDateString = isset($paymentDetails['date']) ? $paymentDetails['date'] : '';
+    // Use next_payment_date as the base to maintain the original billing schedule
+    // This ensures that if a payment is late, the billing schedule doesn't shift forward
+    $scheduledDateString = isset($paymentDetails['next_payment_date']) ? $paymentDetails['next_payment_date'] : '';
     $scheduledDate = $parseRecurringDate($scheduledDateString);
 
     if (isset($attributes['intended_billing_date']) && $attributes['intended_billing_date'] !== '') {
@@ -368,7 +370,38 @@ $advanceBillingCycle = function (DateTime $baseDate, array $attributes) {
     return $next;
 };
 
+// Debug: Check what subscriptions exist in the database
+$debug_sql = 'SELECT saved_credit_card_recurring_id, status, next_payment_date, products_name FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' ORDER BY saved_credit_card_recurring_id';
+$debug_result = $db->Execute($debug_sql);
+$debug_output = "\n=== DEBUG: All Subscriptions in Database ===\n";
+while (!$debug_result->EOF) {
+    $debug_output .= sprintf("ID: %d | Status: %s | Next Payment: %s | Product: %s\n", 
+        $debug_result->fields['saved_credit_card_recurring_id'],
+        $debug_result->fields['status'],
+        $debug_result->fields['next_payment_date'],
+        $debug_result->fields['products_name']
+    );
+    error_log('PayPal Cron - Subscription: ' . sprintf('ID: %d, Status: %s, Next Payment: %s, Product: %s', 
+        $debug_result->fields['saved_credit_card_recurring_id'],
+        $debug_result->fields['status'],
+        $debug_result->fields['next_payment_date'],
+        $debug_result->fields['products_name']
+    ));
+    $debug_result->MoveNext();
+}
+$debug_output .= "=== END DEBUG ===\n\n";
+print $debug_output;
+
 $todays_payments = $paypalSavedCardRecurring->get_scheduled_payments();
+
+if (count($todays_payments) == 0) {
+    $no_payments_msg = "No payments due for processing today (" . date('Y-m-d') . ") or earlier.\n";
+    $no_payments_msg .= "Subscriptions must have:\n";
+    $no_payments_msg .= "  - status = 'scheduled' OR status = 'failed' (failed subscriptions are automatically retried)\n";
+    $no_payments_msg .= "  - next_payment_date <= '" . date('Y-m-d') . "'\n";
+    print $no_payments_msg;
+    error_log('PayPal Cron - ' . $no_payments_msg);
+}
 
 $results = array('success' => array(), 'failed' => array(), 'skipped' => array());
 $total_collected = 0.0;
@@ -601,21 +634,36 @@ foreach ($todays_payments as $payment_id) {
             $log .= ' | Product is not a payment plan (skipped cancellation) ';
         }
 
+        // Determine max allowed failures (0 = unlimited retries)
+        // This constant can be defined in admin configuration
+        // Default to 0 (unlimited) if not defined
+        $max_fails_allowed = defined('SAVED_CREDIT_CARDS_RECURRING_MAX_FAILS_ALLOWED') 
+            ? (int)SAVED_CREDIT_CARDS_RECURRING_MAX_FAILS_ALLOWED 
+            : 0;
+        
         $next_retry_date = 'N/A';
-        if ($num_failed_payments >= SAVED_CREDIT_CARDS_RECURRING_MAX_FAILS_ALLOWED) {
+        $has_exceeded_max_attempts = ($max_fails_allowed > 0 && $num_failed_payments >= $max_fails_allowed);
+        
+        if ($has_exceeded_max_attempts) {
+            // Max attempts reached - notify customer and don't reschedule
             $message = sprintf(SAVED_CREDIT_CARDS_RECURRING_FAILURE_EMAIL, $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['products_name'], $payment_details['last_digits'], $payment_details['products_name']);
             if (!empty($payment_details['customers_email_address'])) {
                 zen_mail($payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['customers_email_address'], SAVED_CREDIT_CARDS_RECURRING_FAILURE_EMAIL_SUBJECT, $message, STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'recurring_failure');
             }
-            $log .= ' User has been notified after ' . $num_failed_payments . ' consecutive failed attempts to process card';
-        } else { //try again tomorrow
+            $log .= ' User has been notified after ' . $num_failed_payments . ' consecutive failed attempts to process card (max: ' . $max_fails_allowed . ')';
+        } else { 
+            // Try again tomorrow (either unlimited retries or haven't hit limit yet)
             $tomorrow = date('Y-m-d', mktime(0, 0, 0, date("m"), date("d") + 1, date("Y")));
             $metadata = $buildSubscriptionMetadata($payment_details, $payment_details['amount']);
             $rescheduleOrdersProductsId = $payment_details['original_orders_products_id'] ?? ($payment_details['orders_products_id'] ?? null);
             $paypalSavedCardRecurring->schedule_payment($payment_details['amount'], $tomorrow, $payment_details['saved_credit_card_id'], $rescheduleOrdersProductsId, 'Recurring payment automatically scheduled after failure.', $metadata); //try again tomorrow
             $message = sprintf(SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL, $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['products_name'], $payment_details['last_digits'], $payment_details['products_name']);
             zen_mail($payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['customers_email_address'], SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL_SUBJECT, $message, STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'recurring_failure');
-            $log .= ' Payment failed, rescheduled for tomorrow.  Customer has been notified.';
+            if ($max_fails_allowed > 0) {
+                $log .= ' Payment failed, rescheduled for tomorrow. Customer has been notified. (attempt ' . $num_failed_payments . ' of ' . $max_fails_allowed . ')';
+            } else {
+                $log .= ' Payment failed, rescheduled for tomorrow. Customer has been notified. (unlimited retries)';
+            }
             $next_retry_date = $tomorrow;
         }
         $results['failed'][] = array(
@@ -627,7 +675,7 @@ foreach ($todays_payments as $payment_id) {
             'gateway_code' => 'N/A',
             'next_retry_date' => $next_retry_date,
             'attempt_number' => $num_failed_payments,
-            'max_attempts' => SAVED_CREDIT_CARDS_RECURRING_MAX_FAILS_ALLOWED,
+            'max_attempts' => $max_fails_allowed > 0 ? $max_fails_allowed : 'Unlimited',
             'customer_notified' => 'Yes',
             'subscription_url' => 'N/A',
         );
@@ -683,16 +731,29 @@ $html_email = recurring_build_email_html(
 print $log;
 $_SESSION['in_cron'] = false;
 
-zen_mail(
-    MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL,
-    MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL,
-    'Recurring Payment Log',
-    $log,
-    STORE_NAME,
-    EMAIL_FROM,
-    array('EMAIL_MESSAGE_HTML' => $html_email),
-    'recurring_log'
-);
+// Determine email recipient with fallback chain
+$notification_email = '';
+if (defined('MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL')) {
+    $notification_email = MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL;
+} elseif (defined('STORE_OWNER_EMAIL_ADDRESS')) {
+    $notification_email = STORE_OWNER_EMAIL_ADDRESS;
+} elseif (defined('EMAIL_FROM')) {
+    $notification_email = EMAIL_FROM;
+}
+
+// Only send email if we have a valid recipient
+if (!empty($notification_email)) {
+    zen_mail(
+        $notification_email,
+        $notification_email,
+        'Recurring Payment Log',
+        $log,
+        STORE_NAME,
+        EMAIL_FROM,
+        array('EMAIL_MESSAGE_HTML' => $html_email),
+        'recurring_log'
+    );
+}
 
 $additional_failure_recipients = array();
 $raw_recipients = '';
