@@ -56,18 +56,21 @@ return $this->PayPalRestful;
                        require_once ($autoload);
                }
                if (class_exists('PayPalRestful\\Api\\PayPalRestfulApi')) {
-                       $clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENT_ID') ? MODULE_PAYMENT_PAYPALR_CLIENT_ID : '';
-                       $clientSecret = defined('MODULE_PAYMENT_PAYPALR_CLIENT_SECRET') ? MODULE_PAYMENT_PAYPALR_CLIENT_SECRET : '';
-                       $environment = '';
-                       if (defined('MODULE_PAYMENT_PAYPALR_ENVIRONMENT')) {
-                               $environment = MODULE_PAYMENT_PAYPALR_ENVIRONMENT;
+                       // Determine environment from MODULE_PAYMENT_PAYPALR_SERVER
+                       $environment = 'sandbox'; // Default to sandbox
+                       if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
+                               $environment = strtolower(MODULE_PAYMENT_PAYPALR_SERVER);
                        }
-                       elseif (defined('MODULE_PAYMENT_PAYPALR_MODE')) {
-                               $environment = MODULE_PAYMENT_PAYPALR_MODE;
+                       
+                       // Get the appropriate credentials based on environment
+                       if ($environment === 'live') {
+                               $clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : '';
+                               $clientSecret = defined('MODULE_PAYMENT_PAYPALR_SECRET_L') ? MODULE_PAYMENT_PAYPALR_SECRET_L : '';
+                       } else {
+                               $clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S') ? MODULE_PAYMENT_PAYPALR_CLIENTID_S : '';
+                               $clientSecret = defined('MODULE_PAYMENT_PAYPALR_SECRET_S') ? MODULE_PAYMENT_PAYPALR_SECRET_S : '';
                        }
-                       if ($environment === '') {
-                               $environment = 'sandbox';
-                       }
+                       
                        try {
                                $this->PayPalRestful = new PayPalRestful\Api\PayPalRestfulApi($environment, $clientId, $clientSecret);
                                return $this->PayPalRestful;

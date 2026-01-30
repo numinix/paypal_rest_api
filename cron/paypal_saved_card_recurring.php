@@ -18,6 +18,35 @@ if (file_exists($langFile)) {
     require_once $langFile;
 }
 
+// Define email constants if not already defined
+if (!defined('SAVED_CREDIT_CARDS_RECURRING_FAILURE_EMAIL')) {
+    define('SAVED_CREDIT_CARDS_RECURRING_FAILURE_EMAIL', 
+        'Dear %s,' . "\n\n" .
+        'We were unable to process your recurring payment for %s.' . "\n\n" .
+        'Card ending in: %s' . "\n\n" .
+        'After multiple attempts, we could not complete the transaction. Please update your payment method to continue your subscription for %s.' . "\n\n" .
+        'Thank you for your business.'
+    );
+}
+
+if (!defined('SAVED_CREDIT_CARDS_RECURRING_FAILURE_EMAIL_SUBJECT')) {
+    define('SAVED_CREDIT_CARDS_RECURRING_FAILURE_EMAIL_SUBJECT', 'Recurring Payment Failed - Action Required');
+}
+
+if (!defined('SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL')) {
+    define('SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL',
+        'Dear %s,' . "\n\n" .
+        'We encountered an issue processing your recurring payment for %s.' . "\n\n" .
+        'Card ending in: %s' . "\n\n" .
+        'We will automatically retry the payment. If the issue persists, please update your payment method for %s.' . "\n\n" .
+        'Thank you for your patience.'
+    );
+}
+
+if (!defined('SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL_SUBJECT')) {
+    define('SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL_SUBJECT', 'Recurring Payment Issue - Will Retry');
+}
+
 $_SESSION['in_cron'] = true; //setting to ensure that some functions that should onlt happen for new orders don't happen during cron.
 
 if (!function_exists('recurring_esc_html')) {
