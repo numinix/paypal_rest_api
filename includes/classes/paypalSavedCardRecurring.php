@@ -1647,7 +1647,15 @@ $payment_modules = new payment($_SESSION['payment']);
 		$order_total_modules = new order_total();
 		$zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_BEFORE_ORDER_TOTALS_PROCESS');
 //NX mod: don't allow store credit for plans
-		if (!zen_product_in_category($products_id, CATEGORY_ID_PLANS) && !zen_product_in_category($products_id, CATEGORY_ID_CUSTOM_PLANS)) {
+		$isPlansProduct = false;
+		if (defined('CATEGORY_ID_PLANS') && zen_product_in_category($products_id, CATEGORY_ID_PLANS)) {
+			$isPlansProduct = true;
+		}
+		if (defined('CATEGORY_ID_CUSTOM_PLANS') && zen_product_in_category($products_id, CATEGORY_ID_CUSTOM_PLANS)) {
+			$isPlansProduct = true;
+		}
+		
+		if (!$isPlansProduct) {
 //plans cannot be paid for with store credit (because a plan is essentially purchasing store credit.)
 //Initialize Store Credit
 			$store_credit = new storeCredit();
