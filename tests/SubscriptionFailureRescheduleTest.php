@@ -9,7 +9,7 @@ declare(strict_types=1);
  * 2. REST API subscriptions are properly detected even when api_type is not set
  * 3. The cron will retry on next run with the original billing date
  *
- * @copyright Copyright 2025 Zen Cart Development Team
+ * @copyright Copyright 2026 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
 
