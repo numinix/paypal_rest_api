@@ -371,9 +371,15 @@ $advanceBillingCycle = function (DateTime $baseDate, array $attributes) {
 // Debug: Check what subscriptions exist in the database
 $debug_sql = 'SELECT saved_credit_card_recurring_id, status, next_payment_date, products_name FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' ORDER BY saved_credit_card_recurring_id';
 $debug_result = $db->Execute($debug_sql);
-error_log('PayPal Cron - All subscriptions in database:');
+$debug_output = "\n=== DEBUG: All Subscriptions in Database ===\n";
 while (!$debug_result->EOF) {
-    error_log(sprintf('  ID: %d, Status: %s, Next Payment: %s, Product: %s', 
+    $debug_output .= sprintf("ID: %d | Status: %s | Next Payment: %s | Product: %s\n", 
+        $debug_result->fields['saved_credit_card_recurring_id'],
+        $debug_result->fields['status'],
+        $debug_result->fields['next_payment_date'],
+        $debug_result->fields['products_name']
+    );
+    error_log('PayPal Cron - Subscription: ' . sprintf('ID: %d, Status: %s, Next Payment: %s, Product: %s', 
         $debug_result->fields['saved_credit_card_recurring_id'],
         $debug_result->fields['status'],
         $debug_result->fields['next_payment_date'],
@@ -381,8 +387,19 @@ while (!$debug_result->EOF) {
     ));
     $debug_result->MoveNext();
 }
+$debug_output .= "=== END DEBUG ===\n\n";
+print $debug_output;
 
 $todays_payments = $paypalSavedCardRecurring->get_scheduled_payments();
+
+if (count($todays_payments) == 0) {
+    $no_payments_msg = "No payments scheduled for today (" . date('Y-m-d') . ") or earlier.\n";
+    $no_payments_msg .= "Subscriptions must have:\n";
+    $no_payments_msg .= "  - status = 'scheduled'\n";
+    $no_payments_msg .= "  - next_payment_date <= '" . date('Y-m-d') . "'\n";
+    print $no_payments_msg;
+    error_log('PayPal Cron - ' . $no_payments_msg);
+}
 
 $results = array('success' => array(), 'failed' => array(), 'skipped' => array());
 $total_collected = 0.0;
