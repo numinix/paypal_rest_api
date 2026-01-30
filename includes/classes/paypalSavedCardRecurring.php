@@ -2190,10 +2190,10 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 
                 if (isset($data['order_id']) && isset($data['date'])) {
                         $sql .= ', recurring_orders_id = ' . (int) $data['order_id'];
-                        $sql .= ", date = '" . $this->escape_db_value($data['date']) . "'";
+                        $sql .= ", next_payment_date = '" . $this->escape_db_value($data['date']) . "'";
                 }
                 elseif (isset($data['date'])) {
-                        $sql .= ", date = '" . $this->escape_db_value($data['date']) . "'";
+                        $sql .= ", next_payment_date = '" . $this->escape_db_value($data['date']) . "'";
                 }
                 elseif (isset($data['saved_credit_card_id'])) {
                         $sql .= ', saved_credit_card_id = ' . (int) $data['saved_credit_card_id'];
