@@ -2546,9 +2546,18 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 		}
 	}
         function notify_error($subject, $message, $type = 'error', $customers_email = '', $customers_name = '') {
-                $to = MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL;
+                // Use configured notification email if available, otherwise fall back to store email
+                $to = '';
+                if (defined('MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL')) {
+                        $to = MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL;
+                } elseif (defined('STORE_OWNER_EMAIL_ADDRESS')) {
+                        $to = STORE_OWNER_EMAIL_ADDRESS;
+                } elseif (defined('EMAIL_FROM')) {
+                        $to = EMAIL_FROM;
+                }
+                
                 if ($type == 'error') {
-                        $message = "The Saved Credit Cards Recurring module encountered an error.  Please contact Numinix Support if you unsure of how to resolve this issue \n\n" . $message;
+                        $message = "The Saved Credit Cards Recurring module encountered an error.  Please contact your system administrator if you are unsure of how to resolve this issue \n\n" . $message;
                 }
 
                 $htmlMessage = nl2br($message);
