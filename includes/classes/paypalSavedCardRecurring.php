@@ -295,7 +295,17 @@ return '';
 }
 protected function build_billing_address_from_card(array $cardDetails, array $vaultCard = array()) {
 if (isset($vaultCard['billing_address']) && is_array($vaultCard['billing_address']) && count($vaultCard['billing_address']) > 0) {
-return $vaultCard['billing_address'];
+// Use vault card's billing address but ensure country_code is present
+$billing = $vaultCard['billing_address'];
+// If country_code is missing, try to get it from customer's address
+if (!isset($billing['country_code']) || $billing['country_code'] === '') {
+$customers_id = $this->determineCardCustomerId($cardDetails);
+$countryCode = $this->getCustomerCountryCode($customers_id, $cardDetails);
+if ($countryCode !== '') {
+$billing['country_code'] = $countryCode;
+}
+}
+return $billing;
 }
 global $db;
 $customers_id = $this->determineCardCustomerId($cardDetails);
@@ -345,6 +355,33 @@ return array_filter($billing, function ($value) {
 return $value !== '' && $value !== null;
 });
 }
+
+protected function getCustomerCountryCode($customers_id, $cardDetails) {
+global $db;
+$addressId = isset($cardDetails['address_id']) ? (int) $cardDetails['address_id'] : 0;
+if ($addressId <= 0 && $customers_id > 0) {
+$customerLookup = $db->Execute("SELECT customers_default_address_id FROM " . TABLE_CUSTOMERS . " WHERE customers_id = " . (int) $customers_id . " LIMIT 1");
+if (!$customerLookup->EOF) {
+$addressId = (int) $customerLookup->fields['customers_default_address_id'];
+}
+}
+if ($addressId <= 0) {
+return '';
+}
+$address = $db->Execute("SELECT entry_country_id FROM " . TABLE_ADDRESS_BOOK . " WHERE address_book_id = " . (int) $addressId . " LIMIT 1");
+if ($address->EOF) {
+return '';
+}
+$countryCode = '';
+if (isset($address->fields['entry_country_id']) && (int) $address->fields['entry_country_id'] > 0) {
+$country = zen_get_countries($address->fields['entry_country_id']);
+if (isset($country['countries_iso_code_2'])) {
+$countryCode = $country['countries_iso_code_2'];
+}
+}
+return $countryCode;
+}
+
 protected function build_vault_payment_source(array $cardDetails, array $options = array()) {
 if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'buildVaultPaymentSource')) {
 return $this->paypalsavedcard->buildVaultPaymentSource($cardDetails, $options);
