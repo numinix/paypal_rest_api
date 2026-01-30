@@ -272,24 +272,40 @@ All new subscriptions created after this change:
 
 ## Database Upgrade
 
-### Running the Upgrade
+### Automatic Module Upgrade (v1.3.9)
 
-**Option 1: SQL Script**
+The database changes are integrated into the PayPal REST API module's upgrade mechanism:
+
+**File:** `includes/modules/payment/paypalr.php`
+- Module version bumped from 1.3.8 to **1.3.9**
+- Upgrade code in `tableCheckup()` method
+- Executes automatically when admin accesses any page after code deployment
+
+**Upgrade Process:**
+1. Module detects `MODULE_PAYMENT_PAYPALR_VERSION` < `1.3.9`
+2. Checks if columns already exist (idempotent)
+3. Adds billing address and shipping columns
+4. Updates module version to 1.3.9
+
+**Safety Features:**
+- Only runs if version upgrade is needed
+- Checks for existing columns before altering table
+- Follows same pattern as all previous version upgrades (1.3.1 - 1.3.8)
+
+### Manual Upgrade (Alternative)
+
+If you prefer to run the upgrade manually:
 ```bash
 mysql your_database < docs/upgrade_add_subscription_billing_addresses.sql
 ```
 
-**Option 2: PHP Init Script**
-The init script runs automatically on next admin page load:
-`admin/includes/init_includes/init_subscription_billing_address_upgrade.php`
-
 ### Verification
 ```sql
 SHOW COLUMNS FROM saved_credit_cards_recurring 
-WHERE Field LIKE 'billing_%';
+WHERE Field LIKE 'billing_%' OR Field LIKE 'shipping_%';
 ```
 
-Should show 9 new billing_* columns.
+Should show 9 billing_* columns and 2 shipping_* columns.
 
 ## Testing
 
