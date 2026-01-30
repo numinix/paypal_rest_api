@@ -656,8 +656,8 @@ foreach ($todays_payments as $payment_id) {
             $tomorrow = date('Y-m-d', mktime(0, 0, 0, date("m"), date("d") + 1, date("Y")));
             // Update the existing subscription's next payment date instead of creating a new one
             $paypalSavedCardRecurring->update_payment_info($payment_id, array(
-                'next_payment_date' => $tomorrow,
-                'comments' => '  Recurring payment rescheduled after failure.  '
+                'date' => $tomorrow,
+                'comments' => 'Recurring payment rescheduled after failure.'
             ));
             $message = sprintf(SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL, $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['products_name'], $payment_details['last_digits'], $payment_details['products_name']);
             zen_mail($payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['customers_email_address'], SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL_SUBJECT, $message, STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'recurring_failure');

@@ -23,7 +23,7 @@ if (file_exists($cronFile)) {
     $content = file_get_contents($cronFile);
     
     // Check that when payment fails, we update the existing subscription
-    $updatePattern = '/update_payment_info.*next_payment_date.*tomorrow/s';
+    $updatePattern = '/update_payment_info.*\'date\'.*tomorrow/s';
     $schedulePattern = '/schedule_payment.*tomorrow.*after failure/';
     
     if (preg_match($updatePattern, $content)) {
@@ -54,9 +54,10 @@ if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     
     // Look for the fallback logic that checks for vault card
-    if (strpos($content, 'has_vault_card') !== false &&
+    $hasVaultCardVar = 'has_vault_card';
+    if (strpos($content, $hasVaultCardVar) !== false &&
         strpos($content, 'paypal_vault_card') !== false &&
-        strpos($content, "api_type === '' && \$has_vault_card") !== false) {
+        strpos($content, 'api_type === \'\' && $' . $hasVaultCardVar) !== false) {
         echo "✓ REST API subscription detection includes vault card fallback\n";
     } else {
         echo "✗ Missing vault card fallback for REST API subscription detection\n";
