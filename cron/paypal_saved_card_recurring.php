@@ -652,21 +652,17 @@ foreach ($todays_payments as $payment_id) {
             }
             $log .= ' User has been notified after ' . $num_failed_payments . ' consecutive failed attempts to process card (max: ' . $max_fails_allowed . ')';
         } else { 
-            // Try again tomorrow (either unlimited retries or haven't hit limit yet)
-            $tomorrow = date('Y-m-d', mktime(0, 0, 0, date("m"), date("d") + 1, date("Y")));
-            // Update the existing subscription's next payment date instead of creating a new one
-            $paypalSavedCardRecurring->update_payment_info($payment_id, array(
-                'date' => $tomorrow,
-                'comments' => 'Recurring payment rescheduled after failure.'
-            ));
+            // Keep trying - subscription will be retried by cron on next run
+            // Do NOT update next_payment_date - this prevents subscription drift
+            // The next billing date is calculated from the original schedule, not from today
             $message = sprintf(SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL, $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['products_name'], $payment_details['last_digits'], $payment_details['products_name']);
             zen_mail($payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['customers_email_address'], SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL_SUBJECT, $message, STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'recurring_failure');
             if ($max_fails_allowed > 0) {
-                $log .= ' Payment failed, rescheduled for tomorrow. Customer has been notified. (attempt ' . $num_failed_payments . ' of ' . $max_fails_allowed . ')';
+                $log .= ' Payment failed, will retry on next cron run. Customer has been notified. (attempt ' . $num_failed_payments . ' of ' . $max_fails_allowed . ')';
             } else {
-                $log .= ' Payment failed, rescheduled for tomorrow. Customer has been notified. (unlimited retries)';
+                $log .= ' Payment failed, will retry on next cron run. Customer has been notified. (unlimited retries)';
             }
-            $next_retry_date = $tomorrow;
+            $next_retry_date = $payment_details['next_payment_date'];
         }
         $results['failed'][] = array(
             'subscription_id' => $payment_id,

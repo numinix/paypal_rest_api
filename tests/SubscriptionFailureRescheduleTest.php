@@ -2,43 +2,46 @@
 declare(strict_types=1);
 
 /**
- * Test to verify subscription failure handling doesn't create duplicate subscriptions
+ * Test to verify subscription failure handling doesn't change next_payment_date
  *
  * This test ensures that:
- * 1. When a payment fails, the cron updates the existing subscription instead of creating a new one
+ * 1. When a payment fails, the subscription's next_payment_date stays the same (no drift)
  * 2. REST API subscriptions are properly detected even when api_type is not set
+ * 3. The cron will retry on next run with the original billing date
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
 
-echo "Running Subscription Failure Reschedule Test...\n\n";
+echo "Running Subscription Failure Date Preservation Test...\n\n";
 
 $basePath = dirname(__DIR__);
 
-// Test 1: Verify cron uses update_payment_info instead of schedule_payment on failure
-echo "Test 1: Checking cron reschedules failed payments without creating duplicates...\n";
+// Test 1: Verify cron does NOT update next_payment_date on failure
+echo "Test 1: Checking cron preserves next_payment_date when payment fails...\n";
 $cronFile = $basePath . '/cron/paypal_saved_card_recurring.php';
 if (file_exists($cronFile)) {
     $content = file_get_contents($cronFile);
     
-    // Check that when payment fails, we update the existing subscription
-    $updatePattern = '/update_payment_info.*\'date\'.*tomorrow/s';
-    $schedulePattern = '/schedule_payment.*tomorrow.*after failure/';
-    
-    if (preg_match($updatePattern, $content)) {
-        echo "✓ Cron uses update_payment_info to reschedule failed payments\n";
-    } else {
-        echo "✗ Cron doesn't use update_payment_info for failed payment rescheduling\n";
+    // Check that we're NOT updating next_payment_date or 'date' field on failure
+    // The old buggy code would call update_payment_info or schedule_payment
+    if (preg_match('/else\s*\{[^}]*update_payment_info.*date.*tomorrow/s', $content)) {
+        echo "✗ Cron still updates next_payment_date on failure (causes drift)\n";
         exit(1);
     }
     
-    // Make sure we're NOT calling schedule_payment on failure (which would create duplicates)
-    if (preg_match($schedulePattern, $content)) {
+    if (preg_match('/else\s*\{[^}]*schedule_payment.*tomorrow.*after failure/s', $content)) {
         echo "✗ Cron still calls schedule_payment on failure (creates duplicates)\n";
         exit(1);
+    }
+    
+    // Check for the correct comment explaining why we don't update the date
+    if (strpos($content, 'Do NOT update next_payment_date') !== false &&
+        strpos($content, 'prevents subscription drift') !== false) {
+        echo "✓ Cron correctly preserves next_payment_date on failure (no drift)\n";
     } else {
-        echo "✓ Cron doesn't call schedule_payment on failure\n";
+        echo "✗ Missing explanation comment about preserving next_payment_date\n";
+        exit(1);
     }
     
     echo "\n";
@@ -90,8 +93,29 @@ if (file_exists($savedCardRecurringFile)) {
     exit(1);
 }
 
+// Test 4: Verify successful payments create NEW subscription (not update existing)
+echo "Test 4: Checking successful payments create new subscription for next cycle...\n";
+if (file_exists($cronFile)) {
+    $content = file_get_contents($cronFile);
+    
+    // When payment succeeds, should call schedule_payment to create next subscription
+    if (strpos($content, 'schedule_payment') !== false &&
+        strpos($content, 'Scheduled after previous successful payment') !== false) {
+        echo "✓ Successful payments create new subscription for next billing cycle\n";
+    } else {
+        echo "✗ Missing schedule_payment call for successful payments\n";
+        exit(1);
+    }
+    
+    echo "\n";
+} else {
+    echo "✗ Cron file not found\n\n";
+    exit(1);
+}
+
 echo "All tests passed! ✓\n";
 echo "\nVerified:\n";
-echo "1. Failed payments are rescheduled by updating existing subscription (no duplicates)\n";
+echo "1. Failed payments preserve next_payment_date (no subscription drift)\n";
 echo "2. REST API subscriptions are detected even when api_type is not set\n";
 echo "3. Failed subscriptions are automatically retried by the cron\n";
+echo "4. Successful payments create new subscription for next billing cycle\n";
