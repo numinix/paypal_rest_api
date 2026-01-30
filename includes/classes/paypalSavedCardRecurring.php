@@ -489,6 +489,12 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                        $this->notify_error('Missing PayPal REST payment source', 'No payment source was available for saved card recurring payment. Details: ' . json_encode($payment_details), 'error');
                        return array('success' => false, 'error' => 'Missing PayPal REST payment source');
                }
+               // Generate a unique PayPal-Request-Id for idempotency
+               // Use subscription ID and current date to create a deterministic but unique ID
+               $subscription_id = isset($payment_details['saved_credit_card_recurring_id']) ? $payment_details['saved_credit_card_recurring_id'] : 0;
+               $request_id = 'recurring_' . $subscription_id . '_' . date('Ymd');
+               $client->setPayPalRequestId($request_id);
+               error_log('PayPal REST Request-Id: ' . $request_id);
                // Log the request being sent for debugging
                error_log('PayPal REST createOrder request: ' . json_encode($request));
                try {
