@@ -56,18 +56,21 @@ return $this->PayPalRestful;
                        require_once ($autoload);
                }
                if (class_exists('PayPalRestful\\Api\\PayPalRestfulApi')) {
-                       $clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENT_ID') ? MODULE_PAYMENT_PAYPALR_CLIENT_ID : '';
-                       $clientSecret = defined('MODULE_PAYMENT_PAYPALR_CLIENT_SECRET') ? MODULE_PAYMENT_PAYPALR_CLIENT_SECRET : '';
-                       $environment = '';
-                       if (defined('MODULE_PAYMENT_PAYPALR_ENVIRONMENT')) {
-                               $environment = MODULE_PAYMENT_PAYPALR_ENVIRONMENT;
+                       // Determine environment from MODULE_PAYMENT_PAYPALR_SERVER
+                       $environment = 'sandbox'; // Default to sandbox
+                       if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
+                               $environment = strtolower(MODULE_PAYMENT_PAYPALR_SERVER);
                        }
-                       elseif (defined('MODULE_PAYMENT_PAYPALR_MODE')) {
-                               $environment = MODULE_PAYMENT_PAYPALR_MODE;
+                       
+                       // Get the appropriate credentials based on environment
+                       if ($environment === 'live') {
+                               $clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : '';
+                               $clientSecret = defined('MODULE_PAYMENT_PAYPALR_SECRET_L') ? MODULE_PAYMENT_PAYPALR_SECRET_L : '';
+                       } else {
+                               $clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S') ? MODULE_PAYMENT_PAYPALR_CLIENTID_S : '';
+                               $clientSecret = defined('MODULE_PAYMENT_PAYPALR_SECRET_S') ? MODULE_PAYMENT_PAYPALR_SECRET_S : '';
                        }
-                       if ($environment === '') {
-                               $environment = 'sandbox';
-                       }
+                       
                        try {
                                $this->PayPalRestful = new PayPalRestful\Api\PayPalRestfulApi($environment, $clientId, $clientSecret);
                                return $this->PayPalRestful;
@@ -291,7 +294,33 @@ return $year . '-' . $month;
 return '';
 }
 protected function build_billing_address_from_card(array $cardDetails, array $vaultCard = array()) {
+// First, check if we have billing address stored in the subscription record (cardDetails)
+// This is the proper way - subscriptions should have their own stored addresses
+if (isset($cardDetails['billing_country_code']) && $cardDetails['billing_country_code'] !== '') {
+// Use stored subscription billing address
+$billing = array(
+'address_line_1' => isset($cardDetails['billing_street_address']) ? trim($cardDetails['billing_street_address']) : '',
+'postal_code' => isset($cardDetails['billing_postcode']) ? trim($cardDetails['billing_postcode']) : '',
+'country_code' => trim($cardDetails['billing_country_code']),
+);
+
+if (isset($cardDetails['billing_suburb']) && $cardDetails['billing_suburb'] !== '') {
+$billing['address_line_2'] = trim($cardDetails['billing_suburb']);
+}
+if (isset($cardDetails['billing_city']) && $cardDetails['billing_city'] !== '') {
+$billing['admin_area_2'] = trim($cardDetails['billing_city']);
+}
+if (isset($cardDetails['billing_state']) && $cardDetails['billing_state'] !== '') {
+$billing['admin_area_1'] = trim($cardDetails['billing_state']);
+}
+
+error_log('PayPal: Using stored subscription billing_address: ' . json_encode($billing));
+return $billing;
+}
+
+// Fallback: check vault card billing_address (for backwards compatibility with old subscriptions)
 if (isset($vaultCard['billing_address']) && is_array($vaultCard['billing_address']) && count($vaultCard['billing_address']) > 0) {
+error_log('PayPal: WARNING - Using vault card billing_address (subscription should have its own stored address)');
 return $vaultCard['billing_address'];
 }
 global $db;
@@ -342,6 +371,33 @@ return array_filter($billing, function ($value) {
 return $value !== '' && $value !== null;
 });
 }
+
+protected function getCustomerCountryCode($customers_id, $cardDetails) {
+global $db;
+$addressId = isset($cardDetails['address_id']) ? (int) $cardDetails['address_id'] : 0;
+if ($addressId <= 0 && $customers_id > 0) {
+$customerLookup = $db->Execute("SELECT customers_default_address_id FROM " . TABLE_CUSTOMERS . " WHERE customers_id = " . (int) $customers_id . " LIMIT 1");
+if (!$customerLookup->EOF) {
+$addressId = (int) $customerLookup->fields['customers_default_address_id'];
+}
+}
+if ($addressId <= 0) {
+return '';
+}
+$address = $db->Execute("SELECT entry_country_id FROM " . TABLE_ADDRESS_BOOK . " WHERE address_book_id = " . (int) $addressId . " LIMIT 1");
+if ($address->EOF) {
+return '';
+}
+$countryCode = '';
+if (isset($address->fields['entry_country_id']) && (int) $address->fields['entry_country_id'] > 0) {
+$country = zen_get_countries($address->fields['entry_country_id']);
+if (isset($country['countries_iso_code_2'])) {
+$countryCode = $country['countries_iso_code_2'];
+}
+}
+return $countryCode;
+}
+
 protected function build_vault_payment_source(array $cardDetails, array $options = array()) {
 if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'buildVaultPaymentSource')) {
 return $this->paypalsavedcard->buildVaultPaymentSource($cardDetails, $options);
@@ -402,7 +458,7 @@ $storedDefaults = array('payment_initiator' => 'MERCHANT', 'payment_type' => 'UN
 if (isset($options['stored_credential']) && is_array($options['stored_credential'])) {
 $storedDefaults = array_merge($storedDefaults, $options['stored_credential']);
 }
-$cardPayload['attributes']['stored_credential'] = $storedDefaults;
+$cardPayload['stored_credential'] = $storedDefaults;
 return $cardPayload;
 }
        protected function find_vault_card_for_payment(array $payment_details) {
@@ -473,6 +529,7 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                $amount = number_format((float) $total_to_bill, 2, '.', '');
                $request = array('intent' => $intent, 'purchase_units' => array(array('amount' => array('currency_code' => $currency, 'value' => $amount))));
 $cardPayload = $this->build_vault_payment_source($payment_details, array('stored_credential' => array('payment_type' => 'RECURRING')));
+               error_log('PayPal REST cardPayload: ' . json_encode($cardPayload));
                if (!empty($cardPayload) && isset($cardPayload['vault_id'])) {
                        $request['payment_source'] = array('card' => $cardPayload);
                        $credential_id = $cardPayload['vault_id'];
@@ -480,18 +537,30 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                elseif (strlen($credential_id) > 0) {
                        $request['payment_source'] = array('token' => array('id' => $credential_id, 'type' => 'BILLING_AGREEMENT'));
                }
+               error_log('PayPal REST final credential_id: ' . $credential_id);
                if (!isset($request['payment_source'])) {
-                       $this->notify_error('Missing PayPal REST payment source', 'No payment source was available for saved card recurring payment #' . $paypal_saved_card_recurring_id . '. Details: ' . json_encode($payment_details), 'error');
+                       $this->notify_error('Missing PayPal REST payment source', 'No payment source was available for saved card recurring payment. Details: ' . json_encode($payment_details), 'error');
                        return array('success' => false, 'error' => 'Missing PayPal REST payment source');
                }
+               // Generate a unique PayPal-Request-Id for idempotency
+               // Use subscription ID and current date to create a deterministic but unique ID
+               $subscription_id = isset($payment_details['saved_credit_card_recurring_id']) ? $payment_details['saved_credit_card_recurring_id'] : 0;
+               $request_id = 'recurring_' . $subscription_id . '_' . date('Ymd');
+               $client->setPayPalRequestId($request_id);
+               error_log('PayPal REST Request-Id: ' . $request_id);
+               // Log the request being sent for debugging
+               error_log('PayPal REST createOrder request: ' . json_encode($request));
                try {
                        $create_response = $this->call_paypal_rest_method($client, 'createOrder', array($request));
                }
                catch (Exception $e) {
+                       error_log('PayPal REST createOrder exception: ' . $e->getMessage());
                        $this->notify_error('PayPal REST order creation failed', 'PayPal REST threw an exception while creating an order. Details: ' . $e->getMessage(), 'error');
                        return array('success' => false, 'error' => $e->getMessage());
                }
+               error_log('PayPal REST createOrder raw response: ' . json_encode($create_response));
                $normalized_create = $this->normalize_rest_response($create_response);
+               error_log('PayPal REST createOrder normalized response: ' . json_encode($normalized_create));
                $order_id = isset($normalized_create['id']) ? $normalized_create['id'] : '';
                if (strlen($order_id) == 0) {
                        $this->notify_error('PayPal REST order creation failed', 'PayPal REST order creation did not return an order id. Response: ' . json_encode($normalized_create), 'error');
@@ -670,6 +739,26 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         array('fieldName' => 'domain', 'value' => $metadata['domain'], 'type' => 'string'),
                         array('fieldName' => 'subscription_attributes_json', 'value' => $metadata['subscription_attributes_json'], 'type' => 'string'),
                 );
+                
+                // Add billing address fields if they exist
+                $billingAddressFields = array('billing_name', 'billing_company', 'billing_street_address', 'billing_suburb',
+                                               'billing_city', 'billing_state', 'billing_postcode', 'billing_country_id', 'billing_country_code');
+                foreach ($billingAddressFields as $field) {
+                        if (isset($metadata[$field]) && $metadata[$field] !== null && $metadata[$field] !== '') {
+                                $type = ($field === 'billing_country_id') ? 'integer' : 'string';
+                                $sql_data_array[] = array('fieldName' => $field, 'value' => $metadata[$field], 'type' => $type);
+                        }
+                }
+                
+                // Add shipping fields if they exist
+                $shippingFields = array('shipping_method', 'shipping_cost');
+                foreach ($shippingFields as $field) {
+                        if (isset($metadata[$field]) && $metadata[$field] !== null && $metadata[$field] !== '') {
+                                $type = ($field === 'shipping_cost') ? 'string' : 'string'; // Decimal stored as string
+                                $sql_data_array[] = array('fieldName' => $field, 'value' => $metadata[$field], 'type' => $type);
+                        }
+                }
+                
                 $db->perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, $sql_data_array);
                 $paypal_saved_card_recurring_id = $db->insert_ID();
                 return $paypal_saved_card_recurring_id;
@@ -755,6 +844,19 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         'domain' => null,
                         'subscription_attributes' => array(),
                         'subscription_attributes_json' => '',
+                        // Billing address fields
+                        'billing_name' => null,
+                        'billing_company' => null,
+                        'billing_street_address' => null,
+                        'billing_suburb' => null,
+                        'billing_city' => null,
+                        'billing_state' => null,
+                        'billing_postcode' => null,
+                        'billing_country_id' => null,
+                        'billing_country_code' => null,
+                        // Shipping fields
+                        'shipping_method' => null,
+                        'shipping_cost' => null,
                 );
 
                 $map = array(
@@ -766,6 +868,19 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         'billing_frequency' => array('billing_frequency', 'billingfrequency'),
                         'total_billing_cycles' => array('total_billing_cycles', 'totalbillingcycles'),
                         'domain' => array('domain'),
+                        // Billing address field mappings
+                        'billing_name' => array('billing_name'),
+                        'billing_company' => array('billing_company'),
+                        'billing_street_address' => array('billing_street_address'),
+                        'billing_suburb' => array('billing_suburb'),
+                        'billing_city' => array('billing_city'),
+                        'billing_state' => array('billing_state'),
+                        'billing_postcode' => array('billing_postcode'),
+                        'billing_country_id' => array('billing_country_id'),
+                        'billing_country_code' => array('billing_country_code'),
+                        // Shipping field mappings
+                        'shipping_method' => array('shipping_method'),
+                        'shipping_cost' => array('shipping_cost'),
                 );
 
                 foreach ($map as $target => $sources) {
@@ -1137,7 +1252,9 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         return array('success' => false, 'error' => 'Validation failed');
                 }
                 $api_type = isset($payment_details['api_type']) ? $payment_details['api_type'] : '';
-                if (in_array($api_type, array('paypalr', 'rest'))) {
+                // Fallback: if api_type is not set but there's a vault card, it's a REST API subscription
+                $has_vault_card = isset($payment_details['paypal_vault_card']) && is_array($payment_details['paypal_vault_card']) && !empty($payment_details['paypal_vault_card']);
+                if (in_array($api_type, array('paypalr', 'rest')) || ($api_type === '' && $has_vault_card)) {
                         $result = $this->process_rest_payment($payment_details, $total_to_bill);
                         if ($result['success']) {
                                 $transaction_id = $result['transaction_id'];
@@ -2245,6 +2362,19 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                                 $snapshotUpdates[] = $stringKey . " = '" . $this->escape_db_value($metadata[$stringKey]) . "'";
                                 unset($metadata[$stringKey]);
                         }
+                }
+                
+                // Handle billing address fields
+                foreach (array('billing_name', 'billing_company', 'billing_street_address', 'billing_suburb',
+                                'billing_city', 'billing_state', 'billing_postcode', 'billing_country_code') as $addressKey) {
+                        if (isset($data[$addressKey])) {
+                                $snapshotUpdates[] = $addressKey . " = '" . $this->escape_db_value($data[$addressKey]) . "'";
+                        }
+                }
+                
+                // Handle billing_country_id (integer)
+                if (isset($data['billing_country_id']) && $data['billing_country_id'] !== null && $data['billing_country_id'] !== '') {
+                        $snapshotUpdates[] = 'billing_country_id = ' . (int) $data['billing_country_id'];
                 }
 
                 if (isset($metadata['subscription_attributes_json']) && $metadata['subscription_attributes_json'] !== '') {
