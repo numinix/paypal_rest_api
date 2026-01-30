@@ -474,7 +474,6 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                $request = array('intent' => $intent, 'purchase_units' => array(array('amount' => array('currency_code' => $currency, 'value' => $amount))));
 $cardPayload = $this->build_vault_payment_source($payment_details, array('stored_credential' => array('payment_type' => 'RECURRING')));
                error_log('PayPal REST cardPayload: ' . json_encode($cardPayload));
-               error_log('PayPal REST credential_id: ' . $credential_id);
                if (!empty($cardPayload) && isset($cardPayload['vault_id'])) {
                        $request['payment_source'] = array('card' => $cardPayload);
                        $credential_id = $cardPayload['vault_id'];
@@ -482,6 +481,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                elseif (strlen($credential_id) > 0) {
                        $request['payment_source'] = array('token' => array('id' => $credential_id, 'type' => 'BILLING_AGREEMENT'));
                }
+               error_log('PayPal REST final credential_id: ' . $credential_id);
                if (!isset($request['payment_source'])) {
                        $this->notify_error('Missing PayPal REST payment source', 'No payment source was available for saved card recurring payment. Details: ' . json_encode($payment_details), 'error');
                        return array('success' => false, 'error' => 'Missing PayPal REST payment source');
