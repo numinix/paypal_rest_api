@@ -294,44 +294,34 @@ return $year . '-' . $month;
 return '';
 }
 protected function build_billing_address_from_card(array $cardDetails, array $vaultCard = array()) {
-error_log('PayPal: build_billing_address_from_card called with vaultCard: ' . json_encode($vaultCard));
-error_log('PayPal: cardDetails keys: ' . implode(', ', array_keys($cardDetails)));
-if (isset($vaultCard['billing_address']) && is_array($vaultCard['billing_address']) && count($vaultCard['billing_address']) > 0) {
-// Use vault card's billing address but ensure country_code is present
-$billing = $vaultCard['billing_address'];
-error_log('PayPal: Using vault billing_address: ' . json_encode($billing));
-// If country_code is missing, try to get it from customer's address
-if (!isset($billing['country_code']) || $billing['country_code'] === '') {
-error_log('PayPal: country_code missing, attempting to retrieve from customer address');
-$customers_id = $this->determineCardCustomerId($cardDetails);
-error_log('PayPal: customers_id: ' . $customers_id);
-$countryCode = $this->getCustomerCountryCode($customers_id, $cardDetails);
-error_log('PayPal: Retrieved country_code: ' . $countryCode);
-if ($countryCode !== '') {
-$billing['country_code'] = $countryCode;
-error_log('PayPal: Added country_code to billing_address: ' . $countryCode);
-} else {
-// If we still can't get country code, try to infer from state/province
-if (isset($billing['admin_area_1'])) {
-$stateCode = $billing['admin_area_1'];
-// Canadian provinces
-if (in_array($stateCode, array('AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT'))) {
-$billing['country_code'] = 'CA';
-error_log('PayPal: Inferred country_code=CA from province: ' . $stateCode);
+// First, check if we have billing address stored in the subscription record (cardDetails)
+// This is the proper way - subscriptions should have their own stored addresses
+if (isset($cardDetails['billing_country_code']) && $cardDetails['billing_country_code'] !== '') {
+// Use stored subscription billing address
+$billing = array(
+'address_line_1' => isset($cardDetails['billing_street_address']) ? trim($cardDetails['billing_street_address']) : '',
+'postal_code' => isset($cardDetails['billing_postcode']) ? trim($cardDetails['billing_postcode']) : '',
+'country_code' => trim($cardDetails['billing_country_code']),
+);
+
+if (isset($cardDetails['billing_suburb']) && $cardDetails['billing_suburb'] !== '') {
+$billing['address_line_2'] = trim($cardDetails['billing_suburb']);
 }
-// US states (just checking a few common ones as example)
-elseif (in_array($stateCode, array('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'))) {
-$billing['country_code'] = 'US';
-error_log('PayPal: Inferred country_code=US from state: ' . $stateCode);
+if (isset($cardDetails['billing_city']) && $cardDetails['billing_city'] !== '') {
+$billing['admin_area_2'] = trim($cardDetails['billing_city']);
 }
+if (isset($cardDetails['billing_state']) && $cardDetails['billing_state'] !== '') {
+$billing['admin_area_1'] = trim($cardDetails['billing_state']);
 }
-if (!isset($billing['country_code']) || $billing['country_code'] === '') {
-error_log('PayPal: ERROR - Still no country_code, this will cause PayPal API error');
-}
-}
-}
-error_log('PayPal: Returning billing_address: ' . json_encode($billing));
+
+error_log('PayPal: Using stored subscription billing_address: ' . json_encode($billing));
 return $billing;
+}
+
+// Fallback: check vault card billing_address (for backwards compatibility with old subscriptions)
+if (isset($vaultCard['billing_address']) && is_array($vaultCard['billing_address']) && count($vaultCard['billing_address']) > 0) {
+error_log('PayPal: WARNING - Using vault card billing_address (subscription should have its own stored address)');
+return $vaultCard['billing_address'];
 }
 global $db;
 $customers_id = $this->determineCardCustomerId($cardDetails);
@@ -749,6 +739,17 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         array('fieldName' => 'domain', 'value' => $metadata['domain'], 'type' => 'string'),
                         array('fieldName' => 'subscription_attributes_json', 'value' => $metadata['subscription_attributes_json'], 'type' => 'string'),
                 );
+                
+                // Add billing address fields if they exist
+                $billingAddressFields = array('billing_name', 'billing_company', 'billing_street_address', 'billing_suburb',
+                                               'billing_city', 'billing_state', 'billing_postcode', 'billing_country_id', 'billing_country_code');
+                foreach ($billingAddressFields as $field) {
+                        if (isset($metadata[$field]) && $metadata[$field] !== null && $metadata[$field] !== '') {
+                                $type = ($field === 'billing_country_id') ? 'integer' : 'string';
+                                $sql_data_array[] = array('fieldName' => $field, 'value' => $metadata[$field], 'type' => $type);
+                        }
+                }
+                
                 $db->perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, $sql_data_array);
                 $paypal_saved_card_recurring_id = $db->insert_ID();
                 return $paypal_saved_card_recurring_id;
@@ -834,6 +835,16 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         'domain' => null,
                         'subscription_attributes' => array(),
                         'subscription_attributes_json' => '',
+                        // Billing address fields
+                        'billing_name' => null,
+                        'billing_company' => null,
+                        'billing_street_address' => null,
+                        'billing_suburb' => null,
+                        'billing_city' => null,
+                        'billing_state' => null,
+                        'billing_postcode' => null,
+                        'billing_country_id' => null,
+                        'billing_country_code' => null,
                 );
 
                 $map = array(
@@ -845,6 +856,16 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         'billing_frequency' => array('billing_frequency', 'billingfrequency'),
                         'total_billing_cycles' => array('total_billing_cycles', 'totalbillingcycles'),
                         'domain' => array('domain'),
+                        // Billing address field mappings
+                        'billing_name' => array('billing_name'),
+                        'billing_company' => array('billing_company'),
+                        'billing_street_address' => array('billing_street_address'),
+                        'billing_suburb' => array('billing_suburb'),
+                        'billing_city' => array('billing_city'),
+                        'billing_state' => array('billing_state'),
+                        'billing_postcode' => array('billing_postcode'),
+                        'billing_country_id' => array('billing_country_id'),
+                        'billing_country_code' => array('billing_country_code'),
                 );
 
                 foreach ($map as $target => $sources) {

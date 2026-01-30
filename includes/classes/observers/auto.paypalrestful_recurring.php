@@ -127,7 +127,11 @@ class zcObserverPaypalrestfulRecurring
         global $db, $zco_notifier;
 
         $orderInfo = $db->Execute(
-            "SELECT customers_id, currency, currency_value
+            "SELECT customers_id, currency, currency_value,
+                    billing_name, billing_company,
+                    billing_street_address, billing_suburb, billing_city,
+                    billing_state, billing_postcode, billing_country,
+                    delivery_country
                FROM " . TABLE_ORDERS . "
               WHERE orders_id = " . $ordersId . "
               LIMIT 1"
@@ -142,7 +146,34 @@ class zcObserverPaypalrestfulRecurring
         $currency = (string)($orderInfo->fields['currency'] ?? (defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : ''));
         $currencyValue = (float)($orderInfo->fields['currency_value'] ?? 1.0);
         
+        // Extract billing address from order for subscription storage
+        $billingAddress = array(
+            'billing_name' => (string)($orderInfo->fields['billing_name'] ?? ''),
+            'billing_company' => (string)($orderInfo->fields['billing_company'] ?? ''),
+            'billing_street_address' => (string)($orderInfo->fields['billing_street_address'] ?? ''),
+            'billing_suburb' => (string)($orderInfo->fields['billing_suburb'] ?? ''),
+            'billing_city' => (string)($orderInfo->fields['billing_city'] ?? ''),
+            'billing_state' => (string)($orderInfo->fields['billing_state'] ?? ''),
+            'billing_postcode' => (string)($orderInfo->fields['billing_postcode'] ?? ''),
+            'billing_country' => (string)($orderInfo->fields['billing_country'] ?? ''),
+        );
+        
+        // Get billing country ID and ISO code
+        if (!empty($billingAddress['billing_country'])) {
+            $countryQuery = $db->Execute(
+                "SELECT countries_id, countries_iso_code_2
+                   FROM " . TABLE_COUNTRIES . "
+                  WHERE countries_name = '" . zen_db_input($billingAddress['billing_country']) . "'
+                  LIMIT 1"
+            );
+            if (!$countryQuery->EOF) {
+                $billingAddress['billing_country_id'] = (int)$countryQuery->fields['countries_id'];
+                $billingAddress['billing_country_code'] = (string)$countryQuery->fields['countries_iso_code_2'];
+            }
+        }
+        
         $this->log->write("    Customer ID: $customersId, Currency: $currency, Currency Value: $currencyValue");
+        $this->log->write("    Billing Address: " . Logger::logJSON($billingAddress));
 
         $products = $db->Execute(
             "SELECT orders_products_id, products_id, products_name, products_quantity, final_price
@@ -215,7 +246,7 @@ class zcObserverPaypalrestfulRecurring
                     $savedCreditCardId,
                     $ordersProductsId,
                     'Subscription created from order #' . $ordersId,
-                    [
+                    array_merge([
                         'products_id' => (int)$products->fields['products_id'],
                         'products_name' => (string)$products->fields['products_name'],
                         'currency_code' => $currency,
@@ -223,7 +254,7 @@ class zcObserverPaypalrestfulRecurring
                         'billing_frequency' => $subscriptionAttributes['billing_frequency'],
                         'total_billing_cycles' => $subscriptionAttributes['total_billing_cycles'],
                         'subscription_attributes' => $attributeMap,
-                    ]
+                    ], $billingAddress) // Include billing address from order
                 );
                 
                 if ($subscriptionId > 0) {
