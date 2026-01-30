@@ -2363,6 +2363,19 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                                 unset($metadata[$stringKey]);
                         }
                 }
+                
+                // Handle billing address fields
+                foreach (array('billing_name', 'billing_company', 'billing_street_address', 'billing_suburb',
+                                'billing_city', 'billing_state', 'billing_postcode', 'billing_country_code') as $addressKey) {
+                        if (isset($data[$addressKey])) {
+                                $snapshotUpdates[] = $addressKey . " = '" . $this->escape_db_value($data[$addressKey]) . "'";
+                        }
+                }
+                
+                // Handle billing_country_id (integer)
+                if (isset($data['billing_country_id']) && $data['billing_country_id'] !== null && $data['billing_country_id'] !== '') {
+                        $snapshotUpdates[] = 'billing_country_id = ' . (int) $data['billing_country_id'];
+                }
 
                 if (isset($metadata['subscription_attributes_json']) && $metadata['subscription_attributes_json'] !== '') {
                         $snapshotUpdates[] = "subscription_attributes_json = '" . $this->escape_db_value($metadata['subscription_attributes_json']) . "'";

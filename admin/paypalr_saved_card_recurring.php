@@ -140,6 +140,37 @@ switch ($action) {
         }
         $redirectAfterAction = true;
         break;
+    
+    case 'update_billing_address':
+        if (isset($_POST['saved_card_recurring_id']) && $_POST['saved_card_recurring_id'] > 0) {
+            $addressData = array();
+            $addressFields = array('billing_name', 'billing_company', 'billing_street_address', 'billing_suburb',
+                                    'billing_city', 'billing_state', 'billing_postcode', 'billing_country_code');
+            
+            foreach ($addressFields as $field) {
+                if (isset($_POST[$field])) {
+                    $addressData[$field] = zen_db_prepare_input($_POST[$field]);
+                }
+            }
+            
+            // Get country ID from country code if provided
+            if (!empty($addressData['billing_country_code'])) {
+                $countryQuery = $db->Execute(
+                    "SELECT countries_id FROM " . TABLE_COUNTRIES . "
+                     WHERE countries_iso_code_2 = '" . zen_db_input($addressData['billing_country_code']) . "'
+                     LIMIT 1"
+                );
+                if (!$countryQuery->EOF) {
+                    $addressData['billing_country_id'] = (int)$countryQuery->fields['countries_id'];
+                }
+            }
+            
+            $addressData['comments'] = '  Billing address updated by admin  ';
+            $paypalSavedCardRecurring->update_payment_info($_POST['saved_card_recurring_id'], $addressData);
+            $messageStack->add_session('Billing address updated for subscription #' . $_POST['saved_card_recurring_id'], 'success');
+        }
+        $redirectAfterAction = true;
+        break;
         
     case 'export_csv':
         // Build query with filters
@@ -645,6 +676,101 @@ function scr_pagination_url($page, $perPage, $queryString) {
                                             <a class="nmx-btn nmx-btn-sm nmx-btn-warning" href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, $query_string . '&action=skip_next_payment&saved_card_recurring_id=' . $subscription['saved_credit_card_recurring_id']); ?>" onclick="return confirm('Skip this payment? The next billing date will be automatically calculated and updated based on the subscription schedule.');">Skip Next</a>
                                             <a class="nmx-btn nmx-btn-sm nmx-btn-danger" href="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING, $query_string . '&action=cancel_scheduled_payment&saved_card_recurring_id=' . $subscription['saved_credit_card_recurring_id']); ?>" onclick="return confirm('Cancel this subscription?');">Cancel</a>
                                         <?php } ?>
+                                        <br/>
+                                        <a class="nmx-btn nmx-btn-sm nmx-btn-info" href="javascript:void(0);" onclick="toggleDetails(<?php echo $subscription['saved_credit_card_recurring_id']; ?>)">Details</a>
+                                    </td>
+                                </tr>
+                                <!-- Details/Address Editing Row -->
+                                <tr id="details-<?php echo $subscription['saved_credit_card_recurring_id']; ?>" style="display:none;" class="subscription-details-row">
+                                    <td colspan="13">
+                                        <div class="nmx-panel nmx-panel-info">
+                                            <div class="nmx-panel-heading">
+                                                <strong>Subscription #<?php echo $subscription['saved_credit_card_recurring_id']; ?> Details</strong>
+                                            </div>
+                                            <div class="nmx-panel-body">
+                                                <div style="display: flex; gap: 20px;">
+                                                    <!-- Billing Address Section -->
+                                                    <div style="flex: 1;">
+                                                        <h4>Billing Address 
+                                                            <?php if ($subscription['status'] == 'scheduled') { ?>
+                                                                <span class="nmx-inline-action" onclick="toggleAddressEdit(<?php echo $subscription['saved_credit_card_recurring_id']; ?>)">(Edit)</span>
+                                                            <?php } ?>
+                                                        </h4>
+                                                        <div id="address-display-<?php echo $subscription['saved_credit_card_recurring_id']; ?>">
+                                                            <?php if (!empty($subscription['billing_name']) || !empty($subscription['billing_street_address'])) { ?>
+                                                                <?php echo zen_output_string_protected($subscription['billing_name']); ?><br/>
+                                                                <?php if ($subscription['billing_company']) echo zen_output_string_protected($subscription['billing_company']) . '<br/>'; ?>
+                                                                <?php echo zen_output_string_protected($subscription['billing_street_address']); ?><br/>
+                                                                <?php if ($subscription['billing_suburb']) echo zen_output_string_protected($subscription['billing_suburb']) . '<br/>'; ?>
+                                                                <?php echo zen_output_string_protected($subscription['billing_city']); ?>, 
+                                                                <?php echo zen_output_string_protected($subscription['billing_state']); ?> 
+                                                                <?php echo zen_output_string_protected($subscription['billing_postcode']); ?><br/>
+                                                                <?php echo zen_output_string_protected($subscription['billing_country_code']); ?>
+                                                            <?php } else { ?>
+                                                                <em>No billing address stored (subscription created before address storage feature)</em>
+                                                            <?php } ?>
+                                                        </div>
+                                                        <div id="address-edit-<?php echo $subscription['saved_credit_card_recurring_id']; ?>" style="display:none;">
+                                                            <form method="post" action="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING); ?>" onsubmit="return confirm('Update billing address for this subscription?');">
+                                                                <input type="hidden" name="action" value="update_billing_address"/>
+                                                                <input type="hidden" name="saved_card_recurring_id" value="<?php echo $subscription['saved_credit_card_recurring_id']; ?>"/>
+                                                                <div class="nmx-form-group">
+                                                                    <label>Name:</label>
+                                                                    <input type="text" name="billing_name" value="<?php echo zen_output_string_protected($subscription['billing_name']); ?>" class="nmx-form-control"/>
+                                                                </div>
+                                                                <div class="nmx-form-group">
+                                                                    <label>Company:</label>
+                                                                    <input type="text" name="billing_company" value="<?php echo zen_output_string_protected($subscription['billing_company']); ?>" class="nmx-form-control"/>
+                                                                </div>
+                                                                <div class="nmx-form-group">
+                                                                    <label>Street Address:</label>
+                                                                    <input type="text" name="billing_street_address" value="<?php echo zen_output_string_protected($subscription['billing_street_address']); ?>" class="nmx-form-control"/>
+                                                                </div>
+                                                                <div class="nmx-form-group">
+                                                                    <label>Address Line 2:</label>
+                                                                    <input type="text" name="billing_suburb" value="<?php echo zen_output_string_protected($subscription['billing_suburb']); ?>" class="nmx-form-control"/>
+                                                                </div>
+                                                                <div class="nmx-form-group">
+                                                                    <label>City:</label>
+                                                                    <input type="text" name="billing_city" value="<?php echo zen_output_string_protected($subscription['billing_city']); ?>" class="nmx-form-control"/>
+                                                                </div>
+                                                                <div class="nmx-form-group">
+                                                                    <label>State/Province:</label>
+                                                                    <input type="text" name="billing_state" value="<?php echo zen_output_string_protected($subscription['billing_state']); ?>" class="nmx-form-control"/>
+                                                                </div>
+                                                                <div class="nmx-form-group">
+                                                                    <label>Postal Code:</label>
+                                                                    <input type="text" name="billing_postcode" value="<?php echo zen_output_string_protected($subscription['billing_postcode']); ?>" class="nmx-form-control"/>
+                                                                </div>
+                                                                <div class="nmx-form-group">
+                                                                    <label>Country Code (2-letter, e.g., CA, US):</label>
+                                                                    <input type="text" name="billing_country_code" value="<?php echo zen_output_string_protected($subscription['billing_country_code']); ?>" maxlength="2" class="nmx-form-control"/>
+                                                                </div>
+                                                                <button type="submit" class="nmx-btn nmx-btn-primary">Save Address</button>
+                                                                <a class="nmx-btn nmx-btn-default" href="javascript:void(0);" onclick="toggleAddressEdit(<?php echo $subscription['saved_credit_card_recurring_id']; ?>)">Cancel</a>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- Shipping Information Section -->
+                                                    <div style="flex: 1;">
+                                                        <h4>Shipping Information</h4>
+                                                        <?php if (!empty($subscription['shipping_method']) || !empty($subscription['shipping_cost'])) { ?>
+                                                            <strong>Method:</strong> <?php echo zen_output_string_protected($subscription['shipping_method']); ?><br/>
+                                                            <strong>Cost:</strong> $<?php echo number_format((float)$subscription['shipping_cost'], 2); ?>
+                                                            <p><em>This rate was locked at subscription creation and will be reused for recurring orders.</em></p>
+                                                        <?php } else { ?>
+                                                            <em>No shipping information (free shipping or subscription created before shipping storage feature)</em>
+                                                        <?php } ?>
+                                                        
+                                                        <h4 style="margin-top: 20px;">Comments</h4>
+                                                        <div style="max-height: 150px; overflow-y: auto; background: #f5f5f5; padding: 10px; border-radius: 4px;">
+                                                            <?php echo nl2br(zen_output_string_protected($subscription['comments'])); ?>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php } ?>
@@ -761,6 +887,27 @@ function updateCard(id) {
     var cardId = select ? select.value : '';
     window.location.href = baseUrl + '?action=update_credit_card&saved_card_recurring_id=' + id + 
         '&set_card=' + cardId + queryString;
+}
+
+function toggleDetails(id) {
+    var row = document.getElementById('details-' + id);
+    if (row) {
+        row.style.display = (row.style.display === 'none') ? 'table-row' : 'none';
+    }
+}
+
+function toggleAddressEdit(id) {
+    var display = document.getElementById('address-display-' + id);
+    var edit = document.getElementById('address-edit-' + id);
+    if (display && edit) {
+        if (display.style.display === 'none') {
+            display.style.display = 'block';
+            edit.style.display = 'none';
+        } else {
+            display.style.display = 'none';
+            edit.style.display = 'block';
+        }
+    }
 }
 </script>
 </body>
