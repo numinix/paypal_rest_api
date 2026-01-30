@@ -483,7 +483,7 @@ if ($action === 'skip_next_payment') {
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
     if ($subscriptionId <= 0) {
-        $messageStack->add_session($messageStackKey, 'Unable to skip payment. Missing identifier.', 'error');
+        $messageStack->add_session( 'Unable to skip payment. Missing identifier.', 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -507,13 +507,13 @@ if ($action === 'skip_next_payment') {
     );
     
     if ($subscription->RecordCount() == 0) {
-        $messageStack->add_session($messageStackKey, 'Subscription not found.', 'error');
+        $messageStack->add_session( 'Subscription not found.', 'error');
         zen_redirect($redirectUrl);
     }
     
     // Only allow skipping active subscriptions
     if ($subscription->fields['status'] !== 'active') {
-        $messageStack->add_session($messageStackKey, 'Only active subscriptions can be skipped.', 'error');
+        $messageStack->add_session( 'Only active subscriptions can be skipped.', 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -536,7 +536,7 @@ if ($action === 'skip_next_payment') {
     
     // Validate we have billing info
     if (!$billingPeriod || $billingFrequency <= 0) {
-        $messageStack->add_session($messageStackKey, 'Cannot skip payment: missing billing schedule information.', 'error');
+        $messageStack->add_session( 'Cannot skip payment: missing billing schedule information.', 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -589,7 +589,7 @@ if ($action === 'skip_next_payment') {
                 break;
         }
     } catch (Exception $e) {
-        $messageStack->add_session($messageStackKey, 'Failed to calculate next payment date.', 'error');
+        $messageStack->add_session( 'Failed to calculate next payment date.', 'error');
         zen_redirect($redirectUrl);
     }
     
@@ -619,7 +619,7 @@ if ($action === 'skip_next_payment') {
         }
     }
     
-    $messageStack->add_session($messageStackKey, sprintf('Payment skipped for subscription #%d. Next payment date updated to %s.', $subscriptionId, $newDate), 'success');
+    $messageStack->add_session( sprintf('Payment skipped for subscription #%d. Next payment date updated to %s.', $subscriptionId, $newDate), 'success');
     zen_redirect($redirectUrl);
 }
 
