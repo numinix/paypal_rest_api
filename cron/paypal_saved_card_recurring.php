@@ -368,6 +368,20 @@ $advanceBillingCycle = function (DateTime $baseDate, array $attributes) {
     return $next;
 };
 
+// Debug: Check what subscriptions exist in the database
+$debug_sql = 'SELECT saved_credit_card_recurring_id, status, next_payment_date, products_name FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' ORDER BY saved_credit_card_recurring_id';
+$debug_result = $db->Execute($debug_sql);
+error_log('PayPal Cron - All subscriptions in database:');
+while (!$debug_result->EOF) {
+    error_log(sprintf('  ID: %d, Status: %s, Next Payment: %s, Product: %s', 
+        $debug_result->fields['saved_credit_card_recurring_id'],
+        $debug_result->fields['status'],
+        $debug_result->fields['next_payment_date'],
+        $debug_result->fields['products_name']
+    ));
+    $debug_result->MoveNext();
+}
+
 $todays_payments = $paypalSavedCardRecurring->get_scheduled_payments();
 
 $results = array('success' => array(), 'failed' => array(), 'skipped' => array());
