@@ -117,6 +117,8 @@ class SavedCreditCardsManager
      * Legacy columns supported:
      * - domain: Used by some legacy implementations to track subscription domains
      * - comments: Used by legacy admin pages to append payment history notes
+     * - billing_*: Billing address fields for subscription independence
+     * - shipping_*: Shipping method and cost captured at subscription creation
      */
     private static function ensureLegacyColumns(): void
     {
@@ -125,6 +127,17 @@ class SavedCreditCardsManager
         $columns = [
             'domain' => "VARCHAR(255) NOT NULL DEFAULT ''",
             'comments' => "TEXT",
+            'billing_name' => "VARCHAR(255) DEFAULT NULL COMMENT 'Billing contact name'",
+            'billing_company' => "VARCHAR(255) DEFAULT NULL COMMENT 'Billing company name'",
+            'billing_street_address' => "VARCHAR(255) DEFAULT NULL COMMENT 'Billing street address'",
+            'billing_suburb' => "VARCHAR(255) DEFAULT NULL COMMENT 'Billing suburb/address line 2'",
+            'billing_city' => "VARCHAR(255) DEFAULT NULL COMMENT 'Billing city'",
+            'billing_state' => "VARCHAR(255) DEFAULT NULL COMMENT 'Billing state/province'",
+            'billing_postcode' => "VARCHAR(255) DEFAULT NULL COMMENT 'Billing postal code'",
+            'billing_country_id' => "INT(11) DEFAULT NULL COMMENT 'Billing country ID (FK to countries table)'",
+            'billing_country_code' => "CHAR(2) DEFAULT NULL COMMENT 'Billing country ISO code (CA, US, etc.)'",
+            'shipping_method' => "VARCHAR(255) DEFAULT NULL COMMENT 'Shipping method name'",
+            'shipping_cost' => "DECIMAL(15,4) DEFAULT NULL COMMENT 'Shipping cost at time of order'",
         ];
 
         foreach ($columns as $column => $definition) {
