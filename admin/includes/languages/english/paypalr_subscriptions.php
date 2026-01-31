@@ -32,3 +32,11 @@ define('SUCCESS_SUBSCRIPTION_STATUS_UPDATED', 'Subscription #%d status has been 
 define('SUCCESS_SUBSCRIPTION_UPDATED', 'Subscription #%d has been updated.');
 define('SUCCESS_BULK_ARCHIVED', 'Successfully archived %d subscription(s).');
 define('SUCCESS_BULK_UNARCHIVED', 'Successfully unarchived %d subscription(s).');
+
+// Order log labels
+if (!defined('TEXT_PAYPALR_SUBSCRIPTION_ORDER_LOG')) {
+    define('TEXT_PAYPALR_SUBSCRIPTION_ORDER_LOG', 'Order Log');
+}
+if (!defined('TEXT_PAYPALR_SUBSCRIPTION_ORDER_LOG_EMPTY')) {
+    define('TEXT_PAYPALR_SUBSCRIPTION_ORDER_LOG_EMPTY', 'No orders logged yet.');
+}

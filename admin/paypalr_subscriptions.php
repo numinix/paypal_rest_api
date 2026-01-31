@@ -1540,6 +1540,38 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                         }
                     }
 
+                    $orderLogEntries = [];
+                    if ($subscriptionId > 0 && defined('TABLE_ORDERS_STATUS_HISTORY')) {
+                        if ($subscriptionType === 'savedcard') {
+                            $commentMatch = '%Subscription #' . (int) $subscriptionId . '%';
+                            $historySql = "SELECT DISTINCT orders_id, date_added
+                                FROM " . TABLE_ORDERS_STATUS_HISTORY . "
+                                WHERE comments LIKE '" . zen_db_input($commentMatch) . "'
+                                ORDER BY date_added DESC";
+                            $historyResult = $db->Execute($historySql);
+                            while ($historyResult instanceof queryFactoryResult && !$historyResult->EOF) {
+                                $orderLogEntries[] = [
+                                    'orders_id' => (int) $historyResult->fields['orders_id'],
+                                    'date_added' => $historyResult->fields['date_added'] ?? ''
+                                ];
+                                $historyResult->MoveNext();
+                            }
+                        }
+                    }
+                    if (empty($orderLogEntries) && !empty($row['orders_id'])) {
+                        $orderDate = '';
+                        if (defined('TABLE_ORDERS')) {
+                            $orderResult = $db->Execute('SELECT date_purchased FROM ' . TABLE_ORDERS . ' WHERE orders_id = ' . (int) $row['orders_id'] . ' LIMIT 1');
+                            if ($orderResult instanceof queryFactoryResult && $orderResult->RecordCount() > 0) {
+                                $orderDate = $orderResult->fields['date_purchased'] ?? '';
+                            }
+                        }
+                        $orderLogEntries[] = [
+                            'orders_id' => (int) $row['orders_id'],
+                            'date_added' => $orderDate
+                        ];
+                    }
+
                     ?>
                     <?php echo zen_draw_form($formId, FILENAME_PAYPALR_SUBSCRIPTIONS, '', 'post', 'id="' . $formId . '"'); ?>
                         <?php echo zen_draw_hidden_field('action', 'update_subscription'); ?>
@@ -1786,6 +1818,27 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                 </div>
                                 <?php } ?>
                                 
+                                <!-- Order Log -->
+                                <div style="margin-top: 16px;">
+                                    <h4 style="margin-top: 0; color: #00618d;"><?php echo TEXT_PAYPALR_SUBSCRIPTION_ORDER_LOG; ?></h4>
+                                    <?php if (!empty($orderLogEntries)) { ?>
+                                        <ul style="margin: 0; padding-left: 18px;">
+                                            <?php foreach ($orderLogEntries as $entry) { ?>
+                                                <li>
+                                                    <a href="<?php echo zen_href_link(FILENAME_ORDERS, 'oID=' . (int) $entry['orders_id'] . '&action=edit'); ?>">
+                                                        #<?php echo (int) $entry['orders_id']; ?>
+                                                    </a>
+                                                    <?php if (!empty($entry['date_added'])) { ?>
+                                                        <span style="color: #666;">&mdash; <?php echo zen_date_short($entry['date_added']); ?></span>
+                                                    <?php } ?>
+                                                </li>
+                                            <?php } ?>
+                                        </ul>
+                                    <?php } else { ?>
+                                        <em><?php echo TEXT_PAYPALR_SUBSCRIPTION_ORDER_LOG_EMPTY; ?></em>
+                                    <?php } ?>
+                                </div>
+
                                 <!-- Attributes -->
                                 <div style="margin-top: 16px;">
                                     <label for="attributes-<?php echo $subscriptionId; ?>">Attributes (JSON)</label>
