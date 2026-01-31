@@ -127,6 +127,7 @@ class SavedCreditCardsManager
         $columns = [
             'domain' => "VARCHAR(255) NOT NULL DEFAULT ''",
             'comments' => "TEXT",
+            'is_archived' => "TINYINT(1) NOT NULL DEFAULT 0",
             'billing_name' => "VARCHAR(255) DEFAULT NULL COMMENT 'Billing contact name'",
             'billing_company' => "VARCHAR(255) DEFAULT NULL COMMENT 'Billing company name'",
             'billing_street_address' => "VARCHAR(255) DEFAULT NULL COMMENT 'Billing street address'",

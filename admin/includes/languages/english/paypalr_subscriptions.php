@@ -18,9 +18,12 @@ define('ERROR_SUBSCRIPTION_CANCEL_MISSING_ID', 'Unable to cancel subscription. M
 define('ERROR_SUBSCRIPTION_SUSPEND_MISSING_ID', 'Unable to suspend subscription. Missing identifier.');
 define('ERROR_SUBSCRIPTION_REACTIVATE_MISSING_ID', 'Unable to reactivate subscription. Missing identifier.');
 define('ERROR_SUBSCRIPTION_ARCHIVE_MISSING_ID', 'Unable to archive subscription. Missing identifier.');
+define('ERROR_SUBSCRIPTION_ARCHIVE_ACTIVE', 'Active subscriptions cannot be archived.');
 define('ERROR_SUBSCRIPTION_UNARCHIVE_MISSING_ID', 'Unable to unarchive subscription. Missing identifier.');
 define('ERROR_BULK_ARCHIVE_NO_SELECTION', 'No subscriptions selected for bulk archive.');
+define('ERROR_BULK_ARCHIVE_NO_ELIGIBLE', 'No selected subscriptions are eligible for bulk archive.');
 define('ERROR_BULK_UNARCHIVE_NO_SELECTION', 'No subscriptions selected for bulk unarchive.');
+define('ERROR_BULK_UNARCHIVE_NO_ELIGIBLE', 'No selected subscriptions are eligible for bulk unarchive.');
 
 // Success messages
 define('SUCCESS_SUBSCRIPTION_CANCELLED', 'Subscription #%d has been cancelled.');
@@ -32,6 +35,7 @@ define('SUCCESS_SUBSCRIPTION_STATUS_UPDATED', 'Subscription #%d status has been 
 define('SUCCESS_SUBSCRIPTION_UPDATED', 'Subscription #%d has been updated.');
 define('SUCCESS_BULK_ARCHIVED', 'Successfully archived %d subscription(s).');
 define('SUCCESS_BULK_UNARCHIVED', 'Successfully unarchived %d subscription(s).');
+define('WARNING_BULK_ARCHIVE_SKIPPED_ACTIVE', 'Skipped %d active subscription(s); active subscriptions cannot be archived.');
 
 // Order log labels
 if (!defined('TEXT_PAYPALR_SUBSCRIPTION_ORDER_LOG')) {
