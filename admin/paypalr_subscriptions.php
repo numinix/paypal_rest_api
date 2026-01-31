@@ -691,17 +691,14 @@ if ($action === 'bulk_archive') {
         zen_redirect($redirectUrl);
     }
     
-    $archived = 0;
-    foreach ($validIds as $subscriptionId) {
-        zen_db_perform(
-            TABLE_PAYPAL_SUBSCRIPTIONS,
-            ['is_archived' => 1, 'last_modified' => date('Y-m-d H:i:s')],
-            'update',
-            'paypal_subscription_id = ' . (int) $subscriptionId
-        );
-        $archived++;
-    }
+    // Perform bulk update with a single query for efficiency
+    $idsList = implode(',', $validIds);
+    $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+            SET is_archived = 1, last_modified = '" . date('Y-m-d H:i:s') . "'
+            WHERE paypal_subscription_id IN (" . $idsList . ")";
+    $db->Execute($sql);
     
+    $archived = count($validIds);
     $messageStack->add_session(sprintf(SUCCESS_BULK_ARCHIVED, $archived), 'success');
     zen_redirect($redirectUrl);
 }
@@ -728,17 +725,14 @@ if ($action === 'bulk_unarchive') {
         zen_redirect($redirectUrl);
     }
     
-    $unarchived = 0;
-    foreach ($validIds as $subscriptionId) {
-        zen_db_perform(
-            TABLE_PAYPAL_SUBSCRIPTIONS,
-            ['is_archived' => 0, 'last_modified' => date('Y-m-d H:i:s')],
-            'update',
-            'paypal_subscription_id = ' . (int) $subscriptionId
-        );
-        $unarchived++;
-    }
+    // Perform bulk update with a single query for efficiency
+    $idsList = implode(',', $validIds);
+    $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+            SET is_archived = 0, last_modified = '" . date('Y-m-d H:i:s') . "'
+            WHERE paypal_subscription_id IN (" . $idsList . ")";
+    $db->Execute($sql);
     
+    $unarchived = count($validIds);
     $messageStack->add_session(sprintf(SUCCESS_BULK_UNARCHIVED, $unarchived), 'success');
     zen_redirect($redirectUrl);
 }
