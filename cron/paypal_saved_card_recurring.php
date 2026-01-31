@@ -55,6 +55,33 @@ if (!function_exists('recurring_esc_html')) {
     }
 }
 
+if (!function_exists('recurring_is_cli')) {
+    /**
+     * Detect if script is running in CLI or web context
+     * @return bool True if running in CLI, false if running in web context
+     */
+    function recurring_is_cli() {
+        return php_sapi_name() === 'cli' || defined('STDIN');
+    }
+}
+
+if (!function_exists('recurring_format_output')) {
+    /**
+     * Format text output appropriately for CLI or web context
+     * In CLI: returns text as-is with newlines
+     * In web: wraps text in <pre> tags for proper line/spacing display
+     * @param string $text Text with newline characters
+     * @return string Formatted text appropriate for the output context
+     */
+    function recurring_format_output($text) {
+        if (recurring_is_cli()) {
+            return $text;
+        }
+        // In web context, wrap in <pre> tags to preserve formatting
+        return '<pre style="font-family: monospace; white-space: pre-wrap; word-wrap: break-word; background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0; line-height: 1.4;">' . htmlspecialchars($text, ENT_QUOTES, 'UTF-8') . '</pre>';
+    }
+}
+
 if (!function_exists('recurring_format_link')) {
     function recurring_format_link($label, $url) {
         $label = recurring_esc_html($label);
@@ -419,7 +446,7 @@ while (!$debug_result->EOF) {
     $debug_result->MoveNext();
 }
 $debug_output .= "=== END DEBUG ===\n\n";
-print $debug_output;
+print recurring_format_output($debug_output);
 
 $todays_payments = $paypalSavedCardRecurring->get_scheduled_payments();
 
@@ -429,7 +456,7 @@ if (count($todays_payments) == 0) {
     $no_payments_msg .= "  - status = 'scheduled'\n";
     $no_payments_msg .= "  - next_payment_date <= '" . date('Y-m-d') . "'\n";
     $no_payments_msg .= "Note: Subscriptions in 'failed', 'complete', 'cancelled', or 'paused' status are NOT processed.\n";
-    print $no_payments_msg;
+    print recurring_format_output($no_payments_msg);
     error_log('PayPal Cron - ' . $no_payments_msg);
 }
 
@@ -779,7 +806,7 @@ $html_email = recurring_build_email_html(
     $sections_all
 );
 
-print $log;
+print recurring_format_output($log);
 $_SESSION['in_cron'] = false;
 
 // Determine email recipient with fallback chain
