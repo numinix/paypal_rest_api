@@ -156,6 +156,35 @@ if ($action === 'update_subscription') {
             $updateData['saved_credit_card_id'] = (int) zen_db_prepare_input($_POST['saved_credit_card_id']);
         }
         
+        // Add billing address fields
+        $billingFields = ['billing_name', 'billing_company', 'billing_street_address', 'billing_suburb',
+                         'billing_city', 'billing_state', 'billing_postcode', 'billing_country_code'];
+        foreach ($billingFields as $field) {
+            if (isset($_POST[$field])) {
+                $updateData[$field] = zen_db_prepare_input($_POST[$field]);
+            }
+        }
+        
+        // Handle billing_country_id from billing_country_code
+        if (isset($_POST['billing_country_code']) && $_POST['billing_country_code'] !== '') {
+            $countryCode = strtoupper(zen_db_prepare_input($_POST['billing_country_code']));
+            $countryQuery = $db->Execute(
+                "SELECT countries_id FROM " . TABLE_COUNTRIES . " 
+                 WHERE countries_iso_code_2 = '" . zen_db_input($countryCode) . "' LIMIT 1"
+            );
+            if (!$countryQuery->EOF) {
+                $updateData['billing_country_id'] = (int)$countryQuery->fields['countries_id'];
+            }
+        }
+        
+        // Add shipping fields
+        if (isset($_POST['shipping_method'])) {
+            $updateData['shipping_method'] = zen_db_prepare_input($_POST['shipping_method']);
+        }
+        if (isset($_POST['shipping_cost'])) {
+            $updateData['shipping_cost'] = (float) zen_db_prepare_input($_POST['shipping_cost']);
+        }
+        
         if (!empty($updateData)) {
             $updateData['comments'] = 'Updated by admin via unified subscriptions page.';
             $paypalSavedCardRecurring->update_payment_info($subscriptionId, $updateData);
@@ -1000,7 +1029,11 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
         . ' sccr.next_payment_date, sccr.comments, sccr.domain,'
         . ' c.customers_firstname, c.customers_lastname, c.customers_email_address,'
         . ' scc.type AS vault_card_type, scc.last_digits AS vault_last_digits,'
-        . ' sccr.saved_credit_card_id'
+        . ' sccr.saved_credit_card_id,'
+        . ' sccr.billing_name, sccr.billing_company, sccr.billing_street_address,'
+        . ' sccr.billing_suburb, sccr.billing_city, sccr.billing_state,'
+        . ' sccr.billing_postcode, sccr.billing_country_id, sccr.billing_country_code,'
+        . ' sccr.shipping_method, sccr.shipping_cost'
         . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
         . ' LEFT JOIN ' . TABLE_SAVED_CREDIT_CARDS . ' scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id'
         . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = scc.customers_id';
@@ -1389,6 +1422,36 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                             $vaultOptions[(string) $vaultCard['paypal_vault_id']] = $label;
                         }
                     }
+                    
+                    // Prepare saved credit card options for savedcard subscriptions
+                    $subscriptionType = $row['subscription_type'] ?? 'rest';
+                    $savedCardOptions = ['0' => 'None'];
+                    if ($subscriptionType === 'savedcard' && $customersId > 0 && defined('TABLE_SAVED_CREDIT_CARDS')) {
+                        $savedCardsQuery = $db->Execute(
+                            "SELECT saved_credit_card_id, type, last_digits, holder_name, is_default
+                             FROM " . TABLE_SAVED_CREDIT_CARDS . "
+                             WHERE customers_id = " . (int)$customersId . "
+                               AND is_deleted = 0
+                             ORDER BY is_default DESC, saved_credit_card_id DESC"
+                        );
+                        if ($savedCardsQuery instanceof queryFactoryResult) {
+                            while (!$savedCardsQuery->EOF) {
+                                $cardId = (int)$savedCardsQuery->fields['saved_credit_card_id'];
+                                $label = '#' . $cardId . ' ' . ($savedCardsQuery->fields['type'] ?? 'Card');
+                                if (!empty($savedCardsQuery->fields['last_digits'])) {
+                                    $label .= ' ••••' . $savedCardsQuery->fields['last_digits'];
+                                }
+                                if (!empty($savedCardsQuery->fields['holder_name'])) {
+                                    $label .= ' - ' . $savedCardsQuery->fields['holder_name'];
+                                }
+                                if ((int)$savedCardsQuery->fields['is_default'] === 1) {
+                                    $label .= ' (Default)';
+                                }
+                                $savedCardOptions[(string)$cardId] = $label;
+                                $savedCardsQuery->MoveNext();
+                            }
+                        }
+                    }
 
                     ?>
                     <?php echo zen_draw_form($formId, FILENAME_PAYPALR_SUBSCRIPTIONS, '', 'post', 'id="' . $formId . '"'); ?>
@@ -1485,17 +1548,27 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                     
                                     <!-- Vault & Status Column -->
                                     <div>
-                                        <h4 style="margin-top: 0; color: #00618d;">Status & Vault</h4>
+                                        <h4 style="margin-top: 0; color: #00618d;">Status & <?php echo $subscriptionType === 'savedcard' ? 'Payment Method' : 'Vault'; ?></h4>
                                         <label>Current Status</label>
                                         <select name="status" form="<?php echo $formId; ?>" class="nmx-form-control">
                                             <?php echo paypalr_render_select_options($availableStatuses, $row['status'] ?? ''); ?>
                                         </select>
+                                        <?php if ($subscriptionType === 'savedcard') { ?>
+                                        <label>Payment Method (Saved Card)</label>
+                                        <select name="saved_credit_card_id" form="<?php echo $formId; ?>" class="nmx-form-control">
+                                            <?php echo paypalr_render_select_options($savedCardOptions, $row['saved_credit_card_id'] ?? '0'); ?>
+                                        </select>
+                                        <p style="margin: 4px 0 0 0; font-size: 0.85em; color: #666;">
+                                            <em>Change the payment method used for this subscription.</em>
+                                        </p>
+                                        <?php } else { ?>
                                         <label>Vault Assignment</label>
                                         <select name="paypal_vault_id" form="<?php echo $formId; ?>" class="nmx-form-control">
                                             <?php echo paypalr_render_select_options($vaultOptions, $row['paypal_vault_id'] ?? '0'); ?>
                                         </select>
                                         <label>Vault ID (manual override)</label>
                                         <input type="text" name="vault_id" value="<?php echo zen_output_string_protected((string) ($row['vault_id'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        <?php } ?>
                                     </div>
                                 </div>
                                 
@@ -1563,6 +1636,65 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <!-- Billing Address -->
+                                <?php if ($subscriptionType === 'savedcard') { ?>
+                                <div style="margin-top: 16px;">
+                                    <h4 style="margin-top: 0; color: #00618d;">Billing Address</h4>
+                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                        <div>
+                                            <label>Billing Name</label>
+                                            <input type="text" name="billing_name" value="<?php echo zen_output_string_protected((string) ($row['billing_name'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Billing Company</label>
+                                            <input type="text" name="billing_company" value="<?php echo zen_output_string_protected((string) ($row['billing_company'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Street Address</label>
+                                            <input type="text" name="billing_street_address" value="<?php echo zen_output_string_protected((string) ($row['billing_street_address'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Address Line 2 (Suburb)</label>
+                                            <input type="text" name="billing_suburb" value="<?php echo zen_output_string_protected((string) ($row['billing_suburb'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>City</label>
+                                            <input type="text" name="billing_city" value="<?php echo zen_output_string_protected((string) ($row['billing_city'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>State/Province</label>
+                                            <input type="text" name="billing_state" value="<?php echo zen_output_string_protected((string) ($row['billing_state'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Postal Code</label>
+                                            <input type="text" name="billing_postcode" value="<?php echo zen_output_string_protected((string) ($row['billing_postcode'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Country Code (2-letter, e.g., CA, US)</label>
+                                            <input type="text" maxlength="2" pattern="[A-Z]{2}" name="billing_country_code" value="<?php echo zen_output_string_protected((string) ($row['billing_country_code'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" style="text-transform: uppercase;" placeholder="CA" />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Shipping Information -->
+                                <div style="margin-top: 16px;">
+                                    <h4 style="margin-top: 0; color: #00618d;">Shipping Information</h4>
+                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                        <div>
+                                            <label>Shipping Method</label>
+                                            <input type="text" name="shipping_method" value="<?php echo zen_output_string_protected((string) ($row['shipping_method'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Shipping Cost</label>
+                                            <input type="number" step="0.01" name="shipping_cost" value="<?php echo ($row['shipping_cost'] !== null) ? (float) $row['shipping_cost'] : ''; ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                    </div>
+                                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: #666;">
+                                        <em>Note: Shipping rate was locked at subscription creation and will be reused for recurring orders.</em>
+                                    </p>
+                                </div>
+                                <?php } ?>
                                 
                                 <!-- Attributes -->
                                 <div style="margin-top: 16px;">

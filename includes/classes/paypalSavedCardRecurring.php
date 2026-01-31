@@ -2376,6 +2376,14 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                 if (isset($data['billing_country_id']) && $data['billing_country_id'] !== null && $data['billing_country_id'] !== '') {
                         $snapshotUpdates[] = 'billing_country_id = ' . (int) $data['billing_country_id'];
                 }
+                
+                // Handle shipping fields
+                if (isset($data['shipping_method']) && $data['shipping_method'] !== null) {
+                        $snapshotUpdates[] = "shipping_method = '" . $this->escape_db_value($data['shipping_method']) . "'";
+                }
+                if (isset($data['shipping_cost']) && $data['shipping_cost'] !== null && $data['shipping_cost'] !== '') {
+                        $snapshotUpdates[] = 'shipping_cost = ' . (float) $data['shipping_cost'];
+                }
 
                 if (isset($metadata['subscription_attributes_json']) && $metadata['subscription_attributes_json'] !== '') {
                         $snapshotUpdates[] = "subscription_attributes_json = '" . $this->escape_db_value($metadata['subscription_attributes_json']) . "'";
