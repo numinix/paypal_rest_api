@@ -172,6 +172,7 @@ php tests/StoredCredentialStructureTest.php
 
 ## Change History
 
+- **2026-01-31**: Fixed recurring payments to respect transaction mode (AUTHORIZE vs CAPTURE)
 - **2026-01-30**: Fixed stored_credential nesting issue causing recurring payment failures
 - **2026-01-30**: Added debug output filter for cancelled subscriptions
 - **2026-01-30**: Enhanced logging for better debugging
