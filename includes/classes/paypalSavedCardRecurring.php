@@ -115,6 +115,29 @@ return $this->PayPalRestful;
                }
                throw new Exception('Unable to finalize PayPal REST order.');
        }
+       /**
+        * Get the appropriate order status based on payment intent.
+        * Captured payments use the "completed" status, while authorized payments use the "pending" status.
+        *
+        * @param string $intent 'CAPTURE' or 'AUTHORIZE'
+        * @return int Order status ID
+        */
+       function get_order_status_for_intent($intent) {
+               if ($intent === 'AUTHORIZE') {
+                       // Use pending status for authorized (not yet captured) payments
+                       if (defined('MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID > 0) {
+                               return (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+                       }
+                       // Fallback to Pending status (1)
+                       return 1;
+               }
+               // Use completed status for captured payments
+               if (defined('MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID > 0) {
+                       return (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+               }
+               // Fallback to Processing status (2)
+               return 2;
+       }
        function normalize_rest_response($response) {
                if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'normalize_rest_response')) {
                        return $this->paypalsavedcard->normalize_rest_response($response);
@@ -547,18 +570,162 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                if (!$transaction_id) {
                        $transaction_id = $credential_id;
                }
+               $payment_status = ($intent === 'CAPTURE') ? 'Completed' : 'Pending';
+               $pendingreason = ($intent === 'AUTHORIZE') ? 'authorization' : '';
                if (is_object($this->paypalsavedcard)) {
                        $this->paypalsavedcard->transaction_id = $transaction_id;
                        // Set payment_status based on intent: 'Completed' for captures, 'Pending' for authorizations
-                       $this->paypalsavedcard->payment_status = ($intent === 'CAPTURE') ? 'Completed' : 'Pending';
+                       $this->paypalsavedcard->payment_status = $payment_status;
                        $this->paypalsavedcard->payment_type = 'PayPal REST';
                        $this->paypalsavedcard->payment_time = date('Y-m-d H:i:s');
                        $this->paypalsavedcard->transactiontype = 'rest';
-                       $this->paypalsavedcard->pendingreason = ($intent === 'AUTHORIZE') ? 'authorization' : '';
+                       $this->paypalsavedcard->pendingreason = $pendingreason;
                        $this->paypalsavedcard->amt = $amount;
                        $this->paypalsavedcard->responsedata = array('ORDER_ID' => $order_id, 'INTENT' => $intent, 'CURRENCYCODE' => $currency, 'AMT' => $amount, 'CREATE_ORDER_RESPONSE' => $normalized_create, 'FINALIZE_ORDER_RESPONSE' => $normalized_capture);
                }
-               return array('success' => true, 'transaction_id' => $transaction_id);
+               // Return comprehensive transaction data for database recording
+               return array(
+                       'success' => true,
+                       'transaction_id' => $transaction_id,
+                       'paypal_order_id' => $order_id,
+                       'intent' => $intent,
+                       'currency' => $currency,
+                       'amount' => $amount,
+                       'payment_status' => $payment_status,
+                       'pending_reason' => $pendingreason,
+                       'create_response' => $normalized_create,
+                       'finalize_response' => $normalized_capture,
+               );
+       }
+       /**
+        * Record a PayPal transaction in the database for admin refund/void functionality.
+        * This ensures recurring payment orders have the same transaction logging as checkout orders.
+        *
+        * @param int $orders_id The Zen Cart order ID
+        * @param array $payment_result The result from process_rest_payment
+        * @param array $payment_details The subscription payment details
+        * @return bool Success status
+        */
+       function record_paypal_transaction($orders_id, $payment_result, $payment_details) {
+               global $db;
+               
+               if (!defined('TABLE_PAYPAL')) {
+                       return false;
+               }
+               
+               $orders_id = (int)$orders_id;
+               if ($orders_id <= 0) {
+                       return false;
+               }
+               
+               $paypal_order_id = $payment_result['paypal_order_id'] ?? '';
+               $transaction_id = $payment_result['transaction_id'] ?? '';
+               $intent = $payment_result['intent'] ?? 'CAPTURE';
+               $currency = $payment_result['currency'] ?? 'USD';
+               $amount = $payment_result['amount'] ?? '0.00';
+               $payment_status = $payment_result['payment_status'] ?? 'Completed';
+               $pending_reason = $payment_result['pending_reason'] ?? '';
+               
+               if (empty($paypal_order_id)) {
+                       return false;
+               }
+               
+               // Get customer info for the transaction record
+               $first_name = $payment_details['customers_firstname'] ?? '';
+               $last_name = $payment_details['customers_lastname'] ?? '';
+               $email = $payment_details['customers_email_address'] ?? '';
+               
+               // Determine module name
+               $module_name = $this->paymentModuleCode;
+               if (empty($module_name)) {
+                       $module_name = 'paypalr_creditcard';
+               }
+               
+               // Get module version
+               $module_version = '';
+               if (defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
+                       $module_version = MODULE_PAYMENT_PAYPALR_VERSION;
+               }
+               
+               $date_added = date('Y-m-d H:i:s');
+               
+               // Create memo with source information
+               $memo = array(
+                       'source' => 'recurring_cron',
+                       'subscription_id' => $payment_details['saved_credit_card_recurring_id'] ?? 0,
+               );
+               
+               // Insert the main order record (CREATE transaction)
+               $sql_data_array = array(
+                       'order_id' => $orders_id,
+                       'txn_type' => 'CREATE',
+                       'module_name' => $module_name,
+                       'module_mode' => $intent,
+                       'payment_type' => 'card',
+                       'payment_status' => $payment_status,
+                       'pending_reason' => $pending_reason,
+                       'mc_currency' => $currency,
+                       'first_name' => substr($first_name, 0, 32),
+                       'last_name' => substr($last_name, 0, 32),
+                       'payer_email' => $email,
+                       'txn_id' => $paypal_order_id,
+                       'mc_gross' => $amount,
+                       'date_added' => $date_added,
+                       'notify_version' => $module_version,
+                       'memo' => json_encode($memo),
+               );
+               
+               try {
+                       zen_db_perform(TABLE_PAYPAL, $sql_data_array);
+               } catch (Exception $e) {
+                       error_log('PayPal recurring transaction recording failed: ' . $e->getMessage());
+                       return false;
+               }
+               
+               // If we have a separate capture/authorization transaction ID, record that too
+               if (!empty($transaction_id) && $transaction_id !== $paypal_order_id) {
+                       $txn_type = ($intent === 'AUTHORIZE') ? 'AUTHORIZE' : 'CAPTURE';
+                       
+                       // Get expiration time for authorizations from the response (with safe nested access)
+                       $expiration_time = 'null';
+                       if ($intent === 'AUTHORIZE') {
+                               $finalize_response = $payment_result['finalize_response'] ?? array();
+                               $purchase_units = $finalize_response['purchase_units'] ?? array();
+                               $first_unit = $purchase_units[0] ?? array();
+                               $payments = $first_unit['payments'] ?? array();
+                               $authorizations = $payments['authorizations'] ?? array();
+                               $first_auth = $authorizations[0] ?? array();
+                               if (isset($first_auth['expiration_time'])) {
+                                       $expiration_time = $first_auth['expiration_time'];
+                               }
+                       }
+                       
+                       $sql_data_array_txn = array(
+                               'order_id' => $orders_id,
+                               'txn_type' => $txn_type,
+                               'final_capture' => ($intent === 'CAPTURE') ? 1 : 0,
+                               'module_name' => $module_name,
+                               'module_mode' => '',
+                               'payment_type' => 'card',
+                               'payment_status' => $payment_status,
+                               'pending_reason' => $pending_reason,
+                               'mc_currency' => $currency,
+                               'txn_id' => $transaction_id,
+                               'parent_txn_id' => $paypal_order_id,
+                               'mc_gross' => $amount,
+                               'date_added' => $date_added,
+                               'notify_version' => $module_version,
+                               'expiration_time' => $expiration_time,
+                       );
+                       
+                       try {
+                               zen_db_perform(TABLE_PAYPAL, $sql_data_array_txn);
+                       } catch (Exception $e) {
+                               error_log('PayPal recurring transaction detail recording failed: ' . $e->getMessage());
+                       }
+               }
+               
+               return true;
        }
        function is_paypalr_primary() {
                if (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS == 'True') {
@@ -1222,7 +1389,10 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         $result = $this->process_rest_payment($payment_details, $total_to_bill);
                         if ($result['success']) {
                                 $transaction_id = $result['transaction_id'];
-                                $this->update_payment_status($paypal_saved_card_recurring_id, 'complete', 'Transaction id: ' . $transaction_id);
+                                // Note: Status is NOT set to 'complete' here. The cron will update the status
+                                // to 'scheduled' with the next billing date after creating the order.
+                                // This ensures only ONE subscription exists that keeps getting updated.
+                                $this->add_payment_comment($paypal_saved_card_recurring_id, 'Transaction id: ' . $transaction_id);
                                 return $result;
                         }
 $this->update_payment_status($paypal_saved_card_recurring_id, 'failed', 'Paypal error: ' . $result['error']);
@@ -1236,7 +1406,9 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
                 if (!$error) {
                         $payment_status = 'Completed';
                         $transaction_id = $this->paypalsavedcard->transaction_id;
-                        $this->update_payment_status($paypal_saved_card_recurring_id, 'complete', 'Transaction id: ' . $transaction_id);
+                        // Note: Status is NOT set to 'complete' here. The cron will update the status
+                        // to 'scheduled' with the next billing date after creating the order.
+                        $this->add_payment_comment($paypal_saved_card_recurring_id, 'Transaction id: ' . $transaction_id);
                         return array('success' => true, 'transaction_id' => $transaction_id);
                 }
                 $this->update_payment_status($paypal_saved_card_recurring_id, 'failed', 'Paypal error: ' . $error);
@@ -1741,10 +1913,20 @@ $payment_modules = new payment($_SESSION['payment']);
 		$zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_TOTALS_PROCESS');
 		return array($order, $order_totals);
 	}
-	function create_order($order, $saved_credit_card_id = '') {
+	function create_order($order, $saved_credit_card_id = '', $order_status = 0) {
 		global $db, $zco_notifier, $order_total_modules, $order_totals;
+// Determine order status: use provided status, or fall back to PayPal module's captured order status
+		if ($order_status <= 0) {
+			// Use PayPal module's order status settings (same as checkout)
+			if (defined('MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID > 0) {
+				$order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+			} else {
+				// Fallback to Processing status (2) if PayPal config not available
+				$order_status = 2;
+			}
+		}
 // create the order
-		$zf_insert_id = $insert_id = $order->create($order_totals, 2);
+		$zf_insert_id = $insert_id = $order->create($order_totals, $order_status);
 		$zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_CREATE');
 // add products from shopping cart to the order
 		$order->create_add_products($zf_insert_id, 2);
@@ -2024,12 +2206,15 @@ $new_card_details = $this->get_saved_card_details($new_card);
 	function get_scheduled_payments() {
 		global $db;
 		$today = date('Y-m-d');
-		$sql = 'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE (status = \'scheduled\' OR status = \'failed\') AND next_payment_date <= \'' . $today . '\'';
+		// Only process subscriptions in 'scheduled' status
+		// Failed subscriptions (max retries exceeded) should NOT be retried
+		// Subscriptions stay 'scheduled' during retry attempts until max retries is exceeded
+		$sql = 'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE status = \'scheduled\' AND next_payment_date <= \'' . $today . '\'';
 		
 		// Debug logging for cron
 		if (!empty($_SESSION['in_cron'])) {
 			error_log('PayPal Cron - get_scheduled_payments() SQL: ' . $sql);
-			error_log('PayPal Cron - Looking for subscriptions with status IN (scheduled, failed) and next_payment_date <= ' . $today);
+			error_log('PayPal Cron - Looking for subscriptions with status = scheduled and next_payment_date <= ' . $today);
 		}
 		
 		$result = $db->Execute($sql);
@@ -2041,7 +2226,7 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		
 		// Debug logging for cron
 		if (!empty($_SESSION['in_cron'])) {
-			error_log('PayPal Cron - Found ' . count($payments) . ' payments to process (scheduled + failed): ' . implode(', ', $payments));
+			error_log('PayPal Cron - Found ' . count($payments) . ' scheduled payments to process: ' . implode(', ', $payments));
 		}
 		
 		return $payments;
@@ -2109,6 +2294,27 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                         $message .= "\n------------------------------------------------------------\n";
 
 			$this->notify_error('Subscription ' . $status . '  for ' . $details['customers_firstname'] . ' ' . $details['customers_lastname'], $message, 'warning', $details['customers_email_address'], $details['customers_firstname']);
+		}
+	}
+	
+	/**
+	 * Add a comment to a subscription without changing its status.
+	 * Used to log transaction IDs and other notes during payment processing.
+	 * 
+	 * @param int $paypal_saved_card_recurring_id Subscription ID
+	 * @param string $comment Comment to add
+	 * @return void
+	 */
+	function add_payment_comment($paypal_saved_card_recurring_id, $comment = '') {
+		global $db;
+		if (empty($comment)) {
+			return;
+		}
+		// Use zen_db_perform for safer database operations
+		$current = $db->Execute('SELECT comments FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id);
+		if (!$current->EOF) {
+			$new_comments = $current->fields['comments'] . ' ' . $comment . ' ';
+			zen_db_perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, array('comments' => $new_comments), 'update', 'saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id);
 		}
 	}
 	
