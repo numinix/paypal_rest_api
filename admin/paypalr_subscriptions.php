@@ -35,9 +35,11 @@ if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php'
 }
 
 use PayPalRestful\Common\SubscriptionManager;
+use PayPalRestful\Common\SavedCreditCardsManager;
 use PayPalRestful\Common\VaultManager;
 
 SubscriptionManager::ensureSchema();
+SavedCreditCardsManager::ensureSchema();
 VaultManager::ensureSchema();
 
 define('FILENAME_PAYPALR_SUBSCRIPTIONS', basename(__FILE__));
@@ -113,6 +115,34 @@ function paypalr_get_profile_manager()
     }
     
     return $profileManager;
+}
+
+/**
+ * Check if a subscription is active based on its type.
+ */
+function paypalr_is_subscription_active($subscriptionType, $subscriptionId)
+{
+    global $db;
+
+    $subscriptionType = strtolower(trim((string) $subscriptionType));
+    if ($subscriptionType === 'savedcard' && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        $statusResult = $db->Execute(
+            "SELECT status FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE saved_credit_card_recurring_id = " . (int) $subscriptionId . " LIMIT 1"
+        );
+        if ($statusResult instanceof queryFactoryResult && $statusResult->RecordCount() > 0) {
+            return strtolower((string) ($statusResult->fields['status'] ?? '')) === 'active';
+        }
+        return false;
+    }
+
+    $statusResult = $db->Execute(
+        "SELECT status FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId . " LIMIT 1"
+    );
+    if ($statusResult instanceof queryFactoryResult && $statusResult->RecordCount() > 0) {
+        return strtolower((string) ($statusResult->fields['status'] ?? '')) === 'active';
+    }
+
+    return false;
 }
 
 $action = strtolower(trim((string) ($_POST['action'] ?? $_GET['action'] ?? '')));
@@ -655,6 +685,7 @@ if ($action === 'skip_next_payment') {
 // Archive subscription action
 if ($action === 'archive_subscription') {
     $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $subscriptionType = strtolower(trim((string) ($_GET['subscription_type'] ?? 'rest')));
     $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
@@ -662,14 +693,28 @@ if ($action === 'archive_subscription') {
         $messageStack->add_session(ERROR_SUBSCRIPTION_ARCHIVE_MISSING_ID, 'error');
         zen_redirect($redirectUrl);
     }
+
+    if (paypalr_is_subscription_active($subscriptionType, $subscriptionId)) {
+        $messageStack->add_session(ERROR_SUBSCRIPTION_ARCHIVE_ACTIVE, 'error');
+        zen_redirect($redirectUrl);
+    }
     
     // Update local record to mark as archived
-    zen_db_perform(
-        TABLE_PAYPAL_SUBSCRIPTIONS,
-        ['is_archived' => 1, 'last_modified' => date('Y-m-d H:i:s')],
-        'update',
-        'paypal_subscription_id = ' . (int) $subscriptionId
-    );
+    if ($subscriptionType === 'savedcard' && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        zen_db_perform(
+            TABLE_SAVED_CREDIT_CARDS_RECURRING,
+            ['is_archived' => 1, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'saved_credit_card_recurring_id = ' . (int) $subscriptionId
+        );
+    } else {
+        zen_db_perform(
+            TABLE_PAYPAL_SUBSCRIPTIONS,
+            ['is_archived' => 1, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'paypal_subscription_id = ' . (int) $subscriptionId
+        );
+    }
     
     $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_ARCHIVED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
@@ -678,6 +723,7 @@ if ($action === 'archive_subscription') {
 // Unarchive subscription action
 if ($action === 'unarchive_subscription') {
     $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $subscriptionType = strtolower(trim((string) ($_GET['subscription_type'] ?? 'rest')));
     $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
@@ -687,12 +733,21 @@ if ($action === 'unarchive_subscription') {
     }
     
     // Update local record to unarchive
-    zen_db_perform(
-        TABLE_PAYPAL_SUBSCRIPTIONS,
-        ['is_archived' => 0, 'last_modified' => date('Y-m-d H:i:s')],
-        'update',
-        'paypal_subscription_id = ' . (int) $subscriptionId
-    );
+    if ($subscriptionType === 'savedcard' && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        zen_db_perform(
+            TABLE_SAVED_CREDIT_CARDS_RECURRING,
+            ['is_archived' => 0, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'saved_credit_card_recurring_id = ' . (int) $subscriptionId
+        );
+    } else {
+        zen_db_perform(
+            TABLE_PAYPAL_SUBSCRIPTIONS,
+            ['is_archived' => 0, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'paypal_subscription_id = ' . (int) $subscriptionId
+        );
+    }
     
     $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_UNARCHIVED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
@@ -701,6 +756,7 @@ if ($action === 'unarchive_subscription') {
 // Bulk archive subscriptions action
 if ($action === 'bulk_archive') {
     $subscriptionIds = $_POST['subscription_ids'] ?? [];
+    $subscriptionTypes = $_POST['subscription_types'] ?? [];
     $redirectQuery = zen_get_all_get_params(['action']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
@@ -711,32 +767,102 @@ if ($action === 'bulk_archive') {
     }
     
     // Filter and validate subscription IDs
-    $validIds = array_filter(array_map('intval', $subscriptionIds), function($id) {
+    $validIds = array_values(array_unique(array_filter(array_map('intval', $subscriptionIds), function($id) {
         return $id > 0;
-    });
+    })));
+
+    $restIds = [];
+    $savedCardIds = [];
+    if (is_array($subscriptionTypes) && !empty($subscriptionTypes)) {
+        foreach ($validIds as $id) {
+            $type = strtolower((string) ($subscriptionTypes[$id] ?? 'rest'));
+            if ($type === 'savedcard') {
+                $savedCardIds[] = $id;
+            } else {
+                $restIds[] = $id;
+            }
+        }
+    } else {
+        $restIds = $validIds;
+    }
     
     if (empty($validIds)) {
         $messageStack->add_session(ERROR_BULK_ARCHIVE_NO_SELECTION, 'error');
         zen_redirect($redirectUrl);
     }
-    
-    // Perform bulk update with a single query for efficiency
-    // Note: $validIds contains only validated positive integers (filtered through intval),
-    // so concatenation is safe from SQL injection
-    $idsList = implode(',', $validIds);
-    $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
-            SET is_archived = 1, last_modified = '" . date('Y-m-d H:i:s') . "'
-            WHERE paypal_subscription_id IN (" . $idsList . ")";
-    $db->Execute($sql);
-    
-    $archived = count($validIds);
+
+    $restActive = 0;
+    if (!empty($restIds)) {
+        $idsList = implode(',', $restIds);
+        $statusResult = $db->Execute(
+            "SELECT paypal_subscription_id, status FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id IN (" . $idsList . ")"
+        );
+        $restIds = [];
+        while ($statusResult instanceof queryFactoryResult && !$statusResult->EOF) {
+            $status = strtolower((string) ($statusResult->fields['status'] ?? ''));
+            if ($status === 'active') {
+                $restActive++;
+            } else {
+                $restIds[] = (int) $statusResult->fields['paypal_subscription_id'];
+            }
+            $statusResult->MoveNext();
+        }
+    }
+
+    $savedActive = 0;
+    if (!empty($savedCardIds) && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        $idsList = implode(',', $savedCardIds);
+        $statusResult = $db->Execute(
+            "SELECT saved_credit_card_recurring_id, status FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE saved_credit_card_recurring_id IN (" . $idsList . ")"
+        );
+        $savedCardIds = [];
+        while ($statusResult instanceof queryFactoryResult && !$statusResult->EOF) {
+            $status = strtolower((string) ($statusResult->fields['status'] ?? ''));
+            if ($status === 'active') {
+                $savedActive++;
+            } else {
+                $savedCardIds[] = (int) $statusResult->fields['saved_credit_card_recurring_id'];
+            }
+            $statusResult->MoveNext();
+        }
+    }
+
+    $archived = 0;
+    if (!empty($restIds)) {
+        $idsList = implode(',', $restIds);
+        $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+                SET is_archived = 1, last_modified = '" . date('Y-m-d H:i:s') . "'
+                WHERE paypal_subscription_id IN (" . $idsList . ")";
+        $db->Execute($sql);
+        $archived += count($restIds);
+    }
+
+    if (!empty($savedCardIds) && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        $idsList = implode(',', $savedCardIds);
+        $sql = "UPDATE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
+                SET is_archived = 1, last_modified = '" . date('Y-m-d H:i:s') . "'
+                WHERE saved_credit_card_recurring_id IN (" . $idsList . ")";
+        $db->Execute($sql);
+        $archived += count($savedCardIds);
+    }
+
+    if ($archived === 0) {
+        $messageStack->add_session(ERROR_BULK_ARCHIVE_NO_ELIGIBLE, 'error');
+        zen_redirect($redirectUrl);
+    }
+
     $messageStack->add_session(sprintf(SUCCESS_BULK_ARCHIVED, $archived), 'success');
+    $activeSkipped = $restActive + $savedActive;
+    if ($activeSkipped > 0) {
+        $messageStack->add_session(sprintf(WARNING_BULK_ARCHIVE_SKIPPED_ACTIVE, $activeSkipped), 'warning');
+    }
     zen_redirect($redirectUrl);
 }
 
 // Bulk unarchive subscriptions action
 if ($action === 'bulk_unarchive') {
     $subscriptionIds = $_POST['subscription_ids'] ?? [];
+    $subscriptionTypes = $_POST['subscription_types'] ?? [];
     $redirectQuery = zen_get_all_get_params(['action']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
@@ -747,25 +873,54 @@ if ($action === 'bulk_unarchive') {
     }
     
     // Filter and validate subscription IDs
-    $validIds = array_filter(array_map('intval', $subscriptionIds), function($id) {
+    $validIds = array_values(array_unique(array_filter(array_map('intval', $subscriptionIds), function($id) {
         return $id > 0;
-    });
+    })));
+
+    $restIds = [];
+    $savedCardIds = [];
+    if (is_array($subscriptionTypes) && !empty($subscriptionTypes)) {
+        foreach ($validIds as $id) {
+            $type = strtolower((string) ($subscriptionTypes[$id] ?? 'rest'));
+            if ($type === 'savedcard') {
+                $savedCardIds[] = $id;
+            } else {
+                $restIds[] = $id;
+            }
+        }
+    } else {
+        $restIds = $validIds;
+    }
     
     if (empty($validIds)) {
         $messageStack->add_session(ERROR_BULK_UNARCHIVE_NO_SELECTION, 'error');
         zen_redirect($redirectUrl);
     }
-    
-    // Perform bulk update with a single query for efficiency
-    // Note: $validIds contains only validated positive integers (filtered through intval),
-    // so concatenation is safe from SQL injection
-    $idsList = implode(',', $validIds);
-    $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
-            SET is_archived = 0, last_modified = '" . date('Y-m-d H:i:s') . "'
-            WHERE paypal_subscription_id IN (" . $idsList . ")";
-    $db->Execute($sql);
-    
-    $unarchived = count($validIds);
+
+    $unarchived = 0;
+    if (!empty($restIds)) {
+        $idsList = implode(',', $restIds);
+        $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+                SET is_archived = 0, last_modified = '" . date('Y-m-d H:i:s') . "'
+                WHERE paypal_subscription_id IN (" . $idsList . ")";
+        $db->Execute($sql);
+        $unarchived += count($restIds);
+    }
+
+    if (!empty($savedCardIds) && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        $idsList = implode(',', $savedCardIds);
+        $sql = "UPDATE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
+                SET is_archived = 0, last_modified = '" . date('Y-m-d H:i:s') . "'
+                WHERE saved_credit_card_recurring_id IN (" . $idsList . ")";
+        $db->Execute($sql);
+        $unarchived += count($savedCardIds);
+    }
+
+    if ($unarchived === 0) {
+        $messageStack->add_session(ERROR_BULK_UNARCHIVE_NO_ELIGIBLE, 'error');
+        zen_redirect($redirectUrl);
+    }
+
     $messageStack->add_session(sprintf(SUCCESS_BULK_UNARCHIVED, $unarchived), 'success');
     zen_redirect($redirectUrl);
 }
@@ -1078,10 +1233,10 @@ if ($filters['subscription_type'] === '' || $filters['subscription_type'] === 'r
 }
 
 // Fetch Saved Card subscriptions
-// Note: Saved cards don't support payment_module or is_archived filters
+// Note: Saved cards don't support payment_module filters
 if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT_CARDS') 
     && ($filters['subscription_type'] === '' || $filters['subscription_type'] === 'savedcard')
-    && $filters['show_archived'] !== 'only') {  // Exclude saved cards when filtering for archived only
+    ) {
     $savedCardWhereClauses = [];
     
     if ($filters['customers_id'] > 0) {
@@ -1093,12 +1248,17 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
     if ($filters['status'] !== '') {
         $savedCardWhereClauses[] = "sccr.status = '" . zen_db_input($filters['status']) . "'";
     }
+    if ($filters['show_archived'] === 'only') {
+        $savedCardWhereClauses[] = 'sccr.is_archived = 1';
+    } elseif ($filters['show_archived'] !== 'all') {
+        $savedCardWhereClauses[] = 'sccr.is_archived = 0';
+    }
     
     $savedCardSql = 'SELECT sccr.saved_credit_card_recurring_id AS paypal_subscription_id,'
         . ' scc.customers_id, sccr.products_id, sccr.products_name,'
         . ' sccr.amount, sccr.currency_code, sccr.billing_period, sccr.billing_frequency,'
         . ' sccr.total_billing_cycles, sccr.status, sccr.date_added AS date,'
-        . ' sccr.next_payment_date, sccr.comments, sccr.domain,'
+        . ' sccr.next_payment_date, sccr.comments, sccr.domain, sccr.is_archived,'
         . ' c.customers_firstname, c.customers_lastname, c.customers_email_address,'
         . ' scc.type AS vault_card_type, scc.last_digits AS vault_last_digits,'
         . ' sccr.saved_credit_card_id,'
@@ -1585,7 +1745,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                     <!-- Summary row (always visible, clickable to expand/collapse) -->
                     <tr class="subscription-summary subscription-row-collapsed" onclick="toggleSubscription(<?php echo $subscriptionId; ?>, event)" data-subscription-id="<?php echo $subscriptionId; ?>">
                         <td onclick="event.stopPropagation();">
-                            <input type="checkbox" name="subscription_ids[]" value="<?php echo $subscriptionId; ?>" class="subscription-checkbox" form="bulk-actions-form">
+                            <input type="checkbox" name="subscription_ids[]" value="<?php echo $subscriptionId; ?>" class="subscription-checkbox" data-subscription-type="<?php echo zen_output_string_protected($subscriptionType); ?>">
                         </td>
                         <td>
                             <span class="toggle-icon"></span>
@@ -1851,7 +2011,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                     <h4 style="margin-top: 0; color: #00618d;">Actions</h4>
                                     <div class="paypalr-subscription-actions">
                                         <button type="submit" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-primary">Save Changes</button>
-                                        <?php if ($currentStatus !== 'cancelled') { ?>
+                                        <?php if ($currentStatus !== 'active') { ?>
                                             <button type="submit" name="set_status" value="cancelled" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-warning">Mark Cancelled</button>
                                         <?php } ?>
                                         <?php if ($currentStatus !== 'active') { ?>
@@ -1886,16 +2046,16 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                                onclick="return confirm('Are you sure you want to cancel this subscription? This action cannot be undone.');"
                                                class="nmx-btn nmx-btn-sm nmx-btn-danger">Cancel</a>
                                         <?php } ?>
-                                        <?php if ($subscriptionType === 'rest') { ?>
-                                        <?php if ($isArchived) { ?>
-                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=unarchive_subscription&subscription_id=' . $subscriptionId); ?>" 
-                                               onclick="return confirm('Are you sure you want to unarchive this subscription?');"
-                                               class="nmx-btn nmx-btn-sm nmx-btn-info">Unarchive</a>
-                                        <?php } else { ?>
-                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=archive_subscription&subscription_id=' . $subscriptionId); ?>" 
-                                               onclick="return confirm('Are you sure you want to archive this subscription? Archived subscriptions are hidden by default.');"
-                                               class="nmx-btn nmx-btn-sm nmx-btn-secondary">Archive</a>
-                                        <?php } ?>
+                                        <?php if ($currentStatus !== 'active') { ?>
+                                            <?php if ($isArchived) { ?>
+                                                <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=unarchive_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                                   onclick="return confirm('Are you sure you want to unarchive this subscription?');"
+                                                   class="nmx-btn nmx-btn-sm nmx-btn-info">Unarchive</a>
+                                            <?php } else { ?>
+                                                <a href="<?php echo zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $actionParams . 'action=archive_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                                   onclick="return confirm('Are you sure you want to archive this subscription? Archived subscriptions are hidden by default.');"
+                                                   class="nmx-btn nmx-btn-sm nmx-btn-secondary">Archive</a>
+                                            <?php } ?>
                                         <?php } ?>
                                     </div>
                                 </div>
@@ -2081,13 +2241,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 bulkActionsForm.querySelectorAll('input[name="subscription_ids[]"]').forEach(function(input) {
                     input.remove();
                 });
-                // Inject selected subscription ids into the bulk form payload
+                bulkActionsForm.querySelectorAll('input[name^="subscription_types["]').forEach(function(input) {
+                    input.remove();
+                });
+                // Inject selected subscription ids and types into the bulk form payload
                 checkedBoxes.forEach(function(checkbox) {
                     const hiddenInput = document.createElement('input');
                     hiddenInput.type = 'hidden';
                     hiddenInput.name = 'subscription_ids[]';
                     hiddenInput.value = checkbox.value;
                     bulkActionsForm.appendChild(hiddenInput);
+
+                    const typeInput = document.createElement('input');
+                    typeInput.type = 'hidden';
+                    typeInput.name = 'subscription_types[' + checkbox.value + ']';
+                    typeInput.value = checkbox.dataset.subscriptionType || '';
+                    bulkActionsForm.appendChild(typeInput);
                 });
                 // Submit the form
                 bulkActionsForm.submit();
