@@ -433,6 +433,14 @@ class PayPalCommon {
             return;
         }
 
+        // Validate required payment_source data exists before proceeding
+        // This can be null/empty when called from cron contexts where the payment was processed
+        // via a different pathway (e.g., saved card recurring payments)
+        $payment_source_data = $orderInfo['payment_source'] ?? [];
+        if (empty($payment_source_data) || !is_array($payment_source_data)) {
+            return;
+        }
+
         $purchase_unit = $orderInfo['purchase_units'][0];
         $address_info = [];
         if (isset($purchase_unit['shipping']['address'])) {
