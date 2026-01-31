@@ -1672,7 +1672,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                         </div>
                                         <div>
                                             <label>Country Code (2-letter, e.g., CA, US)</label>
-                                            <input type="text" maxlength="2" name="billing_country_code" value="<?php echo zen_output_string_protected((string) ($row['billing_country_code'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" style="text-transform: uppercase;" />
+                                            <input type="text" maxlength="2" pattern="[A-Z]{2}" name="billing_country_code" value="<?php echo zen_output_string_protected((string) ($row['billing_country_code'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" style="text-transform: uppercase;" placeholder="CA" />
                                         </div>
                                     </div>
                                 </div>
@@ -1687,7 +1687,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                         </div>
                                         <div>
                                             <label>Shipping Cost</label>
-                                            <input type="number" step="0.01" name="shipping_cost" value="<?php echo ($row['shipping_cost'] !== null && $row['shipping_cost'] !== '') ? (float) $row['shipping_cost'] : ''; ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                            <input type="number" step="0.01" name="shipping_cost" value="<?php echo ($row['shipping_cost'] !== null) ? (float) $row['shipping_cost'] : ''; ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
                                         </div>
                                     </div>
                                     <p style="margin: 8px 0 0 0; font-size: 0.9em; color: #666;">
