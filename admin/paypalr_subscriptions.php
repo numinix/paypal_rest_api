@@ -1552,7 +1552,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                     <!-- Summary row (always visible, clickable to expand/collapse) -->
                     <tr class="subscription-summary subscription-row-collapsed" onclick="toggleSubscription(<?php echo $subscriptionId; ?>, event)" data-subscription-id="<?php echo $subscriptionId; ?>">
                         <td onclick="event.stopPropagation();">
-                            <input type="checkbox" name="subscription_ids[]" value="<?php echo $subscriptionId; ?>" class="subscription-checkbox">
+                            <input type="checkbox" name="subscription_ids[]" value="<?php echo $subscriptionId; ?>" class="subscription-checkbox" form="bulk-actions-form">
                         </td>
                         <td>
                             <span class="toggle-icon"></span>
