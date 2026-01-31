@@ -406,54 +406,13 @@ $vaultId = $this->extract_vault_id_from_card($cardDetails);
 if ($vaultId === '') {
 return array();
 }
-$vaultCard = $this->find_vault_card_for_payment($cardDetails);
+// When using a vault_id, PayPal already has the card details stored.
+// Sending additional fields like expiry, last_digits, brand, name, or billing_address
+// causes an INCOMPATIBLE_PARAMETER_VALUE error from PayPal.
+// Only vault_id and optionally stored_credential should be sent.
 $cardPayload = array('vault_id' => $vaultId);
-$expiry = '';
-if (isset($vaultCard['expiry'])) {
-$expiry = $vaultCard['expiry'];
-}
-if ($expiry === '' && isset($cardDetails['expiry'])) {
-$expiry = $cardDetails['expiry'];
-}
-$expiry = $this->normalize_vault_expiry_value($expiry);
-if ($expiry !== '') {
-$cardPayload['expiry'] = $expiry;
-}
-$lastDigits = '';
-if (isset($vaultCard['last_digits'])) {
-$lastDigits = $vaultCard['last_digits'];
-}
-if ($lastDigits === '' && isset($cardDetails['last_digits'])) {
-$lastDigits = substr($cardDetails['last_digits'], - 4);
-}
-$lastDigits = preg_replace('/[^0-9]/', '', $lastDigits);
-if ($lastDigits !== '') {
-$cardPayload['last_digits'] = substr($lastDigits, - 4);
-}
-$brand = '';
-if (isset($vaultCard['brand'])) {
-$brand = $vaultCard['brand'];
-}
-if ($brand === '' && isset($cardDetails['type'])) {
-$brand = strtoupper($cardDetails['type']);
-}
-if ($brand !== '') {
-$cardPayload['brand'] = strtoupper(trim($brand));
-}
-$name = '';
-if (isset($vaultCard['cardholder_name'])) {
-$name = $vaultCard['cardholder_name'];
-}
-if ($name === '' && isset($cardDetails['name_on_card'])) {
-$name = $cardDetails['name_on_card'];
-}
-if ($name !== '') {
-$cardPayload['name'] = trim($name);
-}
-$billing = $this->build_billing_address_from_card($cardDetails, $vaultCard);
-if (!empty($billing)) {
-$cardPayload['billing_address'] = $billing;
-}
+
+// Add stored_credential for recurring payments
 $storedDefaults = array('payment_initiator' => 'MERCHANT', 'payment_type' => 'UNSCHEDULED', 'usage' => 'SUBSEQUENT');
 if (isset($options['stored_credential']) && is_array($options['stored_credential'])) {
 $storedDefaults = array_merge($storedDefaults, $options['stored_credential']);
