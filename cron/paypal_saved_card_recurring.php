@@ -557,24 +557,14 @@ foreach ($todays_payments as $payment_id) {
 
             $nextCycleDue->setTime(0, 0, 0);
 
-            $scheduledProcessingDate = clone $nextCycleDue;
             if ($nextCycleDue <= $todayDate) {
-                $scheduledProcessingDate = clone $todayDate;
-                $scheduledProcessingDate->modify('+1 day');
-                $log .= ' Catch-up payment scheduled for ' . $scheduledProcessingDate->format('Y-m-d') . ' (covers ' . $nextCycleDue->format('Y-m-d') . '). ';
+                $log .= ' Catch-up payment queued for ' . $nextCycleDue->format('Y-m-d') . '. ';
             }
 
-            $next_payment = $scheduledProcessingDate->format('Y-m-d');
+            $next_payment = $nextCycleDue->format('Y-m-d');
             $next_payment_display = $next_payment;
 
-            $metadata = $buildSubscriptionMetadata($payment_details, $payment_details['amount']);
-            if (!isset($metadata['subscription_attributes']) || !is_array($metadata['subscription_attributes'])) {
-                $metadata['subscription_attributes'] = array();
-            }
-            $metadata['subscription_attributes']['intended_billing_date'] = $nextCycleDue->format('Y-m-d');
-
-            $rescheduleOrdersProductsId = $payment_details['original_orders_products_id'] ?? ($payment_details['orders_products_id'] ?? null);
-            $paypalSavedCardRecurring->schedule_payment($payment_details['amount'], $next_payment, $payment_details['saved_credit_card_id'], $rescheduleOrdersProductsId, 'Scheduled after previous successful payment.', $metadata);
+            $payment_details['subscription_attributes']['intended_billing_date'] = $nextCycleDue->format('Y-m-d');
         }
         $log .= ' Payment successful ';
         $order_id = $paypalSavedCardRecurring->create_order($order, $payment_details['saved_credit_card_id']); //create an order in Zen Cart
@@ -589,7 +579,20 @@ foreach ($todays_payments as $payment_id) {
         if (isset($payment_details['subscription_attributes']) && is_array($payment_details['subscription_attributes'])) {
             $updatePayload['subscription_attributes'] = $payment_details['subscription_attributes'];
         }
+        if ($next_payment !== null) {
+            $updatePayload['date'] = $next_payment;
+        }
         $paypalSavedCardRecurring->update_payment_info($payment_id, $updatePayload);
+        if ($next_payment !== null) {
+            $paypalSavedCardRecurring->update_payment_status($payment_id, 'scheduled', '  Next billing date set to ' . $next_payment . '. ');
+        }
+        if ($order_id > 0 && function_exists('zen_update_orders_history')) {
+            $historyComment = 'Subscription #' . $payment_id . ' recurring payment.';
+            if ($intendedBillingDate instanceof DateTime) {
+                $historyComment .= ' Billing date: ' . $intendedBillingDate->format('Y-m-d') . '.';
+            }
+            zen_update_orders_history($order_id, $historyComment, null, -1, 0);
+        }
         if ($next_payment !== null) {
             $subscription_domain = '';
             if (isset($payment_details['domain']) && $payment_details['domain'] !== '') {

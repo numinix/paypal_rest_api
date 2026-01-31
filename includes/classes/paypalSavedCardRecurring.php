@@ -1765,6 +1765,8 @@ if ($_SESSION['payment'] == 'paypalsavedcard' && is_object($this->paypalsavedcar
 $this->paypalsavedcard->action = 'Sale';
 $this->paypalsavedcard->saved_card_id = $saved_credit_card_id;
 $this->paypalsavedcard->after_process();
+} elseif (!empty($_SESSION['payment']) && isset($GLOBALS[$_SESSION['payment']]) && is_object($GLOBALS[$_SESSION['payment']]) && method_exists($GLOBALS[$_SESSION['payment']], 'after_process')) {
+$GLOBALS[$_SESSION['payment']]->after_process();
 }
 // unset the customer ID
 		unset($_SESSION['customer_id']);
@@ -2256,7 +2258,9 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                 $sql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' SET saved_credit_card_recurring_id=saved_credit_card_recurring_id';
 
                 if (isset($data['order_id']) && isset($data['date'])) {
-                        $sql .= ', recurring_orders_id = ' . (int) $data['order_id'];
+                        if ($this->saved_cards_recurring_has_column('recurring_orders_id')) {
+                                $sql .= ', recurring_orders_id = ' . (int) $data['order_id'];
+                        }
                         $sql .= ", next_payment_date = '" . $this->escape_db_value($data['date']) . "'";
                 }
                 elseif (isset($data['date'])) {
