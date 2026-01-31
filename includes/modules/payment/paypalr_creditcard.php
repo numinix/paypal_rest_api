@@ -464,9 +464,11 @@ class paypalr_creditcard extends base
         }
 
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
-        $saveCardChecked = $allowSaveCard && (!empty($_POST['paypalr_cc_save_card']) || (!empty($_SESSION['PayPalRestful']['save_card'])));
+        $forceSaveCard = $allowSaveCard && $savedCardSelection === 'new' && $this->orderRequiresVaultedCard();
+        $saveCardChecked = $allowSaveCard && ($forceSaveCard || !empty($_POST['paypalr_cc_save_card']) || (!empty($_SESSION['PayPalRestful']['save_card'])));
         if ($savedCardSelection !== 'new') {
             $saveCardChecked = false;
+            $forceSaveCard = false;
         }
 
         $billing_name = zen_output_string_protected($order->billing['firstname'] . ' ' . $order->billing['lastname']);
@@ -511,9 +513,18 @@ class paypalr_creditcard extends base
             'tag' => 'paypalr-cc-cvv',
         ];
 
-        // Save card checkbox
+        // Save card checkbox / subscription notice
         if ($vaultEnabled && $allowSaveCard) {
-            if ($is_bootstrap_template === false) {
+            if ($forceSaveCard) {
+                $notice = MODULE_PAYMENT_PAYPALR_SAVE_CARD_SUBSCRIPTION_NOTICE ?? 'This card will be stored to process your subscription payments.';
+                $fields[] = [
+                    'title' => MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use',
+                    'field' =>
+                        zen_draw_hidden_field('paypalr_cc_save_card', 'on') .
+                        '<span class="ppr-save-card-note">' . zen_output_string_protected($notice) . '</span>',
+                    'tag' => 'ppr-cc-save-card',
+                ];
+            } elseif ($is_bootstrap_template === false) {
                 $fields[] = [
                     'title' => MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use',
                     'field' => zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'class="ppr-creditcard-field ppr-card-new" id="ppr-cc-save-card"'),
@@ -619,6 +630,67 @@ class paypalr_creditcard extends base
         return $html;
     }
 
+    protected function orderRequiresVaultedCard(): bool
+    {
+        if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart'])) {
+            return false;
+        }
+
+        $products = $_SESSION['cart']->get_products();
+        if (!is_array($products) || empty($products)) {
+            return false;
+        }
+
+        if (!class_exists('paypalSavedCardRecurring')) {
+            $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+            if (file_exists($savedCardRecurringPath)) {
+                require_once $savedCardRecurringPath;
+            }
+        }
+
+        if (class_exists('paypalSavedCardRecurring')) {
+            $recurring = new paypalSavedCardRecurring();
+            $subscriptions = $recurring->find_subscription_products_in_order($products);
+            if (!empty($subscriptions)) {
+                return true;
+            }
+        }
+
+        return $this->cartHasPlanIdSubscription($products);
+    }
+
+    protected function cartHasPlanIdSubscription(array $products): bool
+    {
+        global $db;
+
+        foreach ($products as $product) {
+            if (!is_array($product['attributes'] ?? null)) {
+                continue;
+            }
+            foreach ($product['attributes'] as $options_id => $options_values_id) {
+                $options = $db->Execute(
+                    "SELECT products_options_name FROM " . TABLE_PRODUCTS_OPTIONS . " WHERE products_options_id = " . (int)$options_id . " LIMIT 1;"
+                );
+                if ($options->RecordCount() === 0) {
+                    continue;
+                }
+                $normalized = $this->normalizeAttributeKey((string)$options->fields['products_options_name']);
+                if ($normalized === 'paypal_subscription_plan_id' || $normalized === 'plan_id') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    protected function normalizeAttributeKey(string $label): string
+    {
+        $label = strtolower($label);
+        $label = preg_replace('/[^a-z0-9]+/', '_', $label) ?? $label;
+        return trim($label, '_');
+    }
+
     public function pre_confirmation_check()
     {
         // Set payment type - this module always uses card payments
@@ -637,6 +709,8 @@ class paypalr_creditcard extends base
             $_SESSION['PayPalRestful']['save_card'] = $_POST['paypalr_cc_save_card'];
         } elseif (isset($_POST['ppr_cc_save_card'])) {
             $_SESSION['PayPalRestful']['save_card'] = $_POST['ppr_cc_save_card'];
+        } elseif ($this->orderRequiresVaultedCard()) {
+            $_SESSION['PayPalRestful']['save_card'] = true;
         }
         
         // Validate card information
@@ -760,7 +834,8 @@ class paypalr_creditcard extends base
         }
 
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
-        $storeCard = $allowSaveCard && (!empty($_POST['paypalr_cc_save_card']) || !empty($_POST['ppr_cc_save_card']));
+        $forceSaveCard = $allowSaveCard && $this->orderRequiresVaultedCard();
+        $storeCard = $allowSaveCard && ($forceSaveCard || !empty($_POST['paypalr_cc_save_card']) || !empty($_POST['ppr_cc_save_card']));
         if ($storeCard === true) {
             $_SESSION['PayPalRestful']['save_card'] = true;
         } else {
