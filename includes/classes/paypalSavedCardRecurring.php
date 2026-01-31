@@ -686,10 +686,18 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                if (!empty($transaction_id) && $transaction_id !== $paypal_order_id) {
                        $txn_type = ($intent === 'AUTHORIZE') ? 'AUTHORIZE' : 'CAPTURE';
                        
-                       // Get expiration time for authorizations from the response
+                       // Get expiration time for authorizations from the response (with safe nested access)
                        $expiration_time = 'null';
-                       if ($intent === 'AUTHORIZE' && isset($payment_result['finalize_response']['purchase_units'][0]['payments']['authorizations'][0]['expiration_time'])) {
-                               $expiration_time = $payment_result['finalize_response']['purchase_units'][0]['payments']['authorizations'][0]['expiration_time'];
+                       if ($intent === 'AUTHORIZE') {
+                               $finalize_response = $payment_result['finalize_response'] ?? array();
+                               $purchase_units = $finalize_response['purchase_units'] ?? array();
+                               $first_unit = $purchase_units[0] ?? array();
+                               $payments = $first_unit['payments'] ?? array();
+                               $authorizations = $payments['authorizations'] ?? array();
+                               $first_auth = $authorizations[0] ?? array();
+                               if (isset($first_auth['expiration_time'])) {
+                                       $expiration_time = $first_auth['expiration_time'];
+                               }
                        }
                        
                        $sql_data_array_txn = array(
@@ -2299,8 +2307,12 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 		if (empty($comment)) {
 			return;
 		}
-		$sql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' SET comments = CONCAT(comments, \' ' . zen_db_input($comment) . ' \') WHERE saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id;
-		$db->Execute($sql);
+		// Use zen_db_perform for safer database operations
+		$current = $db->Execute('SELECT comments FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id);
+		if (!$current->EOF) {
+			$new_comments = $current->fields['comments'] . ' ' . $comment . ' ';
+			zen_db_perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, array('comments' => $new_comments), 'update', 'saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id);
+		}
 	}
 	
 	/**
