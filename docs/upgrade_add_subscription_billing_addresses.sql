@@ -5,7 +5,9 @@
  * This makes subscriptions independent by storing their own billing address
  * instead of relying on lookups from customer or order tables.
  *
- * Run this script once to upgrade the database schema.
+ * NOTE: As of version 1.3.10+, these columns are automatically added by
+ * SavedCreditCardsManager::ensureLegacyColumns() when the module is loaded.
+ * This SQL file is provided for manual upgrades or troubleshooting only.
  *
  * @copyright Copyright 2026 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
