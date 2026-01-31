@@ -1453,7 +1453,8 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                         <button type="button" id="apply-bulk-action" class="nmx-btn nmx-btn-primary">Apply</button>
                         <span id="selected-count" style="margin-left: 10px; color: #666;"></span>
                     </div>
-                
+                </form>
+
                 <div class="nmx-table-responsive">
                     <table class="nmx-table nmx-table-striped paypalr-subscriptions-table">
 
@@ -1905,7 +1906,6 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                         </tbody>
                     </table>
                 </div>
-                </form>
             </div>
         </div>
         
