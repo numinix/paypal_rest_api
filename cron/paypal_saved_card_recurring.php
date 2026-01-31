@@ -517,7 +517,8 @@ foreach ($todays_payments as $payment_id) {
         $failure_reason = '';
         $payment_intent = 'CAPTURE'; // Store credit is always considered "captured"
         $payment_result = array('success' => true, 'intent' => 'CAPTURE');
-        $paypalSavedCardRecurring->update_payment_status($payment_id, 'complete', '  Paid with store credit.  ');
+        // Note: Status will be set to 'scheduled' later in the flow with the next billing date
+        $paypalSavedCardRecurring->add_payment_comment($payment_id, '  Paid with store credit.  ');
     }
 
     $num_failed_payments = $paypalSavedCardRecurring->count_failed_payments($payment_id, $payment_details);

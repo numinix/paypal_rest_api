@@ -1381,7 +1381,10 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         $result = $this->process_rest_payment($payment_details, $total_to_bill);
                         if ($result['success']) {
                                 $transaction_id = $result['transaction_id'];
-                                $this->update_payment_status($paypal_saved_card_recurring_id, 'complete', 'Transaction id: ' . $transaction_id);
+                                // Note: Status is NOT set to 'complete' here. The cron will update the status
+                                // to 'scheduled' with the next billing date after creating the order.
+                                // This ensures only ONE subscription exists that keeps getting updated.
+                                $this->add_payment_comment($paypal_saved_card_recurring_id, 'Transaction id: ' . $transaction_id);
                                 return $result;
                         }
 $this->update_payment_status($paypal_saved_card_recurring_id, 'failed', 'Paypal error: ' . $result['error']);
@@ -1395,7 +1398,9 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
                 if (!$error) {
                         $payment_status = 'Completed';
                         $transaction_id = $this->paypalsavedcard->transaction_id;
-                        $this->update_payment_status($paypal_saved_card_recurring_id, 'complete', 'Transaction id: ' . $transaction_id);
+                        // Note: Status is NOT set to 'complete' here. The cron will update the status
+                        // to 'scheduled' with the next billing date after creating the order.
+                        $this->add_payment_comment($paypal_saved_card_recurring_id, 'Transaction id: ' . $transaction_id);
                         return array('success' => true, 'transaction_id' => $transaction_id);
                 }
                 $this->update_payment_status($paypal_saved_card_recurring_id, 'failed', 'Paypal error: ' . $error);
@@ -1902,9 +1907,15 @@ $payment_modules = new payment($_SESSION['payment']);
 	}
 	function create_order($order, $saved_credit_card_id = '', $order_status = 0) {
 		global $db, $zco_notifier, $order_total_modules, $order_totals;
-// Determine order status: use provided status, or fall back to default order status (2 = Processing)
+// Determine order status: use provided status, or fall back to PayPal module's captured order status
 		if ($order_status <= 0) {
-			$order_status = (int)(defined('DEFAULT_ORDERS_STATUS_ID') ? DEFAULT_ORDERS_STATUS_ID : 2);
+			// Use PayPal module's order status settings (same as checkout)
+			if (defined('MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID > 0) {
+				$order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+			} else {
+				// Fallback to Processing status (2) if PayPal config not available
+				$order_status = 2;
+			}
 		}
 // create the order
 		$zf_insert_id = $insert_id = $order->create($order_totals, $order_status);
@@ -2273,6 +2284,23 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 
 			$this->notify_error('Subscription ' . $status . '  for ' . $details['customers_firstname'] . ' ' . $details['customers_lastname'], $message, 'warning', $details['customers_email_address'], $details['customers_firstname']);
 		}
+	}
+	
+	/**
+	 * Add a comment to a subscription without changing its status.
+	 * Used to log transaction IDs and other notes during payment processing.
+	 * 
+	 * @param int $paypal_saved_card_recurring_id Subscription ID
+	 * @param string $comment Comment to add
+	 * @return void
+	 */
+	function add_payment_comment($paypal_saved_card_recurring_id, $comment = '') {
+		global $db;
+		if (empty($comment)) {
+			return;
+		}
+		$sql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' SET comments = CONCAT(comments, \' ' . zen_db_input($comment) . ' \') WHERE saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id;
+		$db->Execute($sql);
 	}
 	
 	/**
