@@ -245,6 +245,13 @@ class zcObserverPaypalrestfulRecurring
                 // Zen Cart-managed subscription -> Save to saved_credit_cards_recurring table
                 $this->log->write("    Product #$ordersProductsId: Zen Cart-managed subscription (no plan_id), routing to saved_credit_cards_recurring.");
                 
+                // Ensure saved_credit_cards_recurring table and billing address columns exist
+                // This must be called unconditionally because the table constants are always defined
+                // in extra_datafiles/ppr_database_tables.php, so conditional checks won't work
+                if (class_exists('PayPalRestful\\Common\\SavedCreditCardsManager')) {
+                    \PayPalRestful\Common\SavedCreditCardsManager::ensureSchema();
+                }
+                
                 $savedCreditCardId = $this->getSavedCreditCardId($vaultRecord);
                 if ($savedCreditCardId === 0) {
                     $this->log->write("    WARNING: No saved_credit_card_id found for vault, subscription cannot be created yet.");
@@ -607,11 +614,11 @@ class zcObserverPaypalrestfulRecurring
         
         global $db;
         
-        // Ensure TABLE_SAVED_CREDIT_CARDS is defined
-        if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
-            if (class_exists('PayPalRestful\\Common\\SavedCreditCardsManager')) {
-                \PayPalRestful\Common\SavedCreditCardsManager::ensureSchema();
-            }
+        // Ensure saved_credit_cards table exists and has all required columns
+        // This must be called unconditionally because the table constants are always defined
+        // in extra_datafiles/ppr_database_tables.php, so conditional checks won't work
+        if (class_exists('PayPalRestful\\Common\\SavedCreditCardsManager')) {
+            \PayPalRestful\Common\SavedCreditCardsManager::ensureSchema();
         }
         
         if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
@@ -691,11 +698,11 @@ class zcObserverPaypalrestfulRecurring
     {
         global $db;
         
-        // Ensure TABLE_SAVED_CREDIT_CARDS is defined
-        if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
-            if (class_exists('PayPalRestful\\Common\\SavedCreditCardsManager')) {
-                \PayPalRestful\Common\SavedCreditCardsManager::ensureSchema();
-            }
+        // Ensure saved_credit_cards table exists and has all required columns
+        // This must be called unconditionally because the table constants are always defined
+        // in extra_datafiles/ppr_database_tables.php, so conditional checks won't work
+        if (class_exists('PayPalRestful\\Common\\SavedCreditCardsManager')) {
+            \PayPalRestful\Common\SavedCreditCardsManager::ensureSchema();
         }
         
         if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
