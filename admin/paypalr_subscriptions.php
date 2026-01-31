@@ -675,26 +675,34 @@ if ($action === 'bulk_archive') {
     $redirectQuery = zen_get_all_get_params(['action']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
-    if (empty($subscriptionIds) || !is_array($subscriptionIds)) {
-        $messageStack->add_session('No subscriptions selected for bulk archive.', 'error');
+    // Validate that subscription_ids is an array
+    if (!is_array($subscriptionIds) || empty($subscriptionIds)) {
+        $messageStack->add_session(ERROR_BULK_ARCHIVE_NO_SELECTION, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Filter and validate subscription IDs
+    $validIds = array_filter(array_map('intval', $subscriptionIds), function($id) {
+        return $id > 0;
+    });
+    
+    if (empty($validIds)) {
+        $messageStack->add_session(ERROR_BULK_ARCHIVE_NO_SELECTION, 'error');
         zen_redirect($redirectUrl);
     }
     
     $archived = 0;
-    foreach ($subscriptionIds as $subscriptionId) {
-        $subscriptionId = (int) $subscriptionId;
-        if ($subscriptionId > 0) {
-            zen_db_perform(
-                TABLE_PAYPAL_SUBSCRIPTIONS,
-                ['is_archived' => 1, 'last_modified' => date('Y-m-d H:i:s')],
-                'update',
-                'paypal_subscription_id = ' . (int) $subscriptionId
-            );
-            $archived++;
-        }
+    foreach ($validIds as $subscriptionId) {
+        zen_db_perform(
+            TABLE_PAYPAL_SUBSCRIPTIONS,
+            ['is_archived' => 1, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'paypal_subscription_id = ' . (int) $subscriptionId
+        );
+        $archived++;
     }
     
-    $messageStack->add_session(sprintf('Successfully archived %d subscription(s).', $archived), 'success');
+    $messageStack->add_session(sprintf(SUCCESS_BULK_ARCHIVED, $archived), 'success');
     zen_redirect($redirectUrl);
 }
 
@@ -704,26 +712,34 @@ if ($action === 'bulk_unarchive') {
     $redirectQuery = zen_get_all_get_params(['action']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
     
-    if (empty($subscriptionIds) || !is_array($subscriptionIds)) {
-        $messageStack->add_session('No subscriptions selected for bulk unarchive.', 'error');
+    // Validate that subscription_ids is an array
+    if (!is_array($subscriptionIds) || empty($subscriptionIds)) {
+        $messageStack->add_session(ERROR_BULK_UNARCHIVE_NO_SELECTION, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Filter and validate subscription IDs
+    $validIds = array_filter(array_map('intval', $subscriptionIds), function($id) {
+        return $id > 0;
+    });
+    
+    if (empty($validIds)) {
+        $messageStack->add_session(ERROR_BULK_UNARCHIVE_NO_SELECTION, 'error');
         zen_redirect($redirectUrl);
     }
     
     $unarchived = 0;
-    foreach ($subscriptionIds as $subscriptionId) {
-        $subscriptionId = (int) $subscriptionId;
-        if ($subscriptionId > 0) {
-            zen_db_perform(
-                TABLE_PAYPAL_SUBSCRIPTIONS,
-                ['is_archived' => 0, 'last_modified' => date('Y-m-d H:i:s')],
-                'update',
-                'paypal_subscription_id = ' . (int) $subscriptionId
-            );
-            $unarchived++;
-        }
+    foreach ($validIds as $subscriptionId) {
+        zen_db_perform(
+            TABLE_PAYPAL_SUBSCRIPTIONS,
+            ['is_archived' => 0, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'paypal_subscription_id = ' . (int) $subscriptionId
+        );
+        $unarchived++;
     }
     
-    $messageStack->add_session(sprintf('Successfully unarchived %d subscription(s).', $unarchived), 'success');
+    $messageStack->add_session(sprintf(SUCCESS_BULK_UNARCHIVED, $unarchived), 'success');
     zen_redirect($redirectUrl);
 }
 

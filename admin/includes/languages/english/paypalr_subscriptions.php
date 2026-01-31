@@ -19,6 +19,8 @@ define('ERROR_SUBSCRIPTION_SUSPEND_MISSING_ID', 'Unable to suspend subscription.
 define('ERROR_SUBSCRIPTION_REACTIVATE_MISSING_ID', 'Unable to reactivate subscription. Missing identifier.');
 define('ERROR_SUBSCRIPTION_ARCHIVE_MISSING_ID', 'Unable to archive subscription. Missing identifier.');
 define('ERROR_SUBSCRIPTION_UNARCHIVE_MISSING_ID', 'Unable to unarchive subscription. Missing identifier.');
+define('ERROR_BULK_ARCHIVE_NO_SELECTION', 'No subscriptions selected for bulk archive.');
+define('ERROR_BULK_UNARCHIVE_NO_SELECTION', 'No subscriptions selected for bulk unarchive.');
 
 // Success messages
 define('SUCCESS_SUBSCRIPTION_CANCELLED', 'Subscription #%d has been cancelled.');
@@ -28,3 +30,5 @@ define('SUCCESS_SUBSCRIPTION_ARCHIVED', 'Subscription #%d has been archived.');
 define('SUCCESS_SUBSCRIPTION_UNARCHIVED', 'Subscription #%d has been unarchived.');
 define('SUCCESS_SUBSCRIPTION_STATUS_UPDATED', 'Subscription #%d status has been updated to %s.');
 define('SUCCESS_SUBSCRIPTION_UPDATED', 'Subscription #%d has been updated.');
+define('SUCCESS_BULK_ARCHIVED', 'Successfully archived %d subscription(s).');
+define('SUCCESS_BULK_UNARCHIVED', 'Successfully unarchived %d subscription(s).');
