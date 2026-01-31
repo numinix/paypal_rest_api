@@ -692,6 +692,8 @@ if ($action === 'bulk_archive') {
     }
     
     // Perform bulk update with a single query for efficiency
+    // Note: $validIds contains only validated positive integers (filtered through intval),
+    // so concatenation is safe from SQL injection
     $idsList = implode(',', $validIds);
     $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
             SET is_archived = 1, last_modified = '" . date('Y-m-d H:i:s') . "'
@@ -726,6 +728,8 @@ if ($action === 'bulk_unarchive') {
     }
     
     // Perform bulk update with a single query for efficiency
+    // Note: $validIds contains only validated positive integers (filtered through intval),
+    // so concatenation is safe from SQL injection
     $idsList = implode(',', $validIds);
     $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
             SET is_archived = 0, last_modified = '" . date('Y-m-d H:i:s') . "'
