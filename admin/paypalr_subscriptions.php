@@ -1422,6 +1422,36 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                             $vaultOptions[(string) $vaultCard['paypal_vault_id']] = $label;
                         }
                     }
+                    
+                    // Prepare saved credit card options for savedcard subscriptions
+                    $subscriptionType = $row['subscription_type'] ?? 'rest';
+                    $savedCardOptions = ['0' => 'None'];
+                    if ($subscriptionType === 'savedcard' && $customersId > 0 && defined('TABLE_SAVED_CREDIT_CARDS')) {
+                        $savedCardsQuery = $db->Execute(
+                            "SELECT saved_credit_card_id, type, last_digits, holder_name, is_default
+                             FROM " . TABLE_SAVED_CREDIT_CARDS . "
+                             WHERE customers_id = " . (int)$customersId . "
+                               AND is_deleted = 0
+                             ORDER BY is_default DESC, saved_credit_card_id DESC"
+                        );
+                        if ($savedCardsQuery instanceof queryFactoryResult) {
+                            while (!$savedCardsQuery->EOF) {
+                                $cardId = (int)$savedCardsQuery->fields['saved_credit_card_id'];
+                                $label = '#' . $cardId . ' ' . ($savedCardsQuery->fields['type'] ?? 'Card');
+                                if (!empty($savedCardsQuery->fields['last_digits'])) {
+                                    $label .= ' ••••' . $savedCardsQuery->fields['last_digits'];
+                                }
+                                if (!empty($savedCardsQuery->fields['holder_name'])) {
+                                    $label .= ' - ' . $savedCardsQuery->fields['holder_name'];
+                                }
+                                if ((int)$savedCardsQuery->fields['is_default'] === 1) {
+                                    $label .= ' (Default)';
+                                }
+                                $savedCardOptions[(string)$cardId] = $label;
+                                $savedCardsQuery->MoveNext();
+                            }
+                        }
+                    }
 
                     ?>
                     <?php echo zen_draw_form($formId, FILENAME_PAYPALR_SUBSCRIPTIONS, '', 'post', 'id="' . $formId . '"'); ?>
@@ -1518,17 +1548,27 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                                     
                                     <!-- Vault & Status Column -->
                                     <div>
-                                        <h4 style="margin-top: 0; color: #00618d;">Status & Vault</h4>
+                                        <h4 style="margin-top: 0; color: #00618d;">Status & <?php echo $subscriptionType === 'savedcard' ? 'Payment Method' : 'Vault'; ?></h4>
                                         <label>Current Status</label>
                                         <select name="status" form="<?php echo $formId; ?>" class="nmx-form-control">
                                             <?php echo paypalr_render_select_options($availableStatuses, $row['status'] ?? ''); ?>
                                         </select>
+                                        <?php if ($subscriptionType === 'savedcard') { ?>
+                                        <label>Payment Method (Saved Card)</label>
+                                        <select name="saved_credit_card_id" form="<?php echo $formId; ?>" class="nmx-form-control">
+                                            <?php echo paypalr_render_select_options($savedCardOptions, $row['saved_credit_card_id'] ?? '0'); ?>
+                                        </select>
+                                        <p style="margin: 4px 0 0 0; font-size: 0.85em; color: #666;">
+                                            <em>Change the payment method used for this subscription.</em>
+                                        </p>
+                                        <?php } else { ?>
                                         <label>Vault Assignment</label>
                                         <select name="paypal_vault_id" form="<?php echo $formId; ?>" class="nmx-form-control">
                                             <?php echo paypalr_render_select_options($vaultOptions, $row['paypal_vault_id'] ?? '0'); ?>
                                         </select>
                                         <label>Vault ID (manual override)</label>
                                         <input type="text" name="vault_id" value="<?php echo zen_output_string_protected((string) ($row['vault_id'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        <?php } ?>
                                     </div>
                                 </div>
                                 
