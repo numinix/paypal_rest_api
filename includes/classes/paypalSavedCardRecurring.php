@@ -483,7 +483,11 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                if (!(strlen($credential_id) > 0)) {
                        return array('success' => false, 'error' => 'Missing stored credential identifier');
                }
-               $intent = 'CAPTURE';
+               // Determine intent based on transaction mode setting - recurring card payments should respect the authorize/capture mode
+               $transaction_mode = defined('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE') ? MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE : 'Final Sale';
+               // For card payments, 'Auth Only (All Txns)' and 'Auth Only (Card-Only)' both mean AUTHORIZE
+               // 'Final Sale' means CAPTURE
+               $intent = ($transaction_mode === 'Final Sale') ? 'CAPTURE' : 'AUTHORIZE';
                $currency = $this->get_payment_currency($payment_details);
                $amount = number_format((float) $total_to_bill, 2, '.', '');
                $request = array('intent' => $intent, 'purchase_units' => array(array('amount' => array('currency_code' => $currency, 'value' => $amount))));
@@ -545,11 +549,12 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                }
                if (is_object($this->paypalsavedcard)) {
                        $this->paypalsavedcard->transaction_id = $transaction_id;
-                       $this->paypalsavedcard->payment_status = 'Completed';
+                       // Set payment_status based on intent: 'Completed' for captures, 'Pending' for authorizations
+                       $this->paypalsavedcard->payment_status = ($intent === 'CAPTURE') ? 'Completed' : 'Pending';
                        $this->paypalsavedcard->payment_type = 'PayPal REST';
                        $this->paypalsavedcard->payment_time = date('Y-m-d H:i:s');
                        $this->paypalsavedcard->transactiontype = 'rest';
-                       $this->paypalsavedcard->pendingreason = '';
+                       $this->paypalsavedcard->pendingreason = ($intent === 'AUTHORIZE') ? 'authorization' : '';
                        $this->paypalsavedcard->amt = $amount;
                        $this->paypalsavedcard->responsedata = array('ORDER_ID' => $order_id, 'INTENT' => $intent, 'CURRENCYCODE' => $currency, 'AMT' => $amount, 'CREATE_ORDER_RESPONSE' => $normalized_create, 'FINALIZE_ORDER_RESPONSE' => $normalized_capture);
                }
