@@ -509,11 +509,14 @@ foreach ($todays_payments as $payment_id) {
         $success = $payment_result['success'];
         $txn_id = $payment_result['transaction_id'] ?? '';
         $failure_reason = $payment_result['error'] ?? '';
+        $payment_intent = $payment_result['intent'] ?? 'CAPTURE';
     } else {
         $_SESSION['payment'] = 'storecredit';
         $success = true; //SC can't fail
         $txn_id = '';
         $failure_reason = '';
+        $payment_intent = 'CAPTURE'; // Store credit is always considered "captured"
+        $payment_result = array('success' => true, 'intent' => 'CAPTURE');
         $paypalSavedCardRecurring->update_payment_status($payment_id, 'complete', '  Paid with store credit.  ');
     }
 
@@ -522,6 +525,9 @@ foreach ($todays_payments as $payment_id) {
     $log .= "\n Recurring Payment id " . $payment_id . ' | ' . $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'] . ' |  ' . $payment_details['products_name'] . '| amount: $' . $payment_details['amount'] . ' | ';
 
     if ($success) {
+        // Determine the correct order status based on payment intent (AUTHORIZE vs CAPTURE)
+        $recurring_order_status = $paypalSavedCardRecurring->get_order_status_for_intent($payment_intent);
+        
         $attributes = $extractSubscriptionAttributes($payment_details);
         $next_payment = null;
         $next_payment_display = 'N/A';
@@ -567,7 +573,13 @@ foreach ($todays_payments as $payment_id) {
             $payment_details['subscription_attributes']['intended_billing_date'] = $nextCycleDue->format('Y-m-d');
         }
         $log .= ' Payment successful ';
-        $order_id = $paypalSavedCardRecurring->create_order($order, $payment_details['saved_credit_card_id']); //create an order in Zen Cart
+        $order_id = $paypalSavedCardRecurring->create_order($order, $payment_details['saved_credit_card_id'], $recurring_order_status); //create an order in Zen Cart
+        
+        // Record the PayPal transaction in the database for admin refund/void functionality
+        if ($order_id > 0 && !empty($payment_result['paypal_order_id'])) {
+            $paypalSavedCardRecurring->record_paypal_transaction($order_id, $payment_result, $payment_details);
+        }
+        
         $processedDateString = date('Y-m-d');
         $updatePayload = array('order_id' => $order_id, 'date' => $processedDateString);
         if ($intendedBillingDate instanceof DateTime) {
