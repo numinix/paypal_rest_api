@@ -698,6 +698,78 @@ if ($action === 'unarchive_subscription') {
     zen_redirect($redirectUrl);
 }
 
+// Bulk archive subscriptions action
+if ($action === 'bulk_archive') {
+    $subscriptionIds = $_POST['subscription_ids'] ?? [];
+    $redirectQuery = zen_get_all_get_params(['action']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
+    
+    // Validate that subscription_ids is an array
+    if (!is_array($subscriptionIds) || empty($subscriptionIds)) {
+        $messageStack->add_session(ERROR_BULK_ARCHIVE_NO_SELECTION, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Filter and validate subscription IDs
+    $validIds = array_filter(array_map('intval', $subscriptionIds), function($id) {
+        return $id > 0;
+    });
+    
+    if (empty($validIds)) {
+        $messageStack->add_session(ERROR_BULK_ARCHIVE_NO_SELECTION, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Perform bulk update with a single query for efficiency
+    // Note: $validIds contains only validated positive integers (filtered through intval),
+    // so concatenation is safe from SQL injection
+    $idsList = implode(',', $validIds);
+    $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+            SET is_archived = 1, last_modified = '" . date('Y-m-d H:i:s') . "'
+            WHERE paypal_subscription_id IN (" . $idsList . ")";
+    $db->Execute($sql);
+    
+    $archived = count($validIds);
+    $messageStack->add_session(sprintf(SUCCESS_BULK_ARCHIVED, $archived), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// Bulk unarchive subscriptions action
+if ($action === 'bulk_unarchive') {
+    $subscriptionIds = $_POST['subscription_ids'] ?? [];
+    $redirectQuery = zen_get_all_get_params(['action']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALR_SUBSCRIPTIONS, $redirectQuery);
+    
+    // Validate that subscription_ids is an array
+    if (!is_array($subscriptionIds) || empty($subscriptionIds)) {
+        $messageStack->add_session(ERROR_BULK_UNARCHIVE_NO_SELECTION, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Filter and validate subscription IDs
+    $validIds = array_filter(array_map('intval', $subscriptionIds), function($id) {
+        return $id > 0;
+    });
+    
+    if (empty($validIds)) {
+        $messageStack->add_session(ERROR_BULK_UNARCHIVE_NO_SELECTION, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Perform bulk update with a single query for efficiency
+    // Note: $validIds contains only validated positive integers (filtered through intval),
+    // so concatenation is safe from SQL injection
+    $idsList = implode(',', $validIds);
+    $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+            SET is_archived = 0, last_modified = '" . date('Y-m-d H:i:s') . "'
+            WHERE paypal_subscription_id IN (" . $idsList . ")";
+    $db->Execute($sql);
+    
+    $unarchived = count($validIds);
+    $messageStack->add_session(sprintf(SUCCESS_BULK_UNARCHIVED, $unarchived), 'success');
+    zen_redirect($redirectUrl);
+}
+
 // CSV Export action
 if ($action === 'export_csv') {
     $exportFilters = [
@@ -1368,11 +1440,26 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                 <div class="nmx-panel-title">Vaulted Subscriptions</div>
             </div>
             <div class="nmx-panel-body">
+                <!-- Bulk Actions Form -->
+                <?php echo zen_draw_form('bulk_actions_form', FILENAME_PAYPALR_SUBSCRIPTIONS, '', 'post', 'id="bulk-actions-form"'); ?>
+                    <?php echo zen_draw_hidden_field('action', ''); ?>
+                    <div class="bulk-actions-controls" style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                        <label for="bulk-action-select" style="margin: 0;">Bulk Actions:</label>
+                        <select name="bulk_action" id="bulk-action-select" class="nmx-form-control" style="width: auto;">
+                            <option value="">-- Select Action --</option>
+                            <option value="bulk_archive">Archive Selected</option>
+                            <option value="bulk_unarchive">Unarchive Selected</option>
+                        </select>
+                        <button type="button" id="apply-bulk-action" class="nmx-btn nmx-btn-primary">Apply</button>
+                        <span id="selected-count" style="margin-left: 10px; color: #666;"></span>
+                    </div>
+                
                 <div class="nmx-table-responsive">
                     <table class="nmx-table nmx-table-striped paypalr-subscriptions-table">
 
                         <thead>
                             <tr>
+                                <th style="width: 40px;"><input type="checkbox" id="select-all-subscriptions" title="Select/Unselect All"></th>
                                 <th>Subscription</th>
                                 <th>Type</th>
                                 <th>Customer</th>
@@ -1386,7 +1473,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                         <tbody>
                             <?php if (empty($subscriptionRows)) { ?>
                                 <tr>
-                                    <td colspan="8">No subscriptions found for the selected filters.</td>
+                                    <td colspan="9">No subscriptions found for the selected filters.</td>
                                 </tr>
                             <?php }
                 foreach ($subscriptionRows as $row) {
@@ -1464,6 +1551,9 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                     
                     <!-- Summary row (always visible, clickable to expand/collapse) -->
                     <tr class="subscription-summary subscription-row-collapsed" onclick="toggleSubscription(<?php echo $subscriptionId; ?>, event)" data-subscription-id="<?php echo $subscriptionId; ?>">
+                        <td onclick="event.stopPropagation();">
+                            <input type="checkbox" name="subscription_ids[]" value="<?php echo $subscriptionId; ?>" class="subscription-checkbox">
+                        </td>
                         <td>
                             <span class="toggle-icon"></span>
                             <strong>#<?php echo (int) $row['paypal_subscription_id']; ?></strong>
@@ -1762,6 +1852,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                         </tbody>
                     </table>
                 </div>
+                </form>
             </div>
         </div>
         
@@ -1860,6 +1951,86 @@ document.addEventListener('DOMContentLoaded', function() {
             e.stopPropagation();
         });
     });
+    
+    // Select All / Unselect All functionality
+    const selectAllCheckbox = document.getElementById('select-all-subscriptions');
+    const subscriptionCheckboxes = document.querySelectorAll('.subscription-checkbox');
+    const selectedCountSpan = document.getElementById('selected-count');
+    const applyBulkActionBtn = document.getElementById('apply-bulk-action');
+    const bulkActionSelect = document.getElementById('bulk-action-select');
+    const bulkActionsForm = document.getElementById('bulk-actions-form');
+    
+    // Update selected count display
+    function updateSelectedCount() {
+        const checkedCount = document.querySelectorAll('.subscription-checkbox:checked').length;
+        if (checkedCount > 0) {
+            selectedCountSpan.textContent = checkedCount + ' subscription(s) selected';
+        } else {
+            selectedCountSpan.textContent = '';
+        }
+    }
+    
+    // Select all checkbox handler
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            subscriptionCheckboxes.forEach(function(checkbox) {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updateSelectedCount();
+        });
+    }
+    
+    // Individual checkbox handler
+    subscriptionCheckboxes.forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            // Update select all checkbox state
+            const allChecked = Array.from(subscriptionCheckboxes).every(cb => cb.checked);
+            const someChecked = Array.from(subscriptionCheckboxes).some(cb => cb.checked);
+            
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = allChecked;
+                selectAllCheckbox.indeterminate = someChecked && !allChecked;
+            }
+            
+            updateSelectedCount();
+        });
+    });
+    
+    // Apply bulk action handler
+    if (applyBulkActionBtn) {
+        applyBulkActionBtn.addEventListener('click', function() {
+            const selectedAction = bulkActionSelect.value;
+            const checkedCount = document.querySelectorAll('.subscription-checkbox:checked').length;
+            
+            if (!selectedAction) {
+                alert('Please select a bulk action.');
+                return;
+            }
+            
+            if (checkedCount === 0) {
+                alert('Please select at least one subscription.');
+                return;
+            }
+            
+            // Confirmation messages
+            let confirmMessage = '';
+            if (selectedAction === 'bulk_archive') {
+                confirmMessage = 'Are you sure you want to archive ' + checkedCount + ' subscription(s)?';
+            } else if (selectedAction === 'bulk_unarchive') {
+                confirmMessage = 'Are you sure you want to unarchive ' + checkedCount + ' subscription(s)?';
+            }
+            
+            if (confirm(confirmMessage)) {
+                // Set the action in the hidden field
+                bulkActionsForm.querySelector('input[name="action"]').value = selectedAction;
+                // Submit the form
+                bulkActionsForm.submit();
+            }
+        });
+    }
+    
+    // Initialize count on page load
+    updateSelectedCount();
 });
 </script>
 
