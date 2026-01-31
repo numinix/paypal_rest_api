@@ -21,6 +21,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_SAVED_CARDS' => 'Saved cards:',
     'MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC' => 'Card',
     'MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT' => 'Save this card for future checkouts?',
+    'MODULE_PAYMENT_PAYPALR_SAVE_CARD_SUBSCRIPTION_NOTICE' => 'This card will be stored to process your subscription payments.',
     'MODULE_PAYMENT_PAYPALR_SECRET_L' => 'Live Secret',
     'MODULE_PAYMENT_PAYPALR_SECRET_S' => 'Sandbox Secret',
     'MODULE_PAYMENT_PAYPALR_SERVER' => 'Transaction Server',
