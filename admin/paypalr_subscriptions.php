@@ -1559,7 +1559,7 @@ function paypalr_render_select_options(array $options, $selectedValue): string
                             <strong>#<?php echo (int) $row['paypal_subscription_id']; ?></strong>
                         </td>
                         <td>
-                            <span style="padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; background: <?php
+                            <span style="padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; background: <?php
                                 echo ($row['subscription_type'] ?? 'rest') === 'rest' ? '#007bff' : '#28a745';
                             ?>; color: white;">
                                 <?php echo ($row['subscription_type'] ?? 'rest') === 'rest' ? 'REST API' : 'Saved Card'; ?>
@@ -2000,7 +2000,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (applyBulkActionBtn) {
         applyBulkActionBtn.addEventListener('click', function() {
             const selectedAction = bulkActionSelect.value;
-            const checkedCount = document.querySelectorAll('.subscription-checkbox:checked').length;
+            const checkedBoxes = document.querySelectorAll('.subscription-checkbox:checked');
+            const checkedCount = checkedBoxes.length;
             
             if (!selectedAction) {
                 alert('Please select a bulk action.');
@@ -2023,6 +2024,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if (confirm(confirmMessage)) {
                 // Set the action in the hidden field
                 bulkActionsForm.querySelector('input[name="action"]').value = selectedAction;
+                // Remove any previously injected subscription ids
+                bulkActionsForm.querySelectorAll('input[name="subscription_ids[]"]').forEach(function(input) {
+                    input.remove();
+                });
+                // Inject selected subscription ids into the bulk form payload
+                checkedBoxes.forEach(function(checkbox) {
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'subscription_ids[]';
+                    hiddenInput.value = checkbox.value;
+                    bulkActionsForm.appendChild(hiddenInput);
+                });
                 // Submit the form
                 bulkActionsForm.submit();
             }
