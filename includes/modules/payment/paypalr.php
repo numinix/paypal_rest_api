@@ -312,7 +312,7 @@ class paypalr extends base
         } else {
             $order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
         }
-        $this->order_status = ($order_status > 1) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
+        $this->order_status = ($order_status > 0) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
 
         $this->zone = $this->getModuleZoneSetting();
 

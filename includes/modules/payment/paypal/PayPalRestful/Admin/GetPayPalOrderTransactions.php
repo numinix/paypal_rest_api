@@ -199,7 +199,7 @@ class GetPayPalOrderTransactions
             switch ($record_type) {
                 case 'authorizations':
                     $authorizations = $child_txns;
-                    $this->updateAuthorizations($authorizations);
+                    $this->updateAuthorizations($authorizations, $primary_txn_id);
                     break;
                 case 'captures':
                     $captures = $child_txns;
@@ -215,17 +215,18 @@ class GetPayPalOrderTransactions
         }
     }
 
-    protected function updateAuthorizations(array $authorizations)
+    protected function updateAuthorizations(array $authorizations, string $primary_txn_id = '')
     {
         foreach ($authorizations as $next_authorization) {
             $authorization_txn_id = $next_authorization['id'];
-            $first_auth_txn_id = $first_auth_txn_id ?? $authorization_txn_id;
             if ($this->transactionExists($authorization_txn_id) === true) {
                 continue;
             }
 
             $this->externalTxnAdded = true;
-            $this->addDbTransaction('AUTHORIZE', $next_authorization, 'Externally added.', true, $first_auth_txn_id);
+            // Use the primary order ID (CREATE's txn_id) as the parent for AUTHORIZE transactions
+            $parent_txn_id = ($primary_txn_id !== '') ? $primary_txn_id : $authorization_txn_id;
+            $this->addDbTransaction('AUTHORIZE', $next_authorization, 'Externally added.', true, $parent_txn_id);
             $this->updateMainTransaction($next_authorization);
         }
     }
