@@ -81,7 +81,7 @@ if (!file_exists($recurringPath)) {
 $recurringContent = file_get_contents($recurringPath);
 
 // The function should NOT have the fallback to $data['id']
-$hasBadFallback = preg_match('/function extract_rest_payment_id.*?if \(isset\(\$data\[.id.\]\)\).*?return \$data\[.id.\]/s', $recurringContent);
+$hasBadFallback = preg_match('/function extract_rest_payment_id.*?if \(isset\(\$data\[\'id\'\]\)\).*?return \$data\[\'id\'\]/s', $recurringContent);
 $hasGoodComment = strpos($recurringContent, "Do NOT fall back to \$data['id']") !== false;
 
 if (!$hasBadFallback && $hasGoodComment) {
