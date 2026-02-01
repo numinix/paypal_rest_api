@@ -792,8 +792,7 @@ foreach ($todays_payments as $payment_id) {
             $log .= ' Status set to FAILED after ' . $num_failed_payments . ' consecutive failed attempts (max: ' . $max_fails_allowed . '). Customer notified.';
         } else { 
             // Keep status as 'scheduled' - subscription will be retried by cron on next run
-            // Do NOT change status or next_payment_date - this keeps the subscription in the retry queue
-            // Do NOT update next_payment_date - this prevents subscription drift
+            // Do NOT update next_payment_date or change status - this prevents subscription drift and keeps the subscription in the retry queue
             // The next billing date is calculated from the original schedule, not from today
             $paypalSavedCardRecurring->add_payment_comment($payment_id, ' Payment attempt failed. Will retry. ');
             $message = sprintf(SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL, $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['products_name'], $payment_details['last_digits'], $payment_details['products_name']);
