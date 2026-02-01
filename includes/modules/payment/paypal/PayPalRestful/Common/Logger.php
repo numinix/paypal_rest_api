@@ -40,6 +40,12 @@ class Logger
         if (!empty($current_page_base) && strpos((string)$current_page_base, 'webhook') !== false) {
             $logfile_suffix = 'webhook-' . $uniqueName;
             $logfile_suffix = trim($logfile_suffix, '-');
+        } elseif (!empty($_SESSION['in_cron'])) {
+            // Running from cron - use a dedicated cron log file
+            $logfile_suffix = 'cron';
+            if (!empty($uniqueName)) {
+                $logfile_suffix .= '-' . $uniqueName;
+            }
         } elseif (IS_ADMIN_FLAG === false) {
             $logfile_suffix = 'c-' . ($_SESSION['customer_id'] ?? 'na') . '-' . Helpers::getCustomerNameSuffix();
         } else {
