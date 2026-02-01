@@ -426,6 +426,64 @@ $advanceBillingCycle = function (DateTime $baseDate, array $attributes) {
     return $next;
 };
 
+/**
+ * Calculate the next billing date that falls on the original schedule.
+ * 
+ * This function ensures that manually-edited next_payment_date values don't
+ * cause the billing schedule to drift. It uses the subscription's date_added
+ * (anchor) to calculate what the proper billing dates should be, then returns
+ * the first date in that schedule that is after the current next_payment_date.
+ *
+ * Example: If anchor is 2026-01-07, billing is weekly, and next_payment_date
+ * was manually changed to 2026-02-01, this returns 2026-02-04 (the next date
+ * in the weekly pattern starting from 01-07).
+ */
+$calculateNextScheduledBillingDate = function (DateTime $currentNextPaymentDate, array $paymentDetails, array $attributes) use ($parseRecurringDate, $advanceBillingCycle) {
+    // Get the anchor date (date_added) from the subscription record
+    $anchorDateString = '';
+    if (isset($paymentDetails['date_added']) && $paymentDetails['date_added'] !== '' && $paymentDetails['date_added'] !== null) {
+        $anchorDateString = $paymentDetails['date_added'];
+    }
+    
+    // If no anchor date available, fall back to standard behavior
+    if ($anchorDateString === '') {
+        return $advanceBillingCycle($currentNextPaymentDate, $attributes);
+    }
+    
+    $anchorDate = $parseRecurringDate($anchorDateString);
+    if (!($anchorDate instanceof DateTime)) {
+        return $advanceBillingCycle($currentNextPaymentDate, $attributes);
+    }
+    $anchorDate->setTime(0, 0, 0);
+    
+    // Start from the anchor and advance through the billing schedule
+    // until we find a date that's after the current next_payment_date
+    $scheduledDate = clone $anchorDate;
+    $currentNextPaymentDate->setTime(0, 0, 0);
+    
+    // Safety limit to prevent infinite loops (100 years worth of daily cycles)
+    $maxIterations = 36500;
+    $iterations = 0;
+    
+    while ($scheduledDate <= $currentNextPaymentDate && $iterations < $maxIterations) {
+        $nextScheduledDate = $advanceBillingCycle($scheduledDate, $attributes);
+        if (!($nextScheduledDate instanceof DateTime)) {
+            // If advance fails, fall back to standard behavior
+            return $advanceBillingCycle($currentNextPaymentDate, $attributes);
+        }
+        $scheduledDate = $nextScheduledDate;
+        $scheduledDate->setTime(0, 0, 0);
+        $iterations++;
+    }
+    
+    // Safety check - if we hit max iterations, fall back to standard behavior
+    if ($iterations >= $maxIterations) {
+        return $advanceBillingCycle($currentNextPaymentDate, $attributes);
+    }
+    
+    return $scheduledDate;
+};
+
 // Debug: Check what subscriptions exist in the database (excluding cancelled)
 $debug_sql = 'SELECT saved_credit_card_recurring_id, status, next_payment_date, products_name FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE status != \'cancelled\' ORDER BY saved_credit_card_recurring_id';
 $debug_result = $db->Execute($debug_sql);
@@ -584,7 +642,9 @@ foreach ($todays_payments as $payment_id) {
             }
             $payment_details['subscription_attributes']['intended_billing_date'] = $intendedBillingDateString;
 
-            $nextCycleDue = $advanceBillingCycle($intendedBillingDate, $attributes);
+            // Calculate the next billing date based on the original schedule (anchor date)
+            // This prevents schedule drift when next_payment_date is manually edited
+            $nextCycleDue = $calculateNextScheduledBillingDate($intendedBillingDate, $payment_details, $attributes);
             if (!($nextCycleDue instanceof DateTime)) {
                 $log .= ' Invalid Date! ';
                 continue;
@@ -733,6 +793,7 @@ foreach ($todays_payments as $payment_id) {
         } else { 
             // Keep status as 'scheduled' - subscription will be retried by cron on next run
             // Do NOT change status or next_payment_date - this keeps the subscription in the retry queue
+            // Do NOT update next_payment_date - this prevents subscription drift
             // The next billing date is calculated from the original schedule, not from today
             $paypalSavedCardRecurring->add_payment_comment($payment_id, ' Payment attempt failed. Will retry. ');
             $message = sprintf(SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL, $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['products_name'], $payment_details['last_digits'], $payment_details['products_name']);
