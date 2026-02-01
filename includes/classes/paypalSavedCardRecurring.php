@@ -197,9 +197,9 @@ return $this->PayPalRestful;
                                }
                        }
                }
-              if (isset($data['id'])) {
-                      return $data['id'];
-              }
+              // Note: Do NOT fall back to $data['id'] here as that would return the PayPal order ID
+              // instead of the capture/authorization ID, which would cause record_paypal_transaction
+              // to skip inserting the AUTHORIZE/CAPTURE record (since transaction_id would equal paypal_order_id)
               return false;
       }
       protected function paypal_recurring_has_column($column)
