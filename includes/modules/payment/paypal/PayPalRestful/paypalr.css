@@ -42,6 +42,7 @@
     display: none;
 }
 
+#paymentMethodContainer .ppr-cc-expiration,
 .ppr-cc-expiration {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -49,6 +50,7 @@
     width: 100%;
 }
 
+#paymentMethodContainer .ppr-cc-expiration select,
 .ppr-cc-expiration select {
     min-width: 0 !important;
     width: 100% !important;
