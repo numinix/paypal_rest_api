@@ -45,12 +45,20 @@
 .ppr-cc-expiration {
     display: flex;
     gap: 0.75rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .ppr-cc-expiration select {
-    flex: 1 1 160px;
-    min-width: 0;
+    flex: 1 1 0;
+    min-width: 8rem;
+    width: auto;
+    max-width: 100%;
+}
+
+@media (max-width: 600px) {
+    .ppr-cc-expiration {
+        flex-wrap: wrap;
+    }
 }
 
 @media (max-width: 800px) {
