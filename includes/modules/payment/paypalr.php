@@ -678,16 +678,28 @@ class paypalr extends base
                     SavedCreditCardsManager::ensureSchema();
 
                 case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.7', '<'): //- Fall through from above
-                    // Ensure products_model column exists in saved_credit_cards_recurring table
-                    // This column is included in new installations but may be missing from 
-                    // tables that were created before it was added to the schema
+                    // Ensure products_name/products_model columns exist in saved_credit_cards_recurring table
+                    // These columns are included in new installations but may be missing from
+                    // tables that were created before they were added to the schema
                     if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
                         $table_exists = $db->Execute("SHOW TABLES LIKE '" . TABLE_SAVED_CREDIT_CARDS_RECURRING . "'");
-                        if (!$table_exists->EOF && $sniffer->field_exists(TABLE_SAVED_CREDIT_CARDS_RECURRING, 'products_model') === false) {
-                            $db->Execute(
-                                "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
-                                   ADD products_model VARCHAR(255) NOT NULL DEFAULT '' AFTER products_name"
-                            );
+                        if (!$table_exists->EOF) {
+                            $has_products_name = $sniffer->field_exists(TABLE_SAVED_CREDIT_CARDS_RECURRING, 'products_name');
+                            if ($has_products_name === false) {
+                                $db->Execute(
+                                    "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
+                                       ADD products_name VARCHAR(255) NOT NULL DEFAULT ''"
+                                );
+                                $has_products_name = true;
+                            }
+
+                            if ($sniffer->field_exists(TABLE_SAVED_CREDIT_CARDS_RECURRING, 'products_model') === false) {
+                                $after_clause = $has_products_name ? ' AFTER products_name' : '';
+                                $db->Execute(
+                                    "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
+                                       ADD products_model VARCHAR(255) NOT NULL DEFAULT ''" . $after_clause
+                                );
+                            }
                         }
                     }
 
