@@ -3,8 +3,8 @@
  * Test that verifies all wallet modules (Google Pay, Apple Pay, Venmo) load the PayPal SDK
  * with all required components to ensure compatibility when multiple modules are enabled.
  *
- * The PayPal SDK should be loaded with components=buttons,googlepay,applepay for Google Pay
- * and Apple Pay, and components=buttons,googlepay,applepay,venmo for Venmo so that any wallet
+ * The PayPal SDK should be loaded with components=buttons,googlepay,applepay for Google Pay,
+ * Apple Pay, and Venmo so that any wallet
  * module can use the SDK features it needs, regardless of which module loads the SDK first.
  *
  * @copyright Copyright 2025 Zen Cart Development Team
@@ -38,12 +38,12 @@ if (strpos($applePayJs, '&components=buttons,googlepay,applepay') === false) {
     echo "✓ Apple Pay JS loads SDK with all wallet components\n";
 }
 
-// Test 3: Venmo loads SDK with all components including venmo
-if (strpos($venmoJs, '&components=buttons,googlepay,applepay,venmo') === false) {
+// Test 3: Venmo loads SDK with all components (Venmo is a funding source, not a component)
+if (strpos($venmoJs, '&components=buttons,googlepay,applepay') === false) {
     $testPassed = false;
-    $errors[] = "Venmo JS should load SDK with components=buttons,googlepay,applepay,venmo";
+    $errors[] = "Venmo JS should load SDK with components=buttons,googlepay,applepay";
 } else {
-    echo "✓ Venmo JS loads SDK with all wallet components including venmo\n";
+    echo "✓ Venmo JS loads SDK with all wallet components\n";
 }
 
 // Test 4: All modules use a shared SDK loader state
@@ -122,7 +122,7 @@ if ($testPassed) {
     echo "All SDK components compatibility tests passed! ✓\n\n";
     echo "Summary of functionality:\n";
     echo "- Google Pay and Apple Pay load SDK with components=buttons,googlepay,applepay\n";
-    echo "- Venmo loads SDK with components=buttons,googlepay,applepay,venmo\n";
+    echo "- Venmo loads SDK with components=buttons,googlepay,applepay\n";
     echo "- All wallet modules use a shared SDK loader state for deduplication\n";
     echo "- All wallet modules include environment in buildSdkKey for proper caching\n";
     echo "- All wallet modules add buyer-country=US parameter for sandbox mode\n";

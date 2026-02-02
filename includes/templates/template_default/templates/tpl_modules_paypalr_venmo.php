@@ -19,7 +19,6 @@
     }
     
     $clientId = $walletConfig['client_id'];
-    $intent = $walletConfig['intent'] ?? 'capture';
     $currency = $_SESSION['currency'] ?? DEFAULT_CURRENCY;
     $environment = $walletConfig['environment'] ?? 'sandbox';
     $initialTotal = number_format($currencies->value($_SESSION['cart']->total), 2, '.', '');
@@ -28,7 +27,7 @@
     // Note: As of 2025, PayPal SDK no longer accepts intent parameter
     // Intent is specified when creating the order, not when loading the SDK
     $sdkUrl = 'https://www.paypal.com/sdk/js?client-id=' . urlencode($clientId);
-    $sdkUrl .= '&components=buttons,googlepay,applepay,venmo';
+    $sdkUrl .= '&components=buttons,googlepay,applepay';
     $sdkUrl .= '&enable-funding=venmo';
     $sdkUrl .= '&currency=' . urlencode($currency);
     
