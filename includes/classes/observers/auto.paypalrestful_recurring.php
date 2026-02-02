@@ -573,6 +573,13 @@ class zcObserverPaypalrestfulRecurring
     }
 
     /**
+     * Find vault record for the specific order.
+     * 
+     * This method only returns vault records that were specifically created for the given order.
+     * It does NOT fall back to other vault records the customer may have from previous orders,
+     * as this would incorrectly associate a subscription with a different payment method
+     * (e.g., using an old saved credit card when the customer paid with Google Pay).
+     * 
      * @return array<string,mixed>|null
      */
     protected function findVaultRecord(int $customersId, int $ordersId): ?array
@@ -592,7 +599,11 @@ class zcObserverPaypalrestfulRecurring
             }
         }
 
-        return $records[0];
+        // Do not fall back to other vault records - this would incorrectly associate
+        // a subscription with a payment method from a different order.
+        // For example, a customer paying with Google Pay should not have their
+        // subscription linked to a saved credit card from a previous order.
+        return null;
     }
 
     protected function normalizeAttributeKey(string $label): string
