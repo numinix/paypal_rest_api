@@ -427,61 +427,20 @@ $advanceBillingCycle = function (DateTime $baseDate, array $attributes) {
 };
 
 /**
- * Calculate the next billing date that falls on the original schedule.
+ * Calculate the next billing date by advancing from the current billing date.
  * 
- * This function ensures that manually-edited next_payment_date values don't
- * cause the billing schedule to drift. It uses the subscription's date_added
- * (anchor) to calculate what the proper billing dates should be, then returns
- * the first date in that schedule that is after the current next_payment_date.
+ * This function adds one billing cycle (based on billingperiod and billingfrequency)
+ * to the current next_payment_date. This ensures that the billing schedule advances
+ * correctly: if a payment was due on 02/02 and the billing period is 1 week,
+ * the next billing date will be 02/09.
  *
- * Example: If anchor is 2026-01-07, billing is weekly, and next_payment_date
- * was manually changed to 2026-02-01, this returns 2026-02-04 (the next date
- * in the weekly pattern starting from 01-07).
+ * Example: If next_payment_date is 2026-02-02 and billing is weekly,
+ * this returns 2026-02-09.
  */
-$calculateNextScheduledBillingDate = function (DateTime $currentNextPaymentDate, array $paymentDetails, array $attributes) use ($parseRecurringDate, $advanceBillingCycle) {
-    // Get the anchor date (date_added) from the subscription record
-    $anchorDateString = '';
-    if (isset($paymentDetails['date_added']) && $paymentDetails['date_added'] !== '' && $paymentDetails['date_added'] !== null) {
-        $anchorDateString = $paymentDetails['date_added'];
-    }
-    
-    // If no anchor date available, fall back to standard behavior
-    if ($anchorDateString === '') {
-        return $advanceBillingCycle($currentNextPaymentDate, $attributes);
-    }
-    
-    $anchorDate = $parseRecurringDate($anchorDateString);
-    if (!($anchorDate instanceof DateTime)) {
-        return $advanceBillingCycle($currentNextPaymentDate, $attributes);
-    }
-    $anchorDate->setTime(0, 0, 0);
-    
-    // Start from the anchor and advance through the billing schedule
-    // until we find a date that's after the current next_payment_date
-    $scheduledDate = clone $anchorDate;
-    $currentNextPaymentDate->setTime(0, 0, 0);
-    
-    // Safety limit to prevent infinite loops (100 years worth of daily cycles)
-    $maxIterations = 36500;
-    $iterations = 0;
-    
-    while ($scheduledDate <= $currentNextPaymentDate && $iterations < $maxIterations) {
-        $nextScheduledDate = $advanceBillingCycle($scheduledDate, $attributes);
-        if (!($nextScheduledDate instanceof DateTime)) {
-            // If advance fails, fall back to standard behavior
-            return $advanceBillingCycle($currentNextPaymentDate, $attributes);
-        }
-        $scheduledDate = $nextScheduledDate;
-        $scheduledDate->setTime(0, 0, 0);
-        $iterations++;
-    }
-    
-    // Safety check - if we hit max iterations, fall back to standard behavior
-    if ($iterations >= $maxIterations) {
-        return $advanceBillingCycle($currentNextPaymentDate, $attributes);
-    }
-    
-    return $scheduledDate;
+$calculateNextScheduledBillingDate = function (DateTime $currentNextPaymentDate, array $paymentDetails, array $attributes) use ($advanceBillingCycle) {
+    // Simply advance by one billing cycle from the current next_payment_date
+    // This maintains the correct billing schedule based on the actual billing date
+    return $advanceBillingCycle($currentNextPaymentDate, $attributes);
 };
 
 // Debug: Check what subscriptions exist in the database (excluding cancelled)

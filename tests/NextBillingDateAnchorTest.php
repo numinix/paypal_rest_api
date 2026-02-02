@@ -2,22 +2,21 @@
 declare(strict_types=1);
 
 /**
- * Test to verify that the next billing date calculation maintains the original billing schedule
- * when next_payment_date is manually edited.
+ * Test to verify that the next billing date calculation correctly advances
+ * by one billing period from the current next_payment_date.
  *
  * This test addresses the issue:
- * "I had a subscription order with a next billing date of 02/07/2026. I manually changed it 
- * to 02/01/2026 for testing. After it successfully processed, the next billing date was set 
- * to 02/14/2026. Shouldn't it have been set to 02/07/2026 again?"
+ * "If the Next Billing Date is 02/02/2026 and it's a 1 week recurring subscription,
+ * then the new Next Billing Date should be 1 week from that Next Billing Date."
  *
- * Expected behavior: The next billing date should align with the original schedule based on
- * date_added as the anchor, not drift based on manual edits.
+ * Expected behavior: After processing a payment scheduled for date X, the next
+ * billing date should be X + billing_period (e.g., X + 1 week for weekly billing).
  *
  * @copyright Copyright 2026 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
 
-print "=== Testing Next Billing Date Anchor Calculation ===\n\n";
+print "=== Testing Next Billing Date Calculation ===\n\n";
 
 // Mock the helper functions used by the cron
 $parseRecurringDate = function ($value) {
@@ -101,62 +100,23 @@ $advanceBillingCycle = function (DateTime $baseDate, array $attributes) {
 };
 
 /**
- * The new function that calculates next billing date from the anchor (date_added)
+ * Calculate the next billing date by advancing from the current next_payment_date.
+ * Simply adds one billing cycle to the current billing date.
  */
-$calculateNextScheduledBillingDate = function (DateTime $currentNextPaymentDate, array $paymentDetails, array $attributes) use ($parseRecurringDate, $advanceBillingCycle) {
-    // Get the anchor date (date_added) from the subscription record
-    $anchorDateString = '';
-    if (isset($paymentDetails['date_added']) && $paymentDetails['date_added'] !== '' && $paymentDetails['date_added'] !== null) {
-        $anchorDateString = $paymentDetails['date_added'];
-    }
-    
-    // If no anchor date available, fall back to standard behavior
-    if ($anchorDateString === '') {
-        return $advanceBillingCycle($currentNextPaymentDate, $attributes);
-    }
-    
-    $anchorDate = $parseRecurringDate($anchorDateString);
-    if (!($anchorDate instanceof DateTime)) {
-        return $advanceBillingCycle($currentNextPaymentDate, $attributes);
-    }
-    $anchorDate->setTime(0, 0, 0);
-    
-    // Start from the anchor and advance through the billing schedule
-    // until we find a date that's after the current next_payment_date
-    $scheduledDate = clone $anchorDate;
-    $currentNextPaymentDate->setTime(0, 0, 0);
-    
-    // Safety limit to prevent infinite loops
-    $maxIterations = 36500;
-    $iterations = 0;
-    
-    while ($scheduledDate <= $currentNextPaymentDate && $iterations < $maxIterations) {
-        $nextScheduledDate = $advanceBillingCycle($scheduledDate, $attributes);
-        if (!($nextScheduledDate instanceof DateTime)) {
-            return $advanceBillingCycle($currentNextPaymentDate, $attributes);
-        }
-        $scheduledDate = $nextScheduledDate;
-        $scheduledDate->setTime(0, 0, 0);
-        $iterations++;
-    }
-    
-    if ($iterations >= $maxIterations) {
-        return $advanceBillingCycle($currentNextPaymentDate, $attributes);
-    }
-    
-    return $scheduledDate;
+$calculateNextScheduledBillingDate = function (DateTime $currentNextPaymentDate, array $paymentDetails, array $attributes) use ($advanceBillingCycle) {
+    // Simply advance by one billing cycle from the current next_payment_date
+    // This maintains the correct billing schedule based on the actual billing date
+    return $advanceBillingCycle($currentNextPaymentDate, $attributes);
 };
 
-// Test case 1: Weekly subscription - manually edited to earlier date
-print "Test 1: Weekly subscription, manually edited to earlier date\n";
-print "  Scenario: Weekly subscription started on 01/07/2026 (anchor)\n";
-print "  Original next_payment_date: 02/07/2026\n";
-print "  Admin manually changed to: 02/01/2026 for testing\n";
-print "  Expected next billing after processing: 02/04/2026 (next date in original weekly pattern)\n";
+// Test case 1: Weekly subscription - exact issue from problem statement
+print "Test 1: Weekly subscription - exact issue from problem statement\n";
+print "  Scenario: Next Billing Date is 02/02/2026, 1 week recurring subscription\n";
+print "  Expected next billing after processing: 02/09/2026 (1 week from 02/02)\n";
 
 $paymentDetails = [
-    'date_added' => '2026-01-07',  // Anchor date - subscription creation
-    'next_payment_date' => '2026-02-01'  // Manually edited date
+    'date_added' => '2026-01-02',  // Subscription creation date (ignored)
+    'next_payment_date' => '2026-02-02'
 ];
 $attributes = [
     'billingperiod' => 'Week',
@@ -168,24 +128,22 @@ $nextBillingDate = $calculateNextScheduledBillingDate($currentNextPaymentDate, $
 
 print "  Calculated next billing: " . $nextBillingDate->format('Y-m-d') . "\n";
 
-// 01/07 -> 01/14 -> 01/21 -> 01/28 -> 02/04 (first date after 02/01)
-if ($nextBillingDate->format('Y-m-d') === '2026-02-04') {
-    print "  ✓ PASS: Next billing correctly aligns with original schedule (02/04/2026)\n\n";
+// 02/02 + 1 week = 02/09
+if ($nextBillingDate->format('Y-m-d') === '2026-02-09') {
+    print "  ✓ PASS: Next billing correctly calculated as 02/09/2026\n\n";
 } else {
-    print "  ✗ FAIL: Expected 2026-02-04, got " . $nextBillingDate->format('Y-m-d') . "\n\n";
+    print "  ✗ FAIL: Expected 2026-02-09, got " . $nextBillingDate->format('Y-m-d') . "\n\n";
     exit(1);
 }
 
-// Test case 2: Bi-weekly subscription - manually edited to earlier date
-print "Test 2: Bi-weekly subscription, manually edited to earlier date\n";
-print "  Scenario: Bi-weekly subscription started on 01/07/2026 (anchor)\n";
-print "  Original next_payment_date: 02/04/2026\n";
-print "  Admin manually changed to: 02/01/2026 for testing\n";
-print "  Expected next billing after processing: 02/04/2026 (next date in original bi-weekly pattern)\n";
+// Test case 2: Bi-weekly subscription
+print "Test 2: Bi-weekly subscription\n";
+print "  Scenario: Next Billing Date is 02/01/2026, 2 week recurring subscription\n";
+print "  Expected next billing after processing: 02/15/2026 (2 weeks from 02/01)\n";
 
 $paymentDetails = [
-    'date_added' => '2026-01-07',  // Anchor date
-    'next_payment_date' => '2026-02-01'  // Manually edited date
+    'date_added' => '2026-01-07',
+    'next_payment_date' => '2026-02-01'
 ];
 $attributes = [
     'billingperiod' => 'Week',
@@ -197,24 +155,22 @@ $nextBillingDate = $calculateNextScheduledBillingDate($currentNextPaymentDate, $
 
 print "  Calculated next billing: " . $nextBillingDate->format('Y-m-d') . "\n";
 
-// 01/07 -> 01/21 -> 02/04 (first date after 02/01)
-if ($nextBillingDate->format('Y-m-d') === '2026-02-04') {
-    print "  ✓ PASS: Next billing correctly aligns with original bi-weekly schedule\n\n";
+// 02/01 + 2 weeks = 02/15
+if ($nextBillingDate->format('Y-m-d') === '2026-02-15') {
+    print "  ✓ PASS: Next billing correctly calculated as 02/15/2026\n\n";
 } else {
-    print "  ✗ FAIL: Expected 2026-02-04, got " . $nextBillingDate->format('Y-m-d') . "\n\n";
+    print "  ✗ FAIL: Expected 2026-02-15, got " . $nextBillingDate->format('Y-m-d') . "\n\n";
     exit(1);
 }
 
-// Test case 3: Monthly subscription - manually edited to earlier date
-print "Test 3: Monthly subscription, manually edited to earlier date\n";
-print "  Scenario: Monthly subscription started on 01/15/2026 (anchor)\n";
-print "  Original next_payment_date: 02/15/2026\n";
-print "  Admin manually changed to: 02/01/2026 for testing\n";
-print "  Expected next billing after processing: 02/15/2026 (next date in original monthly pattern)\n";
+// Test case 3: Monthly subscription
+print "Test 3: Monthly subscription\n";
+print "  Scenario: Next Billing Date is 02/01/2026, 1 month recurring subscription\n";
+print "  Expected next billing after processing: 03/01/2026 (1 month from 02/01)\n";
 
 $paymentDetails = [
-    'date_added' => '2026-01-15',  // Anchor date
-    'next_payment_date' => '2026-02-01'  // Manually edited date
+    'date_added' => '2026-01-15',
+    'next_payment_date' => '2026-02-01'
 ];
 $attributes = [
     'billingperiod' => 'Month',
@@ -226,22 +182,22 @@ $nextBillingDate = $calculateNextScheduledBillingDate($currentNextPaymentDate, $
 
 print "  Calculated next billing: " . $nextBillingDate->format('Y-m-d') . "\n";
 
-// 01/15 -> 02/15 (first date after 02/01)
-if ($nextBillingDate->format('Y-m-d') === '2026-02-15') {
-    print "  ✓ PASS: Next billing correctly aligns with original monthly schedule (02/15)\n\n";
+// 02/01 + 1 month = 03/01
+if ($nextBillingDate->format('Y-m-d') === '2026-03-01') {
+    print "  ✓ PASS: Next billing correctly calculated as 03/01/2026\n\n";
 } else {
-    print "  ✗ FAIL: Expected 2026-02-15, got " . $nextBillingDate->format('Y-m-d') . "\n\n";
+    print "  ✗ FAIL: Expected 2026-03-01, got " . $nextBillingDate->format('Y-m-d') . "\n\n";
     exit(1);
 }
 
-// Test case 4: Normal operation (no manual edit) - should work as before
-print "Test 4: Normal operation without manual editing\n";
-print "  Scenario: Weekly subscription with normal payment on 02/04/2026\n";
+// Test case 4: Normal weekly operation
+print "Test 4: Normal weekly operation\n";
+print "  Scenario: Weekly subscription with payment on 02/04/2026\n";
 print "  Expected next billing: 02/11/2026\n";
 
 $paymentDetails = [
-    'date_added' => '2026-01-07',  // Anchor date
-    'next_payment_date' => '2026-02-04'  // Regular payment date (on schedule)
+    'date_added' => '2026-01-07',
+    'next_payment_date' => '2026-02-04'
 ];
 $attributes = [
     'billingperiod' => 'Week',
@@ -253,7 +209,7 @@ $nextBillingDate = $calculateNextScheduledBillingDate($currentNextPaymentDate, $
 
 print "  Calculated next billing: " . $nextBillingDate->format('Y-m-d') . "\n";
 
-// 02/04 -> 02/11
+// 02/04 + 1 week = 02/11
 if ($nextBillingDate->format('Y-m-d') === '2026-02-11') {
     print "  ✓ PASS: Normal operation correctly advances to next scheduled date\n\n";
 } else {
@@ -261,17 +217,17 @@ if ($nextBillingDate->format('Y-m-d') === '2026-02-11') {
     exit(1);
 }
 
-// Test case 5: No anchor date (fallback behavior)
-print "Test 5: No anchor date available (fallback to simple advance)\n";
-print "  Scenario: Legacy subscription without date_added\n";
-print "  Expected behavior: Falls back to adding one billing period to current date\n";
+// Test case 5: Daily subscription
+print "Test 5: Daily subscription\n";
+print "  Scenario: Daily subscription with payment on 02/01/2026\n";
+print "  Expected next billing: 02/02/2026\n";
 
 $paymentDetails = [
-    'date_added' => '',  // No anchor
+    'date_added' => '2026-01-01',
     'next_payment_date' => '2026-02-01'
 ];
 $attributes = [
-    'billingperiod' => 'Week',
+    'billingperiod' => 'Day',
     'billingfrequency' => 1
 ];
 
@@ -280,30 +236,25 @@ $nextBillingDate = $calculateNextScheduledBillingDate($currentNextPaymentDate, $
 
 print "  Calculated next billing: " . $nextBillingDate->format('Y-m-d') . "\n";
 
-// Fallback: 02/01 + 1 week = 02/08
-if ($nextBillingDate->format('Y-m-d') === '2026-02-08') {
-    print "  ✓ PASS: Correctly falls back to simple advance when no anchor available\n\n";
+// 02/01 + 1 day = 02/02
+if ($nextBillingDate->format('Y-m-d') === '2026-02-02') {
+    print "  ✓ PASS: Daily subscription correctly advances by 1 day\n\n";
 } else {
-    print "  ✗ FAIL: Expected 2026-02-08, got " . $nextBillingDate->format('Y-m-d') . "\n\n";
+    print "  ✗ FAIL: Expected 2026-02-02, got " . $nextBillingDate->format('Y-m-d') . "\n\n";
     exit(1);
 }
 
-// Test case 6: Reproduction of exact issue from problem statement
-print "Test 6: Exact reproduction of reported issue\n";
-print "  Scenario from issue:\n";
-print "    - Original next billing date: 02/07/2026\n";
-print "    - Manually changed to: 02/01/2026 for testing\n";
-print "    - After processing, date was: 02/14/2026 (WRONG - bi-weekly assumed)\n";
-print "    - Expected after processing: 02/07/2026 (return to original schedule)\n\n";
+// Test case 6: Yearly subscription
+print "Test 6: Yearly subscription\n";
+print "  Scenario: Yearly subscription with payment on 02/01/2026\n";
+print "  Expected next billing: 02/01/2027\n";
 
-// This tests a subscription that was created on 01/31/2026 with weekly billing
-// The schedule would be: 01/31, 02/07, 02/14, 02/21, etc.
 $paymentDetails = [
-    'date_added' => '2026-01-31',  // Creates schedule: 01/31 -> 02/07 -> 02/14
-    'next_payment_date' => '2026-02-01'  // Manually edited from 02/07
+    'date_added' => '2025-02-01',
+    'next_payment_date' => '2026-02-01'
 ];
 $attributes = [
-    'billingperiod' => 'Week',
+    'billingperiod' => 'Year',
     'billingfrequency' => 1
 ];
 
@@ -312,20 +263,19 @@ $nextBillingDate = $calculateNextScheduledBillingDate($currentNextPaymentDate, $
 
 print "  Calculated next billing: " . $nextBillingDate->format('Y-m-d') . "\n";
 
-// 01/31 -> 02/07 (first date after 02/01)
-if ($nextBillingDate->format('Y-m-d') === '2026-02-07') {
-    print "  ✓ PASS: Next billing correctly returns to 02/07/2026 as expected!\n\n";
+// 02/01/2026 + 1 year = 02/01/2027
+if ($nextBillingDate->format('Y-m-d') === '2027-02-01') {
+    print "  ✓ PASS: Yearly subscription correctly advances by 1 year\n\n";
 } else {
-    print "  ✗ FAIL: Expected 2026-02-07, got " . $nextBillingDate->format('Y-m-d') . "\n\n";
+    print "  ✗ FAIL: Expected 2027-02-01, got " . $nextBillingDate->format('Y-m-d') . "\n\n";
     exit(1);
 }
 
 print "=== All Tests Passed! ===\n";
 print "\n";
 print "Fix verified:\n";
-print "1. Manually-edited next_payment_date no longer causes schedule drift\n";
-print "2. Next billing date aligns with original schedule based on date_added anchor\n";
-print "3. Normal operations continue to work correctly\n";
-print "4. Legacy subscriptions without date_added gracefully fall back to simple advance\n";
+print "1. Weekly subscription on 02/02 correctly advances to 02/09\n";
+print "2. Bi-weekly, monthly, daily, and yearly subscriptions work correctly\n";
+print "3. Next billing date is always current_date + billing_period\n";
 
 exit(0);
