@@ -363,7 +363,7 @@
         }
 
         var query = '?client-id=' + encodeURIComponent(config.clientId)
-            + '&components=buttons,googlepay,applepay,venmo'
+            + '&components=buttons,googlepay,applepay'
             + '&currency=' + encodeURIComponent(config.currency || 'USD');
 
         // Add buyer-country parameter to ensure Venmo eligibility detection works correctly
