@@ -410,6 +410,12 @@ class paypalr_googlepay extends base
             return;
         }
 
+        // Disable Google Pay for subscription products - Google Pay does not support vaulting for recurring payments
+        if ($this->cartContainsSubscriptionProduct()) {
+            $this->enabled = false;
+            return;
+        }
+
         if ((int)$this->zone > 0 && isset($order->billing['country']['id'])) {
             $check_flag = false;
             $check = $db->Execute(
@@ -433,7 +439,88 @@ class paypalr_googlepay extends base
         }
     }
 
+    /**
+     * Check if the cart contains any subscription products that require vaulting.
+     * 
+     * Google Pay does not support vaulting for recurring payments, so this module
+     * should be disabled when the cart contains subscription products.
+     * 
+     * @return bool True if the cart contains subscription products
+     */
+    protected function cartContainsSubscriptionProduct(): bool
+    {
+        if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart'])) {
+            return false;
+        }
 
+        $products = $_SESSION['cart']->get_products();
+        if (!is_array($products) || empty($products)) {
+            return false;
+        }
+
+        // Check using paypalSavedCardRecurring class if available
+        if (!class_exists('paypalSavedCardRecurring')) {
+            $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+            if (file_exists($savedCardRecurringPath)) {
+                require_once $savedCardRecurringPath;
+            }
+        }
+
+        if (class_exists('paypalSavedCardRecurring')) {
+            $recurring = new \paypalSavedCardRecurring();
+            $subscriptions = $recurring->find_subscription_products_in_order($products);
+            if (!empty($subscriptions)) {
+                return true;
+            }
+        }
+
+        // Also check for plan_id attribute-based subscriptions
+        return $this->cartHasPlanIdSubscription($products);
+    }
+
+    /**
+     * Check if any products in the cart have a PayPal subscription plan_id attribute.
+     * 
+     * @param array $products Products from the cart
+     * @return bool True if any product has a plan_id attribute
+     */
+    protected function cartHasPlanIdSubscription(array $products): bool
+    {
+        global $db;
+
+        foreach ($products as $product) {
+            if (!is_array($product['attributes'] ?? null)) {
+                continue;
+            }
+            foreach ($product['attributes'] as $options_id => $options_values_id) {
+                $options = $db->Execute(
+                    "SELECT products_options_name FROM " . TABLE_PRODUCTS_OPTIONS . " WHERE products_options_id = " . (int)$options_id . " LIMIT 1;"
+                );
+                if ($options->RecordCount() === 0) {
+                    continue;
+                }
+                $normalized = $this->normalizeAttributeKey((string)$options->fields['products_options_name']);
+                if ($normalized === 'paypal_subscription_plan_id' || $normalized === 'plan_id') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Normalize an attribute key for comparison.
+     * 
+     * @param string $label The attribute label to normalize
+     * @return string The normalized key
+     */
+    protected function normalizeAttributeKey(string $label): string
+    {
+        $label = strtolower($label);
+        $label = preg_replace('/[^a-z0-9]+/', '_', $label) ?? $label;
+        return trim($label, '_');
+    }
 
     public function javascript_validation(): string
     {
