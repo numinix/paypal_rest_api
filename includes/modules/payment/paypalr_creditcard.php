@@ -423,11 +423,7 @@ class paypalr_creditcard extends base
         
         unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
 
-        $creditCardCss = '';
-        if (!defined('MODULE_PAYMENT_PAYPALR_STYLES_LOADED')) {
-            define('MODULE_PAYMENT_PAYPALR_STYLES_LOADED', true);
-            $creditCardCss = '<link rel="stylesheet" href="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css' . '">';
-        }
+        $creditCardCss = '<link rel="stylesheet" href="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css' . '">';
 
         // Create dropdowns for expiry date
         $expires_month = [];
