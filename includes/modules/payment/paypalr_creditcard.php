@@ -500,9 +500,10 @@ class paypalr_creditcard extends base
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES ?? 'Expiration Date',
             'field' =>
+                '<span class="ppr-cc-expiration">' .
                 zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-month"' . $onFocus) .
-                '&nbsp;' .
-                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-year"' . $onFocus),
+                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-year"' . $onFocus) .
+                '</span>',
             'tag' => 'paypalr-cc-expires-month',
         ];
 

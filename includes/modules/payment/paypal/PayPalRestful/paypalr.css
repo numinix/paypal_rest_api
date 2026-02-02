@@ -41,6 +41,18 @@
 #ppr-choice-paypal+br {
     display: none;
 }
+
+.ppr-cc-expiration {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.ppr-cc-expiration select {
+    flex: 1 1 160px;
+    min-width: 0;
+}
+
 @media (max-width: 800px) {
     .ppr-button-choice {
         flex-direction: column;
