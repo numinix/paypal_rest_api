@@ -46,12 +46,13 @@
     display: flex;
     gap: 0.75rem;
     flex-wrap: nowrap;
+    max-width: 100%;
 }
 
 .ppr-cc-expiration select {
     flex: 1 1 0;
-    min-width: 8rem;
-    width: auto !important;
+    min-width: 0;
+    width: 100% !important;
     max-width: 100% !important;
 }
 
