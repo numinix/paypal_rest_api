@@ -423,6 +423,12 @@ class paypalr_creditcard extends base
         
         unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
 
+        $creditCardCss = '';
+        if (!defined('MODULE_PAYMENT_PAYPALR_STYLES_LOADED')) {
+            define('MODULE_PAYMENT_PAYPALR_STYLES_LOADED', true);
+            $creditCardCss = '<style>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css') . '</style>';
+        }
+
         // Create dropdowns for expiry date
         $expires_month = [];
         $expires_year = [];
@@ -545,7 +551,7 @@ class paypalr_creditcard extends base
 
         // Load the checkout script to handle radio button selection when focusing on fields
         // Add it as a hidden field to avoid placing script tags inside the label element
-        $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+        $checkoutScript = $creditCardCss . '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
         $fields[] = [
             'title' => '',
             'field' => $checkoutScript,

@@ -51,8 +51,8 @@
 .ppr-cc-expiration select {
     flex: 1 1 0;
     min-width: 8rem;
-    width: auto;
-    max-width: 100%;
+    width: auto !important;
+    max-width: 100% !important;
 }
 
 @media (max-width: 600px) {
