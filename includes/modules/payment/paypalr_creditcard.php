@@ -426,7 +426,7 @@ class paypalr_creditcard extends base
         $creditCardCss = '';
         if (!defined('MODULE_PAYMENT_PAYPALR_STYLES_LOADED')) {
             define('MODULE_PAYMENT_PAYPALR_STYLES_LOADED', true);
-            $creditCardCss = '<style>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css') . '</style>';
+            $creditCardCss = '<link rel="stylesheet" href="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css' . '">';
         }
 
         // Create dropdowns for expiry date
