@@ -7,18 +7,24 @@
  * uses the correct configuration constant.
  */
 
-// Simulate the buildCardsAccepted method logic
-function mockBuildCardsAccepted(): string
-{
-    // Define the constant as it would be in a real environment
+// Define constants only if not already defined
+if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS')) {
     define('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS', 'visa,mastercard,amex,discover');
+}
+if (!defined('DIR_WS_TEMPLATE_IMAGES')) {
     define('DIR_WS_TEMPLATE_IMAGES', 'includes/templates/template_default/images/');
-    
-    // Mock zen_image function
+}
+
+// Mock zen_image function at global scope
+if (!function_exists('zen_image')) {
     function zen_image($src, $alt = '', $width = '', $height = '', $params = '') {
         return '<img src="' . htmlspecialchars($src) . '" alt="' . htmlspecialchars($alt) . '">';
     }
-    
+}
+
+// Simulate the buildCardsAccepted method logic
+function mockBuildCardsAccepted(): string
+{
     // This is the fixed implementation
     $cards_accepted = '';
     if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS') && strlen(MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS) > 0) {
