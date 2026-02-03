@@ -598,8 +598,8 @@ class paypalr_creditcard extends base
     protected function buildCardsAccepted(): string
     {
         $cards_accepted = '';
-        if (defined('ACCEPTED_CC_TYPES') && strlen(ACCEPTED_CC_TYPES) > 0) {
-            $accepted_types = explode(',', ACCEPTED_CC_TYPES);
+        if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS') && strlen(MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS) > 0) {
+            $accepted_types = explode(',', MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS);
             foreach ($accepted_types as $type) {
                 $cards_accepted .= zen_image(DIR_WS_TEMPLATE_IMAGES . 'cc_' . strtolower($type) . '.png', $type) . '&nbsp;';
             }
