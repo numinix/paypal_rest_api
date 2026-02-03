@@ -78,6 +78,18 @@
     min-width: auto !important;
 }
 
+.paypalr-card-logos {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: 0.5rem;
+}
+
+.paypalr-card-logo {
+    display: inline-block;
+    vertical-align: middle;
+}
+
 /* Wallet module (Google Pay, Apple Pay, Venmo) radio button hiding */
 .paypalr-wallet-radio-hidden {
     position: absolute !important;
