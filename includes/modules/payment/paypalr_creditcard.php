@@ -599,9 +599,24 @@ class paypalr_creditcard extends base
     {
         $cards_accepted = '';
         if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS') && strlen(MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS) > 0) {
+            // Map card type names to image filenames
+            $cardImageMap = [
+                'amex' => 'american_express.png',
+                'discover' => 'discover.png',
+                'jcb' => 'jcb.png',
+                'maestro' => 'maestro.png',
+                'mastercard' => 'mastercard.png',
+                'solo' => 'solo.png',
+                'visa' => 'visa.png',
+            ];
+            
             $accepted_types = explode(',', MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS);
             foreach ($accepted_types as $type) {
-                $cards_accepted .= zen_image(DIR_WS_TEMPLATE_IMAGES . 'cc_' . strtolower($type) . '.png', $type) . '&nbsp;';
+                $type = strtolower(trim($type));
+                if (isset($cardImageMap[$type])) {
+                    $imagePath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/images/' . $cardImageMap[$type];
+                    $cards_accepted .= zen_image($imagePath, $type) . '&nbsp;';
+                }
             }
         }
         return $cards_accepted;

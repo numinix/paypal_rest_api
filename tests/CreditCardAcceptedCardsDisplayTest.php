@@ -11,8 +11,8 @@
 if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS')) {
     define('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS', 'visa,mastercard,amex,discover');
 }
-if (!defined('DIR_WS_TEMPLATE_IMAGES')) {
-    define('DIR_WS_TEMPLATE_IMAGES', 'includes/templates/template_default/images/');
+if (!defined('DIR_WS_MODULES')) {
+    define('DIR_WS_MODULES', 'includes/modules/');
 }
 
 // Mock zen_image function at global scope
@@ -28,9 +28,24 @@ function mockBuildCardsAccepted(): string
     // This is the fixed implementation
     $cards_accepted = '';
     if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS') && strlen(MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS) > 0) {
+        // Map card type names to image filenames
+        $cardImageMap = [
+            'amex' => 'american_express.png',
+            'discover' => 'discover.png',
+            'jcb' => 'jcb.png',
+            'maestro' => 'maestro.png',
+            'mastercard' => 'mastercard.png',
+            'solo' => 'solo.png',
+            'visa' => 'visa.png',
+        ];
+        
         $accepted_types = explode(',', MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS);
         foreach ($accepted_types as $type) {
-            $cards_accepted .= zen_image(DIR_WS_TEMPLATE_IMAGES . 'cc_' . strtolower($type) . '.png', $type) . '&nbsp;';
+            $type = strtolower(trim($type));
+            if (isset($cardImageMap[$type])) {
+                $imagePath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/images/' . $cardImageMap[$type];
+                $cards_accepted .= zen_image($imagePath, $type) . '&nbsp;';
+            }
         }
     }
     return $cards_accepted;
@@ -49,7 +64,7 @@ if (empty($result)) {
 }
 
 // Test 2: Verify Visa card image is included
-if (strpos($result, 'cc_visa.png') === false) {
+if (strpos($result, 'visa.png') === false) {
     $testPassed = false;
     $errors[] = "Visa card image not found in result";
 } else {
@@ -57,7 +72,7 @@ if (strpos($result, 'cc_visa.png') === false) {
 }
 
 // Test 3: Verify MasterCard image is included
-if (strpos($result, 'cc_mastercard.png') === false) {
+if (strpos($result, 'mastercard.png') === false) {
     $testPassed = false;
     $errors[] = "MasterCard image not found in result";
 } else {
@@ -65,7 +80,7 @@ if (strpos($result, 'cc_mastercard.png') === false) {
 }
 
 // Test 4: Verify American Express image is included
-if (strpos($result, 'cc_amex.png') === false) {
+if (strpos($result, 'american_express.png') === false) {
     $testPassed = false;
     $errors[] = "American Express image not found in result";
 } else {
@@ -73,7 +88,7 @@ if (strpos($result, 'cc_amex.png') === false) {
 }
 
 // Test 5: Verify Discover image is included
-if (strpos($result, 'cc_discover.png') === false) {
+if (strpos($result, 'discover.png') === false) {
     $testPassed = false;
     $errors[] = "Discover image not found in result";
 } else {
@@ -100,8 +115,8 @@ if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS')) {
 echo "\n";
 if ($testPassed) {
     echo "All tests passed! ✓\n";
-    echo "\nThe buildCardsAccepted() method now correctly uses MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS\n";
-    echo "instead of the global ACCEPTED_CC_TYPES constant.\n";
+    echo "\nThe buildCardsAccepted() method correctly uses the PayPal module's images directory\n";
+    echo "with proper image filename mapping (e.g., amex -> american_express.png).\n";
     exit(0);
 } else {
     echo "Tests failed:\n";
