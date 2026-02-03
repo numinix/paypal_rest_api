@@ -84,17 +84,7 @@
     box-sizing: border-box;
 }
 
-#paymentMethodContainer .ppr-savedcard-select {
-    min-width: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-}
-
-#paymentMethodContainer #paypalr-savedcard-select {
-    min-width: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-}
+/* Let checkout overrides control saved-card sizing in OPRC. */
 
 /* Wallet module (Google Pay, Apple Pay, Venmo) radio button hiding */
 .paypalr-wallet-radio-hidden {
