@@ -52,7 +52,7 @@ class paypalr_creditcard extends base
         return defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.3';
+    protected const CURRENT_VERSION = '1.3.4';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -262,9 +262,13 @@ class paypalr_creditcard extends base
         // Check for version-specific configuration updates
         if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION')) {
             switch (true) {
-                // Add future version-specific upgrades here
-                // case version_compare(MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION, '1.3.4', '<'):
-                //     // Add v1.3.4-specific changes here
+                case version_compare(MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION, '1.3.4', '<'):
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Accepted Card Brands', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS', 'amex,discover,jcb,maestro,mastercard,solo,visa', 'Select the card brands you accept for PayPal Advanced Card Fields. These selections control which card logos are displayed on the saved cards add form.', 6, 0, 'zen_cfg_select_multioption([\'amex\', \'discover\', \'jcb\', \'maestro\', \'mastercard\', \'solo\', \'visa\'], ', NULL, now())"
+                    );
                 
                 default:
                     break;
@@ -1231,7 +1235,8 @@ class paypalr_creditcard extends base
                 ('Module Version', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
                 ('Enable PayPal Credit Cards?', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS', 'False', 'Do you want to enable PayPal Credit Cards payments?', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
                 ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
-                ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())"
+                ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now()),
+                ('Accepted Card Brands', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS', 'amex,discover,jcb,maestro,mastercard,solo,visa', 'Select the card brands you accept for PayPal Advanced Card Fields. These selections control which card logos are displayed on the saved cards add form.', 6, 0, 'zen_cfg_select_multioption([\'amex\', \'discover\', \'jcb\', \'maestro\', \'mastercard\', \'solo\', \'visa\'], ', NULL, now())"
         );
         
         // Define the module's current version so that the tableCheckup method will apply all changes
@@ -1246,6 +1251,7 @@ class paypalr_creditcard extends base
             'MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS',
             'MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE',
+            'MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS',
         ];
     }
 
