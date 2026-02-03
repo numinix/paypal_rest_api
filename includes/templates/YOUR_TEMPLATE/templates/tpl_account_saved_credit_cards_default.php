@@ -288,6 +288,38 @@
               </div>
 
               <div class="col-12">
+                <?php
+                  $cardLogoBase = DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalRestful/images/';
+                  $acceptedCardBrands = [];
+                  if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS')) {
+                      $acceptedCardBrands = array_filter(array_map('trim', explode(',', MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS)));
+                  }
+                  if (empty($acceptedCardBrands)) {
+                      $acceptedCardBrands = ['amex', 'discover', 'jcb', 'maestro', 'mastercard', 'solo', 'visa'];
+                  }
+                  $supportedCardBrands = [
+                      'amex' => ['label' => 'American Express', 'image' => $cardLogoBase . 'american_express.png'],
+                      'discover' => ['label' => 'Discover', 'image' => $cardLogoBase . 'discover.png'],
+                      'jcb' => ['label' => 'JCB', 'image' => $cardLogoBase . 'jcb.png'],
+                      'maestro' => ['label' => 'Maestro', 'image' => $cardLogoBase . 'maestro.png'],
+                      'mastercard' => ['label' => 'Mastercard', 'image' => $cardLogoBase . 'mastercard.png'],
+                      'solo' => ['label' => 'Solo', 'image' => $cardLogoBase . 'solo.png'],
+                      'visa' => ['label' => 'Visa', 'image' => $cardLogoBase . 'visa.png'],
+                  ];
+                ?>
+                <div class="saved-card-add__supported-brands">
+                  <div class="saved-card-add__supported-label"><?php echo TEXT_ADD_CARD_SUPPORTED_BRANDS; ?></div>
+                  <ul class="saved-card-add__brand-list" aria-label="<?php echo TEXT_ADD_CARD_SUPPORTED_BRANDS; ?>">
+                    <?php foreach ($acceptedCardBrands as $brandKey) { ?>
+                      <?php if (!isset($supportedCardBrands[$brandKey])) { continue; } ?>
+                      <?php $brand = $supportedCardBrands[$brandKey]; ?>
+                      <li class="saved-card-add__brand">
+                        <img src="<?php echo zen_output_string_protected($brand['image']); ?>" alt="<?php echo zen_output_string_protected($brand['label']); ?>">
+                      </li>
+                    <?php } ?>
+                  </ul>
+                  <small class="text-muted"><?php echo TEXT_ADD_CARD_SUPPORTED_BRANDS_NOTE; ?></small>
+                </div>
                 <div id="card-fields-container" class="mb-3">
                   <!-- PayPal Advanced Card Fields will be inserted here by JavaScript -->
                   <div class="alert alert-info">

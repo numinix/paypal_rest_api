@@ -198,3 +198,51 @@
 #savedCreditCardsDefault .saved-card-editor__address .form-select {
   min-height: 2.75rem;
 }
+
+#savedCreditCardsDefault .saved-card-add__supported-brands {
+  margin-bottom: 1.25rem;
+}
+
+#savedCreditCardsDefault .saved-card-add__supported-label {
+  color: #52606d;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+#savedCreditCardsDefault .saved-card-add__brand-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0 0 0.35rem;
+  padding: 0;
+}
+
+#savedCreditCardsDefault .saved-card-add__brand {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 0.5rem;
+  display: flex;
+  height: 36px;
+  justify-content: center;
+  min-width: 64px;
+  padding: 0.25rem 0.5rem;
+}
+
+#savedCreditCardsDefault .saved-card-add__brand img {
+  display: block;
+  height: 20px;
+  max-width: 56px;
+  object-fit: contain;
+}
+
+#savedCreditCardsDefault .saved-card-add__brand-text {
+  color: #1f2933;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
