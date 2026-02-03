@@ -90,6 +90,12 @@
     max-width: 100% !important;
 }
 
+#paymentMethodContainer #paypalr-savedcard-select {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
 /* Wallet module (Google Pay, Apple Pay, Venmo) radio button hiding */
 .paypalr-wallet-radio-hidden {
     position: absolute !important;
