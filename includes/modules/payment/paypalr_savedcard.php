@@ -486,7 +486,8 @@ class paypalr_savedcard extends base
 
         // Load the checkout script to handle radio button selection
         // Add it as a hidden field to avoid placing script tags inside the label element
-        $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+        $savedCardCss = '<link rel="stylesheet" href="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css' . '">';
+        $checkoutScript = $savedCardCss . '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
         $fields[] = [
             'title' => '',
             'field' => $checkoutScript,

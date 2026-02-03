@@ -423,6 +423,8 @@ class paypalr_creditcard extends base
         
         unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
 
+        $creditCardCss = '<link rel="stylesheet" href="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css' . '">';
+
         // Create dropdowns for expiry date
         $expires_month = [];
         $expires_year = [];
@@ -500,9 +502,10 @@ class paypalr_creditcard extends base
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALR_CC_EXPIRES ?? 'Expiration Date',
             'field' =>
+                '<div class="ppr-cc-expiration">' .
                 zen_draw_pull_down_menu('paypalr_cc_expires_month', $expires_month, date('m'), 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-month"' . $onFocus) .
-                '&nbsp;' .
-                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-year"' . $onFocus),
+                zen_draw_pull_down_menu('paypalr_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalr-cc-expires-year"' . $onFocus) .
+                '</div>',
             'tag' => 'paypalr-cc-expires-month',
         ];
 
@@ -544,7 +547,7 @@ class paypalr_creditcard extends base
 
         // Load the checkout script to handle radio button selection when focusing on fields
         // Add it as a hidden field to avoid placing script tags inside the label element
-        $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+        $checkoutScript = $creditCardCss . '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
         $fields[] = [
             'title' => '',
             'field' => $checkoutScript,

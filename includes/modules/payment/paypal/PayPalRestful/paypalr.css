@@ -41,21 +41,41 @@
 #ppr-choice-paypal+br {
     display: none;
 }
+
+#paymentMethodContainer .ppr-cc-expiration,
+.ppr-cc-expiration {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.4rem;
+}
+
+#paymentMethodContainer .ppr-cc-expiration select,
+.ppr-cc-expiration select {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+    #paymentMethodContainer .ppr-cc-expiration,
+    .ppr-cc-expiration {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0.75rem;
+        width: 100%;
+    }
+}
+
 @media (max-width: 800px) {
     .ppr-button-choice {
         flex-direction: column;
     }
 }
 
-/* Saved Card select box styling */
-.ppr-savedcard-select {
-    width: 100%;
-    min-width: 100%;
-    max-width: 100%;
-    padding: 0.5rem;
-    font-size: 1rem;
-    cursor: pointer;
-    box-sizing: border-box;
+/* Let checkout overrides control saved-card sizing in OPRC. */
+#paymentMethodContainer #paypalr-savedcard-select {
+    min-width: auto !important;
 }
 
 /* Wallet module (Google Pay, Apple Pay, Venmo) radio button hiding */
