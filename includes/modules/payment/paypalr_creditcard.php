@@ -609,14 +609,28 @@ class paypalr_creditcard extends base
                 'solo' => 'solo.png',
                 'visa' => 'visa.png',
             ];
+            $cardLabelMap = [
+                'amex' => 'American Express',
+                'discover' => 'Discover',
+                'jcb' => 'JCB',
+                'maestro' => 'Maestro',
+                'mastercard' => 'Mastercard',
+                'solo' => 'Solo',
+                'visa' => 'Visa',
+            ];
             
             $accepted_types = explode(',', MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS);
+            $cardImages = [];
             foreach ($accepted_types as $type) {
                 $type = strtolower(trim($type));
                 if (isset($cardImageMap[$type])) {
                     $imagePath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/images/' . $cardImageMap[$type];
-                    $cards_accepted .= zen_image($imagePath, $type) . '&nbsp;';
+                    $cardLabel = $cardLabelMap[$type] ?? $type;
+                    $cardImages[] = zen_image($imagePath, $cardLabel, '', '', 'class="paypalr-card-logo"');
                 }
+            }
+            if (!empty($cardImages)) {
+                $cards_accepted = '<span class="paypalr-card-logos">' . implode('', $cardImages) . '</span>';
             }
         }
         return $cards_accepted;
