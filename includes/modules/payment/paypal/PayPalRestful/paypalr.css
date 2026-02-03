@@ -73,17 +73,6 @@
     }
 }
 
-/* Saved Card select box styling */
-.ppr-savedcard-select {
-    width: 100%;
-    min-width: 100%;
-    max-width: 100%;
-    padding: 0.5rem;
-    font-size: 1rem;
-    cursor: pointer;
-    box-sizing: border-box;
-}
-
 /* Let checkout overrides control saved-card sizing in OPRC. */
 
 /* Wallet module (Google Pay, Apple Pay, Venmo) radio button hiding */
