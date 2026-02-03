@@ -31,7 +31,8 @@
 }
 .ppr-button-choice label {
     cursor: pointer;
-    height: 2.5rem;
+    min-height: 2.5rem;
+    height: auto;
     font-weight: bold;
     width: fit-content;
     display: inline-flex;
