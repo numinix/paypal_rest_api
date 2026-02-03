@@ -594,18 +594,20 @@ class paypalr_savedcard extends base
     protected function getCardBrandImage(string $brand): string
     {
         $brandLower = strtolower($brand);
+        // Map card brand names to image filenames
         $brandMap = [
-            'visa' => 'cc_visa.png',
-            'mastercard' => 'cc_mastercard.png',
-            'amex' => 'cc_amex.png',
-            'american express' => 'cc_amex.png',
-            'discover' => 'cc_discover.png',
-            'jcb' => 'cc_jcb.png',
-            'maestro' => 'cc_maestro.png',
+            'visa' => 'visa.png',
+            'mastercard' => 'mastercard.png',
+            'amex' => 'american_express.png',
+            'american express' => 'american_express.png',
+            'discover' => 'discover.png',
+            'jcb' => 'jcb.png',
+            'maestro' => 'maestro.png',
+            'solo' => 'solo.png',
         ];
 
         if (isset($brandMap[$brandLower])) {
-            $imagePath = DIR_WS_TEMPLATE_IMAGES . $brandMap[$brandLower];
+            $imagePath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/images/' . $brandMap[$brandLower];
             if (file_exists(DIR_FS_CATALOG . $imagePath)) {
                 return '<img src="' . $imagePath . '" alt="' . zen_output_string_protected($brand) . '" title="' . zen_output_string_protected($brand) . '" style="vertical-align: middle; margin-right: 5px;">';
             }
