@@ -75,10 +75,7 @@
 
 /* Let checkout overrides control saved-card sizing in OPRC. */
 #paymentMethodContainer #paypalr-savedcard-select {
-    /* height: 33px !important; */
-    min-width: auto;
-    max-width: 254px !important;
-    width: 100% !important;
+    min-width: auto !important;
 }
 
 /* Wallet module (Google Pay, Apple Pay, Venmo) radio button hiding */
