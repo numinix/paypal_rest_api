@@ -84,6 +84,7 @@
     align-items: center;
     gap: 0.35rem;
     margin-left: 0.5rem;
+    vertical-align: middle;
 }
 
 .paypalr-card-logo {
