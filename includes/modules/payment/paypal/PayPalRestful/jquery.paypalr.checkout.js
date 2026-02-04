@@ -11,6 +11,21 @@ if (typeof methodSelect !== 'function') {
 }
 
 jQuery(document).ready(function() {
+    // Debug flag for PayPal wallet button click handler
+    // IMPORTANT: Set to false in production after troubleshooting is complete
+    // This is temporarily enabled to help diagnose wallet modal issues
+    var PAYPAL_WALLET_DEBUG = true;
+    
+    function debugLog(message, data) {
+        if (PAYPAL_WALLET_DEBUG && typeof console !== 'undefined' && console.log) {
+            if (data !== undefined) {
+                console.log('PayPal Wallet: ' + message, data);
+            } else {
+                console.log('PayPal Wallet: ' + message);
+            }
+        }
+    }
+
     // No toggling needed - both PayPal and Credit Card fields are always visible
     // Only handle saved card selection logic
     
@@ -117,6 +132,7 @@ jQuery(document).ready(function() {
         document.addEventListener('onePageCheckoutReloaded', function() {
             updateSavedCardVisibility();
             ensureSavedCardParentMatchesSelection(true);
+            attachPayPalButtonClickHandler();
         });
     }
 
@@ -207,17 +223,6 @@ jQuery(document).ready(function() {
         }
     });
 
-    var $checkoutForm = jQuery('form[name="checkout_payment"]');
-    var $paypalButton = jQuery('#ppr-choice-paypal .ppr-choice-label');
-
-    if (!$paypalButton.length) {
-        $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"] img');
-    }
-
-    if (!$paypalButton.length) {
-        $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"]');
-    }
-
     function paypalWalletIsSelected()
     {
         var $paypalRadio = jQuery('#ppr-paypal');
@@ -243,24 +248,99 @@ jQuery(document).ready(function() {
         return paypalHidden.length > 0;
     }
 
-    if ($checkoutForm.length && $paypalButton.length) {
-        $paypalButton.on('click', function() {
-            window.setTimeout(function() {
-                if (!paypalWalletIsSelected()) {
+    function attachPayPalButtonClickHandler()
+    {
+        var $checkoutForm = jQuery('form[name="checkout_payment"]');
+        var $paypalButton = jQuery('#ppr-choice-paypal .ppr-choice-label');
+        var isWalletOnlyButton = false;
+
+        if (!$paypalButton.length) {
+            $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"] img');
+            isWalletOnlyButton = $paypalButton.length > 0;
+        }
+
+        if (!$paypalButton.length) {
+            $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"]');
+            isWalletOnlyButton = $paypalButton.length > 0;
+        }
+
+        if ($checkoutForm.length && $paypalButton.length) {
+            debugLog('Attaching click handler to button', {
+                isWalletOnlyButton: isWalletOnlyButton,
+                buttonSelector: isWalletOnlyButton ? 'paypalr image/label' : 'other button'
+            });
+
+            // Remove any existing click handlers to avoid duplicates
+            $paypalButton.off('click.paypalr');
+            
+            $paypalButton.on('click.paypalr', function(e) {
+                debugLog('Button clicked - will submit checkout_payment form', {
+                    isWalletOnlyButton: isWalletOnlyButton
+                });
+
+                // Ensure the paypalr module radio is selected
+                var $moduleRadio = jQuery('#pmt-paypalr');
+                if ($moduleRadio.length && $moduleRadio.is(':radio') && !$moduleRadio.is(':checked')) {
+                    debugLog('Selecting payment method radio');
+                    $moduleRadio.prop('checked', true).trigger('change');
+                }
+
+                // For wallet-only button, directly submit the form
+                // The form submission will trigger the PayPal wallet flow via pre_confirmation_check
+                if (isWalletOnlyButton) {
+                    debugLog('Wallet-only button: submitting form directly');
+                    
+                    // Short delay to allow change event to complete
+                    window.setTimeout(function() {
+                        if (typeof window.oprcShowProcessingOverlay === 'function') {
+                            window.oprcShowProcessingOverlay();
+                        }
+
+                        var formElement = $checkoutForm.get(0);
+                        if (!formElement) {
+                            debugLog('ERROR: Form element not found');
+                            return;
+                        }
+
+                        // Allow OPRC to process the submission
+                        var previousAllowState = typeof window.oprcAllowNativeCheckoutSubmit !== 'undefined' 
+                            ? window.oprcAllowNativeCheckoutSubmit 
+                            : false;
+                        window.oprcAllowNativeCheckoutSubmit = true;
+
+                        debugLog('Submitting checkout_payment form');
+
+                        try {
+                            if (typeof formElement.requestSubmit === 'function') {
+                                formElement.requestSubmit();
+                            } else if (typeof formElement.submit === 'function') {
+                                formElement.submit();
+                            } else {
+                                debugLog('ERROR: No submit method available');
+                            }
+                        } finally {
+                            window.oprcAllowNativeCheckoutSubmit = previousAllowState;
+                        }
+                    }, 0);
                     return;
                 }
 
-                var $moduleRadio = jQuery('#pmt-paypalr');
-                var moduleSelected =
-                    !$moduleRadio.length || !$moduleRadio.is(':radio') || $moduleRadio.is(':checked');
+                // For other buttons (non-wallet-only), use the original logic
+                window.setTimeout(function() {
+                    if (!paypalWalletIsSelected()) {
+                        debugLog('Wallet not selected, aborting submission');
+                        return;
+                    }
 
-                if (moduleSelected) {
+                    debugLog('Proceeding with form submission');
+
                     if (typeof window.oprcShowProcessingOverlay === 'function') {
                         window.oprcShowProcessingOverlay();
                     }
 
                     var formElement = $checkoutForm.get(0);
                     if (!formElement) {
+                        debugLog('Form element not found');
                         return;
                     }
 
@@ -268,6 +348,8 @@ jQuery(document).ready(function() {
                         ? window.oprcAllowNativeCheckoutSubmit 
                         : false;
                     window.oprcAllowNativeCheckoutSubmit = true;
+
+                    debugLog('Submitting form');
 
                     try {
                         if (typeof formElement.requestSubmit === 'function') {
@@ -278,10 +360,18 @@ jQuery(document).ready(function() {
                     } finally {
                         window.oprcAllowNativeCheckoutSubmit = previousAllowState;
                     }
-                }
-            }, 0);
-        });
+                }, 0);
+            });
+        } else {
+            debugLog('Could not attach click handler', {
+                formFound: $checkoutForm.length > 0,
+                buttonFound: $paypalButton.length > 0
+            });
+        }
     }
+
+    // Attach handler on initial page load
+    attachPayPalButtonClickHandler();
 
     var $ccNumberInput = jQuery('#paypalr-cc-number');
     if ($ccNumberInput.length) {
