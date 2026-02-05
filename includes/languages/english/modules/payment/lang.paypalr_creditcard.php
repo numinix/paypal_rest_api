@@ -2,7 +2,7 @@
 /**
  * Language definitions for the paypalr_creditcard (PayPal Credit Cards) payment module.
  *
- * Last updated: v1.3.3
+ * Last updated: v1.3.5
  */
 $define = [
     'MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE' => 'Credit Card',

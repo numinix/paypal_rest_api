@@ -91,7 +91,7 @@ namespace {
         define('MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE', '0');
     }
     if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION')) {
-        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION', '1.3.3');
+        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION', '1.3.5');
     }
     
     // Define language constants
@@ -168,6 +168,8 @@ namespace PayPalCreditCardModuleTest {
             $this->assertContains('MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER', $keys);
             $this->assertContains('MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE', $keys);
             $this->assertContains('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION', $keys);
+            $this->assertContains('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS', $keys);
+            $this->assertContains('MODULE_PAYMENT_PAYPALR_CREDITCARD_SHOW_SAVE_CARD_CHECKBOX', $keys);
         }
 
         public function testCheckMethodReturnsFalseWhenNotInstalled(): void

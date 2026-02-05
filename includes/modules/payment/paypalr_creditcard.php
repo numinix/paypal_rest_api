@@ -5,7 +5,7 @@
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  *
- * Last updated: v1.3.3
+ * Last updated: v1.3.5
  */
 /**
  * Load the support class' auto-loader and common class.
@@ -52,7 +52,7 @@ class paypalr_creditcard extends base
         return defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.4';
+    protected const CURRENT_VERSION = '1.3.5';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -268,6 +268,14 @@ class paypalr_creditcard extends base
                             (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
                          VALUES
                             ('Accepted Card Brands', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS', 'amex,discover,jcb,maestro,mastercard,solo,visa', 'Select the card brands you accept for PayPal Advanced Card Fields. These selections control which card logos are displayed on the saved cards add form.', 6, 0, 'zen_cfg_select_multioption([\'amex\', \'discover\', \'jcb\', \'maestro\', \'mastercard\', \'solo\', \'visa\'], ', NULL, now())"
+                    );
+                
+                case version_compare(MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION, '1.3.5', '<'):
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Show Save Card Checkbox', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_SHOW_SAVE_CARD_CHECKBOX', 'True', 'Display the \"Save Card\" checkbox during checkout? If disabled, customers will not see the option to save their card for future use. Note: For orders containing subscriptions, a notice will still be displayed that the card will be saved.', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now())"
                     );
                 
                 default:
@@ -521,8 +529,10 @@ class paypalr_creditcard extends base
         ];
 
         // Save card checkbox / subscription notice
+        $showSaveCardCheckbox = (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_SHOW_SAVE_CARD_CHECKBOX') && MODULE_PAYMENT_PAYPALR_CREDITCARD_SHOW_SAVE_CARD_CHECKBOX === 'True');
         if ($vaultEnabled && $allowSaveCard) {
             if ($forceSaveCard) {
+                // For subscriptions, always show the notice that the card will be saved
                 $notice = MODULE_PAYMENT_PAYPALR_SAVE_CARD_SUBSCRIPTION_NOTICE ?? 'This card will be stored to process your subscription payments.';
                 $fields[] = [
                     'title' => MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use',
@@ -531,21 +541,24 @@ class paypalr_creditcard extends base
                         '<span class="ppr-save-card-note">' . zen_output_string_protected($notice) . '</span>',
                     'tag' => 'ppr-cc-save-card',
                 ];
-            } elseif ($is_bootstrap_template === false) {
-                $fields[] = [
-                    'title' => MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use',
-                    'field' => zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'class="ppr-creditcard-field ppr-card-new" id="ppr-cc-save-card"'),
-                    'tag' => 'ppr-cc-save-card',
-                ];
-            } else {
-                $fields[] = [
-                    'title' => '&nbsp;',
-                    'field' =>
-                        '<div class="custom-control custom-checkbox ppr-creditcard-field ppr-card-new">' .
-                            zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'id="ppr-cc-save-card" class="custom-control-input"') .
-                            '<label class="custom-control-label checkboxLabel" for="ppr-cc-save-card">' . (MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use') . '</label>' .
-                        '</div>',
-                ];
+            } elseif ($showSaveCardCheckbox) {
+                // Only show the checkbox if the configuration allows it
+                if ($is_bootstrap_template === false) {
+                    $fields[] = [
+                        'title' => MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use',
+                        'field' => zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'class="ppr-creditcard-field ppr-card-new" id="ppr-cc-save-card"'),
+                        'tag' => 'ppr-cc-save-card',
+                    ];
+                } else {
+                    $fields[] = [
+                        'title' => '&nbsp;',
+                        'field' =>
+                            '<div class="custom-control custom-checkbox ppr-creditcard-field ppr-card-new">' .
+                                zen_draw_checkbox_field('paypalr_cc_save_card', 'on', $saveCardChecked, 'id="ppr-cc-save-card" class="custom-control-input"') .
+                                '<label class="custom-control-label checkboxLabel" for="ppr-cc-save-card">' . (MODULE_PAYMENT_PAYPALR_SAVE_CARD_PROMPT ?? 'Save for future use') . '</label>' .
+                            '</div>',
+                    ];
+                }
             }
         }
 
@@ -1268,7 +1281,8 @@ class paypalr_creditcard extends base
                 ('Enable PayPal Credit Cards?', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS', 'False', 'Do you want to enable PayPal Credit Cards payments?', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
                 ('Sort order of display.', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
                 ('Payment Zone', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now()),
-                ('Accepted Card Brands', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS', 'amex,discover,jcb,maestro,mastercard,solo,visa', 'Select the card brands you accept for PayPal Advanced Card Fields. These selections control which card logos are displayed on the saved cards add form.', 6, 0, 'zen_cfg_select_multioption([\'amex\', \'discover\', \'jcb\', \'maestro\', \'mastercard\', \'solo\', \'visa\'], ', NULL, now())"
+                ('Accepted Card Brands', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS', 'amex,discover,jcb,maestro,mastercard,solo,visa', 'Select the card brands you accept for PayPal Advanced Card Fields. These selections control which card logos are displayed on the saved cards add form.', 6, 0, 'zen_cfg_select_multioption([\'amex\', \'discover\', \'jcb\', \'maestro\', \'mastercard\', \'solo\', \'visa\'], ', NULL, now()),
+                ('Show Save Card Checkbox', 'MODULE_PAYMENT_PAYPALR_CREDITCARD_SHOW_SAVE_CARD_CHECKBOX', 'True', 'Display the \"Save Card\" checkbox during checkout? If disabled, customers will not see the option to save their card for future use. Note: For orders containing subscriptions, a notice will still be displayed that the card will be saved.', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now())"
         );
         
         // Define the module's current version so that the tableCheckup method will apply all changes
@@ -1284,6 +1298,7 @@ class paypalr_creditcard extends base
             'MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE',
             'MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS',
+            'MODULE_PAYMENT_PAYPALR_CREDITCARD_SHOW_SAVE_CARD_CHECKBOX',
         ];
     }
 
