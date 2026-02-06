@@ -255,14 +255,24 @@ jQuery(document).ready(function() {
         var isWalletOnlyButton = false;
 
         if (!$paypalButton.length) {
-            $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"] img');
-            isWalletOnlyButton = $paypalButton.length > 0;
+            // Look for wallet-only button image in the payment method container
+            // The image is in the creditcard-form div, not inside the label
+            $paypalButton = jQuery('.payment-method.paypalr .creditcard-form img');
         }
 
         if (!$paypalButton.length) {
-            $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"]');
-            isWalletOnlyButton = $paypalButton.length > 0;
+            // Fallback: try legacy selector (in case image is inside label in some templates)
+            $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"] img');
         }
+
+        if (!$paypalButton.length) {
+            // Final fallback to label if no image found
+            $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"]');
+        }
+
+        // If we found an image (not the label), this is a wallet-only button
+        // Otherwise if we found the label fallback, it's also considered wallet-only for this context
+        isWalletOnlyButton = $paypalButton.length > 0;
 
         if ($checkoutForm.length && $paypalButton.length) {
             debugLog('Attaching click handler to button', {

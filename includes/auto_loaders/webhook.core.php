@@ -26,6 +26,9 @@ if (!class_exists('sniffer')) {
 if (!class_exists('shoppingCart')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ShoppingCart.php';
 }
+if (!class_exists('order')) {
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Order.php';
+}
 if (!class_exists('cache')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Cache.php';
 }

@@ -47,7 +47,9 @@ abstract class WebhookHandlerContract
      */
     protected function loadCorePaymentModuleAndLanguageStrings(): void
     {
-        require DIR_WS_CLASSES . 'payment.php';
+        if (!class_exists('payment', false)) {
+            require DIR_WS_CLASSES . 'payment.php';
+        }
         $payment_modules = new \payment ('paypalr');
         $this->paymentModule = $GLOBALS[$payment_modules->selected_module];
     }

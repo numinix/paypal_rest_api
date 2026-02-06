@@ -1141,10 +1141,26 @@
     // If a user still clicks the hidden radio, trigger the Apple Pay button
     var moduleRadio = document.getElementById('pmt-paypalr_applepay');
     if (moduleRadio) {
-        moduleRadio.addEventListener('click', function () {
-            selectApplePayRadio();
-            triggerApplePayButtonClick();
-        });
+        // Add label click prevention
+        var moduleLabel = document.querySelector('label[for="pmt-paypalr_applepay"]');
+        if (moduleLabel && !moduleLabel.dataset.applePayLabelBound) {
+            moduleLabel.addEventListener('click', function () {
+                moduleRadio.dataset.labelClick = 'true';
+            });
+            moduleLabel.dataset.applePayLabelBound = 'true';
+        }
+        if (!moduleRadio.dataset.applePayBound) {
+            moduleRadio.addEventListener('click', function () {
+                selectApplePayRadio();
+                // Don't trigger payment button if this click came from a label
+                if (moduleRadio.dataset.labelClick === 'true') {
+                    moduleRadio.dataset.labelClick = 'false';
+                    return;
+                }
+                triggerApplePayButtonClick();
+            });
+            moduleRadio.dataset.applePayBound = 'true';
+        }
     }
 
     // Intercept checkout submission when Apple Pay radio is selected
