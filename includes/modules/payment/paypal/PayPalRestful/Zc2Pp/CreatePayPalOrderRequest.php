@@ -439,6 +439,47 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // with the order and, if non-zero, include that value in the breakdown.
         //
         $discount_total = max(0.0, $this->calculateDiscount($ot_diffs) - $shipping_discount_total);
+
+        // -----
+        // Some checkout flows provide incomplete $ot_diffs data when the customer uses
+        // store credit/reward points. If no explicit discount was found, inspect
+        // $order->totals to recover discount values (e.g. ot_sc output lines).
+        //
+        if ($discount_total < 0.01) {
+            $discount_total = max(0.0, $this->getDiscountFromOrderTotals($order) - $shipping_discount_total);
+        }
+
+        // -----
+        // Fallback for one-page checkout flows where ot_sc's deduction isn't reflected in
+        // $order_info/$ot_diffs at PayPal order-creation time (even though it's applied for
+        // non-PayPal methods). If that happens, use the customer's redeemed store-credit
+        // session value as a discount, but only when no other discount is present and the
+        // current order-total equals the non-discounted sum.
+        //
+        $session_store_credit = $this->getSessionStoreCreditAmount();
+        if (
+            $session_store_credit > 0
+            && !isset($ot_diffs['ot_sc'])
+            && $discount_total < 0.01
+            && $shipping_discount_total < 0.01
+        ) {
+            $non_discount_total = (float)($item_total + $item_tax_total + $shipping_total + $handling_total + $insurance_total);
+            if (abs($effective_order_total - $non_discount_total) < 0.01) {
+                $fallback_discount = min($session_store_credit, $non_discount_total);
+                if ($fallback_discount > 0) {
+                    $discount_total = $fallback_discount;
+                    $effective_order_total = max(0.0, $effective_order_total - $fallback_discount);
+                    $amount = $this->setRateConvertedValue($effective_order_total);
+                    $this->log->write(
+                        sprintf(
+                            'CreatePayPalOrderRequest: applied fallback store-credit discount %.2f from session.',
+                            $fallback_discount
+                        )
+                    );
+                }
+            }
+        }
+
         if ($discount_total > 0) {
             $breakdown['discount'] = $this->setRateConvertedValue($discount_total);
         }
@@ -451,6 +492,46 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $this->overallDiscount = (float)($shipping_discount_total + $discount_total);
 
         return $amount;
+    }
+
+    protected function getSessionStoreCreditAmount(): float
+    {
+        if (!isset($_SESSION['storecredit']) || !is_numeric($_SESSION['storecredit'])) {
+            return 0.0;
+        }
+
+        return max(0.0, (float)$_SESSION['storecredit']);
+    }
+
+    protected function getDiscountFromOrderTotals(\order $order): float
+    {
+        if (empty($order->totals) || !is_array($order->totals)) {
+            return 0.0;
+        }
+
+        $discount_modules = trim(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT);
+        $discount_modules = ($discount_modules === '') ? '' : $discount_modules . ',';
+        $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv,ot_group_pricing,ot_sc')));
+
+        $discount_total = 0.0;
+        foreach ($order->totals as $order_total) {
+            if (!is_array($order_total)) {
+                continue;
+            }
+
+            $class_name = (string)($order_total['class'] ?? '');
+            if ($class_name === '' || !in_array($class_name, $eligible_modules, true)) {
+                continue;
+            }
+
+            if (!isset($order_total['value']) || !is_numeric($order_total['value'])) {
+                continue;
+            }
+
+            $discount_total += abs((float)$order_total['value']);
+        }
+
+        return $discount_total;
     }
 
     // -----

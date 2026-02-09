@@ -11,35 +11,58 @@ if (!defined('IS_ADMIN_FLAG')) {
     die('Illegal Access');
 }
 
-if (!class_exists('notifier')) {
+if (!class_exists('notifier', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/LegacyNotifier.php';
 }
 
-if (!class_exists('zcDate')) {
+if (!class_exists('zcDate', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ZcDate.php';
 }
 
-if (!class_exists('sniffer')) {
+if (!class_exists('sniffer', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Sniffer.php';
 }
 
-if (!class_exists('shoppingCart')) {
+if (!class_exists('shoppingCart', false)) {
+    $shoppingCartClass = DIR_FS_CATALOG . DIR_WS_CLASSES . 'shopping_cart.php';
+    if (is_file($shoppingCartClass)) {
+        require_once $shoppingCartClass;
+    }
+}
+if (!class_exists('shoppingCart', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ShoppingCart.php';
 }
-if (!class_exists('order')) {
+
+if (!class_exists('order', false)) {
+    $orderClass = DIR_FS_CATALOG . DIR_WS_CLASSES . 'order.php';
+    if (is_file($orderClass)) {
+        require_once $orderClass;
+    }
+}
+if (!class_exists('order', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Order.php';
 }
-if (!class_exists('cache')) {
+
+if (!class_exists('cache', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Cache.php';
 }
-$paypalRestCacheClass = class_exists('cache') ? 'cache' : 'PayPalRestCache';
-if (!class_exists('currencies')) {
+$paypalRestCacheClass = class_exists('cache', false) ? 'cache' : 'PayPalRestCache';
+
+if (!class_exists('currencies', false)) {
+    $currenciesClass = DIR_FS_CATALOG . DIR_WS_CLASSES . 'currencies.php';
+    if (is_file($currenciesClass)) {
+        require_once $currenciesClass;
+    }
+}
+if (!class_exists('currencies', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Currencies.php';
 }
-if (!class_exists('template_func')) {
+
+if (!class_exists('template_func', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/TemplateFunc.php';
 }
-if (!class_exists('messageStack')) {
+
+if (!class_exists('messageStack', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/MessageStack.php';
 }
 

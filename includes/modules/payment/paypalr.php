@@ -1611,11 +1611,34 @@ class paypalr extends base
         $order_info = $this->getOrderTotalsInfo();
 
         // -----
+        // Gather the observer-provided order-total differences once for both
+        // GUID generation and request construction.
+        //
+        global $zcObserverPaypalrestful;
+        $order_total_changes = (isset($zcObserverPaypalrestful) && is_object($zcObserverPaypalrestful))
+            ? $zcObserverPaypalrestful->getOrderTotalChanges()
+            : [];
+
+        // -----
         // Create a GUID (Globally Unique IDentifier) for the order's
         // current 'state'.
         //
         global $order;
-        $order_guid = $this->createOrderGuid($order, $ppr_type);
+        $order_guid = $this->createOrderGuid($order, $ppr_type, $order_info, $order_total_changes);
+
+        $this->log->write(
+            "createPayPalOrder($ppr_type), GUID context:
+"
+            . '  order_info.total=' . (isset($order_info['total']) ? (string)$order_info['total'] : 'unset') . "
+"
+            . '  session.storecredit=' . (isset($_SESSION['storecredit']) ? (string)$_SESSION['storecredit'] : 'unset') . "
+"
+            . '  post.opt_credit=' . (isset($_POST['opt_credit']) ? (string)$_POST['opt_credit'] : 'unset') . "
+"
+            . '  ot_sc.diff.total=' . ((isset($order_total_changes['ot_sc']['diff']['total']) && is_numeric($order_total_changes['ot_sc']['diff']['total'])) ? (string)$order_total_changes['ot_sc']['diff']['total'] : 'unset') . "
+"
+            . '  guid=' . $order_guid
+        );
 
         // -----
         // If the PayPal order been previously created and the order's GUID
@@ -1639,8 +1662,7 @@ class paypalr extends base
         // -----
         // Build the request for the PayPal order's initial creation.
         //
-        global $zcObserverPaypalrestful;
-        $create_order_request = new CreatePayPalOrderRequest($ppr_type, $order, $this->ccInfo, $order_info, $zcObserverPaypalrestful->getOrderTotalChanges());
+        $create_order_request = new CreatePayPalOrderRequest($ppr_type, $order, $this->ccInfo, $order_info, $order_total_changes);
 
         // -----
         // If the order's request-creation resulted in a calculation mismatch,
@@ -1729,11 +1751,45 @@ class paypalr extends base
     // Note: Including the transaction-mode (AUTHORIZE vs. CAPTURE), too ... just
     // in case the site changes that mode while a customer's order is in-progress.
     //
-    protected function createOrderGuid(\order $order, string $ppr_type): string
+    protected function createOrderGuid(\order $order, string $ppr_type, array $order_info = [], array $order_total_changes = []): string
     {
         $_SESSION['PayPalRestful']['CompletedOrders'] = $_SESSION['PayPalRestful']['CompletedOrders'] ?? 0;
         unset($order->info['ip_address']);
-        $hash_data = MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE . json_encode($order) . $_SESSION['securityToken'] . $_SESSION['PayPalRestful']['CompletedOrders'];
+
+        $effective_total = isset($order_info['total']) && is_numeric($order_info['total'])
+            ? (float)$order_info['total']
+            : (isset($order->info['total']) ? (float)$order->info['total'] : 0.0);
+
+        if (!empty($order->totals) && is_array($order->totals)) {
+            foreach ($order->totals as $order_total) {
+                if (!is_array($order_total) || ($order_total['class'] ?? '') !== 'ot_total') {
+                    continue;
+                }
+                if (isset($order_total['value']) && is_numeric($order_total['value'])) {
+                    $effective_total = (float)$order_total['value'];
+                }
+                break;
+            }
+        }
+
+        $storecredit_session = (isset($_SESSION['storecredit']) && is_numeric($_SESSION['storecredit'])) ? (float)$_SESSION['storecredit'] : 0.0;
+        $storecredit_posted = (isset($_POST['opt_credit']) && is_numeric($_POST['opt_credit'])) ? (float)$_POST['opt_credit'] : null;
+        $financial_signature = [
+            'effective_total' => $effective_total,
+            'order_info_total' => (isset($order_info['total']) && is_numeric($order_info['total'])) ? (float)$order_info['total'] : null,
+            'storecredit_session' => $storecredit_session,
+            'storecredit_posted' => $storecredit_posted,
+            'ot_sc_total' => isset($order_total_changes['ot_sc']['diff']['total']) && is_numeric($order_total_changes['ot_sc']['diff']['total'])
+                ? (float)$order_total_changes['ot_sc']['diff']['total']
+                : null,
+        ];
+
+        $hash_data =
+            MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE
+            . json_encode($order)
+            . ($_SESSION['securityToken'] ?? '')
+            . $_SESSION['PayPalRestful']['CompletedOrders']
+            . json_encode($financial_signature);
         if ($ppr_type !== 'paypal') {
             $hash_data .= json_encode($this->ccInfo);
         }
@@ -2098,12 +2154,12 @@ class paypalr extends base
         // Create a GUID (Globally Unique IDentifier) for the order's
         // current 'state'.
         //
-        $order_guid = $this->createOrderGuid($order, 'card');
+        global $zcObserverPaypalrestful;
+        $order_guid = $this->createOrderGuid($order, 'card', $order_info, $zcObserverPaypalrestful->getOrderTotalChanges());
 
         // -----
         // Build the request for the PayPal card-payment order's creation.
         //
-        global $zcObserverPaypalrestful;
         $create_order_request = new CreatePayPalOrderRequest('card', $order, $this->ccInfo, $order_info, $zcObserverPaypalrestful->getOrderTotalChanges());
 
         // -----
