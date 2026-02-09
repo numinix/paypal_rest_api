@@ -383,7 +383,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
     //
     protected function getOrderAmountAndBreakdown(\order $order, array $order_info, array $ot_diffs): array
     {
-        $amount = $this->setRateConvertedValue($order_info['total']);
+        $effective_order_total = $this->getEffectiveOrderTotal($order, $order_info);
+        $amount = $this->setRateConvertedValue($effective_order_total);
         if ($this->countItems() === 0) {
             return $amount;
         }
@@ -450,6 +451,44 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $this->overallDiscount = (float)($shipping_discount_total + $discount_total);
 
         return $amount;
+    }
+
+    // -----
+    // Some one-page checkout flows can leave $order->info['total'] and the observer's
+    // captured $order_info['total'] unchanged even though order-total modules (e.g.
+    // store-credit) have reduced the final total. In those cases, prefer the
+    // ot_total value recorded in $order->totals when available.
+    //
+    protected function getEffectiveOrderTotal(\order $order, array $order_info): float
+    {
+        $order_info_total = isset($order_info['total']) ? (float)$order_info['total'] : 0.0;
+        if (empty($order->totals) || !is_array($order->totals)) {
+            return $order_info_total;
+        }
+
+        foreach ($order->totals as $order_total) {
+            if (!is_array($order_total)) {
+                continue;
+            }
+            $class_name = (string)($order_total['class'] ?? '');
+            if ($class_name !== 'ot_total') {
+                continue;
+            }
+
+            if (!isset($order_total['value']) || !is_numeric($order_total['value'])) {
+                return $order_info_total;
+            }
+
+            $ot_total_value = (float)$order_total['value'];
+            if (abs($ot_total_value - $order_info_total) >= 0.01) {
+                $this->log->write(
+                    "CreatePayPalOrderRequest: using ot_total value {$ot_total_value} instead of order_info total {$order_info_total}."
+                );
+            }
+            return $ot_total_value;
+        }
+
+        return $order_info_total;
     }
 
     // -----
