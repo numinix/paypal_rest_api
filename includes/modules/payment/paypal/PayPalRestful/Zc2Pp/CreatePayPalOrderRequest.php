@@ -466,16 +466,12 @@ class CreatePayPalOrderRequest extends ErrorInfo
     }
     protected function calculateDiscount(array $ot_diffs): float
     {
-        return abs($this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT . ', ot_coupon, ot_gv, ot_group_pricing, ot_sc', $ot_diffs));
+        return abs($this->calculateOrderElementValue(implode(',', $this->getDiscountModules($ot_diffs)), $ot_diffs));
     }
     protected function calculateShippingDiscount(array $ot_diffs): float
     {
         $shipping_discount_total = 0.0;
-        $discount_modules = trim(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT);
-        $discount_modules = ($discount_modules === '') ? '' : $discount_modules . ',';
-        $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv,ot_sc')));
-
-        foreach ($eligible_modules as $next_module) {
+        foreach ($this->getDiscountModules($ot_diffs) as $next_module) {
             if (!isset($ot_diffs[$next_module]['diff'])) {
                 continue;
             }
@@ -489,6 +485,24 @@ class CreatePayPalOrderRequest extends ErrorInfo
         }
 
         return $shipping_discount_total;
+    }
+
+    protected function getDiscountModules(array $ot_diffs): array
+    {
+        $discount_modules = trim(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT);
+        $discount_modules = ($discount_modules === '') ? '' : $discount_modules . ',';
+        $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv,ot_group_pricing,ot_sc')));
+
+        // Include any order-total module that lowers the order total, so unknown
+        // discount modules are handled without adding them to module config.
+        foreach ($ot_diffs as $class_name => $changes) {
+            if (!isset($changes['diff']['total']) || (float)$changes['diff']['total'] >= 0) {
+                continue;
+            }
+            $eligible_modules[] = $class_name;
+        }
+
+        return array_values(array_unique($eligible_modules));
     }
     protected function calculateOrderElementValue(string $ot_class_names, array $ot_diffs): float
     {
