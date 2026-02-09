@@ -466,14 +466,14 @@ class CreatePayPalOrderRequest extends ErrorInfo
     }
     protected function calculateDiscount(array $ot_diffs): float
     {
-        return abs($this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT . ', ot_coupon, ot_gv, ot_group_pricing', $ot_diffs));
+        return abs($this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT . ', ot_coupon, ot_gv, ot_group_pricing, ot_sc', $ot_diffs));
     }
     protected function calculateShippingDiscount(array $ot_diffs): float
     {
         $shipping_discount_total = 0.0;
         $discount_modules = trim(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT);
         $discount_modules = ($discount_modules === '') ? '' : $discount_modules . ',';
-        $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv')));
+        $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv,ot_sc')));
 
         foreach ($eligible_modules as $next_module) {
             if (!isset($ot_diffs[$next_module]['diff'])) {
