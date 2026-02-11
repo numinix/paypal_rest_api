@@ -78,6 +78,10 @@ class Logger
     public static function logJSON($data, bool $keep_links = false, bool $use_var_export = false): string
     {
         if (is_array($data)) {
+            // Create a deep copy to avoid modifying the original data
+            // Using json_decode/encode is safe for data that will be JSON-encoded anyway
+            $data = json_decode(json_encode($data), true);
+            
             unset(
                 $data[CURLOPT_HTTPHEADER],
                 $data['access_token'],
