@@ -845,6 +845,11 @@ class PayPalCommon {
     /**
      * Common createOrderGuid logic
      *
+     * Generates a fixed-length UUID-like GUID (36 chars) from a SHA-256
+     * hash of the order's state. This ensures the PayPal-Request-Id header
+     * stays within PayPal's character limit while still detecting changes
+     * in cart contents, order totals, and wallet payloads.
+     *
      * @param \order $order Order object
      * @param string $ppr_type Payment type
      * @return string
@@ -852,29 +857,40 @@ class PayPalCommon {
     public function createOrderGuid($order, string $ppr_type): string
     {
         $orders_completed = $_SESSION['PayPalRestful']['CompletedOrders'] ?? 0;
-        $guid_base = $_SESSION['customer_id'] . '-' . $_SESSION['cartID'] . '-' . $orders_completed . '-' . $ppr_type;
 
-        $cart_hash = '';
+        $cart_data = '';
         foreach ($order->products as $product) {
-            $cart_hash .= $product['id'] . $product['qty'];
+            $cart_data .= $product['id'] . $product['qty'];
         }
-        $cart_hash = md5($cart_hash);
 
-        $wallet_payload_hash = '';
+        $hash_data =
+            $_SESSION['customer_id']
+            . $_SESSION['cartID']
+            . $orders_completed
+            . $ppr_type
+            . $cart_data
+            . (isset($order->info['total']) ? (string)(float)$order->info['total'] : '')
+            . (isset($order->info['shipping_cost']) ? (string)(float)$order->info['shipping_cost'] : '')
+            . (isset($order->info['tax']) ? (string)(float)$order->info['tax'] : '');
+
+        if (isset($_SESSION['storecredit']) && is_numeric($_SESSION['storecredit'])) {
+            $hash_data .= (string)(float)$_SESSION['storecredit'];
+        }
+
         if (in_array($ppr_type, ['apple_pay', 'google_pay', 'venmo'], true)) {
             $wallet_payload = $_SESSION['PayPalRestful']['WalletPayload'][$ppr_type] ?? null;
             if (is_array($wallet_payload) && !empty($wallet_payload)) {
-                $wallet_payload_hash = md5(json_encode($wallet_payload));
+                $hash_data .= json_encode($wallet_payload);
             }
         }
 
-        return substr(
-            $guid_base
-            . '-' . $cart_hash
-            . ($wallet_payload_hash !== '' ? '-' . $wallet_payload_hash : ''),
-            0,
-            127
-        );
+        $hash = hash('sha256', $hash_data);
+        return
+            substr($hash,  0,  8) . '-' .
+            substr($hash,  8,  4) . '-' .
+            substr($hash, 12,  4) . '-' .
+            substr($hash, 16,  4) . '-' .
+            substr($hash, 20, 12);
     }
 
     /**
