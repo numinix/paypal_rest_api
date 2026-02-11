@@ -764,7 +764,19 @@ class CreatePayPalOrderRequest extends ErrorInfo
             throw new \Exception('Card holder name is required');
         }
         $cc_info['number'] = preg_replace('/[^0-9]/', '', (string)($cc_info['number'] ?? ''));
-        $posted_number = preg_replace('/[^0-9]/', '', (string)($_POST['paypalr_cc_number'] ?? ($_POST['ppr_cc_number'] ?? '')));
+
+        $posted_number_candidates = [
+            $_POST['paypalr_cc_number'] ?? '',
+            $_POST['ppr_cc_number'] ?? '',
+            $_POST['cc_number'] ?? '',
+        ];
+        $posted_number = '';
+        foreach ($posted_number_candidates as $posted_candidate) {
+            $digits = preg_replace('/[^0-9]/', '', (string)$posted_candidate);
+            if (strlen($digits) > strlen($posted_number)) {
+                $posted_number = $digits;
+            }
+        }
 
         // Some checkout flows can carry only a masked/last-4 card value into ccInfo.
         // PayPal requires the full PAN for new-card payments, so prefer the posted
