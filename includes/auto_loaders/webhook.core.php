@@ -11,6 +11,14 @@ if (!defined('IS_ADMIN_FLAG')) {
     die('Illegal Access');
 }
 
+// This autoloader is intended only for webhook bootstrap requests.
+// On storefront pages (e.g. checkout_shipping), loading webhook compatibility
+// classes can conflict with core class loading and trigger redeclaration fatals.
+if (($loaderPrefix ?? '') !== 'webhook') {
+    return;
+}
+
+
 if (!class_exists('notifier', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/LegacyNotifier.php';
 }
