@@ -1008,15 +1008,38 @@ class paypalr_creditcard extends base
 
     public function process_button()
     {
+        global $messageStack;
+        
         // For non-AJAX checkout, generate hidden fields to forward card data
         $savedCardSelection = $_POST['paypalr_saved_card'] ?? 'new';
         $hiddenFields = zen_draw_hidden_field('ppr_saved_card', $savedCardSelection);
         
         if ($savedCardSelection === 'new') {
+            // Validate that the card number is complete before forwarding it
+            // This prevents issues where only the last 4 digits are passed to the confirmation page
+            $cc_number_raw = $_POST['paypalr_cc_number'] ?? '';
+            $cc_number_digits = preg_replace('/[^0-9]/', '', $cc_number_raw);
+            
+            if (strlen($cc_number_digits) < 12) {
+                // Card number is incomplete - this should not happen in normal flow
+                // Log error and keep user on payment page to re-enter card details
+                $this->paypalCommon->ppLog(
+                    'process_button(): Card number is incomplete (length: ' . strlen($cc_number_digits) . '). ' .
+                    'This may indicate a browser autofill issue or data loss. User must re-enter card details.'
+                );
+                $messageStack->add_session(
+                    'checkout_payment',
+                    MODULE_PAYMENT_PAYPALR_TEXT_CC_NUMBER_TOO_SHORT ?? 'Please re-enter your complete credit card number.',
+                    'error'
+                );
+                // Return minimal hidden fields - this will cause validation to fail and keep user on payment page
+                return $hiddenFields;
+            }
+            
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_owner', $_POST['paypalr_cc_owner'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_month', $_POST['paypalr_cc_expires_month'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_year', $_POST['paypalr_cc_expires_year'] ?? '');
-            $hiddenFields .= zen_draw_hidden_field('ppr_cc_number', $_POST['paypalr_cc_number'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_number', $cc_number_raw);
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_cvv', $_POST['paypalr_cc_cvv'] ?? '');
             if (!empty($_POST['paypalr_cc_save_card'])) {
                 $hiddenFields .= zen_draw_hidden_field('ppr_cc_save_card', $_POST['paypalr_cc_save_card']);
