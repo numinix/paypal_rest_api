@@ -11,6 +11,14 @@ if (!defined('IS_ADMIN_FLAG')) {
     die('Illegal Access');
 }
 
+// This autoloader is intended only for webhook bootstrap requests.
+// On storefront pages (e.g. checkout_shipping), loading webhook compatibility
+// classes can conflict with core class loading and trigger redeclaration fatals.
+if (($loaderPrefix ?? '') !== 'webhook') {
+    return;
+}
+
+
 if (!class_exists('notifier', false)) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/LegacyNotifier.php';
 }
@@ -34,12 +42,9 @@ if (!class_exists('shoppingCart', false)) {
 }
 
 if (!class_exists('order', false)) {
-    $orderClass = DIR_FS_CATALOG . DIR_WS_CLASSES . 'order.php';
-    if (is_file($orderClass)) {
-        require_once $orderClass;
-    }
-}
-if (!class_exists('order', false)) {
+    // Avoid pre-loading the core order class here: storefront bootstrap handles
+    // it separately and can re-include the file, causing class redeclaration.
+    // Webhook contexts that don't have the storefront stack can use this shim.
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Order.php';
 }
 
