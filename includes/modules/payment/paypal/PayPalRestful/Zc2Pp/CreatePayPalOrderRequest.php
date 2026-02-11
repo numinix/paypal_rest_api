@@ -796,6 +796,10 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $this->log->write("ERROR: Missing card number");
             throw new \Exception('Card number is required');
         }
+        if (strlen($cc_info['number']) < 12) {
+            $this->log->write('ERROR: Card number appears masked/invalid (length < 12)');
+            throw new \Exception('Credit card number appears incomplete. Please re-enter your full card number.');
+        }
         if (empty($cc_info['security_code'])) {
             $cc_info['security_code'] = $_POST['paypalr_cc_cvv'] ?? ($_POST['ppr_cc_cvv'] ?? '');
         }
