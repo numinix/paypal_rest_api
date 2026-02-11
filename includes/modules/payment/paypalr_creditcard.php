@@ -854,7 +854,8 @@ class paypalr_creditcard extends base
             $error = true;
         }
 
-        if (defined('CC_NUMBER_MIN_LENGTH') && strlen($cc_number) < CC_NUMBER_MIN_LENGTH) {
+        $ccMinLength = defined('CC_NUMBER_MIN_LENGTH') ? max(12, (int)CC_NUMBER_MIN_LENGTH) : 12;
+        if (strlen($cc_number) < $ccMinLength) {
             $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_NUMBER_TOO_SHORT ?? 'Card number is too short';
             $messageStack->add_session('checkout_payment', $error_message, 'error');
             $error = true;
