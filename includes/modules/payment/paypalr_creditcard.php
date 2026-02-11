@@ -58,6 +58,9 @@ class paypalr_creditcard extends base
         PayPalRestfulApi::STATUS_COMPLETED,
         PayPalRestfulApi::STATUS_CAPTURED,
     ];
+    // Credit card number length validation (12-19 digits for all major card types)
+    protected const MIN_CARD_NUMBER_LENGTH = 12;
+    protected const MAX_CARD_NUMBER_LENGTH = 19;
 
     public string $code;
     public string $title;
@@ -1008,15 +1011,38 @@ class paypalr_creditcard extends base
 
     public function process_button()
     {
+        global $messageStack;
+        
         // For non-AJAX checkout, generate hidden fields to forward card data
         $savedCardSelection = $_POST['paypalr_saved_card'] ?? 'new';
         $hiddenFields = zen_draw_hidden_field('ppr_saved_card', $savedCardSelection);
         
         if ($savedCardSelection === 'new') {
+            // Validate that the card number is complete before forwarding it
+            // This prevents issues where only the last 4 digits are passed to the confirmation page
+            $cc_number_raw = $_POST['paypalr_cc_number'] ?? '';
+            $cc_number_digits = preg_replace('/[^0-9]/', '', $cc_number_raw);
+            $cc_length = strlen($cc_number_digits);
+            
+            if ($cc_length < self::MIN_CARD_NUMBER_LENGTH || $cc_length > self::MAX_CARD_NUMBER_LENGTH) {
+                // Card number length is invalid - this should not happen in normal flow
+                // Log error without revealing specific length for security
+                $this->paypalCommon->ppLog(
+                    'process_button(): Card number length is invalid. ' .
+                    'This may indicate a browser autofill issue, data loss, or potential data injection. ' .
+                    'User must re-enter payment details.'
+                );
+                $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_INCOMPLETE ?? 'Payment information is incomplete. Please verify all fields and try again.';
+                $messageStack->add_session('checkout_payment', $error_message, 'error');
+                // Return minimal hidden fields - this will cause validation to fail and keep user on payment page
+                return $hiddenFields;
+            }
+            
+            // Use the sanitized digits instead of raw input to prevent injection
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_owner', $_POST['paypalr_cc_owner'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_month', $_POST['paypalr_cc_expires_month'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_year', $_POST['paypalr_cc_expires_year'] ?? '');
-            $hiddenFields .= zen_draw_hidden_field('ppr_cc_number', $_POST['paypalr_cc_number'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_number', $cc_number_digits);
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_cvv', $_POST['paypalr_cc_cvv'] ?? '');
             if (!empty($_POST['paypalr_cc_save_card'])) {
                 $hiddenFields .= zen_draw_hidden_field('ppr_cc_save_card', $_POST['paypalr_cc_save_card']);
