@@ -58,8 +58,9 @@ class paypalr_creditcard extends base
         PayPalRestfulApi::STATUS_COMPLETED,
         PayPalRestfulApi::STATUS_CAPTURED,
     ];
-    // Minimum valid credit card number length (12 digits for least common cards like Maestro)
+    // Credit card number length validation (12-19 digits for all major card types)
     protected const MIN_CARD_NUMBER_LENGTH = 12;
+    protected const MAX_CARD_NUMBER_LENGTH = 19;
 
     public string $code;
     public string $title;
@@ -1021,15 +1022,17 @@ class paypalr_creditcard extends base
             // This prevents issues where only the last 4 digits are passed to the confirmation page
             $cc_number_raw = $_POST['paypalr_cc_number'] ?? '';
             $cc_number_digits = preg_replace('/[^0-9]/', '', $cc_number_raw);
+            $cc_length = strlen($cc_number_digits);
             
-            if (strlen($cc_number_digits) < self::MIN_CARD_NUMBER_LENGTH) {
-                // Card number is incomplete - this should not happen in normal flow
-                // Log error and keep user on payment page to re-enter card details
+            if ($cc_length < self::MIN_CARD_NUMBER_LENGTH || $cc_length > self::MAX_CARD_NUMBER_LENGTH) {
+                // Card number length is invalid - this should not happen in normal flow
+                // Log error without revealing specific length for security
                 $this->paypalCommon->ppLog(
-                    'process_button(): Card number is incomplete (length: ' . strlen($cc_number_digits) . '). ' .
-                    'This may indicate a browser autofill issue or data loss. User must re-enter card details.'
+                    'process_button(): Card number length is invalid. ' .
+                    'This may indicate a browser autofill issue, data loss, or potential data injection. ' .
+                    'User must re-enter payment details.'
                 );
-                $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_INCOMPLETE ?? 'Please re-enter your complete credit card number.';
+                $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_INCOMPLETE ?? 'Payment information is incomplete. Please verify all fields and try again.';
                 $messageStack->add_session('checkout_payment', $error_message, 'error');
                 // Return minimal hidden fields - this will cause validation to fail and keep user on payment page
                 return $hiddenFields;
