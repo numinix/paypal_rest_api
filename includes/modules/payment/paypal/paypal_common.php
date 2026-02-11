@@ -860,19 +860,6 @@ class PayPalCommon {
         }
         $cart_hash = md5($cart_hash);
 
-        // -----
-        // Include pricing-sensitive data in the GUID so one-page checkout updates that
-        // only change totals (e.g. reward points/store credit) don't incorrectly reuse
-        // a stale PayPal order.
-        //
-        $financial_signature = [
-            'total' => isset($order->info['total']) ? (float)$order->info['total'] : null,
-            'shipping_cost' => isset($order->info['shipping_cost']) ? (float)$order->info['shipping_cost'] : null,
-            'tax' => isset($order->info['tax']) ? (float)$order->info['tax'] : null,
-            'storecredit' => isset($_SESSION['storecredit']) && is_numeric($_SESSION['storecredit']) ? (float)$_SESSION['storecredit'] : 0.0,
-        ];
-        $financial_hash = md5(json_encode($financial_signature));
-
         $wallet_payload_hash = '';
         if (in_array($ppr_type, ['apple_pay', 'google_pay', 'venmo'], true)) {
             $wallet_payload = $_SESSION['PayPalRestful']['WalletPayload'][$ppr_type] ?? null;
@@ -884,7 +871,6 @@ class PayPalCommon {
         return substr(
             $guid_base
             . '-' . $cart_hash
-            . '-' . $financial_hash
             . ($wallet_payload_hash !== '' ? '-' . $wallet_payload_hash : ''),
             0,
             127
@@ -1152,12 +1138,7 @@ class PayPalCommon {
 
         // If a PayPal order already exists in the session for this GUID, reuse it.
         if (isset($_SESSION['PayPalRestful']['Order']['guid']) && $_SESSION['PayPalRestful']['Order']['guid'] === $order_guid) {
-            $log->write("createPayPalOrder($ppr_type): Reusing existing PayPal order with GUID: $order_guid.
-" .
-                "  Session storecredit: " . (isset($_SESSION['storecredit']) ? (string)$_SESSION['storecredit'] : 'unset') . "
-" .
-                "  Order total: " . (isset($order->info['total']) ? (string)$order->info['total'] : 'unset')
-            );
+            $log->write("createPayPalOrder($ppr_type): Reusing existing PayPal order with GUID: $order_guid");
             return true;
         }
 
