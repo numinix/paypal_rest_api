@@ -1,9 +1,7 @@
 <?php
-require_once (DIR_FS_CATALOG . DIR_WS_CLASSES . 'order.php');
-require_once (DIR_FS_CATALOG . DIR_WS_CLASSES . 'order_total.php');
-require_once (DIR_FS_CATALOG . DIR_WS_CLASSES . 'shipping.php');
-require_once (DIR_FS_CATALOG . DIR_WS_CLASSES . 'payment.php');
-require_once (DIR_FS_CATALOG . DIR_WS_CLASSES . 'shopping_cart.php');
+// Do not eager-load core Zen Cart classes here.
+// Storefront bootstrap/autoload handles these and duplicate includes can trigger
+// class redeclaration fatals (e.g., includes/classes/order.php on checkout pages).
 class paypalSavedCardRecurring {
 var $PayPal, $PayPalRestful, $paypalsavedcard, $paymentModuleCode;
 function __construct($paypalsavedcard = null) {
