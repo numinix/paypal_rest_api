@@ -58,6 +58,8 @@ class paypalr_creditcard extends base
         PayPalRestfulApi::STATUS_COMPLETED,
         PayPalRestfulApi::STATUS_CAPTURED,
     ];
+    // Minimum valid credit card number length (12 digits for least common cards like Maestro)
+    protected const MIN_CARD_NUMBER_LENGTH = 12;
 
     public string $code;
     public string $title;
@@ -1020,18 +1022,15 @@ class paypalr_creditcard extends base
             $cc_number_raw = $_POST['paypalr_cc_number'] ?? '';
             $cc_number_digits = preg_replace('/[^0-9]/', '', $cc_number_raw);
             
-            if (strlen($cc_number_digits) < 12) {
+            if (strlen($cc_number_digits) < self::MIN_CARD_NUMBER_LENGTH) {
                 // Card number is incomplete - this should not happen in normal flow
                 // Log error and keep user on payment page to re-enter card details
                 $this->paypalCommon->ppLog(
                     'process_button(): Card number is incomplete (length: ' . strlen($cc_number_digits) . '). ' .
                     'This may indicate a browser autofill issue or data loss. User must re-enter card details.'
                 );
-                $messageStack->add_session(
-                    'checkout_payment',
-                    MODULE_PAYMENT_PAYPALR_TEXT_CC_NUMBER_TOO_SHORT ?? 'Please re-enter your complete credit card number.',
-                    'error'
-                );
+                $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_INCOMPLETE ?? 'Please re-enter your complete credit card number.';
+                $messageStack->add_session('checkout_payment', $error_message, 'error');
                 // Return minimal hidden fields - this will cause validation to fail and keep user on payment page
                 return $hiddenFields;
             }
