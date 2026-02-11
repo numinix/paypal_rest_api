@@ -78,6 +78,9 @@ class Logger
     public static function logJSON($data, bool $keep_links = false, bool $use_var_export = false): string
     {
         if (is_array($data)) {
+            // Create a deep copy to avoid modifying the original data
+            $data = unserialize(serialize($data));
+            
             unset(
                 $data[CURLOPT_HTTPHEADER],
                 $data['access_token'],
