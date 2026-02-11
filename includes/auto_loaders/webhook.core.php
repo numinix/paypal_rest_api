@@ -34,12 +34,9 @@ if (!class_exists('shoppingCart', false)) {
 }
 
 if (!class_exists('order', false)) {
-    $orderClass = DIR_FS_CATALOG . DIR_WS_CLASSES . 'order.php';
-    if (is_file($orderClass)) {
-        require_once $orderClass;
-    }
-}
-if (!class_exists('order', false)) {
+    // Avoid pre-loading the core order class here: storefront bootstrap handles
+    // it separately and can re-include the file, causing class redeclaration.
+    // Webhook contexts that don't have the storefront stack can use this shim.
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/Order.php';
 }
 
