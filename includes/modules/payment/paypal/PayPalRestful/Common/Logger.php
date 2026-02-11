@@ -79,7 +79,8 @@ class Logger
     {
         if (is_array($data)) {
             // Create a deep copy to avoid modifying the original data
-            $data = unserialize(serialize($data));
+            // Using json_decode/encode is safe for data that will be JSON-encoded anyway
+            $data = json_decode(json_encode($data), true);
             
             unset(
                 $data[CURLOPT_HTTPHEADER],
