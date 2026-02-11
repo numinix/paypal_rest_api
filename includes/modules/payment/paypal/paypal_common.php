@@ -845,6 +845,11 @@ class PayPalCommon {
     /**
      * Common createOrderGuid logic
      *
+     * Generates a fixed-length UUID-like GUID (36 chars) from a SHA-256
+     * hash of the order's state. This ensures the PayPal-Request-Id header
+     * stays within PayPal's character limit while still detecting changes
+     * in cart contents, order totals, and wallet payloads.
+     *
      * @param \order $order Order object
      * @param string $ppr_type Payment type
      * @return string
@@ -852,43 +857,40 @@ class PayPalCommon {
     public function createOrderGuid($order, string $ppr_type): string
     {
         $orders_completed = $_SESSION['PayPalRestful']['CompletedOrders'] ?? 0;
-        $guid_base = $_SESSION['customer_id'] . '-' . $_SESSION['cartID'] . '-' . $orders_completed . '-' . $ppr_type;
 
-        $cart_hash = '';
+        $cart_data = '';
         foreach ($order->products as $product) {
-            $cart_hash .= $product['id'] . $product['qty'];
+            $cart_data .= $product['id'] . $product['qty'];
         }
-        $cart_hash = md5($cart_hash);
 
-        // -----
-        // Include pricing-sensitive data in the GUID so one-page checkout updates that
-        // only change totals (e.g. reward points/store credit) don't incorrectly reuse
-        // a stale PayPal order.
-        //
-        $financial_signature = [
-            'total' => isset($order->info['total']) ? (float)$order->info['total'] : null,
-            'shipping_cost' => isset($order->info['shipping_cost']) ? (float)$order->info['shipping_cost'] : null,
-            'tax' => isset($order->info['tax']) ? (float)$order->info['tax'] : null,
-            'storecredit' => isset($_SESSION['storecredit']) && is_numeric($_SESSION['storecredit']) ? (float)$_SESSION['storecredit'] : 0.0,
-        ];
-        $financial_hash = md5(json_encode($financial_signature));
+        $hash_data =
+            $_SESSION['customer_id']
+            . $_SESSION['cartID']
+            . $orders_completed
+            . $ppr_type
+            . $cart_data
+            . (isset($order->info['total']) ? (string)(float)$order->info['total'] : '')
+            . (isset($order->info['shipping_cost']) ? (string)(float)$order->info['shipping_cost'] : '')
+            . (isset($order->info['tax']) ? (string)(float)$order->info['tax'] : '');
 
-        $wallet_payload_hash = '';
+        if (isset($_SESSION['storecredit']) && is_numeric($_SESSION['storecredit'])) {
+            $hash_data .= (string)(float)$_SESSION['storecredit'];
+        }
+
         if (in_array($ppr_type, ['apple_pay', 'google_pay', 'venmo'], true)) {
             $wallet_payload = $_SESSION['PayPalRestful']['WalletPayload'][$ppr_type] ?? null;
             if (is_array($wallet_payload) && !empty($wallet_payload)) {
-                $wallet_payload_hash = md5(json_encode($wallet_payload));
+                $hash_data .= json_encode($wallet_payload);
             }
         }
 
-        return substr(
-            $guid_base
-            . '-' . $cart_hash
-            . '-' . $financial_hash
-            . ($wallet_payload_hash !== '' ? '-' . $wallet_payload_hash : ''),
-            0,
-            127
-        );
+        $hash = hash('sha256', $hash_data);
+        return
+            substr($hash,  0,  8) . '-' .
+            substr($hash,  8,  4) . '-' .
+            substr($hash, 12,  4) . '-' .
+            substr($hash, 16,  4) . '-' .
+            substr($hash, 20, 12);
     }
 
     /**
@@ -1152,12 +1154,7 @@ class PayPalCommon {
 
         // If a PayPal order already exists in the session for this GUID, reuse it.
         if (isset($_SESSION['PayPalRestful']['Order']['guid']) && $_SESSION['PayPalRestful']['Order']['guid'] === $order_guid) {
-            $log->write("createPayPalOrder($ppr_type): Reusing existing PayPal order with GUID: $order_guid.
-" .
-                "  Session storecredit: " . (isset($_SESSION['storecredit']) ? (string)$_SESSION['storecredit'] : 'unset') . "
-" .
-                "  Order total: " . (isset($order->info['total']) ? (string)$order->info['total'] : 'unset')
-            );
+            $log->write("createPayPalOrder($ppr_type): Reusing existing PayPal order with GUID: $order_guid");
             return true;
         }
 
