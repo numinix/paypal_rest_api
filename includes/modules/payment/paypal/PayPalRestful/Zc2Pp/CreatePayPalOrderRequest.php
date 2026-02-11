@@ -814,16 +814,27 @@ class CreatePayPalOrderRequest extends ErrorInfo
             'security_code' => $cc_info['security_code'],
             'expiry' => $expiry_year . '-' . $expiry_month,
             'billing_address' => Address::get($order->billing),
-            'attributes' => [
-                'vault' => [
-                    'store_in_vault' => 'ON_SUCCESS',  // Always vault cards for security and recurring billing
-                ],
-            ],
             'experience_context' => [
                 'return_url' => $this->buildScaUrl($listener_endpoint, '3ds_return'),
                 'cancel_url' => $this->buildScaUrl($listener_endpoint, '3ds_cancel'),
             ],
         ];
+        
+        // Only add vault attributes if vaulting is enabled AND the card should be stored
+        $vaultEnabled = defined('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT') && MODULE_PAYMENT_PAYPALR_ENABLE_VAULT === 'True';
+        $shouldStoreCard = !empty($cc_info['store_card']);
+        
+        if ($vaultEnabled && $shouldStoreCard) {
+            $payment_source['attributes']['vault']['store_in_vault'] = 'ON_SUCCESS';
+            $this->log->write('buildCardPaymentSource: Vault enabled and card will be stored on successful payment.');
+        } else {
+            $this->log->write(
+                'buildCardPaymentSource: Card will NOT be vaulted. ' .
+                '(Vault enabled: ' . ($vaultEnabled ? 'yes' : 'no') . ', ' .
+                'Store card: ' . ($shouldStoreCard ? 'yes' : 'no') . ')'
+            );
+        }
+        
         if (isset($_POST['ppr_cc_sca_always']) || (defined('MODULE_PAYMENT_PAYPALR_SCA_ALWAYS') && MODULE_PAYMENT_PAYPALR_SCA_ALWAYS === 'true')) {
             $payment_source['attributes']['verification']['method'] = 'SCA_ALWAYS'; //- Defaults to 'SCA_WHEN_REQUIRED' for live environment
         }
