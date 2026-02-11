@@ -1038,10 +1038,11 @@ class paypalr_creditcard extends base
                 return $hiddenFields;
             }
             
+            // Use the sanitized digits instead of raw input to prevent injection
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_owner', $_POST['paypalr_cc_owner'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_month', $_POST['paypalr_cc_expires_month'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_year', $_POST['paypalr_cc_expires_year'] ?? '');
-            $hiddenFields .= zen_draw_hidden_field('ppr_cc_number', $cc_number_raw);
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_number', $cc_number_digits);
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_cvv', $_POST['paypalr_cc_cvv'] ?? '');
             if (!empty($_POST['paypalr_cc_save_card'])) {
                 $hiddenFields .= zen_draw_hidden_field('ppr_cc_save_card', $_POST['paypalr_cc_save_card']);
