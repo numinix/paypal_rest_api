@@ -763,13 +763,42 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $this->log->write("ERROR: Missing card holder name");
             throw new \Exception('Card holder name is required');
         }
-        if (empty($cc_info['number'])) {
-            $posted_number = $_POST['paypalr_cc_number'] ?? ($_POST['ppr_cc_number'] ?? '');
-            $cc_info['number'] = preg_replace('/[^0-9]/', '', $posted_number);
+        $cc_info['number'] = preg_replace('/[^0-9]/', '', (string)($cc_info['number'] ?? ''));
+
+        $posted_number_candidates = [
+            $_POST['paypalr_cc_number'] ?? '',
+            $_POST['ppr_cc_number'] ?? '',
+            $_POST['cc_number'] ?? '',
+        ];
+        $posted_number = '';
+        foreach ($posted_number_candidates as $posted_candidate) {
+            $digits = preg_replace('/[^0-9]/', '', (string)$posted_candidate);
+            if (strlen($digits) > strlen($posted_number)) {
+                $posted_number = $digits;
+            }
         }
+
+        // Some checkout flows can carry only a masked/last-4 card value into ccInfo.
+        // PayPal requires the full PAN for new-card payments, so prefer the posted
+        // value if it looks more complete than ccInfo.
+        $cc_info_number_is_last4_only = (
+            strlen($cc_info['number']) <= 4
+            || (!empty($cc_info['last_digits']) && $cc_info['number'] === preg_replace('/[^0-9]/', '', (string)$cc_info['last_digits']))
+        );
+        if ($cc_info_number_is_last4_only && strlen($posted_number) > strlen($cc_info['number'])) {
+            $this->log->write('buildCardPaymentSource: cc_info number appears masked/partial; using posted card number instead.');
+            $cc_info['number'] = $posted_number;
+        } elseif ($cc_info['number'] === '' && $posted_number !== '') {
+            $cc_info['number'] = $posted_number;
+        }
+
         if (empty($cc_info['number'])) {
             $this->log->write("ERROR: Missing card number");
             throw new \Exception('Card number is required');
+        }
+        if (strlen($cc_info['number']) < 12) {
+            $this->log->write('ERROR: Card number appears masked/invalid (length < 12)');
+            throw new \Exception('Credit card number appears incomplete. Please re-enter your full card number.');
         }
         if (empty($cc_info['security_code'])) {
             $cc_info['security_code'] = $_POST['paypalr_cc_cvv'] ?? ($_POST['ppr_cc_cvv'] ?? '');

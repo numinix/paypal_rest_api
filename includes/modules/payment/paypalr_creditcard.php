@@ -841,10 +841,11 @@ class paypalr_creditcard extends base
 
         // Validate new card entry
         // Support fallback field names that might be forwarded from the checkout confirmation page
-        $cc_owner = $_POST['paypalr_cc_owner'] ?? ($_POST['ppr_cc_owner'] ?? '');
-        $cc_number_raw = $_POST['paypalr_cc_number'] ?? ($_POST['ppr_cc_number'] ?? '');
-        $cc_number = preg_replace('/[^0-9]/', '', $cc_number_raw);
-        $cc_cvv = $_POST['paypalr_cc_cvv'] ?? ($_POST['ppr_cc_cvv'] ?? '');
+        $cc_owner = trim((string)($_POST['paypalr_cc_owner'] ?? ($_POST['ppr_cc_owner'] ?? '')));
+        $cc_number_raw = (string)($_POST['paypalr_cc_number'] ?? ($_POST['ppr_cc_number'] ?? ''));
+        $cc_cvv = trim((string)($_POST['paypalr_cc_cvv'] ?? ($_POST['ppr_cc_cvv'] ?? '')));
+        $expiry_month = (string)($_POST['paypalr_cc_expires_month'] ?? ($_POST['ppr_cc_expires_month'] ?? ''));
+        $expiry_year = (string)($_POST['paypalr_cc_expires_year'] ?? ($_POST['ppr_cc_expires_year'] ?? ''));
 
         $error = false;
 
@@ -854,28 +855,57 @@ class paypalr_creditcard extends base
             $error = true;
         }
 
-        if (defined('CC_NUMBER_MIN_LENGTH') && strlen($cc_number) < CC_NUMBER_MIN_LENGTH) {
-            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_NUMBER_TOO_SHORT ?? 'Card number is too short';
-            $messageStack->add_session('checkout_payment', $error_message, 'error');
-            $error = true;
-        }
-
-        if (strlen($cc_cvv) < 3 || strlen($cc_cvv) > 4) {
-            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_CVV_INVALID ?? 'CVV must be 3 or 4 digits';
-            $messageStack->add_session('checkout_payment', $error_message, 'error');
-            $error = true;
-        }
-
-        // Validate expiry month and year
-        $expiry_month = $_POST['paypalr_cc_expires_month'] ?? ($_POST['ppr_cc_expires_month'] ?? '');
-        $expiry_year = $_POST['paypalr_cc_expires_year'] ?? ($_POST['ppr_cc_expires_year'] ?? '');
         if (empty($expiry_month) || empty($expiry_year)) {
             $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRY_REQUIRED ?? 'Card expiration date is required';
             $messageStack->add_session('checkout_payment', $error_message, 'error');
             $error = true;
         }
 
+        require_once DIR_WS_CLASSES . 'cc_validation.php';
+        $cc_validation = new cc_validation();
+        $cc_validation_result = $cc_validation->validate($cc_number_raw, $expiry_month, $expiry_year);
+        switch ((int)$cc_validation_result) {
+            case -1:
+                $error_message = MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD ?? TEXT_CCVAL_ERROR_INVALID_NUMBER;
+                if (trim($cc_number_raw) === '') {
+                    $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_NUMBER_TOO_SHORT ?? 'Card number is too short';
+                }
+                break;
+            case -2:
+            case -3:
+            case -4:
+                $error_message = TEXT_CCVAL_ERROR_INVALID_DATE;
+                break;
+            case 0:
+                $error_message = TEXT_CCVAL_ERROR_INVALID_NUMBER;
+                break;
+            default:
+                $error_message = '';
+                break;
+        }
+        if ($error_message !== '') {
+            $messageStack->add_session('checkout_payment', $error_message, 'error');
+            $error = true;
+        }
+
         if ($error) {
+            if ($is_preconfirmation) {
+                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
+            }
+            return false;
+        }
+
+        $cc_number = (string)$cc_validation->cc_number;
+        $cc_type = (string)$cc_validation->cc_type;
+        $cvv_required_length = ($cc_type === 'American Express') ? 4 : 3;
+        if (!ctype_digit($cc_cvv) || strlen($cc_cvv) !== $cvv_required_length) {
+            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH
+                ?? MODULE_PAYMENT_PAYPALR_TEXT_CC_CVV_INVALID
+                ?? 'CVV is invalid';
+            if (strpos((string)$error_message, '%') !== false) {
+                $error_message = sprintf($error_message, $cc_type, substr($cc_number, -4), $cvv_required_length);
+            }
+            $messageStack->add_session('checkout_payment', $error_message, 'error');
             if ($is_preconfirmation) {
                 zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
             }
@@ -892,7 +922,7 @@ class paypalr_creditcard extends base
         }
 
         $this->ccInfo = [
-            'type' => MODULE_PAYMENT_PAYPALR_TEXT_CC_TYPE_GENERIC ?? 'Card',
+            'type' => ($cc_type !== '' ? $cc_type : (MODULE_PAYMENT_PAYPALR_TEXT_CC_TYPE_GENERIC ?? 'Card')),
             'number' => $cc_number,
             'expiry_month' => $expiry_month,
             'expiry_year' => $expiry_year,
