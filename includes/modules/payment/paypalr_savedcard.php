@@ -649,20 +649,10 @@ class paypalr_savedcard extends base
             $this->title = $this->buildCardTitle($this->selectedCard);
         }
 
-        // Create PayPal order for saved card payment
-        $paypal_order_created = $this->createPayPalOrder('card');
-        if ($paypal_order_created === false) {
-            $error_info = $this->ppr->getErrorInfo();
-            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
-            $this->sendAlertEmail(
-                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
-                MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
-            );
-            $this->setMessageAndRedirect(
-                sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_ADMIN ?? 'Saved Card', $error_code),
-                FILENAME_CHECKOUT_PAYMENT
-            );
-        }
+        // NOTE:
+        // Defer PayPal order creation until before_process (when "Confirm Order"
+        // has been submitted) to avoid charging vaulted cards before the Zen Cart
+        // order is actually placed.
     }
 
     /**
@@ -798,6 +788,22 @@ class paypalr_savedcard extends base
         $order_info = $this->getOrderTotalsInfo();
 
         $this->paymentIsPending = false;
+
+        if (empty($_SESSION['PayPalRestful']['Order']['id'])) {
+            $paypal_order_created = $this->createPayPalOrder('card');
+            if ($paypal_order_created === false) {
+                $error_info = $this->ppr->getErrorInfo();
+                $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
+                $this->sendAlertEmail(
+                    MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
+                    MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
+                );
+                $this->setMessageAndRedirect(
+                    sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_ADMIN ?? 'Saved Card', $error_code),
+                    FILENAME_CHECKOUT_PAYMENT
+                );
+            }
+        }
 
         $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
         $wallet_user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';
