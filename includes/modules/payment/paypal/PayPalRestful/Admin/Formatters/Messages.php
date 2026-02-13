@@ -14,9 +14,9 @@ namespace PayPalRestful\Admin\Formatters;
 class Messages extends \messageStack
 {
     /**
-     * @param string $stack
+     * @param string $class
      */
-    public function output($stack = 'header'): string
+    public function output($class = '')
     {
         $this->table_data_parameters = 'class="pprNotification"';
         return $this->tableBlock($this->errors);
