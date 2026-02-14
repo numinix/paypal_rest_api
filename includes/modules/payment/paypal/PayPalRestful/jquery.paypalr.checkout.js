@@ -265,13 +265,11 @@ jQuery(document).ready(function() {
             $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"] img');
         }
 
-        if (!$paypalButton.length) {
-            // Final fallback to label if no image found
-            $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalr"]');
-        }
+        // Do NOT fall back to the label itself - clicking the label should only
+        // select the radio button, not launch the PayPal wallet modal.
+        // Only the button/image click or form submission should launch the modal.
 
         // If we found an image (not the label), this is a wallet-only button
-        // Otherwise if we found the label fallback, it's also considered wallet-only for this context
         isWalletOnlyButton = $paypalButton.length > 0;
 
         if ($checkoutForm.length && $paypalButton.length) {

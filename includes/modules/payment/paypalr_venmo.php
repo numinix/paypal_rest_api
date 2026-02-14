@@ -729,6 +729,15 @@ class paypalr_venmo extends base
     {
         global $order;
 
+        // Verify the wallet payment flow was completed. If a JS error caused a raw
+        // form POST without the payment modal completing, the session will not have
+        // a valid PayPal order for this wallet type.
+        if (empty($_SESSION['PayPalRestful']['Order']['id']) || empty($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'])) {
+            $this->log->write('Venmo::before_process, wallet payment not confirmed in session; aborting.');
+            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
+        }
+
         $order_info = $this->getOrderTotalsInfo(false);
 
         if (count($order_info) === 0) {

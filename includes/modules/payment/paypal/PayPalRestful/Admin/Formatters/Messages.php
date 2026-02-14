@@ -14,11 +14,14 @@ namespace PayPalRestful\Admin\Formatters;
 class Messages extends \messageStack
 {
     /**
-     * @param string $class
+     * The $class param is unused in admin-side implementations
+     * but this signature matches catalog-side class to allow
+     * for simpler sharing of code that could run in either
      */
-    public function output($class = '')
+    public function output(?string $class = null)
     {
         $this->table_data_parameters = 'class="pprNotification"';
         return $this->tableBlock($this->errors);
     }
 }
+

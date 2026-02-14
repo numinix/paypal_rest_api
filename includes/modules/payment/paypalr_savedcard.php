@@ -484,19 +484,16 @@ class paypalr_savedcard extends base
             ],
         ];
 
-        // Load the checkout script to handle radio button selection
-        // Add it as a hidden field to avoid placing script tags inside the label element
-        $savedCardCss = '<link rel="stylesheet" href="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css' . '">';
-        $checkoutScript = $savedCardCss . '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
-        $fields[] = [
-            'title' => '',
-            'field' => $checkoutScript,
-        ];
-
         // Build module display title
         $moduleTitle = defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT') 
             ? MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT 
             : 'Pay with Saved Card';
+
+        // Load the checkout script to handle radio button selection
+        // Append it to the module output to avoid creating a separate div row
+        $savedCardCss = '<link rel="stylesheet" href="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalr.css' . '">';
+        $checkoutScript = $savedCardCss . '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+        $moduleTitle .= $checkoutScript;
 
         return [
             'id' => $this->code,
@@ -649,10 +646,20 @@ class paypalr_savedcard extends base
             $this->title = $this->buildCardTitle($this->selectedCard);
         }
 
-        // NOTE:
-        // Defer PayPal order creation until before_process (when "Confirm Order"
-        // has been submitted) to avoid charging vaulted cards before the Zen Cart
-        // order is actually placed.
+        // Create PayPal order for saved card payment
+        $paypal_order_created = $this->createPayPalOrder('card');
+        if ($paypal_order_created === false) {
+            $error_info = $this->ppr->getErrorInfo();
+            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
+            $this->sendAlertEmail(
+                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
+                MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
+            );
+            $this->setMessageAndRedirect(
+                sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_ADMIN ?? 'Saved Card', $error_code),
+                FILENAME_CHECKOUT_PAYMENT
+            );
+        }
     }
 
     /**
@@ -788,22 +795,6 @@ class paypalr_savedcard extends base
         $order_info = $this->getOrderTotalsInfo();
 
         $this->paymentIsPending = false;
-
-        if (empty($_SESSION['PayPalRestful']['Order']['id'])) {
-            $paypal_order_created = $this->createPayPalOrder('card');
-            if ($paypal_order_created === false) {
-                $error_info = $this->ppr->getErrorInfo();
-                $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
-                $this->sendAlertEmail(
-                    MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
-                    MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
-                );
-                $this->setMessageAndRedirect(
-                    sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_ADMIN ?? 'Saved Card', $error_code),
-                    FILENAME_CHECKOUT_PAYMENT
-                );
-            }
-        }
 
         $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
         $wallet_user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';

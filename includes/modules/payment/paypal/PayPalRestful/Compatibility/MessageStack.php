@@ -67,9 +67,9 @@ class messageStack
         $this->messages = [];
     }
 
-    public function output($class = 'header')
+    public function output($stack = 'header'): string
     {
-        $stack = $this->normaliseStackName($class);
+        $stack = $this->normaliseStackName($stack);
         $messages = $this->messages[$stack] ?? [];
 
         if (empty($messages)) {

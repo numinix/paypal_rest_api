@@ -1138,26 +1138,13 @@
     // Hide the radio button on page load
     ensureWalletSelectionHidden();
 
-    // If a user still clicks the hidden radio, trigger the Apple Pay button
+    // If a user still clicks the hidden radio, select the payment method
+    // but do NOT launch the modal - only the button click or form submit should do that
     var moduleRadio = document.getElementById('pmt-paypalr_applepay');
     if (moduleRadio) {
-        // Add label click prevention
-        var moduleLabel = document.querySelector('label[for="pmt-paypalr_applepay"]');
-        if (moduleLabel && !moduleLabel.dataset.applePayLabelBound) {
-            moduleLabel.addEventListener('click', function () {
-                moduleRadio.dataset.labelClick = 'true';
-            });
-            moduleLabel.dataset.applePayLabelBound = 'true';
-        }
         if (!moduleRadio.dataset.applePayBound) {
             moduleRadio.addEventListener('click', function () {
                 selectApplePayRadio();
-                // Don't trigger payment button if this click came from a label
-                if (moduleRadio.dataset.labelClick === 'true') {
-                    moduleRadio.dataset.labelClick = 'false';
-                    return;
-                }
-                triggerApplePayButtonClick();
             });
             moduleRadio.dataset.applePayBound = 'true';
         }

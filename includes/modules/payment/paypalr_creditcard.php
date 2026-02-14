@@ -58,9 +58,6 @@ class paypalr_creditcard extends base
         PayPalRestfulApi::STATUS_COMPLETED,
         PayPalRestfulApi::STATUS_CAPTURED,
     ];
-    // Credit card number length validation (12-19 digits for all major card types)
-    protected const MIN_CARD_NUMBER_LENGTH = 12;
-    protected const MAX_CARD_NUMBER_LENGTH = 19;
 
     public string $code;
     public string $title;
@@ -101,7 +98,7 @@ class paypalr_creditcard extends base
     public function getCcInfo(): array
     {
         // Return a copy to prevent external modification of internal state
-        return array_merge([], $this->ccInfo);
+        return [...$this->ccInfo];
     }
 
     /**
@@ -565,14 +562,6 @@ class paypalr_creditcard extends base
             }
         }
 
-        // Load the checkout script to handle radio button selection when focusing on fields
-        // Add it as a hidden field to avoid placing script tags inside the label element
-        $checkoutScript = $creditCardCss . '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
-        $fields[] = [
-            'title' => '',
-            'field' => $checkoutScript,
-        ];
-
         // Build module display with title and card images
         $moduleDisplay = $this->title;
         $cardsAccepted = $this->buildCardsAccepted();
@@ -582,6 +571,11 @@ class paypalr_creditcard extends base
         if ($vaultEnabled && !empty($vaultedCards)) {
             $moduleDisplay .= $this->buildSavedCardInlineOptions($vaultedCards, $savedCardSelection, $onFocus);
         }
+
+        // Load the checkout script to handle radio button selection when focusing on fields
+        // Append it to the module output to avoid creating a separate div row
+        $checkoutScript = $creditCardCss . '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+        $moduleDisplay .= $checkoutScript;
 
         return [
             'id' => $this->code,
@@ -772,12 +766,20 @@ class paypalr_creditcard extends base
             return;
         }
         
-        // NOTE:
-        // Do not create/capture the PayPal order during pre-confirmation.
-        // For direct card processing, PayPal can return COMPLETED from createOrder,
-        // which would charge the customer before they click "Confirm Order".
-        // Order creation is deferred to before_process so payment and Zen Cart
-        // order placement happen in the same final checkout step.
+        // Create PayPal order for credit card payment
+        $paypal_order_created = $this->createPayPalOrder('card');
+        if ($paypal_order_created === false) {
+            $error_info = $this->ppr->getErrorInfo();
+            $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
+            $this->sendAlertEmail(
+                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
+                MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
+            );
+            $this->setMessageAndRedirect(
+                sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE, $error_code),
+                FILENAME_CHECKOUT_PAYMENT
+            );
+        }
     }
 
     protected function validateCardInformation(bool $is_preconfirmation): bool
@@ -836,11 +838,10 @@ class paypalr_creditcard extends base
 
         // Validate new card entry
         // Support fallback field names that might be forwarded from the checkout confirmation page
-        $cc_owner = trim((string)($_POST['paypalr_cc_owner'] ?? ($_POST['ppr_cc_owner'] ?? '')));
-        $cc_number_raw = (string)($_POST['paypalr_cc_number'] ?? ($_POST['ppr_cc_number'] ?? ''));
-        $cc_cvv = trim((string)($_POST['paypalr_cc_cvv'] ?? ($_POST['ppr_cc_cvv'] ?? '')));
-        $expiry_month = (string)($_POST['paypalr_cc_expires_month'] ?? ($_POST['ppr_cc_expires_month'] ?? ''));
-        $expiry_year = (string)($_POST['paypalr_cc_expires_year'] ?? ($_POST['ppr_cc_expires_year'] ?? ''));
+        $cc_owner = $_POST['paypalr_cc_owner'] ?? ($_POST['ppr_cc_owner'] ?? '');
+        $cc_number_raw = $_POST['paypalr_cc_number'] ?? ($_POST['ppr_cc_number'] ?? '');
+        $cc_number = preg_replace('/[^0-9]/', '', $cc_number_raw);
+        $cc_cvv = $_POST['paypalr_cc_cvv'] ?? ($_POST['ppr_cc_cvv'] ?? '');
 
         $error = false;
 
@@ -850,57 +851,28 @@ class paypalr_creditcard extends base
             $error = true;
         }
 
+        if (defined('CC_NUMBER_MIN_LENGTH') && strlen($cc_number) < CC_NUMBER_MIN_LENGTH) {
+            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_NUMBER_TOO_SHORT ?? 'Card number is too short';
+            $messageStack->add_session('checkout_payment', $error_message, 'error');
+            $error = true;
+        }
+
+        if (strlen($cc_cvv) < 3 || strlen($cc_cvv) > 4) {
+            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_CVV_INVALID ?? 'CVV must be 3 or 4 digits';
+            $messageStack->add_session('checkout_payment', $error_message, 'error');
+            $error = true;
+        }
+
+        // Validate expiry month and year
+        $expiry_month = $_POST['paypalr_cc_expires_month'] ?? ($_POST['ppr_cc_expires_month'] ?? '');
+        $expiry_year = $_POST['paypalr_cc_expires_year'] ?? ($_POST['ppr_cc_expires_year'] ?? '');
         if (empty($expiry_month) || empty($expiry_year)) {
             $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_EXPIRY_REQUIRED ?? 'Card expiration date is required';
             $messageStack->add_session('checkout_payment', $error_message, 'error');
             $error = true;
         }
 
-        require_once DIR_WS_CLASSES . 'cc_validation.php';
-        $cc_validation = new cc_validation();
-        $cc_validation_result = $cc_validation->validate($cc_number_raw, $expiry_month, $expiry_year);
-        switch ((int)$cc_validation_result) {
-            case -1:
-                $error_message = MODULE_PAYMENT_PAYPALR_TEXT_BAD_CARD ?? TEXT_CCVAL_ERROR_INVALID_NUMBER;
-                if (trim($cc_number_raw) === '') {
-                    $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_NUMBER_TOO_SHORT ?? 'Card number is too short';
-                }
-                break;
-            case -2:
-            case -3:
-            case -4:
-                $error_message = TEXT_CCVAL_ERROR_INVALID_DATE;
-                break;
-            case 0:
-                $error_message = TEXT_CCVAL_ERROR_INVALID_NUMBER;
-                break;
-            default:
-                $error_message = '';
-                break;
-        }
-        if ($error_message !== '') {
-            $messageStack->add_session('checkout_payment', $error_message, 'error');
-            $error = true;
-        }
-
         if ($error) {
-            if ($is_preconfirmation) {
-                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
-            }
-            return false;
-        }
-
-        $cc_number = (string)$cc_validation->cc_number;
-        $cc_type = (string)$cc_validation->cc_type;
-        $cvv_required_length = ($cc_type === 'American Express') ? 4 : 3;
-        if (!ctype_digit($cc_cvv) || strlen($cc_cvv) !== $cvv_required_length) {
-            $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CVV_LENGTH
-                ?? MODULE_PAYMENT_PAYPALR_TEXT_CC_CVV_INVALID
-                ?? 'CVV is invalid';
-            if (strpos((string)$error_message, '%') !== false) {
-                $error_message = sprintf($error_message, $cc_type, substr($cc_number, -4), $cvv_required_length);
-            }
-            $messageStack->add_session('checkout_payment', $error_message, 'error');
             if ($is_preconfirmation) {
                 zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
             }
@@ -917,7 +889,7 @@ class paypalr_creditcard extends base
         }
 
         $this->ccInfo = [
-            'type' => ($cc_type !== '' ? $cc_type : (MODULE_PAYMENT_PAYPALR_TEXT_CC_TYPE_GENERIC ?? 'Card')),
+            'type' => MODULE_PAYMENT_PAYPALR_TEXT_CC_TYPE_GENERIC ?? 'Card',
             'number' => $cc_number,
             'expiry_month' => $expiry_month,
             'expiry_year' => $expiry_year,
@@ -1003,38 +975,15 @@ class paypalr_creditcard extends base
 
     public function process_button()
     {
-        global $messageStack;
-        
         // For non-AJAX checkout, generate hidden fields to forward card data
         $savedCardSelection = $_POST['paypalr_saved_card'] ?? 'new';
         $hiddenFields = zen_draw_hidden_field('ppr_saved_card', $savedCardSelection);
         
         if ($savedCardSelection === 'new') {
-            // Validate that the card number is complete before forwarding it
-            // This prevents issues where only the last 4 digits are passed to the confirmation page
-            $cc_number_raw = $_POST['paypalr_cc_number'] ?? '';
-            $cc_number_digits = preg_replace('/[^0-9]/', '', $cc_number_raw);
-            $cc_length = strlen($cc_number_digits);
-            
-            if ($cc_length < self::MIN_CARD_NUMBER_LENGTH || $cc_length > self::MAX_CARD_NUMBER_LENGTH) {
-                // Card number length is invalid - this should not happen in normal flow
-                // Log error without revealing specific length for security
-                $this->paypalCommon->ppLog(
-                    'process_button(): Card number length is invalid. ' .
-                    'This may indicate a browser autofill issue, data loss, or potential data injection. ' .
-                    'User must re-enter payment details.'
-                );
-                $error_message = MODULE_PAYMENT_PAYPALR_TEXT_CC_INCOMPLETE ?? 'Payment information is incomplete. Please verify all fields and try again.';
-                $messageStack->add_session('checkout_payment', $error_message, 'error');
-                // Return minimal hidden fields - this will cause validation to fail and keep user on payment page
-                return $hiddenFields;
-            }
-            
-            // Use the sanitized digits instead of raw input to prevent injection
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_owner', $_POST['paypalr_cc_owner'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_month', $_POST['paypalr_cc_expires_month'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_expires_year', $_POST['paypalr_cc_expires_year'] ?? '');
-            $hiddenFields .= zen_draw_hidden_field('ppr_cc_number', $cc_number_digits);
+            $hiddenFields .= zen_draw_hidden_field('ppr_cc_number', $_POST['paypalr_cc_number'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppr_cc_cvv', $_POST['paypalr_cc_cvv'] ?? '');
             if (!empty($_POST['paypalr_cc_save_card'])) {
                 $hiddenFields .= zen_draw_hidden_field('ppr_cc_save_card', $_POST['paypalr_cc_save_card']);
@@ -1089,22 +1038,6 @@ class paypalr_creditcard extends base
         $order_info = $this->getOrderTotalsInfo();
 
         $this->paymentIsPending = false;
-
-        if (empty($_SESSION['PayPalRestful']['Order']['id'])) {
-            $paypal_order_created = $this->createPayPalOrder('card');
-            if ($paypal_order_created === false) {
-                $error_info = $this->ppr->getErrorInfo();
-                $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
-                $this->sendAlertEmail(
-                    MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
-                    MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
-                );
-                $this->setMessageAndRedirect(
-                    sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE, $error_code),
-                    FILENAME_CHECKOUT_PAYMENT
-                );
-            }
-        }
 
         $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
         $wallet_user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';

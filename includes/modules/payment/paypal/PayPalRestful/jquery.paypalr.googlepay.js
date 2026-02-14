@@ -1023,25 +1023,13 @@
     // Hide the radio button on page load
     ensureWalletSelectionHidden();
 
+    // If a user still clicks the hidden radio, select the payment method
+    // but do NOT launch the modal - only the button click or form submit should do that
     var moduleRadio = document.getElementById('pmt-paypalr_googlepay');
     if (moduleRadio) {
-        // Add label click prevention
-        var moduleLabel = document.querySelector('label[for="pmt-paypalr_googlepay"]');
-        if (moduleLabel && !moduleLabel.dataset.googlePayLabelBound) {
-            moduleLabel.addEventListener('click', function () {
-                moduleRadio.dataset.labelClick = 'true';
-            });
-            moduleLabel.dataset.googlePayLabelBound = 'true';
-        }
         if (!moduleRadio.dataset.googlePayBound) {
             moduleRadio.addEventListener('click', function () {
                 selectGooglePayRadio();
-                // Don't trigger payment button if this click came from a label
-                if (moduleRadio.dataset.labelClick === 'true') {
-                    moduleRadio.dataset.labelClick = 'false';
-                    return;
-                }
-                triggerGooglePayButtonClick();
             });
             moduleRadio.dataset.googlePayBound = 'true';
         }

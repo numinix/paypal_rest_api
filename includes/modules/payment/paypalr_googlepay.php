@@ -542,6 +542,7 @@ class paypalr_googlepay extends base
     {
         unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
 
+        $selectionLabel = MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_SELECTION ?? 'Google Pay';
         $buttonContainer = '<div id="paypalr-googlepay-button" class="paypalr-googlepay-button"></div>';
         $hiddenFields =
             zen_draw_hidden_field('ppr_type', 'google_pay') .
@@ -552,11 +553,11 @@ class paypalr_googlepay extends base
 
         return [
             'id' => $this->code,
-            'module' => MODULE_PAYMENT_PAYPALR_GOOGLEPAY_TEXT_SELECTION ?? 'Google Pay',
+            'module' => $selectionLabel,
             'fields' => [
                 [
-                    'title' => $buttonContainer,
-                    'field' => $hiddenFields . $script,
+                    'title' => $selectionLabel,
+                    'field' => $buttonContainer . $hiddenFields . $script,
                 ],
             ],
         ];
@@ -772,6 +773,15 @@ class paypalr_googlepay extends base
     public function before_process()
     {
         global $order;
+
+        // Verify the wallet payment flow was completed. If a JS error caused a raw
+        // form POST without the payment modal completing, the session will not have
+        // a valid PayPal order for this wallet type.
+        if (empty($_SESSION['PayPalRestful']['Order']['id']) || empty($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'])) {
+            $this->log->write('Google Pay::before_process, wallet payment not confirmed in session; aborting.');
+            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALR_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALR_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
+        }
 
         $order_info = $this->getOrderTotalsInfo(false);
 
