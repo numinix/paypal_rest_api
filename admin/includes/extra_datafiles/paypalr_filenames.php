@@ -17,3 +17,6 @@ if (!defined('FILENAME_PAYPALR_SAVED_CARD_RECURRING')) {
 if (!defined('FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT')) {
     define('FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT', 'paypalr_subscriptions_report');
 }
+if (!defined('FILENAME_PAYPALR_WEBHOOK_LOGS')) {
+    define('FILENAME_PAYPALR_WEBHOOK_LOGS', 'paypalr_webhook_logs');
+}
