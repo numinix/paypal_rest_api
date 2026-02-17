@@ -64,7 +64,7 @@ class paypalr extends base
         return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.9';
+    protected const CURRENT_VERSION = '1.3.10';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -722,6 +722,40 @@ class paypalr extends base
                     // Billing address and shipping information columns are now automatically added
                     // by SavedCreditCardsManager::ensureLegacyColumns() (called during v1.3.6 upgrade)
                     // No additional migration needed here.
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.10', '<'): //- Fall through from above
+                    // Create paypal_webhooks table for webhook log storage
+                    $db->Execute(
+                        "CREATE TABLE IF NOT EXISTS " . TABLE_PAYPAL_WEBHOOKS . " (
+                            id BIGINT NOT NULL AUTO_INCREMENT,
+                            webhook_id VARCHAR(64) NOT NULL,
+                            event_type VARCHAR(64) DEFAULT NULL,
+                            body LONGTEXT NOT NULL,
+                            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            user_agent VARCHAR(192) DEFAULT NULL,
+                            request_method VARCHAR(32) DEFAULT NULL,
+                            request_headers TEXT DEFAULT NULL,
+                            PRIMARY KEY (id),
+                            KEY idx_pprwebhook_zen (webhook_id, id, created_at)
+                        )"
+                    );
+
+                    // Register PayPal Webhook Logs under Reports menu
+                    $zc150 = (PROJECT_VERSION_MAJOR > 1 || (PROJECT_VERSION_MAJOR == 1 && substr(PROJECT_VERSION_MINOR, 0, 3) >= 5));
+
+                    if ($zc150 && function_exists('zen_page_key_exists') && function_exists('zen_register_admin_page')) {
+                        if (!zen_page_key_exists('paypalrWebhookLogs')) {
+                            zen_register_admin_page(
+                                'paypalrWebhookLogs',
+                                'BOX_PAYPALR_WEBHOOK_LOGS',
+                                'FILENAME_PAYPALR_WEBHOOK_LOGS',
+                                '',
+                                'reports',
+                                'Y',
+                                101
+                            );
+                        }
+                    }
 
                 default:    //- Fall through from above
                     break;

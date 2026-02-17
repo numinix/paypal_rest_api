@@ -17,3 +17,6 @@ if (!defined('BOX_PAYPALR_SAVED_CARD_RECURRING')) {
 if (!defined('BOX_PAYPALR_SUBSCRIPTIONS_REPORT')) {
     define('BOX_PAYPALR_SUBSCRIPTIONS_REPORT', 'Active Subscriptions Report');
 }
+if (!defined('BOX_PAYPALR_WEBHOOK_LOGS')) {
+    define('BOX_PAYPALR_WEBHOOK_LOGS', 'PayPal Webhook Logs');
+}
