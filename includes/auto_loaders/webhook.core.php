@@ -33,7 +33,7 @@ if (!class_exists('sniffer', false)) {
 
 if (!class_exists('shoppingCart', false)) {
     $shoppingCartClass = DIR_FS_CATALOG . DIR_WS_CLASSES . 'shopping_cart.php';
-    if (is_file($shoppingCartClass)) {
+    if (class_exists('base', false) && is_file($shoppingCartClass)) {
         require_once $shoppingCartClass;
     }
 }
@@ -55,7 +55,7 @@ $paypalRestCacheClass = class_exists('cache', false) ? 'cache' : 'PayPalRestCach
 
 if (!class_exists('currencies', false)) {
     $currenciesClass = DIR_FS_CATALOG . DIR_WS_CLASSES . 'currencies.php';
-    if (is_file($currenciesClass)) {
+    if (class_exists('base', false) && is_file($currenciesClass)) {
         require_once $currenciesClass;
     }
 }
