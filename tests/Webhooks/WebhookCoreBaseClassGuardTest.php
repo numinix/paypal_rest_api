@@ -34,7 +34,7 @@ namespace {
     // Find the block that loads shopping_cart.php from the core classes directory
     if (preg_match("/DIR_WS_CLASSES\s*\.\s*'shopping_cart\.php'/", $content)) {
         // The line that loads the core shopping_cart.php must be guarded by a base class check
-        if (!preg_match("/class_exists\s*\(\s*'base'.*\).*is_file\s*\(\s*\\\$shoppingCartClass\s*\)/s", $content)) {
+        if (!preg_match("/class_exists\s*\(\s*'base'[^)]*\)\s*&&\s*is_file\s*\(\s*\\\$shoppingCartClass\s*\)/", $content)) {
             fwrite(STDERR, "✗ Core shopping_cart.php loading is not guarded by class_exists('base') check\n");
             $failures++;
         } else {
@@ -48,7 +48,7 @@ namespace {
     fwrite(STDOUT, "\nTest 2: currencies core-class loading guards against missing 'base' class...\n");
 
     if (preg_match("/DIR_WS_CLASSES\s*\.\s*'currencies\.php'/", $content)) {
-        if (!preg_match("/class_exists\s*\(\s*'base'.*\).*is_file\s*\(\s*\\\$currenciesClass\s*\)/s", $content)) {
+        if (!preg_match("/class_exists\s*\(\s*'base'[^)]*\)\s*&&\s*is_file\s*\(\s*\\\$currenciesClass\s*\)/", $content)) {
             fwrite(STDERR, "✗ Core currencies.php loading is not guarded by class_exists('base') check\n");
             $failures++;
         } else {
