@@ -2,21 +2,23 @@
 declare(strict_types=1);
 
 /**
- * Test to verify that webhook.core.php guards against loading core Zen Cart
- * classes whose parent class (base) may not be available.
+ * Test to verify that webhook.core.php uses proper Zen Cart autoloader
+ * entries (autoType => 'class') for loading core class files and their
+ * compatibility shim fallbacks, rather than manual require_once calls.
  *
- * When the Zen Cart storefront stack isn't fully loaded (e.g. webhook
- * endpoints), core classes like shoppingCart and currencies extend 'base'
- * which may not yet exist. The autoloader must check for 'base' before
- * attempting to load these core files, falling back to compatibility shims.
+ * The standard Zen Cart autoloader pattern loads class files from
+ * DIR_WS_CLASSES at breakpoint 0, letting the InitSystem handle file
+ * existence checks and load ordering. Compatibility shims are loaded
+ * after each core class via classPath so that the shim's class_exists()
+ * guard can detect whether the core class was loaded successfully.
  *
  * @copyright Copyright 2003-2026 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
 
 namespace {
-    fwrite(STDOUT, "=== Webhook Core Base-Class Guard Test ===\n");
-    fwrite(STDOUT, "Verifying that webhook.core.php checks for 'base' class before loading core classes...\n\n");
+    fwrite(STDOUT, "=== Webhook Core Autoloader Structure Test ===\n");
+    fwrite(STDOUT, "Verifying that webhook.core.php uses proper autoLoadConfig entries...\n\n");
 
     $failures = 0;
 
@@ -28,51 +30,124 @@ namespace {
 
     $content = file_get_contents($webhookCoreFile);
 
-    // Test 1: shoppingCart loading must check for class_exists('base')
-    fwrite(STDOUT, "Test 1: shoppingCart core-class loading guards against missing 'base' class...\n");
+    // ---------------------------------------------------------------
+    // Test 1: No manual require_once calls to load core or shim classes
+    // ---------------------------------------------------------------
+    fwrite(STDOUT, "Test 1: No manual require_once calls outside the autoloader system...\n");
 
-    // Find the block that loads shopping_cart.php from the core classes directory
-    if (preg_match("/DIR_WS_CLASSES\s*\.\s*'shopping_cart\.php'/", $content)) {
-        // The line that loads the core shopping_cart.php must be guarded by a base class check
-        if (!preg_match("/class_exists\s*\(\s*'base'[^)]*\)\s*&&\s*is_file\s*\(\s*\\\$shoppingCartClass\s*\)/", $content)) {
-            fwrite(STDERR, "✗ Core shopping_cart.php loading is not guarded by class_exists('base') check\n");
-            $failures++;
-        } else {
-            fwrite(STDOUT, "✓ Core shopping_cart.php loading is guarded by class_exists('base') check\n");
-        }
-    } else {
-        fwrite(STDOUT, "✓ (No core shopping_cart.php loading found — using compatibility shim only)\n");
-    }
-
-    // Test 2: currencies loading must check for class_exists('base')
-    fwrite(STDOUT, "\nTest 2: currencies core-class loading guards against missing 'base' class...\n");
-
-    if (preg_match("/DIR_WS_CLASSES\s*\.\s*'currencies\.php'/", $content)) {
-        if (!preg_match("/class_exists\s*\(\s*'base'[^)]*\)\s*&&\s*is_file\s*\(\s*\\\$currenciesClass\s*\)/", $content)) {
-            fwrite(STDERR, "✗ Core currencies.php loading is not guarded by class_exists('base') check\n");
-            $failures++;
-        } else {
-            fwrite(STDOUT, "✓ Core currencies.php loading is guarded by class_exists('base') check\n");
-        }
-    } else {
-        fwrite(STDOUT, "✓ (No core currencies.php loading found — using compatibility shim only)\n");
-    }
-
-    // Test 3: Compatibility shim fallbacks still exist
-    fwrite(STDOUT, "\nTest 3: Compatibility shim fallbacks are still present...\n");
-
-    if (strpos($content, 'Compatibility/ShoppingCart.php') === false) {
-        fwrite(STDERR, "✗ ShoppingCart compatibility shim fallback is missing\n");
+    // Match require_once that reference Compatibility/ or DIR_WS_CLASSES outside of autoLoadConfig
+    // (i.e. raw require_once calls that bypass the autoloader)
+    if (preg_match('/^\s*require_once\b/m', $content)) {
+        fwrite(STDERR, "✗ Found manual require_once calls — classes should be loaded via autoLoadConfig entries\n");
         $failures++;
     } else {
-        fwrite(STDOUT, "✓ ShoppingCart compatibility shim fallback is present\n");
+        fwrite(STDOUT, "✓ No manual require_once calls found\n");
     }
 
-    if (strpos($content, 'Compatibility/Currencies.php') === false) {
-        fwrite(STDERR, "✗ Currencies compatibility shim fallback is missing\n");
+    // ---------------------------------------------------------------
+    // Test 2: shopping_cart.php loaded via autoType => 'class'
+    // ---------------------------------------------------------------
+    fwrite(STDOUT, "\nTest 2: shopping_cart.php loaded via autoType => 'class' entry...\n");
+
+    if (preg_match("/'autoType'\s*=>\s*'class'.*'loadFile'\s*=>\s*'shopping_cart\.php'/s", $content)) {
+        fwrite(STDOUT, "✓ shopping_cart.php is loaded via autoType => 'class'\n");
+    } else {
+        fwrite(STDERR, "✗ shopping_cart.php is not loaded via autoType => 'class'\n");
+        $failures++;
+    }
+
+    // ---------------------------------------------------------------
+    // Test 3: currencies.php loaded via autoType => 'class'
+    // ---------------------------------------------------------------
+    fwrite(STDOUT, "\nTest 3: currencies.php loaded via autoType => 'class' entry...\n");
+
+    if (preg_match("/'autoType'\s*=>\s*'class'.*'loadFile'\s*=>\s*'currencies\.php'/s", $content)) {
+        fwrite(STDOUT, "✓ currencies.php is loaded via autoType => 'class'\n");
+    } else {
+        fwrite(STDERR, "✗ currencies.php is not loaded via autoType => 'class'\n");
+        $failures++;
+    }
+
+    // ---------------------------------------------------------------
+    // Test 4: class.base.php loaded via autoType => 'class'
+    // ---------------------------------------------------------------
+    fwrite(STDOUT, "\nTest 4: class.base.php loaded via autoType => 'class' for 1.5.x support...\n");
+
+    if (preg_match("/'autoType'\s*=>\s*'class'.*'loadFile'\s*=>\s*'class\.base\.php'/s", $content)) {
+        fwrite(STDOUT, "✓ class.base.php is loaded via autoType => 'class'\n");
+    } else {
+        fwrite(STDERR, "✗ class.base.php is not loaded via autoType => 'class'\n");
+        $failures++;
+    }
+
+    // ---------------------------------------------------------------
+    // Test 5: Compatibility shim fallbacks are registered via classPath
+    // ---------------------------------------------------------------
+    fwrite(STDOUT, "\nTest 5: Compatibility shim fallbacks are registered via classPath entries...\n");
+
+    $shims = [
+        'ShoppingCart.php' => 'shoppingCart',
+        'Currencies.php' => 'currencies',
+        'LegacyNotifier.php' => 'notifier',
+        'ZcDate.php' => 'zcDate',
+        'Sniffer.php' => 'sniffer',
+        'Cache.php' => 'cache',
+        'MessageStack.php' => 'messageStack',
+        'TemplateFunc.php' => 'template_func',
+        'Order.php' => 'order',
+    ];
+
+    foreach ($shims as $shimFile => $className) {
+        // Look for an autoLoadConfig entry that loads the shim with classPath
+        $pattern = "/'loadFile'\s*=>\s*'" . preg_quote($shimFile, '/') . "'.*'classPath'/s";
+        if (preg_match($pattern, $content)) {
+            fwrite(STDOUT, "  ✓ $shimFile compatibility shim registered with classPath\n");
+        } else {
+            fwrite(STDERR, "  ✗ $shimFile compatibility shim NOT registered with classPath\n");
+            $failures++;
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Test 6: base class is loaded before shopping_cart (ordering check)
+    // ---------------------------------------------------------------
+    fwrite(STDOUT, "\nTest 6: class.base.php appears before shopping_cart.php in breakpoint 0...\n");
+
+    $basePos = strpos($content, "'class.base.php'");
+    $cartPos = strpos($content, "'shopping_cart.php'");
+    if ($basePos !== false && $cartPos !== false && $basePos < $cartPos) {
+        fwrite(STDOUT, "✓ class.base.php is loaded before shopping_cart.php\n");
+    } elseif ($basePos === false) {
+        fwrite(STDERR, "✗ class.base.php not found in file\n");
         $failures++;
     } else {
-        fwrite(STDOUT, "✓ Currencies compatibility shim fallback is present\n");
+        fwrite(STDERR, "✗ class.base.php appears after shopping_cart.php (incorrect order)\n");
+        $failures++;
+    }
+
+    // ---------------------------------------------------------------
+    // Test 7: classInstantiate entries still present for all classes
+    // ---------------------------------------------------------------
+    fwrite(STDOUT, "\nTest 7: classInstantiate entries present for runtime objects...\n");
+
+    $instantiations = [
+        'notifier' => 'zco_notifier',
+        'zcDate' => 'zcDate',
+        'sniffer' => 'sniffer',
+        'shoppingCart' => 'cart',
+        'currencies' => 'currencies',
+        'template_func' => 'template',
+        'messageStack' => 'messageStack',
+    ];
+
+    foreach ($instantiations as $className => $objectName) {
+        $pattern = "/'className'\s*=>\s*'" . preg_quote($className, '/') . "'.*'objectName'\s*=>\s*'" . preg_quote($objectName, '/') . "'/s";
+        if (preg_match($pattern, $content)) {
+            fwrite(STDOUT, "  ✓ $className => \$$objectName classInstantiate entry found\n");
+        } else {
+            fwrite(STDERR, "  ✗ $className => \$$objectName classInstantiate entry MISSING\n");
+            $failures++;
+        }
     }
 
     fwrite(STDOUT, "\n");
