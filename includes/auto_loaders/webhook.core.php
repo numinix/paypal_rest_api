@@ -146,6 +146,9 @@ $autoLoadConfig[0][] = [
     'classPath' => $webhookCompatDir,
 ];
 
+// Determine the cache class name for instantiation at breakpoint 30.
+$webhookCacheClassName = file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'cache.php') ? 'cache' : 'PayPalRestCache';
+
 // --- currencies ---
 if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'currencies.php')) {
     $autoLoadConfig[0][] = [
@@ -184,11 +187,6 @@ $autoLoadConfig[0][] = [
     'loadFile' => 'TemplateFunc.php',
     'classPath' => $webhookCompatDir,
 ];
-
-// Determine the cache class name to use for instantiation at breakpoint 30.
-// The core cache class or the compatibility PayPalRestCache class — whichever
-// was successfully loaded above — will be used.
-$webhookCacheClassName = file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'cache.php') ? 'cache' : 'PayPalRestCache';
 
 /**
  * Breakpoint 5.
