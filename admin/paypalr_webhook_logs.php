@@ -15,8 +15,6 @@ require 'includes/application_top.php';
 // Load PayPal REST API autoloader
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
 
-define('FILENAME_PAYPALR_WEBHOOK_LOGS', basename(__FILE__, '.php'));
-
 if (!defined('HEADING_TITLE')) {
     define('HEADING_TITLE', 'PayPal Webhook Logs');
 }
@@ -65,8 +63,12 @@ $action = isset($_GET['action']) ? trim((string)$_GET['action']) : '';
 
 // Clear logs
 if ($action === 'clear' && isset($_POST['confirm_clear']) && $_POST['confirm_clear'] === 'yes') {
-    $db->Execute("DELETE FROM " . TABLE_PAYPAL_WEBHOOKS);
-    $messageStack->add_session(TEXT_LOGS_CLEARED, 'success');
+    $sessionToken = $_SESSION['securityToken'] ?? '';
+    $requestToken = $_POST['securityToken'] ?? '';
+    if ($sessionToken !== '' && $requestToken === $sessionToken) {
+        $db->Execute("DELETE FROM " . TABLE_PAYPAL_WEBHOOKS);
+        $messageStack->add_session(TEXT_LOGS_CLEARED, 'success');
+    }
     zen_redirect(zen_href_link(FILENAME_PAYPALR_WEBHOOK_LOGS));
 }
 
@@ -75,7 +77,8 @@ $detail_id = isset($_GET['detail']) ? (int)$_GET['detail'] : 0;
 
 if ($detail_id > 0) {
     $detailResult = $db->Execute(
-        "SELECT * FROM " . TABLE_PAYPAL_WEBHOOKS . " WHERE id = " . (int)$detail_id . " LIMIT 1"
+        "SELECT id, webhook_id, event_type, body, created_at, user_agent, request_method, request_headers
+           FROM " . TABLE_PAYPAL_WEBHOOKS . " WHERE id = " . (int)$detail_id . " LIMIT 1"
     );
     $detailRecord = $detailResult->EOF ? null : $detailResult->fields;
 }
@@ -315,7 +318,7 @@ function whl_pretty_json(string $raw): string
         <?php if ($totalRecords > 0) { ?>
             <div class="nmx-panel">
                 <div class="nmx-panel-body">
-                    <?php echo zen_draw_form('paypalr_webhook_clear', FILENAME_PAYPALR_WEBHOOK_LOGS, 'action=clear', 'post', 'onsubmit="return confirm(\'' . addslashes(TEXT_CONFIRM_CLEAR) . '\');"'); ?>
+                    <?php echo zen_draw_form('paypalr_webhook_clear', FILENAME_PAYPALR_WEBHOOK_LOGS, 'action=clear', 'post', 'onsubmit="return confirm(\'' . htmlspecialchars(TEXT_CONFIRM_CLEAR, ENT_QUOTES, 'UTF-8') . '\');"'); ?>
                         <?php echo zen_draw_hidden_field('confirm_clear', 'yes'); ?>
                         <button type="submit" class="nmx-btn nmx-btn-danger"><?php echo TEXT_BUTTON_CLEAR_LOGS; ?></button>
                     </form>
