@@ -27,49 +27,6 @@ if (!defined('HEADING_TITLE')) {
     define('HEADING_TITLE', 'Active Subscriptions Report');
 }
 
-// Language constants with defaults
-$langDefaults = [
-    'TEXT_SUBSCRIPTION_COUNT' => 'Subscriptions:',
-    'TEXT_TOTAL_ANNUAL_VALUE' => 'Annualized Value',
-    'TEXT_TOTALS_BY_CURRENCY' => 'Annual totals by currency:',
-    'TEXT_NO_SUBSCRIPTIONS' => 'No subscriptions found for the selected filters.',
-    'TEXT_VALUE_NOT_AVAILABLE' => 'N/A',
-    'TEXT_FILTER_STATUS' => 'Subscription Status',
-    'TEXT_FILTER_STATUS_ACTIVE' => 'Active',
-    'TEXT_FILTER_STATUS_SUSPENDED' => 'Suspended',
-    'TEXT_FILTER_TYPE' => 'Subscription Type',
-    'TEXT_FILTER_TYPE_ALL' => 'All',
-    'TEXT_FILTER_TYPE_PAYPAL' => 'PayPal',
-    'TEXT_FILTER_TYPE_SAVED_CARD' => 'Saved Card',
-    'TEXT_FILTER_TYPE_REST' => 'REST API',
-    'TEXT_FILTER_SEARCH' => 'Search',
-    'TEXT_BUTTON_FILTER' => 'Filter',
-    'TEXT_BUTTON_RESET' => 'Reset',
-    'TEXT_TYPE_BREAKDOWN' => 'Breakdown by type:',
-    'TEXT_TYPE_PAYPAL' => 'PayPal Legacy',
-    'TEXT_TYPE_SAVED_CARD' => 'Saved Card',
-    'TEXT_TYPE_REST' => 'REST API',
-    'TEXT_PANEL_FILTERS' => 'Filter Subscriptions',
-    'TEXT_PANEL_SUMMARY' => 'Summary',
-    'TEXT_PANEL_RESULTS' => 'Subscriptions by Product',
-    'TEXT_BILLING_DESCRIPTION' => 'Every %1$s %2$s',
-    'TEXT_BILLING_DESCRIPTION_UNKNOWN' => 'N/A',
-    'TABLE_HEADING_PRODUCT' => 'Product',
-    'TABLE_HEADING_SUBSCRIPTION_COUNT' => 'Subscriptions',
-    'TABLE_HEADING_TYPES' => 'Types',
-    'TABLE_HEADING_STATUSES' => 'Statuses',
-    'TABLE_HEADING_BILLING_PROFILES' => 'Billing Profiles',
-    'TABLE_HEADING_NEXT_BILLING' => 'Next Billing',
-    'TABLE_HEADING_ANNUAL_VALUE' => 'Annual Value',
-    'TEXT_PLAN_ANNUAL_VALUE' => 'Annual: %s',
-];
-
-foreach ($langDefaults as $key => $value) {
-    if (!defined($key)) {
-        define($key, $value);
-    }
-}
-
 require DIR_WS_CLASSES . 'currencies.php';
 $currencies = new currencies();
 

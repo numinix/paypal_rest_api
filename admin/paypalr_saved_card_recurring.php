@@ -438,64 +438,7 @@ function scr_pagination_url($page, $perPage, $queryString) {
 <head>
     <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
     <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
-    <style>
-        .edit-content { display: none; }
-        .edit-content.active { display: block; margin-top: 8px; padding: 8px; background: rgba(0, 97, 141, 0.05); border-radius: 8px; }
-        
-        /* Pagination styles */
-        .pagination-controls {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin: 16px 0;
-            padding: 12px;
-            background: #f5f5f5;
-            border-radius: 4px;
-        }
-        .pagination-info {
-            font-size: 14px;
-            color: #555;
-        }
-        .pagination-links {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .pagination-links a,
-        .pagination-links span {
-            padding: 6px 12px;
-            border: 1px solid #ddd;
-            background: white;
-            text-decoration: none;
-            color: #333;
-            border-radius: 3px;
-        }
-        .pagination-links a:hover {
-            background: #00618d;
-            color: white;
-            border-color: #00618d;
-        }
-        .pagination-links span.current {
-            background: #00618d;
-            color: white;
-            border-color: #00618d;
-        }
-        .pagination-links span.disabled {
-            background: #f5f5f5;
-            color: #999;
-            cursor: not-allowed;
-        }
-        .per-page-selector {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .per-page-selector select {
-            padding: 6px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-        }
-    </style>
+    <link rel="stylesheet" href="includes/css/paypalr_saved_card_recurring.css">
 </head>
 <body>
 <?php require DIR_WS_INCLUDES . 'header.php'; ?>
@@ -711,7 +654,7 @@ function scr_pagination_url($page, $perPage, $queryString) {
                                                             <?php } ?>
                                                         </div>
                                                         <div id="address-edit-<?php echo $subscription['saved_credit_card_recurring_id']; ?>" style="display:none;">
-                                                            <form method="post" action="<?php echo zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING); ?>" onsubmit="return confirm('Update billing address for this subscription?');">
+                                                            <?php echo zen_draw_form('update_billing_address_' . $subscription['saved_credit_card_recurring_id'], FILENAME_PAYPALR_SAVED_CARD_RECURRING, '', 'post', 'onsubmit="return confirm(\'Update billing address for this subscription?\');"'); ?>
                                                                 <input type="hidden" name="action" value="update_billing_address"/>
                                                                 <input type="hidden" name="saved_card_recurring_id" value="<?php echo $subscription['saved_credit_card_recurring_id']; ?>"/>
                                                                 <div class="nmx-form-group">
@@ -842,74 +785,8 @@ function scr_pagination_url($page, $perPage, $queryString) {
 <script>
 var baseUrl = <?php echo json_encode(zen_href_link(FILENAME_PAYPALR_SAVED_CARD_RECURRING)); ?>;
 var queryString = <?php echo json_encode($query_string); ?>;
-
-/**
- * Change items per page
- */
-function changePerPage(newPerPage) {
-    const params = new URLSearchParams(window.location.search);
-    params.set('page', '1'); // Reset to first page when changing per page
-    params.set('per_page', newPerPage);
-    window.location.href = baseUrl + '?' + params.toString();
-}
-
-function toggleEdit(el) {
-    var parent = el.parentNode;
-    var editContent = parent.querySelector('.edit-content');
-    if (editContent) {
-        editContent.classList.toggle('active');
-    }
-}
-
-function updateProduct(id, originalOrdersProductsId) {
-    var select = document.querySelector('select[name="set_products_id_' + id + '"]');
-    var productsId = select ? select.value : '';
-    window.location.href = baseUrl + '?action=update_product_id&saved_card_recurring_id=' + id + 
-        '&set_products_id=' + productsId + '&original_orders_products_id=' + originalOrdersProductsId + queryString;
-}
-
-function updateAmount(id) {
-    var input = document.getElementById('set_amount_' + id);
-    var amount = input ? input.value : '';
-    window.location.href = baseUrl + '?action=update_amount_subscription&saved_card_recurring_id=' + id + 
-        '&set_amount=' + encodeURIComponent(amount) + queryString;
-}
-
-function updateDate(id) {
-    var input = document.getElementById('set_date_' + id);
-    var date = input ? input.value : '';
-    window.location.href = baseUrl + '?action=update_payment_date&saved_card_recurring_id=' + id + 
-        '&set_date=' + encodeURIComponent(date) + queryString;
-}
-
-function updateCard(id) {
-    var select = document.querySelector('select[name="set_card_' + id + '"]');
-    var cardId = select ? select.value : '';
-    window.location.href = baseUrl + '?action=update_credit_card&saved_card_recurring_id=' + id + 
-        '&set_card=' + cardId + queryString;
-}
-
-function toggleDetails(id) {
-    var row = document.getElementById('details-' + id);
-    if (row) {
-        row.style.display = (row.style.display === 'none') ? 'table-row' : 'none';
-    }
-}
-
-function toggleAddressEdit(id) {
-    var display = document.getElementById('address-display-' + id);
-    var edit = document.getElementById('address-edit-' + id);
-    if (display && edit) {
-        if (display.style.display === 'none') {
-            display.style.display = 'block';
-            edit.style.display = 'none';
-        } else {
-            display.style.display = 'none';
-            edit.style.display = 'block';
-        }
-    }
-}
 </script>
+<script src="includes/javascript/paypalr_saved_card_recurring.js"></script>
 </body>
 </html>
 <?php require DIR_WS_INCLUDES . 'application_bottom.php';
