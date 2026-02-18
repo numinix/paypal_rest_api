@@ -11,7 +11,9 @@ declare(strict_types=1);
  * 4. The admin report page file exists
  * 5. The version patch in paypalr.php registers the webhook logs admin page
  * 6. The version patch creates the paypal_webhooks table
- * 7. CURRENT_VERSION is bumped to 1.3.10
+ * 7. CURRENT_VERSION is bumped to 1.3.11
+ * 8. WebhookController logs all webhook outcomes with verification_status
+ * 9. v1.3.11 upgrade adds verification_status column
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -65,14 +67,14 @@ if (file_exists($adminPage)) {
     $failures++;
 }
 
-// ---- Test 5: Version constant updated to 1.3.10 ----
-echo "Test 5: Checking CURRENT_VERSION is 1.3.10...\n";
+// ---- Test 5: Version constant updated to 1.3.11 ----
+echo "Test 5: Checking CURRENT_VERSION is 1.3.11...\n";
 $paypalrFile = $basePath . '/includes/modules/payment/paypalr.php';
 $paypalrContent = file_get_contents($paypalrFile);
-if (strpos($paypalrContent, "protected const CURRENT_VERSION = '1.3.10'") !== false) {
-    echo "✓ CURRENT_VERSION is set to 1.3.10\n\n";
+if (strpos($paypalrContent, "protected const CURRENT_VERSION = '1.3.11'") !== false) {
+    echo "✓ CURRENT_VERSION is set to 1.3.11\n\n";
 } else {
-    echo "✗ CURRENT_VERSION is not set to 1.3.10\n\n";
+    echo "✗ CURRENT_VERSION is not set to 1.3.11\n\n";
     $failures++;
 }
 
@@ -152,6 +154,53 @@ if ($filenameInDatafiles && $boxInDefinitions && $filenameNotInDefinitions && $b
     echo "✓ Constants are correctly separated between datafiles and definitions\n\n";
 } else {
     echo "✗ Constants are not correctly separated\n\n";
+    $failures++;
+}
+
+// ---- Test 12: WebhookController saveToDatabase includes verification_status ----
+echo "Test 12: Checking WebhookController saves verification_status...\n";
+$controllerFile = $basePath . '/includes/modules/payment/paypal/PayPalRestful/Webhooks/WebhookController.php';
+$controllerContent = file_get_contents($controllerFile);
+$hasSaveParam = strpos($controllerContent, "verification_status") !== false;
+$hasSaveAllPaths = strpos($controllerContent, "'ignored'") !== false
+    && strpos($controllerContent, "'failed'") !== false
+    && strpos($controllerContent, "'verified'") !== false
+    && strpos($controllerContent, "'skipped'") !== false;
+
+if ($hasSaveParam && $hasSaveAllPaths) {
+    echo "✓ WebhookController logs all webhook outcomes with verification_status\n\n";
+} else {
+    $missing = [];
+    if (!$hasSaveParam) $missing[] = 'verification_status parameter';
+    if (!$hasSaveAllPaths) $missing[] = 'all status paths (verified/failed/ignored/skipped)';
+    echo "✗ WebhookController is missing: " . implode(', ', $missing) . "\n\n";
+    $failures++;
+}
+
+// ---- Test 13: v1.3.11 upgrade adds verification_status column ----
+echo "Test 13: Checking v1.3.11 upgrade adds verification_status column...\n";
+if (preg_match("/case version_compare\(MODULE_PAYMENT_PAYPALR_VERSION, '1\.3\.11', '<'\)/", $paypalrContent)
+    && strpos($paypalrContent, "ADD verification_status") !== false) {
+    echo "✓ v1.3.11 upgrade adds verification_status column\n\n";
+} else {
+    echo "✗ v1.3.11 upgrade for verification_status column not found\n\n";
+    $failures++;
+}
+
+// ---- Test 14: Admin report displays verification status ----
+echo "Test 14: Checking admin report shows verification status...\n";
+$hasStatusHeading = strpos($reportContent, 'TABLE_HEADING_STATUS') !== false;
+$hasStatusLabel = strpos($reportContent, 'TEXT_LABEL_VERIFICATION_STATUS') !== false;
+$hasStatusColumn = strpos($reportContent, 'verification_status') !== false;
+
+if ($hasStatusHeading && $hasStatusLabel && $hasStatusColumn) {
+    echo "✓ Admin report displays verification status in list and detail views\n\n";
+} else {
+    $missing = [];
+    if (!$hasStatusHeading) $missing[] = 'status table heading';
+    if (!$hasStatusLabel) $missing[] = 'status detail label';
+    if (!$hasStatusColumn) $missing[] = 'verification_status field';
+    echo "✗ Admin report is missing: " . implode(', ', $missing) . "\n\n";
     $failures++;
 }
 

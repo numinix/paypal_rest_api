@@ -64,7 +64,7 @@ class paypalr extends base
         return defined('MODULE_PAYMENT_PAYPALR_ZONE') ? (int)MODULE_PAYMENT_PAYPALR_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.10';
+    protected const CURRENT_VERSION = '1.3.11';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalRestfulApi::STATUS_APPROVED,
         PayPalRestfulApi::STATUS_COMPLETED,
@@ -735,6 +735,7 @@ class paypalr extends base
                             user_agent VARCHAR(192) DEFAULT NULL,
                             request_method VARCHAR(32) DEFAULT NULL,
                             request_headers TEXT DEFAULT NULL,
+                            verification_status VARCHAR(16) NOT NULL DEFAULT 'verified',
                             PRIMARY KEY (id),
                             KEY idx_pprwebhook_zen (webhook_id, id, created_at)
                         )"
@@ -755,6 +756,20 @@ class paypalr extends base
                                 101
                             );
                         }
+                    }
+
+                case version_compare(MODULE_PAYMENT_PAYPALR_VERSION, '1.3.11', '<'): //- Fall through from above
+                    // Add verification_status column to paypal_webhooks table so all
+                    // incoming webhooks (verified, failed, ignored, skipped) are logged
+                    $col_check = $db->Execute(
+                        "SHOW COLUMNS FROM " . TABLE_PAYPAL_WEBHOOKS . " LIKE 'verification_status'"
+                    );
+                    if ($col_check->EOF) {
+                        $db->Execute(
+                            "ALTER TABLE " . TABLE_PAYPAL_WEBHOOKS . "
+                                ADD verification_status VARCHAR(16) NOT NULL DEFAULT 'verified'
+                                    AFTER request_headers"
+                        );
                     }
 
                 default:    //- Fall through from above

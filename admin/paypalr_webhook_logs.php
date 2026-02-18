@@ -35,6 +35,7 @@ $langDefaults = [
     'TABLE_HEADING_WEBHOOK_ID' => 'Webhook ID',
     'TABLE_HEADING_EVENT_TYPE' => 'Event Type',
     'TABLE_HEADING_REQUEST_METHOD' => 'Method',
+    'TABLE_HEADING_STATUS' => 'Status',
     'TABLE_HEADING_CREATED_AT' => 'Date/Time',
     'TABLE_HEADING_ACTION' => 'Action',
     'TEXT_VIEW_DETAILS' => 'View',
@@ -43,6 +44,7 @@ $langDefaults = [
     'TEXT_LABEL_EVENT_TYPE' => 'Event Type',
     'TEXT_LABEL_REQUEST_METHOD' => 'Request Method',
     'TEXT_LABEL_USER_AGENT' => 'User Agent',
+    'TEXT_LABEL_VERIFICATION_STATUS' => 'Verification Status',
     'TEXT_LABEL_CREATED_AT' => 'Created At',
     'TEXT_LABEL_REQUEST_HEADERS' => 'Request Headers',
     'TEXT_LABEL_BODY' => 'Body',
@@ -77,7 +79,7 @@ $detail_id = isset($_GET['detail']) ? (int)$_GET['detail'] : 0;
 
 if ($detail_id > 0) {
     $detailResult = $db->Execute(
-        "SELECT id, webhook_id, event_type, body, created_at, user_agent, request_method, request_headers
+        "SELECT id, webhook_id, event_type, body, created_at, user_agent, request_method, request_headers, verification_status
            FROM " . TABLE_PAYPAL_WEBHOOKS . " WHERE id = " . (int)$detail_id . " LIMIT 1"
     );
     $detailRecord = $detailResult->EOF ? null : $detailResult->fields;
@@ -108,7 +110,7 @@ if ($page > $totalPages) {
 
 // Fetch logs
 $logsResult = $db->Execute(
-    "SELECT id, webhook_id, event_type, request_method, created_at
+    "SELECT id, webhook_id, event_type, request_method, verification_status, created_at
        FROM " . TABLE_PAYPAL_WEBHOOKS . $whereClause . "
       ORDER BY created_at DESC, id DESC
       LIMIT " . (int)$perPage . " OFFSET " . (int)$offset
@@ -215,6 +217,9 @@ function whl_pretty_json(string $raw): string
                 <div class="whl-detail-label"><?php echo TEXT_LABEL_USER_AGENT; ?></div>
                 <div class="whl-detail-value"><?php echo zen_output_string_protected($detailRecord['user_agent']); ?></div>
 
+                <div class="whl-detail-label"><?php echo TEXT_LABEL_VERIFICATION_STATUS; ?></div>
+                <div class="whl-detail-value"><?php echo zen_output_string_protected($detailRecord['verification_status'] ?? 'verified'); ?></div>
+
                 <div class="whl-detail-label"><?php echo TEXT_LABEL_CREATED_AT; ?></div>
                 <div class="whl-detail-value"><?php echo zen_output_string_protected($detailRecord['created_at']); ?></div>
 
@@ -267,6 +272,7 @@ function whl_pretty_json(string $raw): string
                                     <th><?php echo TABLE_HEADING_WEBHOOK_ID; ?></th>
                                     <th><?php echo TABLE_HEADING_EVENT_TYPE; ?></th>
                                     <th><?php echo TABLE_HEADING_REQUEST_METHOD; ?></th>
+                                    <th><?php echo TABLE_HEADING_STATUS; ?></th>
                                     <th><?php echo TABLE_HEADING_CREATED_AT; ?></th>
                                     <th><?php echo TABLE_HEADING_ACTION; ?></th>
                                 </tr>
@@ -278,6 +284,7 @@ function whl_pretty_json(string $raw): string
                                         <td><?php echo zen_output_string_protected($log['webhook_id']); ?></td>
                                         <td><?php echo zen_output_string_protected($log['event_type']); ?></td>
                                         <td><?php echo zen_output_string_protected($log['request_method']); ?></td>
+                                        <td><?php echo zen_output_string_protected($log['verification_status'] ?? 'verified'); ?></td>
                                         <td><?php echo zen_output_string_protected($log['created_at']); ?></td>
                                         <td>
                                             <a href="<?php echo zen_href_link(FILENAME_PAYPALR_WEBHOOK_LOGS, 'detail=' . (int)$log['id'] . '&' . zen_get_all_get_params(['detail', 'action'])); ?>" class="nmx-btn nmx-btn-sm nmx-btn-info"><?php echo TEXT_VIEW_DETAILS; ?></a>

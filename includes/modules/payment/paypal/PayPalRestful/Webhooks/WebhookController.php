@@ -9,7 +9,7 @@
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: DrByte June 2025 $
  *
- * Last updated: v1.2.0
+ * Last updated: v1.3.11
  */
 
 namespace PayPalRestful\Webhooks;
@@ -65,6 +65,7 @@ class WebhookController
         // Ensure that the incoming request contains headers etc relevant to PayPal
         if (!$verifier->shouldRespond()) {
             $this->ppr_logger->write('ppr_webhook IGNORED DUE TO HEADERS MISMATCH' . "\n" . print_r($request_headers, true), false, 'before');
+            $this->saveToDatabase($user_agent, $request_method, $request_body, $request_headers, 'ignored');
             return false;
         }
 
@@ -74,6 +75,7 @@ class WebhookController
         if ($status === null) {
             // For future dev: null means this webhook handler should be ignored, and go to next one
             // Probably this logic would be in a loop of classes being iterated, and would respond null to loop to the next one.
+            $this->saveToDatabase($user_agent, $request_method, $request_body, $request_headers, 'skipped');
             return null;
         }
 
@@ -81,13 +83,14 @@ class WebhookController
         if ($status === false) {
             $this->ppr_logger->write('ppr_webhook FAILED VERIFICATION', false, 'before');
             // The verifier already sent an HTTP response, so we just exit here by returning false to the ppr_webhook handler script.
+            $this->saveToDatabase($user_agent, $request_method, $request_body, $request_headers, 'failed');
             return false;
         }
 
         $this->ppr_logger->write("\n\n" . 'webhook verification passed', false, 'before');
 
-        // Log that we received a validated webhook
-        $this->saveToDatabase($user_agent, $request_method, $request_body, $request_headers);
+        // Log the verified webhook to the database
+        $this->saveToDatabase($user_agent, $request_method, $request_body, $request_headers, 'verified');
 
         // Now that verification has passed, dispatch the webhook according to the declared event_type
         return $this->dispatch($event, $webhook);
@@ -127,11 +130,14 @@ class WebhookController
 
     /**
      * Save webhook records to database for subsequent querying
-     */
-    /**
+     *
+     * @param string $user_agent
+     * @param string $request_method
+     * @param string $request_body
      * @param array|string|null $request_headers
+     * @param string $verification_status One of: verified, failed, ignored, skipped
      */
-    protected function saveToDatabase(string $user_agent, string $request_method, string $request_body, $request_headers): void
+    protected function saveToDatabase(string $user_agent, string $request_method, string $request_body, $request_headers, string $verification_status = 'verified'): void
     {
         $json_body = json_decode($request_body, true);
 
@@ -142,6 +148,7 @@ class WebhookController
             'request_method' => substr($request_method, 0, 32),
             'request_headers' => \json_encode($request_headers ?? []),
             'body' => $request_body,
+            'verification_status' => substr($verification_status, 0, 16),
         ];
 
         // ensure table exists
@@ -167,6 +174,7 @@ class WebhookController
                 user_agent VARCHAR(192) DEFAULT NULL,
                 request_method VARCHAR(32) DEFAULT NULL,
                 request_headers TEXT DEFAULT NULL,
+                verification_status VARCHAR(16) NOT NULL DEFAULT 'verified',
                 PRIMARY KEY (id),
                 KEY idx_pprwebhook_zen (webhook_id, id, created_at)
             )"
