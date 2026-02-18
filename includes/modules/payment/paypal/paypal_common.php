@@ -914,8 +914,14 @@ class PayPalCommon {
             $timestamp = 'Timestamp: ' . $payment_info['created_date'] . "\n";
         }
 
+        $paypal_order_id = $orderInfo['id'] ?? '';
+        $paypal_payment_id = $orderInfo['purchase_units'][0]['payments']['captures'][0]['id']
+            ?? $orderInfo['purchase_units'][0]['payments']['authorizations'][0]['id']
+            ?? '';
+
         $message =
-            MODULE_PAYMENT_PAYPALR_TRANSACTION_ID . ($orderInfo['id'] ?? '') . "\n" .
+            MODULE_PAYMENT_PAYPALR_PAYMENT_TRANSACTION_ID . (($paypal_payment_id === '') ? 'n/a' : $paypal_payment_id) . "\n" .
+            MODULE_PAYMENT_PAYPALR_PAYPAL_ORDER_ID . (($paypal_order_id === '') ? 'n/a' : $paypal_order_id) . "\n" .
             sprintf(MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE, $payment_info['payment_type'] ?? $payment_type) . "\n" .
             $timestamp .
             MODULE_PAYMENT_PAYPALR_TRANSACTION_PAYMENT_STATUS . ($orderInfo['payment_status'] ?? '') . "\n" .
