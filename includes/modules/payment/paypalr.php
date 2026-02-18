@@ -2586,6 +2586,11 @@ class paypalr extends base
             $memo['authentication_result'] = $_SESSION['PayPalRestful']['Order']['authentication_result'];
         }
         $memo['amount_mismatch'] = $_SESSION['PayPalRestful']['Order']['amount_mismatch'];
+        $memo['paypal_order_id'] = $this->orderInfo['id'];
+        $memo['paypal_payment_id'] = $payment['id'];
+        if (in_array($this->orderInfo['txn_type'] ?? '', ['CAPTURE', 'AUTHORIZE'], true)) {
+            $memo['paypal_txn_type'] = $this->orderInfo['txn_type'];
+        }
 
         $expiration_time = (isset($this->orderInfo['expiration_time'])) ? Helpers::convertPayPalDatePay2Db($this->orderInfo['expiration_time']) : 'null';
         $num_cart_items = $_SESSION['cart']->count_contents();
