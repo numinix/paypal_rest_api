@@ -1,0 +1,109 @@
+body {
+    margin: 0;
+    padding: 0;
+}
+.status {
+    display: none;
+}
+.status.show { display: block; }
+.credentials {
+    background: rgba(4, 191, 191, 0.06);
+    border: 1px solid var(--nmx-border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+}
+.credentials h3 {
+    margin: 0 0 18px 0;
+    color: var(--nmx-secondary);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.cred-row {
+    margin-bottom: 16px;
+}
+.cred-label {
+    font-weight: 600;
+    color: var(--nmx-dark);
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.cred-value {
+    font-family: 'Monaco', 'Menlo', monospace;
+    background: var(--nmx-surface);
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--nmx-border);
+    word-break: break-all;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.cred-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cred-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.cred-btn {
+    background: var(--nmx-surface);
+    border: 1px solid var(--nmx-border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    color: var(--nmx-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+}
+.cred-btn:hover {
+    background: var(--nmx-secondary);
+    color: #ffffff;
+    border-color: var(--nmx-secondary);
+}
+.cred-btn svg {
+    width: 16px;
+    height: 16px;
+}
+.cred-feedback {
+    font-size: 11px;
+    color: var(--nmx-secondary);
+    margin-left: 8px;
+    font-weight: 600;
+}
+.cred-note {
+    background: rgba(255, 193, 7, 0.12);
+    border: 1px solid #fbbf24;
+    border-radius: 8px;
+    padding: 14px;
+    margin-top: 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 13px;
+    color: #92400e;
+}
+.cred-note svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+}
+.popup-message {
+    text-align: center;
+    padding: 48px;
+}
+.popup-message h2 {
+    color: var(--nmx-secondary);
+    margin-bottom: 18px;
+    font-weight: 700;
+}

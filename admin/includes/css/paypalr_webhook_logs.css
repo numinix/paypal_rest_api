@@ -1,0 +1,24 @@
+.whl-pre {
+    background: var(--nmx-muted, #f2f5f7);
+    border: 1px solid var(--nmx-border, #d6e0e8);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 500px;
+    overflow-y: auto;
+}
+.whl-detail-label {
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--nmx-dark, #171717);
+    margin-bottom: 6px;
+}
+.whl-detail-value {
+    margin-bottom: 20px;
+}

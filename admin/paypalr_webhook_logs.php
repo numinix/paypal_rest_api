@@ -19,49 +19,6 @@ if (!defined('HEADING_TITLE')) {
     define('HEADING_TITLE', 'PayPal Webhook Logs');
 }
 
-// Language constants with defaults
-$langDefaults = [
-    'TEXT_PANEL_SEARCH' => 'Search Webhook Logs',
-    'TEXT_FILTER_WEBHOOK_ID' => 'Webhook ID',
-    'TEXT_FILTER_EVENT_TYPE' => 'Event Type',
-    'TEXT_FILTER_EVENT_TYPE_ALL' => '-- All Event Types --',
-    'TEXT_FILTER_BODY' => 'Body Content',
-    'TEXT_SEARCH_HELP_WEBHOOK_ID' => 'Enter webhook ID...',
-    'TEXT_SEARCH_HELP_BODY' => 'Search body content...',
-    'TEXT_BUTTON_SEARCH' => 'Search',
-    'TEXT_BUTTON_RESET' => 'Reset',
-    'TEXT_BUTTON_CLEAR_LOGS' => 'Clear All Logs',
-    'TEXT_CONFIRM_CLEAR' => 'Are you sure you want to delete ALL webhook logs? This action cannot be undone.',
-    'TEXT_LOGS_CLEARED' => 'All webhook logs have been cleared.',
-    'TEXT_NO_LOGS' => 'No webhook logs found.',
-    'TEXT_PANEL_RESULTS' => 'Webhook Logs',
-    'TABLE_HEADING_ID' => 'ID',
-    'TABLE_HEADING_WEBHOOK_ID' => 'Webhook ID',
-    'TABLE_HEADING_EVENT_TYPE' => 'Event Type',
-    'TABLE_HEADING_REQUEST_METHOD' => 'Method',
-    'TABLE_HEADING_STATUS' => 'Status',
-    'TABLE_HEADING_CREATED_AT' => 'Date/Time',
-    'TABLE_HEADING_ACTION' => 'Action',
-    'TEXT_VIEW_DETAILS' => 'View',
-    'TEXT_PANEL_DETAIL' => 'Webhook Detail',
-    'TEXT_LABEL_WEBHOOK_ID' => 'Webhook ID',
-    'TEXT_LABEL_EVENT_TYPE' => 'Event Type',
-    'TEXT_LABEL_REQUEST_METHOD' => 'Request Method',
-    'TEXT_LABEL_USER_AGENT' => 'User Agent',
-    'TEXT_LABEL_VERIFICATION_STATUS' => 'Verification Status',
-    'TEXT_LABEL_CREATED_AT' => 'Created At',
-    'TEXT_LABEL_REQUEST_HEADERS' => 'Request Headers',
-    'TEXT_LABEL_BODY' => 'Body',
-    'TEXT_BUTTON_BACK' => '&laquo; Back to Logs',
-    'TEXT_DISPLAYING' => 'Displaying %d to %d of %d entries',
-];
-
-foreach ($langDefaults as $key => $value) {
-    if (!defined($key)) {
-        define($key, $value);
-    }
-}
-
 defined('TABLE_PAYPAL_WEBHOOKS') or define('TABLE_PAYPAL_WEBHOOKS', DB_PREFIX . 'paypal_webhooks');
 
 // ---- Handle actions ----
@@ -180,33 +137,8 @@ function whl_pretty_json(string $raw): string
 <head>
     <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
     <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
+    <link rel="stylesheet" href="includes/css/paypalr_webhook_logs.css">
     <title><?php echo HEADING_TITLE; ?></title>
-    <style>
-        .whl-pre {
-            background: var(--nmx-muted, #f2f5f7);
-            border: 1px solid var(--nmx-border, #d6e0e8);
-            border-radius: 8px;
-            padding: 16px;
-            font-size: 13px;
-            line-height: 1.5;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-break: break-word;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        .whl-detail-label {
-            font-weight: 700;
-            font-size: 13px;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--nmx-dark, #171717);
-            margin-bottom: 6px;
-        }
-        .whl-detail-value {
-            margin-bottom: 20px;
-        }
-    </style>
 </head>
 <body>
 <?php require DIR_WS_INCLUDES . 'header.php'; ?>
