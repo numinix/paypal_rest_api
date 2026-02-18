@@ -522,6 +522,12 @@ class PayPalCommon {
             $this->storeVaultCardData($orders_id, $card_source, $orderCustomerCache);
         }
 
+        $memo['paypal_order_id'] = $orderInfo['id'];
+        $memo['paypal_payment_id'] = $payment['id'];
+        if (in_array($orderInfo['txn_type'] ?? '', ['CAPTURE', 'AUTHORIZE'], true)) {
+            $memo['paypal_txn_type'] = $orderInfo['txn_type'];
+        }
+
         // Build and insert the database records
         // Insert two records like the base paypalr module:
         // 1. CREATE record (the PayPal order creation)
