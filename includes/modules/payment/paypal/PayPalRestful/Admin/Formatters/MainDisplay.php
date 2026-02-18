@@ -169,10 +169,7 @@ class MainDisplay
                     // Special case for 'txn_id' field, it's preceeded by its parent-txn-id.
                     //
                     case 'txn_id':
-                        $value =
-                            ((empty($next_txn['parent_txn_id'])) ? '&mdash;' : $next_txn['parent_txn_id']) .
-                            '<br>' .
-                            $value;
+                        $value = $this->formatTransactionIdsForDisplay($txn_index, $next_txn);
                         break;
 
                     // -----
@@ -272,6 +269,102 @@ class MainDisplay
         return $data;
     }
 
+    protected function formatTransactionIdsForDisplay(int $txn_index, array $txn): string
+    {
+        $memo = json_decode($txn['memo'] ?? '', true);
+        if (!is_array($memo)) {
+            $memo = [];
+        }
+
+        $paypal_ids = $this->getPayPalIds($txn, $memo, $txn_index);
+        return
+            MODULE_PAYMENT_PAYPALR_TXN_PAYPAL_ORDER_ID . ' ' . $paypal_ids['paypal_order_id'] .
+            '<br>' .
+            MODULE_PAYMENT_PAYPALR_TXN_PAYMENT_ID . ' ' . $paypal_ids['paypal_payment_id'];
+    }
+
+    protected function getPayPalIds(array $txn, array $memo = [], ?int $txn_index = null): array
+    {
+        $paypal_order_id = $memo['paypal_order_id'] ?? '';
+        $paypal_payment_id = $memo['paypal_payment_id'] ?? '';
+
+        if ($paypal_order_id === '' || $paypal_payment_id === '') {
+            [$derived_order_id, $derived_payment_id] = $this->derivePayPalIdsFromTxnLinks($txn_index ?? $this->findTxnIndex($txn));
+            $paypal_order_id = ($paypal_order_id === '') ? $derived_order_id : $paypal_order_id;
+            $paypal_payment_id = ($paypal_payment_id === '') ? $derived_payment_id : $paypal_payment_id;
+        }
+
+        return [
+            'paypal_order_id' => ($paypal_order_id === '') ? 'n/a' : $paypal_order_id,
+            'paypal_payment_id' => ($paypal_payment_id === '') ? 'n/a' : $paypal_payment_id,
+        ];
+    }
+
+    protected function derivePayPalIdsFromTxnLinks(?int $txn_index): array
+    {
+        if ($txn_index === null || !isset($this->paypalDbTxns[$txn_index])) {
+            return ['', ''];
+        }
+
+        $transaction = $this->paypalDbTxns[$txn_index];
+        $paypal_payment_id = (string)($transaction['txn_id'] ?? '');
+        $search_parent_id = (string)($transaction['parent_txn_id'] ?? '');
+        $paypal_order_id = '';
+
+        if (($transaction['txn_type'] ?? '') === 'CREATE') {
+            $paypal_order_id = $paypal_payment_id;
+            $paypal_payment_id = '';
+            foreach ($this->paypalDbTxns as $next_txn) {
+                if (!empty($next_txn['parent_txn_id']) && $next_txn['parent_txn_id'] === $paypal_order_id) {
+                    $paypal_payment_id = (string)$next_txn['txn_id'];
+                    break;
+                }
+            }
+        } else {
+            while ($search_parent_id !== '') {
+                $parent_txn = $this->findTxnByTxnId($search_parent_id);
+                if ($parent_txn === null) {
+                    break;
+                }
+
+                if (($parent_txn['txn_type'] ?? '') === 'CREATE') {
+                    $paypal_order_id = (string)$parent_txn['txn_id'];
+                    break;
+                }
+
+                $search_parent_id = (string)($parent_txn['parent_txn_id'] ?? '');
+            }
+
+            if ($paypal_order_id === '' && !empty($transaction['parent_txn_id'])) {
+                $paypal_order_id = (string)$transaction['parent_txn_id'];
+            }
+        }
+
+        return [$paypal_order_id, $paypal_payment_id];
+    }
+
+    protected function findTxnByTxnId(string $txn_id): ?array
+    {
+        foreach ($this->paypalDbTxns as $next_txn) {
+            if (($next_txn['txn_id'] ?? '') === $txn_id) {
+                return $next_txn;
+            }
+        }
+
+        return null;
+    }
+
+    protected function findTxnIndex(array $txn): ?int
+    {
+        foreach ($this->paypalDbTxns as $index => $next_txn) {
+            if (($next_txn['txn_type'] ?? '') === ($txn['txn_type'] ?? '') && ($next_txn['txn_id'] ?? '') === ($txn['txn_id'] ?? '')) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
     protected function createActionButton(string $modal_name, string $button_name, string $button_color): string
     {
         return '<button type="button" class="btn btn-' . $button_color . ' btn-sm" data-toggle="modal" data-target="#' . $modal_name . 'Modal">' . $button_name . '</button>';
@@ -283,9 +376,13 @@ class MainDisplay
         // The 'memo' field of the PayPal table contains JSON-encoded "interesting bits" from the order's creation.
         //
         $memo = json_decode($create_fields['memo'] ?? '', true);
+        if (!is_array($memo)) {
+            $memo = [];
+        }
+
         $amount_mismatch_panel = '';
         $card_info = [];
-        if ($memo !== null) {
+        if ($memo !== []) {
             // -----
             // If the amount_mismatch array isn't empty, there was a discrepancy between
             // the order's total calculation by the payment-module and that calculated
@@ -351,6 +448,10 @@ class MainDisplay
             'receiver_email' => MODULE_PAYMENT_PAYPALR_MERCHANT_EMAIL,
             'receiver_id' => MODULE_PAYMENT_PAYPALR_MERCHANT_ID,
         ];
+        $paypal_ids = $this->getPayPalIds($create_fields, $memo);
+        $modal_body .=
+            $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_TXN_PAYPAL_ORDER_ID, $paypal_ids['paypal_order_id']) .
+            $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALR_TXN_PAYMENT_ID, $paypal_ids['paypal_payment_id']);
         foreach ($seller_elements as $field_name => $label) {
             if (!empty($create_fields[$field_name])) {
                 $modal_body .= $this->createStaticFormGroup(3, $label, $create_fields[$field_name]);

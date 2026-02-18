@@ -46,7 +46,9 @@ $define = [
     // Storefront text used to compose an 'after_process' customer-visible note in the
     // order's status-history.  Added for v1.0.5.
     //
+    'MODULE_PAYMENT_PAYPALR_PAYMENT_TRANSACTION_ID' => 'Payment Transaction ID: ',  //- Should end with a space
     'MODULE_PAYMENT_PAYPALR_TRANSACTION_ID' => 'Transaction ID: ',  //- Should end with a space
+    'MODULE_PAYMENT_PAYPALR_PAYPAL_ORDER_ID' => 'PayPal Order ID: ',  //- Should end with a space
     'MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE' => 'Payment Type: PayPal Advanced Checkout (%s)',  //- %s filled in with either 'paypal' or 'card'
     'MODULE_PAYMENT_PAYPALR_TRANSACTION_PAYMENT_STATUS' => 'Payment Status: ',  //- Should end with a space
     'MODULE_PAYMENT_PAYPALR_TRANSACTION_AMOUNT' => 'Amount: ',  //- Should end with a space
@@ -198,6 +200,8 @@ $define = [
     'MODULE_PAYMENT_PAYPALR_TXN_TYPE' => 'Txn Type:',
     'MODULE_PAYMENT_PAYPALR_TXN_ID' => 'Txn ID:',
     'MODULE_PAYMENT_PAYPALR_TXN_PARENT_TXN_ID' => 'Parent Txn ID / Txn ID:',
+    'MODULE_PAYMENT_PAYPALR_TXN_PAYPAL_ORDER_ID' => 'PayPal Order ID:',
+    'MODULE_PAYMENT_PAYPALR_TXN_PAYMENT_ID' => 'Payment Txn ID:',
     'MODULE_PAYMENT_PAYPALR_ACTION' => 'Action',
         'MODULE_PAYMENT_PAYPALR_ACTION_DETAILS' => 'Details',
         'MODULE_PAYMENT_PAYPALR_ACTION_REAUTH' => 'Re-Authorize',
