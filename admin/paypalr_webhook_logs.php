@@ -22,8 +22,12 @@ if (!defined('HEADING_TITLE')) {
 // Language constants with defaults
 $langDefaults = [
     'TEXT_PANEL_SEARCH' => 'Search Webhook Logs',
-    'TEXT_FILTER_SEARCH' => 'Search',
-    'TEXT_SEARCH_HELP' => 'Search by webhook ID, event type, or body content',
+    'TEXT_FILTER_WEBHOOK_ID' => 'Webhook ID',
+    'TEXT_FILTER_EVENT_TYPE' => 'Event Type',
+    'TEXT_FILTER_EVENT_TYPE_ALL' => '-- All Event Types --',
+    'TEXT_FILTER_BODY' => 'Body Content',
+    'TEXT_SEARCH_HELP_WEBHOOK_ID' => 'Enter webhook ID...',
+    'TEXT_SEARCH_HELP_BODY' => 'Search body content...',
     'TEXT_BUTTON_SEARCH' => 'Search',
     'TEXT_BUTTON_RESET' => 'Reset',
     'TEXT_BUTTON_CLEAR_LOGS' => 'Clear All Logs',
@@ -86,18 +90,34 @@ if ($detail_id > 0) {
 }
 
 // ---- Search & Pagination ----
+$webhookId = isset($_GET['webhook_id']) ? trim((string)$_GET['webhook_id']) : '';
+$eventType = isset($_GET['event_type']) ? trim((string)$_GET['event_type']) : '';
 $searchTerm = isset($_GET['search']) ? trim((string)$_GET['search']) : '';
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $perPage = 20;
 $offset = ($page - 1) * $perPage;
 
-$whereClause = '';
-if ($searchTerm !== '') {
-    $escaped = zen_db_input($searchTerm);
-    $whereClause = " WHERE webhook_id LIKE '%" . $escaped . "%'"
-        . " OR event_type LIKE '%" . $escaped . "%'"
-        . " OR body LIKE '%" . $escaped . "%'";
+// Build event type dropdown options from existing data
+$eventTypesResult = $db->Execute(
+    "SELECT DISTINCT event_type FROM " . TABLE_PAYPAL_WEBHOOKS . " ORDER BY event_type"
+);
+$eventTypes = [];
+while (!$eventTypesResult->EOF) {
+    $eventTypes[] = $eventTypesResult->fields['event_type'];
+    $eventTypesResult->MoveNext();
 }
+
+$whereParts = [];
+if ($webhookId !== '') {
+    $whereParts[] = "webhook_id LIKE '%" . zen_db_input($webhookId) . "%'";
+}
+if ($eventType !== '') {
+    $whereParts[] = "event_type = '" . zen_db_input($eventType) . "'";
+}
+if ($searchTerm !== '') {
+    $whereParts[] = "body LIKE '%" . zen_db_input($searchTerm) . "%'";
+}
+$whereClause = !empty($whereParts) ? ' WHERE ' . implode(' AND ', $whereParts) : '';
 
 // Get total count
 $countResult = $db->Execute("SELECT COUNT(*) AS total FROM " . TABLE_PAYPAL_WEBHOOKS . $whereClause);
@@ -128,9 +148,15 @@ $displayEnd = min($offset + $perPage, $totalRecords);
 /**
  * Build pagination URL preserving search params
  */
-function whl_page_url(int $pageNum, string $search = ''): string
+function whl_page_url(int $pageNum, string $webhookId = '', string $eventType = '', string $search = ''): string
 {
     $params = 'page=' . $pageNum;
+    if ($webhookId !== '') {
+        $params .= '&webhook_id=' . urlencode($webhookId);
+    }
+    if ($eventType !== '') {
+        $params .= '&event_type=' . urlencode($eventType);
+    }
     if ($search !== '') {
         $params .= '&search=' . urlencode($search);
     }
@@ -244,8 +270,21 @@ function whl_pretty_json(string $raw): string
             <div class="nmx-panel-body">
                 <?php echo zen_draw_form('paypalr_webhook_search', FILENAME_PAYPALR_WEBHOOK_LOGS, '', 'get', 'class="nmx-form-inline"'); ?>
                     <div class="nmx-form-group">
-                        <label for="search-filter"><?php echo TEXT_FILTER_SEARCH; ?></label>
-                        <input type="text" name="search" id="search-filter" value="<?php echo zen_output_string_protected($searchTerm); ?>" class="nmx-form-control" placeholder="<?php echo zen_output_string_protected(TEXT_SEARCH_HELP); ?>">
+                        <label for="webhook-id-filter"><?php echo TEXT_FILTER_WEBHOOK_ID; ?></label>
+                        <input type="text" name="webhook_id" id="webhook-id-filter" value="<?php echo zen_output_string_protected($webhookId); ?>" class="nmx-form-control" placeholder="<?php echo zen_output_string_protected(TEXT_SEARCH_HELP_WEBHOOK_ID); ?>">
+                    </div>
+                    <div class="nmx-form-group">
+                        <label for="event-type-filter"><?php echo TEXT_FILTER_EVENT_TYPE; ?></label>
+                        <select name="event_type" id="event-type-filter" class="nmx-form-control">
+                            <option value=""><?php echo TEXT_FILTER_EVENT_TYPE_ALL; ?></option>
+                            <?php foreach ($eventTypes as $et) { ?>
+                                <option value="<?php echo zen_output_string_protected($et); ?>"<?php echo ($eventType === $et) ? ' selected' : ''; ?>><?php echo zen_output_string_protected($et); ?></option>
+                            <?php } ?>
+                        </select>
+                    </div>
+                    <div class="nmx-form-group">
+                        <label for="search-filter"><?php echo TEXT_FILTER_BODY; ?></label>
+                        <input type="text" name="search" id="search-filter" value="<?php echo zen_output_string_protected($searchTerm); ?>" class="nmx-form-control" placeholder="<?php echo zen_output_string_protected(TEXT_SEARCH_HELP_BODY); ?>">
                     </div>
                     <div class="nmx-form-actions">
                         <button type="submit" class="nmx-btn nmx-btn-primary"><?php echo TEXT_BUTTON_SEARCH; ?></button>
@@ -301,18 +340,18 @@ function whl_pretty_json(string $raw): string
                         <?php if ($totalPages > 1) { ?>
                             <ul class="nmx-list-pagination">
                                 <li class="<?php echo ($page <= 1) ? 'nmx-disabled' : ''; ?>">
-                                    <a href="<?php echo whl_page_url(max(1, $page - 1), $searchTerm); ?>">&laquo;</a>
+                                    <a href="<?php echo whl_page_url(max(1, $page - 1), $webhookId, $eventType, $searchTerm); ?>">&laquo;</a>
                                 </li>
                                 <?php
                                 $startPage = max(1, $page - 2);
                                 $endPage = min($totalPages, $page + 2);
                                 for ($p = $startPage; $p <= $endPage; $p++) { ?>
                                     <li class="<?php echo ($p === $page) ? 'nmx-active' : ''; ?>">
-                                        <a href="<?php echo whl_page_url($p, $searchTerm); ?>"><?php echo $p; ?></a>
+                                        <a href="<?php echo whl_page_url($p, $webhookId, $eventType, $searchTerm); ?>"><?php echo $p; ?></a>
                                     </li>
                                 <?php } ?>
                                 <li class="<?php echo ($page >= $totalPages) ? 'nmx-disabled' : ''; ?>">
-                                    <a href="<?php echo whl_page_url(min($totalPages, $page + 1), $searchTerm); ?>">&raquo;</a>
+                                    <a href="<?php echo whl_page_url(min($totalPages, $page + 1), $webhookId, $eventType, $searchTerm); ?>">&raquo;</a>
                                 </li>
                             </ul>
                         <?php } ?>
