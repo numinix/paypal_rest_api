@@ -908,6 +908,11 @@ class paypalr_googlepay extends base
             'source' => 'google_pay',
             'card_info' => $card_source,
         ];
+        $memo['paypal_order_id'] = $this->orderInfo['id'];
+        $memo['paypal_payment_id'] = $payment['id'];
+        if (isset($this->orderInfo['txn_type'])) {
+            $memo['paypal_txn_type'] = $this->orderInfo['txn_type'];
+        }
 
         $sql_data_array = [
             'order_id' => $orders_id,
