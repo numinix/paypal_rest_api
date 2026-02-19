@@ -466,7 +466,28 @@ class CreatePayPalOrderRequest extends ErrorInfo
     }
     protected function calculateDiscount(array $ot_diffs): float
     {
-        return abs($this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT . ', ot_coupon, ot_gv, ot_group_pricing', $ot_diffs));
+        // -----
+        // Exclude modules that are already counted as handling or insurance fees, since
+        // those are separate breakdown elements.  Any remaining module that reduces the
+        // order total (negative diff) is treated as a discount, regardless of module name.
+        // This ensures custom coupon/discount modules (e.g. ot_sc, ot_reward_points) are
+        // included in addition to the well-known modules (ot_coupon, ot_gv, ot_group_pricing).
+        //
+        $non_discount_classes = array_filter(explode(',', str_replace(' ', '',
+            MODULE_PAYMENT_PAYPALR_HANDLING_OT . ', ot_loworderfee, ' . MODULE_PAYMENT_PAYPALR_INSURANCE_OT
+        )));
+
+        $value = 0.0;
+        foreach ($ot_diffs as $class => $ot_diff) {
+            if (in_array($class, $non_discount_classes, true)) {
+                continue;
+            }
+            $total_diff = (float)($ot_diff['diff']['total'] ?? 0.0);
+            if ($total_diff < 0) {
+                $value += abs($total_diff);
+            }
+        }
+        return $value;
     }
     protected function calculateShippingDiscount(array $ot_diffs): float
     {
