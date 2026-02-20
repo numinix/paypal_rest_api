@@ -688,15 +688,7 @@ if (!function_exists('oprc_checkout_process')) {
             $zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_BEFORE_ORDER_TOTALS_PRE_CONFIRMATION_CHECK');
         }
 
-        $shouldRunPreConfirmationCheck = true;
-        if (isset($_SESSION['payment']) && isset($GLOBALS[$_SESSION['payment']]) && is_object($GLOBALS[$_SESSION['payment']])) {
-            $paymentModuleCode = $GLOBALS[$_SESSION['payment']]->code;
-            if (is_string($paymentModuleCode) && strpos($paymentModuleCode, 'paypal') === 0) {
-                $shouldRunPreConfirmationCheck = false;
-            }
-        }
-
-        if ($shouldRunPreConfirmationCheck && method_exists($order_total_modules, 'pre_confirmation_check')) {
+        if (method_exists($order_total_modules, 'pre_confirmation_check')) {
             $order_total_modules->pre_confirmation_check();
         }
 
