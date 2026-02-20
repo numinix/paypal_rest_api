@@ -225,6 +225,86 @@ final class CheckoutProcessTest extends TestCase
         $this->assertSame([true], $cart->resetCalls);
     }
 
+    /**
+     * Verify that order_total->pre_confirmation_check() is called even when
+     * the payment method starts with 'paypal'. This ensures coupon discounts
+     * and other order total adjustments are applied to the PayPal order amount.
+     */
+    public function testOrderTotalPreConfirmationCheckCalledForPayPal(): void
+    {
+        $GLOBALS['oprc_test_pre_confirmation_check_called'] = false;
+
+        $cart = new class {
+            public string $cartID = 'PPR001';
+
+            public function count_contents()
+            {
+                return 1;
+            }
+
+            public function reset($flag)
+            {
+            }
+        };
+
+        $_SESSION['customer_id'] = 15;
+        $_SESSION['cart'] = $cart;
+        $_SESSION['cartID'] = 'PPR001';
+        $_SESSION['shipping'] = ['id' => 'flat.flat'];
+        $_SESSION['sendto'] = 5;
+        $_SESSION['billto'] = 6;
+        $_SESSION['payment'] = 'paypalr';
+        $_SESSION['credit_covers'] = false;
+
+        $_POST['payment'] = 'paypalr';
+
+        $paypalrModule = new class {
+            public string $code = 'paypalr';
+            public string $form_action_url = '';
+
+            public function update_status(): void
+            {
+            }
+
+            public function pre_confirmation_check(): void
+            {
+            }
+
+            public function confirmation(): array
+            {
+                return [];
+            }
+
+            public function process_button_ajax($payload = null)
+            {
+                return [
+                    'form_action_url' => 'https://paypal.example.com/checkout',
+                    'orderId' => 'PAYPAL123',
+                ];
+            }
+
+            public function process_button(): string
+            {
+                return '';
+            }
+        };
+
+        $GLOBALS['paypalr'] = $paypalrModule;
+
+        try {
+            oprc_checkout_process(['request_type' => 'ajax']);
+        } catch (OprcAjaxCheckoutException $exception) {
+            $this->fail('Unexpected exception: ' . $exception->getMessage());
+        } finally {
+            unset($GLOBALS['paypalr']);
+        }
+
+        $this->assertTrue(
+            $GLOBALS['oprc_test_pre_confirmation_check_called'],
+            'order_total->pre_confirmation_check() must be called for PayPal payments so that coupon discounts are applied to the PayPal order amount.'
+        );
+    }
+
     public function testUsesProcessButtonFormActionOverride(): void
     {
         $cart = new class {
@@ -452,6 +532,7 @@ class order_total
 
     public function pre_confirmation_check(): void
     {
+        $GLOBALS['oprc_test_pre_confirmation_check_called'] = true;
     }
 
     public function process(): array
