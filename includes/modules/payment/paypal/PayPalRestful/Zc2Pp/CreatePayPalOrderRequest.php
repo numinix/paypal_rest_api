@@ -383,7 +383,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
     //
     protected function getOrderAmountAndBreakdown(\order $order, array $order_info, array $ot_diffs): array
     {
-        $amount = $this->setRateConvertedValue($order_info['total']);
+        $effective_order_total = $this->getEffectiveOrderTotal($order, $order_info);
+        $amount = $this->setRateConvertedValue($effective_order_total);
         if ($this->countItems() === 0) {
             return $amount;
         }
@@ -438,6 +439,47 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // with the order and, if non-zero, include that value in the breakdown.
         //
         $discount_total = max(0.0, $this->calculateDiscount($ot_diffs) - $shipping_discount_total);
+
+        // -----
+        // Some checkout flows provide incomplete $ot_diffs data when the customer uses
+        // store credit/reward points. If no explicit discount was found, inspect
+        // $order->totals to recover discount values (e.g. ot_sc output lines).
+        //
+        if ($discount_total < 0.01) {
+            $discount_total = max(0.0, $this->getDiscountFromOrderTotals($order) - $shipping_discount_total);
+        }
+
+        // -----
+        // Fallback for one-page checkout flows where ot_sc's deduction isn't reflected in
+        // $order_info/$ot_diffs at PayPal order-creation time (even though it's applied for
+        // non-PayPal methods). If that happens, use the customer's redeemed store-credit
+        // session value as a discount, but only when no other discount is present and the
+        // current order-total equals the non-discounted sum.
+        //
+        $session_store_credit = $this->getSessionStoreCreditAmount();
+        if (
+            $session_store_credit > 0
+            && !isset($ot_diffs['ot_sc'])
+            && $discount_total < 0.01
+            && $shipping_discount_total < 0.01
+        ) {
+            $non_discount_total = (float)($item_total + $item_tax_total + $shipping_total + $handling_total + $insurance_total);
+            if (abs($effective_order_total - $non_discount_total) < 0.01) {
+                $fallback_discount = min($session_store_credit, $non_discount_total);
+                if ($fallback_discount > 0) {
+                    $discount_total = $fallback_discount;
+                    $effective_order_total = max(0.0, $effective_order_total - $fallback_discount);
+                    $amount = $this->setRateConvertedValue($effective_order_total);
+                    $this->log->write(
+                        sprintf(
+                            'CreatePayPalOrderRequest: applied fallback store-credit discount %.2f from session.',
+                            $fallback_discount
+                        )
+                    );
+                }
+            }
+        }
+
         if ($discount_total > 0) {
             $breakdown['discount'] = $this->setRateConvertedValue($discount_total);
         }
@@ -450,6 +492,84 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $this->overallDiscount = (float)($shipping_discount_total + $discount_total);
 
         return $amount;
+    }
+
+    protected function getSessionStoreCreditAmount(): float
+    {
+        if (!isset($_SESSION['storecredit']) || !is_numeric($_SESSION['storecredit'])) {
+            return 0.0;
+        }
+
+        return max(0.0, (float)$_SESSION['storecredit']);
+    }
+
+    protected function getDiscountFromOrderTotals(\order $order): float
+    {
+        if (empty($order->totals) || !is_array($order->totals)) {
+            return 0.0;
+        }
+
+        $discount_modules = trim(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT);
+        $discount_modules = ($discount_modules === '') ? '' : $discount_modules . ',';
+        $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv,ot_group_pricing,ot_sc')));
+
+        $discount_total = 0.0;
+        foreach ($order->totals as $order_total) {
+            if (!is_array($order_total)) {
+                continue;
+            }
+
+            $class_name = (string)($order_total['class'] ?? '');
+            if ($class_name === '' || !in_array($class_name, $eligible_modules, true)) {
+                continue;
+            }
+
+            if (!isset($order_total['value']) || !is_numeric($order_total['value'])) {
+                continue;
+            }
+
+            $discount_total += abs((float)$order_total['value']);
+        }
+
+        return $discount_total;
+    }
+
+    // -----
+    // Some one-page checkout flows can leave $order->info['total'] and the observer's
+    // captured $order_info['total'] unchanged even though order-total modules (e.g.
+    // store-credit) have reduced the final total. In those cases, prefer the
+    // ot_total value recorded in $order->totals when available.
+    //
+    protected function getEffectiveOrderTotal(\order $order, array $order_info): float
+    {
+        $order_info_total = isset($order_info['total']) ? (float)$order_info['total'] : 0.0;
+        if (empty($order->totals) || !is_array($order->totals)) {
+            return $order_info_total;
+        }
+
+        foreach ($order->totals as $order_total) {
+            if (!is_array($order_total)) {
+                continue;
+            }
+            $class_name = (string)($order_total['class'] ?? '');
+            if ($class_name !== 'ot_total') {
+                continue;
+            }
+
+            if (!isset($order_total['value']) || !is_numeric($order_total['value'])) {
+                return $order_info_total;
+            }
+
+            $ot_total_value = (float)$order_total['value'];
+            if (abs($ot_total_value - $order_info_total) >= 0.01) {
+                $this->log->write(
+                    "CreatePayPalOrderRequest: using ot_total value {$ot_total_value} instead of order_info total {$order_info_total}."
+                );
+            }
+            return $ot_total_value;
+        }
+
+        return $order_info_total;
     }
 
     // -----
@@ -466,37 +586,12 @@ class CreatePayPalOrderRequest extends ErrorInfo
     }
     protected function calculateDiscount(array $ot_diffs): float
     {
-        // -----
-        // Exclude modules that are already counted as handling or insurance fees, since
-        // those are separate breakdown elements.  Any remaining module that reduces the
-        // order total (negative diff) is treated as a discount, regardless of module name.
-        // This ensures custom coupon/discount modules (e.g. ot_sc, ot_reward_points) are
-        // included in addition to the well-known modules (ot_coupon, ot_gv, ot_group_pricing).
-        //
-        $non_discount_classes = array_filter(explode(',', str_replace(' ', '',
-            MODULE_PAYMENT_PAYPALR_HANDLING_OT . ', ot_loworderfee, ' . MODULE_PAYMENT_PAYPALR_INSURANCE_OT
-        )));
-
-        $value = 0.0;
-        foreach ($ot_diffs as $class => $ot_diff) {
-            if (in_array($class, $non_discount_classes, true)) {
-                continue;
-            }
-            $total_diff = (float)($ot_diff['diff']['total'] ?? 0.0);
-            if ($total_diff < 0) {
-                $value += abs($total_diff);
-            }
-        }
-        return $value;
+        return abs($this->calculateOrderElementValue(implode(',', $this->getDiscountModules($ot_diffs)), $ot_diffs));
     }
     protected function calculateShippingDiscount(array $ot_diffs): float
     {
         $shipping_discount_total = 0.0;
-        $discount_modules = trim(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT);
-        $discount_modules = ($discount_modules === '') ? '' : $discount_modules . ',';
-        $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv')));
-
-        foreach ($eligible_modules as $next_module) {
+        foreach ($this->getDiscountModules($ot_diffs) as $next_module) {
             if (!isset($ot_diffs[$next_module]['diff'])) {
                 continue;
             }
@@ -510,6 +605,24 @@ class CreatePayPalOrderRequest extends ErrorInfo
         }
 
         return $shipping_discount_total;
+    }
+
+    protected function getDiscountModules(array $ot_diffs): array
+    {
+        $discount_modules = trim(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT);
+        $discount_modules = ($discount_modules === '') ? '' : $discount_modules . ',';
+        $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv,ot_group_pricing,ot_sc')));
+
+        // Include any order-total module that lowers the order total, so unknown
+        // discount modules are handled without adding them to module config.
+        foreach ($ot_diffs as $class_name => $changes) {
+            if (!isset($changes['diff']['total']) || (float)$changes['diff']['total'] >= 0) {
+                continue;
+            }
+            $eligible_modules[] = $class_name;
+        }
+
+        return array_values(array_unique($eligible_modules));
     }
     protected function calculateOrderElementValue(string $ot_class_names, array $ot_diffs): float
     {
