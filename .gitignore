@@ -8,3 +8,6 @@ includes/classes/order_total.php
 includes/classes/payment.php
 includes/classes/shipping.php
 includes/classes/shopping_cart.php
+
+# OPRC reference vendor directory
+references/one_page_responsive_checkout/vendor/
