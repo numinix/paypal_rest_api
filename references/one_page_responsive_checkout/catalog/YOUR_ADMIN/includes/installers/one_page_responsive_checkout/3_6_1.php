@@ -1,2 +1,0 @@
-<?php
-//Jquery function updated
