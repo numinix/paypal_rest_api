@@ -45,7 +45,7 @@ namespace {
             // Test 1: Direct POST field (paypalac_saved_card)
             $_POST = ['paypalac_saved_card' => 'vault-123'];
             $_SESSION = [];
-            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? 'new'));
             if ($result !== 'vault-123') {
                 fwrite(STDERR, "Test 1 failed: Expected 'vault-123', got '$result'\n");
                 $failures++;
@@ -56,7 +56,7 @@ namespace {
             // Test 2: Forwarded POST field (ppac_saved_card)
             $_POST = ['ppac_saved_card' => 'vault-456'];
             $_SESSION = [];
-            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? 'new'));
             if ($result !== 'vault-456') {
                 fwrite(STDERR, "Test 2 failed: Expected 'vault-456', got '$result'\n");
                 $failures++;
@@ -66,8 +66,8 @@ namespace {
 
             // Test 3: Session fallback
             $_POST = [];
-            $_SESSION = ['PayPalRestful' => ['saved_card' => 'vault-789']];
-            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $_SESSION = ['PayPalAdvancedCheckout' => ['saved_card' => 'vault-789']];
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? 'new'));
             if ($result !== 'vault-789') {
                 fwrite(STDERR, "Test 3 failed: Expected 'vault-789', got '$result'\n");
                 $failures++;
@@ -78,7 +78,7 @@ namespace {
             // Test 4: Default to 'new'
             $_POST = [];
             $_SESSION = [];
-            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? 'new'));
             if ($result !== 'new') {
                 fwrite(STDERR, "Test 4 failed: Expected 'new', got '$result'\n");
                 $failures++;
@@ -88,8 +88,8 @@ namespace {
 
             // Test 5: Priority order (direct POST > forwarded POST > session > default)
             $_POST = ['paypalac_saved_card' => 'vault-priority'];
-            $_SESSION = ['PayPalRestful' => ['saved_card' => 'vault-session']];
-            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $_SESSION = ['PayPalAdvancedCheckout' => ['saved_card' => 'vault-session']];
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? 'new'));
             if ($result !== 'vault-priority') {
                 fwrite(STDERR, "Test 5 failed: Expected 'vault-priority', got '$result'\n");
                 $failures++;
@@ -99,8 +99,8 @@ namespace {
 
             // Test 6: Forwarded field takes priority over session
             $_POST = ['ppac_saved_card' => 'vault-forwarded'];
-            $_SESSION = ['PayPalRestful' => ['saved_card' => 'vault-session']];
-            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $_SESSION = ['PayPalAdvancedCheckout' => ['saved_card' => 'vault-session']];
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? 'new'));
             if ($result !== 'vault-forwarded') {
                 fwrite(STDERR, "Test 6 failed: Expected 'vault-forwarded', got '$result'\n");
                 $failures++;

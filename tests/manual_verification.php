@@ -17,9 +17,9 @@ define('DIR_WS_MODULES', 'includes/modules/');
 define('TABLE_PAYPAL_SUBSCRIPTIONS', 'paypal_subscriptions');
 define('TABLE_PAYPAL_VAULT', 'paypal_vault');
 
-require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
+require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 
-use PayPalRestful\Common\SubscriptionManager;
+use PayPalAdvancedCheckout\Common\SubscriptionManager;
 
 echo "Step 1: Subscription Creation Flow\n";
 echo "-----------------------------------\n";
@@ -38,7 +38,7 @@ echo "- NOTIFY_PAYPALAC_VAULT_CARD_SAVED notification is sent\n\n";
 echo "Step 3: Subscription Activation (NEW FUNCTIONALITY)\n";
 echo "---------------------------------------------------\n";
 echo "Observer listens for NOTIFY_PAYPALAC_VAULT_CARD_SAVED:\n";
-echo "- zcObserverPaypalrestfulRecurring::updateNotifyPaypalrVaultCardSaved() is called\n";
+echo "- zcObserverPaypaladvcheckoutRecurring::updateNotifyPaypalrVaultCardSaved() is called\n";
 echo "- Calls SubscriptionManager::activateSubscriptionsWithVault()\n";
 echo "- Finds all subscriptions for this order with status 'awaiting_vault'\n";
 echo "- Updates each subscription:\n";

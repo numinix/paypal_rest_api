@@ -289,7 +289,7 @@
 
               <div class="col-12">
                 <?php
-                  $cardLogoBase = DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalRestful/images/';
+                  $cardLogoBase = DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalAdvancedCheckout/images/';
                   $acceptedCardBrands = [];
                   if (defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_ACCEPTED_CARDS')) {
                       $acceptedCardBrands = array_filter(array_map('trim', explode(',', MODULE_PAYMENT_PAYPALAC_CREDITCARD_ACCEPTED_CARDS)));

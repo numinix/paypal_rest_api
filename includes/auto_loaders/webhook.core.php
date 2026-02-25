@@ -23,7 +23,7 @@ if (($loaderPrefix ?? '') !== 'webhook') {
  * unavailable.  Each shim contains a class_exists() guard so it is safe to
  * include even when the real class was already loaded by an earlier entry.
  */
-$webhookCompatDir = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/';
+$webhookCompatDir = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/Compatibility/';
 
 /**
  * Breakpoint 0.

@@ -3,10 +3,10 @@
  * Wallet helper endpoint for PayPal Advanced Checkout wallets (Google Pay, Apple Pay, Venmo, Pay Later).
  */
 
-$autoloaderPath = __DIR__ . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
+$autoloaderPath = __DIR__ . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageAutoloader.php';
 if (is_file($autoloaderPath)) {
     require_once $autoloaderPath;
-    \PayPalRestful\Compatibility\LanguageAutoloader::register();
+    \PayPalAdvancedCheckout\Compatibility\LanguageAutoloader::register();
 }
 
 require 'includes/application_top.php';
@@ -129,11 +129,11 @@ if ($payloadData !== null) {
         return;
     }
 
-    if (!isset($_SESSION['PayPalRestful']['WalletPayload'])) {
-        $_SESSION['PayPalRestful']['WalletPayload'] = [];
+    if (!isset($_SESSION['PayPalAdvancedCheckout']['WalletPayload'])) {
+        $_SESSION['PayPalAdvancedCheckout']['WalletPayload'] = [];
     }
 
-    $_SESSION['PayPalRestful']['WalletPayload'][$wallet] = $payloadData;
+    $_SESSION['PayPalAdvancedCheckout']['WalletPayload'][$wallet] = $payloadData;
 
     echo json_encode(['success' => true, 'cached' => true]);
     require DIR_WS_INCLUDES . 'application_bottom.php';

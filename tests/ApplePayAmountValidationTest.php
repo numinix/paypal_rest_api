@@ -65,7 +65,7 @@ echo "\n";
 
 // Test JavaScript side validation
 echo "Testing JavaScript amount validation...\n";
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
 
 // Extract the onvalidatemerchant callback
 $onvalidatePattern = '/onvalidatemerchant\s*=\s*function\s*\([^)]*\)\s*\{([\s\S]*?)^\s{8}\};/m';

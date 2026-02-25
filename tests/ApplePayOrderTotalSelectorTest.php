@@ -20,7 +20,7 @@ echo "Testing Apple Pay Order Total Selector Configuration\n";
 echo "=====================================================\n\n";
 
 // Get the Apple Pay JS file content
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
 
 // Test 1: Verify getOrderTotalFromPage function exists
 if (strpos($applePayJs, 'function getOrderTotalFromPage') !== false) {

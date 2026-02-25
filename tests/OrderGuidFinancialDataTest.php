@@ -65,7 +65,7 @@ class OrderGuidFinancialDataTest
         $_SESSION = [
             'customer_id' => 12345,
             'cartID' => 'cart_abc123',
-            'PayPalRestful' => [
+            'PayPalAdvancedCheckout' => [
                 'CompletedOrders' => 0,
             ],
         ];
@@ -178,10 +178,10 @@ class OrderGuidFinancialDataTest
 
         $guid_no_payload = $common->createOrderGuid($order, 'apple_pay');
 
-        $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = ['token' => 'token-123'];
+        $_SESSION['PayPalAdvancedCheckout']['WalletPayload']['apple_pay'] = ['token' => 'token-123'];
         $guid_with_payload = $common->createOrderGuid($order, 'apple_pay');
 
-        $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = ['token' => 'token-456'];
+        $_SESSION['PayPalAdvancedCheckout']['WalletPayload']['apple_pay'] = ['token' => 'token-456'];
         $guid_different_payload = $common->createOrderGuid($order, 'apple_pay');
 
         $passed = ($guid_no_payload !== $guid_with_payload) && ($guid_with_payload !== $guid_different_payload);

@@ -9,10 +9,10 @@
  *
  * Last updated: v1.3.1
  */
-$autoloaderPath = __DIR__ . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
+$autoloaderPath = __DIR__ . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageAutoloader.php';
 if (is_file($autoloaderPath)) {
     require_once $autoloaderPath;
-    \PayPalRestful\Compatibility\LanguageAutoloader::register();
+    \PayPalAdvancedCheckout\Compatibility\LanguageAutoloader::register();
 }
 
 require 'includes/application_top.php';
@@ -29,9 +29,9 @@ if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS') || MODULE_PAYMENT_PAYPALAC_STATUS
 
 require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 
-use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Common\Logger;
-use PayPalRestful\Compatibility\Language as LanguageCompatibility;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Common\Logger;
+use PayPalAdvancedCheckout\Compatibility\Language as LanguageCompatibility;
 
 LanguageCompatibility::load();
 
@@ -44,7 +44,7 @@ $logger->write("ppac_listener ($op, " . MODULE_PAYMENT_PAYPALAC_SERVER . ") star
 
 $valid_operations = ['cancel', 'return', '3ds_cancel', '3ds_return'];
 if (!in_array($op, $valid_operations, true)) {
-    unset($_SESSION['PayPalRestful']['Order']);
+    unset($_SESSION['PayPalAdvancedCheckout']['Order']);
     $zco_notifier->notify('NOTIFY_PPR_LISTENER_UNKNOWN_OPERATION', ['op' => $op]);
     zen_redirect(zen_href_link(FILENAME_DEFAULT));  //- FIXME? Perhaps FILENAME_TIME_OUT would be better, since that would kill any session.
 }
@@ -61,12 +61,12 @@ if (!in_array($op, $valid_operations, true)) {
 // checkout process.
 //
 if ($op === 'cancel' || $op === '3ds_cancel') {
-    unset($_SESSION['PayPalRestful']['Order']['PayerAction']);
+    unset($_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']);
     zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
 }
 
-if ($op === 'return' && (!isset($_GET['token'], $_SESSION['PayPalRestful']['Order']['id']) || $_GET['token'] !== $_SESSION['PayPalRestful']['Order']['id'])) {
-    unset($_SESSION['PayPalRestful']['Order']);
+if ($op === 'return' && (!isset($_GET['token'], $_SESSION['PayPalAdvancedCheckout']['Order']['id']) || $_GET['token'] !== $_SESSION['PayPalAdvancedCheckout']['Order']['id'])) {
+    unset($_SESSION['PayPalAdvancedCheckout']['Order']);
     zen_redirect(zen_href_link(FILENAME_DEFAULT));  //- FIXME? Perhaps FILENAME_TIME_OUT would be better, since that would kill any session.
 }
 
@@ -82,7 +82,7 @@ if ($op === 'return' && (!isset($_GET['token'], $_SESSION['PayPalRestful']['Orde
 // unknown reason) that element's not present, the customer's sent
 // back to the payment phase of the checkout process.
 //
-if (!isset($_SESSION['PayPalRestful']['Order']['PayerAction'])) {
+if (!isset($_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'])) {
     $logger->write('ppac_listener, redirecting to checkout_payment; no PayerAction variables.', true, 'after');
     zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
 }
@@ -95,11 +95,11 @@ if (!isset($_SESSION['PayPalRestful']['Order']['PayerAction'])) {
 require DIR_WS_MODULES . 'payment/paypalac.php';
 [$client_id, $secret] = paypalac::getEnvironmentInfo();
 
-$ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALAC_SERVER, $client_id, $secret);
+$ppr = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER, $client_id, $secret);
 $ppr->setKeepTxnLinks(true);
-$order_status = $ppr->getOrderStatus($_SESSION['PayPalRestful']['Order']['id']);
+$order_status = $ppr->getOrderStatus($_SESSION['PayPalAdvancedCheckout']['Order']['id']);
 if ($order_status === false) {
-    unset($_SESSION['PayPalRestful']['Order']);
+    unset($_SESSION['PayPalAdvancedCheckout']['Order']);
     $logger->write('==> getOrderStatus failed, redirecting to shopping-cart', true, 'after');
     zen_redirect(zen_href_link(FILENAME_SHOPPING_CART));
 }
@@ -116,7 +116,7 @@ if ($op === '3ds_return') {
     $enrollment_status = $auth_result['three_d_secure']['enrollment_status'];
     if ($liability_shift === 'UNKNOWN' || ($enrollment_status === 'Y' && $liability_shift === 'NO')) {
         $messageStack->add_session('checkout_payment', MODULE_PAYMENT_PAYPALAC_REDIRECT_LISTENER_TRY_AGAIN, 'error');
-        unset($_SESSION['PayPalRestful']['Order']['PayerAction'], $_SESSION['PayPalRestful']['Order']['authentication_result']);
+        unset($_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'], $_SESSION['PayPalAdvancedCheckout']['Order']['authentication_result']);
         zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
     }
 }
@@ -127,12 +127,12 @@ if ($op === '3ds_return') {
 // the base payment module "knows" that the payment-confirmation (or creation) at PayPal
 // has been completed.
 //
-$_SESSION['PayPalRestful']['Order']['status'] = $order_status['status'];
+$_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $order_status['status'];
 if ($op === 'return') {
-    $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
+    $_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed'] = true;
 } else {
-    $_SESSION['PayPalRestful']['Order']['3DS_response'] = $_SESSION['PayPalRestful']['Order']['PayerAction']['ccInfo'];
-    $_SESSION['PayPalRestful']['Order']['authentication_result'] = $auth_result;
+    $_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response'] = $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']['ccInfo'];
+    $_SESSION['PayPalAdvancedCheckout']['Order']['authentication_result'] = $auth_result;
 }
 
 // -----
@@ -143,8 +143,8 @@ if ($op === 'return') {
 //
 // NOTE: CSS-based spinner compliments of 'loading.io css spinner' ( https://loading.io/css/ )
 //
-$redirect_page = $_SESSION['PayPalRestful']['Order']['PayerAction']['redirect_page']
-    ?? $_SESSION['PayPalRestful']['Order']['PayerAction']['current_page_base'];
+$redirect_page = $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']['redirect_page']
+    ?? $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']['current_page_base'];
 $logger->write("Order's status set to {$order_status['status']}; posting back to $redirect_page.", true, 'after');
 ?>
 <html>
@@ -199,7 +199,7 @@ $logger->write("Order's status set to {$order_status['status']}; posting back to
     <div id="lds-wrapper"><div class="lds-ring"><div></div><div></div><div></div><div></div></div></div>
     <form action="<?php echo zen_href_link($redirect_page); ?>" name="transfer_form" method="post">
 <?php
-foreach ($_SESSION['PayPalRestful']['Order']['PayerAction']['savedPosts'] as $key => $value) {
+foreach ($_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']['savedPosts'] as $key => $value) {
     if (is_string($value)) {
         echo zen_draw_hidden_field($key, $value);
         continue;
@@ -210,7 +210,7 @@ foreach ($_SESSION['PayPalRestful']['Order']['PayerAction']['savedPosts'] as $ke
         echo zen_draw_hidden_field(str_replace(':sub_key:', $sub_key, $array_key_name), $sub_value);
     }
 }
-unset($_SESSION['PayPalRestful']['Order']['PayerAction']);
+unset($_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']);
 ?>
     </form>
 </body>

@@ -52,7 +52,7 @@ function generateSavedCardSelection(array $vaultedCards): array
         return [];
     }
     
-    $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalac.checkout.js"></script>';
+    $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.checkout.js"></script>';
     
     $fields = [];
     foreach ($vaultedCards as $index => $card) {

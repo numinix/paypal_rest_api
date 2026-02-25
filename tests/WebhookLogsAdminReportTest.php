@@ -159,7 +159,7 @@ if ($filenameInDatafiles && $boxInDefinitions && $filenameNotInDefinitions && $b
 
 // ---- Test 12: WebhookController saveToDatabase includes verification_status ----
 echo "Test 12: Checking WebhookController saves verification_status...\n";
-$controllerFile = $basePath . '/includes/modules/payment/paypal/PayPalRestful/Webhooks/WebhookController.php';
+$controllerFile = $basePath . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookController.php';
 $controllerContent = file_get_contents($controllerFile);
 $hasSaveParam = strpos($controllerContent, "verification_status") !== false;
 $hasSaveAllPaths = strpos($controllerContent, "'ignored'") !== false

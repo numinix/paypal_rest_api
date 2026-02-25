@@ -9,9 +9,9 @@ $testPassed = true;
 $errors = [];
 
 // Get the JS files content
-$googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.googlepay.js');
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js');
-$venmoJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.venmo.js');
+$googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.googlepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
+$venmoJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.venmo.js');
 
 // Test 1: Google Pay JS contains radio selection function
 if (strpos($googlePayJs, 'selectGooglePayRadio') === false) {
@@ -110,7 +110,7 @@ if (strpos($venmoJs, 'paypalac-venmo-button') === false || strpos($venmoJs, 'add
 }
 
 // Test 13: CSS file exists and contains wallet radio hidden class
-$cssContent = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/paypalac.css');
+$cssContent = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/paypalac.css');
 if (strpos($cssContent, 'paypalac-wallet-radio-hidden') === false) {
     $testPassed = false;
     $errors[] = "CSS should contain paypalac-wallet-radio-hidden class";

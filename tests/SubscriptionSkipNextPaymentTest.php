@@ -37,8 +37,8 @@ if (file_exists($savedCardRecurringFile)) {
 
 // Test 2: Verify no skip flag logic in schema managers
 echo "Test 2: Verifying skip flag removed from schema managers...\n";
-$savedCardManagerFile = $basePath . '/includes/modules/payment/paypal/PayPalRestful/Common/SavedCreditCardsManager.php';
-$subscriptionManagerFile = $basePath . '/includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
+$savedCardManagerFile = $basePath . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SavedCreditCardsManager.php';
+$subscriptionManagerFile = $basePath . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 
 if (file_exists($savedCardManagerFile) && file_exists($subscriptionManagerFile)) {
     $savedCardContent = file_get_contents($savedCardManagerFile);

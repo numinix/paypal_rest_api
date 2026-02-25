@@ -43,7 +43,7 @@ function mockBuildCardsAccepted(): string
         foreach ($accepted_types as $type) {
             $type = strtolower(trim($type));
             if (isset($cardImageMap[$type])) {
-                $imagePath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/images/' . $cardImageMap[$type];
+                $imagePath = DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/images/' . $cardImageMap[$type];
                 $cards_accepted .= zen_image($imagePath, $type) . '&nbsp;';
             }
         }

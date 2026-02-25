@@ -4,7 +4,7 @@ ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'
 chdir(DIR_FS_CATALOG);
 require_once 'includes/application_top.php';
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
-\PayPalRestful\Common\LegacySubscriptionMigrator::syncLegacySubscriptions();
+\PayPalAdvancedCheckout\Common\LegacySubscriptionMigrator::syncLegacySubscriptions();
 require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
 
 // Load checkout-process language definitions using the active language

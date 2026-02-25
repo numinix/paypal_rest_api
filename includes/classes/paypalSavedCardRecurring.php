@@ -3,10 +3,10 @@
 // Storefront bootstrap/autoload handles these and duplicate includes can trigger
 // class redeclaration fatals (e.g., includes/classes/order.php on checkout pages).
 class paypalSavedCardRecurring {
-var $PayPal, $PayPalRestful, $paypalsavedcard, $paymentModuleCode;
+var $PayPal, $PayPalAdvancedCheckout, $paypalsavedcard, $paymentModuleCode;
 function __construct($paypalsavedcard = null) {
 $this->PayPal = null;
-$this->PayPalRestful = null;
+$this->PayPalAdvancedCheckout = null;
 $this->paymentModuleCode = 'paypalsavedcard';
 if ($paypalsavedcard == NULL) {
 $legacyModulePath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalsavedcard.php';
@@ -39,21 +39,21 @@ return $this->PayPal;
                return $this->PayPal;
        }
        function get_paypal_rest_client() {
-               if ($this->PayPalRestful) {
-                       return $this->PayPalRestful;
+               if ($this->PayPalAdvancedCheckout) {
+                       return $this->PayPalAdvancedCheckout;
                }
 if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'initiate_paypalac')) {
 $client = $this->paypalsavedcard->initiate_paypalac();
 if ($client) {
-$this->PayPalRestful = isset($this->paypalsavedcard->PayPalRestful) ? $this->paypalsavedcard->PayPalRestful : $client;
-return $this->PayPalRestful;
+$this->PayPalAdvancedCheckout = isset($this->paypalsavedcard->PayPalAdvancedCheckout) ? $this->paypalsavedcard->PayPalAdvancedCheckout : $client;
+return $this->PayPalAdvancedCheckout;
 }
 }
                $autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
-               if (!class_exists('PayPalRestful\\Api\\PayPalRestfulApi') && file_exists($autoload)) {
+               if (!class_exists('PayPalAdvancedCheckout\\Api\\PayPalAdvancedCheckoutApi') && file_exists($autoload)) {
                        require_once ($autoload);
                }
-               if (class_exists('PayPalRestful\\Api\\PayPalRestfulApi')) {
+               if (class_exists('PayPalAdvancedCheckout\\Api\\PayPalAdvancedCheckoutApi')) {
                        // Determine environment from MODULE_PAYMENT_PAYPALAC_SERVER
                        $environment = 'sandbox'; // Default to sandbox
                        if (defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
@@ -70,8 +70,8 @@ return $this->PayPalRestful;
                        }
                        
                        try {
-                               $this->PayPalRestful = new PayPalRestful\Api\PayPalRestfulApi($environment, $clientId, $clientSecret);
-                               return $this->PayPalRestful;
+                               $this->PayPalAdvancedCheckout = new PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi($environment, $clientId, $clientSecret);
+                               return $this->PayPalAdvancedCheckout;
                        }
                        catch (Exception $e) {
                                $this->notify_error('Unable to initialize PayPal REST API', 'The PayPal REST API client failed to initialize. Message: ' . $e->getMessage(), 'warning');
@@ -231,13 +231,13 @@ return $this->PayPalRestful;
               return $columns[$column];
       }
 protected function ensure_vault_manager_loaded() {
-if (!class_exists('PayPalRestful\\Common\\VaultManager')) {
+if (!class_exists('PayPalAdvancedCheckout\\Common\\VaultManager')) {
 $autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 if (file_exists($autoload)) {
 require_once ($autoload);
 }
 }
-return class_exists('PayPalRestful\\Common\\VaultManager');
+return class_exists('PayPalAdvancedCheckout\\Common\\VaultManager');
 }
 public function get_saved_card_details($saved_card_id, $customer_id = null) {
 if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'get_card_details')) {
@@ -465,7 +465,7 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                if (!$this->ensure_vault_manager_loaded()) {
                        return array();
                }
-               $cards = PayPalRestful\Common\VaultManager::getCustomerVaultedCards($customers_id, false);
+               $cards = PayPalAdvancedCheckout\Common\VaultManager::getCustomerVaultedCards($customers_id, false);
                foreach ($cards as $card) {
                        if (isset($card['vault_id']) && $card['vault_id'] === $vaultId) {
                                return $card;

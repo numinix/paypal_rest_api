@@ -85,7 +85,7 @@ namespace {
     $storeCard = $allowSaveCard && !empty($_POST[$postvar_prefix . '_cc_save_card']);
 
     if ($storeCard === true) {
-        $_SESSION['PayPalRestful']['save_card'] = true;
+        $_SESSION['PayPalAdvancedCheckout']['save_card'] = true;
         echo "  ✓ Session variable set correctly for pre-confirmation flow\n";
     } else {
         fwrite(STDERR, "  ✗ FAILED: Session variable not set for pre-confirmation flow\n");
@@ -115,7 +115,7 @@ namespace {
     $storeCard = $allowSaveCard && !empty($_POST[$postvar_prefix . '_cc_save_card']);
 
     if ($storeCard === true) {
-        $_SESSION['PayPalRestful']['save_card'] = true;
+        $_SESSION['PayPalAdvancedCheckout']['save_card'] = true;
         echo "  ✓ Session variable set correctly for confirmation flow\n";
     } else {
         fwrite(STDERR, "  ✗ FAILED: Session variable not set for confirmation flow\n");
@@ -127,10 +127,10 @@ namespace {
     
     // Simulate after validation - POST might be different or cleared
     $_POST = [];  // POST cleared or changed
-    $_SESSION['PayPalRestful']['save_card'] = true;  // But session has the value
+    $_SESSION['PayPalAdvancedCheckout']['save_card'] = true;  // But session has the value
 
     // This is what storeVaultCardDataInSession and storeVaultCardData do
-    $visible = !empty($_SESSION['PayPalRestful']['save_card']);
+    $visible = !empty($_SESSION['PayPalAdvancedCheckout']['save_card']);
 
     if ($visible === true) {
         echo "  ✓ Visibility correctly determined from session (not POST)\n";
@@ -146,7 +146,7 @@ namespace {
     ];
     // Session should not have save_card if checkbox wasn't checked
 
-    $visible = !empty($_SESSION['PayPalRestful']['save_card']);
+    $visible = !empty($_SESSION['PayPalAdvancedCheckout']['save_card']);
 
     if ($visible === false) {
         echo "  ✓ Visibility correctly false when checkbox not checked\n";

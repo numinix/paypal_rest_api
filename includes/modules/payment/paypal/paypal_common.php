@@ -10,10 +10,10 @@
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
 
-use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Common\Helpers;
-use PayPalRestful\Common\Logger;
-use PayPalRestful\Common\VaultManager;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Common\Helpers;
+use PayPalAdvancedCheckout\Common\Logger;
+use PayPalAdvancedCheckout\Common\VaultManager;
 
 class PayPalCommon {
     /**
@@ -55,14 +55,14 @@ class PayPalCommon {
         }
 
         $_POST['ppac_type'] = $walletType;
-        $_SESSION['PayPalRestful']['ppac_type'] = $walletType;
+        $_SESSION['PayPalAdvancedCheckout']['ppac_type'] = $walletType;
 
         $payloadRaw = $_POST[$payloadFieldName] ?? '';
         $payload = null;
         $payloadOrderId = null;
 
         if (trim($payloadRaw) === '') {
-            $payload = $_SESSION['PayPalRestful']['WalletPayload'][$walletType] ?? null;
+            $payload = $_SESSION['PayPalAdvancedCheckout']['WalletPayload'][$walletType] ?? null;
 
             if (is_array($payload)) {
                 $this->paymentModule->log->write("Using cached {$walletType} payload from session", true, 'after');
@@ -89,7 +89,7 @@ class PayPalCommon {
         }
 
         $payload = $this->normalizeWalletPayload($walletType, $payload, $errorMessages);
-        $_SESSION['PayPalRestful']['WalletPayload'][$walletType] = $payload;
+        $_SESSION['PayPalAdvancedCheckout']['WalletPayload'][$walletType] = $payload;
 
         // -----------------------------------------------------------------
         // Wallet confirmation flow:
@@ -104,11 +104,11 @@ class PayPalCommon {
             // After client-side confirmOrder(), the payload contains: {orderID, confirmed: true, wallet}
             if (isset($payload['confirmed']) && $payload['confirmed'] === true && isset($payload['orderID'])) {
                 // Save the orderID from the client-side confirmed payload
-                if (!isset($_SESSION['PayPalRestful']['Order'])) {
-                    $_SESSION['PayPalRestful']['Order'] = [];
+                if (!isset($_SESSION['PayPalAdvancedCheckout']['Order'])) {
+                    $_SESSION['PayPalAdvancedCheckout']['Order'] = [];
                 }
 
-                $_SESSION['PayPalRestful']['Order']['id'] = $payload['orderID'];
+                $_SESSION['PayPalAdvancedCheckout']['Order']['id'] = $payload['orderID'];
 
                 // Refresh the order status now that the client-side confirmation is complete
                 $order_status = $this->paymentModule->ppr->getOrderStatus($payload['orderID']);
@@ -119,8 +119,8 @@ class PayPalCommon {
 
                 $status = $order_status['status'] ?? '';
                 if ($status !== '') {
-                    $_SESSION['PayPalRestful']['Order']['status'] = $status;
-                    $_SESSION['PayPalRestful']['Order']['current'] = $order_status;
+                    $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $status;
+                    $_SESSION['PayPalAdvancedCheckout']['Order']['current'] = $order_status;
 
                     $this->paymentModule->log->write(
                         ucfirst(str_replace('_', ' ', $walletType)) . ": Retrieved order status after client-side confirmation: $status",
@@ -135,8 +135,8 @@ class PayPalCommon {
                     'after'
                 );
             
-                $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
-                $_SESSION['PayPalRestful']['Order']['payment_source'] = $walletType;
+                $_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed'] = true;
+                $_SESSION['PayPalAdvancedCheckout']['Order']['payment_source'] = $walletType;
 
                 $this->paymentModule->log->write(
                     "pre_confirmation_check ($walletType) skipped server confirmPaymentSource; confirmed client-side.",
@@ -150,10 +150,10 @@ class PayPalCommon {
 
         // Venmo: Create order on server, then confirm using server-side confirmPaymentSource
         // (This path is also a fallback for any future wallet types that don't use client-side confirmation)
-        $orderIdToConfirm = $_SESSION['PayPalRestful']['Order']['id'] ?? null;
+        $orderIdToConfirm = $_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? null;
 
         if ($orderIdToConfirm === null && $payloadOrderId !== null) {
-            $_SESSION['PayPalRestful']['Order']['id'] = $payloadOrderId;
+            $_SESSION['PayPalAdvancedCheckout']['Order']['id'] = $payloadOrderId;
             $orderIdToConfirm = $payloadOrderId;
             $this->paymentModule->log->write(
                 "Wallet confirmation ($walletType): Using payload orderID {$payloadOrderId} for confirmPaymentSource.",
@@ -183,7 +183,7 @@ class PayPalCommon {
                 );
             }
 
-            $orderIdToConfirm = $_SESSION['PayPalRestful']['Order']['id'] ?? null;
+            $orderIdToConfirm = $_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? null;
         }
 
         $confirm_response = $this->paymentModule->ppr->confirmPaymentSource(
@@ -207,7 +207,7 @@ class PayPalCommon {
                 );
 
                 $confirm_response = $this->paymentModule->ppr->confirmPaymentSource(
-                    $_SESSION['PayPalRestful']['Order']['id'],
+                    $_SESSION['PayPalAdvancedCheckout']['Order']['id'],
                     [$walletType => $payload]
                 );
             }
@@ -219,23 +219,23 @@ class PayPalCommon {
         }
 
         $response_status = $confirm_response['status'] ?? '';
-        if ($response_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED) {
+        if ($response_status === PayPalAdvancedCheckoutApi::STATUS_PAYER_ACTION_REQUIRED) {
             $this->paymentModule->log->write("pre_confirmation_check ($walletType) unexpected payer action requirement." . Logger::logJSON($confirm_response), true, 'after');
             $this->paymentModule->setMessageAndRedirect($errorMessages['payer_action'], FILENAME_CHECKOUT_PAYMENT);
         }
 
         $walletSuccessStatuses = [
-            PayPalRestfulApi::STATUS_APPROVED,
-            PayPalRestfulApi::STATUS_COMPLETED,
-            PayPalRestfulApi::STATUS_CAPTURED,
+            PayPalAdvancedCheckoutApi::STATUS_APPROVED,
+            PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
+            PayPalAdvancedCheckoutApi::STATUS_CAPTURED,
         ];
 
         if ($response_status !== '' && in_array($response_status, $walletSuccessStatuses, true)) {
-            $_SESSION['PayPalRestful']['Order']['status'] = $response_status;
+            $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $response_status;
         }
 
-        $_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed'] = true;
-        $_SESSION['PayPalRestful']['Order']['payment_source'] = $walletType;
+        $_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed'] = true;
+        $_SESSION['PayPalAdvancedCheckout']['Order']['payment_source'] = $walletType;
 
         $this->paymentModule->log->write("pre_confirmation_check ($walletType) completed successfully.", true, 'after');
     }
@@ -595,7 +595,7 @@ class PayPalCommon {
             $zco_notifier->notify('NOTIFY_PAYPALAC_FUNDS_CAPTURED', $sql_data_array);
         }
         
-        $orderInfo['admin_alert_needed'] = ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED);
+        $orderInfo['admin_alert_needed'] = ($payment['status'] !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED);
     }
 
     /**
@@ -765,16 +765,16 @@ class PayPalCommon {
      * Common captureOrAuthorizePayment method for wallet modules
      * Determines whether to capture or authorize based on transaction mode
      *
-     * @param PayPalRestfulApi $ppr PayPal REST API instance
+     * @param PayPalAdvancedCheckoutApi $ppr PayPal REST API instance
      * @param Logger $log Logger instance
      * @param string $payment_source Payment source name (e.g., 'google_pay')
      * @param string $transaction_mode Transaction mode (Final Sale, Auth Only, etc.)
      * @param string $ppac_type Payment type (e.g., 'apple_pay', 'google_pay', 'venmo')
      * @return array|false
      */
-    public function captureWalletPayment(PayPalRestfulApi $ppr, Logger $log, string $payment_source, string $transaction_mode, string $ppac_type)
+    public function captureWalletPayment(PayPalAdvancedCheckoutApi $ppr, Logger $log, string $payment_source, string $transaction_mode, string $ppac_type)
     {
-        $paypal_order_id = $_SESSION['PayPalRestful']['Order']['id'];
+        $paypal_order_id = $_SESSION['PayPalAdvancedCheckout']['Order']['id'];
         
         // Determine if we should capture or authorize based on transaction mode
         // For wallets, "Auth Only (Card-Only)" should still use capture since wallet != card
@@ -787,7 +787,7 @@ class PayPalCommon {
             $response = $ppr->captureOrder($paypal_order_id);
             if ($response === false) {
                 $log->write($payment_source . ': capture failed. ' . Logger::logJSON($ppr->getErrorInfo()));
-                unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+                unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
                 return false;
             }
             $log->write("$payment_source: CAPTURE successful. Status: " . ($response['status'] ?? 'unknown'));
@@ -795,7 +795,7 @@ class PayPalCommon {
             $response = $ppr->authorizeOrder($paypal_order_id);
             if ($response === false) {
                 $log->write($payment_source . ': authorization failed. ' . Logger::logJSON($ppr->getErrorInfo()));
-                unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+                unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
                 return false;
             }
             $log->write("$payment_source: AUTHORIZATION successful. Status: " . ($response['status'] ?? 'unknown'));
@@ -818,7 +818,7 @@ class PayPalCommon {
             return;
         }
 
-        $_SESSION['PayPalRestful']['CompletedOrders'] = ($_SESSION['PayPalRestful']['CompletedOrders'] ?? 0) + 1;
+        $_SESSION['PayPalAdvancedCheckout']['CompletedOrders'] = ($_SESSION['PayPalAdvancedCheckout']['CompletedOrders'] ?? 0) + 1;
 
         $orders_id = (int)($orderInfo['orders_id'] ?? 0);
         $paypal_records_exist = ($orders_id > 0) ? $this->paypalOrderRecordsExist($orders_id) : false;
@@ -843,8 +843,8 @@ class PayPalCommon {
      */
     public function resetOrder()
     {
-        unset($_SESSION['PayPalRestful']['Order']);
-        $_SESSION['PayPalRestful']['ppac_type'] = '';
+        unset($_SESSION['PayPalAdvancedCheckout']['Order']);
+        $_SESSION['PayPalAdvancedCheckout']['ppac_type'] = '';
         unset($_SESSION['ppcheckout']);
     }
 
@@ -862,7 +862,7 @@ class PayPalCommon {
      */
     public function createOrderGuid($order, string $ppac_type): string
     {
-        $orders_completed = $_SESSION['PayPalRestful']['CompletedOrders'] ?? 0;
+        $orders_completed = $_SESSION['PayPalAdvancedCheckout']['CompletedOrders'] ?? 0;
 
         $cart_data = '';
         foreach ($order->products as $product) {
@@ -884,7 +884,7 @@ class PayPalCommon {
         }
 
         if (in_array($ppac_type, ['apple_pay', 'google_pay', 'venmo'], true)) {
-            $wallet_payload = $_SESSION['PayPalRestful']['WalletPayload'][$ppac_type] ?? null;
+            $wallet_payload = $_SESSION['PayPalAdvancedCheckout']['WalletPayload'][$ppac_type] ?? null;
             if (is_array($wallet_payload) && !empty($wallet_payload)) {
                 $hash_data .= json_encode($wallet_payload);
             }
@@ -1054,21 +1054,21 @@ class PayPalCommon {
     /**
      * Process credit card payment (capture or authorize)
      * 
-     * @param PayPalRestfulApi $ppr PayPal API instance
+     * @param PayPalAdvancedCheckoutApi $ppr PayPal API instance
      * @param Logger $log Logger instance
      * @param string $transaction_mode Transaction mode (Final Sale, Auth Only, etc.)
      * @param string $ppac_type Payment type (card, paypal, etc.)
      * @return array|false Response array or false on failure
      */
-    public function processCreditCardPayment(PayPalRestfulApi $ppr, Logger $log, string $transaction_mode, string $ppac_type)
+    public function processCreditCardPayment(PayPalAdvancedCheckoutApi $ppr, Logger $log, string $transaction_mode, string $ppac_type)
     {
-        $paypal_order_id = $_SESSION['PayPalRestful']['Order']['id'] ?? '';
+        $paypal_order_id = $_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '';
 
         $log->write(
             "processCreditCardPayment($ppac_type) starting.\n" .
             "  PayPal Order ID: " . ($paypal_order_id ?: 'NOT SET') . "\n" .
             "  Transaction Mode: $transaction_mode\n" .
-            "  Session payment source: " . ($_SESSION['PayPalRestful']['Order']['payment_source'] ?? 'not set')
+            "  Session payment source: " . ($_SESSION['PayPalAdvancedCheckout']['Order']['payment_source'] ?? 'not set')
         );
 
         if (empty($paypal_order_id)) {
@@ -1076,10 +1076,10 @@ class PayPalCommon {
             return false;
         }
 
-        $order_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
+        $order_status = $_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? '';
         // Check for captures and authorizations in the correct location - they're stored in the 'current' subkey
-        $captures = $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['captures'] ?? [];
-        $authorizations = $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['authorizations'] ?? [];
+        $captures = $_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['payments']['captures'] ?? [];
+        $authorizations = $_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['payments']['authorizations'] ?? [];
 
         $log->write(
             "processCreditCardPayment: Order status check.\n" .
@@ -1092,7 +1092,7 @@ class PayPalCommon {
         // skip the duplicate capture/authorize call and fetch the order details instead.
         // This can happen with vault-enabled credit cards where PayPal completes the
         // authorization during createOrder.
-        if ($order_status === PayPalRestfulApi::STATUS_COMPLETED && ($captures !== [] || $authorizations !== [])) {
+        if ($order_status === PayPalAdvancedCheckoutApi::STATUS_COMPLETED && ($captures !== [] || $authorizations !== [])) {
             $skip_reason = ($captures !== []) ? 'already captured' : 'already authorized';
             $log->write("processCreditCardPayment: Capture/authorize skipped; order was $skip_reason during createOrder.");
             // Fetch the full order details from PayPal since we need the complete response structure
@@ -1156,8 +1156,8 @@ class PayPalCommon {
      */
     public function createPayPalOrder($paymentModule, $order, array $order_info, string $ppac_type, $currencies): bool
     {
-        /** @var zcObserverPaypalrestful $zcObserverPaypalrestful */
-        global $zcObserverPaypalrestful;
+        /** @var zcObserverPaypaladvcheckout $zcObserverPaypaladvcheckout */
+        global $zcObserverPaypaladvcheckout;
 
         $log = new Logger();
 
@@ -1165,7 +1165,7 @@ class PayPalCommon {
         $order_guid = $this->createOrderGuid($order, $ppac_type);
 
         // If a PayPal order already exists in the session for this GUID, reuse it.
-        if (isset($_SESSION['PayPalRestful']['Order']['guid']) && $_SESSION['PayPalRestful']['Order']['guid'] === $order_guid) {
+        if (isset($_SESSION['PayPalAdvancedCheckout']['Order']['guid']) && $_SESSION['PayPalAdvancedCheckout']['Order']['guid'] === $order_guid) {
             $log->write("createPayPalOrder($ppac_type): Reusing existing PayPal order with GUID: $order_guid");
             return true;
         }
@@ -1201,11 +1201,11 @@ class PayPalCommon {
             "  CC Info: " . Logger::logJSON($cc_info_debug)
         );
 
-        $order_total_differences = (isset($zcObserverPaypalrestful) && is_object($zcObserverPaypalrestful))
-            ? $zcObserverPaypalrestful->getOrderTotalChanges()
+        $order_total_differences = (isset($zcObserverPaypaladvcheckout) && is_object($zcObserverPaypaladvcheckout))
+            ? $zcObserverPaypaladvcheckout->getOrderTotalChanges()
             : [];
 
-        $create_order_request = new \PayPalRestful\Zc2Pp\CreatePayPalOrderRequest(
+        $create_order_request = new \PayPalAdvancedCheckout\Zc2Pp\CreatePayPalOrderRequest(
             $ppac_type,
             $order,
             $cc_info,
@@ -1276,7 +1276,7 @@ class PayPalCommon {
             $paypal_order['purchase_units'][0]['payee']
         );
 
-        $_SESSION['PayPalRestful']['Order'] = [
+        $_SESSION['PayPalAdvancedCheckout']['Order'] = [
             'current' => $paypal_order,
             'id' => $paypal_id,
             'status' => $status,
@@ -1304,7 +1304,7 @@ class PayPalCommon {
             return false;
         }
 
-        $do_refund = new \PayPalRestful\Admin\DoRefund($oID, $ppr, $module_code, $module_version);
+        $do_refund = new \PayPalAdvancedCheckout\Admin\DoRefund($oID, $ppr, $module_code, $module_version);
         return true;
     }
 
@@ -1331,7 +1331,7 @@ class PayPalCommon {
             return false;
         }
 
-        $do_auth = new \PayPalRestful\Admin\DoAuthorization($oID, $ppr, $module_code, $module_version);
+        $do_auth = new \PayPalAdvancedCheckout\Admin\DoAuthorization($oID, $ppr, $module_code, $module_version);
         return true;
     }
 
@@ -1354,7 +1354,7 @@ class PayPalCommon {
             return false;
         }
 
-        $do_capture = new \PayPalRestful\Admin\DoCapture($oID, $ppr, $module_code, $module_version);
+        $do_capture = new \PayPalAdvancedCheckout\Admin\DoCapture($oID, $ppr, $module_code, $module_version);
         return true;
     }
 
@@ -1374,7 +1374,7 @@ class PayPalCommon {
             return false;
         }
 
-        $do_void = new \PayPalRestful\Admin\DoVoid($oID, $ppr, $module_code, $module_version);
+        $do_void = new \PayPalAdvancedCheckout\Admin\DoVoid($oID, $ppr, $module_code, $module_version);
         return true;
     }
 }

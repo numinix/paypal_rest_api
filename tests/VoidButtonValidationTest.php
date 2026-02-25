@@ -41,7 +41,7 @@ namespace {
     {
         $passed = true;
 
-        $mainDisplayFile = DIR_FS_CATALOG . DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalRestful/Admin/Formatters/MainDisplay.php';
+        $mainDisplayFile = DIR_FS_CATALOG . DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalAdvancedCheckout/Admin/Formatters/MainDisplay.php';
         $content = file_get_contents($mainDisplayFile);
 
         // Check 1: Verify the JavaScript includes checkValidity() before disabling
@@ -78,7 +78,7 @@ namespace {
     {
         $passed = true;
 
-        $mainDisplayFile = DIR_FS_CATALOG . DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalRestful/Admin/Formatters/MainDisplay.php';
+        $mainDisplayFile = DIR_FS_CATALOG . DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalAdvancedCheckout/Admin/Formatters/MainDisplay.php';
         $content = file_get_contents($mainDisplayFile);
 
         // Check: Verify the void input has required attribute and pattern
@@ -99,7 +99,7 @@ namespace {
     {
         $passed = true;
 
-        $mainDisplayFile = DIR_FS_CATALOG . DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalRestful/Admin/Formatters/MainDisplay.php';
+        $mainDisplayFile = DIR_FS_CATALOG . DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalAdvancedCheckout/Admin/Formatters/MainDisplay.php';
         $content = file_get_contents($mainDisplayFile);
 
         // Check 1: Verify addEventListener is used for click
@@ -136,7 +136,7 @@ namespace {
     {
         $passed = true;
 
-        $mainDisplayFile = DIR_FS_CATALOG . DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalRestful/Admin/Formatters/MainDisplay.php';
+        $mainDisplayFile = DIR_FS_CATALOG . DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalAdvancedCheckout/Admin/Formatters/MainDisplay.php';
         $content = file_get_contents($mainDisplayFile);
 
         // Check 1: Verify show.bs.modal event is used

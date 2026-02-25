@@ -31,7 +31,7 @@ class ApplePayConfirmOrderResponseHandlingTest
     public function __construct()
     {
         // Use __DIR__ to make path relative to test file location
-        $this->jsFile = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js';
+        $this->jsFile = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js';
         
         if (!file_exists($this->jsFile)) {
             throw new RuntimeException("JavaScript file not found: {$this->jsFile}");

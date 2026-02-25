@@ -8,10 +8,10 @@
  * incremental version updates.
  */
 
-$autoloaderPath = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
+$autoloaderPath = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageAutoloader.php';
 if (is_file($autoloaderPath)) {
     require_once $autoloaderPath;
-    \PayPalRestful\Compatibility\LanguageAutoloader::register();
+    \PayPalAdvancedCheckout\Compatibility\LanguageAutoloader::register();
 }
 
 require 'includes/application_top.php';
@@ -130,7 +130,7 @@ function paypalac_upgrade_render_page(): void
     <html <?php echo defined('HTML_PARAMS') ? HTML_PARAMS : 'lang="en"'; ?>>
     <head>
         <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
-        <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
+        <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
     </head>
     <body>
     <?php require DIR_WS_INCLUDES . 'header.php'; ?>

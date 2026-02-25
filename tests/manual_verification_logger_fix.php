@@ -18,9 +18,9 @@ if (!defined('IS_ADMIN_FLAG')) {
     define('IS_ADMIN_FLAG', false);
 }
 
-require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Logger.php';
+require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
 
-use PayPalRestful\Common\Logger;
+use PayPalAdvancedCheckout\Common\Logger;
 
 echo "=================================================================\n";
 echo "Logger::logJSON() Fix Verification\n";

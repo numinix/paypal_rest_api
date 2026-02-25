@@ -13,22 +13,22 @@
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_common.php');
 
-use PayPalRestful\Admin\AdminMain;
-use PayPalRestful\Admin\DoAuthorization;
-use PayPalRestful\Admin\DoCapture;
-use PayPalRestful\Admin\DoRefund;
-use PayPalRestful\Admin\DoVoid;
-use PayPalRestful\Admin\GetPayPalOrderTransactions;
-use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Api\Data\CountryCodes;
-use PayPalRestful\Common\ErrorInfo;
-use PayPalRestful\Common\Helpers;
-use PayPalRestful\Common\Logger;
-use PayPalRestful\Common\VaultManager;
-use PayPalRestful\Compatibility\Language as LanguageCompatibility;
-use PayPalRestful\Zc2Pp\Amount;
-use PayPalRestful\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
-use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
+use PayPalAdvancedCheckout\Admin\AdminMain;
+use PayPalAdvancedCheckout\Admin\DoAuthorization;
+use PayPalAdvancedCheckout\Admin\DoCapture;
+use PayPalAdvancedCheckout\Admin\DoRefund;
+use PayPalAdvancedCheckout\Admin\DoVoid;
+use PayPalAdvancedCheckout\Admin\GetPayPalOrderTransactions;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Api\Data\CountryCodes;
+use PayPalAdvancedCheckout\Common\ErrorInfo;
+use PayPalAdvancedCheckout\Common\Helpers;
+use PayPalAdvancedCheckout\Common\Logger;
+use PayPalAdvancedCheckout\Common\VaultManager;
+use PayPalAdvancedCheckout\Compatibility\Language as LanguageCompatibility;
+use PayPalAdvancedCheckout\Zc2Pp\Amount;
+use PayPalAdvancedCheckout\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
+use PayPalAdvancedCheckout\Zc2Pp\CreatePayPalOrderRequest;
 
 LanguageCompatibility::load('paypalac_paylater');
 
@@ -54,9 +54,9 @@ class paypalac_paylater extends base
 
     protected const CURRENT_VERSION = '1.0.0';
     protected const WALLET_SUCCESS_STATUSES = [
-        PayPalRestfulApi::STATUS_APPROVED,
-        PayPalRestfulApi::STATUS_COMPLETED,
-        PayPalRestfulApi::STATUS_CAPTURED,
+        PayPalAdvancedCheckoutApi::STATUS_APPROVED,
+        PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
+        PayPalAdvancedCheckoutApi::STATUS_CAPTURED,
     ];
 
     // Pay Later is available in these currencies only
@@ -74,7 +74,7 @@ class paypalac_paylater extends base
     public bool $cardsAccepted = false;
     public bool $collectsCardDataOnsite = false;
 
-    public PayPalRestfulApi $ppr;
+    public PayPalAdvancedCheckoutApi $ppr;
     protected ErrorInfo $errorInfo;
     public Logger $log;
     public bool $emailAlerts = false;
@@ -83,7 +83,7 @@ class paypalac_paylater extends base
     protected bool $paymentIsPending = false;
     public array $orderCustomerCache = [];
     protected bool $onOpcConfirmationPage = false;
-    protected array $paypalRestfulSessionOnEntry = [];
+    protected array $paypalAdvCheckoutSessionOnEntry = [];
 
     public function getErrorInfo(): ErrorInfo
     {
@@ -165,8 +165,8 @@ class paypalac_paylater extends base
             }
             $this->tableCheckup();
         } elseif ($this->enabled === true) {
-            global $zcObserverPaypalrestful;
-            if (!isset($zcObserverPaypalrestful)) {
+            global $zcObserverPaypaladvcheckout;
+            if (!isset($zcObserverPaypaladvcheckout)) {
                 $this->enabled = false;
 
                 if (in_array($loaderPrefix ?? '', ['paypal_ipn', 'webhook'], true)) {
@@ -204,7 +204,7 @@ class paypalac_paylater extends base
         global $current_page_base;
         if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
             $this->onOpcConfirmationPage = true;
-            $this->paypalRestfulSessionOnEntry = $_SESSION['PayPalRestful'] ?? [];
+            $this->paypalAdvCheckoutSessionOnEntry = $_SESSION['PayPalAdvancedCheckout'] ?? [];
             $this->attach($this, ['NOTIFY_OPC_OBSERVER_SESSION_FIXUPS']);
         }
 
@@ -223,10 +223,10 @@ class paypalac_paylater extends base
 
     public function updateNotifyOpcObserverSessionFixups(&$class, $eventID, $empty_string, &$session_data)
     {
-        if ($this->onOpcConfirmationPage === false || empty($this->paypalRestfulSessionOnEntry)) {
+        if ($this->onOpcConfirmationPage === false || empty($this->paypalAdvCheckoutSessionOnEntry)) {
             return;
         }
-        $session_data['PayPalRestful'] = $this->paypalRestfulSessionOnEntry;
+        $session_data['PayPalAdvancedCheckout'] = $this->paypalAdvCheckoutSessionOnEntry;
     }
 
     protected function alertMsg(string $msg): string
@@ -288,7 +288,7 @@ class paypalac_paylater extends base
             return false;
         }
 
-        $this->ppr = $this->getPayPalRestfulApi();
+        $this->ppr = $this->getPayPalAdvancedCheckoutApi();
         if ($this->ppr === null) {
             return false;
         }
@@ -296,12 +296,12 @@ class paypalac_paylater extends base
         return true;
     }
 
-    protected function getPayPalRestfulApi(): ?PayPalRestfulApi
+    protected function getPayPalAdvancedCheckoutApi(): ?PayPalAdvancedCheckoutApi
     {
         $client_id = (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : MODULE_PAYMENT_PAYPALAC_CLIENTID_S;
         $secret = (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') ? MODULE_PAYMENT_PAYPALAC_SECRET_L : MODULE_PAYMENT_PAYPALAC_SECRET_S;
 
-        // Trim credentials to match PayPalRestfulApi::getConfiguredCredentials behavior
+        // Trim credentials to match PayPalAdvancedCheckoutApi::getConfiguredCredentials behavior
         $client_id = trim($client_id);
         $secret = trim($secret);
 
@@ -311,14 +311,14 @@ class paypalac_paylater extends base
         }
 
         try {
-            $ppr = new PayPalRestfulApi(
+            $ppr = new PayPalAdvancedCheckoutApi(
                 MODULE_PAYMENT_PAYPALAC_SERVER,
                 $client_id,
                 $secret
             );
             return $ppr;
         } catch (\Exception $e) {
-            $this->log->write('Pay Later: Error creating PayPalRestfulApi: ' . $e->getMessage());
+            $this->log->write('Pay Later: Error creating PayPalAdvancedCheckoutApi: ' . $e->getMessage());
             $this->setConfigurationDisabled($e->getMessage());
             return null;
         }
@@ -462,15 +462,15 @@ class paypalac_paylater extends base
         $css = '';
         if (!defined('MODULE_PAYMENT_PAYPALAC_WALLET_ASSETS_LOADED')) {
             define('MODULE_PAYMENT_PAYPALAC_WALLET_ASSETS_LOADED', true);
-            $css = '<style>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalac.css') . '</style>';
+            $css = '<style>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/paypalac.css') . '</style>';
         }
 
-        return $css . '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/' . $scriptFilename) . '</script>';
+        return $css . '<script>' . file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/' . $scriptFilename) . '</script>';
     }
 
     public function selection(): array
     {
-        unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
+        unset($_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed']);
 
         $buttonContainer = '<div id="paypalac-paylater-button" class="paypalac-paylater-button"></div>';
         $hiddenFields =
@@ -584,9 +584,9 @@ class paypalac_paylater extends base
 
     protected function getOrderTotalsInfo(bool $redirectOnError = true): array
     {
-        global $zcObserverPaypalrestful;
+        global $zcObserverPaypaladvcheckout;
 
-        if (!isset($zcObserverPaypalrestful) || !is_object($zcObserverPaypalrestful)) {
+        if (!isset($zcObserverPaypaladvcheckout) || !is_object($zcObserverPaypaladvcheckout)) {
             $message = MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER ?? 'Observer missing';
 
             if ($redirectOnError) {
@@ -598,7 +598,7 @@ class paypalac_paylater extends base
             return [];
         }
 
-        $order_info = $zcObserverPaypalrestful->getLastOrderValues();
+        $order_info = $zcObserverPaypaladvcheckout->getLastOrderValues();
 
         if (count($order_info) === 0) {
             $message = 'Missing order_total modifications; getLastOrderValues returned empty array.';
@@ -611,7 +611,7 @@ class paypalac_paylater extends base
             return [];
         }
 
-        $order_info['free_shipping_coupon'] = $zcObserverPaypalrestful->orderHasFreeShippingCoupon();
+        $order_info['free_shipping_coupon'] = $zcObserverPaypaladvcheckout->orderHasFreeShippingCoupon();
 
         return $order_info;
     }
@@ -638,7 +638,7 @@ class paypalac_paylater extends base
             return ['success' => false];
         }
 
-        $orderData = $_SESSION['PayPalRestful']['Order'] ?? [];
+        $orderData = $_SESSION['PayPalAdvancedCheckout']['Order'] ?? [];
         $current = $orderData['current']['purchase_units'][0]['amount'] ?? [];
 
         return [
@@ -686,7 +686,7 @@ class paypalac_paylater extends base
 
     public function clear_payments()
     {
-        unset($_SESSION['PayPalRestful']);
+        unset($_SESSION['PayPalAdvancedCheckout']);
     }
 
     public function before_process()
@@ -704,19 +704,19 @@ class paypalac_paylater extends base
 
         $this->paymentIsPending = false;
 
-        $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
-        $wallet_user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';
-        $payer_action_fast_path = ($wallet_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
+        $wallet_status = $_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? '';
+        $wallet_user_action = $_SESSION['PayPalAdvancedCheckout']['Order']['user_action'] ?? '';
+        $payer_action_fast_path = ($wallet_status === PayPalAdvancedCheckoutApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
         
         if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false) {
-            $this->log->write('Pay Later::before_process, cannot capture/authorize; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));
-            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+            $this->log->write('Pay Later::before_process, cannot capture/authorize; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalAdvancedCheckout']['Order'] ?? []));
+            unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
         }
         
         $response = $this->captureOrAuthorizePayment('paylater');
 
-        $_SESSION['PayPalRestful']['Order']['status'] = $response['status'];
+        $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $response['status'];
         unset($response['links']);
         $this->orderInfo = $response;
 
@@ -730,7 +730,7 @@ class paypalac_paylater extends base
 
         $txn_type = $this->orderInfo['intent'];
         $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
-        $payment_status = ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalRestfulApi::STATUS_CAPTURED : PayPalRestfulApi::STATUS_APPROVED);
+        $payment_status = ($payment['status'] !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalAdvancedCheckoutApi::STATUS_CAPTURED : PayPalAdvancedCheckoutApi::STATUS_APPROVED);
 
         $this->orderInfo['payment_status'] = $payment_status;
         $this->orderInfo['paypal_payment_status'] = $payment['status'];
@@ -746,7 +746,7 @@ class paypalac_paylater extends base
         // they have not been captured yet.
         //
         $this->orderInfo['admin_alert_needed'] = false;
-        if ($payment_status !== PayPalRestfulApi::STATUS_CAPTURED) {
+        if ($payment_status !== PayPalAdvancedCheckoutApi::STATUS_CAPTURED) {
             $this->order_status = (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID;
             $order->info['order_status'] = $this->order_status;
             $this->orderInfo['admin_alert_needed'] = true;
@@ -845,7 +845,7 @@ class paypalac_paylater extends base
     public function admin_notification($zf_order_id)
     {
         $zf_order_id = (int)$zf_order_id;
-        $ppr = $this->getPayPalRestfulApi();
+        $ppr = $this->getPayPalAdvancedCheckoutApi();
         if ($ppr === null) {
             return '';
         }
@@ -862,22 +862,22 @@ class paypalac_paylater extends base
 
     public function _doRefund($oID)
     {
-        return $this->paypalCommon->processRefund($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION);
+        return $this->paypalCommon->processRefund($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION);
     }
 
     public function _doAuth($oID, $order_amt, $currency = 'USD')
     {
-        return $this->paypalCommon->processAuthorization($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION, $order_amt, $currency, false);
+        return $this->paypalCommon->processAuthorization($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION, $order_amt, $currency, false);
     }
 
     public function _doCapt($oID, $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
     {
-        return $this->paypalCommon->processCapture($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION, $captureType, $order_amt, $order_currency);
+        return $this->paypalCommon->processCapture($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION, $captureType, $order_amt, $order_currency);
     }
 
     public function _doVoid($oID)
     {
-        return $this->paypalCommon->processVoid($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION);
+        return $this->paypalCommon->processVoid($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION);
     }
 
     public function check(): bool

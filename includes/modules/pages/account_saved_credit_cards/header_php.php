@@ -1,6 +1,6 @@
 <?php
-use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Common\VaultManager;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Common\VaultManager;
 
 if (!defined('FILENAME_ACCOUNT_SAVED_CREDIT_CARDS')) {
     define('FILENAME_ACCOUNT_SAVED_CREDIT_CARDS', 'account_saved_credit_cards');
@@ -667,7 +667,7 @@ if ($hide_saved_cards_page === false) {
                     if ($rawCard === null) {
                         $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
                     } else {
-                        $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALAC_SERVER);
+                        $api = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER);
                         $deleteResponse = $api->deleteVaultPaymentToken((string)$rawCard['vault_id']);
                         $deleteFailed = false;
                         if ($deleteResponse === false) {
@@ -797,7 +797,7 @@ if ($hide_saved_cards_page === false) {
                             if (empty($patchOperations)) {
                                 $messageStack->add('saved_credit_cards', TEXT_EDIT_CARD_NO_CHANGES, 'warning');
                             } else {
-                                $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALAC_SERVER);
+                                $api = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER);
                                 $vaultId = (string)($rawCard['vault_id'] ?? '');
                                 $updateResponse = $api->updateVaultPaymentToken($vaultId, $patchOperations);
                                 if ($updateResponse === false) {
@@ -868,7 +868,7 @@ if ($hide_saved_cards_page === false) {
                     $messageStack->add('saved_credit_cards', TEXT_ADD_CARD_ERROR_GENERAL, 'error');
                 } else {
                     // Create a payment token from the setup token
-                    $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALAC_SERVER);
+                    $api = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER);
                     $paymentTokenResponse = $api->createPaymentTokenFromSetup($setup_token_id);
                     
                     if ($paymentTokenResponse === false) {

@@ -40,38 +40,38 @@ namespace {
     $current_page_base = 'tests';
 }
 
-namespace PayPalRestful\Common {
+namespace PayPalAdvancedCheckout\Common {
     if (!class_exists(Helpers::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
     }
     if (!class_exists(Logger::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Common/Logger.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
     }
     if (!class_exists(ErrorInfo::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Common/ErrorInfo.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
     }
 }
 
-namespace PayPalRestful\Token {
+namespace PayPalAdvancedCheckout\Token {
     if (!class_exists(TokenCache::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Token/TokenCache.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Token/TokenCache.php';
     }
 }
 
-namespace PayPalRestful\Api {
-    if (!class_exists(PayPalRestfulApi::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Api/PayPalRestfulApi.php';
+namespace PayPalAdvancedCheckout\Api {
+    if (!class_exists(PayPalAdvancedCheckoutApi::class)) {
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php';
     }
 }
 
 namespace {
-    use PayPalRestful\Api\PayPalRestfulApi;
+    use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
 
     $failures = 0;
 
     $tests = [
         'live fallback uses configured credentials' => function () {
-            $api = new PayPalRestfulApi('', '', '');
+            $api = new PayPalAdvancedCheckoutApi('', '', '');
             return [
                 'environment' => $api->getEnvironmentType(),
                 'client_id' => getPrivateProperty($api, 'clientId'),
@@ -79,7 +79,7 @@ namespace {
             ];
         },
         'sandbox fallback uses configured credentials' => function () {
-            $api = new PayPalRestfulApi('sandbox', '', '');
+            $api = new PayPalAdvancedCheckoutApi('sandbox', '', '');
             return [
                 'environment' => $api->getEnvironmentType(),
                 'client_id' => getPrivateProperty($api, 'clientId'),
@@ -87,7 +87,7 @@ namespace {
             ];
         },
         'explicit credentials override configuration' => function () {
-            $api = new PayPalRestfulApi('live', 'ProvidedId', 'ProvidedSecret');
+            $api = new PayPalAdvancedCheckoutApi('live', 'ProvidedId', 'ProvidedSecret');
             return [
                 'environment' => $api->getEnvironmentType(),
                 'client_id' => getPrivateProperty($api, 'clientId'),
@@ -131,7 +131,7 @@ namespace {
         exit(1);
     }
 
-    fwrite(STDOUT, "PayPalRestfulApi constructor tests passed.\n");
+    fwrite(STDOUT, "PayPalAdvancedCheckoutApi constructor tests passed.\n");
 }
 
 namespace {

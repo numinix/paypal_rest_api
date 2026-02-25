@@ -10,7 +10,7 @@
 $_SESSION = [];
 
 // Load the MessageStack compatibility class
-require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/Compatibility/MessageStack.php';
+require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/MessageStack.php';
 
 echo "=== MessageStack Manual Verification ===\n\n";
 

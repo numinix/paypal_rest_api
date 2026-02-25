@@ -7,10 +7,10 @@
  * Credentials are automatically retrieved and filled into the module config.
  */
 
-$autoloaderPath = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
+$autoloaderPath = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageAutoloader.php';
 if (is_file($autoloaderPath)) {
     require_once $autoloaderPath;
-    \PayPalRestful\Compatibility\LanguageAutoloader::register();
+    \PayPalAdvancedCheckout\Compatibility\LanguageAutoloader::register();
 }
 
 require 'includes/application_top.php';
@@ -335,7 +335,7 @@ function paypalac_render_onboarding_page(): void
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>PayPal Integrated Signup</title>
-        <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
+        <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
         <link rel="stylesheet" href="includes/css/paypalac_integrated_signup.css">
     </head>
     <body>
@@ -994,7 +994,7 @@ function paypalac_handle_completion(): void
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>PayPal Setup Complete</title>
-        <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
+        <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
         <link rel="stylesheet" href="includes/css/paypalac_integrated_signup.css">
     </head>
     <body>

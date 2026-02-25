@@ -26,7 +26,7 @@ $testPassed = true;
 $errors = [];
 
 // Get the Apple Pay JS file content
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
 
 echo "Testing Native Apple Pay Implementation\n";
 echo "=======================================\n\n";

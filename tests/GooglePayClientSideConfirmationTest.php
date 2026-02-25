@@ -28,7 +28,7 @@ class GooglePayClientSideConfirmationTest
     public function __construct()
     {
         // Use __DIR__ to make path relative to test file location
-        $this->jsFile = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.googlepay.js';
+        $this->jsFile = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.googlepay.js';
         $this->phpFile = dirname(__DIR__) . '/includes/modules/payment/paypal/paypal_common.php';
         
         if (!file_exists($this->jsFile)) {

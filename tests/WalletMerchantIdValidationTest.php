@@ -118,7 +118,7 @@ namespace {
         ];
 
         foreach ($jsFiles as $jsFile) {
-            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/' . $jsFile;
+            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/' . $jsFile;
             $content = file_get_contents($jsPath);
 
             // Check for the merchant ID validation regex

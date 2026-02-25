@@ -1,7 +1,7 @@
 <?php
-use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Common\SubscriptionManager;
-use PayPalRestful\Common\VaultManager;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Common\SubscriptionManager;
+use PayPalAdvancedCheckout\Common\VaultManager;
 
 if (!defined('FILENAME_ACCOUNT_PAYPAL_SUBSCRIPTIONS')) {
     define('FILENAME_ACCOUNT_PAYPAL_SUBSCRIPTIONS', 'account_paypal_subscriptions');
@@ -452,7 +452,7 @@ if ($hideSubscriptionsPage === false) {
     $api = null;
     if (defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
         $paypal_subscriptions_allow_api = true;
-        $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALAC_SERVER);
+        $api = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -670,7 +670,7 @@ if ($hideSubscriptionsPage === false) {
             $remoteError = '';
 
             if ($remoteId !== '') {
-                if (!isset($remoteCache[$remoteId]) && $api instanceof PayPalRestfulApi) {
+                if (!isset($remoteCache[$remoteId]) && $api instanceof PayPalAdvancedCheckoutApi) {
                     $details = $api->getSubscription($remoteId);
                     if ($details === false) {
                         $remoteCache[$remoteId] = [

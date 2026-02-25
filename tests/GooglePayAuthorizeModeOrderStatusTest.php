@@ -146,7 +146,7 @@ class GooglePayAuthorizeModeOrderStatusTest
         $content = file_get_contents($this->applePayFile);
         
         // Find the section that checks payment_status - should only check STATUS_CAPTURED
-        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*\)\s*\{/s';
+        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalAdvancedCheckoutApi::STATUS_CAPTURED\s*\)\s*\{/s';
         
         if (preg_match($pattern, $content)) {
             $this->testResults[] = [
@@ -157,7 +157,7 @@ class GooglePayAuthorizeModeOrderStatusTest
             echo "  ✓ PASS: before_process handles CREATED status correctly (as unpaid/pending)\n";
         } else {
             // Check if the old incorrect pattern exists
-            $oldPattern = '/if\s*\(\s*\$payment\[[\'"]status[\'"]\]\s*!==\s*PayPalRestfulApi::STATUS_COMPLETED\s*\)/s';
+            $oldPattern = '/if\s*\(\s*\$payment\[[\'"]status[\'"]\]\s*!==\s*PayPalAdvancedCheckoutApi::STATUS_COMPLETED\s*\)/s';
             
             if (preg_match($oldPattern, $content)) {
                 $this->testResults[] = [
@@ -187,7 +187,7 @@ class GooglePayAuthorizeModeOrderStatusTest
         $content = file_get_contents($this->applePayFile);
         
         // Check that the conditional uses only STATUS_CAPTURED (CREATED should be treated as unpaid)
-        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*\)\s*\{/';
+        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalAdvancedCheckoutApi::STATUS_CAPTURED\s*\)\s*\{/';
         
         if (preg_match($pattern, $content)) {
             $this->testResults[] = [
@@ -216,7 +216,7 @@ class GooglePayAuthorizeModeOrderStatusTest
         $content = file_get_contents($this->applePayFile);
         
         // Find the section where status is set for non-captured payments (including authorizations)
-        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*\)\s*\{[^}]*ORDER_PENDING_STATUS_ID[^}]*\}/s';
+        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalAdvancedCheckoutApi::STATUS_CAPTURED\s*\)\s*\{[^}]*ORDER_PENDING_STATUS_ID[^}]*\}/s';
         
         if (preg_match($pattern, $content)) {
             $this->testResults[] = [

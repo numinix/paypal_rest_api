@@ -24,8 +24,8 @@ if (file_exists($autoloaderPath)) {
 }
 
 // Ensure legacy saved credit cards tables exist for backward compatibility
-if (class_exists('PayPalRestful\\Common\\SavedCreditCardsManager')) {
-    \PayPalRestful\Common\SavedCreditCardsManager::ensureSchema();
+if (class_exists('PayPalAdvancedCheckout\\Common\\SavedCreditCardsManager')) {
+    \PayPalAdvancedCheckout\Common\SavedCreditCardsManager::ensureSchema();
 }
 
 // Load saved card recurring class
@@ -437,7 +437,7 @@ function scr_pagination_url($page, $perPage, $queryString) {
 <html <?php echo HTML_PARAMS; ?>>
 <head>
     <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
-    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
+    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
     <link rel="stylesheet" href="includes/css/paypalac_saved_card_recurring.css">
 </head>
 <body>

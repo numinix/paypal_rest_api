@@ -209,14 +209,14 @@ namespace {
     }
 
     $baseDir = dirname(__DIR__, 2);
-    require_once $baseDir . '/includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
-    require_once $baseDir . '/includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php';
-    require_once $baseDir . '/includes/modules/payment/paypal/PayPalRestful/Webhooks/WebhookObject.php';
-    require_once $baseDir . '/includes/modules/payment/paypal/PayPalRestful/Webhooks/WebhookHandlerContract.php';
-    require_once $baseDir . '/includes/modules/payment/paypal/PayPalRestful/Webhooks/Events/VaultPaymentTokenUpdated.php';
+    require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+    require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
+    require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookObject.php';
+    require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookHandlerContract.php';
+    require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/Events/VaultPaymentTokenUpdated.php';
 }
 
-namespace PayPalRestful\Common {
+namespace PayPalAdvancedCheckout\Common {
     class Logger
     {
         public function __construct(string $name = '')
@@ -229,10 +229,10 @@ namespace PayPalRestful\Common {
     }
 }
 
-namespace PayPalRestful\Tests\Webhooks {
-    use PayPalRestful\Common\VaultManager;
-    use PayPalRestful\Webhooks\Events\VaultPaymentTokenUpdated;
-    use PayPalRestful\Webhooks\WebhookObject;
+namespace PayPalAdvancedCheckout\Tests\Webhooks {
+    use PayPalAdvancedCheckout\Common\VaultManager;
+    use PayPalAdvancedCheckout\Webhooks\Events\VaultPaymentTokenUpdated;
+    use PayPalAdvancedCheckout\Webhooks\WebhookObject;
     use PHPUnit\Framework\TestCase;
 
     final class VaultPaymentTokenUpdatedTest extends TestCase

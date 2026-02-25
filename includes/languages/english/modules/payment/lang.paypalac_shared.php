@@ -2,7 +2,7 @@
 $define = [
     'MODULE_PAYMENT_PAYPALAC_TEXT_CAPTURE_FAILED' => 'We were unable to complete your payment. Please try a different payment method or try again.',
     'MODULE_PAYMENT_PAYPALAC_ALERT_INVALID_CONFIGURATION' => 'Invalid configuration detected; please review the module settings.',
-    'MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypalrestful.php) was not loaded; please review your installation.',
+    'MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypaladvcheckout.php) was not loaded; please review your installation.',
     'MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE' => 'An error was returned by PayPal when attempting to initiate an order. As a courtesy, only the error \'code\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
     'MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN' => 'Order Requires Attention',
     'MODULE_PAYMENT_PAYPALAC_CC_CVV' => 'CVV Number:',

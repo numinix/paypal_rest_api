@@ -3,15 +3,15 @@
  * AJAX endpoint for creating PayPal setup tokens for adding cards.
  */
 
-$autoloaderPath = __DIR__ . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
+$autoloaderPath = __DIR__ . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageAutoloader.php';
 if (is_file($autoloaderPath)) {
     require_once $autoloaderPath;
-    \PayPalRestful\Compatibility\LanguageAutoloader::register();
+    \PayPalAdvancedCheckout\Compatibility\LanguageAutoloader::register();
 }
 
 require 'includes/application_top.php';
 
-use PayPalRestful\Api\PayPalRestfulApi;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
 
 header('Content-Type: application/json');
 
@@ -64,7 +64,7 @@ if ($action === 'create_setup_token') {
     require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/ppacAutoload.php';
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalac.php';
 
-    $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALAC_SERVER);
+    $api = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER);
     
     // Create setup token for card vaulting
     $paymentSource = [

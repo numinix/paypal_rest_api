@@ -25,10 +25,10 @@
 /**
  * Set supporting application_top parameters, and boot up
  */
-$autoloaderPath = __DIR__ . '/includes/modules/payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
+$autoloaderPath = __DIR__ . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageAutoloader.php';
 if (is_file($autoloaderPath)) {
     require_once $autoloaderPath;
-    \PayPalRestful\Compatibility\LanguageAutoloader::register();
+    \PayPalAdvancedCheckout\Compatibility\LanguageAutoloader::register();
 }
 
 $loaderPrefix = 'webhook';
@@ -37,7 +37,7 @@ $current_page_base = 'ppac_webhook';
 require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 
 // call the controller class, which will dispatch as needed, if validation passes
-$controller = new PayPalRestful\Webhooks\WebhookController();
+$controller = new PayPalAdvancedCheckout\Webhooks\WebhookController();
 $result = $controller();
 
 // properly shut down the application

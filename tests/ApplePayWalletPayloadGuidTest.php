@@ -31,7 +31,7 @@ namespace Tests {
             $_SESSION = [
                 'customer_id' => 123,
                 'cartID' => 'abc',
-                'PayPalRestful' => [
+                'PayPalAdvancedCheckout' => [
                     'CompletedOrders' => 0,
                 ],
             ];
@@ -47,10 +47,10 @@ namespace Tests {
 
             $baseGuid = $common->createOrderGuid($order, 'apple_pay');
 
-            $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = ['token' => 'token-123'];
+            $_SESSION['PayPalAdvancedCheckout']['WalletPayload']['apple_pay'] = ['token' => 'token-123'];
             $tokenGuid = $common->createOrderGuid($order, 'apple_pay');
 
-            $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = ['token' => 'token-456'];
+            $_SESSION['PayPalAdvancedCheckout']['WalletPayload']['apple_pay'] = ['token' => 'token-456'];
             $secondTokenGuid = $common->createOrderGuid($order, 'apple_pay');
 
             if ($baseGuid === $tokenGuid) {

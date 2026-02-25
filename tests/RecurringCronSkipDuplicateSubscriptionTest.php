@@ -21,10 +21,10 @@ declare(strict_types=1);
 fwrite(STDOUT, "Running Recurring Cron Skip Duplicate Subscription Test...\n\n");
 
 $basePath = dirname(__DIR__);
-$observerFile = $basePath . '/includes/classes/observers/auto.paypalrestful_recurring.php';
+$observerFile = $basePath . '/includes/classes/observers/auto.paypaladvcheckout_recurring.php';
 
 if (!file_exists($observerFile)) {
-    fwrite(STDERR, "✗ auto.paypalrestful_recurring.php not found\n\n");
+    fwrite(STDERR, "✗ auto.paypaladvcheckout_recurring.php not found\n\n");
     exit(1);
 }
 

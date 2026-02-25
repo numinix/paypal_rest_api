@@ -29,7 +29,7 @@ echo "========================================\n\n";
 echo "Test 1: Observer CSP nonce handling\n";
 echo "------------------------------------\n";
 
-$observerFile = __DIR__ . '/../includes/classes/observers/auto.paypalrestful.php';
+$observerFile = __DIR__ . '/../includes/classes/observers/auto.paypaladvcheckout.php';
 if (!file_exists($observerFile)) {
     echo "❌ Observer file not found: {$observerFile}\n";
     exit(1);
@@ -68,9 +68,9 @@ echo "Test 2: JavaScript getCspNonce() helper\n";
 echo "----------------------------------------\n";
 
 $jsFiles = [
-    'google-pay' => __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.googlepay.js',
-    'apple-pay' => __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js',
-    'venmo' => __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.venmo.js',
+    'google-pay' => __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.googlepay.js',
+    'apple-pay' => __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js',
+    'venmo' => __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.venmo.js',
 ];
 
 foreach ($jsFiles as $name => $jsFile) {

@@ -32,8 +32,8 @@ namespace {
     // Load the extra_datafiles that defines table constants (simulating Zen Cart's auto-load behavior)
     require_once DIR_FS_CATALOG . 'includes/extra_datafiles/ppac_database_tables.php';
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Logger.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
 
     class MockDbRecord
     {
@@ -63,7 +63,7 @@ namespace {
 
     // Manually include PayPalCommon since it needs special handling
     // We need to mock the use statements
-    class MockPayPalRestfulApi {}
+    class MockPayPalAdvancedCheckoutApi {}
     class MockVaultManager {
         public static function getCustomerVaultedCards(int $customers_id, bool $activeOnly = true): array {
             if ($customers_id <= 0) {
@@ -74,17 +74,17 @@ namespace {
     }
     
     // Define classes that might be referenced
-    if (!class_exists('PayPalRestful\Api\PayPalRestfulApi')) {
-        class_alias('MockPayPalRestfulApi', 'PayPalRestful\Api\PayPalRestfulApi');
+    if (!class_exists('PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi')) {
+        class_alias('MockPayPalAdvancedCheckoutApi', 'PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi');
     }
-    if (!class_exists('PayPalRestful\Common\VaultManager')) {
-        class_alias('MockVaultManager', 'PayPalRestful\Common\VaultManager');
+    if (!class_exists('PayPalAdvancedCheckout\Common\VaultManager')) {
+        class_alias('MockVaultManager', 'PayPalAdvancedCheckout\Common\VaultManager');
     }
 }
 
-namespace PayPalRestful\Common {
+namespace PayPalAdvancedCheckout\Common {
     // Define Helpers if not already loaded
-    if (!class_exists('PayPalRestful\Common\Helpers')) {
+    if (!class_exists('PayPalAdvancedCheckout\Common\Helpers')) {
         class Helpers {
             public static function getEnvironment(): string {
                 return 'sandbox';
@@ -92,7 +92,7 @@ namespace PayPalRestful\Common {
         }
     }
     
-    if (!class_exists('PayPalRestful\Common\Logger')) {
+    if (!class_exists('PayPalAdvancedCheckout\Common\Logger')) {
         class Logger {
             public function __construct($env = null) {}
             public function write($msg, $level = null) {}
@@ -100,9 +100,9 @@ namespace PayPalRestful\Common {
     }
 }
 
-namespace PayPalRestful\Api {
-    if (!class_exists('PayPalRestful\Api\PayPalRestfulApi')) {
-        class PayPalRestfulApi {
+namespace PayPalAdvancedCheckout\Api {
+    if (!class_exists('PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi')) {
+        class PayPalAdvancedCheckoutApi {
             public function __construct($clientId = null, $secret = null, $env = null) {}
         }
     }

@@ -30,7 +30,7 @@ namespace {
         ];
 
         foreach ($jsFiles as $jsFile) {
-            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/' . $jsFile;
+            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/' . $jsFile;
             
             if (!file_exists($jsPath)) {
                 fwrite(STDERR, "FAIL: $jsFile file not found at $jsPath\n");
@@ -93,7 +93,7 @@ namespace {
         ];
 
         foreach ($jsFiles as $jsFile) {
-            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/' . $jsFile;
+            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/' . $jsFile;
             $content = file_get_contents($jsPath);
 
             // Check that the SDK URL includes required parameters

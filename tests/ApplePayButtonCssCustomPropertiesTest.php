@@ -21,7 +21,7 @@ $testPassed = true;
 $errors = [];
 
 // Get the CSS file content
-$cssFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/paypalac.css';
+$cssFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/paypalac.css';
 if (!file_exists($cssFile)) {
     echo "❌ CSS file not found: {$cssFile}\n";
     exit(1);
@@ -30,7 +30,7 @@ if (!file_exists($cssFile)) {
 $css = file_get_contents($cssFile);
 
 // Get the JavaScript file content
-$jsFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js';
+$jsFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js';
 if (!file_exists($jsFile)) {
     echo "❌ JavaScript file not found: {$jsFile}\n";
     exit(1);

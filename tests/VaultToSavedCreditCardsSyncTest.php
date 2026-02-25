@@ -57,7 +57,7 @@ namespace {
         $GLOBALS['psr4Autoloader'] = new mockPsr4Autoloader();
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 }
 
 // Mock ObserverManager trait in separate namespace
@@ -70,7 +70,7 @@ namespace Zencart\Traits {
 }
 
 namespace {
-    require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypalrestful_recurring.php';
+    require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout_recurring.php';
 
     // Mock database
     class queryFactoryResult
@@ -168,7 +168,7 @@ namespace {
 
         public function testVaultRecordSyncedToSavedCreditCards(): void
         {
-            $observer = new zcObserverPaypalrestfulRecurring();
+            $observer = new zcObserverPaypaladvcheckoutRecurring();
 
             $vaultRecord = [
                 'paypal_vault_id' => 123,
@@ -216,7 +216,7 @@ namespace {
             // Set up mock to return existing record
             $this->db->setMockResult(0, ['saved_credit_card_id' => 999], false);
 
-            $observer = new zcObserverPaypalrestfulRecurring();
+            $observer = new zcObserverPaypaladvcheckoutRecurring();
 
             $vaultRecord = [
                 'paypal_vault_id' => 123,
@@ -252,7 +252,7 @@ namespace {
 
         public function testVaultSyncSkipsIfVaultIdEmpty(): void
         {
-            $observer = new zcObserverPaypalrestfulRecurring();
+            $observer = new zcObserverPaypaladvcheckoutRecurring();
 
             $vaultRecord = [
                 'paypal_vault_id' => 123,

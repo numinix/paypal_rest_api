@@ -80,8 +80,8 @@ namespace {
     $db = new MockDb();
 
     // Load the SubscriptionManager and VaultManager
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
 
     $failures = 0;
 
@@ -105,7 +105,7 @@ namespace {
 
     $insertedRecords = [];
     
-    $subscriptionId = \PayPalRestful\Common\SubscriptionManager::logSubscription($testData);
+    $subscriptionId = \PayPalAdvancedCheckout\Common\SubscriptionManager::logSubscription($testData);
     
     if (count($insertedRecords) !== 1) {
         fwrite(STDERR, "✗ Expected one insert, got " . count($insertedRecords) . "\n");
@@ -143,7 +143,7 @@ namespace {
     
     $insertedRecords = [];
     
-    $subscriptionId2 = \PayPalRestful\Common\SubscriptionManager::logSubscription($testData2);
+    $subscriptionId2 = \PayPalAdvancedCheckout\Common\SubscriptionManager::logSubscription($testData2);
     
     if (count($insertedRecords) !== 1) {
         fwrite(STDERR, "✗ Expected one insert for second test\n");
@@ -166,8 +166,8 @@ namespace {
     // (simulating what would happen if the database allowed it)
     $insertedRecords = [];
     
-    $subscriptionId3 = \PayPalRestful\Common\SubscriptionManager::logSubscription($testData);
-    $subscriptionId4 = \PayPalRestful\Common\SubscriptionManager::logSubscription($testData);
+    $subscriptionId3 = \PayPalAdvancedCheckout\Common\SubscriptionManager::logSubscription($testData);
+    $subscriptionId4 = \PayPalAdvancedCheckout\Common\SubscriptionManager::logSubscription($testData);
     
     if (count($insertedRecords) !== 2) {
         fwrite(STDERR, "✗ Expected two inserts for duplicate test\n");

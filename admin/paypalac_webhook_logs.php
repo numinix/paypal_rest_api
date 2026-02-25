@@ -136,7 +136,7 @@ function whl_pretty_json(string $raw): string
 <html <?php echo HTML_PARAMS; ?>>
 <head>
     <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
-    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
+    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
     <link rel="stylesheet" href="includes/css/paypalac_webhook_logs.css">
     <title><?php echo HEADING_TITLE; ?></title>
 </head>

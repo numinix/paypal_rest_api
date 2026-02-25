@@ -61,7 +61,7 @@ foreach ($adminFiles as $file) {
 }
 
 // Test DoRefund, DoCapture, DoVoid, DoAuthorization - they should use 2-param format
-$adminActionsPath = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Admin';
+$adminActionsPath = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Admin';
 $actionFiles = [
     'DoRefund.php',
     'DoCapture.php', 
@@ -69,7 +69,7 @@ $actionFiles = [
     'DoAuthorization.php'
 ];
 
-fwrite(STDOUT, "Testing PayPalRestful Admin action files...\n");
+fwrite(STDOUT, "Testing PayPalAdvancedCheckout Admin action files...\n");
 foreach ($actionFiles as $file) {
     $filePath = $adminActionsPath . '/' . $file;
     if (!file_exists($filePath)) {

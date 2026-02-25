@@ -134,7 +134,7 @@ namespace {
 
     // Test 7: Order history backward compatibility - GetPayPalOrderTransactions recognizes both module names
     fwrite(STDOUT, "\nTest 7: Admin query recognizes both paypalr and paypalac module names...\n");
-    $txnFile = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Admin/GetPayPalOrderTransactions.php';
+    $txnFile = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Admin/GetPayPalOrderTransactions.php';
     if (file_exists($txnFile)) {
         $txnContent = file_get_contents($txnFile);
         if (strpos($txnContent, "'paypalr'") !== false && strpos($txnContent, "IN (") !== false) {

@@ -54,7 +54,7 @@ namespace {
         $GLOBALS['psr4Autoloader'] = new mockPsr4Autoloader();
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 }
 
 // Mock ObserverManager trait in separate namespace
@@ -67,7 +67,7 @@ namespace Zencart\Traits {
 }
 
 namespace {
-    require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypalrestful_recurring.php';
+    require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout_recurring.php';
 
     // Mock database
     class queryFactoryResult
@@ -205,7 +205,7 @@ namespace Tests {
 
         public function testObserverActivatesSubscriptionsWhenVaultNotificationReceived(): void
         {
-            $observer = new \zcObserverPaypalrestfulRecurring();
+            $observer = new \zcObserverPaypaladvcheckoutRecurring();
 
             $vaultRecord = [
                 'customers_id' => 1,
@@ -245,7 +245,7 @@ namespace Tests {
 
         public function testObserverIgnoresInvalidVaultRecord(): void
         {
-            $observer = new \zcObserverPaypalrestfulRecurring();
+            $observer = new \zcObserverPaypaladvcheckoutRecurring();
 
             // Test with empty array
             $class = new \stdClass();
@@ -272,7 +272,7 @@ namespace Tests {
         public function testObserverAttachesToVaultNotification(): void
         {
             // Create a mock to verify the attach method is called with correct events
-            $observer = $this->getMockBuilder(\zcObserverPaypalrestfulRecurring::class)
+            $observer = $this->getMockBuilder(\zcObserverPaypaladvcheckoutRecurring::class)
                 ->onlyMethods(['attach'])
                 ->getMock();
 

@@ -129,7 +129,7 @@ if (preg_match('/public function admin_notification\([^)]*\)\s*\{[^}]+\}/', $pay
 
 // Check that both have similar key components
 $keyComponents = [
-    'getPayPalRestfulApi()',
+    'getPayPalAdvancedCheckoutApi()',
     'new AdminMain(',
     'externalTxnAdded()',
     '$admin_main->get()',

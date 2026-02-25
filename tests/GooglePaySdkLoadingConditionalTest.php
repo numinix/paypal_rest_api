@@ -30,7 +30,7 @@ namespace {
     function testObserverConditionalGooglePayLoading(): bool
     {
         $passed = true;
-        $observerPath = DIR_FS_CATALOG . 'includes/classes/observers/auto.paypalrestful.php';
+        $observerPath = DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout.php';
         
         if (!file_exists($observerPath)) {
             fwrite(STDERR, "FAIL: Observer file not found at $observerPath\n");

@@ -595,7 +595,7 @@ foreach ($typeCounts as $count) {
 <html <?php echo HTML_PARAMS; ?>>
 <head>
     <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
-    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
+    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
     <title><?php echo HEADING_TITLE; ?></title>
 </head>
 <body>

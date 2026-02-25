@@ -105,7 +105,7 @@ $define = [
         'MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_CONFIRMATION_ERROR' => 'Confirm Payment Choice',
 
     'MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATION' => 'The status for order #%1$u was forced to &quot;Pending&quot; due to a PayPal response status of \'%2$s\'.',
-    'MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypalrestful.php) was not loaded; please review your installation.',
+    'MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER' => 'The payment module\'s observer (auto.paypaladvcheckout.php) was not loaded; please review your installation.',
     'MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_NOTIFICATIONS' => 'The required notifications in the order_total.php class were not applied; the payment module cannot place orders.',
     'MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE' => 'An error was returned by PayPal when attempting to initiate an order. As a courtesy, only the error \'code\' was shown to your customer.  The details of the error are shown below.' . "\n\n",
     'MODULE_PAYMENT_PAYPALAC_ALERT_TOTAL_MISMATCH' => 'A discrepancy was found between an order\'s overall value and its breakdown.  The order is being submitted to PayPal without items and cost breakdown included:',

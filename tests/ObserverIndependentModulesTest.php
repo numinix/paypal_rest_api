@@ -18,9 +18,9 @@ if (!defined('DIR_FS_CATALOG')) {
 function testObserverChecksAnyModuleEnabled(): bool
 {
     $observers = [
-        'includes/classes/observers/auto.paypalrestful.php',
-        'includes/classes/observers/auto.paypalrestful_recurring.php',
-        'includes/classes/observers/auto.paypalrestful_vault.php',
+        'includes/classes/observers/auto.paypaladvcheckout.php',
+        'includes/classes/observers/auto.paypaladvcheckout_recurring.php',
+        'includes/classes/observers/auto.paypaladvcheckout_vault.php',
     ];
     
     foreach ($observers as $observerPath) {
@@ -85,9 +85,9 @@ function testObserverChecksAnyModuleEnabled(): bool
 function testObserverRequiresBaseModuleInstalled(): bool
 {
     $observers = [
-        'includes/classes/observers/auto.paypalrestful.php',
-        'includes/classes/observers/auto.paypalrestful_recurring.php',
-        'includes/classes/observers/auto.paypalrestful_vault.php',
+        'includes/classes/observers/auto.paypaladvcheckout.php',
+        'includes/classes/observers/auto.paypaladvcheckout_recurring.php',
+        'includes/classes/observers/auto.paypaladvcheckout_vault.php',
     ];
     
     foreach ($observers as $observerPath) {
@@ -113,9 +113,9 @@ function testObserverRequiresBaseModuleInstalled(): bool
 function testOldPatternRemoved(): bool
 {
     $observers = [
-        'includes/classes/observers/auto.paypalrestful.php',
-        'includes/classes/observers/auto.paypalrestful_recurring.php',
-        'includes/classes/observers/auto.paypalrestful_vault.php',
+        'includes/classes/observers/auto.paypaladvcheckout.php',
+        'includes/classes/observers/auto.paypaladvcheckout_recurring.php',
+        'includes/classes/observers/auto.paypaladvcheckout_vault.php',
     ];
     
     foreach ($observers as $observerPath) {

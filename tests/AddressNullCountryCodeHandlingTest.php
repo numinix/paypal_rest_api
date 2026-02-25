@@ -4,7 +4,7 @@
  * This addresses the TypeError that occurs during Google Pay wallet initialization when delivery
  * address is not yet populated.
  *
- * Issue: PayPalRestful\Api\Data\CountryCodes::convertCountryCode(): Argument #1 ($country_code) 
+ * Issue: PayPalAdvancedCheckout\Api\Data\CountryCodes::convertCountryCode(): Argument #1 ($country_code) 
  * must be of type string, null given
  */
 declare(strict_types=1);
@@ -15,11 +15,11 @@ $errors = [];
 echo "Testing Address Null Country Code Handling\n";
 echo "===========================================\n\n";
 
-require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/Api/Data/CountryCodes.php';
-require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/Zc2Pp/Address.php';
+require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/Data/CountryCodes.php';
+require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/Address.php';
 
-use PayPalRestful\Api\Data\CountryCodes;
-use PayPalRestful\Zc2Pp\Address;
+use PayPalAdvancedCheckout\Api\Data\CountryCodes;
+use PayPalAdvancedCheckout\Zc2Pp\Address;
 
 // Test 1: convertCountryCode handles null input gracefully
 echo "Test 1: convertCountryCode handles null input...\n";

@@ -44,7 +44,7 @@ namespace {
         $GLOBALS['psr4Autoloader'] = new mockPsr4Autoloader();
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 
     // Mock database class
     class queryFactoryResult
@@ -158,7 +158,7 @@ namespace {
 
 namespace Tests {
     use PHPUnit\Framework\TestCase;
-    use PayPalRestful\Common\SubscriptionManager;
+    use PayPalAdvancedCheckout\Common\SubscriptionManager;
 
     class SubscriptionVaultActivationTest extends TestCase
     {

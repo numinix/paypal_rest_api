@@ -6,14 +6,14 @@
  * Last updated: v1.3.1
  */
 
-use PayPalRestful\Api\Data\CountryCodes;
-use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Zc2Pp\Amount;
+use PayPalAdvancedCheckout\Api\Data\CountryCodes;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Zc2Pp\Amount;
 use Zencart\Traits\ObserverManager;
 
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
-    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ObserverManager.php';
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/Compatibility/ObserverManager.php';
 }
 
 class zcObserverPaypalacAdmin
@@ -88,7 +88,7 @@ class zcObserverPaypalacAdmin
 
         require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalac.php';
         [$client_id, $secret] = \paypalac::getEnvironmentInfo();
-        $ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALAC_SERVER, $client_id, $secret);
+        $ppr = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER, $client_id, $secret);
 
         foreach ($track_ids as $i => $tracking_number) {
             if (empty($tracking_number)) {

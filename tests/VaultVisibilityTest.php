@@ -49,8 +49,8 @@ namespace {
         $GLOBALS['psr4Autoloader'] = new mockPsr4Autoloader();
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
 
     // Mock database class
     class queryFactoryResult
@@ -203,7 +203,7 @@ namespace {
 }
 
 namespace {
-    use PayPalRestful\Common\VaultManager;
+    use PayPalAdvancedCheckout\Common\VaultManager;
 
     $failures = 0;
 

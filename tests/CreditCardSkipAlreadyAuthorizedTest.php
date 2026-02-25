@@ -11,7 +11,7 @@ declare(strict_types=1);
  */
 
 namespace {
-    // PayPal API status constants (from PayPalRestfulApi class)
+    // PayPal API status constants (from PayPalAdvancedCheckoutApi class)
     const STATUS_COMPLETED = 'COMPLETED';
     const STATUS_APPROVED = 'APPROVED';
 
@@ -29,7 +29,7 @@ namespace {
     
     // Mock the session state that would occur after createOrder returns with
     // COMPLETED status and an authorization already created (as in the bug report)
-    $_SESSION['PayPalRestful'] = [
+    $_SESSION['PayPalAdvancedCheckout'] = [
         'Order' => [
             'id' => '40404238AU312984A',
             'status' => STATUS_COMPLETED,
@@ -71,7 +71,7 @@ namespace {
     ];
     
     // Verify the session state has authorizations
-    $authorizations = $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['authorizations'] ?? [];
+    $authorizations = $_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['payments']['authorizations'] ?? [];
     if (count($authorizations) === 0) {
         fwrite(STDERR, "✗ Test setup failed: authorizations should be present in session\n");
         $failures++;
@@ -80,7 +80,7 @@ namespace {
     }
     
     // Verify status is COMPLETED  
-    if ($_SESSION['PayPalRestful']['Order']['status'] !== STATUS_COMPLETED) {
+    if ($_SESSION['PayPalAdvancedCheckout']['Order']['status'] !== STATUS_COMPLETED) {
         fwrite(STDERR, "✗ Test setup failed: status should be COMPLETED\n");
         $failures++;
     } else {
@@ -90,8 +90,8 @@ namespace {
     // The fix should detect this condition and skip calling authorizeOrder
     // We're testing the detection logic, not the API call
     $should_skip_authorize = (
-        $_SESSION['PayPalRestful']['Order']['status'] === STATUS_COMPLETED && 
-        !empty($_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['authorizations'])
+        $_SESSION['PayPalAdvancedCheckout']['Order']['status'] === STATUS_COMPLETED && 
+        !empty($_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['payments']['authorizations'])
     );
     
     if (!$should_skip_authorize) {
@@ -106,12 +106,12 @@ namespace {
     // ---------------------------------------------------------------------------
     echo "\nTest 2: Verifying authorization is NOT skipped when order has no authorizations...\n";
     
-    $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments'] = [];
-    $_SESSION['PayPalRestful']['Order']['status'] = STATUS_APPROVED;
+    $_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['payments'] = [];
+    $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = STATUS_APPROVED;
     
     $should_skip_authorize = (
-        $_SESSION['PayPalRestful']['Order']['status'] === STATUS_COMPLETED && 
-        !empty($_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['authorizations'])
+        $_SESSION['PayPalAdvancedCheckout']['Order']['status'] === STATUS_COMPLETED && 
+        !empty($_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['payments']['authorizations'])
     );
     
     if ($should_skip_authorize) {
@@ -126,8 +126,8 @@ namespace {
     // ---------------------------------------------------------------------------
     echo "\nTest 3: Verifying capture skip logic still works correctly...\n";
     
-    $_SESSION['PayPalRestful']['Order']['status'] = STATUS_COMPLETED;
-    $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments'] = [
+    $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = STATUS_COMPLETED;
+    $_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['payments'] = [
         'captures' => [
             [
                 'status' => 'COMPLETED',
@@ -140,9 +140,9 @@ namespace {
         ],
     ];
     
-    $captures = $_SESSION['PayPalRestful']['Order']['current']['purchase_units'][0]['payments']['captures'] ?? [];
+    $captures = $_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['payments']['captures'] ?? [];
     $should_skip_capture = (
-        $_SESSION['PayPalRestful']['Order']['status'] === STATUS_COMPLETED && 
+        $_SESSION['PayPalAdvancedCheckout']['Order']['status'] === STATUS_COMPLETED && 
         !empty($captures)
     );
     

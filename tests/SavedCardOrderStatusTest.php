@@ -12,7 +12,7 @@
 $testPassed = true;
 $errors = [];
 
-// Define status constants as they would be in PayPalRestfulApi
+// Define status constants as they would be in PayPalAdvancedCheckoutApi
 if (!defined('STATUS_CAPTURED')) {
     define('STATUS_CAPTURED', 'CAPTURED');
 }

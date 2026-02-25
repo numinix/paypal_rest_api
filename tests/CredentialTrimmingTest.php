@@ -40,7 +40,7 @@ namespace {
 
 namespace {
     /**
-     * Test that wallet modules trim credentials before creating PayPalRestfulApi
+     * Test that wallet modules trim credentials before creating PayPalAdvancedCheckoutApi
      */
     function testWalletModulesTrimCredentials(): bool
     {
@@ -63,7 +63,7 @@ namespace {
             
             $content = file_get_contents($filePath);
             
-            // Check that credentials are trimmed before being passed to PayPalRestfulApi
+            // Check that credentials are trimmed before being passed to PayPalAdvancedCheckoutApi
             // Pattern: $client_id = trim(...) or similar
             if (strpos($content, 'trim($client_id)') !== false && 
                 strpos($content, 'trim($secret)') !== false) {

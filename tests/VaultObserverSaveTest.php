@@ -42,8 +42,8 @@ namespace {
         $GLOBALS['psr4Autoloader'] = new mockPsr4Autoloader();
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
 
     // Mock database class
     class queryFactoryResult
@@ -165,13 +165,13 @@ namespace Zencart\Traits {
 }
 
 namespace {
-    require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypalrestful_vault.php';
+    require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout_vault.php';
 
     use PHPUnit\Framework\TestCase;
 
     class VaultObserverSaveTest extends TestCase
     {
-        private zcObserverPaypalrestfulVault $observer;
+        private zcObserverPaypaladvcheckoutVault $observer;
 
         protected function setUp(): void
         {
@@ -185,7 +185,7 @@ namespace {
             // Clear session
             $_SESSION = [];
             
-            $this->observer = new zcObserverPaypalrestfulVault();
+            $this->observer = new zcObserverPaypaladvcheckoutVault();
         }
 
         protected function tearDown(): void
@@ -231,7 +231,7 @@ namespace {
             
             // Set up session with order and vault data
             $_SESSION['order_number_created'] = 100;
-            $_SESSION['PayPalRestful']['VaultCardData'] = [
+            $_SESSION['PayPalAdvancedCheckout']['VaultCardData'] = [
                 'card_source' => [
                     'vault' => [
                         'id' => '1234567890',
@@ -288,7 +288,7 @@ namespace {
             $this->assertEquals('1234', $vaultInsert['data']['last_digits'], 'Last digits should match');
             
             // Verify session was cleaned up
-            $this->assertArrayNotHasKey('VaultCardData', $_SESSION['PayPalRestful'] ?? [], 'Vault data should be removed from session');
+            $this->assertArrayNotHasKey('VaultCardData', $_SESSION['PayPalAdvancedCheckout'] ?? [], 'Vault data should be removed from session');
         }
 
         public function testObserverProcessesOrderOnlyOnce(): void
@@ -297,7 +297,7 @@ namespace {
             
             // Set up session
             $_SESSION['order_number_created'] = 100;
-            $_SESSION['PayPalRestful']['VaultCardData'] = [
+            $_SESSION['PayPalAdvancedCheckout']['VaultCardData'] = [
                 'card_source' => [
                     'vault' => [
                         'id' => '1234567890',
@@ -335,7 +335,7 @@ namespace {
             
             // Set up session
             $_SESSION['order_number_created'] = 100;
-            $_SESSION['PayPalRestful']['VaultCardData'] = [
+            $_SESSION['PayPalAdvancedCheckout']['VaultCardData'] = [
                 'card_source' => [
                     'vault' => [
                         'id' => '1234567890',
@@ -374,7 +374,7 @@ namespace {
             
             // Set up session
             $_SESSION['order_number_created'] = 100;
-            $_SESSION['PayPalRestful']['VaultCardData'] = [
+            $_SESSION['PayPalAdvancedCheckout']['VaultCardData'] = [
                 'card_source' => [
                     'vault' => [
                         'id' => '1234567890',

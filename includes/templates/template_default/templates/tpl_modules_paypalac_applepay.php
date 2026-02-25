@@ -47,7 +47,7 @@
 
 <?php
     // Load the native Apple Pay JavaScript integration for cart page
-    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalac.applepay.wallet.js';
+    $scriptPath = DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.wallet.js';
     if (file_exists($scriptPath)) {
         echo '<script>' . file_get_contents($scriptPath) . '</script>';
     } else {

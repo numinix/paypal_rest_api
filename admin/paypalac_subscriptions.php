@@ -16,10 +16,10 @@
 
 require 'includes/application_top.php';
 
-$autoloaderPath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/LanguageAutoloader.php';
+$autoloaderPath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageAutoloader.php';
 if (is_file($autoloaderPath)) {
     require_once $autoloaderPath;
-    \PayPalRestful\Compatibility\LanguageAutoloader::register();
+    \PayPalAdvancedCheckout\Compatibility\LanguageAutoloader::register();
 }
 
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
@@ -34,9 +34,9 @@ if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php'
     require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
 }
 
-use PayPalRestful\Common\SubscriptionManager;
-use PayPalRestful\Common\SavedCreditCardsManager;
-use PayPalRestful\Common\VaultManager;
+use PayPalAdvancedCheckout\Common\SubscriptionManager;
+use PayPalAdvancedCheckout\Common\SavedCreditCardsManager;
+use PayPalAdvancedCheckout\Common\VaultManager;
 
 SubscriptionManager::ensureSchema();
 SavedCreditCardsManager::ensureSchema();
@@ -1340,7 +1340,7 @@ function paypalac_render_select_options(array $options, $selectedValue): string
 <html <?php echo HTML_PARAMS; ?>>
 <head>
     <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
-    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalRestful/numinix_admin.css">
+    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
     <link rel="stylesheet" href="includes/css/paypalac_subscriptions.css">
 </head>
 <body>

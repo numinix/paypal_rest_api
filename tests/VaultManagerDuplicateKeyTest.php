@@ -30,8 +30,8 @@ namespace {
         define('TABLE_PAYPAL_VAULT', DB_PREFIX . 'paypal_vault');
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
 
     class MockDbRecord
     {
@@ -135,7 +135,7 @@ namespace {
     // Initialize mock database
     $GLOBALS['db'] = new MockDbDuplicateKey();
 
-    use PayPalRestful\Common\VaultManager;
+    use PayPalAdvancedCheckout\Common\VaultManager;
 
     $failures = 0;
 

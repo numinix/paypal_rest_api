@@ -62,7 +62,7 @@ function generateSavedCardSelectBoxSelection(array $vaultedCards, string $select
         return [];
     }
     
-    $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalac.checkout.js"></script>';
+    $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.checkout.js"></script>';
     
     // Add "Please select" as the first option
     $selectPrompt = defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_SELECT_PROMPT')

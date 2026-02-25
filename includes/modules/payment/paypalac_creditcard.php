@@ -13,22 +13,22 @@
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_common.php');
 
-use PayPalRestful\Admin\AdminMain;
-use PayPalRestful\Admin\DoAuthorization;
-use PayPalRestful\Admin\DoCapture;
-use PayPalRestful\Admin\DoRefund;
-use PayPalRestful\Admin\DoVoid;
-use PayPalRestful\Admin\GetPayPalOrderTransactions;
-use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Api\Data\CountryCodes;
-use PayPalRestful\Common\ErrorInfo;
-use PayPalRestful\Common\Helpers;
-use PayPalRestful\Common\Logger;
-use PayPalRestful\Common\VaultManager;
-use PayPalRestful\Compatibility\Language as LanguageCompatibility;
-use PayPalRestful\Zc2Pp\Amount;
-use PayPalRestful\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
-use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
+use PayPalAdvancedCheckout\Admin\AdminMain;
+use PayPalAdvancedCheckout\Admin\DoAuthorization;
+use PayPalAdvancedCheckout\Admin\DoCapture;
+use PayPalAdvancedCheckout\Admin\DoRefund;
+use PayPalAdvancedCheckout\Admin\DoVoid;
+use PayPalAdvancedCheckout\Admin\GetPayPalOrderTransactions;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Api\Data\CountryCodes;
+use PayPalAdvancedCheckout\Common\ErrorInfo;
+use PayPalAdvancedCheckout\Common\Helpers;
+use PayPalAdvancedCheckout\Common\Logger;
+use PayPalAdvancedCheckout\Common\VaultManager;
+use PayPalAdvancedCheckout\Compatibility\Language as LanguageCompatibility;
+use PayPalAdvancedCheckout\Zc2Pp\Amount;
+use PayPalAdvancedCheckout\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
+use PayPalAdvancedCheckout\Zc2Pp\CreatePayPalOrderRequest;
 
 LanguageCompatibility::load('paypalac_creditcard');
 
@@ -54,9 +54,9 @@ class paypalac_creditcard extends base
 
     protected const CURRENT_VERSION = '1.3.5';
     protected const WALLET_SUCCESS_STATUSES = [
-        PayPalRestfulApi::STATUS_APPROVED,
-        PayPalRestfulApi::STATUS_COMPLETED,
-        PayPalRestfulApi::STATUS_CAPTURED,
+        PayPalAdvancedCheckoutApi::STATUS_APPROVED,
+        PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
+        PayPalAdvancedCheckoutApi::STATUS_CAPTURED,
     ];
 
     public string $code;
@@ -72,7 +72,7 @@ class paypalac_creditcard extends base
     public bool $collectsCardDataOnsite = false;
 
 
-    public PayPalRestfulApi $ppr;
+    public PayPalAdvancedCheckoutApi $ppr;
     protected ErrorInfo $errorInfo;
     public Logger $log;
     public bool $emailAlerts = false;
@@ -84,7 +84,7 @@ class paypalac_creditcard extends base
     protected bool $shippingCountryIsSupported = true;
     public array $orderCustomerCache = [];
     protected bool $onOpcConfirmationPage = false;
-    protected array $paypalRestfulSessionOnEntry = [];
+    protected array $paypalAdvCheckoutSessionOnEntry = [];
 
     /**
      * Get the credit card information for PayPal order creation.
@@ -153,7 +153,7 @@ class paypalac_creditcard extends base
         $this->paypalCommon = new PayPalCommon($this);
 
         // Credit cards support both auth-only and final sale modes
-        $ppac_type = $_SESSION['PayPalRestful']['ppac_type'] ?? 'card';
+        $ppac_type = $_SESSION['PayPalAdvancedCheckout']['ppac_type'] ?? 'card';
         if (MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Final Sale' || ($ppac_type !== 'card' && MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Auth Only (Card-Only)')) {
             $order_status = (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID;
         } else {
@@ -175,8 +175,8 @@ class paypalac_creditcard extends base
             }
             $this->tableCheckup();
         } elseif ($this->enabled === true) {
-            global $zcObserverPaypalrestful;
-            if (!isset($zcObserverPaypalrestful)) {
+            global $zcObserverPaypaladvcheckout;
+            if (!isset($zcObserverPaypaladvcheckout)) {
                 $this->enabled = false;
 
                 if (in_array($loaderPrefix ?? '', ['paypal_ipn', 'webhook'], true)) {
@@ -216,7 +216,7 @@ class paypalac_creditcard extends base
         global $current_page_base;
         if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
             $this->onOpcConfirmationPage = true;
-            $this->paypalRestfulSessionOnEntry = $_SESSION['PayPalRestful'] ?? [];
+            $this->paypalAdvCheckoutSessionOnEntry = $_SESSION['PayPalAdvancedCheckout'] ?? [];
             $this->attach($this, ['NOTIFY_OPC_OBSERVER_SESSION_FIXUPS']);
         }
 
@@ -232,10 +232,10 @@ class paypalac_creditcard extends base
 
     public function updateNotifyOpcObserverSessionFixups(&$class, $eventID, $empty_string, &$session_data)
     {
-        if ($this->onOpcConfirmationPage === false || empty($this->paypalRestfulSessionOnEntry)) {
+        if ($this->onOpcConfirmationPage === false || empty($this->paypalAdvCheckoutSessionOnEntry)) {
             return;
         }
-        $session_data['PayPalRestful'] = $this->paypalRestfulSessionOnEntry;
+        $session_data['PayPalAdvancedCheckout'] = $this->paypalAdvCheckoutSessionOnEntry;
     }
 
     protected function alertMsg(string $msg): string
@@ -300,7 +300,7 @@ class paypalac_creditcard extends base
             return false;
         }
 
-        $this->ppr = $this->getPayPalRestfulApi();
+        $this->ppr = $this->getPayPalAdvancedCheckoutApi();
         if ($this->ppr === null) {
             return false;
         }
@@ -308,16 +308,16 @@ class paypalac_creditcard extends base
         return true;
     }
 
-    protected function getPayPalRestfulApi(): ?PayPalRestfulApi
+    protected function getPayPalAdvancedCheckoutApi(): ?PayPalAdvancedCheckoutApi
     {
-        if (isset($this->ppr) && $this->ppr instanceof PayPalRestfulApi) {
+        if (isset($this->ppr) && $this->ppr instanceof PayPalAdvancedCheckoutApi) {
             return $this->ppr;
         }
 
         $client_id = (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : MODULE_PAYMENT_PAYPALAC_CLIENTID_S;
         $secret = (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') ? MODULE_PAYMENT_PAYPALAC_SECRET_L : MODULE_PAYMENT_PAYPALAC_SECRET_S;
 
-        // Trim credentials to match PayPalRestfulApi::getConfiguredCredentials behavior
+        // Trim credentials to match PayPalAdvancedCheckoutApi::getConfiguredCredentials behavior
         $client_id = trim($client_id);
         $secret = trim($secret);
 
@@ -327,14 +327,14 @@ class paypalac_creditcard extends base
         }
 
         try {
-            $this->ppr = new PayPalRestfulApi(
+            $this->ppr = new PayPalAdvancedCheckoutApi(
                 MODULE_PAYMENT_PAYPALAC_SERVER,
                 $client_id,
                 $secret
             );
             return $this->ppr;
         } catch (\Exception $e) {
-            $this->log->write('Credit Cards: Error creating PayPalRestfulApi: ' . $e->getMessage());
+            $this->log->write('Credit Cards: Error creating PayPalAdvancedCheckoutApi: ' . $e->getMessage());
             $this->setConfigurationDisabled($e->getMessage());
             return null;
         }
@@ -433,9 +433,9 @@ class paypalac_creditcard extends base
     {
         global $order;
         
-        unset($_SESSION['PayPalRestful']['Order']['wallet_payment_confirmed']);
+        unset($_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed']);
 
-        $creditCardCss = '<link rel="stylesheet" href="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/paypalac.css' . '">';
+        $creditCardCss = '<link rel="stylesheet" href="' . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/paypalac.css' . '">';
 
         // Create dropdowns for expiry date
         $expires_month = [];
@@ -460,7 +460,7 @@ class paypalac_creditcard extends base
             $vaultedCards = $this->paypalCommon->getVaultedCardsForCustomer($_SESSION['customer_id'], true);
         }
 
-        $savedCardSelection = $_POST['paypalac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new');
+        $savedCardSelection = $_POST['paypalac_saved_card'] ?? ($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? 'new');
         if ($savedCardSelection === '' && !empty($vaultedCards)) {
             $savedCardSelection = $vaultedCards[0]['vault_id'];
         }
@@ -479,7 +479,7 @@ class paypalac_creditcard extends base
 
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
         $forceSaveCard = $allowSaveCard && $savedCardSelection === 'new' && $this->orderRequiresVaultedCard();
-        $saveCardChecked = $allowSaveCard && ($forceSaveCard || !empty($_POST['paypalac_cc_save_card']) || (!empty($_SESSION['PayPalRestful']['save_card'])));
+        $saveCardChecked = $allowSaveCard && ($forceSaveCard || !empty($_POST['paypalac_cc_save_card']) || (!empty($_SESSION['PayPalAdvancedCheckout']['save_card'])));
         if ($savedCardSelection !== 'new') {
             $saveCardChecked = false;
             $forceSaveCard = false;
@@ -574,7 +574,7 @@ class paypalac_creditcard extends base
 
         // Load the checkout script to handle radio button selection when focusing on fields
         // Append it to the module output to avoid creating a separate div row
-        $checkoutScript = $creditCardCss . '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalac.checkout.js"></script>';
+        $checkoutScript = $creditCardCss . '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.checkout.js"></script>';
         $moduleDisplay .= $checkoutScript;
 
         return [
@@ -634,7 +634,7 @@ class paypalac_creditcard extends base
             foreach ($accepted_types as $type) {
                 $type = strtolower(trim($type));
                 if (isset($cardImageMap[$type])) {
-                    $imagePath = DIR_WS_MODULES . 'payment/paypal/PayPalRestful/images/' . $cardImageMap[$type];
+                    $imagePath = DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/images/' . $cardImageMap[$type];
                     $cardLabel = $cardLabelMap[$type] ?? $type;
                     $cardImages[] = zen_image($imagePath, $cardLabel, '', '', 'class="paypalac-card-logo"');
                 }
@@ -740,23 +740,23 @@ class paypalac_creditcard extends base
     public function pre_confirmation_check()
     {
         // Set payment type - this module always uses card payments
-        $_SESSION['PayPalRestful']['ppac_type'] = 'card';
+        $_SESSION['PayPalAdvancedCheckout']['ppac_type'] = 'card';
         
         // Store saved card selection if provided
         // Check both direct and forwarded field names
         if (isset($_POST['paypalac_saved_card'])) {
-            $_SESSION['PayPalRestful']['saved_card'] = $_POST['paypalac_saved_card'];
+            $_SESSION['PayPalAdvancedCheckout']['saved_card'] = $_POST['paypalac_saved_card'];
         } elseif (isset($_POST['ppac_saved_card'])) {
-            $_SESSION['PayPalRestful']['saved_card'] = $_POST['ppac_saved_card'];
+            $_SESSION['PayPalAdvancedCheckout']['saved_card'] = $_POST['ppac_saved_card'];
         }
         
         // Store save card preference
         if (isset($_POST['paypalac_cc_save_card'])) {
-            $_SESSION['PayPalRestful']['save_card'] = $_POST['paypalac_cc_save_card'];
+            $_SESSION['PayPalAdvancedCheckout']['save_card'] = $_POST['paypalac_cc_save_card'];
         } elseif (isset($_POST['ppac_cc_save_card'])) {
-            $_SESSION['PayPalRestful']['save_card'] = $_POST['ppac_cc_save_card'];
+            $_SESSION['PayPalAdvancedCheckout']['save_card'] = $_POST['ppac_cc_save_card'];
         } elseif ($this->orderRequiresVaultedCard()) {
-            $_SESSION['PayPalRestful']['save_card'] = true;
+            $_SESSION['PayPalAdvancedCheckout']['save_card'] = true;
         }
         
         // Validate card information
@@ -786,11 +786,11 @@ class paypalac_creditcard extends base
     {
         global $messageStack, $order;
 
-        $saved_card = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+        $saved_card = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? 'new'));
 
         // If using a saved card, minimal validation needed
         if ($saved_card !== 'new') {
-            $_SESSION['PayPalRestful']['saved_card'] = $saved_card;
+            $_SESSION['PayPalAdvancedCheckout']['saved_card'] = $saved_card;
 
             $vaultCards = $this->paypalCommon->getVaultedCardsForCustomer($_SESSION['customer_id'] ?? 0, true);
             $cardFound = false;
@@ -883,9 +883,9 @@ class paypalac_creditcard extends base
         $forceSaveCard = $allowSaveCard && $this->orderRequiresVaultedCard();
         $storeCard = $allowSaveCard && ($forceSaveCard || !empty($_POST['paypalac_cc_save_card']) || !empty($_POST['ppac_cc_save_card']));
         if ($storeCard === true) {
-            $_SESSION['PayPalRestful']['save_card'] = true;
+            $_SESSION['PayPalAdvancedCheckout']['save_card'] = true;
         } else {
-            unset($_SESSION['PayPalRestful']['save_card']);
+            unset($_SESSION['PayPalAdvancedCheckout']['save_card']);
         }
 
         $this->ccInfo = [
@@ -902,7 +902,7 @@ class paypalac_creditcard extends base
 
         // Do NOT store card data in session for security/PCI compliance
         // The card data must be re-entered or re-submitted if POST data is lost
-        $_SESSION['PayPalRestful']['saved_card'] = 'new';
+        $_SESSION['PayPalAdvancedCheckout']['saved_card'] = 'new';
 
         return true;
     }
@@ -932,20 +932,20 @@ class paypalac_creditcard extends base
 
     protected function getOrderTotalsInfo(): array
     {
-        global $zcObserverPaypalrestful;
+        global $zcObserverPaypaladvcheckout;
 
-        if (!isset($zcObserverPaypalrestful) || !is_object($zcObserverPaypalrestful)) {
+        if (!isset($zcObserverPaypaladvcheckout) || !is_object($zcObserverPaypaladvcheckout)) {
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
         }
 
-        $order_info = $zcObserverPaypalrestful->getLastOrderValues();
+        $order_info = $zcObserverPaypaladvcheckout->getLastOrderValues();
 
         if (count($order_info) === 0) {
             $this->log->write('Credit Cards: Missing order_total modifications; getLastOrderValues returned empty array.');
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
         }
 
-        $order_info['free_shipping_coupon'] = $zcObserverPaypalrestful->orderHasFreeShippingCoupon();
+        $order_info['free_shipping_coupon'] = $zcObserverPaypaladvcheckout->orderHasFreeShippingCoupon();
 
         return $order_info;
     }
@@ -1028,7 +1028,7 @@ class paypalac_creditcard extends base
 
     public function clear_payments()
     {
-        unset($_SESSION['PayPalRestful']);
+        unset($_SESSION['PayPalAdvancedCheckout']);
     }
 
     public function before_process()
@@ -1039,19 +1039,19 @@ class paypalac_creditcard extends base
 
         $this->paymentIsPending = false;
 
-        $wallet_status = $_SESSION['PayPalRestful']['Order']['status'] ?? '';
-        $wallet_user_action = $_SESSION['PayPalRestful']['Order']['user_action'] ?? '';
-        $payer_action_fast_path = ($wallet_status === PayPalRestfulApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
+        $wallet_status = $_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? '';
+        $wallet_user_action = $_SESSION['PayPalAdvancedCheckout']['Order']['user_action'] ?? '';
+        $payer_action_fast_path = ($wallet_status === PayPalAdvancedCheckoutApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
         
         if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false) {
-            $this->log->write('Credit Cards::before_process, cannot capture/authorize; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalRestful']['Order'] ?? []));
-            unset($_SESSION['PayPalRestful']['Order'], $_SESSION['payment']);
+            $this->log->write('Credit Cards::before_process, cannot capture/authorize; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalAdvancedCheckout']['Order'] ?? []));
+            unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
         }
         
         $response = $this->captureOrAuthorizePayment('card');
 
-        $_SESSION['PayPalRestful']['Order']['status'] = $response['status'];
+        $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $response['status'];
         unset($response['links']);
         $this->orderInfo = $response;
 
@@ -1065,7 +1065,7 @@ class paypalac_creditcard extends base
 
         $txn_type = $this->orderInfo['intent'];
         $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
-        $payment_status = ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalRestfulApi::STATUS_CAPTURED : PayPalRestfulApi::STATUS_APPROVED);
+        $payment_status = ($payment['status'] !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalAdvancedCheckoutApi::STATUS_CAPTURED : PayPalAdvancedCheckoutApi::STATUS_APPROVED);
 
         $this->orderInfo['payment_status'] = $payment_status;
         $this->orderInfo['paypal_payment_status'] = $payment['status'];
@@ -1073,7 +1073,7 @@ class paypalac_creditcard extends base
 
         $this->orderInfo['expiration_time'] = $payment['expiration_time'] ?? null;
 
-        if ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED) {
+        if ($payment['status'] !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED) {
             $pending_status = (int)MODULE_PAYMENT_PAYPALAC_HELD_STATUS_ID;
             if ($pending_status > 0) {
                 $this->order_status = $pending_status;
@@ -1096,15 +1096,15 @@ class paypalac_creditcard extends base
             return;
         }
 
-        $visible = !empty($_SESSION['PayPalRestful']['save_card']);
+        $visible = !empty($_SESSION['PayPalAdvancedCheckout']['save_card']);
 
-        $_SESSION['PayPalRestful']['VaultCardData'] = [
+        $_SESSION['PayPalAdvancedCheckout']['VaultCardData'] = [
             'card_source' => $card_source,
             'visible' => $visible,
         ];
 
         // Backward compatibility for any legacy consumers
-        $_SESSION['PayPalRestful']['vault_card'] = $card_source;
+        $_SESSION['PayPalAdvancedCheckout']['vault_card'] = $card_source;
     }
 
     protected function extractCardSource(array $response): ?array
@@ -1225,7 +1225,7 @@ class paypalac_creditcard extends base
     public function admin_notification($zf_order_id)
     {
         $zf_order_id = (int)$zf_order_id;
-        $ppr = $this->getPayPalRestfulApi();
+        $ppr = $this->getPayPalAdvancedCheckoutApi();
         if ($ppr === null) {
             return '';
         }
@@ -1242,22 +1242,22 @@ class paypalac_creditcard extends base
 
     public function _doRefund($oID)
     {
-        return $this->paypalCommon->processRefund($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION);
+        return $this->paypalCommon->processRefund($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION);
     }
 
     public function _doAuth($oID, $order_amt, $currency = 'USD')
     {
-        return $this->paypalCommon->processAuthorization($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION, $order_amt, $currency, false);
+        return $this->paypalCommon->processAuthorization($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION, $order_amt, $currency, false);
     }
 
     public function _doCapt($oID, $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
     {
-        return $this->paypalCommon->processCapture($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION, $captureType, $order_amt, $order_currency);
+        return $this->paypalCommon->processCapture($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION, $captureType, $order_amt, $order_currency);
     }
 
     public function _doVoid($oID)
     {
-        return $this->paypalCommon->processVoid($oID, $this->getPayPalRestfulApi(), $this->code, self::CURRENT_VERSION);
+        return $this->paypalCommon->processVoid($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION);
     }
 
     public function check(): bool

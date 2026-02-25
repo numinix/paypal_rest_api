@@ -59,7 +59,7 @@ class OrderGuidReuseStatusCheckTest
         $content = file_get_contents($this->paypalacFile);
         
         // Look for the status check logic
-        $hasStatusCheck = preg_match('/\$cached_status\s*=.*?PayPalRestful.*?Order.*?status/s', $content);
+        $hasStatusCheck = preg_match('/\$cached_status\s*=.*?PayPalAdvancedCheckout.*?Order.*?status/s', $content);
         $hasReusableConstant = preg_match('/const\s+REUSABLE_ORDER_STATUSES\s*=/', $content);
         $hasInArrayCheck = preg_match('/in_array\s*\(\s*\$cached_status\s*,\s*self::REUSABLE_ORDER_STATUSES/', $content);
         

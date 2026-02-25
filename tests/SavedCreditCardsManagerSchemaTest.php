@@ -120,12 +120,12 @@ namespace {
     $db = new MockDb();
 
     // Load the SavedCreditCardsManager
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/SavedCreditCardsManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SavedCreditCardsManager.php';
 
     $failures = 0;
 
     // Test 1: Verify SavedCreditCardsManager class exists
-    if (!class_exists('PayPalRestful\\Common\\SavedCreditCardsManager')) {
+    if (!class_exists('PayPalAdvancedCheckout\\Common\\SavedCreditCardsManager')) {
         fwrite(STDERR, "✗ SavedCreditCardsManager class not found\n");
         $failures++;
     } else {
@@ -134,7 +134,7 @@ namespace {
 
     // Test 2: Call ensureSchema() and verify it creates tables
     try {
-        \PayPalRestful\Common\SavedCreditCardsManager::ensureSchema();
+        \PayPalAdvancedCheckout\Common\SavedCreditCardsManager::ensureSchema();
         fwrite(STDOUT, "✓ SavedCreditCardsManager::ensureSchema() executed without errors\n");
     } catch (\Exception $e) {
         fwrite(STDERR, "✗ ensureSchema() threw exception: " . $e->getMessage() . "\n");
