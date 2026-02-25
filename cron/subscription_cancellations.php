@@ -13,7 +13,7 @@
  * - paypalwpp.php (Website Payments Pro)
  * - paypal.php (PayPal Standard)
  * - paypaldp.php (Direct Payments)
- * - paypalr.php (REST API)
+ * - paypalac.php (REST API)
  * - payflow.php (Payflow)
  */
 

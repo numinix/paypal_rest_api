@@ -15,10 +15,10 @@ if (!defined('DIR_WS_MODULES')) {
     define('DIR_WS_MODULES', 'includes/modules/');
 }
 
-// Create a minimal PSR-4 autoloader for PayPalRestful namespace
+// Create a minimal PSR-4 autoloader for PayPalAdvancedCheckout namespace
 spl_autoload_register(function ($class) {
-    $prefix = 'PayPalRestful\\';
-    $base_dir = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/';
+    $prefix = 'PayPalAdvancedCheckout\\';
+    $base_dir = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/';
     
     $len = strlen($prefix);
     if (strncmp($prefix, $class, $len) !== 0) {
@@ -37,7 +37,7 @@ echo "\n=== Testing Helpers::convertPayPalDatePay2Db Type Signature ===\n\n";
 
 // Test 1: Verify the method signature accepts nullable string
 echo "Test 1: Verify method signature accepts nullable string parameter\n";
-$reflectionClass = new ReflectionClass('PayPalRestful\Common\Helpers');
+$reflectionClass = new ReflectionClass('PayPalAdvancedCheckout\Common\Helpers');
 $reflectionMethod = $reflectionClass->getMethod('convertPayPalDatePay2Db');
 $parameters = $reflectionMethod->getParameters();
 
@@ -90,7 +90,7 @@ echo "✓ PASS: Return type is ?string\n\n";
 // Test 3: Verify the method can be called with null without TypeError
 echo "Test 3: Verify method can be called with null without TypeError\n";
 try {
-    $result = \PayPalRestful\Common\Helpers::convertPayPalDatePay2Db(null);
+    $result = \PayPalAdvancedCheckout\Common\Helpers::convertPayPalDatePay2Db(null);
     echo "✓ PASS: Method accepts null parameter without TypeError\n";
     
     if ($result !== null) {
@@ -106,7 +106,7 @@ try {
 // Test 4: Verify the method can be called with empty string
 echo "Test 4: Verify method handles empty string correctly\n";
 try {
-    $result = \PayPalRestful\Common\Helpers::convertPayPalDatePay2Db('');
+    $result = \PayPalAdvancedCheckout\Common\Helpers::convertPayPalDatePay2Db('');
     echo "✓ PASS: Method accepts empty string without error\n";
     
     if ($result !== null) {
@@ -122,7 +122,7 @@ try {
 // Test 5: Verify the method still works with valid date strings
 echo "Test 5: Verify method still works with valid date strings\n";
 try {
-    $result = \PayPalRestful\Common\Helpers::convertPayPalDatePay2Db('2024-11-21T17:30:45Z');
+    $result = \PayPalAdvancedCheckout\Common\Helpers::convertPayPalDatePay2Db('2024-11-21T17:30:45Z');
     
     if ($result === null) {
         echo "✗ FAIL: Expected non-null return value for valid date string\n";

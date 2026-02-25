@@ -1,6 +1,6 @@
 # Summary of Fixes
 
-This PR addresses three critical issues in the PayPal REST API plugin:
+This PR addresses three critical issues in the PayPal Advanced Checkout plugin:
 
 ## 1. MessageStack.add_session() Format Correction
 
@@ -18,10 +18,10 @@ $messageStack->add_session('Success message', 'success');
 ```
 
 ### Files Fixed
-- `admin/paypalr_subscriptions.php` - 29 instances
-- `admin/paypalr_saved_card_recurring.php` - 14 instances  
-- `admin/paypalr_integrated_signup.php` - 1 instance
-- `admin/paypalr_upgrade.php` - 1 instance
+- `admin/paypalac_subscriptions.php` - 29 instances
+- `admin/paypalac_saved_card_recurring.php` - 14 instances  
+- `admin/paypalac_integrated_signup.php` - 1 instance
+- `admin/paypalac_upgrade.php` - 1 instance
 
 **Total: 51 messageStack calls corrected**
 
@@ -92,7 +92,7 @@ if (isset($record['orders_products_id']) && (int)$record['orders_products_id'] =
 ```
 
 ### Files Fixed
-- `includes/modules/payment/paypal/PayPalRestful/Common/LegacySubscriptionMigrator.php`
+- `includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/LegacySubscriptionMigrator.php`
 
 ## Test Results
 

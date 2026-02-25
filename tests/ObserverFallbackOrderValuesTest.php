@@ -32,23 +32,23 @@ namespace {
         define('FILENAME_DEFAULT', 'index');
     }
 
-    if (!defined('MODULE_PAYMENT_PAYPALR_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_STATUS', 'True');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-        define('MODULE_PAYMENT_PAYPALR_SERVER', 'sandbox');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+        define('MODULE_PAYMENT_PAYPALAC_SERVER', 'sandbox');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_L', 'LiveClientId');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_L', 'LiveClientId');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_L')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_L', 'LiveClientSecret');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_L', 'LiveClientSecret');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_S', 'SandboxClientId');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_S', 'SandboxClientId');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_S')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_S', 'SandboxClientSecret');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_S', 'SandboxClientSecret');
     }
 
     if (!class_exists('base')) {
@@ -62,7 +62,7 @@ namespace {
     $current_page_base = 'checkout_confirmation';
 }
 
-namespace PayPalRestful\Api\Data {
+namespace PayPalAdvancedCheckout\Api\Data {
     class CountryCodes {
         public static function convertCountryCode($code) {
             return $code;
@@ -70,13 +70,13 @@ namespace PayPalRestful\Api\Data {
     }
 }
 
-namespace PayPalRestful\Api {
-    class PayPalRestfulApi {
+namespace PayPalAdvancedCheckout\Api {
+    class PayPalAdvancedCheckoutApi {
         const PARTNER_ATTRIBUTION_ID = 'TEST_BN_CODE';
     }
 }
 
-namespace PayPalRestful\Zc2Pp {
+namespace PayPalAdvancedCheckout\Zc2Pp {
     class Amount {
         public function __construct($currency) {}
         public function getDefaultCurrencyCode() { return 'USD'; }
@@ -102,7 +102,7 @@ namespace {
         };
     }
 
-    require_once dirname(__DIR__) . '/includes/classes/observers/auto.paypalrestful.php';
+    require_once dirname(__DIR__) . '/includes/classes/observers/auto.paypaladvcheckout.php';
 
     /**
      * Test class for observer fallback order values functionality
@@ -125,7 +125,7 @@ namespace {
             global $order;
             $order = null;
 
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             $result = $observer->getLastOrderValues();
 
             $this->assertIsArray($result);
@@ -148,7 +148,7 @@ namespace {
                 'tax_groups' => ['Tax 8%' => 10.00],
             ];
 
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             $result = $observer->getLastOrderValues();
 
             $this->assertIsArray($result);
@@ -178,7 +178,7 @@ namespace {
                 'tax_groups' => ['Different Tax' => 99.99],
             ];
 
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             
             // Simulate receiving a notification
             $notificationData = [
@@ -220,7 +220,7 @@ namespace {
                 'tax' => 3.00,
             ];
 
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             $result = $observer->getLastOrderValues();
 
             $this->assertIsArray($result);
@@ -242,7 +242,7 @@ namespace {
             global $order;
             $order = 'not an object';
 
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             $result = $observer->getLastOrderValues();
 
             $this->assertIsArray($result);
@@ -258,7 +258,7 @@ namespace {
             $order = new \stdClass();
             // No info property
 
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             $result = $observer->getLastOrderValues();
 
             $this->assertIsArray($result);

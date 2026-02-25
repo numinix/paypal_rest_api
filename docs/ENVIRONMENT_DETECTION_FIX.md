@@ -6,7 +6,7 @@
 
 **Symptom:**
 ```
-PayPalRestfulApi::__construct: REST credentials for the sandbox environment are not fully configured.
+PayPalAdvancedCheckoutApi::__construct: REST credentials for the sandbox environment are not fully configured.
 The curlPost (v1/oauth2/token) request failed with invalid credentials.
 "10002": "https://api-m.sandbox.paypal.com/v1/oauth2/token"
 ```
@@ -14,9 +14,9 @@ The curlPost (v1/oauth2/token) request failed with invalid credentials.
 **Root Cause:**
 
 The `get_paypal_rest_client()` method in `paypalSavedCardRecurring.php` was looking for non-existent constants:
-- `MODULE_PAYMENT_PAYPALR_CLIENT_ID`
-- `MODULE_PAYMENT_PAYPALR_CLIENT_SECRET`
-- `MODULE_PAYMENT_PAYPALR_ENVIRONMENT`
+- `MODULE_PAYMENT_PAYPALAC_CLIENT_ID`
+- `MODULE_PAYMENT_PAYPALAC_CLIENT_SECRET`
+- `MODULE_PAYMENT_PAYPALAC_ENVIRONMENT`
 
 Since these constants don't exist, it would:
 1. Default to empty credentials
@@ -48,30 +48,30 @@ The cron script referenced email template constants that were never defined:
 
 **Before:**
 ```php
-$clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENT_ID') ? MODULE_PAYMENT_PAYPALR_CLIENT_ID : '';
-$clientSecret = defined('MODULE_PAYMENT_PAYPALR_CLIENT_SECRET') ? MODULE_PAYMENT_PAYPALR_CLIENT_SECRET : '';
+$clientId = defined('MODULE_PAYMENT_PAYPALAC_CLIENT_ID') ? MODULE_PAYMENT_PAYPALAC_CLIENT_ID : '';
+$clientSecret = defined('MODULE_PAYMENT_PAYPALAC_CLIENT_SECRET') ? MODULE_PAYMENT_PAYPALAC_CLIENT_SECRET : '';
 $environment = '';
-if (defined('MODULE_PAYMENT_PAYPALR_ENVIRONMENT')) {
-    $environment = MODULE_PAYMENT_PAYPALR_ENVIRONMENT;
+if (defined('MODULE_PAYMENT_PAYPALAC_ENVIRONMENT')) {
+    $environment = MODULE_PAYMENT_PAYPALAC_ENVIRONMENT;
 }
 // ... defaults to sandbox
 ```
 
 **After:**
 ```php
-// Determine environment from MODULE_PAYMENT_PAYPALR_SERVER
+// Determine environment from MODULE_PAYMENT_PAYPALAC_SERVER
 $environment = 'sandbox'; // Default to sandbox
-if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-    $environment = strtolower(MODULE_PAYMENT_PAYPALR_SERVER);
+if (defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+    $environment = strtolower(MODULE_PAYMENT_PAYPALAC_SERVER);
 }
 
 // Get the appropriate credentials based on environment
 if ($environment === 'live') {
-    $clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : '';
-    $clientSecret = defined('MODULE_PAYMENT_PAYPALR_SECRET_L') ? MODULE_PAYMENT_PAYPALR_SECRET_L : '';
+    $clientId = defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : '';
+    $clientSecret = defined('MODULE_PAYMENT_PAYPALAC_SECRET_L') ? MODULE_PAYMENT_PAYPALAC_SECRET_L : '';
 } else {
-    $clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S') ? MODULE_PAYMENT_PAYPALR_CLIENTID_S : '';
-    $clientSecret = defined('MODULE_PAYMENT_PAYPALR_SECRET_S') ? MODULE_PAYMENT_PAYPALR_SECRET_S : '';
+    $clientId = defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_S : '';
+    $clientSecret = defined('MODULE_PAYMENT_PAYPALAC_SECRET_S') ? MODULE_PAYMENT_PAYPALAC_SECRET_S : '';
 }
 ```
 
@@ -103,20 +103,20 @@ These constants are defined in the PayPal payment module configuration:
 
 | Constant | Purpose | Values |
 |----------|---------|--------|
-| `MODULE_PAYMENT_PAYPALR_SERVER` | Determines environment | 'live' or 'sandbox' |
-| `MODULE_PAYMENT_PAYPALR_CLIENTID_L` | Live Client ID | Your production client ID |
-| `MODULE_PAYMENT_PAYPALR_SECRET_L` | Live Secret | Your production secret |
-| `MODULE_PAYMENT_PAYPALR_CLIENTID_S` | Sandbox Client ID | Your sandbox client ID |
-| `MODULE_PAYMENT_PAYPALR_SECRET_S` | Sandbox Secret | Your sandbox secret |
+| `MODULE_PAYMENT_PAYPALAC_SERVER` | Determines environment | 'live' or 'sandbox' |
+| `MODULE_PAYMENT_PAYPALAC_CLIENTID_L` | Live Client ID | Your production client ID |
+| `MODULE_PAYMENT_PAYPALAC_SECRET_L` | Live Secret | Your production secret |
+| `MODULE_PAYMENT_PAYPALAC_CLIENTID_S` | Sandbox Client ID | Your sandbox client ID |
+| `MODULE_PAYMENT_PAYPALAC_SECRET_S` | Sandbox Secret | Your sandbox secret |
 
 ### 2. Environment Selection Flow
 
 ```
-1. Check MODULE_PAYMENT_PAYPALR_SERVER
+1. Check MODULE_PAYMENT_PAYPALAC_SERVER
    ├─ If 'live' → Use CLIENTID_L and SECRET_L
    └─ Otherwise → Use CLIENTID_S and SECRET_S (default)
 
-2. Initialize PayPalRestfulApi with:
+2. Initialize PayPalAdvancedCheckoutApi with:
    - Environment ('live' or 'sandbox')
    - Client ID (from appropriate constant)
    - Client Secret (from appropriate constant)
@@ -130,10 +130,10 @@ These constants are defined in the PayPal payment module configuration:
 
 The fix aligns with how other parts of the code determine environment:
 
-**Example from `PayPalRestfulApi.php`:**
+**Example from `PayPalAdvancedCheckoutApi.php`:**
 ```php
-if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-    $configured = strtolower((string)MODULE_PAYMENT_PAYPALR_SERVER);
+if (defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+    $configured = strtolower((string)MODULE_PAYMENT_PAYPALAC_SERVER);
     if ($configured === 'live') {
         return 'live';
     }
@@ -146,7 +146,7 @@ return 'sandbox';
 ### Automated Test: PayPalEnvironmentDetectionTest.php
 
 Verifies:
-1. ✓ Uses `MODULE_PAYMENT_PAYPALR_SERVER` for environment detection
+1. ✓ Uses `MODULE_PAYMENT_PAYPALAC_SERVER` for environment detection
 2. ✓ Uses `CLIENTID_L` and `SECRET_L` for live environment
 3. ✓ Uses `CLIENTID_S` and `SECRET_S` for sandbox environment
 4. ✓ No old incorrect constant names remain
@@ -198,7 +198,7 @@ php tests/PayPalEnvironmentDetectionTest.php
 - `includes/classes/paypalSavedCardRecurring.php` - Environment detection fix
 - `cron/paypal_saved_card_recurring.php` - Email constants definition
 - `tests/PayPalEnvironmentDetectionTest.php` - Test coverage
-- `includes/modules/payment/paypal/PayPalRestful/Api/PayPalRestfulApi.php` - Reference implementation
+- `includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php` - Reference implementation
 
 ## Change History
 

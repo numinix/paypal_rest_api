@@ -30,21 +30,21 @@ namespace {
     }
 
     /**
-     * Test that Apple Pay module does not use MODULE_PAYMENT_PAYPALR_MERCHANT_ID (language label)
+     * Test that Apple Pay module does not use MODULE_PAYMENT_PAYPALAC_MERCHANT_ID (language label)
      */
     function testApplePayDoesNotUseMerchantIdLanguageLabel(): bool
     {
         $passed = true;
-        $applePayFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalr_applepay.php';
+        $applePayFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalac_applepay.php';
         $content = file_get_contents($applePayFile);
 
-        // Check that MODULE_PAYMENT_PAYPALR_MERCHANT_ID is NOT used
+        // Check that MODULE_PAYMENT_PAYPALAC_MERCHANT_ID is NOT used
         // (This is a language constant containing "Merchant ID:", not an actual merchant ID)
-        if (strpos($content, "defined('MODULE_PAYMENT_PAYPALR_MERCHANT_ID')") !== false) {
-            fwrite(STDERR, "FAIL: Apple Pay should NOT reference MODULE_PAYMENT_PAYPALR_MERCHANT_ID (it's a language label)\n");
+        if (strpos($content, "defined('MODULE_PAYMENT_PAYPALAC_MERCHANT_ID')") !== false) {
+            fwrite(STDERR, "FAIL: Apple Pay should NOT reference MODULE_PAYMENT_PAYPALAC_MERCHANT_ID (it's a language label)\n");
             $passed = false;
         } else {
-            fwrite(STDOUT, "✓ Apple Pay does not reference MODULE_PAYMENT_PAYPALR_MERCHANT_ID\n");
+            fwrite(STDOUT, "✓ Apple Pay does not reference MODULE_PAYMENT_PAYPALAC_MERCHANT_ID\n");
         }
 
         return $passed;
@@ -56,7 +56,7 @@ namespace {
     function testGooglePayValidatesOptionalMerchantIdConstant(): bool
     {
         $passed = true;
-        $googlePayFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalr_googlepay.php';
+        $googlePayFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalac_googlepay.php';
         $content = file_get_contents($googlePayFile);
 
         // Find the ajaxGetWalletConfig method
@@ -112,13 +112,13 @@ namespace {
     {
         $passed = true;
         $jsFiles = [
-            'jquery.paypalr.applepay.js',
-            'jquery.paypalr.googlepay.js',
-            'jquery.paypalr.venmo.js',
+            'jquery.paypalac.applepay.js',
+            'jquery.paypalac.googlepay.js',
+            'jquery.paypalac.venmo.js',
         ];
 
         foreach ($jsFiles as $jsFile) {
-            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/' . $jsFile;
+            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/' . $jsFile;
             $content = file_get_contents($jsPath);
 
             // Check for the merchant ID validation regex
@@ -149,7 +149,7 @@ namespace {
     function testApplePayReturnsEmptyMerchantId(): bool
     {
         $passed = true;
-        $applePayFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalr_applepay.php';
+        $applePayFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalac_applepay.php';
         $content = file_get_contents($applePayFile);
 
         // Find the ajaxGetWalletConfig method
@@ -187,7 +187,7 @@ namespace {
     function testVenmoUsesOptionalMerchantId(): bool
     {
         $passed = true;
-        $venmoFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalr_venmo.php';
+        $venmoFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalac_venmo.php';
         $content = file_get_contents($venmoFile);
 
         // Find the ajaxGetWalletConfig method
@@ -200,19 +200,19 @@ namespace {
         // Get the method body
         $methodBody = substr($content, $methodStart, 1500);
 
-        // Check that it uses MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID, not MODULE_PAYMENT_PAYPALR_MERCHANT_ID
-        if (strpos($methodBody, 'MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID') !== false) {
-            fwrite(STDOUT, "✓ Venmo uses MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID\n");
+        // Check that it uses MODULE_PAYMENT_PAYPALAC_VENMO_ACCOUNT_ID, not MODULE_PAYMENT_PAYPALAC_MERCHANT_ID
+        if (strpos($methodBody, 'MODULE_PAYMENT_PAYPALAC_VENMO_ACCOUNT_ID') !== false) {
+            fwrite(STDOUT, "✓ Venmo uses MODULE_PAYMENT_PAYPALAC_VENMO_ACCOUNT_ID\n");
         } else {
-            fwrite(STDERR, "FAIL: Venmo should use MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID\n");
+            fwrite(STDERR, "FAIL: Venmo should use MODULE_PAYMENT_PAYPALAC_VENMO_ACCOUNT_ID\n");
             $passed = false;
         }
 
-        // Check that MODULE_PAYMENT_PAYPALR_MERCHANT_ID is NOT used
-        if (strpos($methodBody, "defined('MODULE_PAYMENT_PAYPALR_MERCHANT_ID')") === false) {
-            fwrite(STDOUT, "✓ Venmo does not use MODULE_PAYMENT_PAYPALR_MERCHANT_ID\n");
+        // Check that MODULE_PAYMENT_PAYPALAC_MERCHANT_ID is NOT used
+        if (strpos($methodBody, "defined('MODULE_PAYMENT_PAYPALAC_MERCHANT_ID')") === false) {
+            fwrite(STDOUT, "✓ Venmo does not use MODULE_PAYMENT_PAYPALAC_MERCHANT_ID\n");
         } else {
-            fwrite(STDERR, "FAIL: Venmo should NOT use MODULE_PAYMENT_PAYPALR_MERCHANT_ID\n");
+            fwrite(STDERR, "FAIL: Venmo should NOT use MODULE_PAYMENT_PAYPALAC_MERCHANT_ID\n");
             $passed = false;
         }
 
@@ -269,11 +269,11 @@ namespace {
     } else {
         fwrite(STDOUT, "\n✓ All merchant ID validation tests passed!\n");
         fwrite(STDOUT, "\nFix summary:\n");
-        fwrite(STDOUT, "1. MODULE_PAYMENT_PAYPALR_MERCHANT_ID is a LANGUAGE LABEL ('Merchant ID:'),\n");
+        fwrite(STDOUT, "1. MODULE_PAYMENT_PAYPALAC_MERCHANT_ID is a LANGUAGE LABEL ('Merchant ID:'),\n");
         fwrite(STDOUT, "   not a configuration value. It should NOT be used as a merchant ID.\n");
         fwrite(STDOUT, "2. Apple Pay via PayPal does not require merchant-id parameter in SDK URL.\n");
         fwrite(STDOUT, "3. Google Pay via PayPal REST uses a validated optional Google Merchant ID configuration when provided.\n");
-        fwrite(STDOUT, "4. Venmo uses MODULE_PAYMENT_PAYPALR_VENMO_ACCOUNT_ID (optional).\n");
+        fwrite(STDOUT, "4. Venmo uses MODULE_PAYMENT_PAYPALAC_VENMO_ACCOUNT_ID (optional).\n");
         fwrite(STDOUT, "5. JavaScript validates merchant ID format before including in SDK URL.\n");
         exit(0);
     }

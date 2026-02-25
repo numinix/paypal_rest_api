@@ -10,8 +10,8 @@ declare(strict_types=1);
  * an admin-wide loading file like extra_datafiles or extra_definitions."
  * 
  * The fix splits constants between two admin-wide loading files:
- * - admin/includes/extra_datafiles/paypalr_filenames.php (FILENAME_* constants)
- * - admin/includes/languages/english/extra_definitions/paypalr_admin_names.php (BOX_* constants)
+ * - admin/includes/extra_datafiles/paypalac_filenames.php (FILENAME_* constants)
+ * - admin/includes/languages/english/extra_definitions/paypalac_admin_names.php (BOX_* constants)
  * 
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -28,12 +28,12 @@ namespace {
     $failures = 0;
 
     // Test 1: Verify FILENAME_* constants are defined in extra_datafiles
-    require_once DIR_FS_CATALOG . 'admin/includes/extra_datafiles/paypalr_filenames.php';
+    require_once DIR_FS_CATALOG . 'admin/includes/extra_datafiles/paypalac_filenames.php';
     
     $filename_constants = [
-        'FILENAME_PAYPALR_SUBSCRIPTIONS' => 'paypalr_subscriptions',
-        'FILENAME_PAYPALR_SAVED_CARD_RECURRING' => 'paypalr_saved_card_recurring',
-        'FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT' => 'paypalr_subscriptions_report',
+        'FILENAME_PAYPALAC_SUBSCRIPTIONS' => 'paypalac_subscriptions',
+        'FILENAME_PAYPALAC_SAVED_CARD_RECURRING' => 'paypalac_saved_card_recurring',
+        'FILENAME_PAYPALAC_SUBSCRIPTIONS_REPORT' => 'paypalac_subscriptions_report',
     ];
     
     foreach ($filename_constants as $const => $expectedValue) {
@@ -57,12 +57,12 @@ namespace {
     }
 
     // Test 2: Verify BOX_* constants are defined in extra_definitions
-    require_once DIR_FS_CATALOG . 'admin/includes/languages/english/extra_definitions/paypalr_admin_names.php';
+    require_once DIR_FS_CATALOG . 'admin/includes/languages/english/extra_definitions/paypalac_admin_names.php';
     
     $box_constants = [
-        'BOX_PAYPALR_SUBSCRIPTIONS' => 'Vaulted Subscriptions',
-        'BOX_PAYPALR_SAVED_CARD_RECURRING' => 'Saved Card Subscriptions',
-        'BOX_PAYPALR_SUBSCRIPTIONS_REPORT' => 'Active Subscriptions Report',
+        'BOX_PAYPALAC_SUBSCRIPTIONS' => 'Vaulted Subscriptions',
+        'BOX_PAYPALAC_SAVED_CARD_RECURRING' => 'Saved Card Subscriptions',
+        'BOX_PAYPALAC_SUBSCRIPTIONS_REPORT' => 'Active Subscriptions Report',
     ];
     
     foreach ($box_constants as $const => $expectedValue) {
@@ -87,12 +87,12 @@ namespace {
 
     // Test 3: Verify all constants required by the installer are available
     $installer_required_constants = [
-        'BOX_PAYPALR_SUBSCRIPTIONS',
-        'FILENAME_PAYPALR_SUBSCRIPTIONS',
-        'BOX_PAYPALR_SAVED_CARD_RECURRING',
-        'FILENAME_PAYPALR_SAVED_CARD_RECURRING',
-        'BOX_PAYPALR_SUBSCRIPTIONS_REPORT',
-        'FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT',
+        'BOX_PAYPALAC_SUBSCRIPTIONS',
+        'FILENAME_PAYPALAC_SUBSCRIPTIONS',
+        'BOX_PAYPALAC_SAVED_CARD_RECURRING',
+        'FILENAME_PAYPALAC_SAVED_CARD_RECURRING',
+        'BOX_PAYPALAC_SUBSCRIPTIONS_REPORT',
+        'FILENAME_PAYPALAC_SUBSCRIPTIONS_REPORT',
     ];
     
     fwrite(STDOUT, "\nVerifying all installer-required constants are available...\n");
@@ -106,7 +106,7 @@ namespace {
     }
 
     // Test 4: Verify the old page-specific language file is removed
-    $old_language_file = DIR_FS_CATALOG . 'admin/includes/languages/english/paypalr_subscriptions.php';
+    $old_language_file = DIR_FS_CATALOG . 'admin/includes/languages/english/paypalac_subscriptions.php';
     if (file_exists($old_language_file)) {
         fwrite(STDERR, "WARNING: Old page-specific language file still exists: $old_language_file\n");
         fwrite(STDERR, "This file should be removed in favor of admin-wide loading via extra_definitions\n");
@@ -119,7 +119,7 @@ namespace {
     fwrite(STDOUT, "\nVerifying correct constant separation...\n");
     
     // Check that extra_datafiles file only has FILENAME_* constants (not BOX_*)
-    $datafiles_content = file_get_contents(DIR_FS_CATALOG . 'admin/includes/extra_datafiles/paypalr_filenames.php');
+    $datafiles_content = file_get_contents(DIR_FS_CATALOG . 'admin/includes/extra_datafiles/paypalac_filenames.php');
     if (preg_match('/define\s*\(\s*[\'"]BOX_[^\'\"]*[\'\"]\s*,/', $datafiles_content)) {
         fwrite(STDERR, "ERROR: BOX_* constant definitions found in extra_datafiles (should be in extra_definitions)\n");
         $failures++;
@@ -128,7 +128,7 @@ namespace {
     }
     
     // Check that extra_definitions file only has BOX_* constants (not FILENAME_*)
-    $definitions_content = file_get_contents(DIR_FS_CATALOG . 'admin/includes/languages/english/extra_definitions/paypalr_admin_names.php');
+    $definitions_content = file_get_contents(DIR_FS_CATALOG . 'admin/includes/languages/english/extra_definitions/paypalac_admin_names.php');
     if (preg_match('/define\s*\(\s*[\'"]FILENAME_[^\'\"]*[\'\"]\s*,/', $definitions_content)) {
         fwrite(STDERR, "ERROR: FILENAME_* constant definitions found in extra_definitions (should be in extra_datafiles)\n");
         $failures++;

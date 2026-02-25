@@ -9,8 +9,8 @@ $testPassed = true;
 $errors = [];
 
 // Mock the constant
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC', 'Card');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVED_CARD_GENERIC')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVED_CARD_GENERIC', 'Card');
 }
 
 // Mock the zen_output_string function
@@ -23,7 +23,7 @@ if (!function_exists('zen_output_string')) {
 // Simulate the buildSavedCardOptions brand selection logic
 function getBrandForCard(array $card): string 
 {
-    return $card['brand'] ?: ($card['card_type'] ?: (MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC ?? 'Card'));
+    return $card['brand'] ?: ($card['card_type'] ?: (MODULE_PAYMENT_PAYPALAC_SAVED_CARD_GENERIC ?? 'Card'));
 }
 
 function buildTestCardLabel(array $card): string

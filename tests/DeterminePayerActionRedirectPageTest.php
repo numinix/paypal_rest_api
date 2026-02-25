@@ -20,7 +20,7 @@ namespace {
     };
 }
 
-namespace PayPalRestful\Compatibility {
+namespace PayPalAdvancedCheckout\Compatibility {
     class Language
     {
         public static function load(): void
@@ -30,8 +30,8 @@ namespace PayPalRestful\Compatibility {
     }
 }
 
-namespace PayPalRestful\Api {
-    class PayPalRestfulApi
+namespace PayPalAdvancedCheckout\Api {
+    class PayPalAdvancedCheckoutApi
     {
         public const STATUS_APPROVED = 'APPROVED';
         public const STATUS_COMPLETED = 'COMPLETED';
@@ -39,13 +39,13 @@ namespace PayPalRestful\Api {
     }
 }
 
-namespace PayPalRestful\Api\Data {
+namespace PayPalAdvancedCheckout\Api\Data {
     class CountryCodes
     {
     }
 }
 
-namespace PayPalRestful\Common {
+namespace PayPalAdvancedCheckout\Common {
     class ErrorInfo
     {
     }
@@ -63,7 +63,7 @@ namespace PayPalRestful\Common {
     }
 }
 
-namespace PayPalRestful\Admin {
+namespace PayPalAdvancedCheckout\Admin {
     class AdminMain
     {
     }
@@ -89,7 +89,7 @@ namespace PayPalRestful\Admin {
     }
 }
 
-namespace PayPalRestful\Zc2Pp {
+namespace PayPalAdvancedCheckout\Zc2Pp {
     class Amount
     {
     }
@@ -104,9 +104,9 @@ namespace PayPalRestful\Zc2Pp {
 }
 
 namespace {
-    require_once dirname(__DIR__) . '/includes/modules/payment/paypalr.php';
+    require_once dirname(__DIR__) . '/includes/modules/payment/paypalac.php';
 
-    class PaypalrTestDouble extends \paypalr
+    class PaypalacTestDouble extends \paypalac
     {
         public function __construct()
         {
@@ -146,7 +146,7 @@ namespace {
         ],
     ];
 
-    $tester = new PaypalrTestDouble();
+    $tester = new PaypalacTestDouble();
     $failures = 0;
 
     foreach ($tests as $description => $test) {

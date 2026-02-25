@@ -8,23 +8,23 @@ When creating a subscription order using a saved card without a Plan ID (Zen Car
 3. **No Manual Date Editing**: There was no option to manually change the next billing date for testing purposes
 
 ## Root Cause
-The observer `auto.paypalrestful_recurring.php` was routing ALL subscriptions to `TABLE_PAYPAL_SUBSCRIPTIONS` (Vaulted Subscriptions), regardless of whether they had a `plan_id`. This was incorrect for Zen Cart-managed subscriptions (those without a `plan_id`).
+The observer `auto.paypalacestful_recurring.php` was routing ALL subscriptions to `TABLE_PAYPAL_SUBSCRIPTIONS` (Vaulted Subscriptions), regardless of whether they had a `plan_id`. This was incorrect for Zen Cart-managed subscriptions (those without a `plan_id`).
 
 ## Solution Implemented
 
 ### 1. Subscription Routing Logic (Observer)
-**File**: `includes/classes/observers/auto.paypalrestful_recurring.php`
+**File**: `includes/classes/observers/auto.paypalacestful_recurring.php`
 
 The observer now checks for the presence of `plan_id` and routes subscriptions accordingly:
 
 - **Subscriptions WITH plan_id** (PayPal-managed):
   - Route to: `TABLE_PAYPAL_SUBSCRIPTIONS`
-  - Admin page: Vaulted Subscriptions (`paypalr_subscriptions.php`)
+  - Admin page: Vaulted Subscriptions (`paypalac_subscriptions.php`)
   - Uses: `SubscriptionManager::logSubscription()`
   
 - **Subscriptions WITHOUT plan_id** (Zen Cart-managed):
   - Route to: `TABLE_SAVED_CREDIT_CARDS_RECURRING`
-  - Admin page: Saved Card Subscriptions (`paypalr_saved_card_recurring.php`)
+  - Admin page: Saved Card Subscriptions (`paypalac_saved_card_recurring.php`)
   - Uses: `paypalSavedCardRecurring::schedule_payment()`
 
 #### Key Implementation Details:
@@ -33,7 +33,7 @@ The observer now checks for the presence of `plan_id` and routes subscriptions a
 3. Proper error handling when vault or saved card records are not available
 
 ### 2. Next Billing Date Display & Editing (Admin)
-**File**: `admin/paypalr_subscriptions.php`
+**File**: `admin/paypalac_subscriptions.php`
 
 Added functionality to the Vaulted Subscriptions admin page:
 
@@ -89,19 +89,19 @@ All existing tests continue to pass:
 
 ## Admin Pages
 
-### Saved Card Subscriptions (`paypalr_saved_card_recurring.php`)
+### Saved Card Subscriptions (`paypalac_saved_card_recurring.php`)
 - **Purpose**: Manage Zen Cart-controlled subscriptions
 - **Features**: Edit date, amount, card, product, cancel, reactivate
 - **Table**: `TABLE_SAVED_CREDIT_CARDS_RECURRING`
 
-### Vaulted Subscriptions (`paypalr_subscriptions.php`)
+### Vaulted Subscriptions (`paypalac_subscriptions.php`)
 - **Purpose**: Manage PayPal-controlled subscriptions
 - **Features**: View/edit billing details, vault assignments, next billing date (NEW)
 - **Table**: `TABLE_PAYPAL_SUBSCRIPTIONS`
 
 ## Files Changed
-1. `includes/classes/observers/auto.paypalrestful_recurring.php` - Routing logic
-2. `admin/paypalr_subscriptions.php` - Next billing date display/edit
+1. `includes/classes/observers/auto.paypalacestful_recurring.php` - Routing logic
+2. `admin/paypalac_subscriptions.php` - Next billing date display/edit
 3. `tests/SubscriptionRoutingTest.php` - New test coverage
 
 ## Backward Compatibility

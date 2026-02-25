@@ -27,7 +27,7 @@ $testsPassed = true;
 // Test 1: Verify updateAuthorizations receives primary_txn_id parameter
 fwrite(STDOUT, "Test 1: Verify updateAuthorizations() receives primary_txn_id parameter...\n");
 
-$filePath = $basePath . '/includes/modules/payment/paypal/PayPalRestful/Admin/GetPayPalOrderTransactions.php';
+$filePath = $basePath . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Admin/GetPayPalOrderTransactions.php';
 if (!file_exists($filePath)) {
     fwrite(STDERR, "✗ GetPayPalOrderTransactions.php not found\n");
     exit(1);

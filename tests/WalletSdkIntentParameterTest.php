@@ -24,13 +24,13 @@ namespace {
     {
         $passed = true;
         $jsFiles = [
-            'jquery.paypalr.applepay.js',
-            'jquery.paypalr.googlepay.js',
-            'jquery.paypalr.venmo.js',
+            'jquery.paypalac.applepay.js',
+            'jquery.paypalac.googlepay.js',
+            'jquery.paypalac.venmo.js',
         ];
 
         foreach ($jsFiles as $jsFile) {
-            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/' . $jsFile;
+            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/' . $jsFile;
             
             if (!file_exists($jsPath)) {
                 fwrite(STDERR, "FAIL: $jsFile file not found at $jsPath\n");
@@ -87,13 +87,13 @@ namespace {
     {
         $passed = true;
         $jsFiles = [
-            'jquery.paypalr.applepay.js',
-            'jquery.paypalr.googlepay.js',
-            'jquery.paypalr.venmo.js',
+            'jquery.paypalac.applepay.js',
+            'jquery.paypalac.googlepay.js',
+            'jquery.paypalac.venmo.js',
         ];
 
         foreach ($jsFiles as $jsFile) {
-            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/' . $jsFile;
+            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/' . $jsFile;
             $content = file_get_contents($jsPath);
 
             // Check that the SDK URL includes required parameters
@@ -110,8 +110,8 @@ namespace {
             // For native Apple Pay implementation, only 'applepay' component is needed.
             $hasValidComponents = (
                 strpos($content, "&components=buttons,googlepay,applepay") !== false ||
-                ($jsFile === 'jquery.paypalr.googlepay.js' && strpos($content, "&components=googlepay") !== false) ||
-                ($jsFile === 'jquery.paypalr.applepay.js' && strpos($content, "&components=applepay") !== false)
+                ($jsFile === 'jquery.paypalac.googlepay.js' && strpos($content, "&components=googlepay") !== false) ||
+                ($jsFile === 'jquery.paypalac.applepay.js' && strpos($content, "&components=applepay") !== false)
             );
             if ($hasValidComponents) {
                 fwrite(STDOUT, "✓ $jsFile includes valid components in SDK URL (no venmo)\n");

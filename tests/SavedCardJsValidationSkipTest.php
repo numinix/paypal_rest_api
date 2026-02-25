@@ -9,37 +9,37 @@ $testPassed = true;
 $errors = [];
 
 // Simulate the javascript_validation() output generation
-$code = 'paypalr_creditcard';
+$code = 'paypalac_creditcard';
 
 // Define constants for testing
 define('CC_OWNER_MIN_LENGTH', 3);
 define('CC_NUMBER_MIN_LENGTH', 12);
-define('MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER', '* Please enter the cardholder name.\n');
-define('MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER', '* Please enter a valid card number.\n');
+define('MODULE_PAYMENT_PAYPALAC_TEXT_JS_CC_OWNER', '* Please enter the cardholder name.\n');
+define('MODULE_PAYMENT_PAYPALAC_TEXT_JS_CC_NUMBER', '* Please enter a valid card number.\n');
 
 // Generate the expected JS similar to javascript_validation()
 $js = '';
 if (defined('CC_OWNER_MIN_LENGTH') && defined('CC_NUMBER_MIN_LENGTH')) {
     $js = '  if (payment_value == "' . $code . '") {' . "\n" .
-          '    var saved_card_field = document.checkout_payment.paypalr_saved_card;' . "\n" .
+          '    var saved_card_field = document.checkout_payment.paypalac_saved_card;' . "\n" .
           '    var using_saved_card = saved_card_field && saved_card_field.value && saved_card_field.value !== "new";' . "\n" .
           '    if (!using_saved_card) {' . "\n" .
-          '      var cc_owner_field = document.checkout_payment.paypalr_cc_owner;' . "\n" .
-          '      var cc_number_field = document.checkout_payment.paypalr_cc_number;' . "\n" .
+          '      var cc_owner_field = document.checkout_payment.paypalac_cc_owner;' . "\n" .
+          '      var cc_number_field = document.checkout_payment.paypalac_cc_number;' . "\n" .
           '      if (cc_owner_field && cc_number_field) {' . "\n" .
           '        var cc_owner = cc_owner_field.value;' . "\n" .
           '        var cc_number = cc_number_field.value;' . "\n";
     
     if (CC_OWNER_MIN_LENGTH > 0) {
         $js .= '        if (cc_owner == "" || cc_owner.length < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
-               '          error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_OWNER . '";' . "\n" .
+               '          error_message = error_message + "' . MODULE_PAYMENT_PAYPALAC_TEXT_JS_CC_OWNER . '";' . "\n" .
                '          error = 1;' . "\n" .
                '        }' . "\n";
     }
     
     if (CC_NUMBER_MIN_LENGTH > 0) {
         $js .= '        if (cc_number == "" || cc_number.length < ' . CC_NUMBER_MIN_LENGTH . ') {' . "\n" .
-               '          error_message = error_message + "' . MODULE_PAYMENT_PAYPALR_TEXT_JS_CC_NUMBER . '";' . "\n" .
+               '          error_message = error_message + "' . MODULE_PAYMENT_PAYPALAC_TEXT_JS_CC_NUMBER . '";' . "\n" .
                '          error = 1;' . "\n" .
                '        }' . "\n";
     }
@@ -50,7 +50,7 @@ if (defined('CC_OWNER_MIN_LENGTH') && defined('CC_NUMBER_MIN_LENGTH')) {
 }
 
 // Test 1: Verify the JS references the saved_card_field
-if (strpos($js, 'var saved_card_field = document.checkout_payment.paypalr_saved_card') === false) {
+if (strpos($js, 'var saved_card_field = document.checkout_payment.paypalac_saved_card') === false) {
     $testPassed = false;
     $errors[] = "JS does not reference saved_card_field";
 } else {

@@ -18,7 +18,7 @@ $testPassed = true;
 $errors = [];
 
 // Get the CSS file content
-$cssFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/paypalr.css';
+$cssFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/paypalac.css';
 if (!file_exists($cssFile)) {
     echo "❌ CSS file not found: {$cssFile}\n";
     exit(1);
@@ -73,11 +73,11 @@ if (preg_match('/apple-pay-button\s*\{[^}]+\}/s', $css, $matches)) {
 }
 
 // Test 5: Verify CSS doesn't conflict with container styling
-if (strpos($css, '.paypalr-applepay-button') !== false) {
-    echo "✓ CSS contains container class .paypalr-applepay-button\n";
+if (strpos($css, '.paypalac-applepay-button') !== false) {
+    echo "✓ CSS contains container class .paypalac-applepay-button\n";
 } else {
     $testPassed = false;
-    $errors[] = "CSS should contain container class .paypalr-applepay-button";
+    $errors[] = "CSS should contain container class .paypalac-applepay-button";
 }
 
 // Summary

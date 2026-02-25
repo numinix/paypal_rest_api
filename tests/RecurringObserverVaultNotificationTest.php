@@ -16,11 +16,11 @@ namespace {
     if (!defined('IS_ADMIN_FLAG')) {
         define('IS_ADMIN_FLAG', false);
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
-        define('MODULE_PAYMENT_PAYPALR_VERSION', '1.0.0');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_VERSION')) {
+        define('MODULE_PAYMENT_PAYPALAC_VERSION', '1.0.0');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_STATUS', 'True');
     }
     if (!defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
         define('TABLE_PAYPAL_SUBSCRIPTIONS', 'paypal_subscriptions');
@@ -54,7 +54,7 @@ namespace {
         $GLOBALS['psr4Autoloader'] = new mockPsr4Autoloader();
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 }
 
 // Mock ObserverManager trait in separate namespace
@@ -67,7 +67,7 @@ namespace Zencart\Traits {
 }
 
 namespace {
-    require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypalrestful_recurring.php';
+    require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout_recurring.php';
 
     // Mock database
     class queryFactoryResult
@@ -205,7 +205,7 @@ namespace Tests {
 
         public function testObserverActivatesSubscriptionsWhenVaultNotificationReceived(): void
         {
-            $observer = new \zcObserverPaypalrestfulRecurring();
+            $observer = new \zcObserverPaypaladvcheckoutRecurring();
 
             $vaultRecord = [
                 'customers_id' => 1,
@@ -216,7 +216,7 @@ namespace Tests {
             ];
 
             $class = new \stdClass();
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALR_VAULT_CARD_SAVED', $vaultRecord);
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
 
             // Verify subscriptions were queried
             $queries = $this->db->getExecutedQueries();
@@ -245,15 +245,15 @@ namespace Tests {
 
         public function testObserverIgnoresInvalidVaultRecord(): void
         {
-            $observer = new \zcObserverPaypalrestfulRecurring();
+            $observer = new \zcObserverPaypaladvcheckoutRecurring();
 
             // Test with empty array
             $class = new \stdClass();
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALR_VAULT_CARD_SAVED', []);
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', []);
             $this->assertEmpty($this->db->performedUpdates);
 
             // Test with missing customers_id
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALR_VAULT_CARD_SAVED', [
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', [
                 'orders_id' => 100,
                 'paypal_vault_id' => 5,
                 'vault_id' => 'vault_token_12345',
@@ -261,7 +261,7 @@ namespace Tests {
             $this->assertEmpty($this->db->performedUpdates);
 
             // Test with missing vault_id
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALR_VAULT_CARD_SAVED', [
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', [
                 'customers_id' => 1,
                 'orders_id' => 100,
                 'paypal_vault_id' => 5,
@@ -272,7 +272,7 @@ namespace Tests {
         public function testObserverAttachesToVaultNotification(): void
         {
             // Create a mock to verify the attach method is called with correct events
-            $observer = $this->getMockBuilder(\zcObserverPaypalrestfulRecurring::class)
+            $observer = $this->getMockBuilder(\zcObserverPaypaladvcheckoutRecurring::class)
                 ->onlyMethods(['attach'])
                 ->getMock();
 
@@ -281,7 +281,7 @@ namespace Tests {
                 ->with(
                     $this->identicalTo($observer),
                     $this->callback(function($events) {
-                        return in_array('NOTIFY_PAYPALR_VAULT_CARD_SAVED', $events, true);
+                        return in_array('NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $events, true);
                     })
                 );
 

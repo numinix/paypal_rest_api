@@ -14,7 +14,7 @@ declare(strict_types=1);
  * This happened because the payment was processed via a different pathway that didn't
  * populate the orderInfo['payment_source'] property.
  *
- * Also, the log filename was incorrectly generated as "paypalr-c-na-nana-*.log" because
+ * Also, the log filename was incorrectly generated as "paypalac-c-na-nana-*.log" because
  * session customer info wasn't available during cron execution.
  *
  * @copyright Copyright 2026 Zen Cart Development Team
@@ -25,7 +25,7 @@ fwrite(STDOUT, "Running Recurring Cron Payment Source Null Handling Test...\n\n"
 
 $basePath = dirname(__DIR__);
 $paypalCommonFile = $basePath . '/includes/modules/payment/paypal/paypal_common.php';
-$loggerFile = $basePath . '/includes/modules/payment/paypal/PayPalRestful/Common/Logger.php';
+$loggerFile = $basePath . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
 
 if (!file_exists($paypalCommonFile)) {
     fwrite(STDERR, "✗ paypal_common.php not found\n\n");

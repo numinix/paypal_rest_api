@@ -10,7 +10,7 @@
  * - When processing wallet payments, PayPalCommon::processWalletConfirmation() needs
  *   to call $this->paymentModule->createPayPalOrder()
  * - If this method is protected, it causes a fatal error:
- *   "Call to protected method paypalr_applepay::createPayPalOrder() from scope PayPalCommon"
+ *   "Call to protected method paypalac_applepay::createPayPalOrder() from scope PayPalCommon"
  *
  * The test verifies:
  * 1. The createPayPalOrder method exists in each wallet module
@@ -24,9 +24,9 @@
 class WalletCreatePayPalOrderVisibilityTest
 {
     private array $walletModules = [
-        'paypalr_applepay' => 'includes/modules/payment/paypalr_applepay.php',
-        'paypalr_googlepay' => 'includes/modules/payment/paypalr_googlepay.php',
-        'paypalr_venmo' => 'includes/modules/payment/paypalr_venmo.php',
+        'paypalac_applepay' => 'includes/modules/payment/paypalac_applepay.php',
+        'paypalac_googlepay' => 'includes/modules/payment/paypalac_googlepay.php',
+        'paypalac_venmo' => 'includes/modules/payment/paypalac_venmo.php',
     ];
     private string $commonFile;
     private array $testResults = [];

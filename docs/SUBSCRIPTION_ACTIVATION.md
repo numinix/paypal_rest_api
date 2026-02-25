@@ -20,8 +20,8 @@ Added `SubscriptionManager::activateSubscriptionsWithVault()` method that:
 - Updates the last_modified timestamp
 
 ### 2. Observer Integration
-Enhanced `zcObserverPaypalrestfulRecurring` to:
-- Listen for `NOTIFY_PAYPALR_VAULT_CARD_SAVED` notifications
+Enhanced `zcObserverPaypaladvcheckoutRecurring` to:
+- Listen for `NOTIFY_PAYPALAC_VAULT_CARD_SAVED` notifications
 - Automatically activate subscriptions when vault cards are saved
 - Send `NOTIFY_SUBSCRIPTIONS_ACTIVATED` notification for downstream integrations
 
@@ -44,9 +44,9 @@ Enhanced `zcObserverPaypalrestfulRecurring` to:
    ↓
 5. VaultManager::saveVaultedCard()
    ↓
-6. NOTIFY_PAYPALR_VAULT_CARD_SAVED sent
+6. NOTIFY_PAYPALAC_VAULT_CARD_SAVED sent
    ↓
-7. zcObserverPaypalrestfulRecurring catches notification
+7. zcObserverPaypaladvcheckoutRecurring catches notification
    ↓
 8. activateSubscriptionsWithVault() called
    - Links subscription to vault
@@ -54,19 +54,19 @@ Enhanced `zcObserverPaypalrestfulRecurring` to:
    ↓
 9. NOTIFY_SUBSCRIPTIONS_ACTIVATED sent
    ↓
-10. Subscription visible in admin/paypalr_subscriptions.php
+10. Subscription visible in admin/paypalac_subscriptions.php
 ```
 
 ## Files Modified
 
 ### Core Functionality
-- `includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php`
+- `includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php`
   - Added `activateSubscriptionsWithVault()` method
   - Added `VAULT_ID_MAX_LENGTH` constant
 
-- `includes/classes/observers/auto.paypalrestful_recurring.php`
-  - Added `NOTIFY_PAYPALR_VAULT_CARD_SAVED` to event listeners
-  - Added `updateNotifyPaypalrVaultCardSaved()` handler method
+- `includes/classes/observers/auto.paypalacestful_recurring.php`
+  - Added `NOTIFY_PAYPALAC_VAULT_CARD_SAVED` to event listeners
+  - Added `updateNotifyPaypalacVaultCardSaved()` handler method
 
 ### Tests
 - `tests/SubscriptionVaultActivationTest.php` (new)
@@ -79,7 +79,7 @@ Enhanced `zcObserverPaypalrestfulRecurring` to:
 
 ## Admin Interface Impact
 
-Subscriptions now appear in `admin/paypalr_subscriptions.php` with:
+Subscriptions now appear in `admin/paypalac_subscriptions.php` with:
 - Status: "active" (instead of stuck in "awaiting_vault")
 - Full vault information displayed
 - All management actions available:
@@ -121,7 +121,7 @@ public static function activateSubscriptionsWithVault(
  * @param string $eventID The event identifier
  * @param array $vaultRecord The saved vault record from VaultManager
  */
-public function updateNotifyPaypalrVaultCardSaved(
+public function updateNotifyPaypalacVaultCardSaved(
     &$class,
     $eventID,
     $vaultRecord
@@ -131,7 +131,7 @@ public function updateNotifyPaypalrVaultCardSaved(
 ## Notifications
 
 ### Consumed
-- `NOTIFY_PAYPALR_VAULT_CARD_SAVED` - Triggered when vault card is saved
+- `NOTIFY_PAYPALAC_VAULT_CARD_SAVED` - Triggered when vault card is saved
 
 ### Produced
 - `NOTIFY_SUBSCRIPTIONS_ACTIVATED` - Triggered when subscriptions are activated
@@ -205,7 +205,7 @@ Potential improvements for future releases:
 ## Support
 
 For questions or issues:
-- Review admin/paypalr_subscriptions.php for subscription management
+- Review admin/paypalac_subscriptions.php for subscription management
 - Check logs for NOTIFY_SUBSCRIPTIONS_ACTIVATED events
 - Verify vault records exist in paypal_vault table
 - Ensure subscription attributes are properly configured on products

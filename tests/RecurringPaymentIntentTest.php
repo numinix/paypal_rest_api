@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Test to verify recurring payments respect the MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE setting
+ * Test to verify recurring payments respect the MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE setting
  *
  * This test ensures that:
  * 1. Recurring payments use AUTHORIZE intent when transaction mode is 'Auth Only (All Txns)' or 'Auth Only (Card-Only)'
@@ -37,7 +37,7 @@ fwrite(STDOUT, "Test 1: Verify intent is not hardcoded to CAPTURE...\n");
 // Check that the old hardcoded line is NOT present
 if (preg_match('/^\s*\$intent\s*=\s*[\'"]CAPTURE[\'"]\s*;\s*$/m', $content)) {
     fwrite(STDERR, "✗ FAIL: intent is still hardcoded to 'CAPTURE'\n");
-    fwrite(STDERR, "  Recurring payments should respect MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE setting\n");
+    fwrite(STDERR, "  Recurring payments should respect MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE setting\n");
     $testsPassed = false;
 } else {
     fwrite(STDOUT, "✓ PASS: intent is not hardcoded to 'CAPTURE'\n");
@@ -45,13 +45,13 @@ if (preg_match('/^\s*\$intent\s*=\s*[\'"]CAPTURE[\'"]\s*;\s*$/m', $content)) {
 
 fwrite(STDOUT, "\n");
 
-// Test 2: Verify MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE is checked
+// Test 2: Verify MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE is checked
 fwrite(STDOUT, "Test 2: Verify transaction mode setting is checked...\n");
 
-if (strpos($content, 'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE') !== false) {
-    fwrite(STDOUT, "✓ PASS: MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE is checked in process_rest_payment\n");
+if (strpos($content, 'MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE') !== false) {
+    fwrite(STDOUT, "✓ PASS: MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE is checked in process_rest_payment\n");
 } else {
-    fwrite(STDERR, "✗ FAIL: MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE is not being checked\n");
+    fwrite(STDERR, "✗ FAIL: MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE is not being checked\n");
     fwrite(STDERR, "  Recurring payments should use the same transaction mode as checkout payments\n");
     $testsPassed = false;
 }
@@ -109,7 +109,7 @@ fwrite(STDOUT, "\n");
 if ($testsPassed) {
     fwrite(STDOUT, "All tests passed! ✓\n\n");
     fwrite(STDOUT, "Verified that recurring payments:\n");
-    fwrite(STDOUT, "1. Respect the MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE setting\n");
+    fwrite(STDOUT, "1. Respect the MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE setting\n");
     fwrite(STDOUT, "2. Use AUTHORIZE intent when in authorization-only mode\n");
     fwrite(STDOUT, "3. Use CAPTURE intent when in 'Final Sale' mode\n");
     fwrite(STDOUT, "4. Set payment_status appropriately based on the intent\n");

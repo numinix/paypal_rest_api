@@ -15,9 +15,9 @@ $testPassed = true;
 $errors = [];
 
 // Get the JS files content
-$googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js');
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js');
-$venmoJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.venmo.js');
+$googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.googlepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
+$venmoJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.venmo.js');
 
 echo "Testing Wallet SDK Components Compatibility\n";
 echo "============================================\n\n";
@@ -47,7 +47,7 @@ if (strpos($venmoJs, '&components=buttons,googlepay,applepay') === false) {
 }
 
 // Test 4: All modules use a shared SDK loader state
-$sharedLoaderPattern = '/window\.paypalrSdkLoaderState\s*\|\|/';
+$sharedLoaderPattern = '/window\.paypalacSdkLoaderState\s*\|\|/';
 if (!preg_match($sharedLoaderPattern, $googlePayJs)) {
     $testPassed = false;
     $errors[] = "Google Pay JS should use shared SDK loader state";

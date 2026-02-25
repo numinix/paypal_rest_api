@@ -1,0 +1,481 @@
+// Define methodSelect function for compatibility with Zen Cart's payment method selection
+// This is called by onfocus attributes in the HTML
+// Only define if not already defined (e.g., by Zen Cart core or OPRC)
+if (typeof methodSelect !== 'function') {
+    window.methodSelect = function(paymentId) {
+        var $radio = jQuery('#' + paymentId);
+        if ($radio.length && $radio.is(':radio') && !$radio.is(':checked')) {
+            $radio.prop('checked', true).trigger('change');
+        }
+    };
+}
+
+jQuery(document).ready(function() {
+    // Debug flag for PayPal wallet button click handler
+    // IMPORTANT: Set to false in production after troubleshooting is complete
+    // This is temporarily enabled to help diagnose wallet modal issues
+    var PAYPAL_WALLET_DEBUG = true;
+    
+    function debugLog(message, data) {
+        if (PAYPAL_WALLET_DEBUG && typeof console !== 'undefined' && console.log) {
+            if (data !== undefined) {
+                console.log('PayPal Wallet: ' + message, data);
+            } else {
+                console.log('PayPal Wallet: ' + message);
+            }
+        }
+    }
+
+    // No toggling needed - both PayPal and Credit Card fields are always visible
+    // Only handle saved card selection logic
+    
+    function toggleNewCardFields(show)
+    {
+        // Toggle between new card entry fields and saved card selection
+        jQuery('.ppr-card-new').each(function() {
+            if (show) {
+                jQuery(this).show();
+                jQuery(this).prev('label').show();
+                jQuery(this).next('br, div.p-2').show();
+            } else {
+                jQuery(this).hide();
+                jQuery(this).prev('label').hide();
+                jQuery(this).next('br, div.p-2').hide();
+            }
+        });
+    }
+
+    function getSavedCardSelection()
+    {
+        var selected = jQuery('input[name="paypalac_saved_card"]:checked');
+        if (selected.length === 0) {
+            var first = jQuery('input[name="paypalac_saved_card"]').first();
+            if (first.length === 0) {
+                return 'new';
+            }
+            return first.val();
+        }
+        return selected.val();
+    }
+
+    function updateSavedCardVisibility()
+    {
+        // Only toggle between new card fields and saved card selection
+        var savedChoice = getSavedCardSelection();
+        if (savedChoice !== 'new') {
+            toggleNewCardFields(false);
+            jQuery('#paypalac_collects_onsite').val('');
+            jQuery('#ppr-cc-save-card').prop('disabled', true);
+            jQuery('#ppr-cc-sca-always').prop('disabled', true);
+        } else {
+            toggleNewCardFields(true);
+            jQuery('#paypalac_collects_onsite').val(1);
+            jQuery('#ppr-cc-save-card').prop('disabled', false);
+            jQuery('#ppr-cc-sca-always').prop('disabled', false);
+        }
+    }
+
+    function selectSavedCardParentModule(triggerChange)
+    {
+        var $parentSavedCardRadio = jQuery('#pmt-paypalac_savedcard');
+        if (!$parentSavedCardRadio.length || !$parentSavedCardRadio.is(':radio')) {
+            return;
+        }
+
+        if ($parentSavedCardRadio.is(':checked')) {
+            return;
+        }
+
+        $parentSavedCardRadio.prop('checked', true);
+        if (triggerChange) {
+            $parentSavedCardRadio.trigger('change');
+        }
+    }
+
+    function ensureSavedCardParentMatchesSelection(triggerChange)
+    {
+        // Check for saved card radio buttons (legacy)
+        var $checkedSavedCard = jQuery('input[name="paypalac_savedcard_vault_id"]:checked');
+        if ($checkedSavedCard.length) {
+            selectSavedCardParentModule(triggerChange);
+            return;
+        }
+        
+        // Check for saved card select box (new)
+        var $savedCardSelect = jQuery('#paypalac-savedcard-select');
+        if ($savedCardSelect.length && $savedCardSelect.val()) {
+            selectSavedCardParentModule(triggerChange);
+        }
+    }
+
+    // Initialize parent radio selection if sub-radios are checked
+    if (jQuery('#pmt-paypalac').is(':radio') && jQuery('#pmt-paypalac').is(':not(:checked)')) {
+        // Check if any sub-radio is selected
+        if (jQuery('#ppr-paypal').is(':checked') || jQuery('#ppr-card').is(':checked')) {
+            // If a sub-radio is selected, select the parent radio
+            jQuery('#pmt-paypalac').prop('checked', true);
+        } else {
+            // If no sub-radio is selected, ensure they're unchecked
+            jQuery('#ppr-paypal, #ppr-card').prop('checked', false);
+        }
+    } else if (jQuery('#pmt-paypalac').is(':not(:radio)')) {
+        // If pmt-paypalac is not a radio (only payment method), default to PayPal
+        jQuery('#ppr-paypal').prop('checked', true);
+    }
+    
+    // Initialize saved card visibility
+    updateSavedCardVisibility();
+    ensureSavedCardParentMatchesSelection(true);
+    
+    // Re-initialize when One Page Responsive Checkout reloads payment methods
+    if (typeof document.addEventListener === 'function') {
+        document.addEventListener('onePageCheckoutReloaded', function() {
+            updateSavedCardVisibility();
+            ensureSavedCardParentMatchesSelection(true);
+            attachPayPalButtonClickHandler();
+        });
+    }
+
+    // Ensure parent module radio is selected when payment method changes
+    jQuery('input[name=payment]').on('change', function() {
+        if (jQuery('#pmt-paypalac').is(':not(:checked)')) {
+            jQuery('#ppr-paypal, #ppr-card').prop('checked', false);
+        } else if (jQuery('#ppr-paypal').is(':not(:checked)') && jQuery('#ppr-card').is(':not(:checked)')) {
+            // Default to PayPal if neither is selected
+            jQuery('#ppr-paypal').prop('checked', true);
+        }
+    });
+
+    // Handle sub-radio selection to ensure parent module is selected
+    jQuery('#ppr-paypal, #ppr-card').on('change click', function() {
+        if (jQuery('#pmt-paypalac').is(':radio') && jQuery('#pmt-paypalac').is(':not(:checked)')) {
+            jQuery('#pmt-paypalac').prop('checked', true).trigger('change');
+        }
+    });
+
+    // Handle clicks on labels for sub-radios
+    jQuery('label[for="ppr-paypal"], label[for="ppr-card"]').on('click', function() {
+        if (jQuery('#pmt-paypalac').is(':radio') && jQuery('#pmt-paypalac').is(':not(:checked)')) {
+            jQuery('#pmt-paypalac').prop('checked', true).trigger('change');
+        }
+    });
+
+    // Handle saved card selection changes (for legacy radio buttons)
+    jQuery(document).on('change', 'input[name="paypalac_saved_card"]', function() {
+        updateSavedCardVisibility();
+    });
+
+    // Handle saved card radio button clicks (legacy)
+    jQuery(document).on('change click', 'input[name="paypalac_savedcard_vault_id"]', function() {
+        selectSavedCardParentModule(true);
+    });
+
+    // Handle saved card select box changes and focus (new select box implementation)
+    // The onfocus/onchange handlers in the HTML also call methodSelect() for compatibility
+    // with Zen Cart's native payment method selection mechanism
+    jQuery(document).on('change focus', '#paypalac-savedcard-select, select[name="paypalac_savedcard_vault_id"]', function() {
+        selectSavedCardParentModule(true);
+    });
+
+    // Handle clicks on the saved card parent radio button or its label
+    // This fixes the issue where clicking on "Pay with Saved Card" doesn't select it initially
+    // We use delegated event handling to ensure it works even if payment methods are loaded dynamically
+    jQuery(document).on('click', '#pmt-paypalac_savedcard, label[for="pmt-paypalac_savedcard"]', function() {
+        selectSavedCardParentModule(true);
+    });
+
+    // When user interacts with credit card fields, ensure parent module is selected
+    jQuery(document).on('focus click', '.ppr-card-new input, .ppr-card-new select, .ppr-creditcard-field input, .ppr-creditcard-field select', function(event) {
+        // Check for main paypalac module radio
+        if (jQuery('#pmt-paypalac').is(':radio') && jQuery('#pmt-paypalac').is(':not(:checked)')) {
+            jQuery('#pmt-paypalac').prop('checked', true).trigger('change');
+        }
+        
+        // Check for standalone credit card module radio
+        if (jQuery('#pmt-paypalac_creditcard').is(':radio') && jQuery('#pmt-paypalac_creditcard').is(':not(:checked)')) {
+            jQuery('#pmt-paypalac_creditcard').prop('checked', true).trigger('change');
+        }
+        
+        // For main module, also select the card option if present
+        if (jQuery(this).hasClass('ppr-cc') || jQuery(this).closest('.ppr-cc').length) {
+            if (jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
+                jQuery('#ppr-card').prop('checked', true).trigger('change');
+            }
+        }
+    });
+
+    // Handle browser autofill
+    jQuery(document).on('change input', '.ppr-card-new input, .ppr-card-new select', function(event) {
+        if (jQuery(this).val()) {
+            // Check for main paypalac module radio
+            if (jQuery('#pmt-paypalac').is(':radio') && jQuery('#pmt-paypalac').is(':not(:checked)')) {
+                jQuery('#pmt-paypalac').prop('checked', true);
+            }
+            
+            // Check for standalone credit card module radio
+            if (jQuery('#pmt-paypalac_creditcard').is(':radio') && jQuery('#pmt-paypalac_creditcard').is(':not(:checked)')) {
+                jQuery('#pmt-paypalac_creditcard').prop('checked', true);
+            }
+            
+            if (jQuery(this).hasClass('ppr-cc') && jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
+                jQuery('#ppr-card').prop('checked', true);
+            }
+        }
+    });
+
+    function paypalWalletIsSelected()
+    {
+        var $paypalRadio = jQuery('#ppr-paypal');
+        if ($paypalRadio.length && $paypalRadio.is(':radio')) {
+            return $paypalRadio.is(':checked');
+        }
+
+        var $pprTypeInputs = jQuery('input[name="ppac_type"]');
+        if (!$pprTypeInputs.length) {
+            return true;
+        }
+
+        var $checkedInput = $pprTypeInputs.filter(':checked');
+        if ($checkedInput.length) {
+            return $checkedInput.val() === 'paypal';
+        }
+
+        var paypalHidden = $pprTypeInputs.filter(function() {
+            var inputType = (jQuery(this).attr('type') || '').toLowerCase();
+            return inputType === 'hidden' && jQuery(this).val() === 'paypal';
+        });
+
+        return paypalHidden.length > 0;
+    }
+
+    function attachPayPalButtonClickHandler()
+    {
+        var $checkoutForm = jQuery('form[name="checkout_payment"]');
+        var $paypalButton = jQuery('#ppr-choice-paypal .ppr-choice-label');
+        var isWalletOnlyButton = false;
+
+        if (!$paypalButton.length) {
+            // Look for wallet-only button image in the payment method container
+            // The image is in the creditcard-form div, not inside the label
+            $paypalButton = jQuery('.payment-method.paypalac .creditcard-form img');
+        }
+
+        if (!$paypalButton.length) {
+            // Fallback: try legacy selector (in case image is inside label in some templates)
+            $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalac"] img');
+        }
+
+        // Do NOT fall back to the label itself - clicking the label should only
+        // select the radio button, not launch the PayPal wallet modal.
+        // Only the button/image click or form submission should launch the modal.
+
+        // If we found an image (not the label), this is a wallet-only button
+        isWalletOnlyButton = $paypalButton.length > 0;
+
+        if ($checkoutForm.length && $paypalButton.length) {
+            debugLog('Attaching click handler to button', {
+                isWalletOnlyButton: isWalletOnlyButton,
+                buttonSelector: isWalletOnlyButton ? 'paypalac image/label' : 'other button'
+            });
+
+            // Remove any existing click handlers to avoid duplicates
+            $paypalButton.off('click.paypalac');
+            
+            $paypalButton.on('click.paypalac', function(e) {
+                debugLog('Button clicked - will submit checkout_payment form', {
+                    isWalletOnlyButton: isWalletOnlyButton
+                });
+
+                // Ensure the paypalac module radio is selected
+                var $moduleRadio = jQuery('#pmt-paypalac');
+                if ($moduleRadio.length && $moduleRadio.is(':radio') && !$moduleRadio.is(':checked')) {
+                    debugLog('Selecting payment method radio');
+                    $moduleRadio.prop('checked', true).trigger('change');
+                }
+
+                // For wallet-only button, directly submit the form
+                // The form submission will trigger the PayPal wallet flow via pre_confirmation_check
+                if (isWalletOnlyButton) {
+                    debugLog('Wallet-only button: submitting form directly');
+                    
+                    // Short delay to allow change event to complete
+                    window.setTimeout(function() {
+                        if (typeof window.oprcShowProcessingOverlay === 'function') {
+                            window.oprcShowProcessingOverlay();
+                        }
+
+                        var formElement = $checkoutForm.get(0);
+                        if (!formElement) {
+                            debugLog('ERROR: Form element not found');
+                            return;
+                        }
+
+                        // Allow OPRC to process the submission
+                        var previousAllowState = typeof window.oprcAllowNativeCheckoutSubmit !== 'undefined' 
+                            ? window.oprcAllowNativeCheckoutSubmit 
+                            : false;
+                        window.oprcAllowNativeCheckoutSubmit = true;
+
+                        debugLog('Submitting checkout_payment form');
+
+                        try {
+                            if (typeof formElement.requestSubmit === 'function') {
+                                formElement.requestSubmit();
+                            } else if (typeof formElement.submit === 'function') {
+                                formElement.submit();
+                            } else {
+                                debugLog('ERROR: No submit method available');
+                            }
+                        } finally {
+                            window.oprcAllowNativeCheckoutSubmit = previousAllowState;
+                        }
+                    }, 0);
+                    return;
+                }
+
+                // For other buttons (non-wallet-only), use the original logic
+                window.setTimeout(function() {
+                    if (!paypalWalletIsSelected()) {
+                        debugLog('Wallet not selected, aborting submission');
+                        return;
+                    }
+
+                    debugLog('Proceeding with form submission');
+
+                    if (typeof window.oprcShowProcessingOverlay === 'function') {
+                        window.oprcShowProcessingOverlay();
+                    }
+
+                    var formElement = $checkoutForm.get(0);
+                    if (!formElement) {
+                        debugLog('Form element not found');
+                        return;
+                    }
+
+                    var previousAllowState = typeof window.oprcAllowNativeCheckoutSubmit !== 'undefined' 
+                        ? window.oprcAllowNativeCheckoutSubmit 
+                        : false;
+                    window.oprcAllowNativeCheckoutSubmit = true;
+
+                    debugLog('Submitting form');
+
+                    try {
+                        if (typeof formElement.requestSubmit === 'function') {
+                            formElement.requestSubmit();
+                        } else if (typeof formElement.submit === 'function') {
+                            formElement.submit();
+                        }
+                    } finally {
+                        window.oprcAllowNativeCheckoutSubmit = previousAllowState;
+                    }
+                }, 0);
+            });
+        } else {
+            debugLog('Could not attach click handler', {
+                formFound: $checkoutForm.length > 0,
+                buttonFound: $paypalButton.length > 0
+            });
+        }
+    }
+
+    // Attach handler on initial page load
+    attachPayPalButtonClickHandler();
+
+    var $ccNumberInput = jQuery('#paypalac-cc-number');
+    if ($ccNumberInput.length) {
+        function getCardGrouping(digits)
+        {
+            if (/^3[47]/.test(digits)) {
+                return [4, 6, 5];
+            }
+            if (/^3(?:0[0-5]|[68])/.test(digits)) {
+                return [4, 6, 4];
+            }
+            return [4, 4, 4, 4, 3];
+        }
+
+        function formatCardNumber(digits)
+        {
+            var cleaned = digits.replace(/\D/g, '').substring(0, 19);
+            var grouping = getCardGrouping(cleaned);
+            var formatted = [];
+            var position = 0;
+
+            for (var i = 0; i < grouping.length && position < cleaned.length; i++) {
+                var groupSize = grouping[i];
+                if (groupSize <= 0) {
+                    break;
+                }
+                formatted.push(cleaned.substr(position, groupSize));
+                position += groupSize;
+            }
+
+            if (position < cleaned.length) {
+                formatted.push(cleaned.substr(position));
+            }
+
+            return formatted.join(' ');
+        }
+
+        function digitsBeforeCaret(value, caretPosition)
+        {
+            var digitsCount = 0;
+            for (var i = 0; i < Math.min(caretPosition, value.length); i++) {
+                if (/\d/.test(value.charAt(i))) {
+                    digitsCount++;
+                }
+            }
+            return digitsCount;
+        }
+
+        function caretFromDigits(value, digitsCount)
+        {
+            if (digitsCount <= 0) {
+                return 0;
+            }
+
+            var digitsSeen = 0;
+            for (var i = 0; i < value.length; i++) {
+                if (/\d/.test(value.charAt(i))) {
+                    digitsSeen++;
+                    if (digitsSeen === digitsCount) {
+                        return i + 1;
+                    }
+                }
+            }
+
+            return value.length;
+        }
+
+        function applyFormattedValue(input)
+        {
+            var currentValue = input.value;
+            var caretStart = input.selectionStart || 0;
+            var digitsCount = digitsBeforeCaret(currentValue, caretStart);
+            var formattedValue = formatCardNumber(currentValue);
+
+            input.value = formattedValue;
+
+            if (document.activeElement === input && typeof input.setSelectionRange === 'function') {
+                var newCaret = caretFromDigits(formattedValue, digitsCount);
+                input.setSelectionRange(newCaret, newCaret);
+            }
+        }
+
+        $ccNumberInput.on('input', function() {
+            applyFormattedValue(this);
+        });
+
+        $ccNumberInput.on('blur', function() {
+            this.value = formatCardNumber(this.value);
+        });
+
+        jQuery('form[name="checkout_payment"]').on('submit', function() {
+            if ($ccNumberInput.length) {
+                $ccNumberInput.val($ccNumberInput.val().replace(/\D/g, '').substring(0, 19));
+            }
+        });
+
+        applyFormattedValue($ccNumberInput.get(0));
+    }
+});

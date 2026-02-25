@@ -28,20 +28,20 @@ namespace {
     if (!defined('DEFAULT_CURRENCY')) {
         define('DEFAULT_CURRENCY', 'USD');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK')) {
-        define('MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK', 'USD');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK')) {
+        define('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK', 'USD');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE')) {
-        define('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE', 'Final Sale');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE')) {
+        define('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE', 'Final Sale');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_HANDLING_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_HANDLING_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_HANDLING_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_HANDLING_OT', '');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_INSURANCE_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_INSURANCE_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_INSURANCE_OT', '');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_DISCOUNT_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT', '');
     }
     if (!defined('SHIPPING_ORIGIN_ZIP')) {
         define('SHIPPING_ORIGIN_ZIP', '');
@@ -53,14 +53,14 @@ namespace {
         define('DIR_WS_CATALOG', '/shop/');
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/ErrorInfo.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Logger.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Api/Data/CountryCodes.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Zc2Pp/Amount.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Zc2Pp/Address.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Zc2Pp/Name.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/Data/CountryCodes.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/Amount.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/Address.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/Name.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/CreatePayPalOrderRequest.php';
 
     if (!class_exists('currencies')) {
         class currencies
@@ -147,13 +147,13 @@ namespace {
     // - The paymentData wrapper has been unwrapped to get the actual token fields
     // - The token has been JSON-encoded into a string
     // This simulates the state AFTER normalizeWalletPayload() has processed the raw browser token.
-    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = [
+    $_SESSION['PayPalAdvancedCheckout']['WalletPayload']['apple_pay'] = [
         'token' => json_encode($applePaymentData),
     ];
 }
 
 namespace {
-    use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
+    use PayPalAdvancedCheckout\Zc2Pp\CreatePayPalOrderRequest;
 
     $order_info = [
         'total' => 100.00,
@@ -219,7 +219,7 @@ namespace {
 
     // Test 2a-extended: Apple Pay token stored as JSON should remain as JSON string (not re-decoded to array)
     // The session token would be normalized with extra fields in the paymentData
-    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = [
+    $_SESSION['PayPalAdvancedCheckout']['WalletPayload']['apple_pay'] = [
         'token' => json_encode(array_merge($applePaymentData, ['foo' => 'bar'])),
     ];
     $request_applepay_json = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
@@ -244,7 +244,7 @@ namespace {
     // Test 2b: Apple Pay WITHOUT token in session should NOT include payment_source.apple_pay
     // This simulates the initial order creation when the button is clicked but before token is available
     // PayPal rejects an empty apple_pay object with MALFORMED_REQUEST_JSON, so it must be omitted
-    unset($_SESSION['PayPalRestful']['WalletPayload']['apple_pay']);
+    unset($_SESSION['PayPalAdvancedCheckout']['WalletPayload']['apple_pay']);
     $request_applepay_no_token = new CreatePayPalOrderRequest('apple_pay', $order, [], $order_info, []);
     $payload_applepay_no_token = $request_applepay_no_token->get();
 
@@ -257,7 +257,7 @@ namespace {
     }
     
     // Restore token for subsequent tests
-    $_SESSION['PayPalRestful']['WalletPayload']['apple_pay'] = ['token' => 'test-apple-token'];
+    $_SESSION['PayPalAdvancedCheckout']['WalletPayload']['apple_pay'] = ['token' => 'test-apple-token'];
 
     // Test 3: Venmo should NOT have payment_source
     $request_venmo = new CreatePayPalOrderRequest('venmo', $order, [], $order_info, []);
@@ -278,7 +278,7 @@ namespace {
         'security_code' => '123',
         'expiry_month' => '09',
         'expiry_year' => '2030',
-        'redirect' => 'ppr_listener.php',
+        'redirect' => 'ppac_listener.php',
     ];
     $request_card = new CreatePayPalOrderRequest('card', $order, $cc_info, $order_info, []);
     $payload_card = $request_card->get();

@@ -14,20 +14,20 @@ namespace {
     if (!defined('DEFAULT_CURRENCY')) {
         define('DEFAULT_CURRENCY', 'USD');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK')) {
-        define('MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK', 'USD');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK')) {
+        define('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK', 'USD');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE')) {
-        define('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE', 'Final Sale');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE')) {
+        define('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE', 'Final Sale');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_HANDLING_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_HANDLING_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_HANDLING_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_HANDLING_OT', '');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_INSURANCE_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_INSURANCE_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_INSURANCE_OT', '');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_DISCOUNT_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT', '');
     }
     if (!defined('SHIPPING_ORIGIN_ZIP')) {
         define('SHIPPING_ORIGIN_ZIP', '');
@@ -39,14 +39,14 @@ namespace {
         define('DIR_WS_CATALOG', '/shop/');
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/ErrorInfo.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Logger.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Api/Data/CountryCodes.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Zc2Pp/Amount.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Zc2Pp/Address.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Zc2Pp/Name.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/Data/CountryCodes.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/Amount.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/Address.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/Name.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/CreatePayPalOrderRequest.php';
 
     class currencies
     {
@@ -116,7 +116,7 @@ namespace {
 }
 
 namespace {
-    use PayPalRestful\Zc2Pp\CreatePayPalOrderRequest;
+    use PayPalAdvancedCheckout\Zc2Pp\CreatePayPalOrderRequest;
 
     $order_info = [
         'total' => 100.00,

@@ -20,8 +20,8 @@ namespace {
     if (!defined('IS_ADMIN_FLAG')) {
         define('IS_ADMIN_FLAG', false);
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_STATUS', 'True');
     }
     if (!defined('TABLE_ORDERS')) {
         define('TABLE_ORDERS', 'orders');
@@ -49,8 +49,8 @@ namespace {
         $GLOBALS['psr4Autoloader'] = new mockPsr4Autoloader();
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
 
     // Mock database class
     class queryFactoryResult
@@ -203,7 +203,7 @@ namespace {
 }
 
 namespace {
-    use PayPalRestful\Common\VaultManager;
+    use PayPalAdvancedCheckout\Common\VaultManager;
 
     $failures = 0;
 

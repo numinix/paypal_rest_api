@@ -1,14 +1,14 @@
 <?php
-use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Common\SubscriptionManager;
-use PayPalRestful\Common\VaultManager;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Common\SubscriptionManager;
+use PayPalAdvancedCheckout\Common\VaultManager;
 
 if (!defined('FILENAME_ACCOUNT_PAYPAL_SUBSCRIPTIONS')) {
     define('FILENAME_ACCOUNT_PAYPAL_SUBSCRIPTIONS', 'account_paypal_subscriptions');
 }
 
-if (!function_exists('paypalr_subscription_fetch_record')) {
-    function paypalr_subscription_fetch_record(int $customersId, int $subscriptionId): ?array
+if (!function_exists('paypalac_subscription_fetch_record')) {
+    function paypalac_subscription_fetch_record(int $customersId, int $subscriptionId): ?array
     {
         if ($customersId <= 0 || $subscriptionId <= 0) {
             return null;
@@ -32,11 +32,11 @@ if (!function_exists('paypalr_subscription_fetch_record')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_decode_attributes')) {
+if (!function_exists('paypalac_subscription_decode_attributes')) {
     /**
      * @return array<string,mixed>
      */
-    function paypalr_subscription_decode_attributes($rawAttributes): array
+    function paypalac_subscription_decode_attributes($rawAttributes): array
     {
         if (is_string($rawAttributes) && trim($rawAttributes) !== '') {
             $decoded = json_decode($rawAttributes, true);
@@ -49,12 +49,12 @@ if (!function_exists('paypalr_subscription_decode_attributes')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_extract_remote_id')) {
+if (!function_exists('paypalac_subscription_extract_remote_id')) {
     /**
      * @param array<string,mixed> $record
      * @param array<string,mixed> $attributes
      */
-    function paypalr_subscription_extract_remote_id(array $record, array $attributes): string
+    function paypalac_subscription_extract_remote_id(array $record, array $attributes): string
     {
         if (!empty($record['vault_id']) && is_string($record['vault_id'])) {
             // Some stores reuse the vault_id column for the PayPal subscription identifier
@@ -84,11 +84,11 @@ if (!function_exists('paypalr_subscription_extract_remote_id')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_get_status_map')) {
+if (!function_exists('paypalac_subscription_get_status_map')) {
     /**
      * @return array<string,array{label:string,class:string}>
      */
-    function paypalr_subscription_get_status_map(): array
+    function paypalac_subscription_get_status_map(): array
     {
         return [
             'pending' => [
@@ -139,14 +139,14 @@ if (!function_exists('paypalr_subscription_get_status_map')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_format_status')) {
+if (!function_exists('paypalac_subscription_format_status')) {
     /**
      * @return array{label:string,class:string}
      */
-    function paypalr_subscription_format_status(string $status): array
+    function paypalac_subscription_format_status(string $status): array
     {
         $status = strtolower(trim($status));
-        $map = paypalr_subscription_get_status_map();
+        $map = paypalac_subscription_get_status_map();
 
         if (isset($map[$status])) {
             return $map[$status];
@@ -164,11 +164,11 @@ if (!function_exists('paypalr_subscription_format_status')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_period_labels')) {
+if (!function_exists('paypalac_subscription_period_labels')) {
     /**
      * @return array<string,array{singular:string,plural:string}>
      */
-    function paypalr_subscription_period_labels(): array
+    function paypalac_subscription_period_labels(): array
     {
         return [
             'DAY' => [
@@ -195,11 +195,11 @@ if (!function_exists('paypalr_subscription_period_labels')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_interval_text')) {
-    function paypalr_subscription_interval_text(int $frequency, string $period): string
+if (!function_exists('paypalac_subscription_interval_text')) {
+    function paypalac_subscription_interval_text(int $frequency, string $period): string
     {
         $period = strtoupper(trim($period));
-        $labels = paypalr_subscription_period_labels();
+        $labels = paypalac_subscription_period_labels();
         $label = $period;
 
         if (isset($labels[$period])) {
@@ -213,20 +213,20 @@ if (!function_exists('paypalr_subscription_interval_text')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_schedule_text')) {
-    function paypalr_subscription_schedule_text(int $frequency, string $period): string
+if (!function_exists('paypalac_subscription_schedule_text')) {
+    function paypalac_subscription_schedule_text(int $frequency, string $period): string
     {
         if ($frequency <= 0 || $period === '') {
             return '';
         }
 
-        $interval = paypalr_subscription_interval_text($frequency, $period);
+        $interval = paypalac_subscription_interval_text($frequency, $period);
         return sprintf(TEXT_SUBSCRIPTION_SCHEDULE_TEMPLATE, $interval);
     }
 }
 
-if (!function_exists('paypalr_subscription_total_cycles_text')) {
-    function paypalr_subscription_total_cycles_text(int $totalCycles): string
+if (!function_exists('paypalac_subscription_total_cycles_text')) {
+    function paypalac_subscription_total_cycles_text(int $totalCycles): string
     {
         if ($totalCycles <= 0) {
             return TEXT_SUBSCRIPTION_TOTAL_CYCLES_INFINITE;
@@ -240,20 +240,20 @@ if (!function_exists('paypalr_subscription_total_cycles_text')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_trial_text')) {
-    function paypalr_subscription_trial_text(int $frequency, string $period, int $totalCycles): string
+if (!function_exists('paypalac_subscription_trial_text')) {
+    function paypalac_subscription_trial_text(int $frequency, string $period, int $totalCycles): string
     {
         if ($frequency <= 0 || $period === '' || $totalCycles <= 0) {
             return '';
         }
 
-        $interval = paypalr_subscription_interval_text($frequency, $period);
+        $interval = paypalac_subscription_interval_text($frequency, $period);
         return sprintf(TEXT_SUBSCRIPTION_TRIAL_TEMPLATE, $interval, $totalCycles);
     }
 }
 
-if (!function_exists('paypalr_subscription_format_datetime')) {
-    function paypalr_subscription_format_datetime(?string $raw): string
+if (!function_exists('paypalac_subscription_format_datetime')) {
+    function paypalac_subscription_format_datetime(?string $raw): string
     {
         if ($raw === null || trim($raw) === '') {
             return '';
@@ -268,8 +268,8 @@ if (!function_exists('paypalr_subscription_format_datetime')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_format_amount')) {
-    function paypalr_subscription_format_amount($amount, string $currencyCode, $currencyValue = null): string
+if (!function_exists('paypalac_subscription_format_amount')) {
+    function paypalac_subscription_format_amount($amount, string $currencyCode, $currencyValue = null): string
     {
         $amount = (float) $amount;
         $currencyCode = strtoupper(trim($currencyCode));
@@ -283,11 +283,11 @@ if (!function_exists('paypalr_subscription_format_amount')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_get_vault_status_map')) {
+if (!function_exists('paypalac_subscription_get_vault_status_map')) {
     /**
      * @return array<string,array{label:string,class:string}>
      */
-    function paypalr_subscription_get_vault_status_map(): array
+    function paypalac_subscription_get_vault_status_map(): array
     {
         return [
             'ACTIVE' => [TEXT_SUBSCRIPTION_VAULT_STATUS_ACTIVE, 'is-active'],
@@ -305,12 +305,12 @@ if (!function_exists('paypalr_subscription_get_vault_status_map')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_format_vault_summary')) {
+if (!function_exists('paypalac_subscription_format_vault_summary')) {
     /**
      * @param array<string,mixed>|null $card
      * @return array{label:string,status_label:string,status_class:string}
      */
-    function paypalr_subscription_format_vault_summary(?array $card): array
+    function paypalac_subscription_format_vault_summary(?array $card): array
     {
         if ($card === null) {
             return [
@@ -321,7 +321,7 @@ if (!function_exists('paypalr_subscription_format_vault_summary')) {
         }
 
         $status = strtoupper(trim((string) ($card['status'] ?? '')));
-        $map = paypalr_subscription_get_vault_status_map();
+        $map = paypalac_subscription_get_vault_status_map();
         $statusMeta = $map[$status] ?? $map['UNKNOWN'];
 
         $labelParts = [];
@@ -348,11 +348,11 @@ if (!function_exists('paypalr_subscription_format_vault_summary')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_format_api_error')) {
+if (!function_exists('paypalac_subscription_format_api_error')) {
     /**
      * @param array<string,mixed> $errorInfo
      */
-    function paypalr_subscription_format_api_error(array $errorInfo): string
+    function paypalac_subscription_format_api_error(array $errorInfo): string
     {
         $parts = [];
 
@@ -380,15 +380,15 @@ if (!function_exists('paypalr_subscription_format_api_error')) {
     }
 }
 
-if (!function_exists('paypalr_subscription_remote_status_text')) {
-    function paypalr_subscription_remote_status_text(string $status): string
+if (!function_exists('paypalac_subscription_remote_status_text')) {
+    function paypalac_subscription_remote_status_text(string $status): string
     {
         $status = strtolower(trim($status));
         if ($status === '') {
             return TEXT_SUBSCRIPTION_STATUS_UNKNOWN;
         }
 
-        $map = paypalr_subscription_get_status_map();
+        $map = paypalac_subscription_get_status_map();
         if (isset($map[$status])) {
             return $map[$status]['label'];
         }
@@ -409,7 +409,7 @@ require DIR_WS_MODULES . zen_get_module_directory('require_languages.php');
 
 $customersId = (int) $_SESSION['customer_id'];
 $hideSubscriptionsPage = true;
-if (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS === 'True') {
+if (defined('MODULE_PAYMENT_PAYPALAC_STATUS') && MODULE_PAYMENT_PAYPALAC_STATUS === 'True') {
     $hideSubscriptionsPage = false;
 }
 
@@ -420,8 +420,8 @@ $paypal_subscriptions_allow_api = false;
 $remoteCache = [];
 
 if ($hideSubscriptionsPage === false) {
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/pprAutoload.php';
-    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/ppacAutoload.php';
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalac.php';
 
     SubscriptionManager::ensureSchema();
     VaultManager::ensureSchema();
@@ -437,7 +437,7 @@ if ($hideSubscriptionsPage === false) {
 
         $vaultCardsById[$vaultId] = $card;
 
-        $summary = paypalr_subscription_format_vault_summary($card);
+        $summary = paypalac_subscription_format_vault_summary($card);
         $vaultOptions[] = [
             'id' => $vaultId,
             'text' => zen_output_string_protected($summary['label']),
@@ -450,9 +450,9 @@ if ($hideSubscriptionsPage === false) {
     }
 
     $api = null;
-    if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
+    if (defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
         $paypal_subscriptions_allow_api = true;
-        $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER);
+        $api = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -464,14 +464,14 @@ if ($hideSubscriptionsPage === false) {
             }
 
             $subscriptionId = (int) zen_db_prepare_input($_POST['paypal_subscription_id'] ?? 0);
-            $subscriptionRecord = paypalr_subscription_fetch_record($customersId, $subscriptionId);
+            $subscriptionRecord = paypalac_subscription_fetch_record($customersId, $subscriptionId);
             if ($subscriptionRecord === null) {
                 $messageStack->add_session('paypal_subscriptions', TEXT_SUBSCRIPTION_NOT_FOUND, 'error');
                 zen_redirect(zen_href_link(FILENAME_ACCOUNT_PAYPAL_SUBSCRIPTIONS, '', 'SSL'));
             }
 
-            $attributes = paypalr_subscription_decode_attributes($subscriptionRecord['attributes'] ?? '');
-            $remoteId = paypalr_subscription_extract_remote_id($subscriptionRecord, $attributes);
+            $attributes = paypalac_subscription_decode_attributes($subscriptionRecord['attributes'] ?? '');
+            $remoteId = paypalac_subscription_extract_remote_id($subscriptionRecord, $attributes);
             $redirectUrl = zen_href_link(FILENAME_ACCOUNT_PAYPAL_SUBSCRIPTIONS, '', 'SSL');
             $now = date('Y-m-d H:i:s');
 
@@ -521,7 +521,7 @@ if ($hideSubscriptionsPage === false) {
 
                     $result = $api->cancelSubscription($remoteId, TEXT_SUBSCRIPTION_CANCEL_NOTE);
                     if ($result === false) {
-                        $message = paypalr_subscription_format_api_error($api->getErrorInfo());
+                        $message = paypalac_subscription_format_api_error($api->getErrorInfo());
                         $messageStack->add_session('paypal_subscriptions', sprintf(TEXT_SUBSCRIPTION_CANCEL_ERROR, zen_output_string_protected($message)), 'error');
                     } else {
                         zen_db_perform(
@@ -546,7 +546,7 @@ if ($hideSubscriptionsPage === false) {
 
                     $result = $api->suspendSubscription($remoteId, TEXT_SUBSCRIPTION_SUSPEND_NOTE);
                     if ($result === false) {
-                        $message = paypalr_subscription_format_api_error($api->getErrorInfo());
+                        $message = paypalac_subscription_format_api_error($api->getErrorInfo());
                         $messageStack->add_session('paypal_subscriptions', sprintf(TEXT_SUBSCRIPTION_SUSPEND_ERROR, zen_output_string_protected($message)), 'error');
                     } else {
                         zen_db_perform(
@@ -571,7 +571,7 @@ if ($hideSubscriptionsPage === false) {
 
                     $result = $api->activateSubscription($remoteId, TEXT_SUBSCRIPTION_RESUME_NOTE);
                     if ($result === false) {
-                        $message = paypalr_subscription_format_api_error($api->getErrorInfo());
+                        $message = paypalac_subscription_format_api_error($api->getErrorInfo());
                         $messageStack->add_session('paypal_subscriptions', sprintf(TEXT_SUBSCRIPTION_RESUME_ERROR, zen_output_string_protected($message)), 'error');
                     } else {
                         zen_db_perform(
@@ -596,7 +596,7 @@ if ($hideSubscriptionsPage === false) {
 
                     $details = $api->getSubscription($remoteId);
                     if ($details === false) {
-                        $message = paypalr_subscription_format_api_error($api->getErrorInfo());
+                        $message = paypalac_subscription_format_api_error($api->getErrorInfo());
                         $messageStack->add_session('paypal_subscriptions', sprintf(TEXT_SUBSCRIPTION_REFRESH_ERROR, zen_output_string_protected($message)), 'error');
                     } else {
                         $remoteStatus = strtolower((string) ($details['status'] ?? ''));
@@ -637,18 +637,18 @@ if ($hideSubscriptionsPage === false) {
     if ($records instanceof queryFactoryResult && $records->RecordCount() > 0) {
         while (!$records->EOF) {
             $record = $records->fields;
-            $attributes = paypalr_subscription_decode_attributes($record['attributes'] ?? '');
-            $remoteId = paypalr_subscription_extract_remote_id($record, $attributes);
+            $attributes = paypalac_subscription_decode_attributes($record['attributes'] ?? '');
+            $remoteId = paypalac_subscription_extract_remote_id($record, $attributes);
 
-            $statusMeta = paypalr_subscription_format_status((string) ($record['status'] ?? ''));
-            $amountDisplay = paypalr_subscription_format_amount(
+            $statusMeta = paypalac_subscription_format_status((string) ($record['status'] ?? ''));
+            $amountDisplay = paypalac_subscription_format_amount(
                 $record['amount'] ?? 0,
                 $record['currency_code'] ?? '',
                 $record['currency_value'] ?? null
             );
-            $scheduleText = paypalr_subscription_schedule_text((int) ($record['billing_frequency'] ?? 0), (string) ($record['billing_period'] ?? ''));
-            $totalCyclesText = paypalr_subscription_total_cycles_text((int) ($record['total_billing_cycles'] ?? 0));
-            $trialText = paypalr_subscription_trial_text(
+            $scheduleText = paypalac_subscription_schedule_text((int) ($record['billing_frequency'] ?? 0), (string) ($record['billing_period'] ?? ''));
+            $totalCyclesText = paypalac_subscription_total_cycles_text((int) ($record['total_billing_cycles'] ?? 0));
+            $trialText = paypalac_subscription_trial_text(
                 (int) ($record['trial_frequency'] ?? 0),
                 (string) ($record['trial_period'] ?? ''),
                 (int) ($record['trial_total_cycles'] ?? 0)
@@ -656,7 +656,7 @@ if ($hideSubscriptionsPage === false) {
 
             $vaultId = (int) ($record['paypal_vault_id'] ?? 0);
             $linkedCard = $vaultCardsById[$vaultId] ?? null;
-            $vaultSummary = paypalr_subscription_format_vault_summary($linkedCard);
+            $vaultSummary = paypalac_subscription_format_vault_summary($linkedCard);
 
             $remoteDetails = [
                 'id' => $remoteId,
@@ -670,12 +670,12 @@ if ($hideSubscriptionsPage === false) {
             $remoteError = '';
 
             if ($remoteId !== '') {
-                if (!isset($remoteCache[$remoteId]) && $api instanceof PayPalRestfulApi) {
+                if (!isset($remoteCache[$remoteId]) && $api instanceof PayPalAdvancedCheckoutApi) {
                     $details = $api->getSubscription($remoteId);
                     if ($details === false) {
                         $remoteCache[$remoteId] = [
                             'success' => false,
-                            'error' => paypalr_subscription_format_api_error($api->getErrorInfo()),
+                            'error' => paypalac_subscription_format_api_error($api->getErrorInfo()),
                         ];
                     } else {
                         $remoteCache[$remoteId] = [
@@ -691,14 +691,14 @@ if ($hideSubscriptionsPage === false) {
                         $data = $cacheEntry['data'];
                         $remoteStatus = (string) ($data['status'] ?? '');
                         $remoteDetails['status'] = $remoteStatus;
-                        $remoteDetails['status_label'] = paypalr_subscription_remote_status_text($remoteStatus);
-                        $remoteDetails['next_billing'] = paypalr_subscription_format_datetime($data['billing_info']['next_billing_time'] ?? '');
+                        $remoteDetails['status_label'] = paypalac_subscription_remote_status_text($remoteStatus);
+                        $remoteDetails['next_billing'] = paypalac_subscription_format_datetime($data['billing_info']['next_billing_time'] ?? '');
 
                         $lastPayment = $data['billing_info']['last_payment'] ?? [];
                         if (is_array($lastPayment)) {
-                            $remoteDetails['last_payment'] = paypalr_subscription_format_datetime($lastPayment['time'] ?? '');
+                            $remoteDetails['last_payment'] = paypalac_subscription_format_datetime($lastPayment['time'] ?? '');
                             if (!empty($lastPayment['amount']['value'])) {
-                                $remoteDetails['last_payment_amount'] = paypalr_subscription_format_amount(
+                                $remoteDetails['last_payment_amount'] = paypalac_subscription_format_amount(
                                     $lastPayment['amount']['value'],
                                     $lastPayment['amount']['currency_code'] ?? '',
                                     null
@@ -790,8 +790,8 @@ if ($hideSubscriptionsPage === false) {
                 'status_label' => $statusMeta['label'],
                 'status_class' => $statusMeta['class'],
                 'status_raw' => (string) ($record['status'] ?? ''),
-                'start_date' => paypalr_subscription_format_datetime($record['date_added'] ?? ''),
-                'last_modified' => paypalr_subscription_format_datetime($record['last_modified'] ?? ''),
+                'start_date' => paypalac_subscription_format_datetime($record['date_added'] ?? ''),
+                'last_modified' => paypalac_subscription_format_datetime($record['last_modified'] ?? ''),
                 'vault_summary' => $vaultSummary,
                 'vault_id' => $vaultId,
                 'vault_options' => $vaultOptions,

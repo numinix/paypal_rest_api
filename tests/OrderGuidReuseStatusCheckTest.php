@@ -25,16 +25,16 @@
 
 class OrderGuidReuseStatusCheckTest
 {
-    private string $paypalrFile;
+    private string $paypalacFile;
     private array $testResults = [];
     
     public function __construct()
     {
         $baseDir = dirname(__DIR__);
-        $this->paypalrFile = $baseDir . '/includes/modules/payment/paypalr.php';
+        $this->paypalacFile = $baseDir . '/includes/modules/payment/paypalac.php';
         
-        if (!file_exists($this->paypalrFile)) {
-            throw new RuntimeException("PayPal payment module file not found: {$this->paypalrFile}");
+        if (!file_exists($this->paypalacFile)) {
+            throw new RuntimeException("PayPal payment module file not found: {$this->paypalacFile}");
         }
     }
     
@@ -56,10 +56,10 @@ class OrderGuidReuseStatusCheckTest
     {
         echo "Test 1: Code checks for reusable statuses before reusing cached order\n";
         
-        $content = file_get_contents($this->paypalrFile);
+        $content = file_get_contents($this->paypalacFile);
         
         // Look for the status check logic
-        $hasStatusCheck = preg_match('/\$cached_status\s*=.*?PayPalRestful.*?Order.*?status/s', $content);
+        $hasStatusCheck = preg_match('/\$cached_status\s*=.*?PayPalAdvancedCheckout.*?Order.*?status/s', $content);
         $hasReusableConstant = preg_match('/const\s+REUSABLE_ORDER_STATUSES\s*=/', $content);
         $hasInArrayCheck = preg_match('/in_array\s*\(\s*\$cached_status\s*,\s*self::REUSABLE_ORDER_STATUSES/', $content);
         
@@ -96,7 +96,7 @@ class OrderGuidReuseStatusCheckTest
     {
         echo "Test 2: Non-reusable statuses (COMPLETED, REFUNDED, etc.) are excluded\n";
         
-        $content = file_get_contents($this->paypalrFile);
+        $content = file_get_contents($this->paypalacFile);
         
         // Extract the REUSABLE_ORDER_STATUSES constant
         $pattern = '/const\s+REUSABLE_ORDER_STATUSES\s*=\s*\[(.*?)\];/s';
@@ -160,7 +160,7 @@ class OrderGuidReuseStatusCheckTest
     {
         echo "Test 3: Appropriate logging messages for status-based decisions\n";
         
-        $content = file_get_contents($this->paypalrFile);
+        $content = file_get_contents($this->paypalacFile);
         
         // Check for log message when order is reusable
         $hasReusableLog = preg_match('/status.*is reusable/', $content);

@@ -8,7 +8,7 @@
  *
  * Background:
  * - After client-side confirmOrder(), JavaScript sends {orderID, wallet, confirmed: true}
- * - The server must recognize this payload and save the orderID to $_SESSION['PayPalRestful']['Order']['id']
+ * - The server must recognize this payload and save the orderID to $_SESSION['PayPalAdvancedCheckout']['Order']['id']
  * - The server must NOT require a token in this case (token was already used client-side)
  *
  * The test verifies that:
@@ -127,7 +127,7 @@ class ApplePayClientSideConfirmOrderIdSaveTest
         
         // Look for the code that saves orderID to session
         $savesOrderId = preg_match(
-            "/\\\$_SESSION\s*\[\s*['\"]PayPalRestful['\"]\s*\]\s*\[\s*['\"]Order['\"]\s*\]\s*\[\s*['\"]id['\"]\s*\]\s*=\s*\\\$payload\s*\[\s*['\"]orderID['\"]\s*\]/",
+            "/\\\$_SESSION\s*\[\s*['\"]PayPalAdvancedCheckout['\"]\s*\]\s*\[\s*['\"]Order['\"]\s*\]\s*\[\s*['\"]id['\"]\s*\]\s*=\s*\\\$payload\s*\[\s*['\"]orderID['\"]\s*\]/",
             $content
         );
         
@@ -138,7 +138,7 @@ class ApplePayClientSideConfirmOrderIdSaveTest
             $this->testResults[] = [
                 'name' => 'Saves orderID to session',
                 'passed' => true,
-                'message' => 'Code saves payload[orderID] to $_SESSION[PayPalRestful][Order][id]'
+                'message' => 'Code saves payload[orderID] to $_SESSION[PayPalAdvancedCheckout][Order][id]'
             ];
             echo "  ✓ PASS: OrderID saved to session\n";
         } else {
@@ -162,7 +162,7 @@ class ApplePayClientSideConfirmOrderIdSaveTest
         
         // Check that the captureWalletPayment function reads from the same session location
         $captureReadsOrderId = preg_match(
-            "/\\\$paypal_order_id\s*=\s*\\\$_SESSION\s*\[\s*['\"]PayPalRestful['\"]\s*\]\s*\[\s*['\"]Order['\"]\s*\]\s*\[\s*['\"]id['\"]\s*\]/",
+            "/\\\$paypal_order_id\s*=\s*\\\$_SESSION\s*\[\s*['\"]PayPalAdvancedCheckout['\"]\s*\]\s*\[\s*['\"]Order['\"]\s*\]\s*\[\s*['\"]id['\"]\s*\]/",
             $content
         );
         
@@ -170,7 +170,7 @@ class ApplePayClientSideConfirmOrderIdSaveTest
             $this->testResults[] = [
                 'name' => 'OrderID available for capture',
                 'passed' => true,
-                'message' => 'captureWalletPayment reads from $_SESSION[PayPalRestful][Order][id]'
+                'message' => 'captureWalletPayment reads from $_SESSION[PayPalAdvancedCheckout][Order][id]'
             ];
             echo "  ✓ PASS: OrderID available for capture at correct location\n";
         } else {

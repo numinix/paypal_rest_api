@@ -19,9 +19,9 @@ if (!isset($psr4Autoloader)) {
     };
 }
 
-require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypalrestful_recurring.php';
+require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout_recurring.php';
 
-class RecurringObserverTestHarness extends zcObserverPaypalrestfulRecurring
+class RecurringObserverTestHarness extends zcObserverPaypaladvcheckoutRecurring
 {
     public function publicNormalizeAttributeKey(string $label): string
     {

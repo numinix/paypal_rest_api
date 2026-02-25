@@ -1,6 +1,6 @@
 <?php
 /**
- * Test to verify wallet payment modules instantiate PayPalRestfulApi with correct parameter order.
+ * Test to verify wallet payment modules instantiate PayPalAdvancedCheckoutApi with correct parameter order.
  * This test was added to prevent regression of the bug where modules passed parameters in wrong order,
  * causing authentication failures with "expired-token error".
  *
@@ -20,20 +20,20 @@ namespace {
     }
 
     // Define required constants for the test
-    if (!defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-        define('MODULE_PAYMENT_PAYPALR_SERVER', 'sandbox');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+        define('MODULE_PAYMENT_PAYPALAC_SERVER', 'sandbox');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_L', 'LiveClientId123');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_L', 'LiveClientId123');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_L')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_L', 'LiveSecret456');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_L', 'LiveSecret456');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_S', 'SandboxClientId789');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_S', 'SandboxClientId789');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_S')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_S', 'SandboxSecret012');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_S', 'SandboxSecret012');
     }
 
     if (session_status() === PHP_SESSION_NONE) {
@@ -41,32 +41,32 @@ namespace {
     }
 }
 
-namespace PayPalRestful\Common {
+namespace PayPalAdvancedCheckout\Common {
     if (!class_exists(Helpers::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
     }
     if (!class_exists(Logger::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Common/Logger.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
     }
     if (!class_exists(ErrorInfo::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Common/ErrorInfo.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
     }
 }
 
-namespace PayPalRestful\Token {
+namespace PayPalAdvancedCheckout\Token {
     if (!class_exists(TokenCache::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Token/TokenCache.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Token/TokenCache.php';
     }
 }
 
-namespace PayPalRestful\Api {
-    if (!class_exists(PayPalRestfulApi::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Api/PayPalRestfulApi.php';
+namespace PayPalAdvancedCheckout\Api {
+    if (!class_exists(PayPalAdvancedCheckoutApi::class)) {
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php';
     }
 }
 
 namespace {
-    use PayPalRestful\Api\PayPalRestfulApi;
+    use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
 
     /**
      * Helper function to extract private property values using reflection
@@ -82,19 +82,19 @@ namespace {
     }
 
     /**
-     * Test that wallet modules use correct parameter order when instantiating PayPalRestfulApi
+     * Test that wallet modules use correct parameter order when instantiating PayPalAdvancedCheckoutApi
      */
     function testWalletModuleConstructorParameterOrder(): array
     {
         $results = [];
         
-        // Test each wallet module's getPayPalRestfulApi method indirectly
+        // Test each wallet module's getPayPalAdvancedCheckoutApi method indirectly
         // by checking the pattern used in the source files
         $modules = [
-            'paypalr_creditcard' => 'includes/modules/payment/paypalr_creditcard.php',
-            'paypalr_applepay' => 'includes/modules/payment/paypalr_applepay.php',
-            'paypalr_googlepay' => 'includes/modules/payment/paypalr_googlepay.php',
-            'paypalr_venmo' => 'includes/modules/payment/paypalr_venmo.php',
+            'paypalac_creditcard' => 'includes/modules/payment/paypalac_creditcard.php',
+            'paypalac_applepay' => 'includes/modules/payment/paypalac_applepay.php',
+            'paypalac_googlepay' => 'includes/modules/payment/paypalac_googlepay.php',
+            'paypalac_venmo' => 'includes/modules/payment/paypalac_venmo.php',
         ];
 
         foreach ($modules as $moduleName => $filePath) {
@@ -106,18 +106,18 @@ namespace {
 
             $content = file_get_contents($fullPath);
             
-            // Check for the correct pattern: new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret)
-            $correctPattern = '/new\s+PayPalRestfulApi\s*\(\s*MODULE_PAYMENT_PAYPALR_SERVER\s*,\s*\$client_id\s*,\s*\$secret\s*\)/s';
+            // Check for the correct pattern: new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER, $client_id, $secret)
+            $correctPattern = '/new\s+PayPalAdvancedCheckoutApi\s*\(\s*MODULE_PAYMENT_PAYPALAC_SERVER\s*,\s*\$client_id\s*,\s*\$secret\s*\)/s';
             
-            // Check for the INCORRECT pattern: new PayPalRestfulApi($client_id, $secret, MODULE_PAYMENT_PAYPALR_SERVER, ...)
-            $incorrectPattern = '/new\s+PayPalRestfulApi\s*\(\s*\$client_id\s*,\s*\$secret\s*,\s*MODULE_PAYMENT_PAYPALR_SERVER/s';
+            // Check for the INCORRECT pattern: new PayPalAdvancedCheckoutApi($client_id, $secret, MODULE_PAYMENT_PAYPALAC_SERVER, ...)
+            $incorrectPattern = '/new\s+PayPalAdvancedCheckoutApi\s*\(\s*\$client_id\s*,\s*\$secret\s*,\s*MODULE_PAYMENT_PAYPALAC_SERVER/s';
             
             if (preg_match($correctPattern, $content)) {
                 $results[$moduleName] = ['status' => 'PASS', 'reason' => 'Uses correct parameter order'];
             } elseif (preg_match($incorrectPattern, $content)) {
                 $results[$moduleName] = ['status' => 'FAIL', 'reason' => 'Uses INCORRECT parameter order - will cause authentication failures!'];
             } else {
-                $results[$moduleName] = ['status' => 'WARN', 'reason' => 'Could not detect PayPalRestfulApi instantiation pattern'];
+                $results[$moduleName] = ['status' => 'WARN', 'reason' => 'Could not detect PayPalAdvancedCheckoutApi instantiation pattern'];
             }
         }
 
@@ -130,7 +130,7 @@ namespace {
     function testCorrectParameterOrderInternals(): bool
     {
         // Test with sandbox environment
-        $api = new PayPalRestfulApi('sandbox', 'TestClientId', 'TestSecret');
+        $api = new PayPalAdvancedCheckoutApi('sandbox', 'TestClientId', 'TestSecret');
         
         $environment = $api->getEnvironmentType();
         $clientId = getPrivateProperty($api, 'clientId');
@@ -156,7 +156,7 @@ namespace {
     $failures = 0;
     
     // Test 1: Verify constructor internals work correctly
-    fwrite(STDOUT, "Test 1: Verifying PayPalRestfulApi constructor parameter order...\n");
+    fwrite(STDOUT, "Test 1: Verifying PayPalAdvancedCheckoutApi constructor parameter order...\n");
     if (testCorrectParameterOrderInternals()) {
         fwrite(STDOUT, "  ✓ Constructor correctly assigns parameters\n");
     } else {

@@ -6,14 +6,14 @@ When archiving a subscription, the page displayed:
 
 ```html
 <div class="messageStack-header noprint">
-    <div class="row messageStackAlert alert alert-danger">paypalr_subscriptions</div>
+    <div class="row messageStackAlert alert alert-danger">paypalac_subscriptions</div>
 </div>
 ```
 
 **Visual Result:**
 ```
 ┌─────────────────────────────────────────┐
-│ ⚠️ paypalr_subscriptions                │  <-- ERROR: Stack key shown instead of message
+│ ⚠️ paypalac_subscriptions                │  <-- ERROR: Stack key shown instead of message
 └─────────────────────────────────────────┘
 ```
 
@@ -70,11 +70,11 @@ Visual: `⚠ This action cannot be undone.` (yellow background)
 ### 1. Session Message Storage (During Action)
 ```php
 // When user clicks "Archive" button
-$messageStack->add_session('paypalr_subscriptions', 'Subscription #123 has been archived.', 'success');
+$messageStack->add_session('paypalac_subscriptions', 'Subscription #123 has been archived.', 'success');
 zen_redirect($redirectUrl);
 ```
 
-This stores the message in `$_SESSION['messageToStack']['paypalr_subscriptions']`
+This stores the message in `$_SESSION['messageToStack']['paypalac_subscriptions']`
 
 ### 2. Session Message Loading (After Redirect)
 ```php
@@ -95,7 +95,7 @@ public function __construct()
 ### 3. Message Rendering (Page Display)
 ```php
 // Admin page calls
-echo $messageStack->output('paypalr_subscriptions');
+echo $messageStack->output('paypalac_subscriptions');
 
 // output() method renders HTML
 public function output($stack = 'header'): string

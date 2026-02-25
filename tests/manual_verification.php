@@ -17,9 +17,9 @@ define('DIR_WS_MODULES', 'includes/modules/');
 define('TABLE_PAYPAL_SUBSCRIPTIONS', 'paypal_subscriptions');
 define('TABLE_PAYPAL_VAULT', 'paypal_vault');
 
-require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
+require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 
-use PayPalRestful\Common\SubscriptionManager;
+use PayPalAdvancedCheckout\Common\SubscriptionManager;
 
 echo "Step 1: Subscription Creation Flow\n";
 echo "-----------------------------------\n";
@@ -33,12 +33,12 @@ echo "Step 2: Vault Token Saved\n";
 echo "--------------------------\n";
 echo "When the vault token becomes available (immediately or via webhook):\n";
 echo "- VaultManager::saveVaultedCard() saves the card\n";
-echo "- NOTIFY_PAYPALR_VAULT_CARD_SAVED notification is sent\n\n";
+echo "- NOTIFY_PAYPALAC_VAULT_CARD_SAVED notification is sent\n\n";
 
 echo "Step 3: Subscription Activation (NEW FUNCTIONALITY)\n";
 echo "---------------------------------------------------\n";
-echo "Observer listens for NOTIFY_PAYPALR_VAULT_CARD_SAVED:\n";
-echo "- zcObserverPaypalrestfulRecurring::updateNotifyPaypalrVaultCardSaved() is called\n";
+echo "Observer listens for NOTIFY_PAYPALAC_VAULT_CARD_SAVED:\n";
+echo "- zcObserverPaypaladvcheckoutRecurring::updateNotifyPaypalacVaultCardSaved() is called\n";
 echo "- Calls SubscriptionManager::activateSubscriptionsWithVault()\n";
 echo "- Finds all subscriptions for this order with status 'awaiting_vault'\n";
 echo "- Updates each subscription:\n";
@@ -50,7 +50,7 @@ echo "- Sends NOTIFY_SUBSCRIPTIONS_ACTIVATED notification\n\n";
 echo "Step 4: Admin Management\n";
 echo "------------------------\n";
 echo "Admin can now see and manage the subscription:\n";
-echo "- Visit admin/paypalr_subscriptions.php\n";
+echo "- Visit admin/paypalac_subscriptions.php\n";
 echo "- Subscription appears with status 'active'\n";
 echo "- Can filter by status, customer, product\n";
 echo "- Can perform actions:\n";
@@ -67,8 +67,8 @@ echo "   - Links subscriptions to vault when it becomes available\n";
 echo "   - Activates subscriptions from 'awaiting_vault' to 'active' status\n\n";
 
 echo "2. Observer updated to listen for vault notifications\n";
-echo "   - Added NOTIFY_PAYPALR_VAULT_CARD_SAVED to event list\n";
-echo "   - Added updateNotifyPaypalrVaultCardSaved() handler\n\n";
+echo "   - Added NOTIFY_PAYPALAC_VAULT_CARD_SAVED to event list\n";
+echo "   - Added updateNotifyPaypalacVaultCardSaved() handler\n\n";
 
 echo "3. Tests added\n";
 echo "   - SubscriptionVaultActivationTest.php (3 tests, 28 assertions)\n";

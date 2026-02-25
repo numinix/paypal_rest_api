@@ -17,20 +17,20 @@ namespace {
     }
 
     // Define test constants with whitespace to verify trimming
-    if (!defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-        define('MODULE_PAYMENT_PAYPALR_SERVER', 'sandbox');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+        define('MODULE_PAYMENT_PAYPALAC_SERVER', 'sandbox');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_L', '  LiveClientId123  ');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_L', '  LiveClientId123  ');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_L')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_L', '  LiveSecret456  ');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_L', '  LiveSecret456  ');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_S', '  SandboxClientId789  ');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_S', '  SandboxClientId789  ');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_S')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_S', '  SandboxSecret012  ');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_S', '  SandboxSecret012  ');
     }
 
     if (session_status() === PHP_SESSION_NONE) {
@@ -40,15 +40,15 @@ namespace {
 
 namespace {
     /**
-     * Test that wallet modules trim credentials before creating PayPalRestfulApi
+     * Test that wallet modules trim credentials before creating PayPalAdvancedCheckoutApi
      */
     function testWalletModulesTrimCredentials(): bool
     {
         $modules = [
-            'paypalr_creditcard',
-            'paypalr_applepay', 
-            'paypalr_googlepay',
-            'paypalr_venmo',
+            'paypalac_creditcard',
+            'paypalac_applepay', 
+            'paypalac_googlepay',
+            'paypalac_venmo',
         ];
         
         $allPassed = true;
@@ -63,7 +63,7 @@ namespace {
             
             $content = file_get_contents($filePath);
             
-            // Check that credentials are trimmed before being passed to PayPalRestfulApi
+            // Check that credentials are trimmed before being passed to PayPalAdvancedCheckoutApi
             // Pattern: $client_id = trim(...) or similar
             if (strpos($content, 'trim($client_id)') !== false && 
                 strpos($content, 'trim($secret)') !== false) {
@@ -78,14 +78,14 @@ namespace {
     }
 
     /**
-     * Test that paypalr.php getEnvironmentInfo returns trimmed credentials
+     * Test that paypalac.php getEnvironmentInfo returns trimmed credentials
      */
-    function testPaypalrGetEnvironmentInfoTrims(): bool
+    function testPaypalacGetEnvironmentInfoTrims(): bool
     {
-        $filePath = DIR_FS_CATALOG . 'includes/modules/payment/paypalr.php';
+        $filePath = DIR_FS_CATALOG . 'includes/modules/payment/paypalac.php';
         
         if (!file_exists($filePath)) {
-            fwrite(STDERR, "FAIL: paypalr.php not found\n");
+            fwrite(STDERR, "FAIL: paypalac.php not found\n");
             return false;
         }
         
@@ -95,10 +95,10 @@ namespace {
         if (strpos($content, 'trim($client_id)') !== false && 
             strpos($content, 'trim($secret)') !== false &&
             strpos($content, 'public static function getEnvironmentInfo') !== false) {
-            fwrite(STDOUT, "✓ paypalr::getEnvironmentInfo() trims credentials\n");
+            fwrite(STDOUT, "✓ paypalac::getEnvironmentInfo() trims credentials\n");
             return true;
         } else {
-            fwrite(STDERR, "✗ paypalr::getEnvironmentInfo() does NOT trim credentials\n");
+            fwrite(STDERR, "✗ paypalac::getEnvironmentInfo() does NOT trim credentials\n");
             return false;
         }
     }
@@ -127,8 +127,8 @@ namespace {
     // Run the tests
     $failures = 0;
     
-    fwrite(STDOUT, "Test 1: Verifying paypalr::getEnvironmentInfo() trims credentials...\n");
-    if (testPaypalrGetEnvironmentInfoTrims()) {
+    fwrite(STDOUT, "Test 1: Verifying paypalac::getEnvironmentInfo() trims credentials...\n");
+    if (testPaypalacGetEnvironmentInfoTrims()) {
         fwrite(STDOUT, "  ✓ Test passed\n");
     } else {
         fwrite(STDERR, "  ✗ Test failed\n");

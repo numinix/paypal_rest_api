@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Confirmed:** Both Google Pay and Apple Pay do support recurring payments/subscriptions through direct integration, but **NOT through PayPal's API**. The current PayPal REST API integration routes these wallet payments through PayPal, which does not support vaulting for Google Pay or Apple Pay tokens.
+**Confirmed:** Both Google Pay and Apple Pay do support recurring payments/subscriptions through direct integration, but **NOT through PayPal's API**. The current PayPal Advanced Checkout integration routes these wallet payments through PayPal, which does not support vaulting for Google Pay or Apple Pay tokens.
 
 To enable subscriptions with Google Pay and Apple Pay, a **separate direct integration** with these payment methods (bypassing PayPal) would be required.
 
@@ -161,7 +161,7 @@ If Option 1 or Option 2 is chosen, the following steps would be required:
 
 ### Phase 2: Direct Google Pay Integration
 
-1. **Create new payment module** `paypalr_googlepay_direct.php` (or similar)
+1. **Create new payment module** `paypalac_googlepay_direct.php` (or similar)
    - Separate from PayPal-routed version
    - Implements Google Pay Web API directly
    
@@ -181,7 +181,7 @@ If Option 1 or Option 2 is chosen, the following steps would be required:
    - Register domain with Apple
    - Host `.well-known/apple-developer-merchantid-domain-association` file
    
-2. **Create new payment module** `paypalr_applepay_direct.php`:
+2. **Create new payment module** `paypalac_applepay_direct.php`:
    - Implements Apple Pay JS API directly
    - Includes `recurringPaymentRequest` for subscriptions
    
@@ -198,7 +198,7 @@ If Option 1 or Option 2 is chosen, the following steps would be required:
    - Or offer both with clear labeling
    
 2. **Subscription Creation**:
-   - Modify `auto.paypalrestful_recurring.php` observer
+   - Modify `auto.paypalacestful_recurring.php` observer
    - Support new token types from direct integrations
    - Route to appropriate recurring billing handler
 

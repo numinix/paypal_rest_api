@@ -31,14 +31,14 @@ namespace {
 
 namespace {
     /**
-     * Test that verifies the paypalr_proxy_to_numinix function captures redirect URLs
+     * Test that verifies the paypalac_proxy_to_numinix function captures redirect URLs
      */
     function testRedirectUrlLogging(): bool
     {
         $passed = true;
 
-        // Read the paypalr_integrated_signup.php file and check for the fix
-        $signupFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        // Read the paypalac_integrated_signup.php file and check for the fix
+        $signupFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($signupFile);
 
         // Check 1: Verify that CURLINFO_REDIRECT_URL is captured
@@ -75,11 +75,11 @@ namespace {
     {
         $passed = true;
 
-        $signupFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $signupFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($signupFile);
 
         // Find the log call for non-200 status and verify it includes redirect_url
-        $pattern = "/paypalr_log_debug\s*\(\s*'Numinix API returned non-200 status'.*?'redirect_url'\s*=>\s*\\\$redirectUrl/s";
+        $pattern = "/paypalac_log_debug\s*\(\s*'Numinix API returned non-200 status'.*?'redirect_url'\s*=>\s*\\\$redirectUrl/s";
         if (preg_match($pattern, $content)) {
             fwrite(STDOUT, "✓ Log call for non-200 status includes redirect_url context\n");
         } else {
@@ -97,7 +97,7 @@ namespace {
     {
         $passed = true;
 
-        $signupFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $signupFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($signupFile);
 
         // Check that localOnlyParams array is defined with the expected parameters
@@ -130,7 +130,7 @@ namespace {
     {
         $passed = true;
 
-        $signupFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $signupFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($signupFile);
 
         // Check that the default URL points to the standalone API endpoint

@@ -21,20 +21,20 @@ namespace {
     }
 
     // Define required constants for the test
-    if (!defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-        define('MODULE_PAYMENT_PAYPALR_SERVER', 'sandbox');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+        define('MODULE_PAYMENT_PAYPALAC_SERVER', 'sandbox');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_L', 'LiveClientId123');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_L', 'LiveClientId123');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_L')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_L', 'LiveSecret456');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_L', 'LiveSecret456');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_S', 'SandboxClientId789');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_S', 'SandboxClientId789');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_S')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_S', 'SandboxSecret012');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_S', 'SandboxSecret012');
     }
 
     if (session_status() === PHP_SESSION_NONE) {
@@ -42,37 +42,37 @@ namespace {
     }
 }
 
-namespace PayPalRestful\Common {
+namespace PayPalAdvancedCheckout\Common {
     if (!class_exists(Helpers::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Common/Helpers.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
     }
     if (!class_exists(Logger::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Common/Logger.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
     }
     if (!class_exists(ErrorInfo::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Common/ErrorInfo.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
     }
 }
 
-namespace PayPalRestful\Token {
+namespace PayPalAdvancedCheckout\Token {
     if (!class_exists(TokenCache::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Token/TokenCache.php';
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Token/TokenCache.php';
     }
 }
 
-namespace PayPalRestful\Api {
-    if (!class_exists(PayPalRestfulApi::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Api/PayPalRestfulApi.php';
+namespace PayPalAdvancedCheckout\Api {
+    if (!class_exists(PayPalAdvancedCheckoutApi::class)) {
+        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php';
     }
 }
 
 namespace {
-    use PayPalRestful\Api\PayPalRestfulApi;
+    use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
 
     /**
      * Helper class to mock PayPal API and simulate 401 errors
      */
-    class MockPayPalRestfulApi extends PayPalRestfulApi
+    class MockPayPalAdvancedCheckoutApi extends PayPalAdvancedCheckoutApi
     {
         private $tokenRequestCount = 0;
         private $otherRequestCount = 0;
@@ -118,8 +118,8 @@ namespace {
     {
         $passed = true;
         
-        // Read the PayPalRestfulApi.php file and check for the fix
-        $apiFile = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Api/PayPalRestfulApi.php';
+        // Read the PayPalAdvancedCheckoutApi.php file and check for the fix
+        $apiFile = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php';
         $content = file_get_contents($apiFile);
         
         // Check 1: Verify that the retry logic checks for 'v1/oauth2/token'
@@ -154,11 +154,11 @@ namespace {
      */
     function testMockBehavior(): bool
     {
-        $mock = new MockPayPalRestfulApi('sandbox', 'TestClient', 'TestSecret');
+        $mock = new MockPayPalAdvancedCheckoutApi('sandbox', 'TestClient', 'TestSecret');
         
         // This would normally try to get a token and fail, but shouldn't retry infinitely
         // Since we're mocking and it returns false immediately, we just check the instantiation works
-        fwrite(STDOUT, "✓ MockPayPalRestfulApi instantiated successfully\n");
+        fwrite(STDOUT, "✓ MockPayPalAdvancedCheckoutApi instantiated successfully\n");
         
         return true;
     }

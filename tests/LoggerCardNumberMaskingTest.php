@@ -12,10 +12,10 @@ namespace {
         define('IS_ADMIN_FLAG', false);
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/Logger.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
 
     use PHPUnit\Framework\TestCase;
-    use PayPalRestful\Common\Logger;
+    use PayPalAdvancedCheckout\Common\Logger;
 
     /**
      * Test that Logger::logJSON masks sensitive data without modifying the original array

@@ -35,23 +35,23 @@ namespace {
         define('FILENAME_DEFAULT', 'index');
     }
 
-    if (!defined('MODULE_PAYMENT_PAYPALR_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_STATUS', 'True');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-        define('MODULE_PAYMENT_PAYPALR_SERVER', 'sandbox');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+        define('MODULE_PAYMENT_PAYPALAC_SERVER', 'sandbox');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_L', 'LiveClientId');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_L', 'LiveClientId');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_L')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_L', 'LiveClientSecret');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_L', 'LiveClientSecret');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_S', 'SandboxClientId');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_S', 'SandboxClientId');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_S')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_S', 'SandboxClientSecret');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_S', 'SandboxClientSecret');
     }
 
     if (!class_exists('base')) {
@@ -65,7 +65,7 @@ namespace {
     $current_page_base = 'checkout_confirmation';
 }
 
-namespace PayPalRestful\Api\Data {
+namespace PayPalAdvancedCheckout\Api\Data {
     class CountryCodes {
         public static function convertCountryCode($code) {
             return $code;
@@ -73,13 +73,13 @@ namespace PayPalRestful\Api\Data {
     }
 }
 
-namespace PayPalRestful\Api {
-    class PayPalRestfulApi {
+namespace PayPalAdvancedCheckout\Api {
+    class PayPalAdvancedCheckoutApi {
         const PARTNER_ATTRIBUTION_ID = 'TEST_BN_CODE';
     }
 }
 
-namespace PayPalRestful\Zc2Pp {
+namespace PayPalAdvancedCheckout\Zc2Pp {
     class Amount {
         public function __construct($currency) {}
         public function getDefaultCurrencyCode() { return 'USD'; }
@@ -105,7 +105,7 @@ namespace {
         };
     }
 
-    require_once dirname(__DIR__) . '/includes/classes/observers/auto.paypalrestful.php';
+    require_once dirname(__DIR__) . '/includes/classes/observers/auto.paypaladvcheckout.php';
 
     /**
      * Test class for observer coupon calculations
@@ -117,7 +117,7 @@ namespace {
          */
         public function testCouponTypeArrayAccess(): void
         {
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             
             // Simulate coupon data as an array (traditional format)
             $parameters = [
@@ -145,7 +145,7 @@ namespace {
          */
         public function testCouponTypeObjectAccess(): void
         {
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             
             // Simulate coupon data as an object with fields (newer format)
             $couponObject = new \stdClass();
@@ -176,7 +176,7 @@ namespace {
          */
         public function testNonFreeShippingCoupon(): void
         {
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             
             // Test with a percentage discount coupon (type P)
             $parameters = [
@@ -206,7 +206,7 @@ namespace {
             $freeShippingTypes = ['S', 'E', 'O'];
             
             foreach ($freeShippingTypes as $type) {
-                $observer = new zcObserverPaypalrestful();
+                $observer = new zcObserverPaypaladvcheckout();
                 
                 $parameters = [
                     'coupon' => [
@@ -232,7 +232,7 @@ namespace {
          */
         public function testMissingCouponType(): void
         {
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             
             // Coupon without coupon_type
             $parameters = [
@@ -259,7 +259,7 @@ namespace {
          */
         public function testEmptyObjectCoupon(): void
         {
-            $observer = new zcObserverPaypalrestful();
+            $observer = new zcObserverPaypaladvcheckout();
             
             // Empty object
             $couponObject = new \stdClass();

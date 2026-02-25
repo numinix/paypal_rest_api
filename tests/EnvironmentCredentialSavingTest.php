@@ -5,7 +5,7 @@
  *
  * This test validates the fix for the issue where numinix.com API returns
  * environment indication but the plugin was ignoring it and using the local
- * MODULE_PAYMENT_PAYPALR_SERVER setting instead.
+ * MODULE_PAYMENT_PAYPALAC_SERVER setting instead.
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -34,14 +34,14 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: The handler reads environment from POST data
         if (preg_match('/\$_POST\s*\[\s*[\'"]environment[\'"]\s*\]/', $content)) {
-            fwrite(STDOUT, "✓ paypalr_handle_save_credentials reads environment from POST\n");
+            fwrite(STDOUT, "✓ paypalac_handle_save_credentials reads environment from POST\n");
         } else {
-            fwrite(STDERR, "FAIL: paypalr_handle_save_credentials should read environment from POST\n");
+            fwrite(STDERR, "FAIL: paypalac_handle_save_credentials should read environment from POST\n");
             $passed = false;
         }
 
@@ -71,7 +71,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: autoSaveCredentials function accepts environment parameter
@@ -100,7 +100,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: handleStatusResponse extracts remoteEnvironment from data
@@ -137,7 +137,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: displayCredentials accepts credentialEnvironment parameter
@@ -195,14 +195,14 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
-        // Check 1: Handler falls back to paypalr_detect_environment when environment not valid
-        if (preg_match('/paypalr_detect_environment\s*\(\s*\)/', $content)) {
-            fwrite(STDOUT, "✓ Handler falls back to paypalr_detect_environment\n");
+        // Check 1: Handler falls back to paypalac_detect_environment when environment not valid
+        if (preg_match('/paypalac_detect_environment\s*\(\s*\)/', $content)) {
+            fwrite(STDOUT, "✓ Handler falls back to paypalac_detect_environment\n");
         } else {
-            fwrite(STDERR, "FAIL: Handler should fall back to paypalr_detect_environment\n");
+            fwrite(STDERR, "FAIL: Handler should fall back to paypalac_detect_environment\n");
             $passed = false;
         }
 

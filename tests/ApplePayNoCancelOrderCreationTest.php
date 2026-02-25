@@ -10,7 +10,7 @@
  * Issue scenario (from user report):
  * - User clicks Apple Pay button
  * - onvalidatemerchant is called (modal opens)
- * - Previously: Order was created here (783ms API call to ppr_wallet.php)
+ * - Previously: Order was created here (783ms API call to ppac_wallet.php)
  * - User cancels without authorizing payment
  * - oncancel is called
  * - Result: Wasted order creation, abandoned order in PayPal system
@@ -35,7 +35,7 @@ echo "Testing Apple Pay No Cancel Order Creation\n";
 echo "==========================================\n\n";
 
 // Get the Apple Pay JS file content
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
 
 // Extract the onApplePayButtonClicked function
 $pattern = '/function onApplePayButtonClicked\s*\([^)]*\)\s*\{([\s\S]*?)^\s{4}\}/m';

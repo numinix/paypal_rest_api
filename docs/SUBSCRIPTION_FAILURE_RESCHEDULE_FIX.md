@@ -116,7 +116,7 @@ $api_type = isset($payment_details['api_type']) ? $payment_details['api_type'] :
 $has_vault_card = isset($payment_details['paypal_vault_card']) 
     && is_array($payment_details['paypal_vault_card']) 
     && !empty($payment_details['paypal_vault_card']);
-if (in_array($api_type, array('paypalr', 'rest')) || ($api_type === '' && $has_vault_card)) {
+if (in_array($api_type, array('paypalac', 'rest')) || ($api_type === '' && $has_vault_card)) {
     // Process as REST API payment
 }
 ```

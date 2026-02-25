@@ -1,6 +1,6 @@
 <?php
 /**
- * Test that verifies the paypalr_savedcard module correctly generates
+ * Test that verifies the paypalac_savedcard module correctly generates
  * a select box for saved cards instead of individual radio buttons.
  */
 
@@ -9,23 +9,23 @@ $testPassed = true;
 $errors = [];
 
 // Mock the constants
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE', '%s ending in %s');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE', '%s ending in %s');
 }
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY', ' (Exp: %s)');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_EXPIRY')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_EXPIRY', ' (Exp: %s)');
 }
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT', 'Pay with Saved Card');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE_SHORT')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE_SHORT', 'Pay with Saved Card');
 }
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD', 'Card');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_UNKNOWN_CARD')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_UNKNOWN_CARD', 'Card');
 }
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL', 'Select Card:');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_SELECT_LABEL')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_SELECT_LABEL', 'Select Card:');
 }
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT', 'Please select...');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_SELECT_PROMPT')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_SELECT_PROMPT', 'Please select...');
 }
 if (!defined('DIR_WS_MODULES')) {
     define('DIR_WS_MODULES', '/includes/modules/');
@@ -53,7 +53,7 @@ if (!function_exists('zen_draw_pull_down_menu')) {
 }
 
 /**
- * Simulates the new selection generation logic from paypalr_savedcard
+ * Simulates the new selection generation logic from paypalac_savedcard
  * using a select box instead of radio buttons
  */
 function generateSavedCardSelectBoxSelection(array $vaultedCards, string $selectedVaultId = ''): array
@@ -62,11 +62,11 @@ function generateSavedCardSelectBoxSelection(array $vaultedCards, string $select
         return [];
     }
     
-    $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+    $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.checkout.js"></script>';
     
     // Add "Please select" as the first option
-    $selectPrompt = defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT')
-        ? MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT
+    $selectPrompt = defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_SELECT_PROMPT')
+        ? MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_SELECT_PROMPT
         : 'Please select...';
     
     $selectOptions = [
@@ -77,18 +77,18 @@ function generateSavedCardSelectBoxSelection(array $vaultedCards, string $select
     ];
 
     foreach ($vaultedCards as $card) {
-        $brand = $card['brand'] ?: ($card['card_type'] ?: MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD);
+        $brand = $card['brand'] ?: ($card['card_type'] ?: MODULE_PAYMENT_PAYPALAC_SAVEDCARD_UNKNOWN_CARD);
         $lastDigits = $card['last_digits'] ?? '****';
         
         $cardTitle = sprintf(
-            MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE,
+            MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE,
             zen_output_string_protected($brand),
             zen_output_string_protected($lastDigits)
         );
         
         if (!empty($card['expiry'])) {
             $cardTitle .= sprintf(
-                MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY,
+                MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_EXPIRY,
                 zen_output_string_protected(formatTestExpiry($card['expiry']))
             );
         }
@@ -100,13 +100,13 @@ function generateSavedCardSelectBoxSelection(array $vaultedCards, string $select
     }
 
     // Build the select box with onchange/onfocus handlers
-    $moduleCode = 'paypalr_savedcard';
-    $selectAttributes = 'id="paypalr-savedcard-select" class="ppr-savedcard-select" ' .
+    $moduleCode = 'paypalac_savedcard';
+    $selectAttributes = 'id="paypalac-savedcard-select" class="ppr-savedcard-select" ' .
         'onchange="if(typeof methodSelect===\'function\')methodSelect(\'pmt-' . $moduleCode . '\')" ' .
         'onfocus="if(typeof methodSelect===\'function\')methodSelect(\'pmt-' . $moduleCode . '\')"';
 
     $selectBox = zen_draw_pull_down_menu(
-        'paypalr_savedcard_vault_id',
+        'paypalac_savedcard_vault_id',
         $selectOptions,
         $selectedVaultId,
         $selectAttributes
@@ -114,15 +114,15 @@ function generateSavedCardSelectBoxSelection(array $vaultedCards, string $select
 
     $fields = [
         [
-            'title' => MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL,
+            'title' => MODULE_PAYMENT_PAYPALAC_SAVEDCARD_SELECT_LABEL,
             'field' => $selectBox,
-            'tag' => 'paypalr-savedcard-select',
+            'tag' => 'paypalac-savedcard-select',
         ],
     ];
     
     return [
-        'id' => 'paypalr_savedcard',
-        'module' => MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT . $checkoutScript,
+        'id' => 'paypalac_savedcard',
+        'module' => MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE_SHORT . $checkoutScript,
         'fields' => $fields,
     ];
 }
@@ -155,11 +155,11 @@ $testCards = [
 
 // Test 1: Selection uses base module code
 $selection = generateSavedCardSelectBoxSelection($testCards, '');
-if ($selection['id'] !== 'paypalr_savedcard') {
+if ($selection['id'] !== 'paypalac_savedcard') {
     $testPassed = false;
-    $errors[] = "Expected id 'paypalr_savedcard', got: " . $selection['id'];
+    $errors[] = "Expected id 'paypalac_savedcard', got: " . $selection['id'];
 } else {
-    echo "✓ Selection uses base module code 'paypalr_savedcard'\n";
+    echo "✓ Selection uses base module code 'paypalac_savedcard'\n";
 }
 
 // Test 2: Only one field (the select box) is generated
@@ -179,17 +179,17 @@ if (strpos($selection['fields'][0]['field'], '<select') === false) {
 }
 
 // Test 4: Select has correct name attribute
-if (strpos($selection['fields'][0]['field'], 'name="paypalr_savedcard_vault_id"') === false) {
+if (strpos($selection['fields'][0]['field'], 'name="paypalac_savedcard_vault_id"') === false) {
     $testPassed = false;
-    $errors[] = "Select should have name 'paypalr_savedcard_vault_id'";
+    $errors[] = "Select should have name 'paypalac_savedcard_vault_id'";
 } else {
     echo "✓ Select has correct name attribute\n";
 }
 
 // Test 5: Select has correct id attribute
-if (strpos($selection['fields'][0]['field'], 'id="paypalr-savedcard-select"') === false) {
+if (strpos($selection['fields'][0]['field'], 'id="paypalac-savedcard-select"') === false) {
     $testPassed = false;
-    $errors[] = "Select should have id 'paypalr-savedcard-select'";
+    $errors[] = "Select should have id 'paypalac-savedcard-select'";
 } else {
     echo "✓ Select has correct id attribute\n";
 }
@@ -221,7 +221,7 @@ if (strpos($selection['fields'][0]['field'], 'value="" selected') === false) {
 }
 
 // Test 8b: "Please select" option contains the correct text
-if (strpos($selection['fields'][0]['field'], MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_SELECT_PROMPT) === false) {
+if (strpos($selection['fields'][0]['field'], MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_SELECT_PROMPT) === false) {
     $testPassed = false;
     $errors[] = '"Please select" option should contain the prompt text';
 } else {
@@ -245,9 +245,9 @@ if (strpos($selection['fields'][0]['field'], '4242') === false) {
 }
 
 // Test 11: Field has correct title label
-if ($selection['fields'][0]['title'] !== MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL) {
+if ($selection['fields'][0]['title'] !== MODULE_PAYMENT_PAYPALAC_SAVEDCARD_SELECT_LABEL) {
     $testPassed = false;
-    $errors[] = 'Field title should be "' . MODULE_PAYMENT_PAYPALR_SAVEDCARD_SELECT_LABEL . '"';
+    $errors[] = 'Field title should be "' . MODULE_PAYMENT_PAYPALAC_SAVEDCARD_SELECT_LABEL . '"';
 } else {
     echo "✓ Field has correct title label\n";
 }

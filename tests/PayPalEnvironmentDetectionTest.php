@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Test to verify PayPal REST client uses correct environment
  *
  * This test ensures that:
- * 1. The REST client initialization uses MODULE_PAYMENT_PAYPALR_SERVER
+ * 1. The REST client initialization uses MODULE_PAYMENT_PAYPALAC_SERVER
  * 2. Live environment uses CLIENTID_L and SECRET_L
  * 3. Sandbox environment uses CLIENTID_S and SECRET_S
  *
@@ -23,36 +23,36 @@ $savedCardRecurringFile = $basePath . '/includes/classes/paypalSavedCardRecurrin
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     
-    // Check that it uses MODULE_PAYMENT_PAYPALR_SERVER
-    if (strpos($content, 'MODULE_PAYMENT_PAYPALR_SERVER') !== false) {
-        fwrite(STDOUT, "✓ Uses MODULE_PAYMENT_PAYPALR_SERVER for environment detection\n");
+    // Check that it uses MODULE_PAYMENT_PAYPALAC_SERVER
+    if (strpos($content, 'MODULE_PAYMENT_PAYPALAC_SERVER') !== false) {
+        fwrite(STDOUT, "✓ Uses MODULE_PAYMENT_PAYPALAC_SERVER for environment detection\n");
     } else {
-        fwrite(STDERR, "✗ MODULE_PAYMENT_PAYPALR_SERVER not found\n");
+        fwrite(STDERR, "✗ MODULE_PAYMENT_PAYPALAC_SERVER not found\n");
         exit(1);
     }
     
     // Check that it uses correct live credentials
-    if (strpos($content, 'MODULE_PAYMENT_PAYPALR_CLIENTID_L') !== false &&
-        strpos($content, 'MODULE_PAYMENT_PAYPALR_SECRET_L') !== false) {
-        fwrite(STDOUT, "✓ Uses MODULE_PAYMENT_PAYPALR_CLIENTID_L and SECRET_L for live\n");
+    if (strpos($content, 'MODULE_PAYMENT_PAYPALAC_CLIENTID_L') !== false &&
+        strpos($content, 'MODULE_PAYMENT_PAYPALAC_SECRET_L') !== false) {
+        fwrite(STDOUT, "✓ Uses MODULE_PAYMENT_PAYPALAC_CLIENTID_L and SECRET_L for live\n");
     } else {
         fwrite(STDERR, "✗ Live credential constants not found\n");
         exit(1);
     }
     
     // Check that it uses correct sandbox credentials
-    if (strpos($content, 'MODULE_PAYMENT_PAYPALR_CLIENTID_S') !== false &&
-        strpos($content, 'MODULE_PAYMENT_PAYPALR_SECRET_S') !== false) {
-        fwrite(STDOUT, "✓ Uses MODULE_PAYMENT_PAYPALR_CLIENTID_S and SECRET_S for sandbox\n");
+    if (strpos($content, 'MODULE_PAYMENT_PAYPALAC_CLIENTID_S') !== false &&
+        strpos($content, 'MODULE_PAYMENT_PAYPALAC_SECRET_S') !== false) {
+        fwrite(STDOUT, "✓ Uses MODULE_PAYMENT_PAYPALAC_CLIENTID_S and SECRET_S for sandbox\n");
     } else {
         fwrite(STDERR, "✗ Sandbox credential constants not found\n");
         exit(1);
     }
     
     // Check that wrong constants are NOT used
-    if (strpos($content, 'MODULE_PAYMENT_PAYPALR_CLIENT_ID') !== false ||
-        strpos($content, 'MODULE_PAYMENT_PAYPALR_CLIENT_SECRET') !== false ||
-        strpos($content, 'MODULE_PAYMENT_PAYPALR_ENVIRONMENT') !== false) {
+    if (strpos($content, 'MODULE_PAYMENT_PAYPALAC_CLIENT_ID') !== false ||
+        strpos($content, 'MODULE_PAYMENT_PAYPALAC_CLIENT_SECRET') !== false ||
+        strpos($content, 'MODULE_PAYMENT_PAYPALAC_ENVIRONMENT') !== false) {
         fwrite(STDERR, "✗ Old incorrect constant names still present\n");
         exit(1);
     }

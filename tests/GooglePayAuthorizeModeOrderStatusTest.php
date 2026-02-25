@@ -3,7 +3,7 @@
  * Test: Google Pay Authorize Mode Order Status
  *
  * This test validates that the Google Pay module correctly sets the order status
- * based on the MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE configuration setting.
+ * based on the MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE configuration setting.
  *
  * Background:
  * - When TRANSACTION_MODE is "Auth Only (All Txns)", orders should be created with "unpaid" status
@@ -12,11 +12,11 @@
  *
  * Problem Statement:
  * - Google Pay orders were always created with "held" status regardless of transaction mode
- * - This was because the constructor always used MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID
- * - It should check MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE like the main paypalr module
+ * - This was because the constructor always used MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID
+ * - It should check MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE like the main paypalac module
  *
  * The test verifies that:
- * 1. Constructor checks MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE setting
+ * 1. Constructor checks MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE setting
  * 2. "Auth Only (All Txns)" mode sets ORDER_PENDING_STATUS_ID (unpaid)
  * 3. "Final Sale" mode sets ORDER_STATUS_ID (held)
  * 4. "Auth Only (Card-Only)" mode sets ORDER_STATUS_ID (held) for wallet payments
@@ -29,20 +29,20 @@
 class GooglePayAuthorizeModeOrderStatusTest
 {
     private string $applePayFile;
-    private string $paypalrFile;
+    private string $paypalacFile;
     private array $testResults = [];
     
     public function __construct()
     {
-        $this->applePayFile = dirname(__DIR__) . '/includes/modules/payment/paypalr_googlepay.php';
-        $this->paypalrFile = dirname(__DIR__) . '/includes/modules/payment/paypalr.php';
+        $this->applePayFile = dirname(__DIR__) . '/includes/modules/payment/paypalac_googlepay.php';
+        $this->paypalacFile = dirname(__DIR__) . '/includes/modules/payment/paypalac.php';
         
         if (!file_exists($this->applePayFile)) {
             throw new RuntimeException("Google Pay file not found: {$this->applePayFile}");
         }
         
-        if (!file_exists($this->paypalrFile)) {
-            throw new RuntimeException("PayPal file not found: {$this->paypalrFile}");
+        if (!file_exists($this->paypalacFile)) {
+            throw new RuntimeException("PayPal file not found: {$this->paypalacFile}");
         }
     }
     
@@ -51,7 +51,7 @@ class GooglePayAuthorizeModeOrderStatusTest
         echo "\n=== Google Pay Authorize Mode Order Status Test ===\n\n";
         
         $this->testConstructorChecksTransactionMode();
-        $this->testConstructorLogicMatchesPaypalr();
+        $this->testConstructorLogicMatchesPaypalac();
         $this->testBeforeProcessHandlesCreatedStatus();
         $this->testBeforeProcessHandlesCapturedStatus();
         $this->testBeforeProcessHandlesPendingStatus();
@@ -60,7 +60,7 @@ class GooglePayAuthorizeModeOrderStatusTest
     }
     
     /**
-     * Test that constructor checks MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE
+     * Test that constructor checks MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE
      */
     private function testConstructorChecksTransactionMode(): void
     {
@@ -69,11 +69,11 @@ class GooglePayAuthorizeModeOrderStatusTest
         $content = file_get_contents($this->applePayFile);
         
         // Check if TRANSACTION_MODE is referenced in the constructor
-        $checksTransactionMode = strpos($content, 'MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE') !== false;
+        $checksTransactionMode = strpos($content, 'MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE') !== false;
         
         // Check if it references both status constants
-        $hasOrderStatusId = strpos($content, 'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID') !== false;
-        $hasPendingStatusId = strpos($content, 'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID') !== false;
+        $hasOrderStatusId = strpos($content, 'MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID') !== false;
+        $hasPendingStatusId = strpos($content, 'MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID') !== false;
         
         // Check for the specific logic pattern (if Final Sale || Auth Only (Card-Only))
         $hasCorrectPattern = (strpos($content, "'Final Sale'") !== false || strpos($content, '"Final Sale"') !== false) &&
@@ -100,39 +100,39 @@ class GooglePayAuthorizeModeOrderStatusTest
     }
     
     /**
-     * Test that constructor logic matches the main paypalr module
+     * Test that constructor logic matches the main paypalac module
      */
-    private function testConstructorLogicMatchesPaypalr(): void
+    private function testConstructorLogicMatchesPaypalac(): void
     {
-        echo "Test 2: Constructor logic matches main paypalr module...\n";
+        echo "Test 2: Constructor logic matches main paypalac module...\n";
         
         $applePayContent = file_get_contents($this->applePayFile);
-        $paypalrContent = file_get_contents($this->paypalrFile);
+        $paypalacContent = file_get_contents($this->paypalacFile);
         
         // Check if both files have the same transaction mode conditional logic
         $applePayHasFinalSale = (strpos($applePayContent, "'Final Sale'") !== false || strpos($applePayContent, '"Final Sale"') !== false);
         $applePayHasCardOnly = (strpos($applePayContent, "'Auth Only (Card-Only)'") !== false || strpos($applePayContent, '"Auth Only (Card-Only)"') !== false);
-        $applePayHasOrderStatus = strpos($applePayContent, 'MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID') !== false;
-        $applePayHasPendingStatus = strpos($applePayContent, 'MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID') !== false;
+        $applePayHasOrderStatus = strpos($applePayContent, 'MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID') !== false;
+        $applePayHasPendingStatus = strpos($applePayContent, 'MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID') !== false;
         
-        $paypalrHasFinalSale = (strpos($paypalrContent, "'Final Sale'") !== false || strpos($paypalrContent, '"Final Sale"') !== false);
-        $paypalrHasCardOnly = (strpos($paypalrContent, "'Auth Only (Card-Only)'") !== false || strpos($paypalrContent, '"Auth Only (Card-Only)"') !== false);
+        $paypalacHasFinalSale = (strpos($paypalacContent, "'Final Sale'") !== false || strpos($paypalacContent, '"Final Sale"') !== false);
+        $paypalacHasCardOnly = (strpos($paypalacContent, "'Auth Only (Card-Only)'") !== false || strpos($paypalacContent, '"Auth Only (Card-Only)"') !== false);
         
         if ($applePayHasFinalSale && $applePayHasCardOnly && $applePayHasOrderStatus && $applePayHasPendingStatus &&
-            $paypalrHasFinalSale && $paypalrHasCardOnly) {
+            $paypalacHasFinalSale && $paypalacHasCardOnly) {
             $this->testResults[] = [
-                'name' => 'Constructor logic matches paypalr',
+                'name' => 'Constructor logic matches paypalac',
                 'passed' => true,
-                'message' => 'Google Pay constructor uses same transaction mode logic as main paypalr module'
+                'message' => 'Google Pay constructor uses same transaction mode logic as main paypalac module'
             ];
-            echo "  ✓ PASS: Constructor logic matches main paypalr module\n";
+            echo "  ✓ PASS: Constructor logic matches main paypalac module\n";
         } else {
             $this->testResults[] = [
-                'name' => 'Constructor logic matches paypalr',
+                'name' => 'Constructor logic matches paypalac',
                 'passed' => false,
-                'message' => 'Logic differs between Google Pay and main paypalr module'
+                'message' => 'Logic differs between Google Pay and main paypalac module'
             ];
-            echo "  ❌ FAIL: Constructor logic differs from paypalr\n";
+            echo "  ❌ FAIL: Constructor logic differs from paypalac\n";
         }
     }
     
@@ -146,7 +146,7 @@ class GooglePayAuthorizeModeOrderStatusTest
         $content = file_get_contents($this->applePayFile);
         
         // Find the section that checks payment_status - should only check STATUS_CAPTURED
-        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*\)\s*\{/s';
+        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalAdvancedCheckoutApi::STATUS_CAPTURED\s*\)\s*\{/s';
         
         if (preg_match($pattern, $content)) {
             $this->testResults[] = [
@@ -157,7 +157,7 @@ class GooglePayAuthorizeModeOrderStatusTest
             echo "  ✓ PASS: before_process handles CREATED status correctly (as unpaid/pending)\n";
         } else {
             // Check if the old incorrect pattern exists
-            $oldPattern = '/if\s*\(\s*\$payment\[[\'"]status[\'"]\]\s*!==\s*PayPalRestfulApi::STATUS_COMPLETED\s*\)/s';
+            $oldPattern = '/if\s*\(\s*\$payment\[[\'"]status[\'"]\]\s*!==\s*PayPalAdvancedCheckoutApi::STATUS_COMPLETED\s*\)/s';
             
             if (preg_match($oldPattern, $content)) {
                 $this->testResults[] = [
@@ -187,7 +187,7 @@ class GooglePayAuthorizeModeOrderStatusTest
         $content = file_get_contents($this->applePayFile);
         
         // Check that the conditional uses only STATUS_CAPTURED (CREATED should be treated as unpaid)
-        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*\)\s*\{/';
+        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalAdvancedCheckoutApi::STATUS_CAPTURED\s*\)\s*\{/';
         
         if (preg_match($pattern, $content)) {
             $this->testResults[] = [
@@ -216,7 +216,7 @@ class GooglePayAuthorizeModeOrderStatusTest
         $content = file_get_contents($this->applePayFile);
         
         // Find the section where status is set for non-captured payments (including authorizations)
-        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalRestfulApi::STATUS_CAPTURED\s*\)\s*\{[^}]*ORDER_PENDING_STATUS_ID[^}]*\}/s';
+        $pattern = '/if\s*\(\s*\$payment_status\s*!==\s*PayPalAdvancedCheckoutApi::STATUS_CAPTURED\s*\)\s*\{[^}]*ORDER_PENDING_STATUS_ID[^}]*\}/s';
         
         if (preg_match($pattern, $content)) {
             $this->testResults[] = [

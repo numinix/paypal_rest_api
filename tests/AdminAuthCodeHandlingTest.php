@@ -39,7 +39,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify state object includes authCode
@@ -68,7 +68,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify handlePopupMessage extracts authCode from payload
@@ -105,7 +105,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify handlePopupMessage extracts sharedId from payload
@@ -142,7 +142,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify pollStatus sends authCode

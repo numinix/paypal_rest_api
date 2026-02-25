@@ -1,0 +1,113 @@
+.paypalac-subscriptions-table td textarea {
+    width: 100%;
+    min-height: 120px;
+    font-family: monospace;
+}
+.paypalac-subscriptions-table td input[type="text"],
+.paypalac-subscriptions-table td input[type="number"],
+.paypalac-subscriptions-table td input[type="date"],
+.paypalac-subscriptions-table td select {
+    width: 100%;
+    box-sizing: border-box;
+}
+.paypalac-subscription-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.paypalac-subscription-meta {
+    font-size: 0.9em;
+    color: #555;
+    margin-top: 8px;
+}
+.paypalac-subscriptions-table label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--nmx-dark);
+    display: block;
+    margin-bottom: 4px;
+    margin-top: 8px;
+}
+.paypalac-subscriptions-table label:first-child {
+    margin-top: 0;
+}
+
+/* Expand/Collapse styles */
+.subscription-row-collapsed + .details-row {
+    display: none;
+}
+.subscription-summary {
+    cursor: pointer;
+    user-select: none;
+}
+.toggle-icon {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 12px;
+    transition: transform 0.2s;
+}
+.toggle-icon::before {
+    content: '\25BC'; /* Down-pointing triangle */
+}
+.subscription-row-collapsed .toggle-icon::before {
+    content: '\25B6'; /* Right-pointing triangle */
+}
+.subscription-summary:hover {
+    background-color: rgba(0, 97, 141, 0.05);
+}
+
+/* Pagination styles */
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 16px 0;
+    padding: 12px;
+    background: #f5f5f5;
+    border-radius: 4px;
+}
+.pagination-info {
+    font-size: 14px;
+    color: #555;
+}
+.pagination-links {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.pagination-links a,
+.pagination-links span {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    background: white;
+    text-decoration: none;
+    color: #333;
+    border-radius: 3px;
+}
+.pagination-links a:hover {
+    background: #00618d;
+    color: white;
+    border-color: #00618d;
+}
+.pagination-links span.current {
+    background: #00618d;
+    color: white;
+    border-color: #00618d;
+}
+.pagination-links span.disabled {
+    background: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+}
+.per-page-selector {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.per-page-selector select {
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}

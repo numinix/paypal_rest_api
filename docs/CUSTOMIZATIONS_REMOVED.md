@@ -2,7 +2,7 @@
 
 ## What Changed
 
-The PayPal REST API plugin has been cleaned up to remove all site-specific customizations that were causing errors on standard installations.
+The PayPal Advanced Checkout plugin has been cleaned up to remove all site-specific customizations that were causing errors on standard installations.
 
 ## Customizations Removed
 

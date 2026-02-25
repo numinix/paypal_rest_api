@@ -111,9 +111,9 @@ namespace {
     $db = new MockDb();
 
     // Load the LegacySubscriptionMigrator
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/VaultManager.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalRestful/Common/LegacySubscriptionMigrator.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/LegacySubscriptionMigrator.php';
 
     $failures = 0;
 
@@ -136,7 +136,7 @@ namespace {
     ];
 
     // Use reflection to access private method
-    $reflectionClass = new ReflectionClass('PayPalRestful\\Common\\LegacySubscriptionMigrator');
+    $reflectionClass = new ReflectionClass('PayPalAdvancedCheckout\\Common\\LegacySubscriptionMigrator');
     $normalizeMethod = $reflectionClass->getMethod('normalizeLegacyRow');
     $normalizeMethod->setAccessible(true);
     

@@ -170,7 +170,7 @@ namespace {
     }
 }
 
-namespace PayPalRestful\Common {
+namespace PayPalAdvancedCheckout\Common {
     class Logger
     {
         public function __construct(string $name = '')
@@ -183,7 +183,7 @@ namespace PayPalRestful\Common {
     }
 }
 
-namespace PayPalRestful\Tests\Webhooks {
+namespace PayPalAdvancedCheckout\Tests\Webhooks {
     use PHPUnit\Framework\TestCase;
 
     final class PaymentCaptureCompletedTest extends TestCase
@@ -261,9 +261,9 @@ namespace PayPalRestful\Tests\Webhooks {
         {
             // Create a minimal mock to instantiate the handler
             $baseDir = dirname(__DIR__, 2);
-            require_once $baseDir . '/includes/modules/payment/paypal/PayPalRestful/Webhooks/WebhookObject.php';
-            require_once $baseDir . '/includes/modules/payment/paypal/PayPalRestful/Webhooks/WebhookHandlerContract.php';
-            require_once $baseDir . '/includes/modules/payment/paypal/PayPalRestful/Webhooks/Events/PaymentCaptureCompleted.php';
+            require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookObject.php';
+            require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookHandlerContract.php';
+            require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/Events/PaymentCaptureCompleted.php';
 
             $webhookData = [
                 'id' => 'WH-TEST',
@@ -280,8 +280,8 @@ namespace PayPalRestful\Tests\Webhooks {
                 'summary' => 'Payment completed',
             ];
 
-            $webhook = new \PayPalRestful\Webhooks\WebhookObject('POST', [], json_encode($webhookData));
-            return new \PayPalRestful\Webhooks\Events\PaymentCaptureCompleted($webhook);
+            $webhook = new \PayPalAdvancedCheckout\Webhooks\WebhookObject('POST', [], json_encode($webhookData));
+            return new \PayPalAdvancedCheckout\Webhooks\Events\PaymentCaptureCompleted($webhook);
         }
     }
 }

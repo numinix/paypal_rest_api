@@ -62,7 +62,7 @@ namespace {
     echo "Testing that vault records only match specific orders (no fallback to other orders)...\n\n";
 
     /**
-     * Simulate the findVaultRecord logic from auto.paypalrestful_recurring.php
+     * Simulate the findVaultRecord logic from auto.paypaladvcheckout_recurring.php
      * This mirrors the FIXED implementation that should NOT fall back to $records[0]
      */
     function findVaultRecord(int $customersId, int $ordersId, array $vaultRecords): ?array

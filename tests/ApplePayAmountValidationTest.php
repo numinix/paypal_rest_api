@@ -23,7 +23,7 @@ echo "=====================================\n\n";
 
 // Test PHP side validation
 echo "Testing PHP amount validation...\n";
-$applePayPhp = file_get_contents(__DIR__ . '/../includes/modules/payment/paypalr_applepay.php');
+$applePayPhp = file_get_contents(__DIR__ . '/../includes/modules/payment/paypalac_applepay.php');
 
 // Test 1: PHP extracts amount from current array
 if (preg_match('/\$amount\s*=\s*\$current\[\'value\'\]\s*\?\?\s*[\'\"][\'\"]/', $applePayPhp)) {
@@ -65,7 +65,7 @@ echo "\n";
 
 // Test JavaScript side validation
 echo "Testing JavaScript amount validation...\n";
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
 
 // Extract the onvalidatemerchant callback
 $onvalidatePattern = '/onvalidatemerchant\s*=\s*function\s*\([^)]*\)\s*\{([\s\S]*?)^\s{8}\};/m';

@@ -6,9 +6,9 @@ declare(strict_types=1);
  *
  * This test addresses the issue:
  * "PHP Fatal error: Uncaught Error: Undefined constant TABLE_SAVED_CREDIT_CARDS_RECURRING"
- * which occurred in admin/paypalr_saved_card_recurring.php at line 193
+ * which occurred in admin/paypalac_saved_card_recurring.php at line 193
  *
- * The fix adds the constant definition to includes/extra_datafiles/ppr_database_tables.php
+ * The fix adds the constant definition to includes/extra_datafiles/ppac_database_tables.php
  * which Zen Cart loads site-wide automatically.
  *
  * @copyright Copyright 2025 Zen Cart Development Team
@@ -24,7 +24,7 @@ namespace {
     }
 
     // Load the extra_datafiles that defines table constants (simulating Zen Cart's auto-load behavior)
-    require_once DIR_FS_CATALOG . 'includes/extra_datafiles/ppr_database_tables.php';
+    require_once DIR_FS_CATALOG . 'includes/extra_datafiles/ppac_database_tables.php';
 
     $failures = 0;
 

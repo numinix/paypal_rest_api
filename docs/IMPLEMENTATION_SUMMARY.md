@@ -29,7 +29,7 @@ Order Placed → Subscription Logged → Vault Saved → Auto-Activated → Visi
 ## Technical Implementation
 
 ### 1. New Method: SubscriptionManager::activateSubscriptionsWithVault()
-**Location:** `includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php`
+**Location:** `includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php`
 
 ```php
 public static function activateSubscriptionsWithVault(
@@ -49,17 +49,17 @@ public static function activateSubscriptionsWithVault(
 ---
 
 ### 2. Observer Enhancement
-**Location:** `includes/classes/observers/auto.paypalrestful_recurring.php`
+**Location:** `includes/classes/observers/auto.paypalacestful_recurring.php`
 
 **Added:**
-- Event listener for `NOTIFY_PAYPALR_VAULT_CARD_SAVED`
-- Handler method `updateNotifyPaypalrVaultCardSaved()`
+- Event listener for `NOTIFY_PAYPALAC_VAULT_CARD_SAVED`
+- Handler method `updateNotifyPaypalacVaultCardSaved()`
 
 **Flow:**
 ```
 VaultManager saves card
     ↓
-NOTIFY_PAYPALR_VAULT_CARD_SAVED
+NOTIFY_PAYPALAC_VAULT_CARD_SAVED
     ↓
 Observer catches notification
     ↓
@@ -93,7 +93,7 @@ Total: 6 tests, 43 assertions - ALL PASSING
 
 ## Admin Interface Impact
 
-### Subscriptions Page: admin/paypalr_subscriptions.php
+### Subscriptions Page: admin/paypalac_subscriptions.php
 
 **Before:**
 - Subscriptions stuck in "awaiting_vault" status
@@ -150,7 +150,7 @@ Complete documentation in docs/SUBSCRIPTION_ACTIVATION.md
 ## Notifications
 
 ### Listens For:
-- `NOTIFY_PAYPALR_VAULT_CARD_SAVED` - When vault card is saved
+- `NOTIFY_PAYPALAC_VAULT_CARD_SAVED` - When vault card is saved
 
 ### Sends:
 - `NOTIFY_SUBSCRIPTIONS_ACTIVATED` - When subscriptions are activated
@@ -176,13 +176,13 @@ Complete documentation in docs/SUBSCRIPTION_ACTIVATION.md
 1. ✅ Order created
 2. ✅ Subscription logged with status "awaiting_vault"
 3. ✅ Vault card saved (PayPal returns vault token)
-4. ✅ NOTIFY_PAYPALR_VAULT_CARD_SAVED triggered
+4. ✅ NOTIFY_PAYPALAC_VAULT_CARD_SAVED triggered
 5. ✅ Observer activates subscription automatically
 6. ✅ Status changed to "active"
 7. ✅ NOTIFY_SUBSCRIPTIONS_ACTIVATED sent
 
 ### Merchant Admin
-1. 🎉 Visits admin/paypalr_subscriptions.php
+1. 🎉 Visits admin/paypalac_subscriptions.php
 2. 🎉 Sees subscription with "active" status
 3. 🎉 Can view, update, pause, or cancel
 4. 🎉 Can export subscription data
@@ -215,8 +215,8 @@ Complete documentation in docs/SUBSCRIPTION_ACTIVATION.md
 ## Files in This PR
 
 ```
-includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php
-includes/classes/observers/auto.paypalrestful_recurring.php
+includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php
+includes/classes/observers/auto.paypalacestful_recurring.php
 tests/SubscriptionVaultActivationTest.php
 tests/RecurringObserverVaultNotificationTest.php
 tests/manual_verification.php

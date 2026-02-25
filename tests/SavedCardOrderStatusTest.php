@@ -1,6 +1,6 @@
 <?php
 /**
- * Test that verifies the paypalr_savedcard module correctly sets order status
+ * Test that verifies the paypalac_savedcard module correctly sets order status
  * for authorized vs captured payments.
  * 
  * Bug fix: The payment modules were treating STATUS_CREATED (authorized) payments
@@ -12,7 +12,7 @@
 $testPassed = true;
 $errors = [];
 
-// Define status constants as they would be in PayPalRestfulApi
+// Define status constants as they would be in PayPalAdvancedCheckoutApi
 if (!defined('STATUS_CAPTURED')) {
     define('STATUS_CAPTURED', 'CAPTURED');
 }
@@ -27,21 +27,21 @@ if (!defined('STATUS_APPROVED')) {
 }
 
 // Define order status IDs
-if (!defined('MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID')) {
-    define('MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID', 2); // Processing
+if (!defined('MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID')) {
+    define('MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID', 2); // Processing
 }
-if (!defined('MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID')) {
-    define('MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID', 1); // Pending
+if (!defined('MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID')) {
+    define('MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID', 1); // Pending
 }
-if (!defined('MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID')) {
-    define('MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID', 1); // Held
+if (!defined('MODULE_PAYMENT_PAYPALAC_HELD_STATUS_ID')) {
+    define('MODULE_PAYMENT_PAYPALAC_HELD_STATUS_ID', 1); // Held
 }
 if (!defined('DEFAULT_ORDERS_STATUS_ID')) {
     define('DEFAULT_ORDERS_STATUS_ID', 1);
 }
 
 /**
- * Simulates the old (buggy) order status logic from paypalr_savedcard.php
+ * Simulates the old (buggy) order status logic from paypalac_savedcard.php
  * This treats both CAPTURED and CREATED as completed
  */
 function getOldOrderStatus(string $paymentStatus): int
@@ -49,13 +49,13 @@ function getOldOrderStatus(string $paymentStatus): int
     // Old buggy logic:
     // if ($payment_status !== STATUS_CAPTURED && $payment_status !== STATUS_CREATED)
     if ($paymentStatus !== STATUS_CAPTURED && $paymentStatus !== STATUS_CREATED) {
-        return (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+        return (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID;
     }
-    return (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+    return (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID;
 }
 
 /**
- * Simulates the new (fixed) order status logic from paypalr_savedcard.php
+ * Simulates the new (fixed) order status logic from paypalac_savedcard.php
  * Only CAPTURED payments are treated as completed; CREATED (authorized) are pending
  */
 function getNewOrderStatus(string $paymentStatus): int
@@ -63,22 +63,22 @@ function getNewOrderStatus(string $paymentStatus): int
     // New fixed logic:
     // if ($payment_status !== STATUS_CAPTURED) -> use ORDER_PENDING_STATUS_ID
     if ($paymentStatus !== STATUS_CAPTURED) {
-        return (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+        return (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID;
     }
-    return (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+    return (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID;
 }
 
 /**
- * Simulates the paypalr.php order status logic (the reference implementation)
+ * Simulates the paypalac.php order status logic (the reference implementation)
  */
-function getPaypalrOrderStatus(string $paymentStatus): int
+function getPaypalacOrderStatus(string $paymentStatus): int
 {
-    // paypalr.php logic (now fixed):
+    // paypalac.php logic (now fixed):
     // if ($payment_status !== STATUS_CAPTURED)
     if ($paymentStatus !== STATUS_CAPTURED) {
-        return (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+        return (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID;
     }
-    return (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+    return (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID;
 }
 
 // Test scenarios
@@ -93,19 +93,19 @@ $testCases = [
 
 echo "Testing order status logic alignment...\n\n";
 
-// Test 1: Verify new logic matches paypalr.php for all statuses
+// Test 1: Verify new logic matches paypalac.php for all statuses
 foreach ($testCases as $testCase) {
     $status = $testCase['status'];
     $description = $testCase['description'];
     
     $newStatus = getNewOrderStatus($status);
-    $paypalrStatus = getPaypalrOrderStatus($status);
+    $paypalacStatus = getPaypalacOrderStatus($status);
     
-    if ($newStatus !== $paypalrStatus) {
+    if ($newStatus !== $paypalacStatus) {
         $testPassed = false;
-        $errors[] = "Status mismatch for '$description' ($status): new=$newStatus, paypalr=$paypalrStatus";
+        $errors[] = "Status mismatch for '$description' ($status): new=$newStatus, paypalac=$paypalacStatus";
     } else {
-        echo "✓ $description ($status): Status matches paypalr.php (status=$newStatus)\n";
+        echo "✓ $description ($status): Status matches paypalac.php (status=$newStatus)\n";
     }
 }
 
@@ -113,7 +113,7 @@ echo "\n";
 
 // Test 2: Verify that CAPTURED status gets ORDER_STATUS_ID (completed)
 $capturedStatus = getNewOrderStatus(STATUS_CAPTURED);
-if ($capturedStatus !== (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID) {
+if ($capturedStatus !== (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID) {
     $testPassed = false;
     $errors[] = "CAPTURED status should use ORDER_STATUS_ID, got: $capturedStatus";
 } else {
@@ -122,7 +122,7 @@ if ($capturedStatus !== (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID) {
 
 // Test 3: Verify that CREATED status gets ORDER_PENDING_STATUS_ID (authorized but not captured)
 $createdStatus = getNewOrderStatus(STATUS_CREATED);
-if ($createdStatus !== (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID) {
+if ($createdStatus !== (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID) {
     $testPassed = false;
     $errors[] = "CREATED status should use ORDER_PENDING_STATUS_ID (authorized, not captured), got: $createdStatus";
 } else {
@@ -131,7 +131,7 @@ if ($createdStatus !== (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID) {
 
 // Test 4: Verify that PENDING status gets ORDER_PENDING_STATUS_ID
 $pendingStatus = getNewOrderStatus(STATUS_PENDING);
-if ($pendingStatus !== (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID) {
+if ($pendingStatus !== (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID) {
     $testPassed = false;
     $errors[] = "PENDING status should use ORDER_PENDING_STATUS_ID, got: $pendingStatus";
 } else {
@@ -140,7 +140,7 @@ if ($pendingStatus !== (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID) {
 
 // Test 5: Verify that other statuses get ORDER_PENDING_STATUS_ID
 $otherStatus = getNewOrderStatus('VOIDED');
-if ($otherStatus !== (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID) {
+if ($otherStatus !== (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID) {
     $testPassed = false;
     $errors[] = "VOIDED status should use ORDER_PENDING_STATUS_ID, got: $otherStatus";
 } else {

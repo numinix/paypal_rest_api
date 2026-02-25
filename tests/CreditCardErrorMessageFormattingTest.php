@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Test that validates the paypalr_creditcard module properly formats
+ * Test that validates the paypalac_creditcard module properly formats
  * error messages with sprintf when order creation fails.
  */
 
@@ -37,44 +37,44 @@ namespace {
     }
     
     // Define PayPal configuration constants needed by parent module
-    if (!defined('MODULE_PAYMENT_PAYPALR_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_STATUS', 'True');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-        define('MODULE_PAYMENT_PAYPALR_SERVER', 'sandbox');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+        define('MODULE_PAYMENT_PAYPALAC_SERVER', 'sandbox');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_DEBUGGING')) {
-        define('MODULE_PAYMENT_PAYPALR_DEBUGGING', 'Off');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_DEBUGGING')) {
+        define('MODULE_PAYMENT_PAYPALAC_DEBUGGING', 'Off');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_S', 'test_client_id');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_S', 'test_client_id');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_S')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_S', 'test_secret');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_S', 'test_secret');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS')) {
-        define('MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS', 'true');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ACCEPT_CARDS')) {
+        define('MODULE_PAYMENT_PAYPALAC_ACCEPT_CARDS', 'true');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID')) {
-        define('MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID', '2');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID')) {
+        define('MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID', '2');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID')) {
-        define('MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID', '1');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID')) {
+        define('MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID', '1');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_ZONE')) {
-        define('MODULE_PAYMENT_PAYPALR_ZONE', '0');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ZONE')) {
+        define('MODULE_PAYMENT_PAYPALAC_ZONE', '0');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SORT_ORDER')) {
-        define('MODULE_PAYMENT_PAYPALR_SORT_ORDER', '-1');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SORT_ORDER')) {
+        define('MODULE_PAYMENT_PAYPALAC_SORT_ORDER', '-1');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
-        define('MODULE_PAYMENT_PAYPALR_VERSION', '1.3.3');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_VERSION')) {
+        define('MODULE_PAYMENT_PAYPALAC_VERSION', '1.3.3');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE')) {
-        define('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE', 'Final Sale');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE')) {
+        define('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE', 'Final Sale');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CURRENCY')) {
-        define('MODULE_PAYMENT_PAYPALR_CURRENCY', 'Selected Currency');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CURRENCY')) {
+        define('MODULE_PAYMENT_PAYPALAC_CURRENCY', 'Selected Currency');
     }
     if (!defined('DEFAULT_ORDERS_STATUS_ID')) {
         define('DEFAULT_ORDERS_STATUS_ID', '1');
@@ -82,48 +82,48 @@ namespace {
     if (!defined('DEFAULT_CURRENCY')) {
         define('DEFAULT_CURRENCY', 'USD');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT')) {
-        define('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT', 'false');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT')) {
+        define('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT', 'false');
     }
     
     // Define credit card module constants
-    if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_CREDITCARD_STATUS', 'True');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER')) {
-        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_SORT_ORDER', '0');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_SORT_ORDER')) {
+        define('MODULE_PAYMENT_PAYPALAC_CREDITCARD_SORT_ORDER', '0');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE')) {
-        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_ZONE', '0');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_ZONE')) {
+        define('MODULE_PAYMENT_PAYPALAC_CREDITCARD_ZONE', '0');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION')) {
-        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_VERSION', '1.3.3');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_VERSION')) {
+        define('MODULE_PAYMENT_PAYPALAC_CREDITCARD_VERSION', '1.3.3');
     }
     
     // Define language constants
-    if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE')) {
-        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE', 'Credit Card');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE')) {
+        define('MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE', 'Credit Card');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_TEXT_TITLE')) {
-        define('MODULE_PAYMENT_PAYPALR_TEXT_TITLE', 'PayPal');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_TEXT_TITLE')) {
+        define('MODULE_PAYMENT_PAYPALAC_TEXT_TITLE', 'PayPal');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE_ADMIN')) {
-        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE_ADMIN', 'PayPal Credit Cards');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE_ADMIN')) {
+        define('MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE_ADMIN', 'PayPal Credit Cards');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_DESCRIPTION')) {
-        define('MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_DESCRIPTION', 'Accept credit card payments via PayPal Advanced Checkout (v%s)');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_DESCRIPTION')) {
+        define('MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_DESCRIPTION', 'Accept credit card payments via PayPal Advanced Checkout (v%s)');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL')) {
-        define('MODULE_PAYMENT_PAYPALR_ERROR_NO_CURL', 'cURL not installed');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ERROR_NO_CURL')) {
+        define('MODULE_PAYMENT_PAYPALAC_ERROR_NO_CURL', 'cURL not installed');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE')) {
-        define('MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE', 'We are unable to process your %1$s payment at this time. Please contact us for assistance, providing us with this code: <b>%2$s</b>.');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE')) {
+        define('MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE', 'We are unable to process your %1$s payment at this time. Please contact us for assistance, providing us with this code: <b>%2$s</b>.');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN')) {
-        define('MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN', 'Order Requires Attention');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN')) {
+        define('MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN', 'Order Requires Attention');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE')) {
-        define('MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE', 'An error was returned by PayPal when attempting to initiate an order.');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE')) {
+        define('MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE', 'An error was returned by PayPal when attempting to initiate an order.');
     }
 
     // Mock database class
@@ -157,7 +157,7 @@ namespace CreditCardErrorMessageFormattingTest {
          */
         public function testErrorMessageConstantHasPlaceholders(): void
         {
-            $message = MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE;
+            $message = MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE;
             
             $this->assertStringContainsString('%1$s', $message, 
                 'Error message should contain %1$s placeholder for payment method name');
@@ -170,11 +170,11 @@ namespace CreditCardErrorMessageFormattingTest {
          */
         public function testSprintfFormatsErrorMessageCorrectly(): void
         {
-            $paymentMethod = MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE;
+            $paymentMethod = MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE;
             $errorCode = 'INVALID_REQUEST';
             
             $formattedMessage = sprintf(
-                MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE,
+                MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE,
                 $paymentMethod,
                 $errorCode
             );
@@ -201,11 +201,11 @@ namespace CreditCardErrorMessageFormattingTest {
          */
         public function testSprintfFormatsErrorMessageWithDefaultErrorCode(): void
         {
-            $paymentMethod = MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE;
+            $paymentMethod = MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE;
             $errorCode = 'OTHER';
             
             $formattedMessage = sprintf(
-                MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE,
+                MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE,
                 $paymentMethod,
                 $errorCode
             );
@@ -219,7 +219,7 @@ namespace CreditCardErrorMessageFormattingTest {
          */
         public function testSprintfFormatsVariousErrorCodes(): void
         {
-            $paymentMethod = MODULE_PAYMENT_PAYPALR_CREDITCARD_TEXT_TITLE;
+            $paymentMethod = MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE;
             $errorCodes = [
                 'INVALID_REQUEST',
                 'PAYMENT_DENIED',
@@ -230,7 +230,7 @@ namespace CreditCardErrorMessageFormattingTest {
             
             foreach ($errorCodes as $errorCode) {
                 $formattedMessage = sprintf(
-                    MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE,
+                    MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE,
                     $paymentMethod,
                     $errorCode
                 );

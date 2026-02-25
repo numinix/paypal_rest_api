@@ -7,13 +7,13 @@
  * PayPal API endpoint (capture vs authorize).
  *
  * Background:
- * - When MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE is 'Final Sale', wallets should CAPTURE
- * - When MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE is 'Auth Only (All Txns)', wallets should AUTHORIZE
- * - When MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE is 'Auth Only (Card-Only)', wallets should CAPTURE
+ * - When MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE is 'Final Sale', wallets should CAPTURE
+ * - When MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE is 'Auth Only (All Txns)', wallets should AUTHORIZE
+ * - When MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE is 'Auth Only (Card-Only)', wallets should CAPTURE
  *   (because wallets are not cards)
  *
  * The test verifies that:
- * 1. captureWalletPayment accepts transaction_mode and ppr_type parameters
+ * 1. captureWalletPayment accepts transaction_mode and ppac_type parameters
  * 2. The method uses the same logic as processCreditCardPayment for determining capture vs authorize
  * 3. The method calls captureOrder when should_capture is true
  * 4. The method calls authorizeOrder when should_capture is false
@@ -50,7 +50,7 @@ class WalletCaptureOrAuthorizeIntentTest
     }
     
     /**
-     * Test that captureWalletPayment has the correct signature with transaction_mode and ppr_type
+     * Test that captureWalletPayment has the correct signature with transaction_mode and ppac_type
      */
     private function testCaptureWalletPaymentSignature(): void
     {
@@ -60,7 +60,7 @@ class WalletCaptureOrAuthorizeIntentTest
         
         // Look for the function signature with all required parameters
         $hasCorrectSignature = preg_match(
-            '/function\s+captureWalletPayment\s*\([^)]*\$transaction_mode[^)]*\$ppr_type[^)]*\)/',
+            '/function\s+captureWalletPayment\s*\([^)]*\$transaction_mode[^)]*\$ppac_type[^)]*\)/',
             $content
         );
         
@@ -68,9 +68,9 @@ class WalletCaptureOrAuthorizeIntentTest
             $this->testResults[] = [
                 'name' => 'captureWalletPayment signature',
                 'passed' => true,
-                'message' => 'Function accepts transaction_mode and ppr_type parameters'
+                'message' => 'Function accepts transaction_mode and ppac_type parameters'
             ];
-            echo "  ✓ PASS: Function signature includes transaction_mode and ppr_type\n";
+            echo "  ✓ PASS: Function signature includes transaction_mode and ppac_type\n";
         } else {
             $this->testResults[] = [
                 'name' => 'captureWalletPayment signature',
@@ -98,9 +98,9 @@ class WalletCaptureOrAuthorizeIntentTest
             $content
         );
         
-        // Also check for the Auth Only (Card-Only) check with ppr_type
+        // Also check for the Auth Only (Card-Only) check with ppac_type
         $hasCardOnlyCheck = preg_match(
-            '/\$ppr_type\s*!==\s*[\'"]card[\'"]\s*&&\s*\$transaction_mode\s*===\s*(?:[\'"]Auth Only \(Card-Only\)[\'"]|self::TRANSACTION_MODE_AUTH_CARD_ONLY)/',
+            '/\$ppac_type\s*!==\s*[\'"]card[\'"]\s*&&\s*\$transaction_mode\s*===\s*(?:[\'"]Auth Only \(Card-Only\)[\'"]|self::TRANSACTION_MODE_AUTH_CARD_ONLY)/',
             $content
         );
         
@@ -191,9 +191,9 @@ class WalletCaptureOrAuthorizeIntentTest
         echo "Test 5: Verify wallet modules pass transaction mode...\n";
         
         $walletModules = [
-            'paypalr_applepay.php' => 'apple_pay',
-            'paypalr_googlepay.php' => 'google_pay',
-            'paypalr_venmo.php' => 'venmo',
+            'paypalac_applepay.php' => 'apple_pay',
+            'paypalac_googlepay.php' => 'google_pay',
+            'paypalac_venmo.php' => 'venmo',
         ];
         
         $allPassed = true;
@@ -210,17 +210,17 @@ class WalletCaptureOrAuthorizeIntentTest
             
             $content = file_get_contents($modulePath);
             
-            // Look for the call to captureWalletPayment with MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE
+            // Look for the call to captureWalletPayment with MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE
             $passesTransactionMode = preg_match(
-                '/captureWalletPayment\s*\([^)]*MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE[^)]*\)/',
+                '/captureWalletPayment\s*\([^)]*MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE[^)]*\)/',
                 $content
             );
             
-            // Also check that it passes the correct ppr_type
+            // Also check that it passes the correct ppac_type
             $passesPprType = strpos($content, "'$expectedType'") !== false;
             
             if ($passesTransactionMode && $passesPprType) {
-                $messages[] = "$moduleName: ✓ Passes transaction mode and ppr_type";
+                $messages[] = "$moduleName: ✓ Passes transaction mode and ppac_type";
             } else {
                 $allPassed = false;
                 $messages[] = "$moduleName: ✗ Missing parameters (mode=" . ($passesTransactionMode ? 'yes' : 'no') . ", type=" . ($passesPprType ? 'yes' : 'no') . ")";
@@ -231,7 +231,7 @@ class WalletCaptureOrAuthorizeIntentTest
             $this->testResults[] = [
                 'name' => 'Wallet modules pass transaction mode',
                 'passed' => true,
-                'message' => 'All wallet modules correctly pass transaction mode and ppr_type'
+                'message' => 'All wallet modules correctly pass transaction mode and ppac_type'
             ];
             echo "  ✓ PASS: All wallet modules updated\n";
             foreach ($messages as $msg) {

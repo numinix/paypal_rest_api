@@ -233,7 +233,7 @@ function testDatabaseInstallerAddsColumns(): bool
 /**
  * Test that PayPal return redirect detection includes authCode
  */
-function testPayPalReturnDetectsAuthCode(): bool
+function testPayPalacReturnDetectsAuthCode(): bool
 {
     $passed = true;
 
@@ -300,7 +300,7 @@ if (testDatabaseInstallerAddsColumns()) {
 }
 
 fwrite(STDOUT, "Test 6: Verifying PayPal return redirect detects authCode...\n");
-if (testPayPalReturnDetectsAuthCode()) {
+if (testPayPalacReturnDetectsAuthCode()) {
     fwrite(STDOUT, "  ✓ Test passed\n\n");
 } else {
     fwrite(STDERR, "  ✗ Test failed\n\n");

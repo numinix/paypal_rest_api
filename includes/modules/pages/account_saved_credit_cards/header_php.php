@@ -1,13 +1,13 @@
 <?php
-use PayPalRestful\Api\PayPalRestfulApi;
-use PayPalRestful\Common\VaultManager;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Common\VaultManager;
 
 if (!defined('FILENAME_ACCOUNT_SAVED_CREDIT_CARDS')) {
     define('FILENAME_ACCOUNT_SAVED_CREDIT_CARDS', 'account_saved_credit_cards');
 }
 
-if (!function_exists('paypalr_format_vault_expiry')) {
-    function paypalr_format_vault_expiry(string $rawExpiry): string
+if (!function_exists('paypalac_format_vault_expiry')) {
+    function paypalac_format_vault_expiry(string $rawExpiry): string
     {
         $rawExpiry = trim($rawExpiry);
         if ($rawExpiry === '') {
@@ -26,8 +26,8 @@ if (!function_exists('paypalr_format_vault_expiry')) {
     }
 }
 
-if (!function_exists('paypalr_format_vault_date')) {
-    function paypalr_format_vault_date(?string $rawDate): string
+if (!function_exists('paypalac_format_vault_date')) {
+    function paypalac_format_vault_date(?string $rawDate): string
     {
         if ($rawDate === null || $rawDate === '') {
             return '';
@@ -42,11 +42,11 @@ if (!function_exists('paypalr_format_vault_date')) {
     }
 }
 
-if (!function_exists('paypalr_format_vault_address')) {
+if (!function_exists('paypalac_format_vault_address')) {
     /**
      * @return string[]
      */
-    function paypalr_format_vault_address(array $billingAddress): array
+    function paypalac_format_vault_address(array $billingAddress): array
     {
         $lines = [];
 
@@ -78,11 +78,11 @@ if (!function_exists('paypalr_format_vault_address')) {
     }
 }
 
-if (!function_exists('paypalr_split_vault_expiry')) {
+if (!function_exists('paypalac_split_vault_expiry')) {
     /**
      * @return array{month:string,year:string}
      */
-    function paypalr_split_vault_expiry(string $rawExpiry): array
+    function paypalac_split_vault_expiry(string $rawExpiry): array
     {
         $month = '';
         $year = '';
@@ -110,8 +110,8 @@ if (!function_exists('paypalr_split_vault_expiry')) {
     }
 }
 
-if (!function_exists('paypalr_lookup_country_iso2')) {
-    function paypalr_lookup_country_iso2(int $countryId): string
+if (!function_exists('paypalac_lookup_country_iso2')) {
+    function paypalac_lookup_country_iso2(int $countryId): string
     {
         if ($countryId <= 0) {
             return '';
@@ -143,8 +143,8 @@ if (!function_exists('paypalr_lookup_country_iso2')) {
     }
 }
 
-if (!function_exists('paypalr_lookup_country_id_by_iso2')) {
-    function paypalr_lookup_country_id_by_iso2(string $iso2): ?int
+if (!function_exists('paypalac_lookup_country_id_by_iso2')) {
+    function paypalac_lookup_country_id_by_iso2(string $iso2): ?int
     {
         $iso2 = strtoupper(trim($iso2));
         if ($iso2 === '') {
@@ -177,8 +177,8 @@ if (!function_exists('paypalr_lookup_country_id_by_iso2')) {
     }
 }
 
-if (!function_exists('paypalr_lookup_zone_code')) {
-    function paypalr_lookup_zone_code(int $zoneId): string
+if (!function_exists('paypalac_lookup_zone_code')) {
+    function paypalac_lookup_zone_code(int $zoneId): string
     {
         if ($zoneId <= 0) {
             return '';
@@ -214,8 +214,8 @@ if (!function_exists('paypalr_lookup_zone_code')) {
     }
 }
 
-if (!function_exists('paypalr_filter_paypal_address_fields')) {
-    function paypalr_filter_paypal_address_fields(array $address): array
+if (!function_exists('paypalac_filter_paypal_address_fields')) {
+    function paypalac_filter_paypal_address_fields(array $address): array
     {
         $allowed = [
             'address_line_1',
@@ -238,8 +238,8 @@ if (!function_exists('paypalr_filter_paypal_address_fields')) {
     }
 }
 
-if (!function_exists('paypalr_build_paypal_address_from_book')) {
-    function paypalr_build_paypal_address_from_book(array $entry): array
+if (!function_exists('paypalac_build_paypal_address_from_book')) {
+    function paypalac_build_paypal_address_from_book(array $entry): array
     {
         $address = [
             'address_line_1' => trim((string)($entry['entry_street_address'] ?? '')),
@@ -251,7 +251,7 @@ if (!function_exists('paypalr_build_paypal_address_from_book')) {
         $zoneId = (int)($entry['entry_zone_id'] ?? 0);
         $state = trim((string)($entry['entry_state'] ?? ''));
         if ($zoneId > 0) {
-            $zoneCode = paypalr_lookup_zone_code($zoneId);
+            $zoneCode = paypalac_lookup_zone_code($zoneId);
             if ($zoneCode !== '') {
                 $state = $zoneCode;
             }
@@ -261,20 +261,20 @@ if (!function_exists('paypalr_build_paypal_address_from_book')) {
         }
 
         $countryId = (int)($entry['entry_country_id'] ?? 0);
-        $countryCode = paypalr_lookup_country_iso2($countryId);
+        $countryCode = paypalac_lookup_country_iso2($countryId);
         if ($countryCode !== '') {
             $address['country_code'] = $countryCode;
         }
 
-        return paypalr_filter_paypal_address_fields($address);
+        return paypalac_filter_paypal_address_fields($address);
     }
 }
 
-if (!function_exists('paypalr_build_paypal_address_from_form')) {
-    function paypalr_build_paypal_address_from_form(array $addressForm): array
+if (!function_exists('paypalac_build_paypal_address_from_form')) {
+    function paypalac_build_paypal_address_from_form(array $addressForm): array
     {
         $countryId = (int)($addressForm['country_id'] ?? 0);
-        $countryCode = paypalr_lookup_country_iso2($countryId);
+        $countryCode = paypalac_lookup_country_iso2($countryId);
 
         $address = [
             'address_line_1' => trim((string)($addressForm['street_address'] ?? '')),
@@ -288,15 +288,15 @@ if (!function_exists('paypalr_build_paypal_address_from_form')) {
             $address['country_code'] = $countryCode;
         }
 
-        return paypalr_filter_paypal_address_fields($address);
+        return paypalac_filter_paypal_address_fields($address);
     }
 }
 
-if (!function_exists('paypalr_fetch_customer_addresses')) {
+if (!function_exists('paypalac_fetch_customer_addresses')) {
     /**
      * @return array<int,array{id:int,label:string}>
      */
-    function paypalr_fetch_customer_addresses(int $customers_id): array
+    function paypalac_fetch_customer_addresses(int $customers_id): array
     {
         if ($customers_id <= 0) {
             return [];
@@ -329,11 +329,11 @@ if (!function_exists('paypalr_fetch_customer_addresses')) {
     }
 }
 
-if (!function_exists('paypalr_get_address_book_entry')) {
+if (!function_exists('paypalac_get_address_book_entry')) {
     /**
      * @return array<string,mixed>|null
      */
-    function paypalr_get_address_book_entry(int $customers_id, int $address_book_id): ?array
+    function paypalac_get_address_book_entry(int $customers_id, int $address_book_id): ?array
     {
         if ($customers_id <= 0 || $address_book_id <= 0) {
             return null;
@@ -357,13 +357,13 @@ if (!function_exists('paypalr_get_address_book_entry')) {
     }
 }
 
-if (!function_exists('paypalr_build_patch_operation')) {
+if (!function_exists('paypalac_build_patch_operation')) {
     /**
      * @param mixed $value
      *
      * @return array<string,mixed>
      */
-    function paypalr_build_patch_operation(string $path, $value, string $operation = 'replace'): array
+    function paypalac_build_patch_operation(string $path, $value, string $operation = 'replace'): array
     {
         return [
             'op' => $operation,
@@ -373,11 +373,11 @@ if (!function_exists('paypalr_build_patch_operation')) {
     }
 }
 
-if (!function_exists('paypalr_get_vault_status_map')) {
+if (!function_exists('paypalac_get_vault_status_map')) {
     /**
      * @return array<string,array{0:string,1:string}>
      */
-    function paypalr_get_vault_status_map(): array
+    function paypalac_get_vault_status_map(): array
     {
         return [
             'ACTIVE' => [TEXT_SAVED_CARD_STATUS_ACTIVE, 'is-active'],
@@ -395,14 +395,14 @@ if (!function_exists('paypalr_get_vault_status_map')) {
     }
 }
 
-if (!function_exists('paypalr_normalize_vault_card')) {
+if (!function_exists('paypalac_normalize_vault_card')) {
     /**
      * @param array<string,mixed> $record
      * @param array<string,array{0:string,1:string}> $statusMap
      *
      * @return array<string,mixed>
      */
-    function paypalr_normalize_vault_card(array $record, array $statusMap): array
+    function paypalac_normalize_vault_card(array $record, array $statusMap): array
     {
         $brand = trim((string)($record['brand'] ?? ''));
         if ($brand === '') {
@@ -425,15 +425,15 @@ if (!function_exists('paypalr_normalize_vault_card')) {
             'vault_id' => (string)($record['vault_id'] ?? ''),
             'brand' => $brand,
             'last_digits' => (string)($record['last_digits'] ?? ''),
-            'expiry' => paypalr_format_vault_expiry((string)($record['expiry'] ?? '')),
+            'expiry' => paypalac_format_vault_expiry((string)($record['expiry'] ?? '')),
             'cardholder_name' => (string)($record['cardholder_name'] ?? ''),
             'status_label' => $statusLabel,
             'status_class' => $statusClass,
             'status_raw' => $statusKey,
-            'last_used' => paypalr_format_vault_date($record['last_used'] ?? ''),
-            'updated' => paypalr_format_vault_date($record['last_modified'] ?? ($record['update_time'] ?? '')),
-            'created' => paypalr_format_vault_date($record['date_added'] ?? ''),
-            'billing_address' => paypalr_format_vault_address($record['billing_address'] ?? []),
+            'last_used' => paypalac_format_vault_date($record['last_used'] ?? ''),
+            'updated' => paypalac_format_vault_date($record['last_modified'] ?? ($record['update_time'] ?? '')),
+            'created' => paypalac_format_vault_date($record['date_added'] ?? ''),
+            'billing_address' => paypalac_format_vault_address($record['billing_address'] ?? []),
             'details_id' => 'saved-card-details-' . $paypalVaultId,
             'edit_href' => ($paypalVaultId > 0)
                 ? zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, 'edit=' . $paypalVaultId, 'SSL')
@@ -450,14 +450,14 @@ if (!defined('TABLE_SAVED_CREDIT_CARDS')) {
     define('TABLE_SAVED_CREDIT_CARDS', DB_PREFIX . 'saved_credit_cards');
 }
 
-if (!function_exists('paypalr_get_payflow_cards')) {
+if (!function_exists('paypalac_get_payflow_cards')) {
     /**
      * Retrieve Payflow saved credit cards for a customer
      *
      * @param int $customers_id
      * @return array
      */
-    function paypalr_get_payflow_cards(int $customers_id): array
+    function paypalac_get_payflow_cards(int $customers_id): array
     {
         if ($customers_id <= 0) {
             return [];
@@ -503,14 +503,14 @@ if (!function_exists('paypalr_get_payflow_cards')) {
     }
 }
 
-if (!function_exists('paypalr_normalize_payflow_card')) {
+if (!function_exists('paypalac_normalize_payflow_card')) {
     /**
      * Normalize Payflow card to match vault card format for display
      *
      * @param array $payflowCard
      * @return array
      */
-    function paypalr_normalize_payflow_card(array $payflowCard): array
+    function paypalac_normalize_payflow_card(array $payflowCard): array
     {
         $cardId = (int)($payflowCard['saved_credit_card_id'] ?? 0);
         $brand = (string)($payflowCard['type'] ?? '');
@@ -520,7 +520,7 @@ if (!function_exists('paypalr_normalize_payflow_card')) {
         $apiType = (string)($payflowCard['api_type'] ?? 'payflow');
 
         // Format expiry from MMYY to MM/YYYY
-        $formattedExpiry = paypalr_format_vault_expiry($expiry);
+        $formattedExpiry = paypalac_format_vault_expiry($expiry);
 
         return [
             'paypal_vault_id' => 0, // Not a vault card
@@ -548,7 +548,7 @@ if (!function_exists('paypalr_normalize_payflow_card')) {
     }
 }
 
-if (!function_exists('paypalr_delete_payflow_card')) {
+if (!function_exists('paypalac_delete_payflow_card')) {
     /**
      * Delete a Payflow saved credit card
      *
@@ -556,7 +556,7 @@ if (!function_exists('paypalr_delete_payflow_card')) {
      * @param int $card_id
      * @return bool
      */
-    function paypalr_delete_payflow_card(int $customers_id, int $card_id): bool
+    function paypalac_delete_payflow_card(int $customers_id, int $card_id): bool
     {
         if ($customers_id <= 0 || $card_id <= 0) {
             return false;
@@ -594,7 +594,7 @@ require(DIR_WS_MODULES . zen_get_module_directory('require_languages.php'));
 
 $customers_id = (int)$_SESSION['customer_id'];
 $hide_saved_cards_page = true;
-if (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS === 'True') {
+if (defined('MODULE_PAYMENT_PAYPALAC_STATUS') && MODULE_PAYMENT_PAYPALAC_STATUS === 'True') {
     $hide_saved_cards_page = false;
 }
 
@@ -630,11 +630,11 @@ for ($offset = 0; $offset <= 15; $offset++) {
 }
 
 if ($hide_saved_cards_page === false) {
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/pprAutoload.php';
-    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr.php';
+    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/ppacAutoload.php';
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalac.php';
 
-    $statusMap = paypalr_get_vault_status_map();
-    $address_book_options = paypalr_fetch_customer_addresses($customers_id);
+    $statusMap = paypalac_get_vault_status_map();
+    $address_book_options = paypalac_fetch_customer_addresses($customers_id);
 
     global $db;
     $countryRecords = $db->Execute(
@@ -667,7 +667,7 @@ if ($hide_saved_cards_page === false) {
                     if ($rawCard === null) {
                         $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
                     } else {
-                        $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER);
+                        $api = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER);
                         $deleteResponse = $api->deleteVaultPaymentToken((string)$rawCard['vault_id']);
                         $deleteFailed = false;
                         if ($deleteResponse === false) {
@@ -746,15 +746,15 @@ if ($hide_saved_cards_page === false) {
                             if ($formValues['address_book_id'] <= 0) {
                                 $validationErrors[] = TEXT_EDIT_CARD_ERROR_ADDRESS_SELECTION;
                             } else {
-                                $addressEntry = paypalr_get_address_book_entry($customers_id, $formValues['address_book_id']);
+                                $addressEntry = paypalac_get_address_book_entry($customers_id, $formValues['address_book_id']);
                                 if ($addressEntry === null) {
                                     $validationErrors[] = TEXT_EDIT_CARD_ERROR_ADDRESS_SELECTION;
                                 } else {
-                                    $billingAddress = paypalr_build_paypal_address_from_book($addressEntry);
+                                    $billingAddress = paypalac_build_paypal_address_from_book($addressEntry);
                                 }
                             }
                         } else {
-                            $billingAddress = paypalr_build_paypal_address_from_form($formValues['new_address']);
+                            $billingAddress = paypalac_build_paypal_address_from_form($formValues['new_address']);
                             if (empty($billingAddress) || empty($billingAddress['address_line_1'] ?? '') || empty($billingAddress['admin_area_2'] ?? '') || empty($billingAddress['postal_code'] ?? '') || empty($billingAddress['country_code'] ?? '')) {
                                 $validationErrors[] = TEXT_EDIT_CARD_ERROR_ADDRESS_NEW;
                             }
@@ -768,7 +768,7 @@ if ($hide_saved_cards_page === false) {
                         } else {
                             $patchOperations = [];
 
-                            $cardholderOp = paypalr_build_patch_operation(
+                            $cardholderOp = paypalac_build_patch_operation(
                                 '/payment_source/card/name',
                                 $formValues['cardholder_name'],
                                 ($rawCard['cardholder_name'] ?? '') === '' ? 'add' : 'replace'
@@ -779,25 +779,25 @@ if ($hide_saved_cards_page === false) {
 
                             $expiryValue = $expiryYear . '-' . $expiryMonth;
                             if ($expiryValue !== (string)($rawCard['expiry'] ?? '')) {
-                                $patchOperations[] = paypalr_build_patch_operation('/payment_source/card/expiry', $expiryValue, 'replace');
+                                $patchOperations[] = paypalac_build_patch_operation('/payment_source/card/expiry', $expiryValue, 'replace');
                             }
 
                             if ($formValues['security_code'] !== '') {
-                                $patchOperations[] = paypalr_build_patch_operation('/payment_source/card/security_code', $formValues['security_code'], 'add');
+                                $patchOperations[] = paypalac_build_patch_operation('/payment_source/card/security_code', $formValues['security_code'], 'add');
                             }
 
                             if (!empty($billingAddress)) {
                                 $existingBilling = $rawCard['billing_address'] ?? [];
-                                $existingBillingFiltered = paypalr_filter_paypal_address_fields($existingBilling);
+                                $existingBillingFiltered = paypalac_filter_paypal_address_fields($existingBilling);
                                 if ($billingAddress !== $existingBillingFiltered) {
-                                    $patchOperations[] = paypalr_build_patch_operation('/payment_source/card/billing_address', $billingAddress, empty($existingBillingFiltered) ? 'add' : 'replace');
+                                    $patchOperations[] = paypalac_build_patch_operation('/payment_source/card/billing_address', $billingAddress, empty($existingBillingFiltered) ? 'add' : 'replace');
                                 }
                             }
 
                             if (empty($patchOperations)) {
                                 $messageStack->add('saved_credit_cards', TEXT_EDIT_CARD_NO_CHANGES, 'warning');
                             } else {
-                                $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER);
+                                $api = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER);
                                 $vaultId = (string)($rawCard['vault_id'] ?? '');
                                 $updateResponse = $api->updateVaultPaymentToken($vaultId, $patchOperations);
                                 if ($updateResponse === false) {
@@ -868,7 +868,7 @@ if ($hide_saved_cards_page === false) {
                     $messageStack->add('saved_credit_cards', TEXT_ADD_CARD_ERROR_GENERAL, 'error');
                 } else {
                     // Create a payment token from the setup token
-                    $api = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER);
+                    $api = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER);
                     $paymentTokenResponse = $api->createPaymentTokenFromSetup($setup_token_id);
                     
                     if ($paymentTokenResponse === false) {
@@ -925,10 +925,10 @@ if ($hide_saved_cards_page === false) {
         $requested_id = (int)zen_db_prepare_input($_GET['delete_payflow']);
         if ($requested_id > 0) {
             // Get the Payflow card for confirmation
-            $payflowCards = paypalr_get_payflow_cards($customers_id);
+            $payflowCards = paypalac_get_payflow_cards($customers_id);
             foreach ($payflowCards as $payflowCard) {
                 if ((int)$payflowCard['saved_credit_card_id'] === $requested_id) {
-                    $delete_card = paypalr_normalize_payflow_card($payflowCard);
+                    $delete_card = paypalac_normalize_payflow_card($payflowCard);
                     $delete_card['confirm_action'] = 'delete_payflow_confirm';
                     break;
                 }
@@ -948,7 +948,7 @@ if ($hide_saved_cards_page === false) {
             if ($payflow_card_id <= 0) {
                 $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
             } else {
-                if (paypalr_delete_payflow_card($customers_id, $payflow_card_id)) {
+                if (paypalac_delete_payflow_card($customers_id, $payflow_card_id)) {
                     $messageStack->add_session('saved_credit_cards', TEXT_DELETE_CARD_SUCCESS, 'success');
                     zen_redirect(zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'));
                 } else {
@@ -963,7 +963,7 @@ if ($hide_saved_cards_page === false) {
         if ($requested_id > 0) {
             $rawDeleteCard = VaultManager::getCustomerVaultCard($customers_id, $requested_id);
             if ($rawDeleteCard !== null) {
-                $delete_card = paypalr_normalize_vault_card($rawDeleteCard, $statusMap);
+                $delete_card = paypalac_normalize_vault_card($rawDeleteCard, $statusMap);
             } else {
                 $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
             }
@@ -979,14 +979,14 @@ if ($hide_saved_cards_page === false) {
         if ($rawEditCard === null) {
             $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
         } else {
-            $edit_card = paypalr_normalize_vault_card($rawEditCard, $statusMap);
+            $edit_card = paypalac_normalize_vault_card($rawEditCard, $statusMap);
             $cardData = $rawEditCard['card_data'] ?? [];
             if (!is_array($cardData)) {
                 $cardData = [];
             }
 
             if (empty($edit_form_values)) {
-                $expiryParts = paypalr_split_vault_expiry((string)($rawEditCard['expiry'] ?? ''));
+                $expiryParts = paypalac_split_vault_expiry((string)($rawEditCard['expiry'] ?? ''));
                 $billingAddress = $rawEditCard['billing_address'] ?? [];
                 if (!is_array($billingAddress) && isset($cardData['billing_address'])) {
                     $billingAddress = $cardData['billing_address'];
@@ -997,7 +997,7 @@ if ($hide_saved_cards_page === false) {
 
                 $defaultCountryId = null;
                 if (!empty($billingAddress['country_code'] ?? '')) {
-                    $defaultCountryId = paypalr_lookup_country_id_by_iso2((string)$billingAddress['country_code']);
+                    $defaultCountryId = paypalac_lookup_country_id_by_iso2((string)$billingAddress['country_code']);
                 }
 
                 $edit_form_values = [
@@ -1023,7 +1023,7 @@ if ($hide_saved_cards_page === false) {
     // Get PayPal Vault cards
     $rawCards = VaultManager::getCustomerVaultedCards($customers_id, false);
     foreach ($rawCards as $rawCard) {
-        $normalized = paypalr_normalize_vault_card($rawCard, $statusMap);
+        $normalized = paypalac_normalize_vault_card($rawCard, $statusMap);
         if ($normalized['paypal_vault_id'] > 0) {
             $normalized['source'] = 'vault';
             $saved_credit_cards[] = $normalized;
@@ -1031,9 +1031,9 @@ if ($hide_saved_cards_page === false) {
     }
 
     // Get Payflow cards if they exist
-    $payflowCards = paypalr_get_payflow_cards($customers_id);
+    $payflowCards = paypalac_get_payflow_cards($customers_id);
     foreach ($payflowCards as $payflowCard) {
-        $saved_credit_cards[] = paypalr_normalize_payflow_card($payflowCard);
+        $saved_credit_cards[] = paypalac_normalize_payflow_card($payflowCard);
     }
 }
 

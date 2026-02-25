@@ -22,7 +22,7 @@ namespace {
     function testObserverHasSdkConfigLogging(): bool
     {
         $passed = true;
-        $observerPath = DIR_FS_CATALOG . 'includes/classes/observers/auto.paypalrestful.php';
+        $observerPath = DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout.php';
         
         if (!file_exists($observerPath)) {
             fwrite(STDERR, "FAIL: Observer file not found at $observerPath\n");
@@ -32,7 +32,7 @@ namespace {
         $content = file_get_contents($observerPath);
 
         // Check that Logger is imported
-        if (strpos($content, 'use PayPalRestful\\Common\\Logger;') !== false) {
+        if (strpos($content, 'use PayPalAdvancedCheckout\\Common\\Logger;') !== false) {
             fwrite(STDOUT, "✓ Observer imports Logger class\n");
         } else {
             fwrite(STDERR, "FAIL: Observer should import Logger class\n");
@@ -89,9 +89,9 @@ namespace {
     {
         $passed = true;
         $walletModules = [
-            'paypalr_applepay.php' => 'Apple Pay',
-            'paypalr_googlepay.php' => 'Google Pay',
-            'paypalr_venmo.php' => 'Venmo',
+            'paypalac_applepay.php' => 'Apple Pay',
+            'paypalac_googlepay.php' => 'Google Pay',
+            'paypalac_venmo.php' => 'Venmo',
         ];
 
         foreach ($walletModules as $filename => $walletName) {
