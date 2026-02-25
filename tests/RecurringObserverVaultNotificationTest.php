@@ -216,7 +216,7 @@ namespace Tests {
             ];
 
             $class = new \stdClass();
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
 
             // Verify subscriptions were queried
             $queries = $this->db->getExecutedQueries();
@@ -249,11 +249,11 @@ namespace Tests {
 
             // Test with empty array
             $class = new \stdClass();
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', []);
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', []);
             $this->assertEmpty($this->db->performedUpdates);
 
             // Test with missing customers_id
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', [
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', [
                 'orders_id' => 100,
                 'paypal_vault_id' => 5,
                 'vault_id' => 'vault_token_12345',
@@ -261,7 +261,7 @@ namespace Tests {
             $this->assertEmpty($this->db->performedUpdates);
 
             // Test with missing vault_id
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', [
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', [
                 'customers_id' => 1,
                 'orders_id' => 100,
                 'paypal_vault_id' => 5,

@@ -38,7 +38,7 @@ return $this->PayPal;
                $this->PayPal = new PayPal($PayPalConfig);
                return $this->PayPal;
        }
-       function get_paypal_rest_client() {
+       function get_paypal_api_client() {
                if ($this->PayPalAdvancedCheckout) {
                        return $this->PayPalAdvancedCheckout;
                }
@@ -74,7 +74,7 @@ return $this->PayPalAdvancedCheckout;
                                return $this->PayPalAdvancedCheckout;
                        }
                        catch (Exception $e) {
-                               $this->notify_error('Unable to initialize PayPal REST API', 'The PayPal REST API client failed to initialize. Message: ' . $e->getMessage(), 'warning');
+                               $this->notify_error('Unable to initialize PayPal Advanced Checkout API', 'The PayPal Advanced Checkout API client failed to initialize. Message: ' . $e->getMessage(), 'warning');
                        }
                }
                return false;
@@ -496,7 +496,7 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                return defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : 'USD';
        }
        function process_rest_payment($payment_details, $total_to_bill) {
-               $client = $this->get_paypal_rest_client();
+               $client = $this->get_paypal_api_client();
                if (!$client) {
                        return array('success' => false, 'error' => 'PayPal REST client unavailable');
                }
@@ -732,7 +732,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                return false;
        }
        function cancel_paypalac_subscription($subscription) {
-               $client = $this->get_paypal_rest_client();
+               $client = $this->get_paypal_api_client();
                if (!$client) {
                        return false;
                }

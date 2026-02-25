@@ -147,7 +147,7 @@ $autoLoadConfig[0][] = [
 ];
 
 // Determine the cache class name for instantiation at breakpoint 30.
-$webhookCacheClassName = file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'cache.php') ? 'cache' : 'PayPalRestCache';
+$webhookCacheClassName = file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'cache.php') ? 'cache' : 'PayPalacCache';
 
 // --- currencies ---
 if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'currencies.php')) {

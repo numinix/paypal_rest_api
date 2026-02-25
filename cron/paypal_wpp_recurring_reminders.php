@@ -17,7 +17,7 @@ ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'
 chdir(DIR_FS_CATALOG);
 require_once 'includes/application_top.php';
 
-// Load PayPal REST API autoloader
+// Load PayPal Advanced Checkout autoloader
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 
 // Load saved card recurring class
@@ -99,8 +99,8 @@ if (defined('TABLE_PAYPAL_RECURRING')) {
         // Initialize PayPalProfileManager
         if (class_exists('PayPalProfileManager')) {
             $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-            $PayPalRestClient = $paypalSavedCardRecurring->get_paypal_rest_client();
-            $PayPalProfileManager = PayPalProfileManager::create($PayPalRestClient, $PayPal);
+            $PayPalApiClient = $paypalSavedCardRecurring->get_paypal_api_client();
+            $PayPalProfileManager = PayPalProfileManager::create($PayPalApiClient, $PayPal);
         }
         
         while (!$subscription->EOF) {

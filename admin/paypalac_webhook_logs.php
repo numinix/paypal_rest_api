@@ -12,7 +12,7 @@
 
 require 'includes/application_top.php';
 
-// Load PayPal REST API autoloader
+// Load PayPal Advanced Checkout autoloader
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 
 if (!defined('HEADING_TITLE')) {

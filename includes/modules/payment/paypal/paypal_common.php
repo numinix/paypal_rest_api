@@ -765,7 +765,7 @@ class PayPalCommon {
      * Common captureOrAuthorizePayment method for wallet modules
      * Determines whether to capture or authorize based on transaction mode
      *
-     * @param PayPalAdvancedCheckoutApi $ppr PayPal REST API instance
+     * @param PayPalAdvancedCheckoutApi $ppr PayPal Advanced Checkout API instance
      * @param Logger $log Logger instance
      * @param string $payment_source Payment source name (e.g., 'google_pay')
      * @param string $transaction_mode Transaction mode (Final Sale, Auth Only, etc.)

@@ -2,7 +2,7 @@
  * PayPal Apple Pay Integration - Native ApplePaySession API
  *
  * This module implements native Apple Pay integration using ApplePaySession API
- * to retrieve user email addresses, then processes payment through PayPal REST API.
+ * to retrieve user email addresses, then processes payment through the PayPal Advanced Checkout module.
  * Based on the Braintree reference implementation pattern.
  *
  * @copyright Copyright 2025 Zen Cart Development Team

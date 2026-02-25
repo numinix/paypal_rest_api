@@ -80,7 +80,7 @@ namespace {
     /**
      * Test that paypalac.php getEnvironmentInfo returns trimmed credentials
      */
-    function testPaypalrGetEnvironmentInfoTrims(): bool
+    function testPaypalacGetEnvironmentInfoTrims(): bool
     {
         $filePath = DIR_FS_CATALOG . 'includes/modules/payment/paypalac.php';
         
@@ -128,7 +128,7 @@ namespace {
     $failures = 0;
     
     fwrite(STDOUT, "Test 1: Verifying paypalac::getEnvironmentInfo() trims credentials...\n");
-    if (testPaypalrGetEnvironmentInfoTrims()) {
+    if (testPaypalacGetEnvironmentInfoTrims()) {
         fwrite(STDOUT, "  ✓ Test passed\n");
     } else {
         fwrite(STDERR, "  ✗ Test failed\n");

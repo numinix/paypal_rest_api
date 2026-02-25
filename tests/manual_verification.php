@@ -38,7 +38,7 @@ echo "- NOTIFY_PAYPALAC_VAULT_CARD_SAVED notification is sent\n\n";
 echo "Step 3: Subscription Activation (NEW FUNCTIONALITY)\n";
 echo "---------------------------------------------------\n";
 echo "Observer listens for NOTIFY_PAYPALAC_VAULT_CARD_SAVED:\n";
-echo "- zcObserverPaypaladvcheckoutRecurring::updateNotifyPaypalrVaultCardSaved() is called\n";
+echo "- zcObserverPaypaladvcheckoutRecurring::updateNotifyPaypalacVaultCardSaved() is called\n";
 echo "- Calls SubscriptionManager::activateSubscriptionsWithVault()\n";
 echo "- Finds all subscriptions for this order with status 'awaiting_vault'\n";
 echo "- Updates each subscription:\n";
@@ -68,7 +68,7 @@ echo "   - Activates subscriptions from 'awaiting_vault' to 'active' status\n\n"
 
 echo "2. Observer updated to listen for vault notifications\n";
 echo "   - Added NOTIFY_PAYPALAC_VAULT_CARD_SAVED to event list\n";
-echo "   - Added updateNotifyPaypalrVaultCardSaved() handler\n\n";
+echo "   - Added updateNotifyPaypalacVaultCardSaved() handler\n\n";
 
 echo "3. Tests added\n";
 echo "   - SubscriptionVaultActivationTest.php (3 tests, 28 assertions)\n";

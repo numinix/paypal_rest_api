@@ -1,6 +1,6 @@
 <?php
 /**
- * Database table constants for the PayPal Rest API plugin (Admin).
+ * Database table constants for the PayPal Advanced Checkout plugin (Admin).
  * These are loaded site-wide automatically by Zen Cart.
  */
 if (!defined('TABLE_PAYPAL')) {

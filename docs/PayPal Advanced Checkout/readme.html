@@ -72,7 +72,7 @@
           <span class="bodyHeaderTxt">Overview</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">PayPal Advanced Checkout (also known as <code>paypalr</code>) combines PayPal Payments Pro and Express Checkout into a single REST-based payment module for Zen Cart 1.5.7c and later. It ships with observer and language shims to support older stores, delivering the modern PayPal REST experience with minimal core changes.</p>
+          <p class="bodyText">PayPal Advanced Checkout (also known as <code>paypalac</code>) combines PayPal Payments Pro and Express Checkout into a single Advanced Checkout payment module for Zen Cart 1.5.7c and later. It ships with observer and language shims to support older stores, delivering the modern PayPal Advanced Checkout experience with minimal core changes.</p>
           <p class="bodyText">Use this document to install, configure, operate, and maintain the module. For supplemental diagrams, API examples, and historical release notes, consult the project wiki and release archives.</p>
           <ul class="bodyList">
             <li>Validated in Zen Cart 1.5.7c+, 2.0.x, and 2.1.0 with both <code>responsive_classic</code> and <code>ZCA Bootstrap</code> templates.</li>
@@ -96,15 +96,15 @@
           <ol>
             <li>Back up your Zen Cart database and store files.</li>
             <li>Review the compatibility checklist in the Overview, including the PHP version and required extensions.</li>
-            <li>Apply the <a href="https://github.com/lat9/paypalr/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank">order total notifier patch</a> if your store runs on Zen Cart versions prior to 1.5.8a.</li>
-            <li>Create PayPal REST API credentials (client ID and secret) for both Sandbox and Live modes using the steps described in the module wiki.</li>
+            <li>Apply the <a href="https://github.com/numinix/paypal_rest_api/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank">order total notifier patch</a> if your store runs on Zen Cart versions prior to 1.5.8a.</li>
+            <li>Create PayPal API credentials (client ID and secret) for both Sandbox and Live modes using the steps described in the module wiki.</li>
           </ol>
           <h4>Uploading files</h4>
           <ol>
             <li>Unzip the release package locally.</li>
             <li>Rename the <code>YOUR_ADMIN/</code> directory to match your store&rsquo;s admin directory name.</li>
             <li>Upload the contents of <code>includes/</code> and your renamed admin folder to the corresponding locations in your Zen Cart installation, merging when prompted.</li>
-            <li>Verify that <code>includes/modules/payment/paypalr.php</code> and the accompanying <code>PayPalRestful</code> library files are present on the server.</li>
+            <li>Verify that <code>includes/modules/payment/paypalac.php</code> and the accompanying <code>PayPalAdvancedCheckout</code> library files are present on the server.</li>
           </ol>
           <h4>Database updates</h4>
           <ol>
@@ -131,9 +131,9 @@
           </ol>
           <pre style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>&lt;?php
   // PayPal Wallet Buttons (Google Pay, Apple Pay, Venmo)
-  $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_paypalr_shopping_cart.php';
+  $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_paypalac_shopping_cart.php';
   if (!file_exists($template_path)) {
-    $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_paypalr_shopping_cart.php';
+    $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_paypalac_shopping_cart.php';
   }
   if (file_exists($template_path)) {
     include($template_path);
@@ -147,9 +147,9 @@
           </ol>
           <pre style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>&lt;?php
   // PayPal Wallet Buttons (Google Pay, Apple Pay, Venmo)
-  $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_paypalr_product_info.php';
+  $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_paypalac_product_info.php';
   if (!file_exists($template_path)) {
-    $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_paypalr_product_info.php';
+    $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_paypalac_product_info.php';
   }
   if (file_exists($template_path)) {
     include($template_path);
@@ -195,7 +195,7 @@
             <li>
               <h4 class="step-title">Risk management &amp; logging</h4>
               <ul>
-                <li>Enable debug logging when diagnosing API responses, and periodically clear <code>/logs/paypalr/</code> to keep storage usage in check.</li>
+                <li>Enable debug logging when diagnosing API responses, and periodically clear <code>/logs/paypalac/</code> to keep storage usage in check.</li>
                 <li>Require confirmed addresses, limit acceptance based on country and currency combinations, or adjust fraud filters according to your policy.</li>
                 <li>Set notification emails for administrator alerts so your team is notified of failed or flagged transactions.</li>
               </ul>
@@ -204,21 +204,21 @@
           <h4>Wallet add-on modules</h4>
           <p class="bodyText">Install the bundled Apple Pay, Google Pay, and Venmo payment modules if you want to surface each wallet alongside the core PayPal Advanced Checkout option. They inherit the parent module's API credentials and diagnostics.</p>
           <ol>
-            <li>Confirm that the primary <strong>PayPal Advanced Checkout</strong> module is installed and enabled; the wallet modules disable themselves if the parent configuration key <code>MODULE_PAYMENT_PAYPALR_VERSION</code> is missing.</li>
+            <li>Confirm that the primary <strong>PayPal Advanced Checkout</strong> module is installed and enabled; the wallet modules disable themselves if the parent configuration key <code>MODULE_PAYMENT_PAYPALAC_VERSION</code> is missing.</li>
             <li>Work with your PayPal account manager to activate each wallet for your merchant ID. Apple Pay also requires you to host the <code>.well-known/apple-developer-merchantid-domain-association</code> file that PayPal supplies.</li>
             <li>Install <strong>PayPal Apple Pay</strong>, <strong>PayPal Google Pay</strong>, or <strong>PayPal Venmo</strong> via <strong>Modules &rarr; Payment</strong>, enable them, and optionally scope them with zone and sort-order settings.</li>
-            <li>Clear compiled templates so the checkout payment page can load the matching JavaScript helpers (<code>jquery.paypalr.applepay.js</code>, <code>jquery.paypalr.googlepay.js</code>, <code>jquery.paypalr.venmo.js</code>). Each script injects a placeholder, listens for PayPal wallet events, and stores the confirmed payload in hidden form fields.</li>
+            <li>Clear compiled templates so the checkout payment page can load the matching JavaScript helpers (<code>jquery.paypalac.applepay.js</code>, <code>jquery.paypalac.googlepay.js</code>, <code>jquery.paypalac.venmo.js</code>). Each script injects a placeholder, listens for PayPal wallet events, and stores the confirmed payload in hidden form fields.</li>
             <li>Run sandbox test orders to confirm that PayPal returns a successful status. The module accepts <code>COMPLETED</code>, <code>APPROVED</code>, and <code>AUTHORIZED</code> responses and will prompt the customer to retry if <code>PAYER_ACTION_REQUIRED</code> is returned.</li>
           </ol>
           <h4>Wallet account setup and IDs</h4>
           <p class="bodyText">Each wallet module exposes its own configuration fields so you can paste the account identifiers PayPal and the wallet providers issue. Use the steps below when onboarding or updating your storefront.</p>
           <ul class="bodyList">
-            <li><strong>Google Pay.</strong> Enable Google Pay in your PayPal account before using this feature. For <strong>Sandbox/Testing</strong>: Go to the <a href="https://developer.paypal.com/" target="_blank" rel="noopener">PayPal Developer Dashboard</a>, navigate to <strong>Apps &amp; Credentials</strong>, select your Sandbox app, scroll to <strong>Features</strong>, check the <strong>Google Pay</strong> checkbox, and click <strong>Save</strong>. For <strong>Live/Production</strong>: Log into your <a href="https://www.paypal.com/businessprofile/settings" target="_blank" rel="noopener">PayPal Business account</a>, navigate to <strong>Account Settings</strong> or <strong>Payments</strong>, find <strong>Google Pay</strong> or <strong>Alternative Payment Methods</strong>, and enable it. Complete any required onboarding steps. The Google Pay integration uses your existing PayPal REST credentials. If PayPal provides you with a Google Merchant ID (a 5&ndash;20 character alphanumeric value) to improve eligibility checks, enter it in the module&rsquo;s configuration field; otherwise, leave it blank.</li>
+            <li><strong>Google Pay.</strong> Enable Google Pay in your PayPal account before using this feature. For <strong>Sandbox/Testing</strong>: Go to the <a href="https://developer.paypal.com/" target="_blank" rel="noopener">PayPal Developer Dashboard</a>, navigate to <strong>Apps &amp; Credentials</strong>, select your Sandbox app, scroll to <strong>Features</strong>, check the <strong>Google Pay</strong> checkbox, and click <strong>Save</strong>. For <strong>Live/Production</strong>: Log into your <a href="https://www.paypal.com/businessprofile/settings" target="_blank" rel="noopener">PayPal Business account</a>, navigate to <strong>Account Settings</strong> or <strong>Payments</strong>, find <strong>Google Pay</strong> or <strong>Alternative Payment Methods</strong>, and enable it. Complete any required onboarding steps. The Google Pay integration uses your existing PayPal API credentials. If PayPal provides you with a Google Merchant ID (a 5&ndash;20 character alphanumeric value) to improve eligibility checks, enter it in the module&rsquo;s configuration field; otherwise, leave it blank.</li>
             <li><strong>Apple Pay.</strong> Apple requires a merchant identifier, domain verification file, and an active payment processing certificate. Sign in to the <a href="https://developer.apple.com/account/resources/identifiers/list/merchant" target="_blank" rel="noopener">Apple Developer portal</a> and create an <em>Apple Pay Merchant ID</em> for your store. Generate a payment processing certificate using the CSR provided by your PayPal/Braintree/Numinix onboarding contact (mirroring the process described in the Braintree Apple Pay module docs): upload the CSR, download the resulting <code>.cer</code>, and hand that certificate back to PayPal so it can be installed on your behalf. Finally, host the <code>.well-known/apple-developer-merchantid-domain-association</code> file that PayPal provides at your storefront root and register the domain inside the Apple Developer portal. Once the certificate and domain are active, enable the PayPal Apple Pay module.</li>
             <li><strong>Venmo.</strong> PayPal enables Venmo processing on a per-merchant basis. After Venmo is activated for your PayPal account, locate your Venmo business profile or account ID (visible in your PayPal business profile or obtainable from your PayPal account manager) and paste it into the <strong>Venmo Business Profile ID</strong> setting in the module. Venmo requires that specific business profile ID.</li>
           </ul>
           <h4>Credit card checkout option</h4>
-          <p class="bodyText">Install the companion <code>paypalr_creditcard</code> payment module when you want to present a dedicated credit card form alongside the PayPal wallet button. The add-on uses the same PayPal REST credentials and logging as the parent module but exposes its own enable/disable switch so you can manage wallet and card availability separately.</p>
+          <p class="bodyText">Install the companion <code>paypalac_creditcard</code> payment module when you want to present a dedicated credit card form alongside the PayPal wallet button. The add-on uses the same PayPal API credentials and logging as the parent module but exposes its own enable/disable switch so you can manage wallet and card availability separately.</p>
           <ul class="bodyList">
             <li><strong>Independent module.</strong> Appears as its own payment method in the admin and storefront.</li>
             <li><strong>Cards only.</strong> Displays card fields without a PayPal wallet button and honors vault/3D Secure settings.</li>
@@ -226,21 +226,21 @@
           </ul>
           <h5>Install and configure</h5>
           <ol>
-            <li>Confirm the primary <code>paypalr</code> module is installed with valid REST credentials.</li>
+            <li>Confirm the primary <code>paypalac</code> module is installed with valid API credentials.</li>
             <li>Go to <strong>Modules &rarr; Payment</strong>, select <strong>PayPal Credit Cards</strong>, and click <strong>Install</strong>.</li>
             <li>Enable the module, set its sort order, and optionally scope it to a geographic zone. The module reads the parent API settings automatically.</li>
           </ol>
           <h5>Recommended pairings</h5>
           <ul class="bodyList">
-            <li><strong>Wallet + cards:</strong> Enable both modules and set <strong>Accept Credit Cards?</strong> to <code>false</code> in <code>paypalr</code> so the wallet button and card form are distinct.</li>
-            <li><strong>Cards only:</strong> Enable <code>paypalr_creditcard</code> and disable <code>paypalr</code> if you want a traditional card-only checkout.</li>
-            <li><strong>Original combined flow:</strong> Disable <code>paypalr_creditcard</code> and leave credit cards enabled inside <code>paypalr</code>.</li>
+            <li><strong>Wallet + cards:</strong> Enable both modules and set <strong>Accept Credit Cards?</strong> to <code>false</code> in <code>paypalac</code> so the wallet button and card form are distinct.</li>
+            <li><strong>Cards only:</strong> Enable <code>paypalac_creditcard</code> and disable <code>paypalac</code> if you want a traditional card-only checkout.</li>
+            <li><strong>Original combined flow:</strong> Disable <code>paypalac_creditcard</code> and leave credit cards enabled inside <code>paypalac</code>.</li>
           </ul>
           <h5>Common issues</h5>
           <ul class="bodyList">
-            <li><strong>Module missing:</strong> Install and configure the parent <code>paypalr</code> module first so the shared configuration keys exist.</li>
+            <li><strong>Module missing:</strong> Install and configure the parent <code>paypalac</code> module first so the shared configuration keys exist.</li>
             <li><strong>Fields not rendering:</strong> Verify SSL is active, card types are enabled in <strong>Configuration &rarr; Credit Cards</strong>, and the parent module has valid credentials.</li>
-            <li><strong>Vault not available:</strong> Set <code>MODULE_PAYMENT_PAYPALR_ENABLE_VAULT</code> to <code>True</code> in the parent module to allow saved cards.</li>
+            <li><strong>Vault not available:</strong> Set <code>MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT</code> to <code>True</code> in the parent module to allow saved cards.</li>
           </ul>
           <h4>Content Security Policy (CSP) support</h4>
           <p class="bodyText">When Zen Cart defines <code>$GLOBALS['CSP_NONCE']</code>, PayPal Advanced Checkout automatically appends the nonce to its SDK tag, inline helpers, and the wallet-specific JavaScript files so pages stay compliant with strict <code>script-src</code> rules.</p>
@@ -255,10 +255,10 @@
             <li>Apply the nonce to any other inline scripts you render: <code>&lt;script nonce="&lt;?= htmlspecialchars($GLOBALS['CSP_NONCE'], ENT_QUOTES, 'UTF-8') ?&gt;"&gt;...&lt;/script&gt;</code>.</li>
           </ol>
           <h4>Pay Later payment module</h4>
-          <p class="bodyText">The <strong>PayPal Pay Later</strong> payment module (<code>paypalr_paylater</code>) provides a dedicated checkout option for customers who want to use PayPal&rsquo;s financing options. When enabled, customers see a &ldquo;Pay Later&rdquo; button on the checkout payment page that launches directly into PayPal&rsquo;s Pay Later flow.</p>
+          <p class="bodyText">The <strong>PayPal Pay Later</strong> payment module (<code>paypalac_paylater</code>) provides a dedicated checkout option for customers who want to use PayPal&rsquo;s financing options. When enabled, customers see a &ldquo;Pay Later&rdquo; button on the checkout payment page that launches directly into PayPal&rsquo;s Pay Later flow.</p>
           <h5>Install and configure</h5>
           <ol>
-            <li>Confirm the primary <code>paypalr</code> module is installed with valid REST credentials.</li>
+            <li>Confirm the primary <code>paypalac</code> module is installed with valid API credentials.</li>
             <li>Go to <strong>Modules &rarr; Payment</strong>, select <strong>PayPal Pay Later</strong>, and click <strong>Install</strong>.</li>
             <li>Enable the module and set its sort order. The module reads the parent API settings automatically.</li>
             <li>Configure the <strong>PayLater Messaging</strong> setting to control where promotional messaging appears on your storefront.</li>
@@ -343,32 +343,32 @@ class zcObserverMyPaylaterCustomizer extends base
             </li>
             <li>
               <h4 class="step-title">Leverage vaulted cards</h4>
-              <p>When customers opt to save their cards, retrieve the vault token using <code>paypalr::getVaultedCardsForCustomer()</code> or <code>PayPalRestful\Common\VaultManager::getCustomerVaultedCards()</code> and submit subsequent captures through <code>PayPalRestful\Api\PayPalRestfulApi</code>.</p>
+              <p>When customers opt to save their cards, retrieve the vault token using <code>paypalac::getVaultedCardsForCustomer()</code> or <code>PayPalAdvancedCheckout\Common\VaultManager::getCustomerVaultedCards()</code> and submit subsequent captures through <code>PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi</code>.</p>
             </li>
           </ol>
           <h4>Card vaulting behavior</h4>
           <p class="bodyText"><strong>All card payments are automatically vaulted with PayPal for security and recurring billing support.</strong> The module controls card visibility separately through a <code>visible</code> flag in the vault table:</p>
           <ul class="bodyList">
-            <li><strong>Visible cards</strong> (<code>visible = 1</code>): Customer explicitly checked &ldquo;Save this card for future checkouts&rdquo; during checkout. These cards appear in the checkout payment selection page (when <code>MODULE_PAYMENT_PAYPALR_ENABLE_VAULT</code> is enabled) and the <code>account_saved_credit_cards</code> page for customer management.</li>
+            <li><strong>Visible cards</strong> (<code>visible = 1</code>): Customer explicitly checked &ldquo;Save this card for future checkouts&rdquo; during checkout. These cards appear in the checkout payment selection page (when <code>MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT</code> is enabled) and the <code>account_saved_credit_cards</code> page for customer management.</li>
             <li><strong>Hidden cards</strong> (<code>visible = 0</code>): Customer did not check the save checkbox, but the card is still vaulted for PCI compliance and security best practices, recurring billing and subscription processing, and merchant-initiated transactions (when using <code>$activeOnly = false</code>).</li>
           </ul>
-          <p class="bodyText">When a customer pays by card, PayPal returns a <code>payment_source.card</code> element that includes the vaulted token. The module saves that response in the vault table via <code>PayPalRestful\Common\VaultManager::saveVaultedCard</code> and raises the <code>NOTIFY_PAYPALR_VAULT_CARD_SAVED</code> observer event so other plugins can react to the new or updated token.</p>
+          <p class="bodyText">When a customer pays by card, PayPal returns a <code>payment_source.card</code> element that includes the vaulted token. The module saves that response in the vault table via <code>PayPalAdvancedCheckout\Common\VaultManager::saveVaultedCard</code> and raises the <code>NOTIFY_PAYPALAC_VAULT_CARD_SAVED</code> observer event so other plugins can react to the new or updated token.</p>
           <h5>Charging vaulted cards from custom code</h5>
           <p class="bodyText">Third-party integrations can use the stored information to perform subsequent charges (for example, recurring subscriptions) without asking the customer to re-enter their card details:</p>
           <ol>
             <li><strong>Include the payment module&rsquo;s autoloader</strong> before referencing any of its classes:
               <pre class="sh_php" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/pprAutoload.php';</code></pre>
             </li>
-            <li><strong>Retrieve the customer&rsquo;s vaulted cards.</strong> The helper <code>paypalr::getVaultedCardsForCustomer($customers_id, $activeOnly = true)</code> returns an array of normalized records (vault identifier, status, masked digits, expiry, billing address, and the original <code>payment_source.card</code> payload).
+            <li><strong>Retrieve the customer&rsquo;s vaulted cards.</strong> The helper <code>paypalac::getVaultedCardsForCustomer($customers_id, $activeOnly = true)</code> returns an array of normalized records (vault identifier, status, masked digits, expiry, billing address, and the original <code>payment_source.card</code> payload).
               <ul>
                 <li>Use <code>$activeOnly = true</code> (default) to get only visible cards for checkout display.</li>
                 <li>Use <code>$activeOnly = false</code> to get all cards (visible and hidden) for merchant-initiated billing.</li>
               </ul>
-              You can also call <code>PayPalRestful\Common\VaultManager::getCustomerVaultedCards</code> directly if you prefer.
+              You can also call <code>PayPalAdvancedCheckout\Common\VaultManager::getCustomerVaultedCards</code> directly if you prefer.
             </li>
-            <li><strong>Build a new PayPal order with the vaulted instrument.</strong> Instantiate <code>PayPalRestful\Api\PayPalRestfulApi</code> using the environment credentials returned by <code>paypalr::getEnvironmentInfo()</code>, create an order payload that references the stored <code>vault_id</code>, and then authorize or capture the order. A minimal example that immediately captures a payment:
-              <pre class="sh_php" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>[$clientId, $clientSecret] = paypalr::getEnvironmentInfo();
-$api = new \PayPalRestful\Api\PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $clientId, $clientSecret);
+            <li><strong>Build a new PayPal order with the vaulted instrument.</strong> Instantiate <code>PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi</code> using the environment credentials returned by <code>paypalac::getEnvironmentInfo()</code>, create an order payload that references the stored <code>vault_id</code>, and then authorize or capture the order. A minimal example that immediately captures a payment:
+              <pre class="sh_php" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>[$clientId, $clientSecret] = paypalac::getEnvironmentInfo();
+$api = new \PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER, $clientId, $clientSecret);
 
 $card = $vaultCards[0]; // Result from step 2
 
@@ -406,11 +406,11 @@ $captureResponse = $api-&gt;captureOrder($createResponse['id']);</code></pre>
           <h4>Integrated Sign-Up (ISU)</h4>
           <p class="bodyText">Launch the <strong>Complete PayPal setup</strong> button on the Payment Modules page to onboard merchants directly with PayPal. The portal returns credentials to the administrator and records whether the process completed or was cancelled.</p>
           <h4>Recurring products and subscriptions</h4>
-          <p class="bodyText">PayPal Advanced Checkout does not create subscription catalog entries inside Zen Cart automatically, but it exposes the PayPal Billing Plans and Subscriptions REST endpoints so you can build recurring offers without leaving the storefront. The helper lives in <code>PayPalRestful\Api\PayPalRestfulApi</code> and supports plan creation, activation, subscription lifecycle management, and cancellations via dedicated methods.</p>
+          <p class="bodyText">PayPal Advanced Checkout does not create subscription catalog entries inside Zen Cart automatically, but it exposes the PayPal Billing Plans and Subscriptions REST endpoints so you can build recurring offers without leaving the storefront. The helper lives in <code>PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi</code> and supports plan creation, activation, subscription lifecycle management, and cancellations via dedicated methods.</p>
           <ol class="steps">
             <li>
               <h4 class="step-title">Create a billing product and plan</h4>
-              <p>Use the PayPal developer dashboard or a short script that calls <code>$api-&gt;createPlan()</code> to define pricing, billing cycles, and trial periods. The API class requires the same credentials retrieved via <code>paypalr::getEnvironmentInfo()</code>, so you can reuse the bootstrap code from the vaulted-card example above. Activate the plan with <code>$api-&gt;activatePlan($planId)</code> once PayPal returns the identifier.</p>
+              <p>Use the PayPal developer dashboard or a short script that calls <code>$api-&gt;createPlan()</code> to define pricing, billing cycles, and trial periods. The API class requires the same credentials retrieved via <code>paypalac::getEnvironmentInfo()</code>, so you can reuse the bootstrap code from the vaulted-card example above. Activate the plan with <code>$api-&gt;activatePlan($planId)</code> once PayPal returns the identifier.</p>
             </li>
             <li>
               <h4 class="step-title">Map plans to Zen Cart products</h4>
@@ -418,7 +418,7 @@ $captureResponse = $api-&gt;captureOrder($createResponse['id']);</code></pre>
             </li>
             <li>
               <h4 class="step-title">Launch the subscription sign-up</h4>
-              <p>When the customer checks out, detect the subscription product in your cart observer, instantiate <code>PayPalRestfulApi</code>, and call <code>$api-&gt;createSubscription()</code> with the plan ID, subscriber details, and <code>application_context</code> return URLs that point to a dedicated confirmation page. Redirect the customer to the approval link PayPal returns so they can accept the billing agreement.</p>
+              <p>When the customer checks out, detect the subscription product in your cart observer, instantiate <code>PayPalAdvancedCheckoutApi</code>, and call <code>$api-&gt;createSubscription()</code> with the plan ID, subscriber details, and <code>application_context</code> return URLs that point to a dedicated confirmation page. Redirect the customer to the approval link PayPal returns so they can accept the billing agreement.</p>
             </li>
             <li>
               <h4 class="step-title">Handle webhooks and order fulfillment</h4>
@@ -497,7 +497,7 @@ $captureResponse = $api-&gt;captureOrder($createResponse['id']);</code></pre>
           <p class="bodyText">Fold these recurring tasks into your runbook to keep the integration healthy.</p>
           <ul class="bodyList">
             <li><strong>Webhooks:</strong> Configure PayPal webhooks to notify your store of disputes, subscription updates, and risk events. Extend the bundled listeners if you need to trigger custom workflows.</li>
-            <li><strong>Logging:</strong> Review <code>/logs/paypalr/</code> for API failures or timeouts and rotate logs regularly, especially on shared hosting.</li>
+            <li><strong>Logging:</strong> Review <code>/logs/paypalac/</code> for API failures or timeouts and rotate logs regularly, especially on shared hosting.</li>
             <li><strong>Credentials:</strong> Rotate your PayPal client secrets periodically, then rerun sandbox smoke tests before resuming live traffic.</li>
             <li><strong>Extensions:</strong> Consult the project wiki for recipes that automate vaulted card captures, payment retries, or ERP integrations.</li>
           </ul>

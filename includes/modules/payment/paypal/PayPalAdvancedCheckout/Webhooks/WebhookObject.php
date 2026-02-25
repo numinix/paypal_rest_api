@@ -1,6 +1,6 @@
 <?php
 /**
- * PayPal REST API Webhook Object
+ * PayPal Advanced Checkout Webhook Object
  * This class is just a model to hold all the content of the incoming webhook data
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team

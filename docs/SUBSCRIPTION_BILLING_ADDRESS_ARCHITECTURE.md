@@ -80,7 +80,7 @@ Future payments use updated address
 
 ## Implementation Details
 
-### 1. Subscription Creation (auto.paypalrestful_recurring.php)
+### 1. Subscription Creation (auto.paypalacestful_recurring.php)
 
 **What Changed:**
 ```php
@@ -274,15 +274,15 @@ All new subscriptions created after this change:
 
 ### Automatic Module Upgrade (v1.3.9)
 
-The database changes are integrated into the PayPal REST API module's upgrade mechanism:
+The database changes are integrated into the PayPal Advanced Checkout module's upgrade mechanism:
 
-**File:** `includes/modules/payment/paypalr.php`
+**File:** `includes/modules/payment/paypalac.php`
 - Module version bumped from 1.3.8 to **1.3.9**
 - Upgrade code in `tableCheckup()` method
 - Executes automatically when admin accesses any page after code deployment
 
 **Upgrade Process:**
-1. Module detects `MODULE_PAYMENT_PAYPALR_VERSION` < `1.3.9`
+1. Module detects `MODULE_PAYMENT_PAYPALAC_VERSION` < `1.3.9`
 2. Checks if columns already exist (idempotent)
 3. Adds billing address and shipping columns
 4. Updates module version to 1.3.9
@@ -347,7 +347,7 @@ If needed, add similar fields for shipping:
 
 1. `docs/upgrade_add_subscription_billing_addresses.sql` - SQL upgrade script
 2. `admin/includes/init_includes/init_subscription_billing_address_upgrade.php` - PHP init script
-3. `includes/classes/observers/auto.paypalrestful_recurring.php` - Extract & pass billing address
+3. `includes/classes/observers/auto.paypalacestful_recurring.php` - Extract & pass billing address
 4. `includes/classes/paypalSavedCardRecurring.php` - Store & use billing address
 
 ## Summary

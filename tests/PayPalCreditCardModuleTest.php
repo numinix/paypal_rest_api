@@ -152,7 +152,7 @@ namespace PayPalCreditCardModuleTest {
             $this->assertStringContainsString('PayPal Credit Cards', $module->title);
         }
 
-        public function testModuleExtendsPayPalr(): void
+        public function testModuleExtendsPayPalac(): void
         {
             $module = new \paypalac_creditcard();
             

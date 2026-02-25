@@ -1,6 +1,6 @@
 <?php
 /**
- * Test: PayPalr process_button_ajax Return Type
+ * Test: PayPalac process_button_ajax Return Type
  *
  * This test validates that the paypalac module's process_button_ajax method
  * returns an array instead of false when payment source is not 'card'.
@@ -27,7 +27,7 @@
 echo "Testing paypalac::process_button_ajax() return type fix...\n\n";
 
 // Test that the method now returns an array instead of false for non-card payment sources
-class PaypalrProcessButtonAjaxReturnTypeTest
+class PaypalacProcessButtonAjaxReturnTypeTest
 {
     private string $paypalacFile;
     
@@ -36,7 +36,7 @@ class PaypalrProcessButtonAjaxReturnTypeTest
         $this->paypalacFile = dirname(__DIR__) . '/includes/modules/payment/paypalac.php';
         
         if (!file_exists($this->paypalacFile)) {
-            throw new RuntimeException("PayPalr file not found: {$this->paypalacFile}");
+            throw new RuntimeException("PayPalac file not found: {$this->paypalacFile}");
         }
     }
     
@@ -100,7 +100,7 @@ class PaypalrProcessButtonAjaxReturnTypeTest
         
         if ($venmoReturnsArray && $paylaterReturnsArray) {
             echo "  ✓ Venmo and PayLater modules consistently return empty array []\n";
-            echo "  ✓ PayPalr module now matches this pattern for non-card payment sources\n";
+            echo "  ✓ PayPalac module now matches this pattern for non-card payment sources\n";
         } else {
             echo "  ⚠ Warning: Could not verify consistency with other modules\n";
         }
@@ -108,7 +108,7 @@ class PaypalrProcessButtonAjaxReturnTypeTest
 }
 
 try {
-    $test = new PaypalrProcessButtonAjaxReturnTypeTest();
+    $test = new PaypalacProcessButtonAjaxReturnTypeTest();
     $test->run();
     echo "\n✅ All tests passed!\n";
     echo "   - process_button_ajax now returns array instead of false\n";

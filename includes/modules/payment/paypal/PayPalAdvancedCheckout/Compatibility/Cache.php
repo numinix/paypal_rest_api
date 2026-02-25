@@ -3,7 +3,7 @@
  * Minimal cache compatibility class.
  */
 
-if (class_exists('PayPalRestCache', false)) {
+if (class_exists('PayPalacCache', false)) {
     return;
 }
 
@@ -11,7 +11,7 @@ if (class_exists('PayPalRestCache', false)) {
  * Lightweight cache implementation used when the Zen Cart core cache class
  * is not available.
  */
-class PayPalRestCache
+class PayPalacCache
 {
     /** @var array<string, mixed> */
     protected $storage = [];

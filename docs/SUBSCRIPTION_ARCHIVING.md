@@ -8,7 +8,7 @@ This document describes the subscription archiving feature added to the PayPal A
 
 ### 1. Database Schema Updates
 
-**File:** `includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php`
+**File:** `includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php`
 
 - Added `is_archived` column to the `paypal_subscriptions` table
   - Type: `TINYINT(1) NOT NULL DEFAULT 0`
@@ -19,7 +19,7 @@ The schema is automatically updated when the subscription manager is initialized
 
 ### 2. Archive/Unarchive Actions
 
-**File:** `admin/paypalr_subscriptions.php`
+**File:** `admin/paypalac_subscriptions.php`
 
 Added two new actions:
 
@@ -83,7 +83,7 @@ This ensures quick status buttons work reliably for all subscriptions, including
 
 ### Archiving a Subscription
 
-1. Navigate to **Admin → Catalog → PayPal Subscriptions** (paypalr_subscriptions.php)
+1. Navigate to **Admin → Catalog → PayPal Subscriptions** (paypalac_subscriptions.php)
 2. Find the subscription you want to archive
 3. Click the "Archive" button in the Status & Actions column
 4. Confirm the action in the dialog

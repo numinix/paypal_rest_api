@@ -23,7 +23,7 @@ This PR addresses critical issues with PayPal saved card subscriptions by adding
 
 ### 1. Database Schema Updates
 
-**File**: `includes/modules/payment/paypal/PayPalRestful/Common/SavedCreditCardsManager.php`
+**File**: `includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SavedCreditCardsManager.php`
 
 Added 11 new columns to the `saved_credit_cards_recurring` table via `ensureLegacyColumns()`:
 
@@ -46,7 +46,7 @@ These columns are automatically added when the module is loaded (no manual SQL e
 
 ### 2. Admin UI Updates
 
-**File**: `admin/paypalr_subscriptions.php`
+**File**: `admin/paypalac_subscriptions.php`
 
 Added comprehensive UI for managing subscription addresses:
 
@@ -69,7 +69,7 @@ Added comprehensive UI for managing subscription addresses:
 
 ### 3. Backend Updates
 
-**File**: `admin/paypalr_subscriptions.php`
+**File**: `admin/paypalac_subscriptions.php`
 
 Updated the `update_subscription` action handler to:
 - Accept billing address fields from POST data
@@ -86,7 +86,7 @@ Updated `update_payment_info()` method to:
 
 ### 4. Data Capture on Subscription Creation
 
-**File**: `includes/classes/observers/auto.paypalrestful_recurring.php`
+**File**: `includes/classes/observers/auto.paypalacestful_recurring.php`
 
 Already captures billing and shipping data from orders:
 - Extracts billing address from orders table
@@ -180,8 +180,8 @@ Expected output:
 
 ## Files Changed
 
-1. `includes/modules/payment/paypal/PayPalRestful/Common/SavedCreditCardsManager.php` - Schema management
-2. `admin/paypalr_subscriptions.php` - Admin UI and handlers
+1. `includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SavedCreditCardsManager.php` - Schema management
+2. `admin/paypalac_subscriptions.php` - Admin UI and handlers
 3. `includes/classes/paypalSavedCardRecurring.php` - Backend update support
 4. `docs/upgrade_add_subscription_billing_addresses.sql` - Manual SQL script (updated)
 5. `tests/SavedCreditCardsRecurringBillingAddressTest.php` - Test coverage (new)

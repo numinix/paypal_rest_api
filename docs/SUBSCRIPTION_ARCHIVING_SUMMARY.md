@@ -60,7 +60,7 @@ Added to the `paypal_subscriptions` table:
 
 Schema updates automatically on first page load after upgrade.
 
-#### 2. Archive/Unarchive Actions (paypalr_subscriptions.php)
+#### 2. Archive/Unarchive Actions (paypalac_subscriptions.php)
 
 **Archive Action:**
 - URL: `?action=archive_subscription&subscription_id={id}`
@@ -130,7 +130,7 @@ This means:
 ## Files Modified
 
 ### 1. SubscriptionManager.php
-**Path:** `includes/modules/payment/paypal/PayPalRestful/Common/SubscriptionManager.php`
+**Path:** `includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php`
 
 **Changes:**
 - Added `is_archived` column to schema
@@ -138,8 +138,8 @@ This means:
 
 **Lines:** 85 (column), 98 (index)
 
-### 2. paypalr_subscriptions.php  
-**Path:** `admin/paypalr_subscriptions.php`
+### 2. paypalac_subscriptions.php  
+**Path:** `admin/paypalac_subscriptions.php`
 
 **Changes:**
 - Fixed quick status button handling (lines 151-168)

@@ -177,7 +177,7 @@ All existing vault tests continue to pass:
 
 1. **Set up a recurring subscription** with a saved credit card
 2. **Wait for the scheduled payment date** or trigger the cron job manually
-3. **Check the PayPal REST API logs** for the createOrder request:
+3. **Check the PayPal Advanced Checkout logs** for the createOrder request:
    ```
    PayPal REST cardPayload: {"vault_id":"...","stored_credential":{...}}
    ```
@@ -233,7 +233,7 @@ The curlPost (v2/checkout/orders) request was successful (201).
 - `includes/classes/paypalSavedCardRecurring.php` - Main fix (lines 401-422)
 - `tests/RecurringVaultPaymentSourceTest.php` - Test coverage for the fix
 - `tests/CreatePayPalOrderRequestVaultTest.php` - Related vault handling tests
-- `includes/modules/payment/paypal/PayPalRestful/Zc2Pp/CreatePayPalOrderRequest.php` - Correctly handles vault in regular checkouts
+- `includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/CreatePayPalOrderRequest.php` - Correctly handles vault in regular checkouts
 
 ## PayPal API Documentation References
 

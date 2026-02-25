@@ -1,6 +1,6 @@
 <?php
 /**
- * PayPal REST API Webhook Controller
+ * PayPal Advanced Checkout Webhook Controller
  * This controller parses the incoming webhook and brokers the
  * necessary steps for validation and dispatching based on the
  * nature of the webhook content.

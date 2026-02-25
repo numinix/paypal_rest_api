@@ -118,7 +118,7 @@ Jan 31, 2026:
 
 The PayPal REST client already had infrastructure for this:
 
-**File:** `includes/modules/payment/paypal/PayPalRestful/Api/PayPalRestfulApi.php`
+**File:** `includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php`
 
 ```php
 // Property (line 138)
@@ -191,7 +191,7 @@ This fix addresses a PayPal API requirement that appears to be:
 ## Related Files
 
 - `includes/classes/paypalSavedCardRecurring.php` - Request ID generation
-- `includes/modules/payment/paypal/PayPalRestful/Api/PayPalRestfulApi.php` - Header handling infrastructure
+- `includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php` - Header handling infrastructure
 - `tests/PayPalRequestIdTest.php` - Test coverage
 - `docs/PAYPAL_REQUEST_ID_FIX.md` - This documentation
 

@@ -106,7 +106,7 @@ namespace PayPalAdvancedCheckout\Zc2Pp {
 namespace {
     require_once dirname(__DIR__) . '/includes/modules/payment/paypalac.php';
 
-    class PaypalrTestDouble extends \paypalac
+    class PaypalacTestDouble extends \paypalac
     {
         public function __construct()
         {
@@ -146,7 +146,7 @@ namespace {
         ],
     ];
 
-    $tester = new PaypalrTestDouble();
+    $tester = new PaypalacTestDouble();
     $failures = 0;
 
     foreach ($tests as $description => $test) {

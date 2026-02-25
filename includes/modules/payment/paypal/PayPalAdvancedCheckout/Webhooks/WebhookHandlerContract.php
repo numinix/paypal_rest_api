@@ -1,6 +1,6 @@
 <?php
 /**
- * PayPal REST API Webhook Contract
+ * PayPal Advanced Checkout Webhook Contract
  * This abstract class is the base for all configured webhook handler classes.
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team

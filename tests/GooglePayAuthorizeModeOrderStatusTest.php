@@ -51,7 +51,7 @@ class GooglePayAuthorizeModeOrderStatusTest
         echo "\n=== Google Pay Authorize Mode Order Status Test ===\n\n";
         
         $this->testConstructorChecksTransactionMode();
-        $this->testConstructorLogicMatchesPaypalr();
+        $this->testConstructorLogicMatchesPaypalac();
         $this->testBeforeProcessHandlesCreatedStatus();
         $this->testBeforeProcessHandlesCapturedStatus();
         $this->testBeforeProcessHandlesPendingStatus();
@@ -102,7 +102,7 @@ class GooglePayAuthorizeModeOrderStatusTest
     /**
      * Test that constructor logic matches the main paypalac module
      */
-    private function testConstructorLogicMatchesPaypalr(): void
+    private function testConstructorLogicMatchesPaypalac(): void
     {
         echo "Test 2: Constructor logic matches main paypalac module...\n";
         

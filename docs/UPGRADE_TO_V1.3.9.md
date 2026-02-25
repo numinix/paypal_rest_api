@@ -1,4 +1,4 @@
-# PayPal REST API Module - Upgrade to v1.3.9
+# PayPal Advanced Checkout Module - Upgrade to v1.3.9
 
 ## Overview
 
@@ -47,7 +47,7 @@ New columns in `saved_credit_cards_recurring` table:
 The upgrade happens automatically when any admin accesses an admin page after code deployment:
 
 1. **Detection:**
-   - Module checks `MODULE_PAYMENT_PAYPALR_VERSION`
+   - Module checks `MODULE_PAYMENT_PAYPALAC_VERSION`
    - If < 1.3.9, upgrade is triggered
 
 2. **Execution:**
@@ -110,7 +110,7 @@ Expected: 11 new columns (9 billing + 2 shipping)
 
 ### View Subscription Details
 
-In admin > Modules > Payment > PayPal REST API > Subscriptions:
+In admin > Modules > Payment > PayPal Advanced Checkout > Subscriptions:
 1. Click "Details" button for any subscription
 2. Expandable section shows:
    - Billing address (formatted)
@@ -136,12 +136,12 @@ For **scheduled** subscriptions:
 ### Files Modified
 
 **Core Module:**
-- `includes/modules/payment/paypalr.php`
+- `includes/modules/payment/paypalac.php`
   - Version bumped to 1.3.9
   - Added upgrade case in tableCheckup()
 
 **Subscription Creation:**
-- `includes/classes/observers/auto.paypalrestful_recurring.php`
+- `includes/classes/observers/auto.paypalacestful_recurring.php`
   - Extract billing address from order
   - Extract shipping info from order
   - Store with subscription
@@ -153,7 +153,7 @@ For **scheduled** subscriptions:
   - Support address updates
 
 **Admin Interface:**
-- `admin/paypalr_saved_card_recurring.php`
+- `admin/paypalac_saved_card_recurring.php`
   - Display billing address
   - Edit form for address updates
   - Display shipping information
@@ -174,7 +174,7 @@ For **scheduled** subscriptions:
 2. Access admin page
 3. Verify upgrade executed (check logs)
 4. Verify columns exist in database
-5. Verify `MODULE_PAYMENT_PAYPALR_VERSION` = '1.3.9'
+5. Verify `MODULE_PAYMENT_PAYPALAC_VERSION` = '1.3.9'
 
 ### Test Subscription Creation
 
@@ -211,7 +211,7 @@ For **scheduled** subscriptions:
 **Check:**
 - Is code deployed?
 - Access admin page to trigger
-- Check `MODULE_PAYMENT_PAYPALR_VERSION` in database
+- Check `MODULE_PAYMENT_PAYPALAC_VERSION` in database
 - Check error logs
 
 **Solution:**
@@ -281,7 +281,7 @@ If issues occur:
    ```sql
    UPDATE configuration 
    SET configuration_value = '1.3.8' 
-   WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_VERSION';
+   WHERE configuration_key = 'MODULE_PAYMENT_PAYPALAC_VERSION';
    ```
 
 ## Support

@@ -1,7 +1,7 @@
 # Admin Page Registration for PayPal Subscription Pages
 
 ## Issue
-The PayPal subscription admin pages (`paypalr_subscriptions.php`, `paypalr_saved_card_recurring.php`, `paypalr_subscriptions_report.php`) existed but were not registered in the Zen Cart admin menu system, making them inaccessible to merchants.
+The PayPal subscription admin pages (`paypalac_subscriptions.php`, `paypalac_saved_card_recurring.php`, `paypalac_subscriptions_report.php`) existed but were not registered in the Zen Cart admin menu system, making them inaccessible to merchants.
 
 ## Solution
 Created a single Zen Cart installer file to register all subscription-related admin pages in the admin menu.
@@ -16,35 +16,35 @@ This single installer registers all three subscription pages:
 
 1. **Vaulted Subscriptions**
    - Menu location: Customers > Vaulted Subscriptions
-   - Page key: `paypalrSubscriptions`
+   - Page key: `paypalacSubscriptions`
    - Sort order: 10
 
 2. **Saved Card Subscriptions**
    - Menu location: Customers > Saved Card Subscriptions
-   - Page key: `paypalrSavedCardRecurring`
+   - Page key: `paypalacSavedCardRecurring`
    - Sort order: 11
 
 3. **Active Subscriptions Report**
    - Menu location: Reports > Active Subscriptions Report
-   - Page key: `paypalrSubscriptionsReport`
+   - Page key: `paypalacSubscriptionsReport`
    - Sort order: 100
 
 ### Language Definitions
 
 Language definitions are split between two admin-wide loading directories as per Zen Cart conventions:
 
-**`admin/includes/extra_datafiles/paypalr_filenames.php`** - Filename constants
+**`admin/includes/extra_datafiles/paypalac_filenames.php`** - Filename constants
 ```php
-define('FILENAME_PAYPALR_SUBSCRIPTIONS', 'paypalr_subscriptions');
-define('FILENAME_PAYPALR_SAVED_CARD_RECURRING', 'paypalr_saved_card_recurring');
-define('FILENAME_PAYPALR_SUBSCRIPTIONS_REPORT', 'paypalr_subscriptions_report');
+define('FILENAME_PAYPALAC_SUBSCRIPTIONS', 'paypalac_subscriptions');
+define('FILENAME_PAYPALAC_SAVED_CARD_RECURRING', 'paypalac_saved_card_recurring');
+define('FILENAME_PAYPALAC_SUBSCRIPTIONS_REPORT', 'paypalac_subscriptions_report');
 ```
 
-**`admin/includes/languages/english/extra_definitions/paypalr_admin_names.php`** - Menu label constants
+**`admin/includes/languages/english/extra_definitions/paypalac_admin_names.php`** - Menu label constants
 ```php
-define('BOX_PAYPALR_SUBSCRIPTIONS', 'Vaulted Subscriptions');
-define('BOX_PAYPALR_SAVED_CARD_RECURRING', 'Saved Card Subscriptions');
-define('BOX_PAYPALR_SUBSCRIPTIONS_REPORT', 'Active Subscriptions Report');
+define('BOX_PAYPALAC_SUBSCRIPTIONS', 'Vaulted Subscriptions');
+define('BOX_PAYPALAC_SAVED_CARD_RECURRING', 'Saved Card Subscriptions');
+define('BOX_PAYPALAC_SUBSCRIPTIONS_REPORT', 'Active Subscriptions Report');
 ```
 
 These files are automatically loaded admin-wide by Zen Cart, ensuring the constants are available when the installer runs.
@@ -140,13 +140,13 @@ To test the registration:
 
 1. Clear any existing registrations (if testing in development):
    ```sql
-   DELETE FROM admin_pages WHERE page_key LIKE 'paypalr%';
+   DELETE FROM admin_pages WHERE page_key LIKE 'paypalac%';
    ```
 
 2. Access any of the subscription pages:
-   - `admin/paypalr_subscriptions.php`
-   - `admin/paypalr_saved_card_recurring.php`
-   - `admin/paypalr_subscriptions_report.php`
+   - `admin/paypalac_subscriptions.php`
+   - `admin/paypalac_saved_card_recurring.php`
+   - `admin/paypalac_subscriptions_report.php`
 
 3. Verify the pages appear in the correct menus:
    - Vaulted Subscriptions under Customers
@@ -157,7 +157,7 @@ To test the registration:
    ```sql
    SELECT page_key, menu_key, display_on_menu, sort_order 
    FROM admin_pages 
-   WHERE page_key LIKE 'paypalr%';
+   WHERE page_key LIKE 'paypalac%';
    ```
 
 ## Compatibility
@@ -173,7 +173,7 @@ If additional subscription pages are added in the future:
 
 1. Edit the installer: `admin/includes/installers/paypal_advanced_checkout/1_0_0.php`
 2. Add new registration block with unique page key
-3. Add language constant to: `admin/includes/languages/english/paypalr_subscriptions.php`
+3. Add language constant to: `admin/includes/languages/english/paypalac_subscriptions.php`
 4. Use appropriate menu_key ('customers', 'reports', etc.) and sort order
 
 ---

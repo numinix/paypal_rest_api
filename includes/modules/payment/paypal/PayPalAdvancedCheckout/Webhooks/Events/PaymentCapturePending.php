@@ -1,6 +1,6 @@
 <?php
 /**
- * PayPal REST API Webhooks
+ * PayPal Advanced Checkout Webhooks
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0

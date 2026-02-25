@@ -2,7 +2,7 @@
  * PayPal Google Pay Integration - Native Google Pay API
  *
  * This module implements native Google Pay integration using google.payments.api
- * to retrieve user email addresses, then processes payment through PayPal REST API.
+ * to retrieve user email addresses, then processes payment through the PayPal Advanced Checkout module.
  * Based on the Braintree reference implementation pattern.
  *
  * @copyright Copyright 2025 Zen Cart Development Team

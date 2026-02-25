@@ -1,6 +1,6 @@
 <?php
 /**
- * PayPal REST API Webhook Responder
+ * PayPal Advanced Checkout Webhook Responder
  * This class handles verifying the validity of an incoming webhook
  * to ensure that it is legitimate. It checks POST headers for relevance
  * and checks that the payload's CRC check passes validity with PayPal

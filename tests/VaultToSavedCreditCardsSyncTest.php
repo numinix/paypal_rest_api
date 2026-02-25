@@ -183,7 +183,7 @@ namespace {
             ];
 
             $class = new stdClass();
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
 
             // Verify that INSERT query was executed
             $insertExecuted = false;
@@ -231,7 +231,7 @@ namespace {
             ];
 
             $class = new stdClass();
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
 
             // Verify that SELECT query was executed but INSERT was NOT
             $selectExecuted = false;
@@ -264,7 +264,7 @@ namespace {
             ];
 
             $class = new stdClass();
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
+            $observer->updateNotifyPaypalacVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
 
             // Verify that no INSERT query was executed
             foreach ($this->db->queries as $query) {

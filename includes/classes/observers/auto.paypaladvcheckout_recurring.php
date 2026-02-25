@@ -379,7 +379,7 @@ class zcObserverPaypaladvcheckoutRecurring
      * @param string $eventID The event identifier
      * @param array $vaultRecord The saved vault record from VaultManager
      */
-    public function updateNotifyPaypalrVaultCardSaved(&$class, $eventID, $vaultRecord): void
+    public function updateNotifyPaypalacVaultCardSaved(&$class, $eventID, $vaultRecord): void
     {
         $this->log->write("==> Subscription Observer: NOTIFY_PAYPALAC_VAULT_CARD_SAVED fired.");
         

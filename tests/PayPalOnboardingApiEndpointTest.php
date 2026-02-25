@@ -33,7 +33,7 @@ namespace {
     /**
      * Test that verifies the API endpoint handles PayPal return redirects
      */
-    function testPayPalReturnRedirectHandling(): bool
+    function testPayPalacReturnRedirectHandling(): bool
     {
         $passed = true;
 
@@ -72,7 +72,7 @@ namespace {
     /**
      * Test that verifies the helper function for detecting PayPal returns exists
      */
-    function testPayPalReturnDetectionHelperExists(): bool
+    function testPayPalacReturnDetectionHelperExists(): bool
     {
         $passed = true;
 
@@ -260,7 +260,7 @@ namespace {
     $failures = 0;
 
     fwrite(STDOUT, "Test 1: Verifying API endpoint handles PayPal return redirects...\n");
-    if (testPayPalReturnRedirectHandling()) {
+    if (testPayPalacReturnRedirectHandling()) {
         fwrite(STDOUT, "  ✓ Test passed\n\n");
     } else {
         fwrite(STDERR, "  ✗ Test failed\n\n");
@@ -268,7 +268,7 @@ namespace {
     }
 
     fwrite(STDOUT, "Test 2: Verifying PayPal return detection helper exists...\n");
-    if (testPayPalReturnDetectionHelperExists()) {
+    if (testPayPalacReturnDetectionHelperExists()) {
         fwrite(STDOUT, "  ✓ Test passed\n\n");
     } else {
         fwrite(STDERR, "  ✗ Test failed\n\n");

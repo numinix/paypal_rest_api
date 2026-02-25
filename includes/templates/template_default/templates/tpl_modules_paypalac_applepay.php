@@ -4,7 +4,7 @@
  * Apple Pay button template for shopping cart page
  * 
  * Uses native ApplePaySession API to retrieve user email addresses,
- * then processes payment through PayPal REST API.
+ * then processes payment through the PayPal Advanced Checkout module.
  * Based on Braintree implementation pattern.
  */
     require_once(DIR_WS_LANGUAGES . $_SESSION['language'] . '/modules/payment/paypalac_applepay.php');

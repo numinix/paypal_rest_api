@@ -71,7 +71,7 @@ function getNewOrderStatus(string $paymentStatus): int
 /**
  * Simulates the paypalac.php order status logic (the reference implementation)
  */
-function getPaypalrOrderStatus(string $paymentStatus): int
+function getPaypalacOrderStatus(string $paymentStatus): int
 {
     // paypalac.php logic (now fixed):
     // if ($payment_status !== STATUS_CAPTURED)
@@ -99,7 +99,7 @@ foreach ($testCases as $testCase) {
     $description = $testCase['description'];
     
     $newStatus = getNewOrderStatus($status);
-    $paypalacStatus = getPaypalrOrderStatus($status);
+    $paypalacStatus = getPaypalacOrderStatus($status);
     
     if ($newStatus !== $paypalacStatus) {
         $testPassed = false;

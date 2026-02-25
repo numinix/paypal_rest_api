@@ -25,7 +25,7 @@ class SavedCreditCardsManager
      * - Fresh installations (runs as part of all upgrade cases in tableCheckup())
      * 
      * These tables are used by legacy admin pages (paypalac_saved_card_recurring.php)
-     * and older payment modules. For sites using the new PayPal REST API exclusively,
+     * and older payment modules. For sites using PayPal Advanced Checkout exclusively,
      * data is stored in paypal_vault and paypal_subscriptions tables instead.
      */
     public static function ensureSchema(): void
