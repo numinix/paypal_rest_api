@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * Test that validates the save card checkbox works correctly with both
- * field name prefixes (paypalac_ and ppr_) in different checkout flows.
+ * field name prefixes (paypalac_ and ppac_) in different checkout flows.
  */
 
 namespace {
@@ -92,16 +92,16 @@ namespace {
         $failures++;
     }
 
-    echo "\nTest 2: Confirmation flow (prefix=ppr) with save card checked...\n";
+    echo "\nTest 2: Confirmation flow (prefix=ppac) with save card checked...\n";
     
-    // Simulate confirmation POST data (field names have ppr_ prefix)
+    // Simulate confirmation POST data (field names have ppac_ prefix)
     $_POST = [
         'ppac_cc_owner' => 'John Doe',
         'ppac_cc_number' => '4111111111111111',
         'ppac_cc_expires_month' => '12',
         'ppac_cc_expires_year' => '2025',
         'ppac_cc_cvv' => '123',
-        'ppac_cc_save_card' => 'on',  // Checkbox checked (note: ppr_ prefix)
+        'ppac_cc_save_card' => 'on',  // Checkbox checked (note: ppac_ prefix)
         'ppac_saved_card' => 'new',
     ];
     // Session should still have save_card from pre-confirmation, but let's test fresh
@@ -110,7 +110,7 @@ namespace {
     ];
 
     // Simulate what validateCardInformation does
-    $postvar_prefix = 'ppr';  // Confirmation flow
+    $postvar_prefix = 'ppac';  // Confirmation flow
     $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
     $storeCard = $allowSaveCard && !empty($_POST[$postvar_prefix . '_cc_save_card']);
 

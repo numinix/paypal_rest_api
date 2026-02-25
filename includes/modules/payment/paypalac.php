@@ -3029,6 +3029,29 @@ class paypalac extends base
         );
 
         // -----
+        // Migrate configuration values from the old paypalr module if it was previously installed.
+        // This allows stores upgrading from paypalr to paypalac to keep their existing settings
+        // (credentials, order statuses, etc.) without having to reconfigure.
+        //
+        $old_config = $db->Execute(
+            "SELECT configuration_key, configuration_value
+               FROM " . TABLE_CONFIGURATION . "
+              WHERE configuration_key LIKE 'MODULE\_PAYMENT\_PAYPALR\_%'"
+        );
+        while (!$old_config->EOF) {
+            $old_key = $old_config->fields['configuration_key'];
+            $new_key = str_replace('MODULE_PAYMENT_PAYPALR_', 'MODULE_PAYMENT_PAYPALAC_', $old_key);
+            $old_value = $old_config->fields['configuration_value'];
+            $db->Execute(
+                "UPDATE " . TABLE_CONFIGURATION . "
+                    SET configuration_value = '" . zen_db_input($old_value) . "'
+                  WHERE configuration_key = '" . zen_db_input($new_key) . "'
+                  LIMIT 1"
+            );
+            $old_config->MoveNext();
+        }
+
+        // -----
         // Make any modifications to the 'paypal' table, if not already done.
 
         //

@@ -111,7 +111,7 @@ class GetPayPalOrderTransactions
             "SELECT *
                FROM " . TABLE_PAYPAL . "
               WHERE order_id = {$this->oID}
-                AND module_name = '{$this->moduleName}'
+                AND module_name IN ('{$this->moduleName}', 'paypalr')
               ORDER BY
                 CASE txn_type
                     WHEN 'CREATE' THEN -1
