@@ -2974,7 +2974,7 @@ class paypalac extends base
 
         $current_version = self::CURRENT_VERSION;
         $db->Execute(
-            "INSERT INTO " . TABLE_CONFIGURATION . "
+            "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
                 (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
              VALUES
                 ('Module Version', 'MODULE_PAYMENT_PAYPALAC_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
