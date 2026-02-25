@@ -1,15 +1,11 @@
 <?php
 /**
- * Remove Expired Cards Cron
+ * PayPal Advanced Checkout - Remove Expired Cards Cron
  * 
  * Marks expired saved credit cards as deleted in the database.
  * This cleanup script runs independently of subscription processing.
  * 
- * Compatible with all payment modules that use TABLE_SAVED_CREDIT_CARDS:
- * - paypalwpp.php (Website Payments Pro)
- * - paypaldp.php (Direct Payments)
- * - paypalac.php (REST API)
- * - payflow.php (Payflow)
+ * Handles both TABLE_SAVED_CREDIT_CARDS and TABLE_PAYPAL_VAULT entries.
  */
 
 require '../includes/configure.php';

@@ -607,10 +607,10 @@ Every file with `use PayPalRestful\...` must be updated to `use PayPalAdvancedCh
 
 ### 11.1 Files to Update
 
-- [ ] `cron/paypal_saved_card_recurring.php` — update all `paypalr` / `PayPalRestful` references
-- [ ] `cron/remove_expired_cards.php` — update all `paypalr` / `PayPalRestful` references
-- [ ] `cron/subscription_cancellations.php` — update all `paypalr` / `PayPalRestful` references
-- [ ] `cron/paypal_wpp_recurring_reminders.php` — update all `paypalr` / `PayPalRestful` references
+- [x] `cron/paypal_saved_card_recurring.php` → `cron/paypalac_saved_card_recurring.php` — renamed and updated
+- [x] `cron/remove_expired_cards.php` → `cron/paypalac_remove_expired_cards.php` — renamed and updated
+- [x] `cron/subscription_cancellations.php` → `cron/paypalac_subscription_cancellations.php` — renamed and updated
+- [x] `cron/paypal_wpp_recurring_reminders.php` → `cron/paypalac_recurring_reminders.php` — renamed, updated constants from `PAYPAL_WPP_RECURRING_*` to `PAYPALAC_RECURRING_*`
 
 ---
 

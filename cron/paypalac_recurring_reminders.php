@@ -1,15 +1,12 @@
 <?php
 /**
- * PayPal WPP Recurring Reminders Cron
+ * PayPal Advanced Checkout Recurring Reminders Cron
  * 
  * Sends renewal reminders, payment reminders, and expiration notices for subscriptions.
- * Supports both legacy PayPal recurring profiles and REST API subscriptions.
+ * Supports both legacy PayPal recurring profiles and PayPal Advanced Checkout subscriptions.
  * 
- * Compatible with:
- * - paypalwpp.php (Website Payments Pro)
- * - paypaldp.php (Direct Payments)
- * - paypalac.php (REST API)
- * - payflow.php (Payflow)
+ * Legacy WPP/Payflow recurring profiles are also processed if enabled, to support
+ * stores running both systems simultaneously during the transition period.
  */
 
 require '../includes/configure.php';
@@ -29,40 +26,40 @@ if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.p
 }
 
 // Define default configuration values if not set
-if (!defined('PAYPAL_WPP_RECURRING_RENEWAL_REMINDER')) {
-    define('PAYPAL_WPP_RECURRING_RENEWAL_REMINDER', 0);
+if (!defined('PAYPALAC_RECURRING_RENEWAL_REMINDER')) {
+    define('PAYPALAC_RECURRING_RENEWAL_REMINDER', 0);
 }
-if (!defined('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER')) {
-    define('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER', 0);
+if (!defined('PAYPALAC_RECURRING_PAYMENT_REMINDER')) {
+    define('PAYPALAC_RECURRING_PAYMENT_REMINDER', 0);
 }
 
 // Define email templates if not set
-if (!defined('PAYPAL_WPP_RECURRING_RENEWAL_REMINDER_EMAIL')) {
-    define('PAYPAL_WPP_RECURRING_RENEWAL_REMINDER_EMAIL', "Dear %s,\n\nThis is a reminder that your subscription for %s is set to expire in %d days on %s.\n\nTo renew your subscription, please visit: %s\n\nThank you for your business.");
+if (!defined('PAYPALAC_RECURRING_RENEWAL_REMINDER_EMAIL')) {
+    define('PAYPALAC_RECURRING_RENEWAL_REMINDER_EMAIL', "Dear %s,\n\nThis is a reminder that your subscription for %s is set to expire in %d days on %s.\n\nTo renew your subscription, please visit: %s\n\nThank you for your business.");
 }
-if (!defined('PAYPAL_WPP_RECURRING_RENEWAL_REMINDER_EMAIL_SUBJECT')) {
-    define('PAYPAL_WPP_RECURRING_RENEWAL_REMINDER_EMAIL_SUBJECT', 'Subscription Renewal Reminder - %s');
+if (!defined('PAYPALAC_RECURRING_RENEWAL_REMINDER_EMAIL_SUBJECT')) {
+    define('PAYPALAC_RECURRING_RENEWAL_REMINDER_EMAIL_SUBJECT', 'Subscription Renewal Reminder - %s');
 }
-if (!defined('PAYPAL_WPP_RECURRING_RENEWAL_REMINDER_EMAIL_INVALID_PRODUCT')) {
-    define('PAYPAL_WPP_RECURRING_RENEWAL_REMINDER_EMAIL_INVALID_PRODUCT', "Dear %s,\n\nThis is a reminder that your subscription is set to expire in %d days on %s.\n\nPlease contact us for renewal options.\n\nThank you for your business.");
+if (!defined('PAYPALAC_RECURRING_RENEWAL_REMINDER_EMAIL_INVALID_PRODUCT')) {
+    define('PAYPALAC_RECURRING_RENEWAL_REMINDER_EMAIL_INVALID_PRODUCT', "Dear %s,\n\nThis is a reminder that your subscription is set to expire in %d days on %s.\n\nPlease contact us for renewal options.\n\nThank you for your business.");
 }
-if (!defined('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL')) {
-    define('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL', "Dear %s,\n\nThis is a reminder that your subscription payment for %s will be processed in %d days on %s.\n\nTo view your subscription details, please visit: %s\n\nThank you for your business.");
+if (!defined('PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL')) {
+    define('PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL', "Dear %s,\n\nThis is a reminder that your subscription payment for %s will be processed in %d days on %s.\n\nTo view your subscription details, please visit: %s\n\nThank you for your business.");
 }
-if (!defined('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_SUBJECT')) {
-    define('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_SUBJECT', 'Upcoming Subscription Payment - %s');
+if (!defined('PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL_SUBJECT')) {
+    define('PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL_SUBJECT', 'Upcoming Subscription Payment - %s');
 }
-if (!defined('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_INVALID_PRODUCT')) {
-    define('PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_INVALID_PRODUCT', "Dear %s,\n\nThis is a reminder that your subscription payment will be processed in %d days on %s.\n\nPlease contact us for details.\n\nThank you for your business.");
+if (!defined('PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL_INVALID_PRODUCT')) {
+    define('PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL_INVALID_PRODUCT', "Dear %s,\n\nThis is a reminder that your subscription payment will be processed in %d days on %s.\n\nPlease contact us for details.\n\nThank you for your business.");
 }
-if (!defined('PAYPAL_WPP_RECURRING_EXPIRED_NOTICE')) {
-    define('PAYPAL_WPP_RECURRING_EXPIRED_NOTICE', "Dear %s,\n\nYour subscription for %s has expired today.\n\nTo renew your subscription, please visit: %s\n\nThank you for your business.");
+if (!defined('PAYPALAC_RECURRING_EXPIRED_NOTICE')) {
+    define('PAYPALAC_RECURRING_EXPIRED_NOTICE', "Dear %s,\n\nYour subscription for %s has expired today.\n\nTo renew your subscription, please visit: %s\n\nThank you for your business.");
 }
-if (!defined('PAYPAL_WPP_RECURRING_EXPIRED_NOTICE_EMAIL_SUBJECT')) {
-    define('PAYPAL_WPP_RECURRING_EXPIRED_NOTICE_EMAIL_SUBJECT', 'Subscription Expired - %s');
+if (!defined('PAYPALAC_RECURRING_EXPIRED_NOTICE_EMAIL_SUBJECT')) {
+    define('PAYPALAC_RECURRING_EXPIRED_NOTICE_EMAIL_SUBJECT', 'Subscription Expired - %s');
 }
-if (!defined('PAYPAL_WPP_RECURRING_EXPIRED_NOTICE_INVALID_PRODUCT')) {
-    define('PAYPAL_WPP_RECURRING_EXPIRED_NOTICE_INVALID_PRODUCT', "Dear %s,\n\nYour subscription has expired today.\n\nPlease contact us for renewal options.\n\nThank you for your business.");
+if (!defined('PAYPALAC_RECURRING_EXPIRED_NOTICE_INVALID_PRODUCT')) {
+    define('PAYPALAC_RECURRING_EXPIRED_NOTICE_INVALID_PRODUCT', "Dear %s,\n\nYour subscription has expired today.\n\nPlease contact us for renewal options.\n\nThank you for your business.");
 }
 
 $log = [];
@@ -137,10 +134,10 @@ if (defined('TABLE_PAYPAL_RECURRING')) {
             $normalizedStatus = strtoupper($currentStatus);
             
             // Renewal reminders
-            if (PAYPAL_WPP_RECURRING_RENEWAL_REMINDER > 0 && $normalizedStatus == 'ACTIVE') {
+            if (PAYPALAC_RECURRING_RENEWAL_REMINDER > 0 && $normalizedStatus == 'ACTIVE') {
                 $expiration_date = strtotime($subscription->fields['expiration_date']);
                 if ($subscription->fields['expiration_date'] > 0 && 
-                    (date('Y-m-d') == date('Y-m-d', strtotime('-' . (int)PAYPAL_WPP_RECURRING_RENEWAL_REMINDER . ' days', $expiration_date))) && 
+                    (date('Y-m-d') == date('Y-m-d', strtotime('-' . (int)PAYPALAC_RECURRING_RENEWAL_REMINDER . ' days', $expiration_date))) && 
                     $subscription->fields['reminded'] != date('Y-m-d')) {
                     
                     $customer = $db->Execute("SELECT customers_firstname, customers_lastname, customers_email_address FROM " . TABLE_CUSTOMERS . " WHERE customers_id = " . (int)$subscription->fields['customers_id'] . " LIMIT 1;");
@@ -148,23 +145,23 @@ if (defined('TABLE_PAYPAL_RECURRING')) {
                         $products_id = $subscription->fields['products_id'];
                         $products_name = zen_get_products_name($products_id);
                         if ($products_name) {
-                            $email_msg = sprintf(PAYPAL_WPP_RECURRING_RENEWAL_REMINDER_EMAIL, 
+                            $email_msg = sprintf(PAYPALAC_RECURRING_RENEWAL_REMINDER_EMAIL, 
                                 $customer->fields['customers_firstname'], 
                                 addslashes($products_name), 
-                                (int)PAYPAL_WPP_RECURRING_RENEWAL_REMINDER, 
+                                (int)PAYPALAC_RECURRING_RENEWAL_REMINDER, 
                                 $subscription->fields['expiration_date'], 
                                 zen_href_link(zen_get_info_page($products_id), 'products_id=' . $products_id));
                         } else {
-                            $email_msg = sprintf(PAYPAL_WPP_RECURRING_RENEWAL_REMINDER_EMAIL_INVALID_PRODUCT, 
+                            $email_msg = sprintf(PAYPALAC_RECURRING_RENEWAL_REMINDER_EMAIL_INVALID_PRODUCT, 
                                 $customer->fields['customers_firstname'], 
-                                (int)PAYPAL_WPP_RECURRING_RENEWAL_REMINDER, 
+                                (int)PAYPALAC_RECURRING_RENEWAL_REMINDER, 
                                 $subscription->fields['expiration_date']);
                         }
                         $html_msg['EMAIL_MESSAGE_HTML'] = nl2br($email_msg);
                         zen_mail(
                             $customer->fields['customers_firstname'] . ' ' . $customer->fields['customers_lastname'], 
                             $customer->fields['customers_email_address'], 
-                            sprintf(PAYPAL_WPP_RECURRING_RENEWAL_REMINDER_EMAIL_SUBJECT, $subscription->fields['profile_id']), 
+                            sprintf(PAYPALAC_RECURRING_RENEWAL_REMINDER_EMAIL_SUBJECT, $subscription->fields['profile_id']), 
                             $email_msg, 
                             STORE_NAME, 
                             EMAIL_FROM, 
@@ -179,7 +176,7 @@ if (defined('TABLE_PAYPAL_RECURRING')) {
             }
             
             // Payment reminders
-            if (PAYPAL_WPP_RECURRING_PAYMENT_REMINDER > 0 && $normalizedStatus == 'ACTIVE') {
+            if (PAYPALAC_RECURRING_PAYMENT_REMINDER > 0 && $normalizedStatus == 'ACTIVE') {
                 $nextBillingRaw = '';
                 if (isset($profile['NEXTBILLINGDATE'])) {
                     $nextBillingRaw = $profile['NEXTBILLINGDATE'];
@@ -195,29 +192,29 @@ if (defined('TABLE_PAYPAL_RECURRING')) {
                 $nextDateParts = strlen($nextBillingRaw) > 0 ? explode('T', str_replace('Z', '', $nextBillingRaw)) : [''];
                 $next_date = (strlen($nextDateParts[0]) > 0) ? strtotime($nextDateParts[0]) : false;
                 
-                if ($next_date && date('Y-m-d') == date('Y-m-d', strtotime('-' . (int)PAYPAL_WPP_RECURRING_PAYMENT_REMINDER . ' days', $next_date))) {
+                if ($next_date && date('Y-m-d') == date('Y-m-d', strtotime('-' . (int)PAYPALAC_RECURRING_PAYMENT_REMINDER . ' days', $next_date))) {
                     $customer = $db->Execute("SELECT customers_firstname, customers_lastname, customers_email_address FROM " . TABLE_CUSTOMERS . " WHERE customers_id = " . (int)$subscription->fields['customers_id'] . " LIMIT 1;");
                     if ($customer->RecordCount() > 0) {
                         $products_id = $subscription->fields['products_id'];
                         $products_name = zen_get_products_name($products_id);
                         if ($products_name) {
-                            $email_msg = sprintf(PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL, 
+                            $email_msg = sprintf(PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL, 
                                 $customer->fields['customers_firstname'], 
                                 addslashes($products_name), 
-                                (int)PAYPAL_WPP_RECURRING_PAYMENT_REMINDER, 
+                                (int)PAYPALAC_RECURRING_PAYMENT_REMINDER, 
                                 date('m-d-Y', $next_date), 
                                 zen_href_link(zen_get_info_page($products_id), 'products_id=' . $products_id));
                         } else {
-                            $email_msg = sprintf(PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_INVALID_PRODUCT, 
+                            $email_msg = sprintf(PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL_INVALID_PRODUCT, 
                                 $customer->fields['customers_firstname'], 
-                                (int)PAYPAL_WPP_RECURRING_PAYMENT_REMINDER, 
+                                (int)PAYPALAC_RECURRING_PAYMENT_REMINDER, 
                                 date('m-d-Y', $next_date));
                         }
                         $html_msg['EMAIL_MESSAGE_HTML'] = nl2br($email_msg);
                         zen_mail(
                             $customer->fields['customers_firstname'] . ' ' . $customer->fields['customers_lastname'], 
                             $customer->fields['customers_email_address'], 
-                            sprintf(PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_SUBJECT, $subscription->fields['profile_id']), 
+                            sprintf(PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL_SUBJECT, $subscription->fields['profile_id']), 
                             $email_msg, 
                             STORE_NAME, 
                             EMAIL_FROM, 
@@ -239,19 +236,19 @@ if (defined('TABLE_PAYPAL_RECURRING')) {
                     $products_id = $subscription->fields['products_id'];
                     $products_name = zen_get_products_name($products_id);
                     if ($products_name) {
-                        $email_msg = sprintf(PAYPAL_WPP_RECURRING_EXPIRED_NOTICE, 
+                        $email_msg = sprintf(PAYPALAC_RECURRING_EXPIRED_NOTICE, 
                             $customer->fields['customers_firstname'], 
                             addslashes($products_name), 
                             zen_href_link(zen_get_info_page($products_id), 'products_id=' . $products_id));
                     } else {
-                        $email_msg = sprintf(PAYPAL_WPP_RECURRING_EXPIRED_NOTICE_INVALID_PRODUCT, 
+                        $email_msg = sprintf(PAYPALAC_RECURRING_EXPIRED_NOTICE_INVALID_PRODUCT, 
                             $customer->fields['customers_firstname']);
                     }
                     $html_msg['EMAIL_MESSAGE_HTML'] = nl2br($email_msg);
                     zen_mail(
                         $customer->fields['customers_firstname'] . ' ' . $customer->fields['customers_lastname'], 
                         $customer->fields['customers_email_address'], 
-                        sprintf(PAYPAL_WPP_RECURRING_EXPIRED_NOTICE_EMAIL_SUBJECT, $subscription->fields['profile_id']), 
+                        sprintf(PAYPALAC_RECURRING_EXPIRED_NOTICE_EMAIL_SUBJECT, $subscription->fields['profile_id']), 
                         $email_msg, 
                         STORE_NAME, 
                         EMAIL_FROM, 
@@ -263,7 +260,7 @@ if (defined('TABLE_PAYPAL_RECURRING')) {
                     
                     // Notify observers
                     if (isset($zco_notifier)) {
-                        $zco_notifier->notify('NOTIFY_PAYPAL_WPP_RECURRING_EXPIRED');
+                        $zco_notifier->notify('NOTIFY_PAYPALAC_RECURRING_EXPIRED');
                     }
                 }
             }
@@ -297,14 +294,14 @@ if (defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
             }
             
             // Payment reminders for REST subscriptions
-            if (PAYPAL_WPP_RECURRING_PAYMENT_REMINDER > 0 && $nextBillingDate) {
-                if (date('Y-m-d') == date('Y-m-d', strtotime('-' . (int)PAYPAL_WPP_RECURRING_PAYMENT_REMINDER . ' days', $nextBillingDate))) {
+            if (PAYPALAC_RECURRING_PAYMENT_REMINDER > 0 && $nextBillingDate) {
+                if (date('Y-m-d') == date('Y-m-d', strtotime('-' . (int)PAYPALAC_RECURRING_PAYMENT_REMINDER . ' days', $nextBillingDate))) {
                     if (!empty($row['customers_email_address'])) {
                         $products_name = $row['products_name'];
-                        $email_msg = sprintf(PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL, 
+                        $email_msg = sprintf(PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL, 
                             $row['customers_firstname'], 
                             addslashes($products_name), 
-                            (int)PAYPAL_WPP_RECURRING_PAYMENT_REMINDER, 
+                            (int)PAYPALAC_RECURRING_PAYMENT_REMINDER, 
                             date('m-d-Y', $nextBillingDate), 
                             zen_href_link(FILENAME_ACCOUNT));
                         
@@ -312,7 +309,7 @@ if (defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
                         zen_mail(
                             $row['customers_firstname'] . ' ' . $row['customers_lastname'], 
                             $row['customers_email_address'], 
-                            sprintf(PAYPAL_WPP_RECURRING_PAYMENT_REMINDER_EMAIL_SUBJECT, 'REST-' . $row['paypal_subscription_id']), 
+                            sprintf(PAYPALAC_RECURRING_PAYMENT_REMINDER_EMAIL_SUBJECT, 'REST-' . $row['paypal_subscription_id']), 
                             $email_msg, 
                             STORE_NAME, 
                             EMAIL_FROM, 

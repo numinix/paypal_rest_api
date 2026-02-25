@@ -1,6 +1,6 @@
 <?php
 /**
- * Subscription Cancellations Cron
+ * PayPal Advanced Checkout - Subscription Cancellations Cron
  * 
  * Processes scheduled subscription cancellations by:
  * - Removing group pricing for customers with expired cancellation dates
@@ -8,13 +8,6 @@
  * 
  * This ensures that customers who have cancelled their subscriptions 
  * lose their group pricing discounts after the cancellation grace period.
- * 
- * Compatible with all payment modules:
- * - paypalwpp.php (Website Payments Pro)
- * - paypal.php (PayPal Standard)
- * - paypaldp.php (Direct Payments)
- * - paypalac.php (REST API)
- * - payflow.php (Payflow)
  */
 
 require '../includes/configure.php';
