@@ -148,6 +148,21 @@ namespace {
         $failures++;
     }
 
+    // Test 8: install() uses INSERT IGNORE to prevent duplicate key errors during upgrade
+    fwrite(STDOUT, "\nTest 8: install() uses INSERT IGNORE to prevent duplicate key errors...\n");
+    if ($installMethodStart !== false && $installMethodEnd !== false) {
+        $installBody = substr($content, $installMethodStart, $installMethodEnd - $installMethodStart);
+        if (preg_match('/INSERT\s+IGNORE\s+INTO\b.*TABLE_CONFIGURATION/s', $installBody)) {
+            fwrite(STDOUT, "✓ install() uses INSERT IGNORE INTO for configuration keys\n");
+        } else {
+            fwrite(STDERR, "✗ FAILED: install() should use INSERT IGNORE to handle pre-existing keys from paypalr upgrades\n");
+            $failures++;
+        }
+    } else {
+        fwrite(STDERR, "✗ FAILED: Could not locate install() method boundaries\n");
+        $failures++;
+    }
+
     // Summary
     fwrite(STDOUT, "\n=== Test Summary ===\n");
     if ($failures > 0) {
