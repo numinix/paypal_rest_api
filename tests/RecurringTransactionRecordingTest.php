@@ -22,7 +22,7 @@ fwrite(STDOUT, "Running Recurring Transaction Recording Test...\n\n");
 
 $basePath = dirname(__DIR__);
 $savedCardRecurringFile = $basePath . '/includes/classes/paypalSavedCardRecurring.php';
-$cronFile = $basePath . '/cron/paypal_saved_card_recurring.php';
+$cronFile = $basePath . '/cron/paypalac_saved_card_recurring.php';
 
 if (!file_exists($savedCardRecurringFile)) {
     fwrite(STDERR, "✗ paypalSavedCardRecurring.php not found\n\n");
@@ -30,7 +30,7 @@ if (!file_exists($savedCardRecurringFile)) {
 }
 
 if (!file_exists($cronFile)) {
-    fwrite(STDERR, "✗ paypal_saved_card_recurring.php (cron) not found\n\n");
+    fwrite(STDERR, "✗ paypalac_saved_card_recurring.php (cron) not found\n\n");
     exit(1);
 }
 

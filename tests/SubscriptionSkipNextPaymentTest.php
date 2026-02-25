@@ -58,7 +58,7 @@ if (file_exists($savedCardManagerFile) && file_exists($subscriptionManagerFile))
 
 // Test 3: Verify cron file has no skip flag logic
 echo "Test 3: Checking cron file has no skip flag logic...\n";
-$cronFile = $basePath . '/cron/paypal_saved_card_recurring.php';
+$cronFile = $basePath . '/cron/paypalac_saved_card_recurring.php';
 if (file_exists($cronFile)) {
     $content = file_get_contents($cronFile);
     if (strpos($content, 'skip_next_payment') === false) {
