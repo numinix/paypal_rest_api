@@ -1,7 +1,7 @@
 <?php
 /**
  * A class to create a payload to confirm the payment choice for the specified payment-type
- * for the PayPalRestful (paypalr) Payment Module
+ * for the PayPalRestful (paypalac) Payment Module
  *
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -43,7 +43,7 @@ class ConfirmPayPalPaymentChoiceRequest
         // The brand-name supplied to PayPal (appears on PayPal-sent invoices to the
         // customer) is either the configured value or the store's defined name.
         //
-        $brand_name = (MODULE_PAYMENT_PAYPALR_BRANDNAME !== '') ? MODULE_PAYMENT_PAYPALR_BRANDNAME : STORE_NAME;
+        $brand_name = (MODULE_PAYMENT_PAYPALAC_BRANDNAME !== '') ? MODULE_PAYMENT_PAYPALAC_BRANDNAME : STORE_NAME;
 
         // -----
         // Determine the post-choice action for the customer. If we're running the 'standard' 3-page
@@ -55,7 +55,7 @@ class ConfirmPayPalPaymentChoiceRequest
         $this->userAction = 'CONTINUE';
         global $current_page_base;
         if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && defined('CHECKOUT_ONE_CONFIRMATION_REQUIRED') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
-            if (!in_array('paypalr', explode(',', str_replace(' ', '', CHECKOUT_ONE_CONFIRMATION_REQUIRED)))) {
+            if (!in_array('paypalac', explode(',', str_replace(' ', '', CHECKOUT_ONE_CONFIRMATION_REQUIRED)))) {
                 $this->userAction = 'PAY_NOW';
             }
         }

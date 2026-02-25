@@ -29,7 +29,7 @@ abstract class WebhookHandlerContract
     protected $log;
     /** @var PayPalRestfulApi */
     protected $ppr;
-    /** @var \paypalr */
+    /** @var \paypalac */
     protected $paymentModule;
     public function __construct(WebhookObject $webhook)
     {
@@ -43,14 +43,14 @@ abstract class WebhookHandlerContract
     abstract public function action(): void;
 
     /**
-     * Instantiate paypalr payment module, including its language string dependencies.
+     * Instantiate paypalac payment module, including its language string dependencies.
      */
     protected function loadCorePaymentModuleAndLanguageStrings(): void
     {
         if (!class_exists('payment', false)) {
             require DIR_WS_CLASSES . 'payment.php';
         }
-        $payment_modules = new \payment ('paypalr');
+        $payment_modules = new \payment ('paypalac');
         $this->paymentModule = $GLOBALS[$payment_modules->selected_module];
     }
 
@@ -64,9 +64,9 @@ abstract class WebhookHandlerContract
             return true;
         }
 
-        [$client_id, $secret] = \paypalr::getEnvironmentInfo();
+        [$client_id, $secret] = \paypalac::getEnvironmentInfo();
         if ($client_id !== '' && $secret !== '') {
-            $this->ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret);
+            $this->ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALAC_SERVER, $client_id, $secret);
             return true;
         }
 

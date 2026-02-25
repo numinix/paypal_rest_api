@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 /**
  * Test to verify that the saved card selection is correctly retrieved
- * from forwarded POST fields (ppr_saved_card) as well as direct POST
- * (paypalr_saved_card) and session.
+ * from forwarded POST fields (ppac_saved_card) as well as direct POST
+ * (paypalac_saved_card) and session.
  */
 
 namespace {
@@ -23,18 +23,18 @@ namespace {
     if (!defined('DIR_WS_CATALOG')) {
         define('DIR_WS_CATALOG', '/shop/');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_STATUS', 'True');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT')) {
-        define('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT')) {
+        define('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT', 'True');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC')) {
-        define('MODULE_PAYMENT_PAYPALR_SAVED_CARD_GENERIC', 'Card');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SAVED_CARD_GENERIC')) {
+        define('MODULE_PAYMENT_PAYPALAC_SAVED_CARD_GENERIC', 'Card');
     }
 
     // Mock required classes
-    class paypalr_creditcard_test_wrapper
+    class paypalac_creditcard_test_wrapper
     {
         public function testSavedCardRetrieval(): void
         {
@@ -42,32 +42,32 @@ namespace {
             
             $failures = 0;
 
-            // Test 1: Direct POST field (paypalr_saved_card)
-            $_POST = ['paypalr_saved_card' => 'vault-123'];
+            // Test 1: Direct POST field (paypalac_saved_card)
+            $_POST = ['paypalac_saved_card' => 'vault-123'];
             $_SESSION = [];
-            $result = $_POST['paypalr_saved_card'] ?? ($_POST['ppr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
             if ($result !== 'vault-123') {
                 fwrite(STDERR, "Test 1 failed: Expected 'vault-123', got '$result'\n");
                 $failures++;
             } else {
-                echo "✓ Test 1 passed: Direct POST field (paypalr_saved_card) correctly retrieved\n";
+                echo "✓ Test 1 passed: Direct POST field (paypalac_saved_card) correctly retrieved\n";
             }
 
-            // Test 2: Forwarded POST field (ppr_saved_card)
-            $_POST = ['ppr_saved_card' => 'vault-456'];
+            // Test 2: Forwarded POST field (ppac_saved_card)
+            $_POST = ['ppac_saved_card' => 'vault-456'];
             $_SESSION = [];
-            $result = $_POST['paypalr_saved_card'] ?? ($_POST['ppr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
             if ($result !== 'vault-456') {
                 fwrite(STDERR, "Test 2 failed: Expected 'vault-456', got '$result'\n");
                 $failures++;
             } else {
-                echo "✓ Test 2 passed: Forwarded POST field (ppr_saved_card) correctly retrieved\n";
+                echo "✓ Test 2 passed: Forwarded POST field (ppac_saved_card) correctly retrieved\n";
             }
 
             // Test 3: Session fallback
             $_POST = [];
             $_SESSION = ['PayPalRestful' => ['saved_card' => 'vault-789']];
-            $result = $_POST['paypalr_saved_card'] ?? ($_POST['ppr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
             if ($result !== 'vault-789') {
                 fwrite(STDERR, "Test 3 failed: Expected 'vault-789', got '$result'\n");
                 $failures++;
@@ -78,7 +78,7 @@ namespace {
             // Test 4: Default to 'new'
             $_POST = [];
             $_SESSION = [];
-            $result = $_POST['paypalr_saved_card'] ?? ($_POST['ppr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
             if ($result !== 'new') {
                 fwrite(STDERR, "Test 4 failed: Expected 'new', got '$result'\n");
                 $failures++;
@@ -87,9 +87,9 @@ namespace {
             }
 
             // Test 5: Priority order (direct POST > forwarded POST > session > default)
-            $_POST = ['paypalr_saved_card' => 'vault-priority'];
+            $_POST = ['paypalac_saved_card' => 'vault-priority'];
             $_SESSION = ['PayPalRestful' => ['saved_card' => 'vault-session']];
-            $result = $_POST['paypalr_saved_card'] ?? ($_POST['ppr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
             if ($result !== 'vault-priority') {
                 fwrite(STDERR, "Test 5 failed: Expected 'vault-priority', got '$result'\n");
                 $failures++;
@@ -98,9 +98,9 @@ namespace {
             }
 
             // Test 6: Forwarded field takes priority over session
-            $_POST = ['ppr_saved_card' => 'vault-forwarded'];
+            $_POST = ['ppac_saved_card' => 'vault-forwarded'];
             $_SESSION = ['PayPalRestful' => ['saved_card' => 'vault-session']];
-            $result = $_POST['paypalr_saved_card'] ?? ($_POST['ppr_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
+            $result = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalRestful']['saved_card'] ?? 'new'));
             if ($result !== 'vault-forwarded') {
                 fwrite(STDERR, "Test 6 failed: Expected 'vault-forwarded', got '$result'\n");
                 $failures++;
@@ -117,6 +117,6 @@ namespace {
         }
     }
 
-    $tester = new paypalr_creditcard_test_wrapper();
+    $tester = new paypalac_creditcard_test_wrapper();
     $tester->testSavedCardRetrieval();
 }

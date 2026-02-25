@@ -20,20 +20,20 @@ namespace {
     }
 
     // Define required constants for the test
-    if (!defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-        define('MODULE_PAYMENT_PAYPALR_SERVER', 'sandbox');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+        define('MODULE_PAYMENT_PAYPALAC_SERVER', 'sandbox');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_L', 'LiveClientId123');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_L', 'LiveClientId123');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_L')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_L', 'LiveSecret456');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_L', 'LiveSecret456');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_S', 'SandboxClientId789');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_S', 'SandboxClientId789');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_S')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_S', 'SandboxSecret012');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_S', 'SandboxSecret012');
     }
 
     if (session_status() === PHP_SESSION_NONE) {
@@ -91,10 +91,10 @@ namespace {
         // Test each wallet module's getPayPalRestfulApi method indirectly
         // by checking the pattern used in the source files
         $modules = [
-            'paypalr_creditcard' => 'includes/modules/payment/paypalr_creditcard.php',
-            'paypalr_applepay' => 'includes/modules/payment/paypalr_applepay.php',
-            'paypalr_googlepay' => 'includes/modules/payment/paypalr_googlepay.php',
-            'paypalr_venmo' => 'includes/modules/payment/paypalr_venmo.php',
+            'paypalac_creditcard' => 'includes/modules/payment/paypalac_creditcard.php',
+            'paypalac_applepay' => 'includes/modules/payment/paypalac_applepay.php',
+            'paypalac_googlepay' => 'includes/modules/payment/paypalac_googlepay.php',
+            'paypalac_venmo' => 'includes/modules/payment/paypalac_venmo.php',
         ];
 
         foreach ($modules as $moduleName => $filePath) {
@@ -106,11 +106,11 @@ namespace {
 
             $content = file_get_contents($fullPath);
             
-            // Check for the correct pattern: new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret)
-            $correctPattern = '/new\s+PayPalRestfulApi\s*\(\s*MODULE_PAYMENT_PAYPALR_SERVER\s*,\s*\$client_id\s*,\s*\$secret\s*\)/s';
+            // Check for the correct pattern: new PayPalRestfulApi(MODULE_PAYMENT_PAYPALAC_SERVER, $client_id, $secret)
+            $correctPattern = '/new\s+PayPalRestfulApi\s*\(\s*MODULE_PAYMENT_PAYPALAC_SERVER\s*,\s*\$client_id\s*,\s*\$secret\s*\)/s';
             
-            // Check for the INCORRECT pattern: new PayPalRestfulApi($client_id, $secret, MODULE_PAYMENT_PAYPALR_SERVER, ...)
-            $incorrectPattern = '/new\s+PayPalRestfulApi\s*\(\s*\$client_id\s*,\s*\$secret\s*,\s*MODULE_PAYMENT_PAYPALR_SERVER/s';
+            // Check for the INCORRECT pattern: new PayPalRestfulApi($client_id, $secret, MODULE_PAYMENT_PAYPALAC_SERVER, ...)
+            $incorrectPattern = '/new\s+PayPalRestfulApi\s*\(\s*\$client_id\s*,\s*\$secret\s*,\s*MODULE_PAYMENT_PAYPALAC_SERVER/s';
             
             if (preg_match($correctPattern, $content)) {
                 $results[$moduleName] = ['status' => 'PASS', 'reason' => 'Uses correct parameter order'];

@@ -15,15 +15,15 @@ require_once ($legacyModulePath);
 $this->paypalsavedcard = new paypalsavedcard($this);
 }
 else {
-$restCardModule = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr_creditcard.php';
-$this->paymentModuleCode = file_exists($restCardModule) ? 'paypalr_creditcard' : 'paypalr';
+$restCardModule = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalac_creditcard.php';
+$this->paymentModuleCode = file_exists($restCardModule) ? 'paypalac_creditcard' : 'paypalac';
 $this->paypalsavedcard = null;
 }
 }
 else {
 $this->paypalsavedcard = $paypalsavedcard;
 if (!is_object($this->paypalsavedcard)) {
-$this->paymentModuleCode = 'paypalr_creditcard';
+$this->paymentModuleCode = 'paypalac_creditcard';
 }
 }
 }
@@ -42,31 +42,31 @@ return $this->PayPal;
                if ($this->PayPalRestful) {
                        return $this->PayPalRestful;
                }
-if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'initiate_paypalr')) {
-$client = $this->paypalsavedcard->initiate_paypalr();
+if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'initiate_paypalac')) {
+$client = $this->paypalsavedcard->initiate_paypalac();
 if ($client) {
 $this->PayPalRestful = isset($this->paypalsavedcard->PayPalRestful) ? $this->paypalsavedcard->PayPalRestful : $client;
 return $this->PayPalRestful;
 }
 }
-               $autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+               $autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
                if (!class_exists('PayPalRestful\\Api\\PayPalRestfulApi') && file_exists($autoload)) {
                        require_once ($autoload);
                }
                if (class_exists('PayPalRestful\\Api\\PayPalRestfulApi')) {
-                       // Determine environment from MODULE_PAYMENT_PAYPALR_SERVER
+                       // Determine environment from MODULE_PAYMENT_PAYPALAC_SERVER
                        $environment = 'sandbox'; // Default to sandbox
-                       if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-                               $environment = strtolower(MODULE_PAYMENT_PAYPALR_SERVER);
+                       if (defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+                               $environment = strtolower(MODULE_PAYMENT_PAYPALAC_SERVER);
                        }
                        
                        // Get the appropriate credentials based on environment
                        if ($environment === 'live') {
-                               $clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L') ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : '';
-                               $clientSecret = defined('MODULE_PAYMENT_PAYPALR_SECRET_L') ? MODULE_PAYMENT_PAYPALR_SECRET_L : '';
+                               $clientId = defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : '';
+                               $clientSecret = defined('MODULE_PAYMENT_PAYPALAC_SECRET_L') ? MODULE_PAYMENT_PAYPALAC_SECRET_L : '';
                        } else {
-                               $clientId = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S') ? MODULE_PAYMENT_PAYPALR_CLIENTID_S : '';
-                               $clientSecret = defined('MODULE_PAYMENT_PAYPALR_SECRET_S') ? MODULE_PAYMENT_PAYPALR_SECRET_S : '';
+                               $clientId = defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_S : '';
+                               $clientSecret = defined('MODULE_PAYMENT_PAYPALAC_SECRET_S') ? MODULE_PAYMENT_PAYPALAC_SECRET_S : '';
                        }
                        
                        try {
@@ -123,15 +123,15 @@ return $this->PayPalRestful;
        function get_order_status_for_intent($intent) {
                if ($intent === 'AUTHORIZE') {
                        // Use pending status for authorized (not yet captured) payments
-                       if (defined('MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID > 0) {
-                               return (int)MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID;
+                       if (defined('MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID > 0) {
+                               return (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID;
                        }
                        // Fallback to Pending status (1)
                        return 1;
                }
                // Use completed status for captured payments
-               if (defined('MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID > 0) {
-                       return (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+               if (defined('MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID > 0) {
+                       return (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID;
                }
                // Fallback to Processing status (2)
                return 2;
@@ -232,7 +232,7 @@ return $this->PayPalRestful;
       }
 protected function ensure_vault_manager_loaded() {
 if (!class_exists('PayPalRestful\\Common\\VaultManager')) {
-$autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+$autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 if (file_exists($autoload)) {
 require_once ($autoload);
 }
@@ -505,7 +505,7 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                        return array('success' => false, 'error' => 'Missing stored credential identifier');
                }
                // Determine intent based on transaction mode setting - recurring card payments should respect the authorize/capture mode
-               $transaction_mode = defined('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE') ? MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE : 'Final Sale';
+               $transaction_mode = defined('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE') ? MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE : 'Final Sale';
                // For card payments, 'Auth Only (All Txns)' and 'Auth Only (Card-Only)' both mean AUTHORIZE
                // 'Final Sale' means CAPTURE
                $intent = ($transaction_mode === 'Final Sale') ? 'CAPTURE' : 'AUTHORIZE';
@@ -636,13 +636,13 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                // Determine module name
                $module_name = $this->paymentModuleCode;
                if (empty($module_name)) {
-                       $module_name = 'paypalr_creditcard';
+                       $module_name = 'paypalac_creditcard';
                }
                
                // Get module version
                $module_version = '';
-               if (defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
-                       $module_version = MODULE_PAYMENT_PAYPALR_VERSION;
+               if (defined('MODULE_PAYMENT_PAYPALAC_VERSION')) {
+                       $module_version = MODULE_PAYMENT_PAYPALAC_VERSION;
                }
                
                $date_added = date('Y-m-d H:i:s');
@@ -725,13 +725,13 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                
                return true;
        }
-       function is_paypalr_primary() {
-               if (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS == 'True') {
+       function is_paypalac_primary() {
+               if (defined('MODULE_PAYMENT_PAYPALAC_STATUS') && MODULE_PAYMENT_PAYPALAC_STATUS == 'True') {
                        return true;
                }
                return false;
        }
-       function cancel_paypalr_subscription($subscription) {
+       function cancel_paypalac_subscription($subscription) {
                $client = $this->get_paypal_rest_client();
                if (!$client) {
                        return false;
@@ -1383,7 +1383,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                 $api_type = isset($payment_details['api_type']) ? $payment_details['api_type'] : '';
                 // Fallback: if api_type is not set but there's a vault card, it's a REST API subscription
                 $has_vault_card = isset($payment_details['paypal_vault_card']) && is_array($payment_details['paypal_vault_card']) && !empty($payment_details['paypal_vault_card']);
-                if (in_array($api_type, array('paypalr', 'rest')) || ($api_type === '' && $has_vault_card)) {
+                if (in_array($api_type, array('paypalac', 'rest')) || ($api_type === '' && $has_vault_card)) {
                         $result = $this->process_rest_payment($payment_details, $total_to_bill);
                         if ($result['success']) {
                                 $transaction_id = $result['transaction_id'];
@@ -1916,8 +1916,8 @@ $payment_modules = new payment($_SESSION['payment']);
 // Determine order status: use provided status, or fall back to PayPal module's captured order status
 		if ($order_status <= 0) {
 			// Use PayPal module's order status settings (same as checkout)
-			if (defined('MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID > 0) {
-				$order_status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+			if (defined('MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID > 0) {
+				$order_status = (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID;
 			} else {
 				// Fallback to Processing status (2) if PayPal config not available
 				$order_status = 2;

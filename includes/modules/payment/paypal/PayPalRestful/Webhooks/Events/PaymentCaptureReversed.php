@@ -28,7 +28,7 @@ class PaymentCaptureReversed extends WebhookHandlerContract
 
         $this->log->write('PAYMENT.CAPTURE.REVERSED - action() triggered');
 
-        // Instantiate paypalr module to load its language strings for status messages
+        // Instantiate paypalac module to load its language strings for status messages
         $this->loadCorePaymentModuleAndLanguageStrings();
 
         $txnID = $this->data['resource']['id'] ?? null;
@@ -41,8 +41,8 @@ class PaymentCaptureReversed extends WebhookHandlerContract
 
         // Sync our database with all updates from PayPal
         $this->getApiAndCredentials();
-        $ppr_txns = new GetPayPalOrderTransactions($this->paymentModule->code, $this->paymentModule->getCurrentVersion(), $oID, $this->ppr);
-        $ppr_txns->syncPaypalTxns();
+        $ppac_txns = new GetPayPalOrderTransactions($this->paymentModule->code, $this->paymentModule->getCurrentVersion(), $oID, $this->ppr);
+        $ppac_txns->syncPaypalTxns();
 
         // Update order-status records noting what's happened
         $summary = $this->data['summary'];
@@ -51,7 +51,7 @@ class PaymentCaptureReversed extends WebhookHandlerContract
             "Notice: REFUNDED/REVERSED. Trans ID: $txnID \n" .
             "Amount: $amount\n$summary\n";
         $admin_message = $this->data['summary'] . "\n" . $this->data['note_to_payer'];
-        $status = (int)MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID;
+        $status = (int)MODULE_PAYMENT_PAYPALAC_REFUNDED_STATUS_ID;
         $status = ($status > 0) ? $status : 1;
 
         // Save update and notify customer
@@ -59,8 +59,8 @@ class PaymentCaptureReversed extends WebhookHandlerContract
 
         // Notify merchant via email
         zen_update_orders_history($oID, $admin_message, 'webhook', -1, -2);
-        $this->paymentModule->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN, $comments . "\n" .
-            sprintf(MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION, $oID, $this->data['resource']['status'])
+        $this->paymentModule->sendAlertEmail(MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN, $comments . "\n" .
+            sprintf(MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATION, $oID, $this->data['resource']['status'])
         );
     }
 }

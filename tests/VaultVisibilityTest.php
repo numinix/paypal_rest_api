@@ -20,8 +20,8 @@ namespace {
     if (!defined('IS_ADMIN_FLAG')) {
         define('IS_ADMIN_FLAG', false);
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_STATUS', 'True');
     }
     if (!defined('TABLE_ORDERS')) {
         define('TABLE_ORDERS', 'orders');

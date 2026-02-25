@@ -48,7 +48,7 @@ class VaultPaymentTokenUpdated extends WebhookHandlerContract
 
         global $zco_notifier;
         if (isset($zco_notifier) && method_exists($zco_notifier, 'notify')) {
-            $zco_notifier->notify('NOTIFY_PAYPALR_VAULT_CARD_SAVED', $updatedRecord);
+            $zco_notifier->notify('NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $updatedRecord);
         }
     }
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Part of the paypalr (PayPal Advanced Checkout) payment module.
+ * Part of the paypalac (PayPal Advanced Checkout) payment module.
  * This observer class handles the JS SDK integration logic.
  * It also watches for notifications from the 'order_total' class,
  * introduced in this (https://github.com/zencart/zencart/pull/6090) Zen Cart PR,
@@ -15,7 +15,7 @@ use PayPalRestful\Api\PayPalRestfulApi;
 use PayPalRestful\Common\Logger;
 use PayPalRestful\Zc2Pp\Amount;
 
-require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ObserverManager.php';
 }
@@ -33,10 +33,10 @@ class zcObserverPaypalrestful
     public function __construct()
     {
         // -----
-        // If the base paypalr payment-module isn't installed, nothing further to do here.
+        // If the base paypalac payment-module isn't installed, nothing further to do here.
         // The observer is needed as long as any PayPal payment module is enabled.
         //
-        if (!defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
+        if (!defined('MODULE_PAYMENT_PAYPALAC_VERSION')) {
             return;
         }
 
@@ -44,12 +44,12 @@ class zcObserverPaypalrestful
         // Check if at least one PayPal payment module is enabled
         //
         $anyModuleEnabled = (
-            (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS') && MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS') && MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS === 'True')
+            (defined('MODULE_PAYMENT_PAYPALAC_STATUS') && MODULE_PAYMENT_PAYPALAC_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_STATUS') && MODULE_PAYMENT_PAYPALAC_CREDITCARD_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALAC_APPLEPAY_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_VENMO_STATUS') && MODULE_PAYMENT_PAYPALAC_VENMO_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS') && MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS === 'True')
         );
 
         if (!$anyModuleEnabled) {
@@ -60,14 +60,14 @@ class zcObserverPaypalrestful
         // Initialize the logger for SDK configuration debugging.
         //
         $this->log = new Logger();
-        if (strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false) {
+        if (strpos(MODULE_PAYMENT_PAYPALAC_DEBUGGING, 'Log') !== false) {
             $this->log->enableDebug();
         }
 
         // -----
         // If currently on either the 3-page or OPC checkout-confirmation pages, need to monitor
         // calls to the order-totals' pre_confirmation_check method. That method is run on that
-        // page prior to paypalr's pre_confirmation_check method.
+        // page prior to paypalac's pre_confirmation_check method.
         //
         // NOTE: The page that's set during the AJAX checkout-payment class is 'index'!
         //
@@ -99,7 +99,7 @@ class zcObserverPaypalrestful
         // -----
         // If currently on the checkout_process page, need to monitor calls to the
         // order-totals' process method.  That method's run on that page prior to
-        // paypalr's before_process method.
+        // paypalac's before_process method.
         //
         }
         if ($current_page_base === FILENAME_CHECKOUT_PROCESS || ($oprcProcessKey !== null && $current_page_base === $oprcProcessKey)) {
@@ -289,7 +289,7 @@ class zcObserverPaypalrestful
 
         // -----
         // If the current order-total has made changes to the order-info, record
-        // that information for use by the paypalr payment-module's processing.
+        // that information for use by the paypalac payment-module's processing.
         //
         if (count($diff) !== 0) {
             $this->orderTotalChanges[$ot_updates['class']] = [
@@ -308,7 +308,7 @@ class zcObserverPaypalrestful
     }
 
     // -----
-    // Public methods (used by the paypalr payment-module) to retrieve the results
+    // Public methods (used by the paypalac payment-module) to retrieve the results
     // of the notifications' processing.
     //
     // Note: If getLastOrderValues returns an empty array, the implication is that
@@ -463,8 +463,8 @@ class zcObserverPaypalrestful
      */
     protected function isGuestWalletEnabled(): bool
     {
-        return defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET') 
-            && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_ENABLE_GUEST_WALLET === 'True';
+        return defined('MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_ENABLE_GUEST_WALLET') 
+            && MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_ENABLE_GUEST_WALLET === 'True';
     }
 
     protected function outputJsSdkHeaderAssets($current_page): void
@@ -478,10 +478,10 @@ class zcObserverPaypalrestful
         $js_fields = [];
         $js_scriptparams = [];
 
-        $js_fields['client-id'] = MODULE_PAYMENT_PAYPALR_SERVER === 'live' ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S;
+        $js_fields['client-id'] = MODULE_PAYMENT_PAYPALAC_SERVER === 'live' ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : MODULE_PAYMENT_PAYPALAC_CLIENTID_S;
         $buyerCountry = $this->determineBuyerCountryCode();
 
-        if (MODULE_PAYMENT_PAYPALR_SERVER === 'sandbox') {
+        if (MODULE_PAYMENT_PAYPALAC_SERVER === 'sandbox') {
             $js_fields['client-id'] = 'sb'; // 'sb' for sandbox
             $js_fields['debug'] = 'true'; // sandbox only, un-minifies the JS
             $js_fields['buyer-country'] = $paypalSandboxBuyerCountryCodeOverride ?? $buyerCountry; // sandbox only
@@ -509,9 +509,9 @@ class zcObserverPaypalrestful
         // (Venmo uses buttons with FUNDING.VENMO, PayPal wallet uses buttons with default funding,
         // Pay Later uses buttons with FUNDING.PAYLATER)
         $needsButtonsComponent = (
-            (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS') && MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS === 'True')
+            (defined('MODULE_PAYMENT_PAYPALAC_STATUS') && MODULE_PAYMENT_PAYPALAC_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_VENMO_STATUS') && MODULE_PAYMENT_PAYPALAC_VENMO_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS') && MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS === 'True')
         );
         if ($needsButtonsComponent) {
             $components[] = 'buttons';
@@ -520,7 +520,7 @@ class zcObserverPaypalrestful
         // Load Google Pay SDK component based on user status and guest wallet setting
         // Per PayPal support guidance, we can use PayPal SDK for both logged-in and guest users
         // without requiring direct Google Pay SDK or merchant verification
-        if (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True') {
+        if (defined('MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_STATUS === 'True') {
             // Load googlepay component if:
             // 1. User is logged in (uses PayPal SDK, email from session)
             // 2. Guest wallet is enabled (uses PayPal SDK, email collected via emailRequired in PaymentDataRequest)
@@ -528,7 +528,7 @@ class zcObserverPaypalrestful
                 $components[] = 'googlepay';
             }
         }
-        if (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True') {
+        if (defined('MODULE_PAYMENT_PAYPALAC_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALAC_APPLEPAY_STATUS === 'True') {
             $components[] = 'applepay';
         }
         
@@ -572,17 +572,17 @@ class zcObserverPaypalrestful
             
             $this->log->write(
                 "PayPal SDK Configuration for page '$current_page':\n" .
-                "  - Environment: " . MODULE_PAYMENT_PAYPALR_SERVER . "\n" .
+                "  - Environment: " . MODULE_PAYMENT_PAYPALAC_SERVER . "\n" .
                 "  - Client ID: " . $loggedClientId . "\n" .
                 "  - Components: " . $js_fields['components'] . "\n" .
                 "  - Currency: " . ($js_fields['currency'] ?? 'not set') . "\n" .
                 "  - Buyer Country: " . ($js_fields['buyer-country'] ?? 'not set') . "\n" .
                 "  - Enabled Modules: " .
-                    "PayPal=" . (defined('MODULE_PAYMENT_PAYPALR_STATUS') ? MODULE_PAYMENT_PAYPALR_STATUS : 'n/a') . ", " .
-                    "GooglePay=" . (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS : 'n/a') . ", " .
-                    "ApplePay=" . (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS : 'n/a') . ", " .
-                    "Venmo=" . (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') ? MODULE_PAYMENT_PAYPALR_VENMO_STATUS : 'n/a') . ", " .
-                    "PayLater=" . (defined('MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS') ? MODULE_PAYMENT_PAYPALR_PAYLATER_STATUS : 'n/a') . "\n" .
+                    "PayPal=" . (defined('MODULE_PAYMENT_PAYPALAC_STATUS') ? MODULE_PAYMENT_PAYPALAC_STATUS : 'n/a') . ", " .
+                    "GooglePay=" . (defined('MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_STATUS : 'n/a') . ", " .
+                    "ApplePay=" . (defined('MODULE_PAYMENT_PAYPALAC_APPLEPAY_STATUS') ? MODULE_PAYMENT_PAYPALAC_APPLEPAY_STATUS : 'n/a') . ", " .
+                    "Venmo=" . (defined('MODULE_PAYMENT_PAYPALAC_VENMO_STATUS') ? MODULE_PAYMENT_PAYPALAC_VENMO_STATUS : 'n/a') . ", " .
+                    "PayLater=" . (defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS') ? MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS : 'n/a') . "\n" .
                 "  - User Logged In: " . ($this->isUserLoggedIn() ? 'yes' : 'no') . "\n" .
                 "  - Guest Wallet Enabled: " . ($this->isGuestWalletEnabled() ? 'yes' : 'no') . "\n" .
                 "  - Google Pay Component Loaded: " . ($googlePayComponentLoaded ? 'yes' : 'no') . "\n" .
@@ -665,7 +665,7 @@ class zcObserverPaypalrestful
 let paypalMessagesPageType = '<?= $pageType ?>';
 let paypalMessageableOverride = <?= $override ? json_encode($override) : '{}' ?>;
 let paypalMessageableStyles = <?= !empty($messageStyles) ? json_encode($messageStyles) : '{}' ?>;
-<?= file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.jssdk_messages.js'); ?>
+<?= file_get_contents(DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalac.jssdk_messages.js'); ?>
 </script>
 <?php
         return;
@@ -675,7 +675,7 @@ let paypalMessageableStyles = <?= !empty($messageStyles) ? json_encode($messageS
     {
         global $current_page_base, $this_is_home_page, $category_depth, $tpl_page_body;
 
-        $limit = defined('MODULE_PAYMENT_PAYPALR_PAYLATER_MESSAGING') ? MODULE_PAYMENT_PAYPALR_PAYLATER_MESSAGING : 'All';
+        $limit = defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_MESSAGING') ? MODULE_PAYMENT_PAYPALAC_PAYLATER_MESSAGING : 'All';
         $limit = explode(', ', $limit);
 
         $limitAllCheckout = !empty(array_intersect($limit, ['All', 'Checkout']));

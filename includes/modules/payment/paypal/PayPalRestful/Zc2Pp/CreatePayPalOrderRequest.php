@@ -1,7 +1,7 @@
 <?php
 /**
  * A class to 'convert' a Zen Cart order to a PayPal order-creation request payload
- * for the PayPalRestful (paypalr) Payment Module
+ * for the PayPalRestful (paypalac) Payment Module
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -67,7 +67,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
     //
     // Note: The $order_info and $ot_diffs arrays are created by the payment-module's auto.paypalrestful.php observer.
     //
-    public function __construct(string $ppr_type, \order $order, array $cc_info, array $order_info, array $ot_diffs)
+    public function __construct(string $ppac_type, \order $order, array $cc_info, array $order_info, array $ot_diffs)
     {
         // Instantiate any ErrorInfo dependencies
         parent::__construct();
@@ -79,13 +79,13 @@ class CreatePayPalOrderRequest extends ErrorInfo
         $this->paypalCurrencyCode = $this->amount->getDefaultCurrencyCode();
 
         $this->log->write(
-            "CreatePayPalOrderRequest::__construct($ppr_type, ...) starts ...\n" .
+            "CreatePayPalOrderRequest::__construct($ppac_type, ...) starts ...\n" .
             "Order's info: " . Logger::logJSON($order->info) . "\n" .
             'order_info: ' . Logger::logJSON($order_info) . "\n" .
             'ot_diffs: ' . Logger::logJSON($ot_diffs)
         );
 
-        if (MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Final Sale' || ($ppr_type !== 'card' && MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE === 'Auth Only (Card-Only)')) {
+        if (MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Final Sale' || ($ppac_type !== 'card' && MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Auth Only (Card-Only)')) {
             $intent = 'CAPTURE';
         } else {
             $intent = 'AUTHORIZE';
@@ -108,8 +108,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
         // -----
         // Set soft-descriptor override if defined. Else it will use the branding details already in the PayPal account.
-        if (defined('MODULE_PAYMENT_PAYPALR_SOFT_DESCRIPTOR') && MODULE_PAYMENT_PAYPALR_SOFT_DESCRIPTOR !== '') {
-            $this->request['purchase_units'][0]['soft_descriptor'] = substr(MODULE_PAYMENT_PAYPALR_SOFT_DESCRIPTOR, 0, 22);
+        if (defined('MODULE_PAYMENT_PAYPALAC_SOFT_DESCRIPTOR') && MODULE_PAYMENT_PAYPALAC_SOFT_DESCRIPTOR !== '') {
+            $this->request['purchase_units'][0]['soft_descriptor'] = substr(MODULE_PAYMENT_PAYPALAC_SOFT_DESCRIPTOR, 0, 22);
         }
 
         // -----
@@ -145,7 +145,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // - 'google_pay': Include empty payment_source to signal Google Pay wallet usage
         // - 'venmo': Do NOT include payment_source (SDK handles it)
         //
-        if ($ppr_type === 'card') {
+        if ($ppac_type === 'card') {
             $this->request['payment_source']['card'] = $this->buildCardPaymentSource($order, $cc_info);
 
             // -----
@@ -156,9 +156,9 @@ class CreatePayPalOrderRequest extends ErrorInfo
             if (count($supplementary_data) !== 0) {
                 $this->request['purchase_units'][0]['supplementary_data'] = $supplementary_data;
             }
-        } elseif ($ppr_type === 'paypal') {
+        } elseif ($ppac_type === 'paypal') {
             $this->request['payment_source']['paypal'] = $this->buildPayPalPaymentSource($order);
-        } elseif ($ppr_type === 'apple_pay') {
+        } elseif ($ppac_type === 'apple_pay') {
             // Apple Pay:
             // - When the Apple Pay token is already available in the session
             //   (server-side confirmation flow), attach it as the payment source.
@@ -205,7 +205,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
                     $this->log->write("Apple Pay: Token could not be normalized to JSON string; omitting payment_source.apple_pay.", true, 'after');
                 }
             }
-        } elseif ($ppr_type === 'google_pay') {
+        } elseif ($ppac_type === 'google_pay') {
             $this->request['payment_source']['google_pay'] = new \stdClass();
         }
 
@@ -214,7 +214,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
         // For venmo - do NOT include payment_source; the PayPal SDK handles the payment source during the wallet authorization flow
 
-        $this->log->write("\nCreatePayPalOrderRequest::__construct($ppr_type, ...) finished, request:\n" . Logger::logJSON($this->request, true, true));
+        $this->log->write("\nCreatePayPalOrderRequest::__construct($ppac_type, ...) finished, request:\n" . Logger::logJSON($this->request, true, true));
     }
     protected function validateOrderAmounts()
     {
@@ -509,7 +509,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             return 0.0;
         }
 
-        $discount_modules = trim(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT);
+        $discount_modules = trim(MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT);
         $discount_modules = ($discount_modules === '') ? '' : $discount_modules . ',';
         $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv,ot_group_pricing,ot_sc')));
 
@@ -578,11 +578,11 @@ class CreatePayPalOrderRequest extends ErrorInfo
     //
     protected function calculateHandling(array $ot_diffs): float
     {
-        return $this->itemBreakdown['item_onetime_charges'] + $this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_HANDLING_OT . ', ot_loworderfee', $ot_diffs);
+        return $this->itemBreakdown['item_onetime_charges'] + $this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALAC_HANDLING_OT . ', ot_loworderfee', $ot_diffs);
     }
     protected function calculateInsurance(array $ot_diffs): float
     {
-        return $this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALR_INSURANCE_OT, $ot_diffs);
+        return $this->calculateOrderElementValue(MODULE_PAYMENT_PAYPALAC_INSURANCE_OT, $ot_diffs);
     }
     protected function calculateDiscount(array $ot_diffs): float
     {
@@ -609,7 +609,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
     protected function getDiscountModules(array $ot_diffs): array
     {
-        $discount_modules = trim(MODULE_PAYMENT_PAYPALR_DISCOUNT_OT);
+        $discount_modules = trim(MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT);
         $discount_modules = ($discount_modules === '') ? '' : $discount_modules . ',';
         $eligible_modules = array_filter(explode(',', str_replace(' ', '', $discount_modules . 'ot_coupon,ot_gv,ot_group_pricing,ot_sc')));
 
@@ -744,8 +744,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // ccInfo population), fall back to the POSTed checkout fields so the confirmation
         // page can still build the PayPal request without fatally erroring.
         if ($expiry_month === '' || $expiry_year === '') {
-            $expiry_month = $_POST['paypalr_cc_expires_month'] ?? ($_POST['ppr_cc_expires_month'] ?? $expiry_month);
-            $expiry_year = $_POST['paypalr_cc_expires_year'] ?? ($_POST['ppr_cc_expires_year'] ?? $expiry_year);
+            $expiry_month = $_POST['paypalac_cc_expires_month'] ?? ($_POST['ppac_cc_expires_month'] ?? $expiry_month);
+            $expiry_year = $_POST['paypalac_cc_expires_year'] ?? ($_POST['ppac_cc_expires_year'] ?? $expiry_year);
             $expiry_month = str_pad((string)$expiry_month, 2, '0', STR_PAD_LEFT);
         }
 
@@ -757,14 +757,14 @@ class CreatePayPalOrderRequest extends ErrorInfo
         
         // Validate other required fields (with POST fallbacks for confirmation page)
         if (empty($cc_info['name'])) {
-            $cc_info['name'] = $_POST['paypalr_cc_owner'] ?? ($_POST['ppr_cc_owner'] ?? '');
+            $cc_info['name'] = $_POST['paypalac_cc_owner'] ?? ($_POST['ppac_cc_owner'] ?? '');
         }
         if (empty($cc_info['name'])) {
             $this->log->write("ERROR: Missing card holder name");
             throw new \Exception('Card holder name is required');
         }
         if (empty($cc_info['number'])) {
-            $posted_number = $_POST['paypalr_cc_number'] ?? ($_POST['ppr_cc_number'] ?? '');
+            $posted_number = $_POST['paypalac_cc_number'] ?? ($_POST['ppac_cc_number'] ?? '');
             $cc_info['number'] = preg_replace('/[^0-9]/', '', $posted_number);
         }
         if (empty($cc_info['number'])) {
@@ -772,7 +772,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             throw new \Exception('Card number is required');
         }
         if (empty($cc_info['security_code'])) {
-            $cc_info['security_code'] = $_POST['paypalr_cc_cvv'] ?? ($_POST['ppr_cc_cvv'] ?? '');
+            $cc_info['security_code'] = $_POST['paypalac_cc_cvv'] ?? ($_POST['ppac_cc_cvv'] ?? '');
         }
         if (empty($cc_info['security_code'])) {
             $this->log->write("ERROR: Missing card security code");
@@ -795,7 +795,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
                 'cancel_url' => $this->buildScaUrl($listener_endpoint, '3ds_cancel'),
             ],
         ];
-        if (isset($_POST['ppr_cc_sca_always']) || (defined('MODULE_PAYMENT_PAYPALR_SCA_ALWAYS') && MODULE_PAYMENT_PAYPALR_SCA_ALWAYS === 'true')) {
+        if (isset($_POST['ppac_cc_sca_always']) || (defined('MODULE_PAYMENT_PAYPALAC_SCA_ALWAYS') && MODULE_PAYMENT_PAYPALAC_SCA_ALWAYS === 'true')) {
             $payment_source['attributes']['verification']['method'] = 'SCA_ALWAYS'; //- Defaults to 'SCA_WHEN_REQUIRED' for live environment
         }
         return $payment_source;
@@ -886,7 +886,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             if (defined('REDIRECT_LISTENER')) {
                 $listener_endpoint = (string)constant('REDIRECT_LISTENER');
             } else {
-                $listener_endpoint = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_listener.php';
+                $listener_endpoint = HTTP_SERVER . DIR_WS_CATALOG . 'ppac_listener.php';
             }
         }
 

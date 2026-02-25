@@ -114,13 +114,13 @@ class WebhookResponder
         ];
 
         // Load the PayPal Advanced Checkout API class and get the credentials, so we can make the postback using the current access token
-        require DIR_WS_MODULES . 'payment/paypalr.php';
-        [$client_id, $secret] = \paypalr::getEnvironmentInfo();
-        $ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALR_SERVER, $client_id, $secret);
+        require DIR_WS_MODULES . 'payment/paypalac.php';
+        [$client_id, $secret] = \paypalac::getEnvironmentInfo();
+        $ppr = new PayPalRestfulApi(MODULE_PAYMENT_PAYPALAC_SERVER, $client_id, $secret);
 
         // We pass true here because we can only get an access token if it is valid; else we must just say the webhook validation failed
         if ($ppr->validatePayPalCredentials(true) === false) {
-            //$this->ppr_logger->write('PayPal credentials are invalid or token expired; cannot verify webhook by postback.', false, 'before');
+            //$this->ppac_logger->write('PayPal credentials are invalid or token expired; cannot verify webhook by postback.', false, 'before');
             return null; // Unable to get a current access token.
         }
 
@@ -135,8 +135,8 @@ class WebhookResponder
      */
     protected function setWebhookSubscribeId()
     {
-        if (defined('MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS')) {
-            $this->webhook_listener_subscribe_id = MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS;
+        if (defined('MODULE_PAYMENT_PAYPALAC_SUBSCRIBED_WEBHOOKS')) {
+            $this->webhook_listener_subscribe_id = MODULE_PAYMENT_PAYPALAC_SUBSCRIBED_WEBHOOKS;
         }
     }
 }

@@ -36,7 +36,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify PayPal partner.js script is included
@@ -65,7 +65,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify paypalOnboardedCallback function is defined
@@ -94,7 +94,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify event listener for paypalOnboardingComplete
@@ -131,7 +131,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify useMiniBrowserFlow function exists
@@ -176,7 +176,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify both flows are attempted

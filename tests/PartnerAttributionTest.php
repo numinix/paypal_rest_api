@@ -4,8 +4,8 @@ declare(strict_types=1);
 /**
  * Test to verify that the Numinix partner attribution ID is included in all PayPal API calls.
  * 
- * This test confirms that all payment modules (paypalr, paypalr_applepay, paypalr_googlepay, 
- * paypalr_venmo) and all supporting code (admin observers, listeners, webhooks, vault management)
+ * This test confirms that all payment modules (paypalac, paypalac_applepay, paypalac_googlepay, 
+ * paypalac_venmo) and all supporting code (admin observers, listeners, webhooks, vault management)
  * use the centralized PayPalRestfulApi class which automatically includes the partner attribution
  * header in all HTTP requests to PayPal.
  *
@@ -24,20 +24,20 @@ namespace {
         define('IS_ADMIN_FLAG', true);
     }
 
-    if (!defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-        define('MODULE_PAYMENT_PAYPALR_SERVER', 'sandbox');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+        define('MODULE_PAYMENT_PAYPALAC_SERVER', 'sandbox');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_L', 'LiveClientId');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_L', 'LiveClientId');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_L')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_L', 'LiveClientSecret');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_L')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_L', 'LiveClientSecret');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S')) {
-        define('MODULE_PAYMENT_PAYPALR_CLIENTID_S', 'SandboxClientId');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_CLIENTID_S', 'SandboxClientId');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_SECRET_S')) {
-        define('MODULE_PAYMENT_PAYPALR_SECRET_S', 'SandboxClientSecret');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_SECRET_S')) {
+        define('MODULE_PAYMENT_PAYPALAC_SECRET_S', 'SandboxClientSecret');
     }
 
     if (!class_exists('base')) {
@@ -169,13 +169,13 @@ namespace {
     }
 
     /**
-     * Test 4: Verify wallet modules extend the main paypalr class
+     * Test 4: Verify wallet modules extend the main paypalac class
      */
-    echo "\nTest 4: Checking wallet modules extend paypalr...\n";
+    echo "\nTest 4: Checking wallet modules extend paypalac...\n";
     $walletModules = [
-        'paypalr_applepay' => dirname(__DIR__) . '/includes/modules/payment/paypalr_applepay.php',
-        'paypalr_googlepay' => dirname(__DIR__) . '/includes/modules/payment/paypalr_googlepay.php',
-        'paypalr_venmo' => dirname(__DIR__) . '/includes/modules/payment/paypalr_venmo.php',
+        'paypalac_applepay' => dirname(__DIR__) . '/includes/modules/payment/paypalac_applepay.php',
+        'paypalac_googlepay' => dirname(__DIR__) . '/includes/modules/payment/paypalac_googlepay.php',
+        'paypalac_venmo' => dirname(__DIR__) . '/includes/modules/payment/paypalac_venmo.php',
     ];
     
     foreach ($walletModules as $moduleName => $modulePath) {
@@ -185,11 +185,11 @@ namespace {
         }
         
         $moduleContents = file_get_contents($modulePath);
-        if (strpos($moduleContents, "class $moduleName extends paypalr") === false) {
-            fwrite(STDERR, "FAILED: Wallet module $moduleName does not extend paypalr\n");
+        if (strpos($moduleContents, "class $moduleName extends paypalac") === false) {
+            fwrite(STDERR, "FAILED: Wallet module $moduleName does not extend paypalac\n");
             $failures++;
         } else {
-            echo "  ✓ $moduleName extends paypalr (inherits partner attribution)\n";
+            echo "  ✓ $moduleName extends paypalac (inherits partner attribution)\n";
         }
     }
 
@@ -198,8 +198,8 @@ namespace {
      */
     echo "\nTest 5: Checking other code locations instantiate PayPalRestfulApi...\n";
     $otherLocations = [
-        'Admin Observer' => dirname(__DIR__) . '/admin/includes/classes/observers/auto.PaypalRestAdmin.php',
-        'Payment Listener' => dirname(__DIR__) . '/ppr_listener.php',
+        'Admin Observer' => dirname(__DIR__) . '/admin/includes/classes/observers/auto.PaypalacAdmin.php',
+        'Payment Listener' => dirname(__DIR__) . '/ppac_listener.php',
         'Vault Management' => dirname(__DIR__) . '/includes/modules/pages/account_saved_credit_cards/header_php.php',
         'Subscription Management' => dirname(__DIR__) . '/includes/modules/pages/account_paypal_subscriptions/header_php.php',
         'Webhook Handler' => dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/Webhooks/WebhookHandlerContract.php',

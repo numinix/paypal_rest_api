@@ -104,9 +104,9 @@ namespace PayPalRestful\Zc2Pp {
 }
 
 namespace {
-    require_once dirname(__DIR__) . '/includes/modules/payment/paypalr.php';
+    require_once dirname(__DIR__) . '/includes/modules/payment/paypalac.php';
 
-    class PaypalrTestDouble extends \paypalr
+    class PaypalrTestDouble extends \paypalac
     {
         public function __construct()
         {

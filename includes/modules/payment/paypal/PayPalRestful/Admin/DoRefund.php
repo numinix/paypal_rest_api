@@ -23,34 +23,34 @@ class DoRefund
         global $messageStack;
 
         if (!isset($_POST['ppr-amount'], $_POST['doRefundOid'], $_POST['capture_txn_id'], $_POST['ppr-refund-note']) || $oID !== (int)$_POST['doRefundOid']) {
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REFUND_PARAM_ERROR, 1), 'error');
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_REFUND_PARAM_ERROR, 1), 'error');
             return;
         }
 
-        $ppr_txns = new GetPayPalOrderTransactions($module_name, $module_version, $oID, $ppr);
-        $ppr_capture_db_txns = $ppr_txns->getDatabaseTxns('CAPTURE');
-        if (count($ppr_capture_db_txns) === 0) {
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_NO_RECORDS, 'CAPTURE', $oID), 'error');
+        $ppac_txns = new GetPayPalOrderTransactions($module_name, $module_version, $oID, $ppr);
+        $ppac_capture_db_txns = $ppac_txns->getDatabaseTxns('CAPTURE');
+        if (count($ppac_capture_db_txns) === 0) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_NO_RECORDS, 'CAPTURE', $oID), 'error');
             return;
         }
 
         $capture_id_txn = false;
         $total_amount_captured = 0;
-        foreach ($ppr_capture_db_txns as $next_txn) {
+        foreach ($ppac_capture_db_txns as $next_txn) {
             if ($next_txn['txn_id'] === $_POST['capture_txn_id']) {
                 $capture_id_txn = $next_txn;
             }
             $total_amount_captured += $next_txn['mc_gross'];
         }
         if ($capture_id_txn === false) {
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REFUND_PARAM_ERROR, 2), 'error');
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_REFUND_PARAM_ERROR, 2), 'error');
             return;
         }
 
         $capture_currency = $capture_id_txn['mc_currency'];
 
         $payer_note = $_POST['ppr-refund-note'];
-        $invoice_id = $ppr_txns->getInvoiceId();
+        $invoice_id = $ppac_txns->getInvoiceId();
 
         $full_refund = isset($_POST['ppr-refund-full']);
         $amount = new Amount($capture_currency);
@@ -66,23 +66,23 @@ class DoRefund
             $issue = $error_info['details'][0]['issue'] ?? '';
             switch ($issue) {
                 default:
-                    $error_message = MODULE_PAYMENT_PAYPALR_REFUND_ERROR . "\n" . json_encode($error_info);
+                    $error_message = MODULE_PAYMENT_PAYPALAC_REFUND_ERROR . "\n" . json_encode($error_info);
                     break;
             }
             $messageStack->add_session($error_message, 'error');
             return;
         }
 
-        $ppr_txns->addDbTransaction('REFUND', $refund_response);
+        $ppac_txns->addDbTransaction('REFUND', $refund_response);
 
         $parent_capture_status = $ppr->getCaptureStatus($_POST['capture_txn_id']);
         if ($parent_capture_status === false) {
             $messageStack->add_session("Error retrieving capture status:\n" . json_encode($ppr->getErrorInfo()), 'warning');
         } else {
-            $ppr_txns->updateParentTxnDateAndStatus($parent_capture_status);
+            $ppac_txns->updateParentTxnDateAndStatus($parent_capture_status);
         }
 
-        $ppr_txns->updateMainTransaction($refund_response);
+        $ppac_txns->updateMainTransaction($refund_response);
 
         // -----
         // Sum up all refunds for this order (there might be multiple captures
@@ -97,12 +97,12 @@ class DoRefund
         $refund_status = -1;
         $total_amount_refunded = $refund_response['amount']['value'];
 
-        $ppr_refund_db_txns = $ppr_txns->getDatabaseTxns('REFUND');
-        foreach ($ppr_refund_db_txns as $next_txn) {
+        $ppac_refund_db_txns = $ppac_txns->getDatabaseTxns('REFUND');
+        foreach ($ppac_refund_db_txns as $next_txn) {
             $total_amount_refunded += $next_txn['mc_gross'];
         }
         if ($amount->getValueFromFloat((float)$total_amount_refunded) === $amount->getValueFromFloat((float)$total_amount_captured)) {
-            $refund_status = (int)MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID;
+            $refund_status = (int)MODULE_PAYMENT_PAYPALAC_REFUNDED_STATUS_ID;
             $refund_status = ($refund_status > 0) ? $refund_status : 1;
         }
 
@@ -115,6 +115,6 @@ class DoRefund
 
         zen_update_orders_history($oID, $comments, null, $refund_status, 0);
 
-        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REFUND_COMPLETE, $amount_refunded), 'success');
+        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_REFUND_COMPLETE, $amount_refunded), 'success');
     }
 }

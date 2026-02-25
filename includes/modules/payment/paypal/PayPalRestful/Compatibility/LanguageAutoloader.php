@@ -1,9 +1,9 @@
 <?php
 /**
  * Provides a lightweight autoloader that makes the core Zen Cart language
- * class available when the paypalr entry points are executed in isolation.
+ * class available when the paypalac entry points are executed in isolation.
  *
- * PayPal webhook deliveries can invoke ppr_webhook.php without the rest of the
+ * PayPal webhook deliveries can invoke ppac_webhook.php without the rest of the
  * storefront bootstrap. Some hosting environments omit the stock
  * includes/classes/language.php file from the deployment that services the
  * webhook endpoint, which previously resulted in a fatal error. This shim
@@ -31,7 +31,7 @@ final class LanguageAutoloader
     }
 
     /**
-     * Attempt to load the Zen Cart language class or provide the paypalr stub
+     * Attempt to load the Zen Cart language class or provide the paypalac stub
      * when the storefront's class is unavailable.
      */
     private static function autoload(string $class): void

@@ -28,20 +28,20 @@ namespace {
     if (!defined('DEFAULT_CURRENCY')) {
         define('DEFAULT_CURRENCY', 'USD');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK')) {
-        define('MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK', 'USD');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK')) {
+        define('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK', 'USD');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE')) {
-        define('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE', 'Final Sale');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE')) {
+        define('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE', 'Final Sale');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_HANDLING_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_HANDLING_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_HANDLING_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_HANDLING_OT', '');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_INSURANCE_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_INSURANCE_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_INSURANCE_OT', '');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_DISCOUNT_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT', '');
     }
     if (!defined('SHIPPING_ORIGIN_ZIP')) {
         define('SHIPPING_ORIGIN_ZIP', '');
@@ -278,7 +278,7 @@ namespace {
         'security_code' => '123',
         'expiry_month' => '09',
         'expiry_year' => '2030',
-        'redirect' => 'ppr_listener.php',
+        'redirect' => 'ppac_listener.php',
     ];
     $request_card = new CreatePayPalOrderRequest('card', $order, $cc_info, $order_info, []);
     $payload_card = $request_card->get();

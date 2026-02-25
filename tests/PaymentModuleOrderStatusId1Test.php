@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Background:
  * The bug was that the condition `$order_status > 1` would incorrectly reject
  * status ID 1, falling back to DEFAULT_ORDERS_STATUS_ID instead of using the
- * configured MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID value.
+ * configured MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID value.
  *
  * @copyright Copyright 2026 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -21,13 +21,13 @@ fwrite(STDOUT, "Running Payment Module Order Status ID 1 Test...\n\n");
 
 $basePath = dirname(__DIR__);
 $paymentModules = [
-    'paypalr.php',
-    'paypalr_creditcard.php',
-    'paypalr_venmo.php',
-    'paypalr_applepay.php',
-    'paypalr_googlepay.php',
-    'paypalr_paylater.php',
-    'paypalr_savedcard.php',
+    'paypalac.php',
+    'paypalac_creditcard.php',
+    'paypalac_venmo.php',
+    'paypalac_applepay.php',
+    'paypalac_googlepay.php',
+    'paypalac_paylater.php',
+    'paypalac_savedcard.php',
 ];
 
 $testsPassed = true;
@@ -67,7 +67,7 @@ if ($testsPassed) {
     fwrite(STDOUT, "All tests passed! ✓\n\n");
     fwrite(STDOUT, "Verified that all payment modules:\n");
     fwrite(STDOUT, "1. Use (\$order_status > 0) to properly handle status ID 1\n");
-    fwrite(STDOUT, "2. Will correctly use MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID when set to 1\n");
+    fwrite(STDOUT, "2. Will correctly use MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID when set to 1\n");
     exit(0);
 } else {
     fwrite(STDERR, "\nSome tests failed! ✗\n");

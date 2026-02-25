@@ -7,7 +7,7 @@ declare(strict_types=1);
  * and enable admin functions like refunds.
  *
  * The new approach uses radio buttons within a single payment selection, all using
- * the base module code 'paypalr_savedcard'.
+ * the base module code 'paypalac_savedcard'.
  */
 
 $testPassed = true;
@@ -19,7 +19,7 @@ $errors = [];
 function getPaymentModuleCode(): string
 {
     // The module now always returns its base code for all selections
-    return 'paypalr_savedcard';
+    return 'paypalac_savedcard';
 }
 
 /**
@@ -28,21 +28,21 @@ function getPaymentModuleCode(): string
 function getSelectedVaultId(array $postData): string
 {
     // Radio buttons directly submit the vault_id value
-    return $postData['paypalr_savedcard_vault_id'] ?? '';
+    return $postData['paypalac_savedcard_vault_id'] ?? '';
 }
 
 $moduleCode = getPaymentModuleCode();
 
 // Test 1: Module code is always the base module code
-if ($moduleCode !== 'paypalr_savedcard') {
+if ($moduleCode !== 'paypalac_savedcard') {
     $testPassed = false;
-    $errors[] = "Test 1 failed: Expected 'paypalr_savedcard', got '$moduleCode'";
+    $errors[] = "Test 1 failed: Expected 'paypalac_savedcard', got '$moduleCode'";
 } else {
-    echo "✓ Test 1: Module code is always 'paypalr_savedcard'\n";
+    echo "✓ Test 1: Module code is always 'paypalac_savedcard'\n";
 }
 
 // Test 2: Vault ID comes directly from radio button POST value
-$postData = ['paypalr_savedcard_vault_id' => 'vault_123'];
+$postData = ['paypalac_savedcard_vault_id' => 'vault_123'];
 $vaultId = getSelectedVaultId($postData);
 if ($vaultId !== 'vault_123') {
     $testPassed = false;
@@ -52,7 +52,7 @@ if ($vaultId !== 'vault_123') {
 }
 
 // Test 3: Different vault ID selected
-$postData = ['paypalr_savedcard_vault_id' => 'vault_456'];
+$postData = ['paypalac_savedcard_vault_id' => 'vault_456'];
 $vaultId = getSelectedVaultId($postData);
 if ($vaultId !== 'vault_456') {
     $testPassed = false;
@@ -77,7 +77,7 @@ echo "\n";
 if ($testPassed) {
     echo "All payment method identification tests passed! ✓\n";
     echo "\nThe new approach:\n";
-    echo "- Uses single payment selection with base module code 'paypalr_savedcard'\n";
+    echo "- Uses single payment selection with base module code 'paypalac_savedcard'\n";
     echo "- Radio buttons for each saved card submit vault_id directly\n";
     echo "- Zen Cart can properly link orders to this module\n";
     echo "- Admin functions like refunds work correctly\n";

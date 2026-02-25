@@ -23,26 +23,26 @@ class DoAuthorization
         global $db, $messageStack;
 
         if (!isset($_POST['ppr-amount'], $_POST['doAuthOid'], $_POST['auth_txn_id']) || $oID !== (int)$_POST['doAuthOid']) {
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_PARAM_ERROR, 1), 'error');
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_REAUTH_PARAM_ERROR, 1), 'error');
             return;
         }
 
-        $ppr_txns = new GetPayPalOrderTransactions($module_name, $module_version, $oID, $ppr);
-        $ppr_db_txns = $ppr_txns->getDatabaseTxns('AUTHORIZE');
-        if (count($ppr_db_txns) === 0) {
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_NO_RECORDS, 'AUTHORIZE', $oID), 'error');
+        $ppac_txns = new GetPayPalOrderTransactions($module_name, $module_version, $oID, $ppr);
+        $ppac_db_txns = $ppac_txns->getDatabaseTxns('AUTHORIZE');
+        if (count($ppac_db_txns) === 0) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_NO_RECORDS, 'AUTHORIZE', $oID), 'error');
             return;
         }
 
         $auth_id_txn = false;
-        foreach ($ppr_db_txns as $next_txn) {
+        foreach ($ppac_db_txns as $next_txn) {
             if ($next_txn['txn_id'] === $_POST['auth_txn_id']) {
                 $auth_id_txn = $next_txn;
                 break;
             }
         }
         if ($auth_id_txn === false) {
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_PARAM_ERROR, 2), 'error');
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_REAUTH_PARAM_ERROR, 2), 'error');
             return;
         }
 
@@ -56,18 +56,18 @@ class DoAuthorization
             $issue = $error_info['details'][0]['issue'] ?? '';
             switch ($issue) {
                 case 'REAUTHORIZATION_TOO_SOON':
-                    $error_message = MODULE_PAYMENT_PAYPALR_REAUTH_TOO_SOON;
+                    $error_message = MODULE_PAYMENT_PAYPALAC_REAUTH_TOO_SOON;
                     break;
                 default:
-                    $error_message = MODULE_PAYMENT_PAYPALR_REAUTH_ERROR . "\n" . json_encode($error_info);
+                    $error_message = MODULE_PAYMENT_PAYPALAC_REAUTH_ERROR . "\n" . json_encode($error_info);
                     break;
             }
             $messageStack->add_session($error_message, 'error');
             return;
         }
 
-        $ppr_txns->addDbTransaction('AUTHORIZE', $auth_response);
-        $ppr_txns->updateMainTransaction($auth_response);
+        $ppac_txns->addDbTransaction('AUTHORIZE', $auth_response);
+        $ppac_txns->updateMainTransaction($auth_response);
 
         // -----
         // A re-authorization transaction, for whatever reason, doesn't return its 'parent'
@@ -92,6 +92,6 @@ class DoAuthorization
             'Amount: ' . $amount;
         zen_update_orders_history($oID, $comments);
 
-        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_REAUTH_COMPLETE, $amount), 'success');
+        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_REAUTH_COMPLETE, $amount), 'success');
     }
 }

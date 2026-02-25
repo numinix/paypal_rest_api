@@ -59,12 +59,12 @@ class PaymentCaptureCompleted extends WebhookHandlerContract
 
         // Ensure order's status is updated to reflect that payment has been captured
         // - look up order
-        // - ensure it was paid via paypalr
+        // - ensure it was paid via paypalac
         // - CHECK WHETHER WAS ALREADY CAPTURED, so we're not duplicating status records and notifier calls
         // - update payment status, including a note with any safe-to-share info from webhook
 
 
-        // Instantiate paypalr module to load its language strings for status messages
+        // Instantiate paypalac module to load its language strings for status messages
         $this->loadCorePaymentModuleAndLanguageStrings();
 
         $txnID = $this->data['resource']['id'] ?? null;
@@ -81,8 +81,8 @@ class PaymentCaptureCompleted extends WebhookHandlerContract
 
         // Sync our database with all updates from PayPal
         $this->getApiAndCredentials();
-        $ppr_txns = new GetPayPalOrderTransactions($this->paymentModule->code, $this->paymentModule->getCurrentVersion(), $oID, $this->ppr);
-        $ppr_txns->syncPaypalTxns();
+        $ppac_txns = new GetPayPalOrderTransactions($this->paymentModule->code, $this->paymentModule->getCurrentVersion(), $oID, $this->ppr);
+        $ppac_txns->syncPaypalTxns();
 
         // If this capture was already recorded previously, don't update order status
         // to prevent orders from being moved back to "paid" status after they've been shipped
@@ -100,11 +100,11 @@ class PaymentCaptureCompleted extends WebhookHandlerContract
             "Amount: $amount\n$summary\n";
 
         if ($this->data['resource']['final_capture'] === false) {
-            $admin_message = MODULE_PAYMENT_PAYPALR_PARTIAL_CAPTURE;
+            $admin_message = MODULE_PAYMENT_PAYPALAC_PARTIAL_CAPTURE;
             $status = -1;
         } else {
-            $admin_message = MODULE_PAYMENT_PAYPALR_FINAL_CAPTURE;
-            $status = (int)MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID;
+            $admin_message = MODULE_PAYMENT_PAYPALAC_FINAL_CAPTURE;
+            $status = (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID;
             $status = ($status > 0) ? $status : 2;
         }
 
@@ -113,15 +113,15 @@ class PaymentCaptureCompleted extends WebhookHandlerContract
 
         // Notify merchant via email
         zen_update_orders_history($oID, $admin_message, 'webhook', -1, -2);
-        $this->paymentModule->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN, $comments . "\n" .
-            sprintf(MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION, $oID, $this->data['resource']['status'])
+        $this->paymentModule->sendAlertEmail(MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN, $comments . "\n" .
+            sprintf(MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATION, $oID, $this->data['resource']['status'])
         );
 
         // If funds have been captured, fire a notification so that sites that
         // manage payments are aware of the incoming funds.
         //
         global $zco_notifier;
-        $zco_notifier->notify('NOTIFY_PAYPALR_FUNDS_CAPTURED', ['webhook' => $this->data]);
+        $zco_notifier->notify('NOTIFY_PAYPALAC_FUNDS_CAPTURED', ['webhook' => $this->data]);
     }
 }
 

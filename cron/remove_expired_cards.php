@@ -8,7 +8,7 @@
  * Compatible with all payment modules that use TABLE_SAVED_CREDIT_CARDS:
  * - paypalwpp.php (Website Payments Pro)
  * - paypaldp.php (Direct Payments)
- * - paypalr.php (REST API)
+ * - paypalac.php (REST API)
  * - payflow.php (Payflow)
  */
 

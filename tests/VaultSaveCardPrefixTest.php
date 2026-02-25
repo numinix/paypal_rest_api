@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * Test that validates the save card checkbox works correctly with both
- * field name prefixes (paypalr_ and ppr_) in different checkout flows.
+ * field name prefixes (paypalac_ and ppr_) in different checkout flows.
  */
 
 namespace {
@@ -16,8 +16,8 @@ namespace {
     if (!defined('IS_ADMIN_FLAG')) {
         define('IS_ADMIN_FLAG', false);
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_STATUS', 'True');
     }
     if (!defined('CC_OWNER_MIN_LENGTH')) {
         define('CC_OWNER_MIN_LENGTH', 3);
@@ -63,24 +63,24 @@ namespace {
 namespace {
     $failures = 0;
 
-    echo "Test 1: Pre-confirmation flow (prefix=paypalr) with save card checked...\n";
+    echo "Test 1: Pre-confirmation flow (prefix=paypalac) with save card checked...\n";
     
     // Simulate pre-confirmation POST data
     $_POST = [
-        'paypalr_cc_owner' => 'John Doe',
-        'paypalr_cc_number' => '4111111111111111',
-        'paypalr_cc_expires_month' => '12',
-        'paypalr_cc_expires_year' => '2025',
-        'paypalr_cc_cvv' => '123',
-        'paypalr_cc_save_card' => 'on',  // Checkbox checked
-        'paypalr_saved_card' => 'new',
+        'paypalac_cc_owner' => 'John Doe',
+        'paypalac_cc_number' => '4111111111111111',
+        'paypalac_cc_expires_month' => '12',
+        'paypalac_cc_expires_year' => '2025',
+        'paypalac_cc_cvv' => '123',
+        'paypalac_cc_save_card' => 'on',  // Checkbox checked
+        'paypalac_saved_card' => 'new',
     ];
     $_SESSION = [
         'customer_id' => 99,
     ];
 
     // Simulate what validateCardInformation does
-    $postvar_prefix = 'paypalr';  // Pre-confirmation
+    $postvar_prefix = 'paypalac';  // Pre-confirmation
     $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
     $storeCard = $allowSaveCard && !empty($_POST[$postvar_prefix . '_cc_save_card']);
 
@@ -96,13 +96,13 @@ namespace {
     
     // Simulate confirmation POST data (field names have ppr_ prefix)
     $_POST = [
-        'ppr_cc_owner' => 'John Doe',
-        'ppr_cc_number' => '4111111111111111',
-        'ppr_cc_expires_month' => '12',
-        'ppr_cc_expires_year' => '2025',
-        'ppr_cc_cvv' => '123',
-        'ppr_cc_save_card' => 'on',  // Checkbox checked (note: ppr_ prefix)
-        'ppr_saved_card' => 'new',
+        'ppac_cc_owner' => 'John Doe',
+        'ppac_cc_number' => '4111111111111111',
+        'ppac_cc_expires_month' => '12',
+        'ppac_cc_expires_year' => '2025',
+        'ppac_cc_cvv' => '123',
+        'ppac_cc_save_card' => 'on',  // Checkbox checked (note: ppr_ prefix)
+        'ppac_saved_card' => 'new',
     ];
     // Session should still have save_card from pre-confirmation, but let's test fresh
     $_SESSION = [
@@ -161,7 +161,7 @@ namespace {
     }
 
     echo "\n✅ All save card checkbox prefix tests passed.\n";
-    echo "   - Pre-confirmation flow (paypalr_cc_save_card) works correctly\n";
-    echo "   - Confirmation flow (ppr_cc_save_card) works correctly\n";
+    echo "   - Pre-confirmation flow (paypalac_cc_save_card) works correctly\n";
+    echo "   - Confirmation flow (ppac_cc_save_card) works correctly\n";
     echo "   - Visibility determination uses session variable (robust)\n";
 }

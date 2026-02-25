@@ -1,6 +1,6 @@
 <?php
 /**
- * Compatibility language loader for the PayPalRestful (paypalr) payment module.
+ * Compatibility language loader for the PayPalRestful (paypalac) payment module.
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -14,7 +14,7 @@ class Language
 {
     /** @var array */
     protected static $loadedModules = [];
-    public static function load(string $moduleCode = 'paypalr'): void
+    public static function load(string $moduleCode = 'paypalac'): void
     {
         if (isset(self::$loadedModules[$moduleCode])) {
             return;
@@ -78,8 +78,8 @@ class Language
 
         $filenames = [
             "lang.$moduleCode.php",
-            'lang.paypalr_shared.php',
-            'lang.paypalr.php',
+            'lang.paypalac_shared.php',
+            'lang.paypalac.php',
         ];
 
         foreach ($filenames as $filename) {
@@ -97,7 +97,7 @@ class Language
     protected static function getExtraDefinitionPaths(string $directory): array
     {
         $files = [
-            'lang.paypalr_redirect_listener_definitions.php',
+            'lang.paypalac_redirect_listener_definitions.php',
         ];
 
         $paths = [];

@@ -14,7 +14,7 @@ declare(strict_types=1);
  * This happened because the payment was processed via a different pathway that didn't
  * populate the orderInfo['payment_source'] property.
  *
- * Also, the log filename was incorrectly generated as "paypalr-c-na-nana-*.log" because
+ * Also, the log filename was incorrectly generated as "paypalac-c-na-nana-*.log" because
  * session customer info wasn't available during cron execution.
  *
  * @copyright Copyright 2026 Zen Cart Development Team

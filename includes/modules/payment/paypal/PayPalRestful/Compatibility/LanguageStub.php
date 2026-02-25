@@ -56,8 +56,8 @@ final class LanguageShim extends LanguageShimBase
     {
         $languages = [];
 
-        if (defined('PAYPALR_AVAILABLE_LANGUAGES') && is_array(PAYPALR_AVAILABLE_LANGUAGES)) {
-            foreach (PAYPALR_AVAILABLE_LANGUAGES as $language) {
+        if (defined('PAYPALAC_AVAILABLE_LANGUAGES') && is_array(PAYPALAC_AVAILABLE_LANGUAGES)) {
+            foreach (PAYPALAC_AVAILABLE_LANGUAGES as $language) {
                 if (is_array($language) && isset($language['code'], $language['directory'])) {
                     $languages[] = $this->normaliseLanguageArray($language);
                 } elseif (is_string($language) && $language !== '') {

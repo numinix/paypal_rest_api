@@ -184,7 +184,7 @@
     <?php if ($add_card_mode === true) { ?>
       <script>
         // Expose PayPal client ID for JavaScript
-        window.PAYPAL_CLIENT_ID = '<?php echo MODULE_PAYMENT_PAYPALR_SERVER === "live" ? MODULE_PAYMENT_PAYPALR_CLIENTID_L : MODULE_PAYMENT_PAYPALR_CLIENTID_S; ?>';
+        window.PAYPAL_CLIENT_ID = '<?php echo MODULE_PAYMENT_PAYPALAC_SERVER === "live" ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : MODULE_PAYMENT_PAYPALAC_CLIENTID_S; ?>';
       </script>
       <section class="saved-cards-add-form card mb-4">
         <div class="card-body">
@@ -291,8 +291,8 @@
                 <?php
                   $cardLogoBase = DIR_WS_INCLUDES . 'modules/payment/paypal/PayPalRestful/images/';
                   $acceptedCardBrands = [];
-                  if (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS')) {
-                      $acceptedCardBrands = array_filter(array_map('trim', explode(',', MODULE_PAYMENT_PAYPALR_CREDITCARD_ACCEPTED_CARDS)));
+                  if (defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_ACCEPTED_CARDS')) {
+                      $acceptedCardBrands = array_filter(array_map('trim', explode(',', MODULE_PAYMENT_PAYPALAC_CREDITCARD_ACCEPTED_CARDS)));
                   }
                   if (empty($acceptedCardBrands)) {
                       $acceptedCardBrands = ['amex', 'discover', 'jcb', 'maestro', 'mastercard', 'solo', 'visa'];

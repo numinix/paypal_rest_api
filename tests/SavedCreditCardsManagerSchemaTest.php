@@ -6,7 +6,7 @@ declare(strict_types=1);
  *
  * This test addresses the issue:
  * "MySQL error 1146: Table 'saved_credit_cards_recurring' doesn't exist"
- * which occurred when accessing admin/paypalr_saved_card_recurring.php
+ * which occurred when accessing admin/paypalac_saved_card_recurring.php
  *
  * The fix creates legacy table schemas for backward compatibility with older
  * admin pages and payment modules.

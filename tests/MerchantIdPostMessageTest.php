@@ -110,7 +110,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify handlePopupMessage extracts merchantId from payload
@@ -147,7 +147,7 @@ namespace {
     {
         $passed = true;
 
-        $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+        $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
         $content = file_get_contents($adminFile);
 
         // Check 1: Verify pollStatus sends merchant_id

@@ -122,7 +122,7 @@
             }
 
             // Create setup token via AJAX
-            return fetch('ppr_add_card.php', {
+            return fetch('ppac_add_card.php', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'

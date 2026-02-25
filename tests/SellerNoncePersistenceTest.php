@@ -36,7 +36,7 @@ function testAdminJsStateIncludesSellerNonce(): bool
 {
     $passed = true;
 
-    $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+    $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
     $content = file_get_contents($adminFile);
 
     // Check that state object includes sellerNonce
@@ -57,7 +57,7 @@ function testAdminJsCapturesSellerNonceFromResponse(): bool
 {
     $passed = true;
 
-    $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+    $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
     $content = file_get_contents($adminFile);
 
     // Check that seller_nonce is extracted from response data
@@ -78,7 +78,7 @@ function testStatusPollingIncludesSellerNonce(): bool
 {
     $passed = true;
 
-    $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+    $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
     $content = file_get_contents($adminFile);
 
     // Check that status polling sends seller_nonce
@@ -99,11 +99,11 @@ function testSellerNonceStoredInSession(): bool
 {
     $passed = true;
 
-    $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+    $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
     $content = file_get_contents($adminFile);
 
     // Check that seller_nonce is stored in session
-    if (strpos($content, "['paypalr_isu_seller_nonce']") !== false) {
+    if (strpos($content, "['paypalac_isu_seller_nonce']") !== false) {
         fwrite(STDOUT, "✓ seller_nonce is stored in PHP session\n");
     } else {
         fwrite(STDERR, "FAIL: seller_nonce should be stored in PHP session\n");
@@ -217,11 +217,11 @@ function testCompletionPageIncludesSellerNonce(): bool
 {
     $passed = true;
 
-    $adminFile = DIR_FS_CATALOG . 'admin/paypalr_integrated_signup.php';
+    $adminFile = DIR_FS_CATALOG . 'admin/paypalac_integrated_signup.php';
     $content = file_get_contents($adminFile);
 
     // Check that completion page retrieves seller_nonce from session
-    if (strpos($content, "['paypalr_isu_seller_nonce']") !== false) {
+    if (strpos($content, "['paypalac_isu_seller_nonce']") !== false) {
         fwrite(STDOUT, "✓ Completion page retrieves seller_nonce from session\n");
     } else {
         fwrite(STDERR, "FAIL: Completion page should retrieve seller_nonce from session\n");

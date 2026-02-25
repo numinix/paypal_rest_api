@@ -28,11 +28,11 @@ echo "✓ Test 1 passed - message output works\n\n";
 echo "Test 2: Session messages (archive action simulation)\n";
 echo "-----------------------------------------------------\n";
 $messageStack1 = new messageStack();
-$messageStack1->add_session('paypalr_subscriptions', 'Subscription #123 has been archived.', 'success');
+$messageStack1->add_session('paypalac_subscriptions', 'Subscription #123 has been archived.', 'success');
 
 // Simulate page redirect/reload - create new instance
 $messageStack2 = new messageStack();
-$output = $messageStack2->output('paypalr_subscriptions');
+$output = $messageStack2->output('paypalac_subscriptions');
 echo "Output after 'page reload':\n";
 echo htmlspecialchars($output) . "\n\n";
 
@@ -94,6 +94,6 @@ if ($output === '') {
 
 echo "=== All Tests Complete ===\n";
 echo "\nThis verifies that the MessageStack fix resolves the issue where\n";
-echo "'paypalr_subscriptions' was displayed instead of the actual message.\n";
+echo "'paypalac_subscriptions' was displayed instead of the actual message.\n";
 echo "\nThe output() method now properly formats messages with Bootstrap alert\n";
 echo "classes (alert-success, alert-danger, alert-warning) and escapes HTML.\n";

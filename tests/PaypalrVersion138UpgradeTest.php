@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Test to verify v1.3.8 upgrade properly de-registers the paypalrSavedCardRecurring admin page
+ * Test to verify v1.3.8 upgrade properly de-registers the paypalacSavedCardRecurring admin page
  *
  * This test ensures that:
  * 1. The version constant is updated to 1.3.8
@@ -20,9 +20,9 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify version constant is updated to 1.3.8
 echo "Test 1: Checking version constant...\n";
-$paypalrFile = $basePath . '/includes/modules/payment/paypalr.php';
-if (file_exists($paypalrFile)) {
-    $content = file_get_contents($paypalrFile);
+$paypalacFile = $basePath . '/includes/modules/payment/paypalac.php';
+if (file_exists($paypalacFile)) {
+    $content = file_get_contents($paypalacFile);
     if (strpos($content, "protected const CURRENT_VERSION = '1.3.8'") !== false) {
         echo "✓ CURRENT_VERSION constant is set to 1.3.8\n\n";
     } else {
@@ -30,7 +30,7 @@ if (file_exists($paypalrFile)) {
         exit(1);
     }
 } else {
-    echo "✗ paypalr.php file not found\n\n";
+    echo "✗ paypalac.php file not found\n\n";
     exit(1);
 }
 
@@ -45,7 +45,7 @@ if (strpos($content, "Last updated: v1.3.8") !== false) {
 
 // Test 3: Verify upgrade case exists for v1.3.8
 echo "Test 3: Checking for v1.3.8 upgrade case in tableCheckup()...\n";
-if (preg_match("/case version_compare\(MODULE_PAYMENT_PAYPALR_VERSION, '1\.3\.8', '<'\)/", $content)) {
+if (preg_match("/case version_compare\(MODULE_PAYMENT_PAYPALAC_VERSION, '1\.3\.8', '<'\)/", $content)) {
     echo "✓ Version 1.3.8 upgrade case exists\n\n";
 } else {
     echo "✗ Version 1.3.8 upgrade case not found\n\n";
@@ -54,7 +54,7 @@ if (preg_match("/case version_compare\(MODULE_PAYMENT_PAYPALR_VERSION, '1\.3\.8'
 
 // Test 4: Verify de-registration logic is present
 echo "Test 4: Checking for admin page de-registration logic...\n";
-if (strpos($content, "zen_page_key_exists('paypalrSavedCardRecurring')") !== false &&
+if (strpos($content, "zen_page_key_exists('paypalacSavedCardRecurring')") !== false &&
     strpos($content, "DELETE FROM") !== false &&
     strpos($content, "TABLE_ADMIN_PAGES") !== false) {
     echo "✓ Admin page de-registration logic is present\n\n";
@@ -65,7 +65,7 @@ if (strpos($content, "zen_page_key_exists('paypalrSavedCardRecurring')") !== fal
 
 // Test 5: Verify the page_key matches what was registered in v1.3.5
 echo "Test 5: Checking that page_key matches registration...\n";
-if (preg_match("/WHERE page_key = 'paypalrSavedCardRecurring'/", $content)) {
+if (preg_match("/WHERE page_key = 'paypalacSavedCardRecurring'/", $content)) {
     echo "✓ page_key matches the registered key from v1.3.5\n\n";
 } else {
     echo "✗ page_key does not match\n\n";

@@ -1,6 +1,6 @@
 <?php
 /**
- * A ZenCart-to-PayPal conversion class for Address types used by the PayPalRestful (paypalr) Payment Module
+ * A ZenCart-to-PayPal conversion class for Address types used by the PayPalRestful (paypalac) Payment Module
  *
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0

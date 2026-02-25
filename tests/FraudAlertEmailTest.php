@@ -36,8 +36,8 @@ namespace {
     }
     
     // Define language constants needed by PayPalCommon
-    if (!defined('MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT')) {
-        define('MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT', 'ALERT: PayPal Advanced Checkout (%s)');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT')) {
+        define('MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT', 'ALERT: PayPal Advanced Checkout (%s)');
     }
 
     // Mock database class

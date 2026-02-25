@@ -37,28 +37,28 @@ class base {
 function testCcInfoGetter() {
     echo "Testing getCcInfo getter method...\n\n";
 
-    // Test 1: Verify paypalr_savedcard has getCcInfo method
-    echo "Test 1: Checking paypalr_savedcard has getCcInfo method...\n";
+    // Test 1: Verify paypalac_savedcard has getCcInfo method
+    echo "Test 1: Checking paypalac_savedcard has getCcInfo method...\n";
     
     // Read the file and check for the method
-    $savedcard_content = file_get_contents(DIR_FS_CATALOG . 'includes/modules/payment/paypalr_savedcard.php');
+    $savedcard_content = file_get_contents(DIR_FS_CATALOG . 'includes/modules/payment/paypalac_savedcard.php');
     
     if (strpos($savedcard_content, 'public function getCcInfo(): array') !== false) {
-        echo "✓ paypalr_savedcard has getCcInfo method\n";
+        echo "✓ paypalac_savedcard has getCcInfo method\n";
     } else {
-        echo "✗ FAILED: paypalr_savedcard is missing getCcInfo method\n";
+        echo "✗ FAILED: paypalac_savedcard is missing getCcInfo method\n";
         return false;
     }
 
-    // Test 2: Verify paypalr_creditcard has getCcInfo method
-    echo "\nTest 2: Checking paypalr_creditcard has getCcInfo method...\n";
+    // Test 2: Verify paypalac_creditcard has getCcInfo method
+    echo "\nTest 2: Checking paypalac_creditcard has getCcInfo method...\n";
     
-    $creditcard_content = file_get_contents(DIR_FS_CATALOG . 'includes/modules/payment/paypalr_creditcard.php');
+    $creditcard_content = file_get_contents(DIR_FS_CATALOG . 'includes/modules/payment/paypalac_creditcard.php');
     
     if (strpos($creditcard_content, 'public function getCcInfo(): array') !== false) {
-        echo "✓ paypalr_creditcard has getCcInfo method\n";
+        echo "✓ paypalac_creditcard has getCcInfo method\n";
     } else {
-        echo "✗ FAILED: paypalr_creditcard is missing getCcInfo method\n";
+        echo "✗ FAILED: paypalac_creditcard is missing getCcInfo method\n";
         return false;
     }
 
@@ -178,8 +178,8 @@ echo "\n" . str_repeat("=", 61) . "\n";
 if ($result) {
     echo "✓ All SavedCard CcInfo Getter tests passed!\n\n";
     echo "Summary of the fix:\n";
-    echo "- Added public getCcInfo() method to paypalr_savedcard.php\n";
-    echo "- Added public getCcInfo() method to paypalr_creditcard.php\n";
+    echo "- Added public getCcInfo() method to paypalac_savedcard.php\n";
+    echo "- Added public getCcInfo() method to paypalac_creditcard.php\n";
     echo "- Updated PayPalCommon::createPayPalOrder to use getCcInfo()\n";
     echo "- This allows proper access to the protected ccInfo property\n";
     echo "- Saved card payments now correctly pass vault_id to PayPal\n";

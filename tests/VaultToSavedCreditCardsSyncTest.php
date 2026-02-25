@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * Test that validates the sync of vault records to saved_credit_cards table
- * when NOTIFY_PAYPALR_VAULT_CARD_SAVED is triggered.
+ * when NOTIFY_PAYPALAC_VAULT_CARD_SAVED is triggered.
  */
 
 namespace {
@@ -16,11 +16,11 @@ namespace {
     if (!defined('IS_ADMIN_FLAG')) {
         define('IS_ADMIN_FLAG', false);
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
-        define('MODULE_PAYMENT_PAYPALR_VERSION', '1.0.0');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_VERSION')) {
+        define('MODULE_PAYMENT_PAYPALAC_VERSION', '1.0.0');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_STATUS', 'True');
     }
     if (!defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
         define('TABLE_PAYPAL_SUBSCRIPTIONS', 'paypal_subscriptions');
@@ -183,7 +183,7 @@ namespace {
             ];
 
             $class = new stdClass();
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALR_VAULT_CARD_SAVED', $vaultRecord);
+            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
 
             // Verify that INSERT query was executed
             $insertExecuted = false;
@@ -231,7 +231,7 @@ namespace {
             ];
 
             $class = new stdClass();
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALR_VAULT_CARD_SAVED', $vaultRecord);
+            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
 
             // Verify that SELECT query was executed but INSERT was NOT
             $selectExecuted = false;
@@ -264,7 +264,7 @@ namespace {
             ];
 
             $class = new stdClass();
-            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALR_VAULT_CARD_SAVED', $vaultRecord);
+            $observer->updateNotifyPaypalrVaultCardSaved($class, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $vaultRecord);
 
             // Verify that no INSERT query was executed
             foreach ($this->db->queries as $query) {

@@ -22,20 +22,20 @@ namespace {
     if (!defined('DEFAULT_CURRENCY')) {
         define('DEFAULT_CURRENCY', 'USD');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK')) {
-        define('MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK', 'USD');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK')) {
+        define('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK', 'USD');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE')) {
-        define('MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE', 'Final Sale');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE')) {
+        define('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE', 'Final Sale');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_HANDLING_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_HANDLING_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_HANDLING_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_HANDLING_OT', '');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_INSURANCE_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_INSURANCE_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_INSURANCE_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_INSURANCE_OT', '');
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_DISCOUNT_OT')) {
-        define('MODULE_PAYMENT_PAYPALR_DISCOUNT_OT', '');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT')) {
+        define('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT', '');
     }
     if (!defined('SHIPPING_ORIGIN_ZIP')) {
         define('SHIPPING_ORIGIN_ZIP', '');
@@ -152,10 +152,10 @@ namespace {
     $failures = 0;
 
     // Test 1: Pre-confirmation flow (is_preconfirmation = true)
-    // Should check for 'paypalr_cc_save_card'
+    // Should check for 'paypalac_cc_save_card'
     echo "Test 1: Pre-confirmation flow with save card checkbox checked...\n";
-    $_POST['paypalr_cc_save_card'] = 'on';
-    unset($_POST['ppr_cc_save_card']);
+    $_POST['paypalac_cc_save_card'] = 'on';
+    unset($_POST['ppac_cc_save_card']);
 
     $cc_info_preconf = [
         'name' => 'Jane Doe',
@@ -164,7 +164,7 @@ namespace {
         'expiry_month' => '09',
         'expiry_year' => '2030',
         'store_card' => true,  // This should be set when checkbox is checked
-        'redirect' => 'ppr_listener.php',
+        'redirect' => 'ppac_listener.php',
     ];
     $request_preconf = new CreatePayPalOrderRequest('card', $order, $cc_info_preconf, $order_info, []);
     $payload_preconf = $request_preconf->get();
@@ -181,10 +181,10 @@ namespace {
     }
 
     // Test 2: Regular 3-page checkout flow (is_preconfirmation = false)
-    // Should also check for 'paypalr_cc_save_card' after the fix
+    // Should also check for 'paypalac_cc_save_card' after the fix
     echo "\nTest 2: Regular checkout flow with save card checkbox checked...\n";
-    $_POST['paypalr_cc_save_card'] = 'on';
-    unset($_POST['ppr_cc_save_card']);
+    $_POST['paypalac_cc_save_card'] = 'on';
+    unset($_POST['ppac_cc_save_card']);
 
     $cc_info_regular = [
         'name' => 'Jane Doe',
@@ -193,7 +193,7 @@ namespace {
         'expiry_month' => '09',
         'expiry_year' => '2030',
         'store_card' => true,  // This should be set when checkbox is checked
-        'redirect' => 'ppr_listener.php',
+        'redirect' => 'ppac_listener.php',
     ];
     $request_regular = new CreatePayPalOrderRequest('card', $order, $cc_info_regular, $order_info, []);
     $payload_regular = $request_regular->get();
@@ -211,8 +211,8 @@ namespace {
 
     // Test 3: Verify all cards are vaulted (the visibility is controlled separately)
     echo "\nTest 3: Checkbox not checked (all cards are vaulted, visibility controlled separately)...\n";
-    unset($_POST['paypalr_cc_save_card']);
-    unset($_POST['ppr_cc_save_card']);
+    unset($_POST['paypalac_cc_save_card']);
+    unset($_POST['ppac_cc_save_card']);
 
     $cc_info_nosave = [
         'name' => 'Jane Doe',
@@ -221,7 +221,7 @@ namespace {
         'expiry_month' => '09',
         'expiry_year' => '2030',
         'store_card' => false,  // This is false when checkbox is not checked, but card is still vaulted
-        'redirect' => 'ppr_listener.php',
+        'redirect' => 'ppac_listener.php',
     ];
     $request_nosave = new CreatePayPalOrderRequest('card', $order, $cc_info_nosave, $order_info, []);
     $payload_nosave = $request_nosave->get();

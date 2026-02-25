@@ -10,7 +10,7 @@
  * Issue: Setting these properties as inline styles via JavaScript may not work
  * correctly with WebKit's <apple-pay-button> custom element on iOS Safari.
  *
- * Solution: Define CSS custom properties in paypalr.css, not in JavaScript.
+ * Solution: Define CSS custom properties in paypalac.css, not in JavaScript.
  *
  * @copyright Copyright 2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -21,7 +21,7 @@ $testPassed = true;
 $errors = [];
 
 // Get the CSS file content
-$cssFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/paypalr.css';
+$cssFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/paypalac.css';
 if (!file_exists($cssFile)) {
     echo "❌ CSS file not found: {$cssFile}\n";
     exit(1);
@@ -30,7 +30,7 @@ if (!file_exists($cssFile)) {
 $css = file_get_contents($cssFile);
 
 // Get the JavaScript file content
-$jsFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js';
+$jsFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js';
 if (!file_exists($jsFile)) {
     echo "❌ JavaScript file not found: {$jsFile}\n";
     exit(1);
@@ -121,7 +121,7 @@ if (preg_match('/apple-pay-button\s*\{[^}]+\}/s', $css, $matches)) {
 if ($testPassed) {
     echo "All Apple Pay button CSS custom properties tests passed! ✓\n\n";
     echo "Summary:\n";
-    echo "- CSS custom properties are defined in paypalr.css\n";
+    echo "- CSS custom properties are defined in paypalac.css\n";
     echo "- --apple-pay-button-width, --apple-pay-button-height, and --apple-pay-button-border-radius are in the CSS\n";
     echo "- JavaScript does NOT set these properties as inline styles\n";
     echo "- This ensures proper rendering on iOS Safari\n\n";

@@ -22,17 +22,17 @@ class DoVoid
         global $db, $messageStack;
 
         if (!isset($_POST['ppr-void-id'], $_POST['doVoidOid'], $_POST['ppr-void-note']) || $oID !== (int)$_POST['doVoidOid']) {
-            $messageStack->add_session(MODULE_PAYMENT_PAYPALR_VOID_PARAM_ERROR, 'error');
+            $messageStack->add_session(MODULE_PAYMENT_PAYPALAC_VOID_PARAM_ERROR, 'error');
             return;
         }
 
         // -----
         // The order needs to have at least one authorization to be voided.
         //
-        $ppr_txns = new GetPayPalOrderTransactions($module_name, $module_version, $oID, $ppr);
-        $ppr_db_txns = $ppr_txns->getDatabaseTxns('AUTHORIZE');
-        if (count($ppr_db_txns) === 0) {
-            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_NO_RECORDS, 'AUTHORIZE', $oID), 'error');
+        $ppac_txns = new GetPayPalOrderTransactions($module_name, $module_version, $oID, $ppr);
+        $ppac_db_txns = $ppac_txns->getDatabaseTxns('AUTHORIZE');
+        if (count($ppac_db_txns) === 0) {
+            $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_NO_RECORDS, 'AUTHORIZE', $oID), 'error');
             return;
         }
 
@@ -40,10 +40,10 @@ class DoVoid
         // Only the primary authorization (when the order was initially created) can be voided and
         // its transaction-id must match that entered for the void.
         //
-        $main_txn = $ppr_txns->getDatabaseTxns('CREATE');
+        $main_txn = $ppac_txns->getDatabaseTxns('CREATE');
         $auth_id_txn = false;
         $auth_txn_parent_id = '';
-        foreach ($ppr_db_txns as $next_txn) {
+        foreach ($ppac_db_txns as $next_txn) {
             if ($next_txn['txn_id'] === $_POST['ppr-void-id']) {
                 $auth_id_txn = $next_txn;
                 $auth_txn_parent_id = $next_txn['parent_txn_id'];
@@ -51,13 +51,13 @@ class DoVoid
             }
         }
         if ($auth_id_txn === false || $auth_txn_parent_id !== $main_txn[0]['txn_id']) {
-            $messageStack->add_session(MODULE_PAYMENT_PAYPALR_VOID_BAD_AUTH_ID, 'error');
+            $messageStack->add_session(MODULE_PAYMENT_PAYPALAC_VOID_BAD_AUTH_ID, 'error');
             return;
         }
 
         $void_response = $ppr->voidPayment($_POST['ppr-void-id']);
         if ($void_response === false) {
-             $messageStack->add_session(MODULE_PAYMENT_PAYPALR_VOID_ERROR . "\n" . json_encode($ppr->getErrorInfo()), 'error');
+             $messageStack->add_session(MODULE_PAYMENT_PAYPALAC_VOID_ERROR . "\n" . json_encode($ppr->getErrorInfo()), 'error');
              return;
         }
 
@@ -80,11 +80,11 @@ class DoVoid
         // The order's status is unchanged if previous captures have been performed,
         // otherwise, goes to 'voided'.
         //
-        $captured_txns = $ppr_txns->getDatabaseTxns('CAPTURE');
+        $captured_txns = $ppac_txns->getDatabaseTxns('CAPTURE');
         if (count($captured_txns) !== 0) {
             $voided_status = -1;
         } else {
-            $voided_status = (int)MODULE_PAYMENT_PAYPALR_VOIDED_STATUS_ID;
+            $voided_status = (int)MODULE_PAYMENT_PAYPALAC_VOIDED_STATUS_ID;
             $voided_status = ($voided_status > 0) ? $voided_status : 1;
         }
 
@@ -93,6 +93,6 @@ class DoVoid
             strip_tags($_POST['ppr-void-note']);
         zen_update_orders_history($oID, $comments, null, $voided_status, 0);
 
-        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALR_VOID_COMPLETE, $oID), 'warning');
+        $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_VOID_COMPLETE, $oID), 'warning');
     }
 }

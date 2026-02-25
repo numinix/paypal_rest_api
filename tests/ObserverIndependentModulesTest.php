@@ -1,9 +1,9 @@
 <?php
 /**
  * Test to verify that the observer initializes when any PayPal payment module is enabled,
- * not just the base paypalr module. This ensures wallet modules can function independently.
+ * not just the base paypalac module. This ensures wallet modules can function independently.
  *
- * Issue: If paypalr.php is disabled (but still installed), the wallet modules should still
+ * Issue: If paypalac.php is disabled (but still installed), the wallet modules should still
  * be able to process payments on their own using the shared credentials.
  */
 declare(strict_types=1);
@@ -27,19 +27,19 @@ function testObserverChecksAnyModuleEnabled(): bool
         $observerFile = DIR_FS_CATALOG . $observerPath;
         $content = file_get_contents($observerFile);
         
-        // Check that the code first checks for MODULE_PAYMENT_PAYPALR_VERSION (base module installed)
-        if (strpos($content, 'MODULE_PAYMENT_PAYPALR_VERSION') === false) {
+        // Check that the code first checks for MODULE_PAYMENT_PAYPALAC_VERSION (base module installed)
+        if (strpos($content, 'MODULE_PAYMENT_PAYPALAC_VERSION') === false) {
             fwrite(STDERR, "FAIL: $observerPath doesn't check if base module is installed\n");
             return false;
         }
         
         // Check that the code checks for each module's status being 'True' with OR logic
         // This ensures any enabled module will allow the observer to initialize
-        $hasBaseCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_STATUS === 'True'") !== false;
-        $hasCreditCardCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS === 'True'") !== false;
-        $hasApplePayCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True'") !== false;
-        $hasGooglePayCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True'") !== false;
-        $hasVenmoCheck = strpos($content, "MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True'") !== false;
+        $hasBaseCheck = strpos($content, "MODULE_PAYMENT_PAYPALAC_STATUS === 'True'") !== false;
+        $hasCreditCardCheck = strpos($content, "MODULE_PAYMENT_PAYPALAC_CREDITCARD_STATUS === 'True'") !== false;
+        $hasApplePayCheck = strpos($content, "MODULE_PAYMENT_PAYPALAC_APPLEPAY_STATUS === 'True'") !== false;
+        $hasGooglePayCheck = strpos($content, "MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_STATUS === 'True'") !== false;
+        $hasVenmoCheck = strpos($content, "MODULE_PAYMENT_PAYPALAC_VENMO_STATUS === 'True'") !== false;
         
         if (!$hasBaseCheck) {
             fwrite(STDERR, "FAIL: $observerPath doesn't check base module status\n");
@@ -94,9 +94,9 @@ function testObserverRequiresBaseModuleInstalled(): bool
         $observerFile = DIR_FS_CATALOG . $observerPath;
         $content = file_get_contents($observerFile);
         
-        // The observer should check MODULE_PAYMENT_PAYPALR_VERSION first
+        // The observer should check MODULE_PAYMENT_PAYPALAC_VERSION first
         // and return early if not defined
-        $pattern = '/if\s*\(\s*!defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALR_VERSION[\'"]\s*\)\s*\)\s*\{/';
+        $pattern = '/if\s*\(\s*!defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALAC_VERSION[\'"]\s*\)\s*\)\s*\{/';
         if (!preg_match($pattern, $content)) {
             fwrite(STDERR, "FAIL: $observerPath doesn't check if base module is installed before checking statuses\n");
             return false;
@@ -123,13 +123,13 @@ function testOldPatternRemoved(): bool
         $content = file_get_contents($observerFile);
         
         // The old pattern that caused the bug was:
-        // if (!defined('MODULE_PAYMENT_PAYPALR_STATUS') || MODULE_PAYMENT_PAYPALR_STATUS !== 'True')
+        // if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS') || MODULE_PAYMENT_PAYPALAC_STATUS !== 'True')
         // This should NOT exist anymore - observers should check VERSION first, then check
         // if ANY module is enabled (not just STATUS alone with OR for undefined check)
         
         // Build regex pattern to detect the problematic pattern
-        $definedCheck = '!defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALR_STATUS[\'"]\s*\)';
-        $statusCheck = 'MODULE_PAYMENT_PAYPALR_STATUS\s*!==\s*[\'"]True[\'"]';
+        $definedCheck = '!defined\s*\(\s*[\'"]MODULE_PAYMENT_PAYPALAC_STATUS[\'"]\s*\)';
+        $statusCheck = 'MODULE_PAYMENT_PAYPALAC_STATUS\s*!==\s*[\'"]True[\'"]';
         $oldPattern = '/if\s*\(\s*' . $definedCheck . '\s*\|\|\s*' . $statusCheck . '\s*\)/';
         
         if (preg_match($oldPattern, $content)) {

@@ -20,13 +20,13 @@ class WebhookController
 {
     protected bool $enableDebugFileLogging;
     /** @var Logger */
-    protected $ppr_logger;
+    protected $ppac_logger;
 
     public function __construct(?bool $enableDebugFileLogging = null)
     {
         if ($enableDebugFileLogging === null) {
-            $enableDebugFileLogging = defined('MODULE_PAYMENT_PAYPALR_DEBUGGING')
-                && strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false;
+            $enableDebugFileLogging = defined('MODULE_PAYMENT_PAYPALAC_DEBUGGING')
+                && strpos(MODULE_PAYMENT_PAYPALAC_DEBUGGING, 'Log') !== false;
         }
 
         $this->enableDebugFileLogging = $enableDebugFileLogging;
@@ -46,15 +46,15 @@ class WebhookController
         $logIdentifier = $json_body['id'] ?? $json_body['event_type'] ?? '';
 
         // Create logger, just for logging to /logs directory
-        $this->ppr_logger = new Logger($logIdentifier);
+        $this->ppac_logger = new Logger($logIdentifier);
 
         // Enable logging
         if ($this->enableDebugFileLogging) {
-            $this->ppr_logger->enableDebug();
+            $this->ppac_logger->enableDebug();
         }
 
         // log that we got an incoming webhook, and its details
-        $this->ppr_logger->write("ppr_webhook ($event, $user_agent, $request_method) starts.\n" . Logger::logJSON($json_body), true);
+        $this->ppac_logger->write("ppac_webhook ($event, $user_agent, $request_method) starts.\n" . Logger::logJSON($json_body), true);
 
         // set object, which will be used for validation and for dispatching
         $webhook = new WebhookObject($request_method, $request_headers, $request_body, $user_agent);
@@ -64,7 +64,7 @@ class WebhookController
 
         // Ensure that the incoming request contains headers etc relevant to PayPal
         if (!$verifier->shouldRespond()) {
-            $this->ppr_logger->write('ppr_webhook IGNORED DUE TO HEADERS MISMATCH' . "\n" . print_r($request_headers, true), false, 'before');
+            $this->ppac_logger->write('ppac_webhook IGNORED DUE TO HEADERS MISMATCH' . "\n" . print_r($request_headers, true), false, 'before');
             $this->saveToDatabase($user_agent, $request_method, $request_body, $request_headers, 'ignored');
             return false;
         }
@@ -81,13 +81,13 @@ class WebhookController
 
         // This should never happen, but we must abort if verification fails.
         if ($status === false) {
-            $this->ppr_logger->write('ppr_webhook FAILED VERIFICATION', false, 'before');
-            // The verifier already sent an HTTP response, so we just exit here by returning false to the ppr_webhook handler script.
+            $this->ppac_logger->write('ppac_webhook FAILED VERIFICATION', false, 'before');
+            // The verifier already sent an HTTP response, so we just exit here by returning false to the ppac_webhook handler script.
             $this->saveToDatabase($user_agent, $request_method, $request_body, $request_headers, 'failed');
             return false;
         }
 
-        $this->ppr_logger->write("\n\n" . 'webhook verification passed', false, 'before');
+        $this->ppac_logger->write("\n\n" . 'webhook verification passed', false, 'before');
 
         // Log the verified webhook to the database
         $this->saveToDatabase($user_agent, $request_method, $request_body, $request_headers, 'verified');
@@ -102,11 +102,11 @@ class WebhookController
         $objectName = 'PayPalRestful\Webhooks\Events\\' . $this->strToStudly($event);
 
         if (class_exists($objectName)) {
-//debug:    $this->ppr_logger->write('class found: ' . $objectName, false, 'before');
+//debug:    $this->ppac_logger->write('class found: ' . $objectName, false, 'before');
 
             $call = new $objectName($webhook);
             if ($call->eventTypeIsSupported()) {
-                $this->ppr_logger->write("\n\n" . 'webhook event supported by ' . $objectName . "\n", false, 'before');
+                $this->ppac_logger->write("\n\n" . 'webhook event supported by ' . $objectName . "\n", false, 'before');
 
                 // dispatch to take the necessary action for the webhook
                 $call->action();
@@ -114,7 +114,7 @@ class WebhookController
                 return true;
             }
         }
-        $this->ppr_logger->write('class NOT found: ' . $objectName, false, 'before');
+        $this->ppac_logger->write('class NOT found: ' . $objectName, false, 'before');
         return false;
     }
 

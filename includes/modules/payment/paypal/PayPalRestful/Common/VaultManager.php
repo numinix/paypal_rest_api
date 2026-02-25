@@ -1,6 +1,6 @@
 <?php
 /**
- * VaultManager.php maintains PayPal vault metadata for the PayPalRestful (paypalr) payment module.
+ * VaultManager.php maintains PayPal vault metadata for the PayPalRestful (paypalac) payment module.
  *
  * The vault stores per-customer payment tokens for Advanced Credit and Debit Card
  * transactions so that other plugins (for example, recurring billing extensions)

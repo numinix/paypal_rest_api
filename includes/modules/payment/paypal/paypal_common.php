@@ -3,8 +3,8 @@
  * PayPalCommon
  *
  * A shared class to centralize common PayPal functions for all PayPal payment modules.
- * This class contains helper methods used by paypalr and its variant modules
- * (paypalr_googlepay, paypalr_applepay, paypalr_venmo).
+ * This class contains helper methods used by paypalac and its variant modules
+ * (paypalac_googlepay, paypalac_applepay, paypalac_venmo).
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -32,7 +32,7 @@ class PayPalCommon {
     /**
      * Constructor
      *
-     * @param object $paymentModule The payment module instance (paypalr or variant)
+     * @param object $paymentModule The payment module instance (paypalac or variant)
      */
     public function __construct($paymentModule) {
         $this->paymentModule = $paymentModule;
@@ -54,8 +54,8 @@ class PayPalCommon {
             return;
         }
 
-        $_POST['ppr_type'] = $walletType;
-        $_SESSION['PayPalRestful']['ppr_type'] = $walletType;
+        $_POST['ppac_type'] = $walletType;
+        $_SESSION['PayPalRestful']['ppac_type'] = $walletType;
 
         $payloadRaw = $_POST[$payloadFieldName] ?? '';
         $payload = null;
@@ -174,11 +174,11 @@ class PayPalCommon {
                 $error_info = $this->paymentModule->ppr->getErrorInfo();
                 $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
                 $this->paymentModule->sendAlertEmail(
-                    MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN,
-                    MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
+                    MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN,
+                    MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
                 );
                 $this->paymentModule->setMessageAndRedirect(
-                    sprintf(MODULE_PAYMENT_PAYPALR_TEXT_CREATE_ORDER_ISSUE, $errorMessages['title'], $error_code),
+                    sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE, $errorMessages['title'], $error_code),
                     FILENAME_CHECKOUT_PAYMENT
                 );
             }
@@ -372,7 +372,7 @@ class PayPalCommon {
     /**
      * Load wallet-specific language file
      *
-     * @param string $code The module code (e.g., 'paypalr_googlepay')
+     * @param string $code The module code (e.g., 'paypalac_googlepay')
      * @return void
      */
     public function loadWalletLanguageFile($code) {
@@ -529,7 +529,7 @@ class PayPalCommon {
         }
 
         // Build and insert the database records
-        // Insert two records like the base paypalr module:
+        // Insert two records like the base paypalac module:
         // 1. CREATE record (the PayPal order creation)
         // 2. CAPTURE/AUTHORIZE record (the payment transaction)
         global $db;
@@ -592,7 +592,7 @@ class PayPalCommon {
         
         if ($orderInfo['txn_type'] === 'CAPTURE') {
             global $zco_notifier;
-            $zco_notifier->notify('NOTIFY_PAYPALR_FUNDS_CAPTURED', $sql_data_array);
+            $zco_notifier->notify('NOTIFY_PAYPALAC_FUNDS_CAPTURED', $sql_data_array);
         }
         
         $orderInfo['admin_alert_needed'] = ($payment['status'] !== PayPalRestfulApi::STATUS_COMPLETED);
@@ -619,7 +619,7 @@ class PayPalCommon {
 
         $storedVault = VaultManager::saveVaultedCard($customers_id, $orders_id, $card_source);
         if ($storedVault !== null) {
-            $this->paymentModule->notify('NOTIFY_PAYPALR_VAULT_CARD_SAVED', $storedVault);
+            $this->paymentModule->notify('NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $storedVault);
         }
 
         return $storedVault;
@@ -673,7 +673,7 @@ class PayPalCommon {
             zen_mail(
                 STORE_NAME,
                 STORE_OWNER_EMAIL_ADDRESS,
-                sprintf(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT, $subject_detail),
+                sprintf(MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT, $subject_detail),
                 $message,
                 STORE_OWNER,
                 STORE_OWNER_EMAIL_ADDRESS,
@@ -769,17 +769,17 @@ class PayPalCommon {
      * @param Logger $log Logger instance
      * @param string $payment_source Payment source name (e.g., 'google_pay')
      * @param string $transaction_mode Transaction mode (Final Sale, Auth Only, etc.)
-     * @param string $ppr_type Payment type (e.g., 'apple_pay', 'google_pay', 'venmo')
+     * @param string $ppac_type Payment type (e.g., 'apple_pay', 'google_pay', 'venmo')
      * @return array|false
      */
-    public function captureWalletPayment(PayPalRestfulApi $ppr, Logger $log, string $payment_source, string $transaction_mode, string $ppr_type)
+    public function captureWalletPayment(PayPalRestfulApi $ppr, Logger $log, string $payment_source, string $transaction_mode, string $ppac_type)
     {
         $paypal_order_id = $_SESSION['PayPalRestful']['Order']['id'];
         
         // Determine if we should capture or authorize based on transaction mode
         // For wallets, "Auth Only (Card-Only)" should still use capture since wallet != card
         $should_capture = ($transaction_mode === self::TRANSACTION_MODE_FINAL_SALE ||
-                          ($ppr_type !== 'card' && $transaction_mode === self::TRANSACTION_MODE_AUTH_CARD_ONLY));
+                          ($ppac_type !== 'card' && $transaction_mode === self::TRANSACTION_MODE_AUTH_CARD_ONLY));
         
         $log->write("$payment_source: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
 
@@ -844,7 +844,7 @@ class PayPalCommon {
     public function resetOrder()
     {
         unset($_SESSION['PayPalRestful']['Order']);
-        $_SESSION['PayPalRestful']['ppr_type'] = '';
+        $_SESSION['PayPalRestful']['ppac_type'] = '';
         unset($_SESSION['ppcheckout']);
     }
 
@@ -857,10 +857,10 @@ class PayPalCommon {
      * in cart contents, order totals, and wallet payloads.
      *
      * @param \order $order Order object
-     * @param string $ppr_type Payment type
+     * @param string $ppac_type Payment type
      * @return string
      */
-    public function createOrderGuid($order, string $ppr_type): string
+    public function createOrderGuid($order, string $ppac_type): string
     {
         $orders_completed = $_SESSION['PayPalRestful']['CompletedOrders'] ?? 0;
 
@@ -873,7 +873,7 @@ class PayPalCommon {
             $_SESSION['customer_id']
             . $_SESSION['cartID']
             . $orders_completed
-            . $ppr_type
+            . $ppac_type
             . $cart_data
             . (isset($order->info['total']) ? (string)(float)$order->info['total'] : '')
             . (isset($order->info['shipping_cost']) ? (string)(float)$order->info['shipping_cost'] : '')
@@ -883,8 +883,8 @@ class PayPalCommon {
             $hash_data .= (string)(float)$_SESSION['storecredit'];
         }
 
-        if (in_array($ppr_type, ['apple_pay', 'google_pay', 'venmo'], true)) {
-            $wallet_payload = $_SESSION['PayPalRestful']['WalletPayload'][$ppr_type] ?? null;
+        if (in_array($ppac_type, ['apple_pay', 'google_pay', 'venmo'], true)) {
+            $wallet_payload = $_SESSION['PayPalRestful']['WalletPayload'][$ppac_type] ?? null;
             if (is_array($wallet_payload) && !empty($wallet_payload)) {
                 $hash_data .= json_encode($wallet_payload);
             }
@@ -920,26 +920,26 @@ class PayPalCommon {
             ?? '';
 
         $message =
-            MODULE_PAYMENT_PAYPALR_PAYMENT_TRANSACTION_ID . (($paypal_payment_id === '') ? 'n/a' : $paypal_payment_id) . "\n" .
-            MODULE_PAYMENT_PAYPALR_PAYPAL_ORDER_ID . (($paypal_order_id === '') ? 'n/a' : $paypal_order_id) . "\n" .
-            sprintf(MODULE_PAYMENT_PAYPALR_TRANSACTION_TYPE, $payment_info['payment_type'] ?? $payment_type) . "\n" .
+            MODULE_PAYMENT_PAYPALAC_PAYMENT_TRANSACTION_ID . (($paypal_payment_id === '') ? 'n/a' : $paypal_payment_id) . "\n" .
+            MODULE_PAYMENT_PAYPALAC_PAYPAL_ORDER_ID . (($paypal_order_id === '') ? 'n/a' : $paypal_order_id) . "\n" .
+            sprintf(MODULE_PAYMENT_PAYPALAC_TRANSACTION_TYPE, $payment_info['payment_type'] ?? $payment_type) . "\n" .
             $timestamp .
-            MODULE_PAYMENT_PAYPALR_TRANSACTION_PAYMENT_STATUS . ($orderInfo['payment_status'] ?? '') . "\n" .
-            MODULE_PAYMENT_PAYPALR_TRANSACTION_AMOUNT . ($payment_info['amount'] ?? '') . "\n";
+            MODULE_PAYMENT_PAYPALAC_TRANSACTION_PAYMENT_STATUS . ($orderInfo['payment_status'] ?? '') . "\n" .
+            MODULE_PAYMENT_PAYPALAC_TRANSACTION_AMOUNT . ($payment_info['amount'] ?? '') . "\n";
 
         $payment_source_type = $orderInfo['payment_info']['payment_type'] ?? $payment_type;
-        $message .= MODULE_PAYMENT_PAYPALR_FUNDING_SOURCE . $payment_source_type . "\n";
+        $message .= MODULE_PAYMENT_PAYPALAC_FUNDING_SOURCE . $payment_source_type . "\n";
 
         if (!empty($orderInfo['payment_source'][$payment_source_type]['email_address'])) {
-            $message .= MODULE_PAYMENT_PAYPALR_BUYER_EMAIL . $orderInfo['payment_source'][$payment_source_type]['email_address'] . "\n";
+            $message .= MODULE_PAYMENT_PAYPALAC_BUYER_EMAIL . $orderInfo['payment_source'][$payment_source_type]['email_address'] . "\n";
         }
 
         zen_update_orders_history($orderInfo['orders_id'], $message, null, -1, 0);
 
         if (($orderInfo['admin_alert_needed'] ?? false) === true) {
             $this->sendAlertEmail(
-                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN ?? 'Order Attention',
-                sprintf(MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION ?? 'Order %d created with status %s', $orderInfo['orders_id'], $orderInfo['paypal_payment_status'])
+                MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN ?? 'Order Attention',
+                sprintf(MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATION ?? 'Order %d created with status %s', $orderInfo['orders_id'], $orderInfo['paypal_payment_status'])
             );
         }
     }
@@ -1057,15 +1057,15 @@ class PayPalCommon {
      * @param PayPalRestfulApi $ppr PayPal API instance
      * @param Logger $log Logger instance
      * @param string $transaction_mode Transaction mode (Final Sale, Auth Only, etc.)
-     * @param string $ppr_type Payment type (card, paypal, etc.)
+     * @param string $ppac_type Payment type (card, paypal, etc.)
      * @return array|false Response array or false on failure
      */
-    public function processCreditCardPayment(PayPalRestfulApi $ppr, Logger $log, string $transaction_mode, string $ppr_type)
+    public function processCreditCardPayment(PayPalRestfulApi $ppr, Logger $log, string $transaction_mode, string $ppac_type)
     {
         $paypal_order_id = $_SESSION['PayPalRestful']['Order']['id'] ?? '';
 
         $log->write(
-            "processCreditCardPayment($ppr_type) starting.\n" .
+            "processCreditCardPayment($ppac_type) starting.\n" .
             "  PayPal Order ID: " . ($paypal_order_id ?: 'NOT SET') . "\n" .
             "  Transaction Mode: $transaction_mode\n" .
             "  Session payment source: " . ($_SESSION['PayPalRestful']['Order']['payment_source'] ?? 'not set')
@@ -1108,7 +1108,7 @@ class PayPalCommon {
 
         // Determine if we should capture or authorize based on transaction mode
         $should_capture = ($transaction_mode === self::TRANSACTION_MODE_FINAL_SALE ||
-                          ($ppr_type !== 'card' && $transaction_mode === self::TRANSACTION_MODE_AUTH_CARD_ONLY));
+                          ($ppac_type !== 'card' && $transaction_mode === self::TRANSACTION_MODE_AUTH_CARD_ONLY));
 
         $log->write("processCreditCardPayment: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
 
@@ -1150,11 +1150,11 @@ class PayPalCommon {
      * @param object $paymentModule The payment module instance
      * @param object $order The Zen Cart order object
      * @param array $order_info Order totals information
-     * @param string $ppr_type Payment type (card, paypal, google_pay, etc.)
+     * @param string $ppac_type Payment type (card, paypal, google_pay, etc.)
      * @param object $currencies Currency object
      * @return bool True on success, false on failure
      */
-    public function createPayPalOrder($paymentModule, $order, array $order_info, string $ppr_type, $currencies): bool
+    public function createPayPalOrder($paymentModule, $order, array $order_info, string $ppac_type, $currencies): bool
     {
         /** @var zcObserverPaypalrestful $zcObserverPaypalrestful */
         global $zcObserverPaypalrestful;
@@ -1162,11 +1162,11 @@ class PayPalCommon {
         $log = new Logger();
 
         // Create a GUID (Globally Unique IDentifier) for the order's current 'state'.
-        $order_guid = $this->createOrderGuid($order, $ppr_type);
+        $order_guid = $this->createOrderGuid($order, $ppac_type);
 
         // If a PayPal order already exists in the session for this GUID, reuse it.
         if (isset($_SESSION['PayPalRestful']['Order']['guid']) && $_SESSION['PayPalRestful']['Order']['guid'] === $order_guid) {
-            $log->write("createPayPalOrder($ppr_type): Reusing existing PayPal order with GUID: $order_guid");
+            $log->write("createPayPalOrder($ppac_type): Reusing existing PayPal order with GUID: $order_guid");
             return true;
         }
 
@@ -1177,7 +1177,7 @@ class PayPalCommon {
         if (method_exists($paymentModule, 'getCcInfo')) {
             $cc_info = $paymentModule->getCcInfo();
         } else {
-            // Fallback for modules that don't have the getter (e.g., paypalr main module)
+            // Fallback for modules that don't have the getter (e.g., paypalac main module)
             $cc_info = property_exists($paymentModule, 'ccInfo') ? ($paymentModule->ccInfo ?? []) : [];
         }
 
@@ -1195,7 +1195,7 @@ class PayPalCommon {
             ];
         }
         $log->write(
-            "createPayPalOrder($ppr_type): Building PayPal order request.\n" .
+            "createPayPalOrder($ppac_type): Building PayPal order request.\n" .
             "  GUID: $order_guid\n" .
             "  Module: " . ($paymentModule->code ?? 'unknown') . "\n" .
             "  CC Info: " . Logger::logJSON($cc_info_debug)
@@ -1206,7 +1206,7 @@ class PayPalCommon {
             : [];
 
         $create_order_request = new \PayPalRestful\Zc2Pp\CreatePayPalOrderRequest(
-            $ppr_type,
+            $ppac_type,
             $order,
             $cc_info,
             $order_info,
@@ -1216,8 +1216,8 @@ class PayPalCommon {
         $order_amount_mismatch = $create_order_request->getBreakdownMismatch();
         if (count($order_amount_mismatch) !== 0) {
             $paymentModule->sendAlertEmail(
-                MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_TOTAL_MISMATCH,
-                MODULE_PAYMENT_PAYPALR_ALERT_TOTAL_MISMATCH . "\n\n" . Logger::logJSON($order_amount_mismatch)
+                MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_TOTAL_MISMATCH,
+                MODULE_PAYMENT_PAYPALAC_ALERT_TOTAL_MISMATCH . "\n\n" . Logger::logJSON($order_amount_mismatch)
             );
         }
 
@@ -1239,7 +1239,7 @@ class PayPalCommon {
         }
 
         $log->write(
-            "createPayPalOrder($ppr_type): Sending order to PayPal.\n" .
+            "createPayPalOrder($ppac_type): Sending order to PayPal.\n" .
             "  Payment source type: $payment_source_type\n" .
             "  Has vault_id in source: $has_vault_id"
         );
@@ -1249,7 +1249,7 @@ class PayPalCommon {
         if ($paypal_order === false) {
             $error_info = $paymentModule->ppr->getErrorInfo();
             $log->write(
-                "createPayPalOrder($ppr_type): PayPal order creation FAILED.\n" .
+                "createPayPalOrder($ppac_type): PayPal order creation FAILED.\n" .
                 "  Error: " . Logger::logJSON($error_info)
             );
             if (method_exists($paymentModule, 'getErrorInfo')) {
@@ -1262,7 +1262,7 @@ class PayPalCommon {
         $status = $paypal_order['status'];
 
         $log->write(
-            "createPayPalOrder($ppr_type): PayPal order created successfully.\n" .
+            "createPayPalOrder($ppac_type): PayPal order created successfully.\n" .
             "  PayPal Order ID: $paypal_id\n" .
             "  Status: $status"
         );
@@ -1281,7 +1281,7 @@ class PayPalCommon {
             'id' => $paypal_id,
             'status' => $status,
             'guid' => $order_guid,
-            'payment_source' => $ppr_type,
+            'payment_source' => $ppac_type,
             'amount_mismatch' => $order_amount_mismatch,
         ];
 

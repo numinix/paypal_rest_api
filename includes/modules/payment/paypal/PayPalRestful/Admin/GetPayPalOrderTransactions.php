@@ -85,7 +85,7 @@ class GetPayPalOrderTransactions
         $this->getPayPalUpdates();
 
         if ($this->externalTxnAdded === true) {
-            $this->messages->add(MODULE_PAYMENT_PAYPALR_EXTERNAL_ADDITION, 'warning');
+            $this->messages->add(MODULE_PAYMENT_PAYPALAC_EXTERNAL_ADDITION, 'warning');
         }
 
         if (!\property_exists($this->messages, 'size') || $this->messages->size !== 0) {
@@ -176,7 +176,7 @@ class GetPayPalOrderTransactions
         if ($txns === false) {
             $error_info = $this->ppr->getErrorInfo();
             if ($error_info['name'] !== 'RESOURCE_NOT_FOUND') {
-                $this->messages->add(MODULE_PAYMENT_PAYPALR_TEXT_GETDETAILS_ERROR . "\n" . Logger::logJSON($error_info), 'error');
+                $this->messages->add(MODULE_PAYMENT_PAYPALAC_TEXT_GETDETAILS_ERROR . "\n" . Logger::logJSON($error_info), 'error');
             }
             return;
         }
@@ -345,7 +345,7 @@ class GetPayPalOrderTransactions
         //
         if ($txn_type === 'CAPTURE' || $txn_type === 'REFUND') {
             global $zco_notifier;
-            $zco_notifier->notify('NOTIFY_PAYPALR_ADMIN_FUNDS_IN_OUT', $sql_data_array);
+            $zco_notifier->notify('NOTIFY_PAYPALAC_ADMIN_FUNDS_IN_OUT', $sql_data_array);
         }
 
         return $parent_txn_id;

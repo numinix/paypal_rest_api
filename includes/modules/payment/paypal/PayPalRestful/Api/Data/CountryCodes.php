@@ -1,6 +1,6 @@
 <?php
 /**
- * An API-data class for Countries used by the PayPalRestful (paypalr) Payment Module
+ * An API-data class for Countries used by the PayPalRestful (paypalac) Payment Module
  *
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0

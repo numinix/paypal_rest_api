@@ -1,6 +1,6 @@
 <?php
 /**
- * Test that verifies the paypalr_savedcard module has the proper admin notification
+ * Test that verifies the paypalac_savedcard module has the proper admin notification
  * features to enable refund functionality.
  * 
  * Bug fix: The saved card module was missing the external transaction handling
@@ -12,22 +12,22 @@ $testPassed = true;
 $errors = [];
 
 // Path to the saved card module
-$savedCardModulePath = __DIR__ . '/../includes/modules/payment/paypalr_savedcard.php';
-$paypalrModulePath = __DIR__ . '/../includes/modules/payment/paypalr.php';
+$savedCardModulePath = __DIR__ . '/../includes/modules/payment/paypalac_savedcard.php';
+$paypalacModulePath = __DIR__ . '/../includes/modules/payment/paypalac.php';
 
 if (!file_exists($savedCardModulePath)) {
-    echo "Error: paypalr_savedcard.php not found at $savedCardModulePath\n";
+    echo "Error: paypalac_savedcard.php not found at $savedCardModulePath\n";
     exit(1);
 }
 
-if (!file_exists($paypalrModulePath)) {
-    echo "Error: paypalr.php not found at $paypalrModulePath\n";
+if (!file_exists($paypalacModulePath)) {
+    echo "Error: paypalac.php not found at $paypalacModulePath\n";
     exit(1);
 }
 
 // Read the file contents
 $savedCardContent = file_get_contents($savedCardModulePath);
-$paypalrContent = file_get_contents($paypalrModulePath);
+$paypalacContent = file_get_contents($paypalacModulePath);
 
 echo "Testing saved card admin notification features...\n\n";
 
@@ -56,7 +56,7 @@ if (strpos($savedCardContent, 'externalTxnAdded()') === false) {
 }
 
 // Test 4: Check that zen_update_orders_history is called for external transactions
-if (strpos($savedCardContent, 'zen_update_orders_history($zf_order_id, MODULE_PAYMENT_PAYPALR_EXTERNAL_ADDITION)') === false) {
+if (strpos($savedCardContent, 'zen_update_orders_history($zf_order_id, MODULE_PAYMENT_PAYPALAC_EXTERNAL_ADDITION)') === false) {
     $testPassed = false;
     $errors[] = "zen_update_orders_history call for external transactions not found";
 } else {
@@ -64,7 +64,7 @@ if (strpos($savedCardContent, 'zen_update_orders_history($zf_order_id, MODULE_PA
 }
 
 // Test 5: Check that sendAlertEmail is called for external transactions
-if (strpos($savedCardContent, 'sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN') === false) {
+if (strpos($savedCardContent, 'sendAlertEmail(MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN') === false) {
     $testPassed = false;
     $errors[] = "sendAlertEmail call for external transactions not found";
 } else {
@@ -104,27 +104,27 @@ if (strpos($savedCardContent, 'public function _doAuth(') === false) {
 }
 
 // Test 10: Check that help() returns the wiki link
-if (strpos($savedCardContent, "return [\n            'link' => 'https://github.com/lat9/paypalr/wiki'\n        ];") === false &&
-    strpos($savedCardContent, "'link' => 'https://github.com/lat9/paypalr/wiki'") === false) {
+if (strpos($savedCardContent, "return [\n            'link' => 'https://github.com/lat9/paypalac/wiki'\n        ];") === false &&
+    strpos($savedCardContent, "'link' => 'https://github.com/lat9/paypalac/wiki'") === false) {
     $testPassed = false;
-    $errors[] = "help() method should return wiki link like paypalr.php";
+    $errors[] = "help() method should return wiki link like paypalac.php";
 } else {
     echo "✓ help() method returns wiki link\n";
 }
 
-// Test 11: Compare admin_notification structure with paypalr.php
-echo "\nComparing admin_notification structure with paypalr.php...\n";
+// Test 11: Compare admin_notification structure with paypalac.php
+echo "\nComparing admin_notification structure with paypalac.php...\n";
 
 // Extract admin_notification method from both files using regex
 $savedCardAdminNotification = '';
-$paypalrAdminNotification = '';
+$paypalacAdminNotification = '';
 
 if (preg_match('/public function admin_notification\([^)]*\)\s*\{[^}]+\}/', $savedCardContent, $matches)) {
     $savedCardAdminNotification = $matches[0];
 }
 
-if (preg_match('/public function admin_notification\([^)]*\)\s*\{[^}]+\}/', $paypalrContent, $matches)) {
-    $paypalrAdminNotification = $matches[0];
+if (preg_match('/public function admin_notification\([^)]*\)\s*\{[^}]+\}/', $paypalacContent, $matches)) {
+    $paypalacAdminNotification = $matches[0];
 }
 
 // Check that both have similar key components
@@ -136,7 +136,7 @@ $keyComponents = [
 ];
 
 $savedCardHasAll = true;
-$paypalrHasAll = true;
+$paypalacHasAll = true;
 
 foreach ($keyComponents as $component) {
     if (strpos($savedCardContent, $component) !== false) {
@@ -145,10 +145,10 @@ foreach ($keyComponents as $component) {
         $savedCardHasAll = false;
     }
     
-    if (strpos($paypalrContent, $component) !== false) {
-        // Good - component found in paypalr
+    if (strpos($paypalacContent, $component) !== false) {
+        // Good - component found in paypalac
     } else {
-        $paypalrHasAll = false;
+        $paypalacHasAll = false;
     }
 }
 

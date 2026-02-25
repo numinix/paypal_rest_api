@@ -1,6 +1,6 @@
 <?php
 /**
- * Test that verifies the paypalr_savedcard module correctly generates
+ * Test that verifies the paypalac_savedcard module correctly generates
  * a single payment selection with radio buttons for each saved card.
  */
 
@@ -9,17 +9,17 @@ $testPassed = true;
 $errors = [];
 
 // Mock the constants
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE', '%s ending in %s');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE', '%s ending in %s');
 }
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY', ' (Exp: %s)');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_EXPIRY')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_EXPIRY', ' (Exp: %s)');
 }
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT', 'Pay with Saved Card');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE_SHORT')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE_SHORT', 'Pay with Saved Card');
 }
-if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD')) {
-    define('MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD', 'Card');
+if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_UNKNOWN_CARD')) {
+    define('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_UNKNOWN_CARD', 'Card');
 }
 
 // Mock zen_output_string_protected
@@ -43,7 +43,7 @@ if (!defined('DIR_WS_MODULES')) {
 }
 
 /**
- * Simulates the new selection generation logic from paypalr_savedcard
+ * Simulates the new selection generation logic from paypalac_savedcard
  * Returns a single selection with radio buttons for each card in fields array
  */
 function generateSavedCardSelection(array $vaultedCards): array
@@ -52,33 +52,33 @@ function generateSavedCardSelection(array $vaultedCards): array
         return [];
     }
     
-    $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalr.checkout.js"></script>';
+    $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/jquery.paypalac.checkout.js"></script>';
     
     $fields = [];
     foreach ($vaultedCards as $index => $card) {
-        $brand = $card['brand'] ?: ($card['card_type'] ?: MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD);
+        $brand = $card['brand'] ?: ($card['card_type'] ?: MODULE_PAYMENT_PAYPALAC_SAVEDCARD_UNKNOWN_CARD);
         $lastDigits = $card['last_digits'] ?? '****';
         
         // Build card label
         $cardTitle = sprintf(
-            MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE,
+            MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE,
             zen_output_string_protected($brand),
             zen_output_string_protected($lastDigits)
         );
         
         if (!empty($card['expiry'])) {
             $cardTitle .= sprintf(
-                MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_EXPIRY,
+                MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_EXPIRY,
                 zen_output_string_protected(formatTestExpiry($card['expiry']))
             );
         }
         
         $vaultId = $card['vault_id'];
         $isChecked = ($index === 0);
-        $radioId = 'paypalr-savedcard-' . $index;
+        $radioId = 'paypalac-savedcard-' . $index;
         
         $radioInput = zen_draw_radio_field(
-            'paypalr_savedcard_vault_id',
+            'paypalac_savedcard_vault_id',
             $vaultId,
             $isChecked,
             'id="' . $radioId . '" class="ppr-savedcard-radio"'
@@ -91,8 +91,8 @@ function generateSavedCardSelection(array $vaultedCards): array
     }
     
     return [
-        'id' => 'paypalr_savedcard',
-        'module' => MODULE_PAYMENT_PAYPALR_SAVEDCARD_TEXT_TITLE_SHORT . $checkoutScript,
+        'id' => 'paypalac_savedcard',
+        'module' => MODULE_PAYMENT_PAYPALAC_SAVEDCARD_TEXT_TITLE_SHORT . $checkoutScript,
         'fields' => $fields,
     ];
 }
@@ -125,11 +125,11 @@ $testCards = [
 
 // Test 1: Selection uses base module code
 $selection = generateSavedCardSelection($testCards);
-if ($selection['id'] !== 'paypalr_savedcard') {
+if ($selection['id'] !== 'paypalac_savedcard') {
     $testPassed = false;
-    $errors[] = "Expected id 'paypalr_savedcard', got: " . $selection['id'];
+    $errors[] = "Expected id 'paypalac_savedcard', got: " . $selection['id'];
 } else {
-    echo "✓ Selection uses base module code 'paypalr_savedcard'\n";
+    echo "✓ Selection uses base module code 'paypalac_savedcard'\n";
 }
 
 // Test 2: Multiple cards generate multiple fields (radio buttons)
@@ -146,9 +146,9 @@ foreach ($selection['fields'] as $index => $field) {
         $testPassed = false;
         $errors[] = "Field $index should contain a radio button";
     }
-    if (strpos($field['field'], 'paypalr_savedcard_vault_id') === false) {
+    if (strpos($field['field'], 'paypalac_savedcard_vault_id') === false) {
         $testPassed = false;
-        $errors[] = "Field $index should have name 'paypalr_savedcard_vault_id'";
+        $errors[] = "Field $index should have name 'paypalac_savedcard_vault_id'";
     }
 }
 if ($testPassed) {
@@ -216,7 +216,7 @@ $noBrandCard = [
     ],
 ];
 $noBrandSelection = generateSavedCardSelection($noBrandCard);
-if (strpos($noBrandSelection['fields'][0]['field'], MODULE_PAYMENT_PAYPALR_SAVEDCARD_UNKNOWN_CARD) === false) {
+if (strpos($noBrandSelection['fields'][0]['field'], MODULE_PAYMENT_PAYPALAC_SAVEDCARD_UNKNOWN_CARD) === false) {
     $testPassed = false;
     $errors[] = 'Card with no brand should use fallback';
 } else {

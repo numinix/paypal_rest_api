@@ -28,7 +28,7 @@ class currencies
         }
 
         $this->ensureCurrencyDefined(defined('DEFAULT_CURRENCY') ? (string) DEFAULT_CURRENCY : null);
-        $this->ensureCurrencyDefined(defined('MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK') ? (string) MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK : null);
+        $this->ensureCurrencyDefined(defined('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK') ? (string) MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK : null);
     }
 
     /**
@@ -76,8 +76,8 @@ class currencies
             return $value * ($rate === 0.0 ? 1.0 : $rate);
         }
 
-        if ($use_defaults && defined('MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK')) {
-            $fallback = strtoupper((string) MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK);
+        if ($use_defaults && defined('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK')) {
+            $fallback = strtoupper((string) MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK);
             if ($this->is_set($fallback)) {
                 $rate = (float) ($this->currencies[$fallback]['value'] ?? 1.0);
                 return $value * ($rate === 0.0 ? 1.0 : $rate);

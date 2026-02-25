@@ -8,7 +8,7 @@
  * Compatible with:
  * - paypalwpp.php (Website Payments Pro)
  * - paypaldp.php (Direct Payments)
- * - paypalr.php (REST API)
+ * - paypalac.php (REST API)
  * - payflow.php (Payflow)
  */
 
@@ -18,7 +18,7 @@ chdir(DIR_FS_CATALOG);
 require_once 'includes/application_top.php';
 
 // Load PayPal REST API autoloader
-require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 
 // Load saved card recurring class
 require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';

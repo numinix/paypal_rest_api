@@ -89,9 +89,9 @@ namespace {
     {
         $passed = true;
         $walletModules = [
-            'paypalr_applepay.php' => 'Apple Pay',
-            'paypalr_googlepay.php' => 'Google Pay',
-            'paypalr_venmo.php' => 'Venmo',
+            'paypalac_applepay.php' => 'Apple Pay',
+            'paypalac_googlepay.php' => 'Google Pay',
+            'paypalac_venmo.php' => 'Venmo',
         ];
 
         foreach ($walletModules as $filename => $walletName) {

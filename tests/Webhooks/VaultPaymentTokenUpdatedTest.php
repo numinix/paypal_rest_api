@@ -330,7 +330,7 @@ namespace PayPalRestful\Tests\Webhooks {
 
             $this->assertNotEmpty($this->notifier->events);
             [$event, $payload] = $this->notifier->events[0];
-            $this->assertSame('NOTIFY_PAYPALR_VAULT_CARD_SAVED', $event);
+            $this->assertSame('NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $event);
             $this->assertSame('2026-12', $payload['expiry']);
             $this->assertSame('ACTIVE', $payload['status']);
             $this->assertSame('5678', $payload['last_digits']);

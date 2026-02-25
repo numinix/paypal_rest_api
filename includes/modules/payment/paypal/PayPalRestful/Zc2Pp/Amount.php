@@ -1,6 +1,6 @@
 <?php
 /**
- * A data class for Amount types used by the PayPalRestful (paypalr) Payment Module
+ * A data class for Amount types used by the PayPalRestful (paypalac) Payment Module
  *
  * @copyright Copyright 2023 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -99,8 +99,8 @@ class Amount
                 $this->log->write('  --> Using store default currency (' . DEFAULT_CURRENCY . ')');
                 $default_currency = DEFAULT_CURRENCY;
             } else {
-                $this->log->write('  --> Using configured back-up currency (' . MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK . ')');
-                $default_currency = MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK;
+                $this->log->write('  --> Using configured back-up currency (' . MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK . ')');
+                $default_currency = MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK;
             }
         }
 

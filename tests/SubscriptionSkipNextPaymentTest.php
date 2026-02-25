@@ -74,8 +74,8 @@ if (file_exists($cronFile)) {
 
 // Test 4: Verify admin files have skip action with immediate date update
 echo "Test 4: Checking admin files for skip action with date calculation...\n";
-$savedCardAdminFile = $basePath . '/admin/paypalr_saved_card_recurring.php';
-$subscriptionsAdminFile = $basePath . '/admin/paypalr_subscriptions.php';
+$savedCardAdminFile = $basePath . '/admin/paypalac_saved_card_recurring.php';
+$subscriptionsAdminFile = $basePath . '/admin/paypalac_subscriptions.php';
 
 if (file_exists($savedCardAdminFile) && file_exists($subscriptionsAdminFile)) {
     $savedCardContent = file_get_contents($savedCardAdminFile);
@@ -94,13 +94,13 @@ if (file_exists($savedCardAdminFile) && file_exists($subscriptionsAdminFile)) {
         echo "✓ Both admin files have skip_next_payment action with date calculation and PayPal API integration\n\n";
     } else {
         if (!$hasSavedCardAction || !$hasSavedCardButton) {
-            echo "✗ paypalr_saved_card_recurring.php missing skip action or button\n";
+            echo "✗ paypalac_saved_card_recurring.php missing skip action or button\n";
         }
         if (!$hasSubscriptionsAction || !$hasSubscriptionsButton || !$hasSubscriptionsCalc) {
-            echo "✗ paypalr_subscriptions.php missing skip action, button, or date calculation\n";
+            echo "✗ paypalac_subscriptions.php missing skip action, button, or date calculation\n";
         }
         if (!$hasPayPalAPIUpdate) {
-            echo "✗ paypalr_subscriptions.php missing PayPal API integration for vault subscriptions\n";
+            echo "✗ paypalac_subscriptions.php missing PayPal API integration for vault subscriptions\n";
         }
         echo "\n";
         exit(1);

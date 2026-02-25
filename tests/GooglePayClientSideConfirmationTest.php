@@ -28,7 +28,7 @@ class GooglePayClientSideConfirmationTest
     public function __construct()
     {
         // Use __DIR__ to make path relative to test file location
-        $this->jsFile = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js';
+        $this->jsFile = dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.googlepay.js';
         $this->phpFile = dirname(__DIR__) . '/includes/modules/payment/paypal/paypal_common.php';
         
         if (!file_exists($this->jsFile)) {
@@ -168,7 +168,7 @@ class GooglePayClientSideConfirmationTest
         
         // Check that it sets the payload and dispatches event
         $setsPayload = strpos($content, 'setGooglePayPayload(payload)') !== false;
-        $dispatchesEvent = strpos($content, 'paypalr:googlepay:payload') !== false;
+        $dispatchesEvent = strpos($content, 'paypalac:googlepay:payload') !== false;
         
         if ($hasConfirmOrderInCallback && $setsPayload && $dispatchesEvent) {
             $this->testResults[] = [

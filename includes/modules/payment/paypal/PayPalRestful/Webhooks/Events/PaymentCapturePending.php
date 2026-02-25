@@ -28,7 +28,7 @@ class PaymentCapturePending extends WebhookHandlerContract
 
         $this->log->write('PAYMENT.CAPTURE.PENDING - action() triggered');
 
-        // Instantiate paypalr module to load its language strings for status messages
+        // Instantiate paypalac module to load its language strings for status messages
         $this->loadCorePaymentModuleAndLanguageStrings();
 
         $txnID = $this->data['resource']['id'] ?? null;
@@ -41,8 +41,8 @@ class PaymentCapturePending extends WebhookHandlerContract
 
         // Sync our database with all updates from PayPal
         $this->getApiAndCredentials();
-        $ppr_txns = new GetPayPalOrderTransactions($this->paymentModule->code, $this->paymentModule->getCurrentVersion(), $oID, $this->ppr);
-        $ppr_txns->syncPaypalTxns();
+        $ppac_txns = new GetPayPalOrderTransactions($this->paymentModule->code, $this->paymentModule->getCurrentVersion(), $oID, $this->ppr);
+        $ppac_txns->syncPaypalTxns();
 
         // Update order-status records noting what's happened
         $summary = $this->data['summary'];
@@ -55,8 +55,8 @@ class PaymentCapturePending extends WebhookHandlerContract
         zen_update_orders_history($oID, $comments, 'webhook', -1, 0);
 
         // Notify merchant via email
-        $this->paymentModule->sendAlertEmail(MODULE_PAYMENT_PAYPALR_ALERT_SUBJECT_ORDER_ATTN, $comments . "\n" .
-            sprintf(MODULE_PAYMENT_PAYPALR_ALERT_ORDER_CREATION, $oID, $this->data['resource']['status'])
+        $this->paymentModule->sendAlertEmail(MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN, $comments . "\n" .
+            sprintf(MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATION, $oID, $this->data['resource']['status'])
         );
     }
 }

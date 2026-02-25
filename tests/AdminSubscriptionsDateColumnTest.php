@@ -2,12 +2,12 @@
 declare(strict_types=1);
 
 /**
- * Test to verify that admin/paypalr_subscriptions.php uses the correct column name 'date_added'
+ * Test to verify that admin/paypalac_subscriptions.php uses the correct column name 'date_added'
  * instead of 'date' in the saved_credit_cards_recurring table SELECT query.
  *
  * This test addresses the issue:
  * "MySQL error 1054: Unknown column 'sccr.date' in 'field list'"
- * which occurred when accessing admin/paypalr_subscriptions.php
+ * which occurred when accessing admin/paypalac_subscriptions.php
  *
  * The fix changes the SQL SELECT to use 'sccr.date_added AS date' which matches the actual
  * column name in the saved_credit_cards_recurring table schema.
@@ -18,10 +18,10 @@ declare(strict_types=1);
 
 namespace {
     fwrite(STDOUT, "=== Admin Subscriptions Date Column Test ===\n");
-    fwrite(STDOUT, "Testing that admin/paypalr_subscriptions.php uses correct column name...\n\n");
+    fwrite(STDOUT, "Testing that admin/paypalac_subscriptions.php uses correct column name...\n\n");
 
     // Read the admin file
-    $adminFile = dirname(__DIR__) . '/admin/paypalr_subscriptions.php';
+    $adminFile = dirname(__DIR__) . '/admin/paypalac_subscriptions.php';
     if (!file_exists($adminFile)) {
         fwrite(STDERR, "✗ Admin file not found: $adminFile\n");
         exit(1);

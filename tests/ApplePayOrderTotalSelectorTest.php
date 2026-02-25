@@ -20,7 +20,7 @@ echo "Testing Apple Pay Order Total Selector Configuration\n";
 echo "=====================================================\n\n";
 
 // Get the Apple Pay JS file content
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js');
 
 // Test 1: Verify getOrderTotalFromPage function exists
 if (strpos($applePayJs, 'function getOrderTotalFromPage') !== false) {
@@ -110,10 +110,10 @@ if (preg_match('/\/\*\*[\s\S]*?data-total-selector[\s\S]*?\*\/[\s\S]*?function o
     echo "✗ observeOrderTotal lacks documentation about data-total-selector\n";
 }
 
-// Test 7: Verify the container element is 'paypalr-applepay-button'
-if (strpos($applePayJs, "'paypalr-applepay-button'") !== false || 
-    strpos($applePayJs, '"paypalr-applepay-button"') !== false) {
-    echo "✓ Configuration is read from 'paypalr-applepay-button' container\n";
+// Test 7: Verify the container element is 'paypalac-applepay-button'
+if (strpos($applePayJs, "'paypalac-applepay-button'") !== false || 
+    strpos($applePayJs, '"paypalac-applepay-button"') !== false) {
+    echo "✓ Configuration is read from 'paypalac-applepay-button' container\n";
 } else {
     $testPassed = false;
     $errors[] = "Configuration container element not found";
@@ -158,7 +158,7 @@ if ($testPassed) {
     echo "Summary:\n";
     echo "- Default selector is 'ottotal' (standard Zen Cart element)\n";
     echo "- Selector can be customized via data-total-selector attribute\n";
-    echo "- Example: <div id=\"paypalr-applepay-button\" data-total-selector=\"custom-total-id\"></div>\n";
+    echo "- Example: <div id=\"paypalac-applepay-button\" data-total-selector=\"custom-total-id\"></div>\n";
     echo "- Both getOrderTotalFromPage() and observeOrderTotal() use the same configuration\n";
     echo "- Amount extraction includes currency detection and numeric parsing\n";
     exit(0);

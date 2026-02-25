@@ -37,7 +37,7 @@ class IntegratedSignup
     {
         $this->environment = (strtolower($environment) === 'live') ? 'live' : 'sandbox';
         $this->log = new Logger('isu');
-        if (defined('MODULE_PAYMENT_PAYPALR_DEBUGGING') && strpos(MODULE_PAYMENT_PAYPALR_DEBUGGING, 'Log') !== false) {
+        if (defined('MODULE_PAYMENT_PAYPALAC_DEBUGGING') && strpos(MODULE_PAYMENT_PAYPALAC_DEBUGGING, 'Log') !== false) {
             $this->log->enableDebug();
         }
         $this->initializeApi();
@@ -135,7 +135,7 @@ class IntegratedSignup
 
     private function initializeApi(): void
     {
-        [$clientId, $clientSecret] = \paypalr::getPartnerCredentials($this->environment);
+        [$clientId, $clientSecret] = \paypalac::getPartnerCredentials($this->environment);
         if ($clientId === '' || $clientSecret === '') {
             $this->error = [
                 'errMsg' => sprintf('Missing partner credentials for the %s environment.', $this->environment),
@@ -332,7 +332,7 @@ class IntegratedSignup
     private function getOnboardingUrl(string $action): string
     {
         if (function_exists('zen_href_link')) {
-            return zen_href_link('paypalr_integrated_signup.php', 'action=' . $action, 'SSL');
+            return zen_href_link('paypalac_integrated_signup.php', 'action=' . $action, 'SSL');
         }
 
         return '';

@@ -3,7 +3,7 @@
  * Test to verify that TEXT_SAVED_CARD_STATUS_* constants are properly defined.
  *
  * This test ensures that the status text constants used by the
- * paypalr_get_vault_status_map() function are properly loaded from the
+ * paypalac_get_vault_status_map() function are properly loaded from the
  * language file without early-return issues.
  *
  * Issue: The backwards compatibility language file had an early return that
@@ -72,7 +72,7 @@ namespace Tests {
         public function testConstantsCanBeUsedInFunctionReturn(): void
         {
             // Verify that the constants can be used in a function that returns an array
-            // This simulates what paypalr_get_vault_status_map does
+            // This simulates what paypalac_get_vault_status_map does
             $statusMap = [
                 'ACTIVE' => [TEXT_SAVED_CARD_STATUS_ACTIVE, 'is-active'],
                 'INACTIVE' => [TEXT_SAVED_CARD_STATUS_INACTIVE, 'is-inactive'],

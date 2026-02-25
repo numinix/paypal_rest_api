@@ -1,6 +1,6 @@
 <?php
 /**
- * A collection of 'helper' methods for the PayPalRestful (paypalr) Payment Module
+ * A collection of 'helper' methods for the PayPalRestful (paypalac) Payment Module
  *
  * @copyright Copyright 2023-2024 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0

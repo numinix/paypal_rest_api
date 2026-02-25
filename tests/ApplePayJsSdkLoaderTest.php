@@ -18,7 +18,7 @@ $testPassed = true;
 $errors = [];
 
 // Get the JavaScript file content
-$jsFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js';
+$jsFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js';
 if (!file_exists($jsFile)) {
     echo "❌ JavaScript file not found: {$jsFile}\n";
     exit(1);

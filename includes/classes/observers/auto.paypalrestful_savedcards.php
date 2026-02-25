@@ -11,7 +11,7 @@
 
 use Zencart\Traits\ObserverManager;
 
-require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ObserverManager.php';
 }
@@ -26,12 +26,12 @@ class zcObserverPaypalrestfulSavedCards
     public function __construct()
     {
         // Only proceed if the saved card module is enabled
-        if (!defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_STATUS') || MODULE_PAYMENT_PAYPALR_SAVEDCARD_STATUS !== 'True') {
+        if (!defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_STATUS') || MODULE_PAYMENT_PAYPALAC_SAVEDCARD_STATUS !== 'True') {
             return;
         }
 
         // Check if vault is enabled
-        if (!defined('MODULE_PAYMENT_PAYPALR_ENABLE_VAULT') || MODULE_PAYMENT_PAYPALR_ENABLE_VAULT !== 'True') {
+        if (!defined('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT') || MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT !== 'True') {
             return;
         }
 
@@ -45,7 +45,7 @@ class zcObserverPaypalrestfulSavedCards
      * Handle payment module selection expansion.
      *
      * When the payment modules are gathered for display, this observer expands
-     * the paypalr_savedcard module into multiple entries - one for each saved card.
+     * the paypalac_savedcard module into multiple entries - one for each saved card.
      *
      * @param object $class
      * @param string $eventID
@@ -63,11 +63,11 @@ class zcObserverPaypalrestfulSavedCards
             return;
         }
 
-        // Find the paypalr_savedcard entry in the selection
+        // Find the paypalac_savedcard entry in the selection
         $savedCardIndex = null;
         $originalSortOrder = 0;
         foreach ($selection as $index => $module) {
-            if (isset($module['id']) && strpos($module['id'], 'paypalr_savedcard') === 0) {
+            if (isset($module['id']) && strpos($module['id'], 'paypalac_savedcard') === 0) {
                 $savedCardIndex = $index;
                 break;
             }
@@ -79,17 +79,17 @@ class zcObserverPaypalrestfulSavedCards
         }
 
         // Get the saved card module instance to retrieve all cards
-        global $paypalr_savedcard;
-        if (!isset($paypalr_savedcard) || !is_object($paypalr_savedcard)) {
+        global $paypalac_savedcard;
+        if (!isset($paypalac_savedcard) || !is_object($paypalac_savedcard)) {
             // Try to instantiate it
-            if (!class_exists('paypalr_savedcard')) {
-                require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalr_savedcard.php';
+            if (!class_exists('paypalac_savedcard')) {
+                require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalac_savedcard.php';
             }
-            $paypalr_savedcard = new paypalr_savedcard();
+            $paypalac_savedcard = new paypalac_savedcard();
         }
 
         // Get all saved card selections
-        $cardSelections = $paypalr_savedcard->getSelections();
+        $cardSelections = $paypalac_savedcard->getSelections();
 
         // If no cards or only one card, leave as is
         if (count($cardSelections) <= 1) {

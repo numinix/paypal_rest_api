@@ -9,9 +9,9 @@ $testPassed = true;
 $errors = [];
 
 // Get the JS files content
-$googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js');
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js');
-$venmoJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.venmo.js');
+$googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.googlepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js');
+$venmoJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.venmo.js');
 
 // Test 1: Google Pay JS contains radio selection function
 if (strpos($googlePayJs, 'selectGooglePayRadio') === false) {
@@ -22,15 +22,15 @@ if (strpos($googlePayJs, 'selectGooglePayRadio') === false) {
 }
 
 // Test 2: Google Pay JS targets correct radio button
-if (strpos($googlePayJs, 'pmt-paypalr_googlepay') === false) {
+if (strpos($googlePayJs, 'pmt-paypalac_googlepay') === false) {
     $testPassed = false;
-    $errors[] = "Google Pay JS should target pmt-paypalr_googlepay radio";
+    $errors[] = "Google Pay JS should target pmt-paypalac_googlepay radio";
 } else {
     echo "✓ Google Pay JS targets correct radio button\n";
 }
 
 // Test 3: Google Pay JS hides radio button
-if (strpos($googlePayJs, 'hideModuleRadio') === false || strpos($googlePayJs, 'paypalr-wallet-radio-hidden') === false) {
+if (strpos($googlePayJs, 'hideModuleRadio') === false || strpos($googlePayJs, 'paypalac-wallet-radio-hidden') === false) {
     $testPassed = false;
     $errors[] = "Google Pay JS should hide the radio button";
 } else {
@@ -38,7 +38,7 @@ if (strpos($googlePayJs, 'hideModuleRadio') === false || strpos($googlePayJs, 'p
 }
 
 // Test 4: Google Pay JS adds click handler to container
-if (strpos($googlePayJs, 'paypalr-googlepay-button') === false || strpos($googlePayJs, 'addEventListener') === false) {
+if (strpos($googlePayJs, 'paypalac-googlepay-button') === false || strpos($googlePayJs, 'addEventListener') === false) {
     $testPassed = false;
     $errors[] = "Google Pay JS should add click handler to container";
 } else {
@@ -54,15 +54,15 @@ if (strpos($applePayJs, 'selectApplePayRadio') === false) {
 }
 
 // Test 6: Apple Pay JS targets correct radio button
-if (strpos($applePayJs, 'pmt-paypalr_applepay') === false) {
+if (strpos($applePayJs, 'pmt-paypalac_applepay') === false) {
     $testPassed = false;
-    $errors[] = "Apple Pay JS should target pmt-paypalr_applepay radio";
+    $errors[] = "Apple Pay JS should target pmt-paypalac_applepay radio";
 } else {
     echo "✓ Apple Pay JS targets correct radio button\n";
 }
 
 // Test 7: Apple Pay JS hides radio button
-if (strpos($applePayJs, 'hideModuleRadio') === false || strpos($applePayJs, 'paypalr-wallet-radio-hidden') === false) {
+if (strpos($applePayJs, 'hideModuleRadio') === false || strpos($applePayJs, 'paypalac-wallet-radio-hidden') === false) {
     $testPassed = false;
     $errors[] = "Apple Pay JS should hide the radio button";
 } else {
@@ -70,7 +70,7 @@ if (strpos($applePayJs, 'hideModuleRadio') === false || strpos($applePayJs, 'pay
 }
 
 // Test 8: Apple Pay JS adds click handler to container
-if (strpos($applePayJs, 'paypalr-applepay-button') === false || strpos($applePayJs, 'addEventListener') === false) {
+if (strpos($applePayJs, 'paypalac-applepay-button') === false || strpos($applePayJs, 'addEventListener') === false) {
     $testPassed = false;
     $errors[] = "Apple Pay JS should add click handler to container";
 } else {
@@ -86,15 +86,15 @@ if (strpos($venmoJs, 'selectVenmoRadio') === false) {
 }
 
 // Test 10: Venmo JS targets correct radio button
-if (strpos($venmoJs, 'pmt-paypalr_venmo') === false) {
+if (strpos($venmoJs, 'pmt-paypalac_venmo') === false) {
     $testPassed = false;
-    $errors[] = "Venmo JS should target pmt-paypalr_venmo radio";
+    $errors[] = "Venmo JS should target pmt-paypalac_venmo radio";
 } else {
     echo "✓ Venmo JS targets correct radio button\n";
 }
 
 // Test 11: Venmo JS hides radio button
-if (strpos($venmoJs, 'hideModuleRadio') === false || strpos($venmoJs, 'paypalr-wallet-radio-hidden') === false) {
+if (strpos($venmoJs, 'hideModuleRadio') === false || strpos($venmoJs, 'paypalac-wallet-radio-hidden') === false) {
     $testPassed = false;
     $errors[] = "Venmo JS should hide the radio button";
 } else {
@@ -102,7 +102,7 @@ if (strpos($venmoJs, 'hideModuleRadio') === false || strpos($venmoJs, 'paypalr-w
 }
 
 // Test 12: Venmo JS adds click handler to container
-if (strpos($venmoJs, 'paypalr-venmo-button') === false || strpos($venmoJs, 'addEventListener') === false) {
+if (strpos($venmoJs, 'paypalac-venmo-button') === false || strpos($venmoJs, 'addEventListener') === false) {
     $testPassed = false;
     $errors[] = "Venmo JS should add click handler to container";
 } else {
@@ -110,10 +110,10 @@ if (strpos($venmoJs, 'paypalr-venmo-button') === false || strpos($venmoJs, 'addE
 }
 
 // Test 13: CSS file exists and contains wallet radio hidden class
-$cssContent = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/paypalr.css');
-if (strpos($cssContent, 'paypalr-wallet-radio-hidden') === false) {
+$cssContent = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/paypalac.css');
+if (strpos($cssContent, 'paypalac-wallet-radio-hidden') === false) {
     $testPassed = false;
-    $errors[] = "CSS should contain paypalr-wallet-radio-hidden class";
+    $errors[] = "CSS should contain paypalac-wallet-radio-hidden class";
 } else {
     echo "✓ CSS contains wallet radio hidden class\n";
 }

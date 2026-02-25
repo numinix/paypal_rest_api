@@ -1,6 +1,6 @@
 <?php
 /**
- * Debug logging class for the PayPalRestful (paypalr) Payment Module
+ * Debug logging class for the PayPalRestful (paypalac) Payment Module
  *
  * @copyright Copyright 2023-2025 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
@@ -55,7 +55,7 @@ class Logger
                 $logfile_suffix .= '-o' . $order->info['order_id'];
             }
         }
-        self::$debugLogFile = DIR_FS_LOGS . '/paypalr-' . $logfile_suffix . '-' . date('Ymd') . '.log';
+        self::$debugLogFile = DIR_FS_LOGS . '/paypalac-' . $logfile_suffix . '-' . date('Ymd') . '.log';
     }
 
     public function enableDebug()

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Test to verify that admin/paypalr_subscriptions.php has bulk archive/unarchive functionality
+ * Test to verify that admin/paypalac_subscriptions.php has bulk archive/unarchive functionality
  * with checkboxes and select all/unselect all capability.
  *
  * This test verifies:
@@ -18,10 +18,10 @@ declare(strict_types=1);
 
 namespace {
     fwrite(STDOUT, "=== Bulk Archive Subscriptions Test ===\n");
-    fwrite(STDOUT, "Testing bulk archive/unarchive functionality in admin/paypalr_subscriptions.php...\n\n");
+    fwrite(STDOUT, "Testing bulk archive/unarchive functionality in admin/paypalac_subscriptions.php...\n\n");
 
     // Read the admin file
-    $adminFile = dirname(__DIR__) . '/admin/paypalr_subscriptions.php';
+    $adminFile = dirname(__DIR__) . '/admin/paypalac_subscriptions.php';
     if (!file_exists($adminFile)) {
         fwrite(STDERR, "✗ Admin file not found: $adminFile\n");
         exit(1);

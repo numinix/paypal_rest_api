@@ -12,7 +12,7 @@
 use PayPalRestful\Common\VaultManager;
 use Zencart\Traits\ObserverManager;
 
-require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/pprAutoload.php';
+require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalRestful/Compatibility/ObserverManager.php';
 }
@@ -27,10 +27,10 @@ class zcObserverPaypalrestfulVault
     public function __construct()
     {
         // -----
-        // If the base paypalr payment-module isn't installed, nothing further to do here.
+        // If the base paypalac payment-module isn't installed, nothing further to do here.
         // The observer is needed as long as any PayPal payment module is enabled.
         //
-        if (!defined('MODULE_PAYMENT_PAYPALR_VERSION')) {
+        if (!defined('MODULE_PAYMENT_PAYPALAC_VERSION')) {
             return;
         }
 
@@ -38,12 +38,12 @@ class zcObserverPaypalrestfulVault
         // Check if at least one PayPal payment module is enabled
         //
         $anyModuleEnabled = (
-            (defined('MODULE_PAYMENT_PAYPALR_STATUS') && MODULE_PAYMENT_PAYPALR_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS') && MODULE_PAYMENT_PAYPALR_CREDITCARD_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_APPLEPAY_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALR_GOOGLEPAY_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_VENMO_STATUS') && MODULE_PAYMENT_PAYPALR_VENMO_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALR_SAVEDCARD_STATUS') && MODULE_PAYMENT_PAYPALR_SAVEDCARD_STATUS === 'True')
+            (defined('MODULE_PAYMENT_PAYPALAC_STATUS') && MODULE_PAYMENT_PAYPALAC_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_STATUS') && MODULE_PAYMENT_PAYPALAC_CREDITCARD_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_APPLEPAY_STATUS') && MODULE_PAYMENT_PAYPALAC_APPLEPAY_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_STATUS') && MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_VENMO_STATUS') && MODULE_PAYMENT_PAYPALAC_VENMO_STATUS === 'True') ||
+            (defined('MODULE_PAYMENT_PAYPALAC_SAVEDCARD_STATUS') && MODULE_PAYMENT_PAYPALAC_SAVEDCARD_STATUS === 'True')
         );
 
         if (!$anyModuleEnabled) {
@@ -107,7 +107,7 @@ class zcObserverPaypalrestfulVault
         
         if ($storedVault !== null) {
             // Notify other observers that a vault card was saved
-            $this->notify('NOTIFY_PAYPALR_VAULT_CARD_SAVED', $storedVault);
+            $this->notify('NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $storedVault);
         }
 
         // Clean up the session data

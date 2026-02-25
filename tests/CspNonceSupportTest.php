@@ -68,9 +68,9 @@ echo "Test 2: JavaScript getCspNonce() helper\n";
 echo "----------------------------------------\n";
 
 $jsFiles = [
-    'google-pay' => __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.googlepay.js',
-    'apple-pay' => __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.applepay.js',
-    'venmo' => __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalr.venmo.js',
+    'google-pay' => __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.googlepay.js',
+    'apple-pay' => __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.applepay.js',
+    'venmo' => __DIR__ . '/../includes/modules/payment/paypal/PayPalRestful/jquery.paypalac.venmo.js',
 ];
 
 foreach ($jsFiles as $name => $jsFile) {

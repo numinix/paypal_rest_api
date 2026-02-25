@@ -15,10 +15,10 @@ $failures = 0;
 $adminPath = dirname(__DIR__) . '/admin';
 
 $adminFiles = [
-    'paypalr_subscriptions.php',
-    'paypalr_saved_card_recurring.php',
-    'paypalr_integrated_signup.php',
-    'paypalr_upgrade.php'
+    'paypalac_subscriptions.php',
+    'paypalac_saved_card_recurring.php',
+    'paypalac_integrated_signup.php',
+    'paypalac_upgrade.php'
 ];
 
 foreach ($adminFiles as $file) {

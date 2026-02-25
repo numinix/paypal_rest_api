@@ -11,11 +11,11 @@ $testPassed = true;
 $errors = [];
 
 // Simulate the code change
-$code = 'paypalr_creditcard';
+$code = 'paypalac_creditcard';
 $onFocus = ' onfocus="methodSelect(\'pmt-' . $code . '\')"';
 
 // Test 1: Verify the onfocus attribute is constructed correctly
-$expectedOnFocus = ' onfocus="methodSelect(\'pmt-paypalr_creditcard\')"';
+$expectedOnFocus = ' onfocus="methodSelect(\'pmt-paypalac_creditcard\')"';
 if ($onFocus !== $expectedOnFocus) {
     $testPassed = false;
     $errors[] = "OnFocus attribute mismatch. Expected: {$expectedOnFocus}, Got: {$onFocus}";
@@ -25,7 +25,7 @@ if ($onFocus !== $expectedOnFocus) {
 
 // Test 2: Verify the attribute can be safely concatenated with HTML attributes
 $testHtml = 'class="test-class" id="test-id"' . $onFocus;
-if (strpos($testHtml, 'onfocus="methodSelect(\'pmt-paypalr_creditcard\')"') === false) {
+if (strpos($testHtml, 'onfocus="methodSelect(\'pmt-paypalac_creditcard\')"') === false) {
     $testPassed = false;
     $errors[] = "OnFocus attribute not found in concatenated HTML";
 } else {
@@ -33,7 +33,7 @@ if (strpos($testHtml, 'onfocus="methodSelect(\'pmt-paypalr_creditcard\')"') === 
 }
 
 // Test 3: Verify the JavaScript function call is properly escaped
-if (strpos($onFocus, 'methodSelect(') === false || strpos($onFocus, 'pmt-paypalr_creditcard') === false) {
+if (strpos($onFocus, 'methodSelect(') === false || strpos($onFocus, 'pmt-paypalac_creditcard') === false) {
     $testPassed = false;
     $errors[] = "JavaScript function call not properly formatted";
 } else {
@@ -45,7 +45,7 @@ function mockBuildSavedCardInlineOptions(array $vaultedCards, string $selectedVa
 {
     $html = '<div class="ppr-saved-card-inline">';
     $html .= '<label>';
-    $html .= '<input type="radio" name="paypalr_saved_card" value="new"' . $onFocus . ' />';
+    $html .= '<input type="radio" name="paypalac_saved_card" value="new"' . $onFocus . ' />';
     $html .= '<span>Use a new card</span>';
     $html .= '</label>';
     $html .= '</div>';
@@ -53,7 +53,7 @@ function mockBuildSavedCardInlineOptions(array $vaultedCards, string $selectedVa
 }
 
 $mockResult = mockBuildSavedCardInlineOptions([], 'new', $onFocus);
-if (strpos($mockResult, 'onfocus="methodSelect(\'pmt-paypalr_creditcard\')"') === false) {
+if (strpos($mockResult, 'onfocus="methodSelect(\'pmt-paypalac_creditcard\')"') === false) {
     $testPassed = false;
     $errors[] = "buildSavedCardInlineOptions does not include onfocus attribute";
 } else {

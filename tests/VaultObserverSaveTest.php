@@ -16,8 +16,8 @@ namespace {
     if (!defined('IS_ADMIN_FLAG')) {
         define('IS_ADMIN_FLAG', false);
     }
-    if (!defined('MODULE_PAYMENT_PAYPALR_STATUS')) {
-        define('MODULE_PAYMENT_PAYPALR_STATUS', 'True');
+    if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS')) {
+        define('MODULE_PAYMENT_PAYPALAC_STATUS', 'True');
     }
     if (!defined('TABLE_ORDERS')) {
         define('TABLE_ORDERS', 'orders');
@@ -359,13 +359,13 @@ namespace {
             
             $vaultNotification = null;
             foreach ($zco_notifier->notifications as $notification) {
-                if ($notification['event'] === 'NOTIFY_PAYPALR_VAULT_CARD_SAVED') {
+                if ($notification['event'] === 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED') {
                     $vaultNotification = $notification;
                     break;
                 }
             }
             
-            $this->assertNotNull($vaultNotification, 'NOTIFY_PAYPALR_VAULT_CARD_SAVED notification should be sent');
+            $this->assertNotNull($vaultNotification, 'NOTIFY_PAYPALAC_VAULT_CARD_SAVED notification should be sent');
         }
 
         public function testObserverHandlesInvalidCustomerId(): void

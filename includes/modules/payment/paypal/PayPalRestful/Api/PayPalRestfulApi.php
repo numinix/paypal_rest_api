@@ -227,8 +227,8 @@ class PayPalRestfulApi extends ErrorInfo
             return $endpoint_type;
         }
 
-        if (defined('MODULE_PAYMENT_PAYPALR_SERVER')) {
-            $configured = strtolower((string)MODULE_PAYMENT_PAYPALR_SERVER);
+        if (defined('MODULE_PAYMENT_PAYPALAC_SERVER')) {
+            $configured = strtolower((string)MODULE_PAYMENT_PAYPALAC_SERVER);
             if ($configured === 'live') {
                 return 'live';
             }
@@ -240,11 +240,11 @@ class PayPalRestfulApi extends ErrorInfo
     protected function getConfiguredCredentials(string $environment): array
     {
         if ($environment === 'live') {
-            $client_id = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_L') ? (string)MODULE_PAYMENT_PAYPALR_CLIENTID_L : '';
-            $client_secret = defined('MODULE_PAYMENT_PAYPALR_SECRET_L') ? (string)MODULE_PAYMENT_PAYPALR_SECRET_L : '';
+            $client_id = defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L') ? (string)MODULE_PAYMENT_PAYPALAC_CLIENTID_L : '';
+            $client_secret = defined('MODULE_PAYMENT_PAYPALAC_SECRET_L') ? (string)MODULE_PAYMENT_PAYPALAC_SECRET_L : '';
         } else {
-            $client_id = defined('MODULE_PAYMENT_PAYPALR_CLIENTID_S') ? (string)MODULE_PAYMENT_PAYPALR_CLIENTID_S : '';
-            $client_secret = defined('MODULE_PAYMENT_PAYPALR_SECRET_S') ? (string)MODULE_PAYMENT_PAYPALR_SECRET_S : '';
+            $client_id = defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S') ? (string)MODULE_PAYMENT_PAYPALAC_CLIENTID_S : '';
+            $client_secret = defined('MODULE_PAYMENT_PAYPALAC_SECRET_S') ? (string)MODULE_PAYMENT_PAYPALAC_SECRET_S : '';
         }
 
         return [trim($client_id), trim($client_secret)];
@@ -770,7 +770,7 @@ class PayPalRestfulApi extends ErrorInfo
             }
         }
 
-        $url = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook.php';
+        $url = HTTP_SERVER . DIR_WS_CATALOG . 'ppac_webhook.php';
 
         $events = [];
         foreach ($this->webhooksToRegister as $event) {
@@ -801,10 +801,10 @@ class PayPalRestfulApi extends ErrorInfo
 
         // store the resulting webhook registration ID for later reference
         global $db;
-        $result = $db->Execute("SELECT configuration_value FROM " . TABLE_CONFIGURATION . " WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS' LIMIT 1");
+        $result = $db->Execute("SELECT configuration_value FROM " . TABLE_CONFIGURATION . " WHERE configuration_key = 'MODULE_PAYMENT_PAYPALAC_SUBSCRIBED_WEBHOOKS' LIMIT 1");
         if ($result->EOF) {
             zen_db_perform(TABLE_CONFIGURATION, [
-                'configuration_key' => 'MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS',
+                'configuration_key' => 'MODULE_PAYMENT_PAYPALAC_SUBSCRIBED_WEBHOOKS',
                 'configuration_value' => $webhook_id,
                 'configuration_title' => 'PayPal webhooks subscribe ID',
                 'configuration_description' => 'This module registers certain actions to trigger webhook notifications to this store; here we store the ID of that registration so we can update or delete it later if needed.',
@@ -817,7 +817,7 @@ class PayPalRestfulApi extends ErrorInfo
             zen_db_perform(TABLE_CONFIGURATION, [
                 'configuration_value' => $webhook_id,
                 'last_modified' => 'now()',
-            ], 'UPDATE', "configuration_key='MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS'");
+            ], 'UPDATE', "configuration_key='MODULE_PAYMENT_PAYPALAC_SUBSCRIBED_WEBHOOKS'");
         }
     }
 
@@ -826,7 +826,7 @@ class PayPalRestfulApi extends ErrorInfo
      */
     public function registerAndUpdateSubscribedWebhooks(): void
     {
-        $webhook_id = defined('MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS') ? MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS : '';
+        $webhook_id = defined('MODULE_PAYMENT_PAYPALAC_SUBSCRIBED_WEBHOOKS') ? MODULE_PAYMENT_PAYPALAC_SUBSCRIBED_WEBHOOKS : '';
 
         if (empty($webhook_id)) {
             $this->subscribeWebhook();
@@ -898,9 +898,9 @@ class PayPalRestfulApi extends ErrorInfo
     public function unsubscribeWebhooks(): void
     {
         $this->log->write("==> Start deleteWebhook Registration", true);
-        $url = HTTP_SERVER . DIR_WS_CATALOG . 'ppr_webhook.php';
+        $url = HTTP_SERVER . DIR_WS_CATALOG . 'ppac_webhook.php';
 
-        $webhook_id = defined('MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS') ? MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS : '';
+        $webhook_id = defined('MODULE_PAYMENT_PAYPALAC_SUBSCRIBED_WEBHOOKS') ? MODULE_PAYMENT_PAYPALAC_SUBSCRIBED_WEBHOOKS : '';
         if (empty($webhook_id)) {
             // None remembered internally, but let's also check if any are registered at PayPal for our URL, and remove them.
             $response = $this->curlGet("v1/notifications/webhooks/");
@@ -920,7 +920,7 @@ class PayPalRestfulApi extends ErrorInfo
         if ($response !== false) {
             global $db;
             // deregistration successful, so we delete our record.
-            $db->Execute('DELETE FROM ' . TABLE_CONFIGURATION . " WHERE configuration_key = 'MODULE_PAYMENT_PAYPALR_SUBSCRIBED_WEBHOOKS'");
+            $db->Execute('DELETE FROM ' . TABLE_CONFIGURATION . " WHERE configuration_key = 'MODULE_PAYMENT_PAYPALAC_SUBSCRIBED_WEBHOOKS'");
         }
         $this->log->write("==> End deleteWebhook Registration", true);
     }
