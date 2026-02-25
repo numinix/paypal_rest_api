@@ -34,7 +34,7 @@ When a subscription payment fails and is later successfully processed, the syste
 
 ### Key Code Change
 
-**File:** `cron/paypal_saved_card_recurring.php`
+**File:** `cron/paypalac_saved_card_recurring.php`
 
 **Before (Line 300):**
 ```php
@@ -171,7 +171,7 @@ All tests should pass with output showing the calculations maintain the billing 
 
 ### Files Modified
 
-- `cron/paypal_saved_card_recurring.php` - Main fix (line 302)
+- `cron/paypalac_saved_card_recurring.php` - Main fix (line 302)
 - `tests/NextPaymentDateCalculationTest.php` - Test coverage
 
 ### Related Functions

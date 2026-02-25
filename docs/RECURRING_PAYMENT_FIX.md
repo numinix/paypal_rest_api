@@ -84,7 +84,7 @@ $cardPayload['stored_credential'] = $storedDefaults;
 ## Additional Improvements
 
 ### 1. Filtered Debug Output
-**File**: `cron/paypal_saved_card_recurring.php` (line 374)
+**File**: `cron/paypalac_saved_card_recurring.php` (line 374)
 
 Changed the debug SQL query to exclude cancelled subscriptions:
 ```sql
@@ -161,7 +161,7 @@ php tests/StoredCredentialStructureTest.php
 ## Related Files
 
 - `includes/classes/paypalSavedCardRecurring.php` - Main fix
-- `cron/paypal_saved_card_recurring.php` - Debug output filter
+- `cron/paypalac_saved_card_recurring.php` - Debug output filter
 - `tests/StoredCredentialStructureTest.php` - Test coverage
 
 ## PayPal API Documentation References

@@ -62,7 +62,7 @@ Created `tests/UpdatePaymentInfoDateColumnTest.php` to validate the fix.
 ## 3. Duplicate Key Error in Legacy Subscription Migrator
 
 ### Problem
-When running the cron job `paypal_saved_card_recurring.php`, got duplicate key error:
+When running the cron job `paypalac_saved_card_recurring.php`, got duplicate key error:
 
 **Error:**
 ```

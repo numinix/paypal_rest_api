@@ -2,7 +2,7 @@
 
 ## Problem
 
-The cron job `paypal_saved_card_recurring.php` was failing with:
+The cron job `paypalac_saved_card_recurring.php` was failing with:
 ```
 MySQL error 1054: Unknown column 'date' in 'where clause' :: 
 SELECT saved_credit_card_recurring_id FROM saved_credit_cards_recurring 
@@ -84,7 +84,7 @@ All tests passing ✅
 
 ## Impact
 
-The cron job `cron/paypal_saved_card_recurring.php` can now:
+The cron job `cron/paypalac_saved_card_recurring.php` can now:
 - ✅ Successfully query for scheduled payments due today
 - ✅ Calculate failed payment statistics without errors
 - ✅ Check for existing customer subscriptions correctly

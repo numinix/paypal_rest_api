@@ -210,7 +210,7 @@ To see how many times a subscription has failed, check the `count_failed_payment
 
 ### Code Location
 
-**File:** `cron/paypal_saved_card_recurring.php`
+**File:** `cron/paypalac_saved_card_recurring.php`
 
 **Lines:** ~637-665
 

@@ -77,7 +77,7 @@ if ($environment === 'live') {
 
 ### Fix 2: Define Email Constants
 
-**File:** `cron/paypal_saved_card_recurring.php` (lines 20-49)
+**File:** `cron/paypalac_saved_card_recurring.php` (lines 20-49)
 
 Added constant definitions with default email templates:
 
@@ -170,7 +170,7 @@ php tests/PayPalEnvironmentDetectionTest.php
    - Check for absence of fatal errors
 
 3. **Test Recurring Payment:**
-   - Run cron: `/shop/cron/paypal_saved_card_recurring.php`
+   - Run cron: `/shop/cron/paypalac_saved_card_recurring.php`
    - Check logs for:
      ```
      PayPal REST createOrder request: {...}
@@ -196,7 +196,7 @@ php tests/PayPalEnvironmentDetectionTest.php
 ## Related Files
 
 - `includes/classes/paypalSavedCardRecurring.php` - Environment detection fix
-- `cron/paypal_saved_card_recurring.php` - Email constants definition
+- `cron/paypalac_saved_card_recurring.php` - Email constants definition
 - `tests/PayPalEnvironmentDetectionTest.php` - Test coverage
 - `includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php` - Reference implementation
 
