@@ -1469,7 +1469,7 @@ class paypalac extends base
     {
         global $messageStack, $order;
 
-        $postvar_prefix = ($is_preconfirmation === true) ? 'paypalac' : 'ppr';
+        $postvar_prefix = ($is_preconfirmation === true) ? 'paypalac' : 'ppac';
         $savedCardSelection = $_POST[$postvar_prefix . '_saved_card'] ?? 'new';
         if ($savedCardSelection !== 'new') {
             $savedCard = $this->findVaultedCard($savedCardSelection);
