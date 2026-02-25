@@ -999,6 +999,29 @@ class paypalac_googlepay extends base
                 ('Google Pay Merchant ID (deprecated)', 'MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_MERCHANT_ID', '', 'DEPRECATED: This setting is no longer used. As of 2025, PayPal SDK no longer accepts the google-pay-merchant-id parameter. Leave blank.', 6, 0, NULL, NULL, now())" 
         );
         
+        // -----
+        // Migrate configuration values from the old paypalr_googlepay module if it was previously installed.
+        // This allows stores upgrading from paypalr to paypalac to keep their existing settings
+        // without having to reconfigure.
+        //
+        $old_config = $db->Execute(
+            "SELECT configuration_key, configuration_value
+               FROM " . TABLE_CONFIGURATION . "
+              WHERE configuration_key LIKE 'MODULE\_PAYMENT\_PAYPALR\_GOOGLEPAY\_%'"
+        );
+        while (!$old_config->EOF) {
+            $old_key = $old_config->fields['configuration_key'];
+            $new_key = str_replace('MODULE_PAYMENT_PAYPALR_GOOGLEPAY_', 'MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_', $old_key);
+            $old_value = $old_config->fields['configuration_value'];
+            $db->Execute(
+                "UPDATE " . TABLE_CONFIGURATION . "
+                    SET configuration_value = '" . zen_db_input($old_value) . "'
+                  WHERE configuration_key = '" . zen_db_input($new_key) . "'
+                  LIMIT 1"
+            );
+            $old_config->MoveNext();
+        }
+
         // Define the module's current version so that the tableCheckup method will apply all changes
         define('MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_VERSION', '0.0.0');
         $this->tableCheckup();
