@@ -135,13 +135,108 @@ Each file must be:
 1. **Renamed** (filename `paypalr` → `paypalac`)
 2. **Contents updated** (all `PAYPALR` constant names → `PAYPALAC`)
 
-### 2.3 Database Migration Consideration
+### 2.3 Database Migration — Auto-Copy from `paypalr` on Install
 
-Existing installations have `MODULE_PAYMENT_PAYPALR_*` keys stored in the `configuration` table.
-A migration/upgrade path in `tableCheckup()` must:
-- [ ] Rename configuration keys from `MODULE_PAYMENT_PAYPALR_*` to `MODULE_PAYMENT_PAYPALAC_*`
-- [ ] Update `configuration_group_id` references if any
-- [ ] Handle the case where old keys exist and new keys do not (upgrade scenario)
+Stores that already have the `paypalr` plugin installed must be able to transition to `paypalac`
+without reconfiguring. The new module's **`install()`** method handles this automatically.
+Users must then **manually** uninstall the old `paypalr` module and remove its files.
+
+#### 2.3.1 Migration Logic in `install()`
+
+Before inserting new configuration rows, `install()` must check whether old `MODULE_PAYMENT_PAYPALR_*`
+keys exist in the `configuration` table. If they do, copy each old value into the corresponding
+new `MODULE_PAYMENT_PAYPALAC_*` row so the store keeps its existing settings.
+
+```
+Pseudocode — inside install(), before the INSERT:
+
+  1. SELECT configuration_key, configuration_value
+       FROM configuration
+      WHERE configuration_key LIKE 'MODULE_PAYMENT_PAYPALR_%'
+
+  2. Build a key→value map from the result set.
+
+  3. After the normal INSERT of new PAYPALAC rows (with default values),
+     for each row returned in step 1:
+       old_key  = row.configuration_key                        (e.g. MODULE_PAYMENT_PAYPALR_SERVER)
+       new_key  = replace('PAYPALR', 'PAYPALAC', old_key)      (e.g. MODULE_PAYMENT_PAYPALAC_SERVER)
+       old_val  = row.configuration_value                       (e.g. 'live')
+
+       UPDATE configuration
+          SET configuration_value = old_val
+        WHERE configuration_key  = new_key
+        LIMIT 1
+```
+
+This means:
+- Fresh installs (no old keys) → defaults are used as usual.
+- Upgrades from `paypalr` → old values are copied to the new keys automatically.
+- The old `paypalr` keys are **not deleted** — the user must uninstall the old module
+  through the Zen Cart admin and remove old `paypalr` files manually.
+
+#### 2.3.2 Configuration Keys to Migrate
+
+The following database-stored keys have a 1-to-1 old→new mapping. Every value
+must be preserved during migration:
+
+| Old Key (`PAYPALR`) | New Key (`PAYPALAC`) |
+|---|---|
+| `MODULE_PAYMENT_PAYPALR_STATUS` | `MODULE_PAYMENT_PAYPALAC_STATUS` |
+| `MODULE_PAYMENT_PAYPALR_VERSION` | `MODULE_PAYMENT_PAYPALAC_VERSION` |
+| `MODULE_PAYMENT_PAYPALR_DISABLE_ON_ERROR` | `MODULE_PAYMENT_PAYPALAC_DISABLE_ON_ERROR` |
+| `MODULE_PAYMENT_PAYPALR_SERVER` | `MODULE_PAYMENT_PAYPALAC_SERVER` |
+| `MODULE_PAYMENT_PAYPALR_CLIENTID_L` | `MODULE_PAYMENT_PAYPALAC_CLIENTID_L` |
+| `MODULE_PAYMENT_PAYPALR_SECRET_L` | `MODULE_PAYMENT_PAYPALAC_SECRET_L` |
+| `MODULE_PAYMENT_PAYPALR_CLIENTID_S` | `MODULE_PAYMENT_PAYPALAC_CLIENTID_S` |
+| `MODULE_PAYMENT_PAYPALR_SECRET_S` | `MODULE_PAYMENT_PAYPALAC_SECRET_S` |
+| `MODULE_PAYMENT_PAYPALR_SORT_ORDER` | `MODULE_PAYMENT_PAYPALAC_SORT_ORDER` |
+| `MODULE_PAYMENT_PAYPALR_ZONE` | `MODULE_PAYMENT_PAYPALAC_ZONE` |
+| `MODULE_PAYMENT_PAYPALR_ORDER_STATUS_ID` | `MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID` |
+| `MODULE_PAYMENT_PAYPALR_ORDER_PENDING_STATUS_ID` | `MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID` |
+| `MODULE_PAYMENT_PAYPALR_REFUNDED_STATUS_ID` | `MODULE_PAYMENT_PAYPALAC_REFUNDED_STATUS_ID` |
+| `MODULE_PAYMENT_PAYPALR_VOIDED_STATUS_ID` | `MODULE_PAYMENT_PAYPALAC_VOIDED_STATUS_ID` |
+| `MODULE_PAYMENT_PAYPALR_HELD_STATUS_ID` | `MODULE_PAYMENT_PAYPALAC_HELD_STATUS_ID` |
+| `MODULE_PAYMENT_PAYPALR_BRANDNAME` | `MODULE_PAYMENT_PAYPALAC_BRANDNAME` |
+| `MODULE_PAYMENT_PAYPALR_SOFT_DESCRIPTOR` | `MODULE_PAYMENT_PAYPALAC_SOFT_DESCRIPTOR` |
+| `MODULE_PAYMENT_PAYPALR_TRANSACTION_MODE` | `MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE` |
+| `MODULE_PAYMENT_PAYPALR_CURRENCY` | `MODULE_PAYMENT_PAYPALAC_CURRENCY` |
+| `MODULE_PAYMENT_PAYPALR_CURRENCY_FALLBACK` | `MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK` |
+| `MODULE_PAYMENT_PAYPALR_ENABLE_VAULT` | `MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT` |
+| `MODULE_PAYMENT_PAYPALR_SCA_ALWAYS` | `MODULE_PAYMENT_PAYPALAC_SCA_ALWAYS` |
+| `MODULE_PAYMENT_PAYPALR_PAYLATER_MESSAGING` | `MODULE_PAYMENT_PAYPALAC_PAYLATER_MESSAGING` |
+| `MODULE_PAYMENT_PAYPALR_HANDLING_OT` | `MODULE_PAYMENT_PAYPALAC_HANDLING_OT` |
+| `MODULE_PAYMENT_PAYPALR_INSURANCE_OT` | `MODULE_PAYMENT_PAYPALAC_INSURANCE_OT` |
+| `MODULE_PAYMENT_PAYPALR_DISCOUNT_OT` | `MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT` |
+| `MODULE_PAYMENT_PAYPALR_DEBUGGING` | `MODULE_PAYMENT_PAYPALAC_DEBUGGING` |
+
+> **Note:** `MODULE_PAYMENT_PAYPALR_ACCEPT_CARDS` was removed in v1.3.4 and does not need migration.
+
+#### 2.3.3 Admin Page Keys — No Auto-Migration Needed
+
+The old `paypalr` admin page registrations (`paypalrSubscriptions`, `paypalrSavedCardRecurring`,
+`paypalrSubscriptionsReport`, `paypalrWebhookLogs`) live in the `admin_pages` table but belong
+to the old module. The new `paypalac` module's `tableCheckup()` will register its own pages
+(`paypalacSubscriptions`, etc.) independently. When the user uninstalls the old `paypalr` module,
+its page registrations are cleaned up by the old module's `remove()` method.
+
+#### 2.3.4 Order History — Backward Compatibility
+
+Existing orders in the `paypal` table reference `paypalr` as the payment module code in the
+`module_name` or `module_mode` columns. These records must remain valid.  The admin notification
+handler (in the observer/admin class) should recognize **both** `paypalr` and `paypalac` as
+valid module codes when displaying PayPal order details, so historical orders continue to
+show payment information correctly.
+
+#### 2.3.5 Upgrade Instructions for Store Owners
+
+After installing the new `paypalac` module:
+
+1. Go to **Admin → Modules → Payment → PayPal Advanced Checkout** and click **Install**.
+   The installer automatically copies all settings from the old `paypalr` module if present.
+2. Verify your configuration (credentials, order statuses, etc.) are correct.
+3. Test a transaction in sandbox mode.
+4. Go to **Admin → Modules → Payment → PayPal RESTful** (the old module) and click **Remove**.
+5. Delete all old `paypalr` files from the server.
 
 ---
 
@@ -758,14 +853,27 @@ Some test files have `paypalr` in their filename:
 
 ## Important Notes
 
-1. **Database Migration**: Existing installations will have `MODULE_PAYMENT_PAYPALR_*` config keys and `paypalrSubscriptions` / etc. admin page keys in the database. The `tableCheckup()` method must include migration logic to rename these automatically on upgrade.
+1. **Automatic Config Migration**: The new `paypalac` module's `install()` method detects existing
+   `MODULE_PAYMENT_PAYPALR_*` keys in the database and copies their **values** into the new
+   `MODULE_PAYMENT_PAYPALAC_*` keys. This ensures beta testers and existing stores keep their
+   credentials, order statuses, and all other settings without reconfiguring. See Phase 2.3 for
+   full implementation details.
 
-2. **Backward Compatibility**: Consider whether to support a transition period where old config keys are read if new ones don't exist, or do a hard cutover.
+2. **Old Module Not Touched**: The migration **copies** values — it does not rename or delete
+   the old `paypalr` keys. Both modules can coexist temporarily. The store owner must manually
+   uninstall the old `paypalr` module via Admin → Modules → Payment and then delete the old files.
 
-3. **Admin Page Keys**: The `admin_pages` table stores page keys. The migration must update these records (e.g., `paypalrSubscriptions` → `paypalacSubscriptions`).
+3. **Admin Page Keys**: The old module's admin page registrations (`paypalrSubscriptions`, etc.) are
+   left in place and cleaned up when the store owner uninstalls the old module. The new module
+   registers its own pages independently (`paypalacSubscriptions`, etc.).
 
-4. **Order History**: Existing orders in `paypal` table reference `paypalr` as the payment module. A database update or compatibility layer may be needed.
+4. **Order History**: Existing orders in the `paypal` table reference `paypalr` as the payment module.
+   The admin observer/notification handler must recognize both `paypalr` and `paypalac` module codes
+   so that historical order details continue to display correctly.
 
-5. **Webhook URLs**: If webhook URLs contain `ppr_webhook.php`, these need to be re-registered with PayPal after the rename.
+5. **Webhook URLs**: If webhook URLs contain `ppr_webhook.php`, these need to be re-registered with
+   PayPal after the rename to `ppac_webhook.php`. The `install()` method should handle webhook
+   re-registration automatically.
 
-6. **Template Overrides**: Customers who have copied template files to custom template directories will need to rename their copies manually. Document this in upgrade instructions.
+6. **Template Overrides**: Customers who have copied template files to custom template directories
+   will need to rename their copies manually. Document this in upgrade instructions.
