@@ -1287,6 +1287,29 @@ class paypalac_creditcard extends base
                 ('Show Save Card Checkbox', 'MODULE_PAYMENT_PAYPALAC_CREDITCARD_SHOW_SAVE_CARD_CHECKBOX', 'True', 'Display the \"Save Card\" checkbox during checkout? If disabled, customers will not see the option to save their card for future use. Note: For orders containing subscriptions, a notice will still be displayed that the card will be saved.', 6, 0, 'zen_cfg_select_option([''True'', ''False''], ', NULL, now())"
         );
         
+        // -----
+        // Migrate configuration values from the old paypalr_creditcard module if it was previously installed.
+        // This allows stores upgrading from paypalr to paypalac to keep their existing settings
+        // without having to reconfigure.
+        //
+        $old_config = $db->Execute(
+            "SELECT configuration_key, configuration_value
+               FROM " . TABLE_CONFIGURATION . "
+              WHERE configuration_key LIKE 'MODULE\_PAYMENT\_PAYPALR\_CREDITCARD\_%'"
+        );
+        while (!$old_config->EOF) {
+            $old_key = $old_config->fields['configuration_key'];
+            $new_key = str_replace('MODULE_PAYMENT_PAYPALR_CREDITCARD_', 'MODULE_PAYMENT_PAYPALAC_CREDITCARD_', $old_key);
+            $old_value = $old_config->fields['configuration_value'];
+            $db->Execute(
+                "UPDATE " . TABLE_CONFIGURATION . "
+                    SET configuration_value = '" . zen_db_input($old_value) . "'
+                  WHERE configuration_key = '" . zen_db_input($new_key) . "'
+                  LIMIT 1"
+            );
+            $old_config->MoveNext();
+        }
+
         // Define the module's current version so that the tableCheckup method will apply all changes
         define('MODULE_PAYMENT_PAYPALAC_CREDITCARD_VERSION', '0.0.0');
         $this->tableCheckup();
