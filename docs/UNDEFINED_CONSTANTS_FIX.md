@@ -2,7 +2,7 @@
 
 ## Problem
 
-The cron job `paypal_saved_card_recurring.php` was failing with:
+The cron job `paypalac_saved_card_recurring.php` was failing with:
 ```
 PHP Fatal error: Uncaught Error: Undefined constant "CATEGORY_ID_PLANS" 
 in paypalSavedCardRecurring.php:1650
@@ -86,7 +86,7 @@ Created `tests/UndefinedConstantsTest.php` to validate:
 
 ## Impact
 
-The cron job `cron/paypal_saved_card_recurring.php` can now:
+The cron job `cron/paypalac_saved_card_recurring.php` can now:
 - ✅ Run successfully without site-specific constants
 - ✅ Process recurring payments without fatal errors
 - ✅ Maintain compatibility with customized installations

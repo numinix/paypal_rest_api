@@ -119,6 +119,6 @@ If this returns your subscription ID, the cron will process it on the next run.
 
 ## Related Files
 
-- `cron/paypal_saved_card_recurring.php` - The cron job
+- `cron/paypalac_saved_card_recurring.php` - The cron job
 - `includes/classes/paypalSavedCardRecurring.php` - Contains `get_scheduled_payments()`
 - `admin/paypalac_saved_card_recurring.php` - Admin interface for managing subscriptions

@@ -164,7 +164,7 @@ Hook into email sending notifications to modify message content before emails ar
 
 1. Place your observer file in `includes/classes/observers/`
 2. Clear your Zen Cart cache if applicable
-3. Run the cron job: `php cron/paypal_saved_card_recurring.php`
+3. Run the cron job: `php cron/paypalac_saved_card_recurring.php`
 4. Check logs for any errors
 5. Verify the expected behavior (store credit restrictions, custom emails, etc.)
 

@@ -128,7 +128,7 @@ namespace {
     // Test 5: Verify cron file also handles the constant properly
     fwrite(STDOUT, "\nTest 5: Checking cron file email notification...\n");
     
-    $cronFile = DIR_FS_CATALOG . 'cron/paypal_saved_card_recurring.php';
+    $cronFile = DIR_FS_CATALOG . 'cron/paypalac_saved_card_recurring.php';
     if (file_exists($cronFile)) {
         $cronContent = file_get_contents($cronFile);
         

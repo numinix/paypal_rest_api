@@ -19,7 +19,7 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify cron does NOT update next_payment_date on failure
 echo "Test 1: Checking cron preserves next_payment_date when payment fails...\n";
-$cronFile = $basePath . '/cron/paypal_saved_card_recurring.php';
+$cronFile = $basePath . '/cron/paypalac_saved_card_recurring.php';
 if (file_exists($cronFile)) {
     $content = file_get_contents($cronFile);
     

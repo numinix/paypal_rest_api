@@ -2,10 +2,10 @@
 
 ## Problem
 
-The cron job `paypal_saved_card_recurring.php` was failing at the end with:
+The cron job `paypalac_saved_card_recurring.php` was failing at the end with:
 ```
 PHP Fatal error: Undefined constant "MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL" 
-in cron/paypal_saved_card_recurring.php:687
+in cron/paypalac_saved_card_recurring.php:687
 ```
 
 This happened when the `notify_error()` method tried to send error notifications, **and** when the cron tried to send the summary email at the end.
@@ -15,7 +15,7 @@ This happened when the `notify_error()` method tried to send error notifications
 The constant was used in TWO places without checking if it was defined:
 
 1. **Line 2549** in `includes/classes/paypalSavedCardRecurring.php` - `notify_error()` method
-2. **Lines 687-688** in `cron/paypal_saved_card_recurring.php` - Summary email
+2. **Lines 687-688** in `cron/paypalac_saved_card_recurring.php` - Summary email
 
 The constant `MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL` is:
 - A payment module configuration constant
@@ -52,7 +52,7 @@ function notify_error($subject, $message, $type = 'error', $customers_email = ''
 }
 ```
 
-### Fix 2: Cron summary email (paypal_saved_card_recurring.php)
+### Fix 2: Cron summary email (paypalac_saved_card_recurring.php)
 
 **Before:**
 ```php
@@ -151,7 +151,7 @@ The cron job can now:
 ## Files Changed
 
 - `includes/classes/paypalSavedCardRecurring.php` - Fixed constant usage in `notify_error()`
-- `cron/paypal_saved_card_recurring.php` - Fixed constant usage in summary email
+- `cron/paypalac_saved_card_recurring.php` - Fixed constant usage in summary email
 - `tests/UndefinedEmailConstantTest.php` - Comprehensive test for both locations
 
 ## Related Issues

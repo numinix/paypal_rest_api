@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * This test addresses the issue:
  * "MySQL error 1054: Unknown column 'date' in 'where clause'"
- * which occurred when running the cron job paypal_saved_card_recurring.php
+ * which occurred when running the cron job paypalac_saved_card_recurring.php
  *
  * The fix changes SQL queries to use 'next_payment_date' which matches the actual
  * column name in the saved_credit_cards_recurring table schema.

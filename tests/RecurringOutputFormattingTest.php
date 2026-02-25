@@ -13,7 +13,7 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify helper functions exist in cron file
 fwrite(STDOUT, "Test 1: Checking recurring_is_cli() function exists...\n");
-$cronFile = $basePath . '/cron/paypal_saved_card_recurring.php';
+$cronFile = $basePath . '/cron/paypalac_saved_card_recurring.php';
 if (file_exists($cronFile)) {
     $content = file_get_contents($cronFile);
     
@@ -24,7 +24,7 @@ if (file_exists($cronFile)) {
         exit(1);
     }
 } else {
-    fwrite(STDERR, "✗ paypal_saved_card_recurring.php not found\n");
+    fwrite(STDERR, "✗ paypalac_saved_card_recurring.php not found\n");
     exit(1);
 }
 

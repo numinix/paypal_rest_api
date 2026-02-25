@@ -70,7 +70,7 @@ After payment succeeds later:
 The original cron code called `schedule_payment()` after a payment failure, which always **inserts a new row** into the database:
 
 ```php
-// ORIGINAL BUGGY CODE (line ~659 in cron/paypal_saved_card_recurring.php)
+// ORIGINAL BUGGY CODE (line ~659 in cron/paypalac_saved_card_recurring.php)
 $paypalSavedCardRecurring->schedule_payment(
     $payment_details['amount'], 
     $tomorrow, 
@@ -96,7 +96,7 @@ $paypalSavedCardRecurring->update_payment_info($payment_id, array(
 The correct solution is to **do nothing** when a payment fails (except update status and send notification):
 
 ```php
-// CORRECT FIX (line ~654 in cron/paypal_saved_card_recurring.php)
+// CORRECT FIX (line ~654 in cron/paypalac_saved_card_recurring.php)
 // Keep trying - subscription will be retried by cron on next run
 // Do NOT update next_payment_date - this prevents subscription drift
 // The next billing date is calculated from the original schedule, not from today
@@ -179,7 +179,7 @@ This test verifies:
 
 ## Files Changed
 
-1. **cron/paypal_saved_card_recurring.php** (line ~654)
+1. **cron/paypalac_saved_card_recurring.php** (line ~654)
    - Removed call to `update_payment_info()` that was updating the date
    - Now preserves next_payment_date to prevent drift
    

@@ -66,7 +66,7 @@ if (file_exists($savedCardRecurringFile)) {
 
 // Test 2: Verify email constants are defined in cron
 fwrite(STDOUT, "Test 2: Checking email constants are defined...\n");
-$cronFile = $basePath . '/cron/paypal_saved_card_recurring.php';
+$cronFile = $basePath . '/cron/paypalac_saved_card_recurring.php';
 if (file_exists($cronFile)) {
     $content = file_get_contents($cronFile);
     
