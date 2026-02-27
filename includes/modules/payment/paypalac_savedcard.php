@@ -847,6 +847,8 @@ class paypalac_savedcard extends base
             $this->orderInfo['admin_alert_needed'] = true;
 
             $this->log->write("==> paypalac_savedcard::before_process: Payment status {$payment['status']} received from PayPal; order's status forced to pending.");
+        } else {
+            $order->info['order_status'] = $this->order_status;
         }
 
         $this->notify('NOTIFY_PAYPALAC_BEFORE_PROCESS_FINISHED', $this->orderInfo);

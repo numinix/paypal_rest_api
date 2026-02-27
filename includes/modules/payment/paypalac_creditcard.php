@@ -1081,6 +1081,7 @@ class paypalac_creditcard extends base
             }
             $this->orderInfo['admin_alert_needed'] = true;
         } else {
+            $order->info['order_status'] = $this->order_status;
             $this->orderInfo['admin_alert_needed'] = false;
         }
 
