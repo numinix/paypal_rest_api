@@ -1967,6 +1967,52 @@ class paypalac extends base
     }
 
     /**
+     * Prepare module-specific POST data needed for OPRC AJAX checkout.
+     *
+     * Called by OPRC before processing begins so this module can set up
+     * any hidden fields it requires (e.g. ppac_type) without OPRC needing
+     * to know about module-specific field names.
+     *
+     * Note: This method also populates $_POST and $_REQUEST with the
+     * inferred ppac_type value because the module's update_status() reads
+     * it from $_POST during later processing.
+     *
+     * @param  array $postData  Current $_POST data.
+     * @return array  Key/value pairs to add to the checkout process fields.
+     */
+    public function prepare_ajax_checkout_post(array $postData): array
+    {
+        if (isset($postData['ppac_type'])) {
+            return ['ppac_type' => $postData['ppac_type']];
+        }
+
+        $ppac_type = 'paypal';
+
+        $cardIndicators = [
+            'paypalac_cc_number',
+            'paypalac_cc_cvv',
+            'paypalac_cc_sca_always',
+            'paypalac_collects_onsite',
+            'ppac_cc_number',
+            'ppac_cc_cvv',
+            'ppac_cc_sca_always',
+            'ppac_collects_onsite',
+        ];
+
+        foreach ($cardIndicators as $field) {
+            if (isset($postData[$field]) && is_scalar($postData[$field]) && trim((string)$postData[$field]) !== '') {
+                $ppac_type = 'card';
+                break;
+            }
+        }
+
+        $_POST['ppac_type'] = $ppac_type;
+        $_REQUEST['ppac_type'] = $ppac_type;
+
+        return ['ppac_type' => $ppac_type];
+    }
+
+    /**
      * Determine whether the shipping-edit button should be displayed or not (also used on the
      * "shipping" phase of the checkout process).
      *

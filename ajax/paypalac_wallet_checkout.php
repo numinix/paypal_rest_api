@@ -150,6 +150,14 @@ $email = $payload['email'] ?? '';
 $shipping_address_raw = $payload['shipping_address'] ?? [];
 $billing_address_raw  = $payload['billing_address'] ?? [];
 
+// Track whether the customer was already logged in before this request runs.
+// Must be captured here, before any session modifications below, so we can
+// preserve their session email rather than overwriting it later.
+// Use !empty() to match zen_is_logged_in() which uses !empty($_SESSION['customer_id']).
+// isset() returns true for falsy values like 0 or '', which would incorrectly
+// skip customer creation for guests.
+$customerWasLoggedIn = !empty($_SESSION['customer_id']);
+
 // Log the payload total for debugging potential amount mismatches
 log_paypalac_wallet_message("Payload total from client: $total (currency: $currency)");
 log_paypalac_wallet_message("Payment method nonce: " . ($payment_method_nonce ?: 'N/A'));
@@ -163,6 +171,22 @@ $billing_address  = normalize_braintree_contact($billing_address_raw, $module);
 if (empty($email)) {
     $email = $billing_address['emailAddress'] ?? $billing_address['email'] ?? '';
     log_paypalac_wallet_message("Email extracted from billing address: $email");
+}
+
+// For already-logged-in users, fall back to their email when no email was collected
+// from Google Pay (emailRequired: false is used for logged-in users).
+// Zen Cart's login does not set $_SESSION['customer_email_address'], so query the DB.
+if (empty($email) && $customerWasLoggedIn) {
+    if (!empty($_SESSION['customer_email_address'])) {
+        $email = $_SESSION['customer_email_address'];
+        log_paypalac_wallet_message("Using session email for logged-in user");
+    } else {
+        $email_query = $db->Execute("SELECT customers_email_address FROM " . TABLE_CUSTOMERS . " WHERE customers_id = " . (int)$_SESSION['customer_id']);
+        if (!$email_query->EOF) {
+            $email = $email_query->fields['customers_email_address'];
+            log_paypalac_wallet_message("Using database email for logged-in user (session email not set)");
+        }
+    }
 }
 
 // Validate that we have an email address and it's in proper format
@@ -299,7 +323,7 @@ $isGuestCheckout = in_array($module, $guestModules, true);
 // Check if customer exists by email
 $customer_query = $db->Execute("SELECT customers_id, customers_firstname, customers_lastname FROM " . TABLE_CUSTOMERS . " WHERE customers_email_address = '" . zen_db_input($email) . "'");
 
-if (!isset($_SESSION['customer_id'])) {
+if (empty($_SESSION['customer_id'])) {
     if ($customer_query->RecordCount() > 0) {
         // If customer exists, use existing customer ID and set session variables
         $customer_id = $customer_query->fields['customers_id'];
@@ -352,8 +376,12 @@ if (!isset($_SESSION['customer_id'])) {
     $customer_id = $_SESSION['customer_id'];
 }
 
-// Ensure email is always set in session (critical for order processing)
-$_SESSION['customer_email_address'] = $email;
+// Ensure email is set in session (critical for order processing).
+// For already-logged-in users, preserve their existing session email rather than
+// overwriting it with a potentially different Google Pay account email.
+if (!$customerWasLoggedIn) {
+    $_SESSION['customer_email_address'] = $email;
+}
 
 log_paypalac_wallet_message("Customer ID: $customer_id");
 
@@ -530,7 +558,40 @@ if (!isset($credit_covers)) {
 
 $zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_BEGIN');
 
+// Start output buffering to capture PHP notices/warnings from order initialization.
+// The order class and order_total modules reference variables that may not be set in
+// the AJAX wallet context (e.g., $order in order.php:391, $customers_group, etc.).
+// Without buffering, these notices corrupt the JSON response and the client-side JS
+// fails to parse it, showing "Checkout failed" even though the order was created.
+ob_start();
+
 $payment_modules = new payment($_SESSION['payment']);
+
+// For wallet payments (Apple Pay, Google Pay) confirmed client-side, refresh the
+// PayPal order status and set wallet_payment_confirmed before before_process().
+// In the normal checkout flow, pre_confirmation_check() handles this via
+// processWalletConfirmation(), but the AJAX wallet checkout skips that step.
+$walletTypeMap = ['paypalac_applepay' => 'apple_pay', 'paypalac_googlepay' => 'google_pay'];
+if (isset($walletTypeMap[$module]) && !empty($_SESSION['PayPalAdvancedCheckout']['Order']['id'])) {
+    $walletOrderId = $_SESSION['PayPalAdvancedCheckout']['Order']['id'];
+    $walletType = $walletTypeMap[$module];
+
+    if (isset($GLOBALS[$module]) && isset($GLOBALS[$module]->ppr)
+        && method_exists($GLOBALS[$module]->ppr, 'getOrderStatus')) {
+        $walletOrderStatus = $GLOBALS[$module]->ppr->getOrderStatus($walletOrderId);
+        if ($walletOrderStatus !== false && !empty($walletOrderStatus['status'])) {
+            $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $walletOrderStatus['status'];
+            $_SESSION['PayPalAdvancedCheckout']['Order']['current'] = $walletOrderStatus;
+            log_paypalac_wallet_message("Refreshed wallet order status from PayPal: " . $walletOrderStatus['status']);
+        } else {
+            log_paypalac_wallet_message("WARNING: Failed to refresh wallet order status from PayPal for order $walletOrderId");
+        }
+    }
+    $_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed'] = true;
+    $_SESSION['PayPalAdvancedCheckout']['Order']['payment_source'] = $walletType;
+    log_paypalac_wallet_message("Set wallet_payment_confirmed for $walletType order $walletOrderId");
+}
+
 $order = new order();
 $shipping_modules = new shipping($_SESSION['shipping'] ?? '');
 
@@ -556,6 +617,7 @@ if (isset($order->billing['zone_id']) && $order->billing['zone_id'] > 0) {
 }
 
 if (sizeof($order->products) < 1) {
+    ob_end_clean();
     echo json_encode(['status' => 'error', 'message' => 'Cart is empty.']);
     exit;
 }
@@ -567,6 +629,7 @@ if (isset($_SESSION['cart']->cartID) && $_SESSION['cartID']) {
         $payment_modules->clear_payment();
         $order_total_modules->clear_posts();
         unset($_SESSION['payment'], $_SESSION['shipping']);
+        ob_end_clean();
         echo json_encode(['status' => 'error', 'message' => 'Session verification failed. Please reload and try again.']);
         exit;
     }
@@ -590,6 +653,7 @@ $order_totals = $order_total_modules->process();
 $zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_TOTALS_PROCESS');
 
 if (!isset($_SESSION['payment']) && $credit_covers === false) {
+    ob_end_clean();
     echo json_encode(['status' => 'error', 'message' => 'Payment session expired.']);
     exit;
 }
@@ -669,13 +733,21 @@ $zco_notifier->notify('NOTIFY_HEADER_END_CHECKOUT_PROCESS', $insert_id);
 $response = ['status' => 'success', 'order_id' => $insert_id];
 log_paypalac_wallet_message("Order created: $insert_id");
 
+// Clear the saved cart from a Buy Now product-page wallet flow.
+// The order has been placed, so the original cart should not be restored.
+unset($_SESSION['paypalac_wallet_saved_cart']);
+
 switch ($module) {
     case 'paypalac_venmo':
     case 'braintree_api':
     case 'paypalac_googlepay':
     case 'paypalac_applepay':
         // For Google Pay, include the redirect_url to FILENAME_CHECKOUT_SUCCESS
-        $response['redirect_url'] = zen_href_link(FILENAME_CHECKOUT_SUCCESS, '', 'SSL');
+        $response['redirect_url'] = html_entity_decode(
+            zen_href_link(FILENAME_CHECKOUT_SUCCESS, '', 'SSL'),
+            ENT_QUOTES,
+            defined('CHARSET') ? CHARSET : 'UTF-8'
+        );
         log_paypalac_wallet_message("Checkout redirect URL: " . $response['redirect_url']);
         break;
     default:
@@ -683,6 +755,18 @@ switch ($module) {
         $response['message'] = 'Unsupported payment module';
         log_paypalac_wallet_message("Unsupported module in handler: $module");
         break;
+}
+
+// Discard any PHP notices/warnings captured during order processing
+// to ensure clean JSON output
+ob_end_clean();
+
+// Flush session to the store before sending the response. The JS client
+// immediately navigates to checkout_success after receiving the JSON. If
+// session_write_close() only runs in the shutdown handler, there is a race
+// where the next request loads stale session data (missing customer_id, etc.).
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
 }
 
 // Send response to client

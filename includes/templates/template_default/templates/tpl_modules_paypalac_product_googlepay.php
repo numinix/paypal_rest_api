@@ -13,7 +13,8 @@
     $googlePayModule = new paypalac_googlepay();
     
     // Get wallet configuration to verify Google Pay is enabled
-    $walletConfig = $googlePayModule->ajaxGetWalletConfig();
+    // Pass product ID so shipping requirement is based on the viewed product's virtual status, not the cart contents
+    $walletConfig = $googlePayModule->ajaxGetWalletConfig((int)$_GET['products_id']);
     if (empty($walletConfig['success']) || empty($walletConfig['clientId'])) {
         // If configuration fails, don't show the button
         return;
@@ -22,18 +23,19 @@
     // Check if user is logged in
     $isLoggedIn = isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0;
     $guestWalletEnabled = isset($walletConfig['enableGuestWallet']) && $walletConfig['enableGuestWallet'] === true;
+    $productRequiresShipping = !empty($walletConfig['cartRequiresShipping']);
     
     // Show Google Pay button if:
-    // 1. User is logged in (uses PayPal SDK, email from session), OR
-    // 2. Guest wallet is enabled (uses PayPal SDK, email collected via emailRequired in PaymentDataRequest)
-    // Per PayPal support, we can use PayPal SDK without direct Google Pay SDK or merchant verification
-    if (!$isLoggedIn && !$guestWalletEnabled) {
-        // User not logged in AND guest wallet disabled - don't show button
+    // 1. User is logged in (uses native Google Pay SDK without callbackIntents), OR
+    // 2. Guest wallet is enabled (uses native Google Pay SDK with callbackIntents for shipping), OR
+    // 3. Product is virtual (no shipping needed - works for all users without callbackIntents)
+    if (!$isLoggedIn && !$guestWalletEnabled && $productRequiresShipping) {
+        // User not logged in AND guest wallet disabled AND physical product - don't show button
         return;
     }
     
-    // For logged-in users, show Google Pay button rendered via PayPal SDK
-    // For guests (when guest wallet enabled), show Google Pay button rendered via PayPal SDK
+    // For logged-in users: Native Google Pay SDK without callbackIntents (avoids OR_BIBED_06 errors)
+    // For guests (when guest wallet enabled): Native Google Pay SDK with callbackIntents for shipping calculation
 ?>
 
 <script>
@@ -43,6 +45,13 @@
 // IMPORTANT: This must be set BEFORE loading jquery.paypalac.googlepay.wallet.js
 // because the wallet script reads this value immediately when it loads (IIFE execution)
 window.paypalacWalletIsLoggedIn = <?php echo (isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0) ? 'true' : 'false'; ?>;
+
+// Product page configuration - provide the product price so shipping quote
+// requests can include it in the total (the product isn't in the cart yet)
+window.paypalacGooglePayConfig = {
+    initialTotal: "<?php echo number_format($currencies->value(zen_get_products_base_price((int)$_GET['products_id'])), 2, '.', ''); ?>",
+    productId: <?php echo (int)$_GET['products_id']; ?>
+};
 </script>
 
 <?php

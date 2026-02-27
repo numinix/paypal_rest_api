@@ -1,18 +1,28 @@
 /**
  * PayPal Google Pay Integration - Wallet Button Implementation
  *
- * This module implements Google Pay for cart/product pages with different approaches
- * based on user login status:
- * 
- * LOGGED IN USERS:
- * - Uses PayPal SDK (paypal.Googlepay()) for payment processing
- * - User email comes from session (no need to collect from Google Pay)
- * - Shipping address and options fetched via ajax endpoint
- * 
- * GUEST USERS (NOT LOGGED IN):
- * - Uses native Google Pay SDK directly (google.payments.api.PaymentsClient)
- * - Email address collected from Google Pay
- * - Shipping address and options still fetched via ajax endpoint
+ * This module implements Google Pay for cart/product pages using the native
+ * Google Pay SDK (google.payments.api.PaymentsClient) for button rendering and
+ * the PayPal SDK (paypal.Googlepay()) for configuration and order confirmation.
+ *
+ * ALL USERS (logged-in and guest) - physical cart + Google Merchant ID configured:
+ * - Shipping address + shipping option collected via Google Pay modal using callbackIntents
+ * - Requires a configured Google Merchant ID in merchantInfo so Google can verify the merchant
+ * - Uses paypal.Googlepay().confirmOrder() for payment confirmation
+ * - Guest users additionally provide their email address via the modal
+ *
+ * ALL USERS - virtual cart (no physical items):
+ * - No shipping address or shipping option is requested in the modal
+ * - Works with or without a Google Merchant ID
+ *
+ * PHYSICAL CART - no Google Merchant ID configured:
+ * - Button is NOT rendered because callbackIntents cannot be used without a Merchant ID
+ *   and shipping cannot be collected inside the modal
+ *
+ * GUEST USERS - WITHOUT Google Merchant ID configured:
+ * - For virtual-only carts the button renders normally (no shipping needed)
+ * - For physical carts the button is suppressed (see above)
+ * - Only rendered when the guest wallet configuration option is enabled
  *
  * Reference: https://developer.paypal.com/docs/checkout/advanced/googlepay/
  *
@@ -29,7 +39,8 @@
     var sdkState = {
         config: null,
         googlepay: null,
-        paymentsClient: null
+        paymentsClient: null,
+        useCallbackIntents: false
     };
 
     var WALLET_BUTTON_MIN_WIDTH = '200px';
@@ -104,6 +115,42 @@
         }
 
         return true;
+    }
+
+    /**
+     * Collect the product form data (quantity and attributes) from the current
+     * page.  Used by fetchWalletOrder and fetchShippingOptions on product pages
+     * so the server can set up the Buy Now cart.
+     * @param {Object} requestData - The request object to augment in place.
+     */
+    function collectProductFormData(requestData) {
+        var qtyInput = document.querySelector('input[name="cart_quantity"]');
+        requestData.cart_quantity = qtyInput ? (parseInt(qtyInput.value, 10) || 1) : 1;
+        var cartForm = document.querySelector('form[name="cart_quantity"]');
+        if (cartForm) {
+            var attribs = {};
+            var selects = cartForm.querySelectorAll('select[name^="id["]');
+            for (var i = 0; i < selects.length; i++) {
+                attribs[selects[i].name] = selects[i].value;
+            }
+            var radios = cartForm.querySelectorAll('input[type="radio"][name^="id["]:checked');
+            for (var j = 0; j < radios.length; j++) {
+                attribs[radios[j].name] = radios[j].value;
+            }
+            var checkboxes = cartForm.querySelectorAll('input[type="checkbox"][name^="id["]:checked');
+            for (var k = 0; k < checkboxes.length; k++) {
+                attribs[checkboxes[k].name] = checkboxes[k].value;
+            }
+            var texts = cartForm.querySelectorAll('input[type="text"][name^="id["], textarea[name^="id["]');
+            for (var m = 0; m < texts.length; m++) {
+                if (texts[m].value) {
+                    attribs[texts[m].name] = texts[m].value;
+                }
+            }
+            if (Object.keys(attribs).length > 0) {
+                requestData.attributes = attribs;
+            }
+        }
     }
 
     function submitCheckoutForm() {
@@ -344,12 +391,20 @@
     /**
      * Fetch SDK configuration only (no order creation).
      * Used during initial button rendering.
+     * Includes products_id when on a product page so the server can check
+     * whether the viewed product is virtual (shipping not required).
      */
     function fetchWalletConfig() {
+        var requestData = { wallet: 'google_pay', config_only: true };
+        // Detect product page context from URL
+        var match = window.location.search.match(/[?&]products_id=(\d+)/);
+        if (match) {
+            requestData.products_id = parseInt(match[1], 10);
+        }
         return fetch('ppac_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ wallet: 'google_pay', config_only: true })
+            body: JSON.stringify(requestData)
         }).then(parseWalletResponse).catch(function (error) {
             console.error('Unable to load Google Pay configuration', error);
             return { success: false, message: error && error.message ? error.message : 'Unable to load Google Pay configuration' };
@@ -363,11 +418,21 @@
     function fetchWalletOrder() {
         console.log('[Google Pay] fetchWalletOrder: Starting order creation request to ppac_wallet.php');
         var startTime = Date.now();
-        
+
+        var orderData = { wallet: 'google_pay' };
+
+        // On product pages, send product info so the server can set up the
+        // "Buy Now" cart before creating the PayPal order.
+        var gpConfig = window.paypalacGooglePayConfig;
+        if (gpConfig && gpConfig.productId) {
+            orderData.products_id = gpConfig.productId;
+            collectProductFormData(orderData);
+        }
+
         return fetch('ppac_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ wallet: 'google_pay' })
+            body: JSON.stringify(orderData)
         }).then(function(response) {
             var elapsed = Date.now() - startTime;
             console.log('[Google Pay] fetchWalletOrder: Received response after ' + elapsed + 'ms, status:', response.status);
@@ -416,6 +481,20 @@
         if (selectedShippingOptionId) {
             requestData.selectedShippingOptionId = selectedShippingOptionId;
         }
+
+        // On product pages, send product info so the server can set up the
+        // "Buy Now" cart (reset + add just this product) before quoting shipping.
+        var gpConfig = window.paypalacGooglePayConfig;
+        if (gpConfig && gpConfig.productId) {
+            requestData.products_id = gpConfig.productId;
+            if (gpConfig.initialTotal) {
+                var productPrice = parseFloat(gpConfig.initialTotal);
+                if (!isNaN(productPrice) && productPrice > 0) {
+                    requestData.productPrice = productPrice.toFixed(2);
+                }
+            }
+            collectProductFormData(requestData);
+        }
         
         // Use configurable base path for AJAX endpoint to support subdirectory installations
         var ajaxBasePath = window.paypalacAjaxBasePath || 'ajax/';
@@ -434,88 +513,6 @@
         }).catch(function (error) {
             console.error('[Google Pay] Failed to fetch shipping options', error);
             throw error;
-        });
-    }
-
-    /**
-     * Update shipping information via AJAX
-     * Used for PayPal Buttons component callbacks
-     */
-    function updateShipping(shippingAddress, shippingOption) {
-        console.log('[Google Pay] Updating shipping via AJAX');
-        
-        var requestData = {
-            module: 'paypalac_googlepay'
-        };
-        
-        if (shippingAddress) {
-            requestData.shippingAddress = {
-                name: shippingAddress.recipient_name || '',
-                address1: shippingAddress.line1 || '',
-                address2: shippingAddress.line2 || '',
-                locality: shippingAddress.city || '',
-                administrativeArea: shippingAddress.state || '',
-                postalCode: shippingAddress.postal_code || '',
-                countryCode: shippingAddress.country_code || ''
-            };
-        }
-        
-        if (shippingOption) {
-            requestData.selectedShippingOptionId = shippingOption.id;
-        }
-        
-        var ajaxBasePath = window.paypalacAjaxBasePath || 'ajax/';
-        var ajaxUrl = ajaxBasePath + 'paypalac_wallet.php';
-        
-        return fetch(ajaxUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestData)
-        }).then(function(response) {
-            return parseWalletResponse(response);
-        }).then(function(data) {
-            console.log('[Google Pay] Shipping update response:', data);
-            return data;
-        }).catch(function(error) {
-            console.error('[Google Pay] Failed to update shipping:', error);
-            return { error: true, message: error.message };
-        });
-    }
-
-    /**
-     * Process wallet checkout via AJAX
-     * Used for PayPal Buttons component onApprove callback
-     */
-    function processWalletCheckout(orderID) {
-        console.log('[Google Pay] Processing wallet checkout for order:', orderID);
-        
-        var checkoutPayload = {
-            module: 'paypalac_googlepay',
-            orderID: orderID
-        };
-        
-        var ajaxBasePath = window.paypalacAjaxBasePath || 'ajax/';
-        var checkoutUrl = ajaxBasePath + 'paypalac_wallet_checkout.php';
-        
-        return fetch(checkoutUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(checkoutPayload)
-        }).then(function(response) {
-            return response.json();
-        }).then(function(result) {
-            console.log('[Google Pay] Checkout result:', result);
-            return {
-                success: result.status === 'success',
-                redirectUrl: result.redirect_url,
-                message: result.message
-            };
-        }).catch(function(error) {
-            console.error('[Google Pay] Checkout request failed:', error);
-            return {
-                success: false,
-                message: error.message || 'Checkout request failed'
-            };
         });
     }
 
@@ -605,6 +602,15 @@
 
         if (sharedSdkLoader.promise && sharedSdkLoader.key === desiredKey && window.paypal && typeof window.paypal.Googlepay === 'function') {
             return sharedSdkLoader.promise.then(function () { return window.paypal; });
+        }
+
+        // Detect PayPal SDK already loaded by another template (e.g. Apple Pay's <script> tag)
+        // even when sharedSdkLoader hasn't been set. Avoids duplicate SDK loading which can
+        // cause the second load to silently fail and leave the promise chain unresolved.
+        if (!existingScript && window.paypal && typeof window.paypal.Googlepay === 'function') {
+            sharedSdkLoader.key = desiredKey;
+            sharedSdkLoader.promise = Promise.resolve(window.paypal);
+            return sharedSdkLoader.promise;
         }
 
         if (existingScript) {
@@ -768,19 +774,18 @@
     /**
      * Handle the Google Pay button click event.
      * Creates a PayPal order and initiates the Google Pay payment flow.
+     *
+     * Mirrors the checkout page flow (jquery.paypalac.googlepay.js), with the only
+     * difference being that shipping address and option are collected inside the modal.
      * 
-     * For logged-in users: Uses PayPal SDK only (no Google Pay SDK)
-     * For guests: Uses both PayPal SDK and Google Pay SDK with full modal UI
-     * 
-     * IMPORTANT: For guests, paymentsClient.loadPaymentData() should be called as close to 
-     * the user gesture as possible to avoid potential user gesture timeout issues in some browsers.
+     * IMPORTANT: paymentsClient.loadPaymentData() should be called as close to the user gesture
+     * as possible to avoid potential user gesture timeout issues in some browsers.
      * 
      * The order is created BEFORE calling loadPaymentData to get the actual amount, but both 
      * operations happen within the same user gesture handler to minimize delay.
      */
     function onGooglePayButtonClicked() {
         console.log('[Google Pay] Button clicked, starting payment flow');
-        console.log('[Google Pay] User logged in:', isLoggedIn);
         
         selectGooglePayRadio();
 
@@ -793,19 +798,8 @@
         var googlepay = sdkState.googlepay;
         var paymentsClient = sdkState.paymentsClient;
 
-        // For logged-in users, paymentsClient won't exist (PayPal SDK only)
-        // For guests, both googlepay and paymentsClient are required
-        if (!googlepay) {
-            console.error('[Google Pay] PayPal Googlepay SDK not initialized');
-            setGooglePayPayload({});
-            if (typeof window.oprcHideProcessingOverlay === 'function') {
-                window.oprcHideProcessingOverlay();
-            }
-            return;
-        }
-
-        if (!isLoggedIn && !paymentsClient) {
-            console.error('[Google Pay] Guest mode requires Google Pay SDK PaymentsClient, but it is not initialized');
+        if (!googlepay || !paymentsClient) {
+            console.error('[Google Pay] Not properly initialized - googlepay:', !!googlepay, 'paymentsClient:', !!paymentsClient);
             setGooglePayPayload({});
             if (typeof window.oprcHideProcessingOverlay === 'function') {
                 window.oprcHideProcessingOverlay();
@@ -836,7 +830,7 @@
 
             console.log('[Google Pay] Configuration valid, allowed payment methods:', allowedPaymentMethods.length);
 
-            // Add billing address requirements to allowedPaymentMethods
+            // Add billing address requirements to allowedPaymentMethods (similar to Braintree implementation)
             // Create a deep copy to avoid mutating the original PayPal config
             var modifiedPaymentMethods = JSON.parse(JSON.stringify(allowedPaymentMethods));
             if (modifiedPaymentMethods && modifiedPaymentMethods[0] && modifiedPaymentMethods[0].parameters) {
@@ -855,7 +849,7 @@
             console.log('[Google Pay] Step 1: Creating PayPal order to get actual amount');
             return fetchWalletOrder().then(function (orderConfig) {
                 console.log('[Google Pay] Order creation result:', orderConfig);
-                
+
                 if (!orderConfig || orderConfig.success === false) {
                     console.error('[Google Pay] Failed to create PayPal order', orderConfig);
                     setGooglePayPayload({});
@@ -876,138 +870,32 @@
 
                 console.log('[Google Pay] Order validated - ID:', orderConfig.orderID, 'Amount:', orderConfig.amount, 'Currency:', orderConfig.currency);
 
-                sdkState.config = orderConfig;
                 var orderId = orderConfig.orderID;
 
-                // For logged-in users: Collect shipping data but not email (email from session)
-                if (isLoggedIn) {
-                    console.log('[Google Pay] Logged-in user - collecting shipping data for confirmOrder (email from session)');
-                    
-                    // For logged-in users, exclude merchant ID to avoid Google merchant verification requirement
-                    // Use merchantName only (doesn't require verification)
-                    var merchantInfoForLoggedIn = {};
-                    if (basePaymentDataRequest.merchantInfo && basePaymentDataRequest.merchantInfo.merchantName) {
-                        merchantInfoForLoggedIn.merchantName = basePaymentDataRequest.merchantInfo.merchantName;
-                    }
-                    console.log('[Google Pay] Using merchantInfo WITHOUT merchantId for logged-in user (no verification required)');
-                    
-                    // Build payment data request with shipping but no email
-                    var paymentDataRequest = {
-                        apiVersion: basePaymentDataRequest.apiVersion || 2,
-                        apiVersionMinor: basePaymentDataRequest.apiVersionMinor || 0,
-                        allowedPaymentMethods: modifiedPaymentMethods,
-                        transactionInfo: {
-                            totalPriceStatus: 'FINAL',
-                            totalPrice: orderConfig.amount,
-                            currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
-                            countryCode: 'US'
-                        },
-                        merchantInfo: merchantInfoForLoggedIn,
-                        emailRequired: false,
-                        // Enable shipping address and shipping option selection in the Google Pay modal
-                        shippingAddressRequired: true,
-                        shippingAddressParameters: {
-                            phoneNumberRequired: true
-                        },
-                        shippingOptionRequired: true,
-                        // Provide initial shipping options to avoid Google Pay error
-                        // These will be updated via onPaymentDataChanged callback when address changes
-                        shippingOptionParameters: {
-                            defaultSelectedOptionId: 'shipping_option_unselected',
-                            shippingOptions: []
-                        },
-                        // Register callbacks for address and shipping option changes
-                        callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
-                    };
-                    
-                    console.log('[Google Pay] Requesting payment data with shipping from Google Pay');
-                    
-                    // Collect payment data from Google Pay with shipping but no email
-                    return paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
-                        console.log('[Google Pay] Payment data received for logged-in user');
-                        
-                        // Debug logging for logged-in user payment data
-                        console.log('[Google Pay] DEBUG (Logged-in) - Full paymentData keys:', Object.keys(paymentData));
-                        console.log('[Google Pay] DEBUG (Logged-in) - paymentData.email:', paymentData.email || '(empty - expected for logged-in users)');
-                        
-                        // Call confirmOrder with payment data
-                        console.log('[Google Pay] Calling confirmOrder for logged-in user');
-                        return googlepay.confirmOrder({
-                            orderId: orderId,
-                            paymentMethodData: paymentData.paymentMethodData
-                        }).then(function (confirmResult) {
-                            console.log('[Google Pay] confirmOrder result for logged-in user:', confirmResult);
-                            
-                            // Extract shipping and billing addresses from Google Pay payment data
-                            var shippingAddress = paymentData.shippingAddress || {};
-                            var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
-                            var shippingOption = paymentData.shippingOptionData || {};
-                            
-                            console.log('[Google Pay] DEBUG (Logged-in) - Shipping address:', shippingAddress);
-                            console.log('[Google Pay] DEBUG (Logged-in) - Billing address:', billingAddress);
-                            
-                            // Build the checkout payload with order ID and shipping data
-                            var checkoutPayload = {
-                                payment_method_nonce: orderId,
-                                module: 'paypalac_googlepay',
-                                total: orderConfig.amount,
-                                currency: orderConfig.currency || 'USD',
-                                orderID: orderId,
-                                isLoggedIn: true,
-                                shipping_address: shippingAddress,
-                                billing_address: billingAddress,
-                                shipping_option: shippingOption
-                            };
-                            
-                            console.log('[Google Pay] Sending checkout request to ajax handler for logged-in user');
-                            
-                            // Send to checkout handler
-                            var ajaxBasePath = window.paypalacAjaxBasePath || 'ajax/';
-                            var checkoutUrl = ajaxBasePath + 'paypalac_wallet_checkout.php';
-                            
-                            return fetch(checkoutUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(checkoutPayload)
-                            }).then(function(response) {
-                                return response.json();
-                            }).then(function(checkoutResult) {
-                                console.log('[Google Pay] Checkout result for logged-in user:', checkoutResult);
-                                
-                                if (checkoutResult.status === 'success' && checkoutResult.redirect_url) {
-                                    console.log('[Google Pay] Redirecting to:', checkoutResult.redirect_url);
-                                    window.location.href = checkoutResult.redirect_url;
-                                } else {
-                                    console.error('[Google Pay] Checkout failed:', checkoutResult);
-                                    setGooglePayPayload({});
-                                    if (typeof window.oprcHideProcessingOverlay === 'function') {
-                                        window.oprcHideProcessingOverlay();
-                                    }
-                                    alert('Checkout failed: ' + (checkoutResult.message || 'Unknown error'));
-                                }
-                            }).catch(function(checkoutError) {
-                                console.error('[Google Pay] Checkout request failed for logged-in user:', checkoutError);
-                                setGooglePayPayload({});
-                                if (typeof window.oprcHideProcessingOverlay === 'function') {
-                                    window.oprcHideProcessingOverlay();
-                                }
-                                alert('Checkout request failed: ' + (checkoutError && checkoutError.message ? checkoutError.message : 'Unknown error'));
-                            });
-                        }).catch(function(confirmError) {
-                            console.error('[Google Pay] confirmOrder failed for logged-in user:', confirmError);
-                            setGooglePayPayload({});
-                            if (typeof window.oprcHideProcessingOverlay === 'function') {
-                                window.oprcHideProcessingOverlay();
-                            }
-                            alert('Payment confirmation failed: ' + (confirmError && confirmError.message ? confirmError.message : 'An internal server error has occurred'));
-                        });
-                    });
+                // Build payment data request with the actual order amount.
+                //
+                // callbackIntents (for in-modal shipping option selection) requires Google Pay to
+                // verify the merchant via merchantInfo.merchantId. The PayPal SDK supplies a
+                // merchantInfo but its merchantId is a PayPal account ID, not a Google-verified
+                // merchant ID, so callbackIntents trigger OR_BIBED_06 unless we override it with
+                // a properly registered Google Merchant ID.
+                //
+                // Three cases:
+                //   Virtual cart (any user):                  no shipping fields in modal
+                //   Physical cart + Merchant ID (any user):   shippingAddressRequired + callbackIntents
+                //   Physical cart, no Merchant ID:            button hidden (see renderGooglePayButton)
+                // useCallbackIntents was computed and stored during renderGooglePayButton().
+                var useCallbackIntents = sdkState.useCallbackIntents;
+                var cartRequiresShipping = !!(sdkState.config && sdkState.config.cartRequiresShipping);
+                var configuredGoogleMerchantId = (sdkState.config && sdkState.config.googleMerchantId) ? sdkState.config.googleMerchantId : '';
+
+                // Build merchantInfo. For callbackIntents we override merchantId with the
+                // configured Google Merchant ID so Google's servers can verify the merchant.
+                var merchantInfo = Object.assign({}, basePaymentDataRequest.merchantInfo || {});
+                if (useCallbackIntents) {
+                    merchantInfo.merchantId = configuredGoogleMerchantId;
                 }
 
-                // Guest user flow - use Google Pay modal
-                console.log('[Google Pay] Guest user - building payment data request for Google Pay modal');
-
-                // Build payment data request with the actual order amount
                 var paymentDataRequest = {
                     apiVersion: basePaymentDataRequest.apiVersion || 2,
                     apiVersionMinor: basePaymentDataRequest.apiVersionMinor || 0,
@@ -1018,32 +906,30 @@
                         currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
                         countryCode: 'US'
                     },
-                    merchantInfo: basePaymentDataRequest.merchantInfo || {},
-                    // Email collection: Only required for guest users (not logged in)
-                    // Logged-in users have email in session on server side
+                    merchantInfo: merchantInfo,
+                    // Email: guests must provide it; logged-in users have it in their session
                     emailRequired: !isLoggedIn,
-                    // Enable shipping address and shipping option selection in the Google Pay modal
-                    shippingAddressRequired: true,
-                    shippingAddressParameters: {
-                        phoneNumberRequired: true
-                        // Note: emailRequired in shippingAddressParameters is NOT used because
-                        // we handle email collection at the top level with emailRequired: !isLoggedIn
-                    },
-                    shippingOptionRequired: true,
-                    // Provide initial shipping options to avoid Google Pay error
-                    // These will be updated via onPaymentDataChanged callback when address changes
-                    shippingOptionParameters: {
-                        defaultSelectedOptionId: 'shipping_option_unselected',
-                        shippingOptions: []
-                    },
-                    // Register callbacks for address and shipping option changes
-                    // Note: PAYMENT_AUTHORIZATION is not included because PayPal SDK uses confirmOrder() API
-                    callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION']
+                    // Only request a shipping address for non-virtual carts
+                    shippingAddressRequired: cartRequiresShipping
                 };
 
-                // Debug logging for PaymentDataRequest configuration
-                console.log('[Google Pay] DEBUG - PaymentDataRequest.emailRequired:', paymentDataRequest.emailRequired);
-                console.log('[Google Pay] DEBUG - isLoggedIn:', isLoggedIn);
+                if (cartRequiresShipping) {
+                    paymentDataRequest.shippingAddressParameters = {
+                        phoneNumberRequired: true
+                    };
+                }
+
+                // When the cart requires shipping and a Merchant ID is configured, collect the
+                // shipping option inside the modal using callbackIntents for dynamic calculation.
+                if (useCallbackIntents) {
+                    paymentDataRequest.shippingOptionRequired = true;
+                    paymentDataRequest.shippingOptionParameters = {
+                        defaultSelectedOptionId: 'shipping_option_unselected',
+                        shippingOptions: []
+                    };
+                    paymentDataRequest.callbackIntents = ['SHIPPING_ADDRESS', 'SHIPPING_OPTION'];
+                }
+
                 console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
 
                 // Step 2: Invoke Google Pay payment sheet with actual amount
@@ -1052,16 +938,7 @@
                     console.log('[Google Pay] Payment data received from Google Pay sheet');
                     console.log('[Google Pay] Payment method data:', paymentData.paymentMethodData);
                     
-                    // Debug logging for email collection
-                    console.log('[Google Pay] DEBUG - paymentData.email:', paymentData.email || '(empty)');
-                    console.log('[Google Pay] DEBUG - Full paymentData keys:', Object.keys(paymentData));
-                    if (paymentData.paymentMethodData && paymentData.paymentMethodData.info && paymentData.paymentMethodData.info.billingAddress) {
-                        console.log('[Google Pay] DEBUG - billingAddress.emailAddress:', paymentData.paymentMethodData.info.billingAddress.emailAddress || '(empty)');
-                    }
-                    
                     // Step 3: Confirm the order using PayPal's client-side API
-                    // Similar to Apple Pay, Google Pay now uses client-side confirmation via confirmOrder()
-                    // This is the recommended flow per PayPal's Advanced Integration documentation
                     console.log('[Google Pay] Calling paypal.Googlepay().confirmOrder...', orderId);
                     
                     return googlepay.confirmOrder({
@@ -1070,39 +947,44 @@
                     }).then(function (confirmResult) {
                         console.log('[Google Pay] confirmOrder result:', confirmResult);
                         
-                        // Extract shipping and billing addresses from Google Pay payment data
+                        // Show processing cursor while checkout completes
+                        document.body.classList.add('processing-payment');
+                        
+                        // Extract addresses and shipping option from Google Pay payment data
                         var shippingAddress = paymentData.shippingAddress || {};
                         var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
-                        // Email extraction: paymentData.email is typically empty with PayPal SDK since
-                        // we don't use emailRequired (incompatible with confirmOrder() flow).
-                        // For logged-in users, email comes from session on the server side.
-                        var email = paymentData.email || billingAddress.emailAddress || '';
-                        
-                        // Debug logging for email extraction
-                        console.log('[Google Pay] DEBUG - Extracted email:', email || '(empty)');
-                        console.log('[Google Pay] DEBUG - Email source:', paymentData.email ? 'paymentData.email' : (billingAddress.emailAddress ? 'billingAddress.emailAddress' : 'none'));
+                        var shippingOption = paymentData.shippingOptionData || {};
+                        // Email: guests provide it via Google Pay; logged-in users have it in session
+                        var email = '';
+                        if (!isLoggedIn) {
+                            email = paymentData.email || billingAddress.emailAddress || '';
+                        }
                         
                         // Build the complete payload for checkout
                         var checkoutPayload = {
-                            payment_method_nonce: orderId, // Use orderID as the payment reference
+                            payment_method_nonce: orderId,
                             module: 'paypalac_googlepay',
                             total: orderConfig.amount,
                             currency: orderConfig.currency || 'USD',
                             email: email,
                             shipping_address: shippingAddress,
                             billing_address: billingAddress,
-                            orderID: orderId
+                            orderID: orderId,
+                            paypal_order_id: orderId,
+                            shipping_option: shippingOption
                         };
                         
                         console.log('[Google Pay] Sending checkout request to ajax handler');
                         
-                        // Send to checkout handler instead of just submitting form
                         var ajaxBasePath = window.paypalacAjaxBasePath || 'ajax/';
                         var checkoutUrl = ajaxBasePath + 'paypalac_wallet_checkout.php';
                         
                         return fetch(checkoutUrl, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
                             body: JSON.stringify(checkoutPayload)
                         }).then(function(response) {
                             return response.json();
@@ -1114,6 +996,7 @@
                                 window.location.href = checkoutResult.redirect_url;
                             } else {
                                 console.error('[Google Pay] Checkout failed:', checkoutResult);
+                                document.body.classList.remove('processing-payment');
                                 setGooglePayPayload({});
                                 if (typeof window.oprcHideProcessingOverlay === 'function') {
                                     window.oprcHideProcessingOverlay();
@@ -1122,6 +1005,7 @@
                             }
                         }).catch(function(checkoutError) {
                             console.error('[Google Pay] Checkout request failed:', checkoutError);
+                            document.body.classList.remove('processing-payment');
                             setGooglePayPayload({});
                             if (typeof window.oprcHideProcessingOverlay === 'function') {
                                 window.oprcHideProcessingOverlay();
@@ -1130,6 +1014,7 @@
                         });
                     }).catch(function (confirmError) {
                         console.error('[Google Pay] confirmOrder failed:', confirmError);
+                        document.body.classList.remove('processing-payment');
                         setGooglePayPayload({});
                         if (typeof window.oprcHideProcessingOverlay === 'function') {
                             window.oprcHideProcessingOverlay();
@@ -1147,6 +1032,7 @@
             } else {
                 console.error('[Google Pay] Payment error occurred', error);
             }
+            document.body.classList.remove('processing-payment');
             setGooglePayPayload({});
             if (typeof window.oprcHideProcessingOverlay === 'function') {
                 window.oprcHideProcessingOverlay();
@@ -1155,7 +1041,14 @@
     }
 
     /**
-     * Render the native Google Pay button using Google's PaymentsClient.
+     * Render the Google Pay button.
+     *
+     * Uses the native Google Pay SDK (google.payments.api.PaymentsClient) for all users.
+     * The PayPal SDK (paypal.Googlepay()) is used alongside for configuration and order
+     * confirmation, while the native SDK handles the button rendering and payment sheet.
+     *
+     * For logged-in users: Email comes from session; shipping data collected in modal.
+     * For guest users: Email collected from Google Pay; shipping data collected in modal.
      */
     function renderGooglePayButton() {
         console.log('[Google Pay] Starting button rendering');
@@ -1170,7 +1063,7 @@
         var container = document.getElementById('paypalac-googlepay-button');
         if (!container) {
             console.warn('[Google Pay] Button container not found');
-            renderState.renderState.renderingInProgress = false;
+            renderState.renderingInProgress = false;
             return;
         }
 
@@ -1199,94 +1092,23 @@
             // Note: Guest wallet availability check is now handled at PHP template level
             // If this script is loaded, the button should be shown
 
-            sdkState.config = config;
-
-            // For logged-in users: Use PayPal Googlepay API to render proper Google Pay button
-            // This approach renders a Google Pay button without requiring Google merchant verification
-            if (isLoggedIn) {
-                console.log('[Google Pay] Logged-in user detected - using PayPal Googlepay API');
-                // Load both PayPal SDK and Google Pay JS for button rendering
-                return Promise.all([
-                    loadPayPalSdk(config),
-                    loadGooglePayJs()
-                ]).then(function (results) {
-                    var paypal = results[0];
-                    console.log('[Google Pay] SDKs loaded successfully for logged-in user');
-                    
-                    // Verify PayPal Googlepay API is available
-                    if (typeof paypal.Googlepay !== 'function') {
-                        console.warn('[Google Pay] PayPal Googlepay API not available');
-                        renderState.renderingInProgress = false;
-                        hidePaymentMethodContainer();
-                        return;
-                    }
-                    
-                    // Initialize PayPal Google Pay
-                    console.log('[Google Pay] Initializing PayPal Googlepay API for logged-in user');
-                    var googlepay = paypal.Googlepay();
-                    sdkState.googlepay = googlepay;
-                    
-                    // Get configuration from PayPal
-                    return googlepay.config().then(function (googlepayConfig) {
-                        console.log('[Google Pay] Got Googlepay config for logged-in user');
-                        
-                        // Create Google Pay PaymentsClient for button rendering
-                        var googlePayEnvironment = config.environment === 'sandbox' ? 'TEST' : 'PRODUCTION';
-                        console.log('[Google Pay] Creating PaymentsClient with environment:', googlePayEnvironment);
-                        
-                        // Register callbacks for shipping address and option changes
-                        var paymentsClient = new google.payments.api.PaymentsClient({
-                            environment: googlePayEnvironment,
-                            paymentDataCallbacks: {
-                                onPaymentDataChanged: onPaymentDataChanged
-                            }
-                        });
-                        sdkState.paymentsClient = paymentsClient;
-                        
-                        // Check if ready to pay
-                        var allowedPaymentMethods = getAllowedPaymentMethods(googlepayConfig);
-                        var isReadyToPayRequest = {
-                            apiVersion: googlepayConfig.apiVersion || 2,
-                            apiVersionMinor: googlepayConfig.apiVersionMinor || 0,
-                            allowedPaymentMethods: allowedPaymentMethods
-                        };
-                        
-                        return paymentsClient.isReadyToPay(isReadyToPayRequest).then(function (response) {
-                            if (!response.result) {
-                                console.log('[Google Pay] Not ready to pay for logged-in user');
-                                renderState.renderingInProgress = false;
-                                hidePaymentMethodContainer();
-                                return;
-                            }
-                            
-                            console.log('[Google Pay] Device is ready to pay, creating button for logged-in user');
-                            
-                            // Create Google Pay button using PaymentsClient
-                            // This renders a proper Google Pay button without needing Google merchant verification
-                            var button = paymentsClient.createButton({
-                                onClick: onGooglePayButtonClicked,
-                                buttonColor: 'black',
-                                buttonType: 'pay',
-                                buttonRadius: 4,
-                                buttonSizeMode: 'fill'
-                            });
-                            
-                            normalizeWalletButton(button);
-                            container.appendChild(button);
-                            console.log('[Google Pay] Google Pay button rendered successfully for logged-in user');
-                            renderState.buttonRendered = true;
-                            renderState.renderingInProgress = false;
-                        });
-                    });
-                }).catch(function (error) {
-                    console.error('[Google Pay] Failed to initialize for logged-in user:', error);
-                    renderState.renderingInProgress = false;
-                    hidePaymentMethodContainer();
-                });
+            // Without a Google Merchant ID, callbackIntents cannot be used, so shipping
+            // options cannot be shown inside the Google Pay modal.  When the cart contains
+            // physical items the user would be immediately redirected to checkout_shipping
+            // anyway – hiding the button avoids a confusing dead-end UX.
+            if (!hasMerchantId && config.cartRequiresShipping) {
+                console.log('[Google Pay] Button suppressed: no Google Merchant ID and cart requires shipping');
+                renderState.renderingInProgress = false;
+                hidePaymentMethodContainer();
+                return null;
             }
 
-            // Guest user path - requires Google Pay SDK and merchant verification
-            console.log('[Google Pay] Guest user detected - using both PayPal SDK and Google Pay SDK');
+            sdkState.config = config;
+
+            // All users use native Google Pay SDK for button rendering.
+            // The PayPal SDK provides configuration and order confirmation,
+            // while the native Google Pay SDK handles the button and payment sheet.
+            console.log('[Google Pay] Using native Google Pay SDK with PayPal SDK');
             // Load both PayPal SDK and Google Pay JS in parallel
             console.log('[Google Pay] Loading PayPal SDK and Google Pay JS library');
             return Promise.all([
@@ -1324,13 +1146,25 @@
                 // Create Google Payments Client
                 // Use environment from config (stored in sdkState) to determine Google Pay environment
                 var googlePayEnvironment = (sdkState.config && sdkState.config.environment === 'sandbox') ? 'TEST' : 'PRODUCTION';
-                console.log('[Google Pay] Creating PaymentsClient with environment:', googlePayEnvironment);
-                var paymentsClient = new google.payments.api.PaymentsClient({
-                    environment: googlePayEnvironment,
-                    paymentDataCallbacks: {
+                // A Google Merchant ID is needed for callbackIntents to pass Google's merchant
+                // verification. Physical carts always use callbackIntents (for both logged-in
+                // and guest users) so that shipping is collected inside the modal. Without a
+                // Merchant ID the button is hidden for physical carts, so this code is only
+                // reached when callbackIntents can actually be used.
+                // callbackIntents are skipped for virtual carts (no shipping needed).
+                var configuredGoogleMerchantId = (sdkState.config && sdkState.config.googleMerchantId) ? sdkState.config.googleMerchantId : '';
+                var cartRequiresShipping = !!(sdkState.config && sdkState.config.cartRequiresShipping);
+                var useCallbackIntents = !!configuredGoogleMerchantId && cartRequiresShipping;
+                sdkState.useCallbackIntents = useCallbackIntents;
+                console.log('[Google Pay] Creating PaymentsClient with environment:', googlePayEnvironment, 'loggedIn:', isLoggedIn, 'useCallbackIntents:', useCallbackIntents);
+                // Only register paymentDataCallbacks when callbackIntents will be used.
+                var paymentsClientConfig = { environment: googlePayEnvironment };
+                if (useCallbackIntents) {
+                    paymentsClientConfig.paymentDataCallbacks = {
                         onPaymentDataChanged: onPaymentDataChanged
-                    }
-                });
+                    };
+                }
+                var paymentsClient = new google.payments.api.PaymentsClient(paymentsClientConfig);
                 sdkState.paymentsClient = paymentsClient;
 
                 // Get base configuration from PayPal for isReadyToPay check
@@ -1444,9 +1278,12 @@
     // but do NOT launch the modal - only the button click or form submit should do that
     var moduleRadio = document.getElementById('pmt-paypalac_googlepay');
     if (moduleRadio) {
-        moduleRadio.addEventListener('click', function () {
-            selectGooglePayRadio();
-        });
+        if (!moduleRadio.dataset.googlePayBound) {
+            moduleRadio.addEventListener('click', function () {
+                selectGooglePayRadio();
+            });
+            moduleRadio.dataset.googlePayBound = 'true';
+        }
     }
 
     var checkoutForm = document.querySelector('form[name="checkout_payment"]');

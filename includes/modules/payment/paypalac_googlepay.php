@@ -570,7 +570,7 @@ class paypalac_googlepay extends base
      *
      * @return array
      */
-    public function ajaxGetWalletConfig(): array
+    public function ajaxGetWalletConfig(int $productsId = 0): array
     {
         $client_id = (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : MODULE_PAYMENT_PAYPALAC_CLIENTID_S;
         $client_id = trim($client_id);
@@ -604,6 +604,26 @@ class paypalac_googlepay extends base
             return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_ERROR_INITIALIZE ?? 'Unable to start Google Pay. Please try again.'];
         }
 
+        // When a products_id is provided (product page context), determine shipping
+        // requirement from the product itself rather than the session cart.
+        if ($productsId > 0) {
+            $requiresShipping = !zen_get_products_virtual($productsId);
+        } else {
+            // Determine whether the current cart contains physical (non-virtual) items.
+            // An empty cart returns false from get_content_type(); only 'virtual' carts are
+            // explicitly virtual. We default to false (i.e. don't suppress the button) when
+            // the cart is empty, e.g. on product pages where nothing has been added yet.
+            $cartIsVirtual = false;
+            $hasCart = isset($_SESSION['cart']) && method_exists($_SESSION['cart'], 'get_content_type');
+            if ($hasCart) {
+                $contentType = $_SESSION['cart']->get_content_type();
+                if ($contentType === 'virtual') {
+                    $cartIsVirtual = true;
+                }
+            }
+            $requiresShipping = !$cartIsVirtual && $hasCart && $_SESSION['cart']->count_contents() > 0;
+        }
+
         return [
             'success' => true,
             'clientId' => $client_id,
@@ -613,11 +633,17 @@ class paypalac_googlepay extends base
             'intent' => $intent,
             'environment' => MODULE_PAYMENT_PAYPALAC_SERVER,
             'enableGuestWallet' => (defined('MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_ENABLE_GUEST_WALLET') && MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_ENABLE_GUEST_WALLET === 'True'),
+            'cartRequiresShipping' => $requiresShipping,
         ];
     }
 
     public function ajaxCreateWalletOrder(): array
     {
+        // All users (logged-in and guest) use callbackIntents when a Google Merchant ID is
+        // configured, selecting shipping inside the modal for physical carts.
+        // When no Merchant ID is configured, the button is suppressed for physical carts
+        // by the JS layer, so we never need to redirect to checkout_shipping from here.
+
         $response = $this->buildWalletAjaxResponse('google_pay');
         if ($response['success'] === false && empty($response['message'])) {
             $response['message'] = MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_ERROR_INITIALIZE ?? 'Unable to start Google Pay. Please try again.';

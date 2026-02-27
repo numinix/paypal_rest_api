@@ -675,7 +675,8 @@
         var orderPromise = null;
 
         // Create payment request with the actual order amount from the page
-        // Request contact fields that PayPal's confirmPaymentSource API requires
+        // On checkout, shipping address and options are already handled by the checkout flow,
+        // so the Apple Pay modal should NOT request shipping fields.
         var paymentRequest = {
             countryCode: applePayConfig.countryCode || 'US',
             currencyCode: orderTotal.currency || applePayConfig.currencyCode || 'USD',
@@ -687,11 +688,7 @@
                 type: 'final'
             },
             // Request billing contact fields required by PayPal's API
-            requiredBillingContactFields: ['postalAddress', 'name', 'email'],
-            // Request shipping contact for physical goods
-            // Note: Always requested because PayPal may need shipping info even for mixed carts
-            // Future enhancement: Make this conditional based on cart content type
-            requiredShippingContactFields: ['postalAddress', 'name', 'email', 'phone']
+            requiredBillingContactFields: ['postalAddress', 'name', 'email']
         };
 
         // Step 3: Create ApplePaySession synchronously in the click handler
@@ -750,75 +747,8 @@
             });
         };
 
-        // Handle shipping contact selection (address changes)
-        session.onshippingcontactselected = function (event) {
-            console.log('[Apple Pay] onshippingcontactselected called');
-            
-            fetchShippingOptions(event.shippingContact, null)
-                .then(function(response) {
-                    console.log('[Apple Pay] Shipping contact update completed - total:', response.newTotal ? response.newTotal.amount : 'N/A');
-                    
-                    // Check for error response
-                    if (response.error) {
-                        console.error('[Apple Pay] Shipping contact update error:', response.error);
-                        session.completeShippingContactSelection(
-                            ApplePaySession.STATUS_FAILURE,
-                            [],
-                            response.newTotal || { label: 'Total', amount: '0.00' },
-                            response.newLineItems || []
-                        );
-                        return;
-                    }
-                    
-                    // Return the updated shipping methods and totals
-                    session.completeShippingContactSelection(
-                        ApplePaySession.STATUS_SUCCESS,
-                        response.newShippingMethods || [],
-                        response.newTotal || { label: 'Total', amount: '0.00' },
-                        response.newLineItems || []
-                    );
-                })
-                .catch(function(error) {
-                    console.error('[Apple Pay] Failed to fetch shipping options:', error);
-                    session.completeShippingContactSelection(
-                        ApplePaySession.STATUS_FAILURE,
-                        [],
-                        { label: 'Total', amount: '0.00' },
-                        []
-                    );
-                });
-        };
-
-        // Handle shipping method selection (shipping option changes)
-        session.onshippingmethodselected = function (event) {
-            console.log('[Apple Pay] onshippingmethodselected called - method:', event.shippingMethod.identifier);
-            
-            // Get the last shipping contact from the session
-            // Note: Apple Pay doesn't provide shipping contact in this event
-            // We need to fetch with the selected method ID
-            fetchShippingOptions({ 
-                countryCode: 'US',  // Fallback - will use session values on server
-                postalCode: ''
-            }, event.shippingMethod.identifier)
-                .then(function(response) {
-                    console.log('[Apple Pay] Shipping method update completed - total:', response.newTotal ? response.newTotal.amount : 'N/A');
-                    
-                    // Return the updated totals
-                    session.completeShippingMethodSelection(
-                        ApplePaySession.STATUS_SUCCESS,
-                        response.newTotal || { label: 'Total', amount: '0.00' },
-                        response.newLineItems || []
-                    );
-                })
-                .catch(function(error) {
-                    console.error('[Apple Pay] Failed to update totals for shipping method:', error);
-                    session.completeShippingMethodSelection(
-                        ApplePaySession.STATUS_FAILURE,
-                        { label: 'Total', amount: '0.00' },
-                        []
-                    );
-                });
-        };
+        // Note: onshippingcontactselected and onshippingmethodselected are NOT registered
+        // on checkout because shipping is already handled by the checkout flow.
 
         // Step 5: Handle payment authorization
         // Create order only when user authorizes payment
@@ -874,74 +804,28 @@
                     // Only now do we tell Apple Pay the payment succeeded
                     session.completePayment(ApplePaySession.STATUS_SUCCESS);
 
-                    // Extract shipping and billing addresses from Apple Pay payment data
-                    var shippingContact = event.payment.shippingContact || {};
+                    // For checkout flow: Store payment data and submit form
+                    // The checkout form submission goes to normal checkout processing
+                    // No AJAX request needed - everything handled by payment module
                     var billingContact = event.payment.billingContact || {};
-                    
-                    // Build the complete payload for checkout
+                    var email = billingContact.emailAddress || '';
+
+                    // Build the payload for the hidden form field
+                    // Set confirmed: true to indicate client-side confirmation was successful
                     var checkoutPayload = {
-                        payment_method_nonce: orderId, // Use orderID as the payment reference
-                        module: 'paypalac_applepay',
-                        total: config.amount,
-                        currency: config.currency || 'USD',
-                        email: shippingContact.emailAddress || billingContact.emailAddress || '',
-                        shipping_address: {
-                            name: ((shippingContact.givenName || '') + ' ' + (shippingContact.familyName || '')).trim(),
-                            address1: (shippingContact.addressLines && shippingContact.addressLines[0]) || '',
-                            address2: (shippingContact.addressLines && shippingContact.addressLines[1]) || '',
-                            locality: shippingContact.locality || '',
-                            administrativeArea: shippingContact.administrativeArea || '',
-                            postalCode: shippingContact.postalCode || '',
-                            countryCode: shippingContact.countryCode || '',
-                            phoneNumber: shippingContact.phoneNumber || ''
-                        },
-                        billing_address: {
-                            name: ((billingContact.givenName || '') + ' ' + (billingContact.familyName || '')).trim(),
-                            address1: (billingContact.addressLines && billingContact.addressLines[0]) || '',
-                            address2: (billingContact.addressLines && billingContact.addressLines[1]) || '',
-                            locality: billingContact.locality || '',
-                            administrativeArea: billingContact.administrativeArea || '',
-                            postalCode: billingContact.postalCode || '',
-                            countryCode: billingContact.countryCode || '',
-                            phoneNumber: billingContact.phoneNumber || ''
-                        },
-                        orderID: orderId
+                        confirmed: true,
+                        orderID: orderId,
+                        email: email,
+                        confirmResult: confirmResult
+                        // Note: No shipping_address or billing_address
+                        // Checkout uses addresses already in session
                     };
-                    
-                    console.log('[Apple Pay] Sending checkout request to ajax handler');
-                    
-                    // Send to checkout handler instead of just submitting form
-                    var ajaxBasePath = window.paypalacAjaxBasePath || 'ajax/';
-                    var checkoutUrl = ajaxBasePath + 'paypalac_wallet_checkout.php';
-                    
-                    return fetch(checkoutUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(checkoutPayload)
-                    }).then(function(response) {
-                        return response.json();
-                    }).then(function(checkoutResult) {
-                        console.log('[Apple Pay] Checkout result:', checkoutResult);
-                        
-                        if (checkoutResult.status === 'success' && checkoutResult.redirect_url) {
-                            console.log('[Apple Pay] Redirecting to:', checkoutResult.redirect_url);
-                            window.location.href = checkoutResult.redirect_url;
-                        } else {
-                            console.error('[Apple Pay] Checkout failed:', checkoutResult);
-                            setApplePayPayload({});
-                            if (typeof window.oprcHideProcessingOverlay === 'function') {
-                                window.oprcHideProcessingOverlay();
-                            }
-                            alert('Checkout failed: ' + (checkoutResult.message || 'Unknown error'));
-                        }
-                    }).catch(function(checkoutError) {
-                        console.error('[Apple Pay] Checkout request failed:', checkoutError);
-                        setApplePayPayload({});
-                        if (typeof window.oprcHideProcessingOverlay === 'function') {
-                            window.oprcHideProcessingOverlay();
-                        }
-                        alert('Checkout failed. Please try again.');
-                    });
+
+                    console.log('[Apple Pay] Storing payload and submitting checkout form');
+
+                    // Store payload in hidden field and submit form
+                    // This triggers normal checkout processing via payment module
+                    setApplePayPayload(checkoutPayload);
                 }).catch(function (err) {
                     console.error('[Apple Pay] confirmOrder failed:', err);
                     session.completePayment(ApplePaySession.STATUS_FAILURE);

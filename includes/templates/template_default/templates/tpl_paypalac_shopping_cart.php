@@ -38,6 +38,23 @@ if (defined('MODULE_PAYMENT_PAYPALAC_VENMO_STATUS') && MODULE_PAYMENT_PAYPALAC_V
 
 <style>
 /* PayPal wallet buttons updates */
+/* New PayPal Advanced Checkout wallet button containers */
+#paypalac-googlepay-button,
+#paypalac-applepay-button {
+    margin-top: 15px;
+    width: 228px;
+    margin-left: auto;
+}
+#paypalac-googlepay-button apple-pay-button,
+#paypalac-applepay-button apple-pay-button {
+    --apple-pay-button-width: 100%;
+    --apple-pay-button-height: 50px;
+    --apple-pay-button-border-radius: 3px;
+    display: block;
+    width: 100%;
+    height: 50px;
+}
+/* Legacy Braintree wallet button containers */
 div#google-pay-button-container {
     margin-top:20px !important;
     width:228px !important;
@@ -82,6 +99,10 @@ div#venmo-button-container {
     max-width: 100%;
 }
 @media (max-width:768px) {
+    #paypalac-googlepay-button,
+    #paypalac-applepay-button {
+        width: 100% !important;
+    }
     div#google-pay-button-container {
         width:100% !important;
     }

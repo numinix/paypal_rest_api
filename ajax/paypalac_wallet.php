@@ -113,6 +113,52 @@ switch ($module) {
 
 log_paypalac_wallet_message('Received data: ' . print_r($data, true), false);
 
+// -----
+// Product page "Buy Now": when a products_id is provided the wallet buttons
+// act as a Buy Now button — the cart is replaced with ONLY the viewed product
+// at the quantity specified on the form.  This ensures shipping modules,
+// order totals, and order creation all see exactly one product regardless of
+// what was previously in the cart.
+//
+$walletBuyNowActive = false;
+if (!empty($data['products_id']) && (int)$data['products_id'] > 0) {
+    $walletProductId = (int)$data['products_id'];
+    $walletQty = !empty($data['cart_quantity']) && (int)$data['cart_quantity'] > 0
+        ? (int)$data['cart_quantity']
+        : 1;
+    // Parse attributes from the request (format: "id[option_id]" => value)
+    $walletAttributes = [];
+    if (!empty($data['attributes']) && is_array($data['attributes'])) {
+        foreach ($data['attributes'] as $key => $value) {
+            // Extract the option ID from keys like "id[3]" or "id[3][txt]"
+            if (preg_match('/^id\[(\d+)\]/', $key, $m)) {
+                $walletAttributes[(int)$m[1]] = $value;
+            }
+        }
+    }
+
+    // Save original cart so it can be restored if the wallet flow is
+    // cancelled.  Only save once per wallet session to avoid overwriting
+    // the real cart with a previous Buy Now cart.
+    if (!isset($_SESSION['paypalac_wallet_saved_cart'])) {
+        $_SESSION['paypalac_wallet_saved_cart'] = !empty($_SESSION['cart']->contents)
+            ? serialize($_SESSION['cart']->contents)
+            : null;
+    }
+
+    // Reset the cart and add only the viewed product
+    $_SESSION['cart']->reset(false);   // clear contents without DB wipe
+    $_SESSION['cart']->add_cart(
+        $walletProductId,
+        $walletQty,
+        !empty($walletAttributes) ? $walletAttributes : '',
+        false  // suppress new-product notification
+    );
+    $walletBuyNowActive = true;
+    log_paypalac_wallet_message('Product page Buy Now: reset cart and added product ' .
+        $walletProductId . ' (qty ' . $walletQty . ') for wallet checkout');
+}
+
 // Dynamically fetch store's ISO country code
 $country_query = "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES . " WHERE countries_id = " . (int)STORE_COUNTRY;
 $country_result = $db->Execute($country_query);
@@ -129,8 +175,11 @@ $administrativeArea = $shippingAddress['administrativeArea'] ?? '';
 // Log parsed address info
 log_paypalac_wallet_message("Parsed shipping address: countryCode=$countryCode, postalCode=$postalCode, locality=$locality, administrativeArea=$administrativeArea");
 
-// Validate that we have the necessary shipping address data
-if (empty($countryCode) || empty($postalCode) || empty($locality)) {
+// Validate that we have the necessary shipping address data.
+// Note: Apple Pay provides only limited address fields during onshippingcontactselected
+// (countryCode and postalCode are guaranteed; locality may be empty until authorization).
+// We only require countryCode and postalCode for quoting shipping rates.
+if (empty($countryCode) || empty($postalCode)) {
     http_response_code(400);
     $error_message = 'Invalid or incomplete shipping address.';
     log_paypalac_wallet_message('Error: ' . $error_message);
@@ -230,6 +279,11 @@ $order->delivery = array(
 // Use DEFAULT_CURRENCY for calculations - cart->show_total() returns base currency value
 // Get validated base currency (with fallback if DEFAULT_CURRENCY not properly configured)
 $baseCurrency = get_validated_base_currency($currencies, defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : null);
+
+// With Buy Now active the product is already in the cart, so show_total()
+// and show_weight() include it.  No price addon is needed.
+$productPriceAddon = 0;
+
 $order->info = array(
     'subtotal' => $_SESSION['cart']->show_total(),
     'currency' => $baseCurrency,
@@ -241,8 +295,8 @@ log_paypalac_wallet_message('Initial order object created in base currency: ' . 
 
 // Required by shipping quote logic
 $total_weight = $_SESSION['cart']->show_weight();
-$shipping_estimator_display_weight = $total_weight;
 $total_count = $_SESSION['cart']->count_contents();
+$shipping_estimator_display_weight = $total_weight;
 
 // Quote shipping options based on delivery
 $shipping_modules = new shipping();
@@ -428,6 +482,7 @@ if (isset($_SESSION['billto'])) {
 $order = new order();
 // Do NOT override the currency - let Zen Cart use DEFAULT_CURRENCY for calculations
 // $order->info['currency'] is already set to DEFAULT_CURRENCY by the order class
+
 $order->info['shipping_cost'] = $_SESSION['shipping']['cost'];
 $order->info['shipping_method'] = $_SESSION['shipping']['module'] . " (" . $_SESSION['shipping']['title'] . ")";
 $order->info['shipping_module_code'] = $_SESSION['shipping']['id'];

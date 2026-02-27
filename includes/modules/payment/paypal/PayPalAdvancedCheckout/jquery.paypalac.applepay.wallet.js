@@ -76,6 +76,20 @@
      * @returns {Object} Object with amount (string) and currency (string) properties
      */
     function getOrderTotalFromPage() {
+        // On product pages, the config provides the product price directly.
+        // Use it as the initial total since the #ottotal element (cart total)
+        // won't include the currently viewed product.
+        var appleConfig = window.paypalacApplePayConfig;
+        if (appleConfig && appleConfig.initialTotal) {
+            var configAmount = parseFloat(appleConfig.initialTotal);
+            if (!isNaN(configAmount) && configAmount > 0) {
+                return {
+                    amount: configAmount.toFixed(2),
+                    currency: appleConfig.currencyCode || 'USD'
+                };
+            }
+        }
+
         // Get the element selector from configuration or use default
         var container = document.getElementById('paypalac-applepay-button');
         var totalSelector = container && container.dataset.totalSelector 
@@ -127,6 +141,42 @@
             amount: amount,
             currency: currency
         };
+    }
+
+    /**
+     * Collect the product form data (quantity and attributes) from the current
+     * page.  Used by fetchWalletOrder and fetchShippingOptions on product pages
+     * so the server can set up the Buy Now cart.
+     * @param {Object} requestData - The request object to augment in place.
+     */
+    function collectProductFormData(requestData) {
+        var qtyInput = document.querySelector('input[name="cart_quantity"]');
+        requestData.cart_quantity = qtyInput ? (parseInt(qtyInput.value, 10) || 1) : 1;
+        var cartForm = document.querySelector('form[name="cart_quantity"]');
+        if (cartForm) {
+            var attribs = {};
+            var selects = cartForm.querySelectorAll('select[name^="id["]');
+            for (var i = 0; i < selects.length; i++) {
+                attribs[selects[i].name] = selects[i].value;
+            }
+            var radios = cartForm.querySelectorAll('input[type="radio"][name^="id["]:checked');
+            for (var j = 0; j < radios.length; j++) {
+                attribs[radios[j].name] = radios[j].value;
+            }
+            var checkboxes = cartForm.querySelectorAll('input[type="checkbox"][name^="id["]:checked');
+            for (var k = 0; k < checkboxes.length; k++) {
+                attribs[checkboxes[k].name] = checkboxes[k].value;
+            }
+            var texts = cartForm.querySelectorAll('input[type="text"][name^="id["], textarea[name^="id["]');
+            for (var m = 0; m < texts.length; m++) {
+                if (texts[m].value) {
+                    attribs[texts[m].name] = texts[m].value;
+                }
+            }
+            if (Object.keys(attribs).length > 0) {
+                requestData.attributes = attribs;
+            }
+        }
     }
 
     function submitCheckoutForm() {
@@ -367,12 +417,28 @@
     /**
      * Fetch SDK configuration only (no order creation).
      * Used during initial button rendering.
+     * Includes products_id when on a product page so the server can check
+     * whether the viewed product is virtual (shipping not required).
      */
     function fetchWalletConfig() {
+        var requestData = { wallet: 'apple_pay', config_only: true };
+        // Detect product page context from the Apple Pay config or from URL
+        var productId = (window.paypalacApplePayConfig && window.paypalacApplePayConfig.productId)
+            ? window.paypalacApplePayConfig.productId
+            : 0;
+        if (!productId) {
+            var match = window.location.search.match(/[?&]products_id=(\d+)/);
+            if (match) {
+                productId = parseInt(match[1], 10);
+            }
+        }
+        if (productId) {
+            requestData.products_id = productId;
+        }
         return fetch('ppac_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ wallet: 'apple_pay', config_only: true })
+            body: JSON.stringify(requestData)
         }).then(parseWalletResponse).catch(function (error) {
             console.error('Unable to load Apple Pay configuration', error);
             return { success: false, message: error && error.message ? error.message : 'Unable to load Apple Pay configuration' };
@@ -386,11 +452,21 @@
     function fetchWalletOrder() {
         console.log('[Apple Pay] fetchWalletOrder: Starting order creation request to ppac_wallet.php');
         var startTime = Date.now();
-        
+
+        var orderData = { wallet: 'apple_pay' };
+
+        // On product pages, send product info so the server can set up the
+        // "Buy Now" cart before creating the PayPal order.
+        var appleConfig = window.paypalacApplePayConfig;
+        if (appleConfig && appleConfig.productId) {
+            orderData.products_id = appleConfig.productId;
+            collectProductFormData(orderData);
+        }
+
         return fetch('ppac_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ wallet: 'apple_pay' })
+            body: JSON.stringify(orderData)
         }).then(function(response) {
             var elapsed = Date.now() - startTime;
             console.log('[Apple Pay] fetchWalletOrder: Received response after ' + elapsed + 'ms, status:', response.status);
@@ -437,6 +513,20 @@
         // Include selected shipping option if provided
         if (selectedShippingMethodId) {
             requestData.selectedShippingOptionId = selectedShippingMethodId;
+        }
+
+        // On product pages, send product info so the server can set up the
+        // "Buy Now" cart (reset + add just this product) before quoting shipping.
+        var appleConfig = window.paypalacApplePayConfig;
+        if (appleConfig && appleConfig.productId) {
+            requestData.products_id = appleConfig.productId;
+            if (appleConfig.initialTotal) {
+                var productPrice = parseFloat(appleConfig.initialTotal);
+                if (!isNaN(productPrice) && productPrice > 0) {
+                    requestData.productPrice = productPrice.toFixed(2);
+                }
+            }
+            collectProductFormData(requestData);
         }
         
         // Use configurable base path for AJAX endpoint to support subdirectory installations
@@ -533,6 +623,15 @@
 
         if (sharedSdkLoader.promise && sharedSdkLoader.key === desiredKey && window.paypal && typeof window.paypal.Applepay === 'function') {
             return sharedSdkLoader.promise.then(function () { return window.paypal; });
+        }
+
+        // Detect PayPal SDK already loaded by another template (e.g. the synchronous <script> tag)
+        // even when sharedSdkLoader hasn't been set. Avoids duplicate SDK loading which can
+        // cause the second load to silently fail and leave the promise chain unresolved.
+        if (!existingScript && window.paypal && typeof window.paypal.Applepay === 'function') {
+            sharedSdkLoader.key = desiredKey;
+            sharedSdkLoader.promise = Promise.resolve(window.paypal);
+            return sharedSdkLoader.promise;
         }
 
         if (existingScript) {
@@ -685,16 +784,18 @@
         var orderConfig = null;
         var orderPromise = null;
 
+        // Store the last shipping contact so onshippingmethodselected can reuse it
+        var lastShippingContact = null;
+
         // Create payment request with the actual order amount from the page
-        // Request contact fields based on user login status
+        // Request contact fields based on user login status and cart content
+        var cartRequiresShipping = !!(sdkState.config && sdkState.config.cartRequiresShipping);
         var billingFields = ['postalAddress', 'name'];
-        var shippingFields = ['postalAddress', 'name', 'phone'];
         
         // Only request email from Apple Pay if user is NOT logged in
         // Logged-in users have email in session on server side
         if (!isLoggedIn) {
             billingFields.push('email');
-            shippingFields.push('email');
         }
         
         var paymentRequest = {
@@ -708,11 +809,18 @@
                 type: 'final'
             },
             // Request billing contact fields - email only for guest users
-            requiredBillingContactFields: billingFields,
-            // Request shipping contact for physical goods - email only for guest users
-            // Note: Always requested because PayPal may need shipping info even for mixed carts
-            requiredShippingContactFields: shippingFields
+            requiredBillingContactFields: billingFields
         };
+
+        // Only request shipping contact fields when the cart contains physical items
+        // For virtual-only carts, no shipping address or shipping options are needed
+        if (cartRequiresShipping) {
+            var shippingFields = ['postalAddress', 'name', 'phone'];
+            if (!isLoggedIn) {
+                shippingFields.push('email');
+            }
+            paymentRequest.requiredShippingContactFields = shippingFields;
+        }
 
         // Step 3: Create ApplePaySession synchronously in the click handler
         // This MUST happen synchronously to maintain user gesture context
@@ -770,75 +878,84 @@
             });
         };
 
-        // Handle shipping contact selection (address changes)
-        session.onshippingcontactselected = function (event) {
-            console.log('[Apple Pay] onshippingcontactselected called');
-            
-            fetchShippingOptions(event.shippingContact, null)
-                .then(function(response) {
-                    console.log('[Apple Pay] Shipping contact update completed - total:', response.newTotal ? response.newTotal.amount : 'N/A');
-                    
-                    // Check for error response
-                    if (response.error) {
-                        console.error('[Apple Pay] Shipping contact update error:', response.error);
-                        session.completeShippingContactSelection(
-                            ApplePaySession.STATUS_FAILURE,
-                            [],
-                            response.newTotal || { label: 'Total', amount: '0.00' },
-                            response.newLineItems || []
-                        );
-                        return;
-                    }
-                    
-                    // Return the updated shipping methods and totals
-                    session.completeShippingContactSelection(
-                        ApplePaySession.STATUS_SUCCESS,
-                        response.newShippingMethods || [],
-                        response.newTotal || { label: 'Total', amount: '0.00' },
-                        response.newLineItems || []
-                    );
-                })
-                .catch(function(error) {
-                    console.error('[Apple Pay] Failed to fetch shipping options:', error);
-                    session.completeShippingContactSelection(
-                        ApplePaySession.STATUS_FAILURE,
-                        [],
-                        { label: 'Total', amount: '0.00' },
-                        []
-                    );
-                });
-        };
+        // Only register shipping handlers when the cart requires shipping.
+        // For virtual-only carts, no shipping address or options are collected.
+        if (cartRequiresShipping) {
+            // Handle shipping contact selection (address changes)
+            session.onshippingcontactselected = function (event) {
+                console.log('[Apple Pay] onshippingcontactselected called');
 
-        // Handle shipping method selection (shipping option changes)
-        session.onshippingmethodselected = function (event) {
-            console.log('[Apple Pay] onshippingmethodselected called - method:', event.shippingMethod.identifier);
-            
-            // Get the last shipping contact from the session
-            // Note: Apple Pay doesn't provide shipping contact in this event
-            // We need to fetch with the selected method ID
-            fetchShippingOptions({ 
-                countryCode: 'US',  // Fallback - will use session values on server
-                postalCode: ''
-            }, event.shippingMethod.identifier)
-                .then(function(response) {
-                    console.log('[Apple Pay] Shipping method update completed - total:', response.newTotal ? response.newTotal.amount : 'N/A');
-                    
-                    // Return the updated totals
-                    session.completeShippingMethodSelection(
-                        ApplePaySession.STATUS_SUCCESS,
-                        response.newTotal || { label: 'Total', amount: '0.00' },
-                        response.newLineItems || []
-                    );
-                })
-                .catch(function(error) {
-                    console.error('[Apple Pay] Failed to update totals for shipping method:', error);
-                    session.completeShippingMethodSelection(
-                        ApplePaySession.STATUS_FAILURE,
-                        { label: 'Total', amount: '0.00' },
-                        []
-                    );
-                });
-        };
+                // Save the shipping contact so onshippingmethodselected can reuse it
+                lastShippingContact = event.shippingContact;
+                
+                fetchShippingOptions(event.shippingContact, null)
+                    .then(function(response) {
+                        console.log('[Apple Pay] Shipping contact update completed - total:', response.newTotal ? response.newTotal.amount : 'N/A');
+                        
+                        // Check for error response
+                        if (response.error) {
+                            console.error('[Apple Pay] Shipping contact update error:', response.error);
+                            session.completeShippingContactSelection({
+                                newShippingMethods: [],
+                                newTotal: response.newTotal || { label: 'Total', amount: '0.00' },
+                                newLineItems: response.newLineItems || [],
+                                errors: [new ApplePayError('shippingContactInvalid')]
+                            });
+                            return;
+                        }
+                        
+                        // Return the updated shipping methods and totals
+                        session.completeShippingContactSelection({
+                            newShippingMethods: response.newShippingMethods || [],
+                            newTotal: response.newTotal || { label: 'Total', amount: '0.00' },
+                            newLineItems: response.newLineItems || []
+                        });
+                    })
+                    .catch(function(error) {
+                        console.error('[Apple Pay] Failed to fetch shipping options:', error);
+                        session.completeShippingContactSelection({
+                            newShippingMethods: [],
+                            newTotal: { label: 'Total', amount: '0.00' },
+                            newLineItems: [],
+                            errors: [new ApplePayError('shippingContactInvalid')]
+                        });
+                    });
+            };
+
+            // Handle shipping method selection (shipping option changes)
+            session.onshippingmethodselected = function (event) {
+                console.log('[Apple Pay] onshippingmethodselected called - method:', event.shippingMethod.identifier);
+                
+                // Reuse the shipping contact from the last onshippingcontactselected event
+                // Apple Pay does not provide the contact in onshippingmethodselected
+                if (!lastShippingContact) {
+                    console.warn('[Apple Pay] No saved shipping contact for method selection - this should not happen');
+                    session.completeShippingMethodSelection({
+                        newTotal: { label: 'Total', amount: orderTotal.amount },
+                        newLineItems: []
+                    });
+                    return;
+                }
+
+                fetchShippingOptions(lastShippingContact, event.shippingMethod.identifier)
+                    .then(function(response) {
+                        console.log('[Apple Pay] Shipping method update completed - total:', response.newTotal ? response.newTotal.amount : 'N/A');
+                        
+                        // Return the updated totals
+                        session.completeShippingMethodSelection({
+                            newTotal: response.newTotal || { label: 'Total', amount: '0.00' },
+                            newLineItems: response.newLineItems || []
+                        });
+                    })
+                    .catch(function(error) {
+                        console.error('[Apple Pay] Failed to update totals for shipping method:', error);
+                        session.completeShippingMethodSelection({
+                            newTotal: { label: 'Total', amount: '0.00' },
+                            newLineItems: []
+                        });
+                    });
+            };
+        }
 
         // Step 5: Handle payment authorization
         // Create order only when user authorizes payment
@@ -925,7 +1042,8 @@
                             countryCode: billingContact.countryCode || '',
                             phoneNumber: billingContact.phoneNumber || ''
                         },
-                        orderID: orderId
+                        orderID: orderId,
+                        paypal_order_id: orderId
                     };
                     
                     console.log('[Apple Pay] Sending checkout request to ajax handler');
@@ -936,7 +1054,10 @@
                     
                     return fetch(checkoutUrl, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
                         body: JSON.stringify(checkoutPayload)
                     }).then(function(response) {
                         return response.json();

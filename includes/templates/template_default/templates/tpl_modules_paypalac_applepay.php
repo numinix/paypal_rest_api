@@ -79,13 +79,13 @@ window.paypalacApplePayConfig = {
 // Initialize Apple Pay when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-        if (typeof window.initPayPalRApplePay === 'function') {
-            window.initPayPalRApplePay();
+        if (typeof window.paypalacApplePayRender === 'function') {
+            window.paypalacApplePayRender();
         }
     });
 } else {
-    if (typeof window.initPayPalRApplePay === 'function') {
-        window.initPayPalRApplePay();
+    if (typeof window.paypalacApplePayRender === 'function') {
+        window.paypalacApplePayRender();
     }
 }
 </script>
@@ -97,14 +97,18 @@ if (document.readyState === 'loading') {
 <style>
 #paypalac-applepay-button {
     min-height: 50px;
-    margin-top: 20px;
+    margin-top: 15px;
     margin-left: auto !important;
     width: 228px;
 }
 
-.paypalac-applepay-button {
+#paypalac-applepay-button apple-pay-button {
+    --apple-pay-button-width: 100%;
+    --apple-pay-button-height: 50px;
+    --apple-pay-button-border-radius: 3px;
+    display: block;
     width: 100%;
-    max-width: 320px;
+    height: 50px;
 }
 
 @media (max-width:768px) {

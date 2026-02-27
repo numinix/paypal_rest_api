@@ -13,10 +13,61 @@ require 'includes/application_top.php';
 
 header('Content-Type: application/json');
 
+// Parse the request body early so we can check config_only before cart validation.
+$requestBody = file_get_contents('php://input');
+$requestData = json_decode($requestBody, true) ?: [];
+
+$wallet = $requestData['wallet'] ?? '';
+$configOnly = !empty($requestData['config_only']);
+$payloadData = $requestData['payload'] ?? null;
+
 // -----
-// Validate cart state before proceeding. A valid session and non-empty cart are required.
+// Product page "Buy Now": when products_id is provided the wallet buttons act
+// as a Buy Now button.  If the shipping quote endpoint (ajax/paypalac_wallet.php)
+// already set up the cart during onshippingcontactselected, the cart will contain
+// just this product.  If not (e.g. virtual products that skip shipping), we set
+// it up here before order creation.
 //
-if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart']) || $_SESSION['cart']->count_contents() < 1) {
+if (!$configOnly && !empty($requestData['products_id']) && (int)$requestData['products_id'] > 0) {
+    $buyNowProductId = (int)$requestData['products_id'];
+    $buyNowQty = !empty($requestData['cart_quantity']) && (int)$requestData['cart_quantity'] > 0
+        ? (int)$requestData['cart_quantity']
+        : 1;
+    // Parse attributes from the request
+    $buyNowAttributes = [];
+    if (!empty($requestData['attributes']) && is_array($requestData['attributes'])) {
+        foreach ($requestData['attributes'] as $key => $value) {
+            if (preg_match('/^id\[(\d+)\]/', $key, $m)) {
+                $buyNowAttributes[(int)$m[1]] = $value;
+            }
+        }
+    }
+
+    // Save original cart once per wallet session
+    if (!isset($_SESSION['paypalac_wallet_saved_cart'])) {
+        $_SESSION['paypalac_wallet_saved_cart'] = !empty($_SESSION['cart']->contents)
+            ? serialize($_SESSION['cart']->contents)
+            : null;
+    }
+
+    // Reset and add just the Buy Now product
+    $_SESSION['cart']->reset(false);
+    $_SESSION['cart']->add_cart(
+        $buyNowProductId,
+        $buyNowQty,
+        !empty($buyNowAttributes) ? $buyNowAttributes : '',
+        false
+    );
+}
+
+// -----
+// Validate cart state before proceeding. A non-empty cart is required for order
+// creation and payload caching, but config_only requests (used to render the
+// button on product pages) only need SDK configuration and work without a cart.
+//
+$hasValidCart = isset($_SESSION['cart']) && is_object($_SESSION['cart']) && $_SESSION['cart']->count_contents() > 0;
+
+if (!$hasValidCart && !$configOnly) {
     echo json_encode(['success' => false, 'message' => 'Cart is empty or session expired']);
     require DIR_WS_INCLUDES . 'application_bottom.php';
     return;
@@ -32,6 +83,8 @@ if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart']) || $_SESSION['car
 // The observer's getLastOrderValues() fallback will still retrieve basic totals
 // from $order->info even if the full order_total processing encounters issues.
 //
+// Skip order initialization for config_only requests since they don't need it.
+//
 global $order, $order_total_modules;
 
 // Helper function to sanitize error messages for logging
@@ -44,6 +97,7 @@ if (!function_exists('ppac_wallet_sanitize_error_message')) {
     }
 }
 
+if (!$configOnly && $hasValidCart) {
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     // Only suppress non-critical errors - let fatal errors through
     // E_ERROR and E_CORE_ERROR will still halt execution as expected
@@ -85,13 +139,7 @@ try {
 } finally {
     restore_error_handler();
 }
-
-$requestBody = file_get_contents('php://input');
-$requestData = json_decode($requestBody, true) ?: [];
-
-$wallet = $requestData['wallet'] ?? '';
-$configOnly = !empty($requestData['config_only']);
-$payloadData = $requestData['payload'] ?? null;
+} // end if (!$configOnly && $hasValidCart)
 
 $moduleMap = [
     'google_pay' => 'paypalac_googlepay',
@@ -151,7 +199,10 @@ if ($configOnly) {
         require DIR_WS_INCLUDES . 'application_bottom.php';
         return;
     }
-    $response = $moduleInstance->ajaxGetWalletConfig();
+    // Pass products_id from request so product-page wallets can determine
+    // whether the viewed product is virtual (not based on the cart).
+    $productsId = isset($requestData['products_id']) ? (int)$requestData['products_id'] : 0;
+    $response = $moduleInstance->ajaxGetWalletConfig($productsId);
 } else {
     if (!method_exists($moduleInstance, 'ajaxCreateWalletOrder')) {
         echo json_encode(['success' => false, 'message' => 'Wallet module missing AJAX handler']);

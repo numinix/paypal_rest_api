@@ -499,7 +499,7 @@ class paypalac_applepay extends base
      *
      * @return array
      */
-    public function ajaxGetWalletConfig(): array
+    public function ajaxGetWalletConfig(int $productsId = 0): array
     {
         $client_id = (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : MODULE_PAYMENT_PAYPALAC_CLIENTID_S;
         $client_id = trim($client_id);
@@ -535,6 +535,12 @@ class paypalac_applepay extends base
             return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALAC_APPLEPAY_ERROR_INITIALIZE ?? 'Unable to start Apple Pay. Please try again.'];
         }
 
+        // When a products_id is provided (product page context), determine shipping
+        // requirement from the product itself rather than the session cart.
+        $requiresShipping = ($productsId > 0)
+            ? !zen_get_products_virtual($productsId)
+            : $this->walletCartRequiresShipping();
+
         return [
             'success' => true,
             'clientId' => $client_id,
@@ -542,6 +548,7 @@ class paypalac_applepay extends base
             'currency' => $_SESSION['currency'] ?? 'USD',
             'intent' => $intent,
             'environment' => MODULE_PAYMENT_PAYPALAC_SERVER,
+            'cartRequiresShipping' => $requiresShipping,
         ];
     }
 
@@ -553,6 +560,19 @@ class paypalac_applepay extends base
         }
 
         return $response;
+    }
+
+    /**
+     * Determine whether the current session cart contains physical items that require shipping.
+     * Returns false for empty carts or virtual-only carts.
+     */
+    protected function walletCartRequiresShipping(): bool
+    {
+        $hasCart = isset($_SESSION['cart']) && method_exists($_SESSION['cart'], 'get_content_type');
+        if (!$hasCart || $_SESSION['cart']->count_contents() < 1) {
+            return false;
+        }
+        return $_SESSION['cart']->get_content_type() !== 'virtual';
     }
 
     public function pre_confirmation_check()

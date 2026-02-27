@@ -22,18 +22,19 @@
     // Check if user is logged in
     $isLoggedIn = isset($_SESSION['customer_id']) && $_SESSION['customer_id'] > 0;
     $guestWalletEnabled = isset($walletConfig['enableGuestWallet']) && $walletConfig['enableGuestWallet'] === true;
+    $cartRequiresShipping = !empty($walletConfig['cartRequiresShipping']);
     
     // Show Google Pay button if:
-    // 1. User is logged in (uses PayPal SDK, email from session), OR
-    // 2. Guest wallet is enabled (uses PayPal SDK, email collected via emailRequired in PaymentDataRequest)
-    // Per PayPal support, we can use PayPal SDK without direct Google Pay SDK or merchant verification
-    if (!$isLoggedIn && !$guestWalletEnabled) {
-        // User not logged in AND guest wallet disabled - don't show button
+    // 1. User is logged in (uses native Google Pay SDK without callbackIntents), OR
+    // 2. Guest wallet is enabled (uses native Google Pay SDK with callbackIntents for shipping), OR
+    // 3. Cart is virtual (no shipping needed - works for all users without callbackIntents)
+    if (!$isLoggedIn && !$guestWalletEnabled && $cartRequiresShipping) {
+        // User not logged in AND guest wallet disabled AND physical cart - don't show button
         return;
     }
     
-    // For logged-in users, show Google Pay button rendered via PayPal SDK
-    // For guests (when guest wallet enabled), show Google Pay button rendered via PayPal SDK
+    // For logged-in users: Native Google Pay SDK without callbackIntents (avoids OR_BIBED_06 errors)
+    // For guests (when guest wallet enabled): Native Google Pay SDK with callbackIntents for shipping calculation
 ?>
 
 <script>

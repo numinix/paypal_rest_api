@@ -12,8 +12,9 @@
 
     $applePayModule = new paypalac_applepay();
     
-    // Get wallet configuration
-    $walletConfig = $applePayModule->ajaxGetWalletConfig();
+    // Get wallet configuration - pass product ID so shipping requirement is based on
+    // the viewed product's virtual status, not the cart contents
+    $walletConfig = $applePayModule->ajaxGetWalletConfig((int)$_GET['products_id']);
     if (empty($walletConfig['success']) || empty($walletConfig['clientId'])) {
         // If configuration fails, don't show the button
         return;
@@ -83,13 +84,13 @@ window.paypalacApplePayConfig = {
 // Initialize Apple Pay when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-        if (typeof window.initPayPalRApplePay === 'function') {
-            window.initPayPalRApplePay();
+        if (typeof window.paypalacApplePayRender === 'function') {
+            window.paypalacApplePayRender();
         }
     });
 } else {
-    if (typeof window.initPayPalRApplePay === 'function') {
-        window.initPayPalRApplePay();
+    if (typeof window.paypalacApplePayRender === 'function') {
+        window.paypalacApplePayRender();
     }
 }
 </script>
@@ -102,16 +103,22 @@ if (document.readyState === 'loading') {
 #paypalac-applepay-button {
     min-height: 50px;
     margin-top: 20px;
+    max-width: 320px;
 }
 
-.paypalac-applepay-button {
+#paypalac-applepay-button apple-pay-button {
+    --apple-pay-button-width: 100%;
+    --apple-pay-button-height: 50px;
+    --apple-pay-button-border-radius: 3px;
+    display: block;
     width: 100%;
-    max-width: 320px;
+    height: 50px;
 }
 
 @media (max-width:768px) {
     #paypalac-applepay-button {
         width: 100% !important;
+        max-width: 100%;
     }
 }
 
