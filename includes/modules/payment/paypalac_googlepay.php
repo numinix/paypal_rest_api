@@ -868,6 +868,8 @@ class paypalac_googlepay extends base
             $this->orderInfo['admin_alert_needed'] = true;
 
             $this->log->write("==> Google Pay::before_process: Payment status {$payment['status']} received from PayPal; order's status forced to pending.");
+        } else {
+            $order->info['order_status'] = $this->order_status;
         }
     }
 
