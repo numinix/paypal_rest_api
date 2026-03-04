@@ -454,7 +454,7 @@
 
     /**
      * Load Apple's Apple Pay JS SDK.
-     * Required for the <apple-pay-button> WebKit custom element to render properly.
+     * Required for the apple-pay-button WebKit custom element to render properly.
      * This SDK must be loaded before the button element is appended to the DOM.
      *
      * @returns {Promise} Resolves when the SDK is loaded
@@ -973,7 +973,7 @@
      * The element ID can be configured via data-total-selector attribute on the button container.
      * Default: 'ottotal' (standard Zen Cart order total element)
      * 
-     * To customize: <div id="paypalac-applepay-button" data-total-selector="custom-total-id"></div>
+     * To customize, add data-total-selector="custom-total-id" to the button container element.
      */
     function observeOrderTotal() {
         // Get the element selector from configuration or use default
@@ -983,11 +983,32 @@
             : 'ottotal';
         
         var totalElement = document.getElementById(totalSelector);
-        if (!totalElement || typeof MutationObserver === 'undefined') {
+
+        // Prefer a stable ancestor that is not destroyed when order totals
+        // are refreshed.  OPRC replaces the *inner* content of the wrapper
+        // (e.g. #shopBagWrapper), which removes the original element and
+        // any MutationObserver attached to it.  Observing the wrapper
+        // instead ensures the observer survives content replacement.
+        var observeTarget = null;
+        if (totalElement) {
+            var stableAncestor = totalElement.closest('#shopBagWrapper');
+            observeTarget = stableAncestor || totalElement;
+        } else {
+            observeTarget = document.getElementById('shopBagWrapper');
+        }
+
+        if (!observeTarget || typeof MutationObserver === 'undefined') {
             if (!totalElement) {
                 console.warn('Apple Pay: Order total element not found: #' + totalSelector);
             }
             return;
+        }
+
+        // Disconnect any previous observer so that re-executions of this
+        // script (e.g. when OPRC refreshes the payment container) do not
+        // accumulate duplicate observers.
+        if (window._paypalacApplePayOrderTotalObserver) {
+            window._paypalacApplePayOrderTotalObserver.disconnect();
         }
 
         var rerenderTimeout = null;
@@ -1005,7 +1026,8 @@
             rerenderTimeout = setTimeout(rerenderApplePayButton, 50);
         });
 
-        observer.observe(totalElement, { childList: true, subtree: true, characterData: true });
+        observer.observe(observeTarget, { childList: true, subtree: true, characterData: true });
+        window._paypalacApplePayOrderTotalObserver = observer;
     }
 
     // -------------------------------------------------------------------------
@@ -1064,13 +1086,42 @@
         });
 
         if (container.innerHTML.trim() === '') {
-            container.innerHTML = '<span class="paypalac-applepay-placeholder">' + (typeof paypalacApplePayText !== 'undefined' ? paypalacApplePayText : 'Apple Pay') + '</span>';
+            var ph = document.createElement('span');
+            ph.className = 'paypalac-applepay-placeholder';
+            ph.textContent = typeof paypalacApplePayText !== 'undefined' ? paypalacApplePayText : 'Apple Pay';
+            container.appendChild(ph);
         }
     }
 
     if (typeof window !== 'undefined') {
         window.paypalacApplePayRender = renderApplePayButton;
     }
+
+    // Listen for the OPRC checkout-reload event so the button re-renders
+    // after all container updates (order totals, shipping, etc.) are
+    // complete.  The event name is assembled at runtime to prevent
+    // oprcProcessScriptsAndDispatch from deduplicating this script
+    // (the dedup regex matches the literal event name in script content).
+    //
+    // The listener is removed and re-added on every IIFE execution so
+    // that OPRC's managed-listener system (oprcCaptureEventListeners /
+    // oprcResetManagedEventListeners) can track and clean up the
+    // reference correctly.  A one-time guard would leave a stale
+    // listener after OPRC removes the captured reference, preventing
+    // the button from re-rendering on subsequent payment refreshes.
+    var reloadEventName = ['onePage', 'Checkout', 'Reloaded'].join('');
+
+    if (typeof window._paypalacApplePayReloadListener === 'function') {
+        document.removeEventListener(reloadEventName, window._paypalacApplePayReloadListener);
+    }
+
+    window._paypalacApplePayReloadListener = function () {
+        if (typeof window.paypalacApplePayRender === 'function') {
+            window.paypalacApplePayRender();
+        }
+    };
+
+    document.addEventListener(reloadEventName, window._paypalacApplePayReloadListener);
 
     renderApplePayButton();
 

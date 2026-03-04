@@ -191,51 +191,75 @@
     }
 
     /**
-     * Hide the entire payment method container when payment is not eligible.
-     * This hides the parent element (e.g., paypalac_googlepay-custom-control-container)
-     * so the user doesn't see an unavailable payment option.
+     * Find the nearest payment-method wrapper around the button container.
      */
-    function hidePaymentMethodContainer() {
+    function findPaymentMethodWrapper() {
         var container = document.getElementById('paypalac-googlepay-button');
         if (!container) {
-            return;
+            return null;
         }
 
-        // Find the parent container that wraps this payment method
-        // Common patterns: closest .moduleRow, closest payment container div, or parent with class containing 'container'
-        var parentContainer = container.closest('[id*="paypalac_googlepay"][id*="container"]')
+        var wrapper = container.closest('[id*="paypalac_googlepay"][id*="container"]')
             || container.closest('.moduleRow')
             || container.closest('[class*="paypalac_googlepay"]');
 
-        // If we found a specific parent container, hide it
-        if (parentContainer) {
-            parentContainer.style.display = 'none';
-            return;
+        if (wrapper) {
+            return wrapper;
         }
 
-        // Fallback: traverse up and hide a suitable parent
-        // Look for common payment module wrapper patterns
         var parent = container.parentElement;
         var depth = 0;
         var maxDepth = 5;
 
         while (parent && depth < maxDepth) {
-            // Check if parent has an ID or class indicating it's a payment container
             var parentId = (parent.id || '').toLowerCase();
             var parentClass = (parent.className || '').toLowerCase();
 
             if (parentId.indexOf('paypalac_googlepay') !== -1 ||
                 parentClass.indexOf('paypalac_googlepay') !== -1 ||
                 parentClass.indexOf('modulerow') !== -1) {
-                parent.style.display = 'none';
-                return;
+                return parent;
             }
             parent = parent.parentElement;
             depth++;
         }
 
-        // Last resort: just hide the button container itself and clear content
-        container.style.display = 'none';
+        return null;
+    }
+
+    /**
+     * Hide the entire payment method container when payment is not eligible.
+     * This hides the parent element (e.g., paypalac_googlepay-custom-control-container)
+     * so the user doesn't see an unavailable payment option.
+     */
+    function hidePaymentMethodContainer() {
+        var wrapper = findPaymentMethodWrapper();
+        if (wrapper) {
+            wrapper.style.display = 'none';
+            return;
+        }
+
+        var container = document.getElementById('paypalac-googlepay-button');
+        if (container) {
+            container.style.display = 'none';
+        }
+    }
+
+    /**
+     * Ensure the payment method container is visible.
+     * Reverses any previous hidePaymentMethodContainer() call so
+     * that a fresh render attempt can display the button.
+     */
+    function showPaymentMethodContainer() {
+        var wrapper = findPaymentMethodWrapper();
+        if (wrapper) {
+            wrapper.style.display = '';
+        }
+
+        var container = document.getElementById('paypalac-googlepay-button');
+        if (container) {
+            container.style.display = '';
+        }
     }
 
     /**
@@ -278,6 +302,12 @@
     }
 
     function rerenderGooglePayButton() {
+        // Clear the guard so the upcoming render call is not skipped.
+        // This path is only reached from explicit re-render triggers
+        // (e.g. the MutationObserver on #ottotal) where we intentionally
+        // want a fresh render regardless of prior state.
+        window._paypalacGooglePayRendering = false;
+
         if (typeof window.paypalacGooglePayRender === 'function') {
             window.paypalacGooglePayRender();
         }
@@ -846,16 +876,31 @@
 
     /**
      * Render the native Google Pay button using Google's PaymentsClient.
+     *
+     * Uses a global render guard so that only one render chain runs at a
+     * time.  When the payment container is replaced the inline script may
+     * execute more than once (jQuery .replaceWith evaluates scripts, then
+     * oprcProcessScriptsAndDispatch re-executes them).  Without the guard
+     * two concurrent async chains race, potentially leaving the container
+     * empty or the parent hidden.
      */
     function renderGooglePayButton() {
         console.log('[Google Pay] Starting button rendering');
-        
+
+        if (window._paypalacGooglePayRendering) {
+            console.log('[Google Pay] Render already in progress, skipping');
+            return;
+        }
+
         var container = document.getElementById('paypalac-googlepay-button');
         if (!container) {
             console.warn('[Google Pay] Button container not found');
             return;
         }
 
+        window._paypalacGooglePayRendering = true;
+
+        showPaymentMethodContainer();
         normalizeWalletContainer(container);
         container.innerHTML = '';
 
@@ -967,6 +1012,9 @@
                                 buttonSizeMode: 'fill'
                             });
 
+                            // Clear any stale content (e.g. placeholder added
+                            // by a concurrent IIFE execution) before appending.
+                            container.innerHTML = '';
                             normalizeWalletButton(button);
                             container.appendChild(button);
                             console.log('[Google Pay] Button rendered successfully');
@@ -978,6 +1026,10 @@
         }).catch(function (error) {
             console.error('[Google Pay] Failed to render button', error);
             hidePaymentMethodContainer();
+        }).then(function () {
+            // Always clear the render guard (.then after .catch is used
+            // instead of .finally for broader browser compatibility).
+            window._paypalacGooglePayRendering = false;
         });
     }
 
@@ -987,8 +1039,29 @@
 
     function observeOrderTotal() {
         var totalElement = document.getElementById('ottotal');
-        if (!totalElement || typeof MutationObserver === 'undefined') {
+
+        // Prefer a stable ancestor that is not destroyed when order totals
+        // are refreshed.  OPRC replaces the *inner* content of the wrapper
+        // (e.g. #shopBagWrapper), which removes the original #ottotal node
+        // and any MutationObserver attached to it.  Observing the wrapper
+        // instead ensures the observer survives content replacement.
+        var observeTarget = null;
+        if (totalElement) {
+            var stableAncestor = totalElement.closest('#shopBagWrapper');
+            observeTarget = stableAncestor || totalElement;
+        } else {
+            observeTarget = document.getElementById('shopBagWrapper');
+        }
+
+        if (!observeTarget || typeof MutationObserver === 'undefined') {
             return;
+        }
+
+        // Disconnect any previous observer so that re-executions of this
+        // script (e.g. when OPRC refreshes the payment container) do not
+        // accumulate duplicate observers.
+        if (window._paypalacGooglePayOrderTotalObserver) {
+            window._paypalacGooglePayOrderTotalObserver.disconnect();
         }
 
         var rerenderTimeout = null;
@@ -1006,7 +1079,8 @@
             rerenderTimeout = setTimeout(rerenderGooglePayButton, 50);
         });
 
-        observer.observe(totalElement, { childList: true, subtree: true, characterData: true });
+        observer.observe(observeTarget, { childList: true, subtree: true, characterData: true });
+        window._paypalacGooglePayOrderTotalObserver = observer;
     }
 
     // -------------------------------------------------------------------------
@@ -1065,7 +1139,10 @@
         });
 
         if (container.innerHTML.trim() === '') {
-            container.innerHTML = '<span class="paypalac-googlepay-placeholder">' + (typeof paypalacGooglePayText !== 'undefined' ? paypalacGooglePayText : 'Google Pay') + '</span>';
+            var ph = document.createElement('span');
+            ph.className = 'paypalac-googlepay-placeholder';
+            ph.textContent = typeof paypalacGooglePayText !== 'undefined' ? paypalacGooglePayText : 'Google Pay';
+            container.appendChild(ph);
             normalizeWalletButton(container.firstElementChild);
         }
     }
@@ -1073,6 +1150,33 @@
     if (typeof window !== 'undefined') {
         window.paypalacGooglePayRender = renderGooglePayButton;
     }
+
+    // Listen for the OPRC checkout-reload event so the button re-renders
+    // after all container updates (order totals, shipping, etc.) are
+    // complete.  The event name is assembled at runtime to prevent
+    // oprcProcessScriptsAndDispatch from deduplicating this script
+    // (the dedup regex matches the literal event name in script content).
+    //
+    // The listener is removed and re-added on every IIFE execution so
+    // that OPRC's managed-listener system (oprcCaptureEventListeners /
+    // oprcResetManagedEventListeners) can track and clean up the
+    // reference correctly.  A one-time guard would leave a stale
+    // listener after OPRC removes the captured reference, preventing
+    // the button from re-rendering on subsequent payment refreshes.
+    var reloadEventName = ['onePage', 'Checkout', 'Reloaded'].join('');
+
+    if (typeof window._paypalacGooglePayReloadListener === 'function') {
+        document.removeEventListener(reloadEventName, window._paypalacGooglePayReloadListener);
+    }
+
+    window._paypalacGooglePayReloadListener = function () {
+        window._paypalacGooglePayRendering = false;
+        if (typeof window.paypalacGooglePayRender === 'function') {
+            window.paypalacGooglePayRender();
+        }
+    };
+
+    document.addEventListener(reloadEventName, window._paypalacGooglePayReloadListener);
 
     renderGooglePayButton();
 
