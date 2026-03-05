@@ -43,10 +43,10 @@
         <div class="contentMenu">
           <ul>
             <li><a href="#Overview" id="btnOverview" class="btn" title="Overview" data-target="Overview">Overview</a></li>
-            <li><a href="#Installation" id="btnInstallation" class="btn" title="Installation" data-target="Installation">Installation</a></li>
+            <li><a href="#UnInstallation" id="btnUnInstallation" class="btn" title="Un/Installation" data-target="UnInstallation">Un/Installation</a></li>
             <li><a href="#Configuration" id="btnConfiguration" class="btn" title="Configuration" data-target="Configuration">Configuration</a></li>
             <li><a href="#Usage" id="btnUsage" class="btn" title="Usage" data-target="Usage">Usage</a></li>
-            <li><a href="#Uninstallation" id="btnUninstallation" class="btn" title="Uninstallation" data-target="Uninstallation">Uninstallation</a></li>
+            <li><a href="#Developers" id="btnDevelopers" class="btn" title="Developers" data-target="Developers">Developers</a></li>
             <li><a href="#Troubleshooting" id="btnTroubleshooting" class="btn" title="Troubleshooting" data-target="Troubleshooting">Troubleshooting</a></li>
             <li><a href="#Support" id="btnSupport" class="btn" title="Support" data-target="Support">Support</a></li>
             <li><a href="#License" id="btnLicense" class="btn" title="License" data-target="License">License</a></li>
@@ -86,81 +86,44 @@
       </div>
       <!--EOF OVERVIEW-->
 
-      <!--BOF INSTALLATION-->
-      <div class="bodyHeaderContainer" id="Installation">
+      <!--BOF UN/INSTALLATION-->
+      <div class="bodyHeaderContainer" id="UnInstallation">
         <div class="bodyHeader" id="green">
-          <span class="bodyHeaderTxt">Installation</span>
+          <span class="bodyHeaderTxt">Un/Installation</span>
         </div>
         <div class="bodyWrapper">
-          <h4>Before you start</h4>
+          <h4>Install the plugin</h4>
           <ol>
             <li>Back up your Zen Cart database and store files.</li>
-            <li>Review the compatibility checklist in the Overview, including the PHP version and required extensions.</li>
-            <li>Apply the <a href="https://github.com/numinix/paypal_rest_api/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank">order total notifier patch</a> if your store runs on Zen Cart versions prior to 1.5.8a.</li>
-            <li>Create PayPal API credentials (client ID and secret) for both Sandbox and Live modes using the steps described in the module wiki.</li>
+            <li>Confirm your store meets requirements from the Overview section (Zen Cart/PHP/extensions).</li>
+            <li>Apply the <a href="https://github.com/numinix/paypal_rest_api/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank" rel="noopener">order total notifier patch</a> if your Zen Cart version requires it.</li>
+            <li>Unzip the release package and rename <code>YOUR_ADMIN/</code> to your real admin directory.</li>
+            <li>Upload <code>includes/</code> and the renamed admin folder into your store, merging files.</li>
+            <li>In admin, go to <strong>Modules &rarr; Payment</strong> and install <strong>PayPal Advanced Checkout</strong> (and optional wallet/card companion modules you plan to use).</li>
+            <li>In <strong>Configuration &rarr; PayPal Modules</strong>, add Sandbox credentials first, run a test transaction, then add Live credentials.</li>
           </ol>
-          <h4>Uploading files</h4>
+
+          <h4>Optional components commonly installed with this plugin</h4>
+          <ul class="bodyList">
+            <li><strong>Saved-card account page:</strong> Requires CSS/JS Loader plus template files under <code>includes/templates/YOUR_TEMPLATE/</code>.</li>
+            <li><strong>PayPal Credit Cards module:</strong> Install <code>paypalac_creditcard</code> when you want a separate card-only payment option.</li>
+            <li><strong>Wallet modules:</strong> Google Pay, Apple Pay, and Venmo can be enabled after account-level approval and configuration.</li>
+          </ul>
+
+          <h4>Uninstall the plugin</h4>
           <ol>
-            <li>Unzip the release package locally.</li>
-            <li>Rename the <code>YOUR_ADMIN/</code> directory to match your store&rsquo;s admin directory name.</li>
-            <li>Upload the contents of <code>includes/</code> and your renamed admin folder to the corresponding locations in your Zen Cart installation, merging when prompted.</li>
-            <li>Verify that <code>includes/modules/payment/paypalac.php</code> and the accompanying <code>PayPalAdvancedCheckout</code> library files are present on the server.</li>
+            <li>Switch the module to Sandbox mode and confirm no live transactions are in flight.</li>
+            <li>In <strong>Modules &rarr; Payment</strong>, remove PayPal Advanced Checkout and any companion modules.</li>
+            <li>Delete uploaded module files from <code>includes/modules/payment/</code>, language files, observer files, and admin files you added.</li>
+            <li>If no other add-on depends on it, roll back the <code>includes/classes/order_total.php</code> notifier patch.</li>
+            <li>Revoke or rotate API credentials in your PayPal developer dashboard.</li>
           </ol>
-          <h4>Database updates</h4>
-          <ol>
-            <li>Log in to your Zen Cart admin.</li>
-            <li>Navigate to <strong>Modules → Payment</strong> and confirm that <strong>PayPal Advanced Checkout</strong> appears in the list. No manual SQL patches are required for a fresh install.</li>
-            <li>If upgrading from an older beta, follow the upgrade checklist in the module wiki to reconcile any schema or configuration changes before enabling the new code.</li>
-          </ol>
-          <p class="bodyText">After the files are in place, the module&rsquo;s configuration group appears under <strong>Configuration → PayPal Modules</strong> and the payment method is ready for activation via <strong>Modules → Payment</strong>.</p>
-          <h4>Optional saved card management page</h4>
-          <p class="bodyText">PayPal Advanced Checkout ships with a customer-facing page for reviewing vaulted cards. The page relies on the <strong>CSS/JS Loader</strong> plugin to enqueue its JavaScript and CSS assets. Install and configure the loader before enabling the page.</p>
-          <ol>
-            <li>Install <a href="https://www.numinix.com/css-js-loader-828" target="_blank" rel="noopener">CSS/JS Loader</a> so Zen Cart can load the page-specific jQuery 3.7.1 and jQuery Migrate 3.4.1 assets.</li>
-            <li>Copy the contents of <code>includes/templates/YOUR_TEMPLATE/</code> into your active storefront template, renaming the <code>YOUR_TEMPLATE</code> directory to match.</li>
-            <li>Optionally create <code>includes/templates/&lt;your template&gt;/css/ascc_overrides.css</code> to layer additional styling. The plugin does not ship with this file so you can maintain your overrides outside of version control.</li>
-          </ol>
-          <p class="bodyText">Once the loader is in place, the saved-card page adopts the responsive template&rsquo;s layout automatically. You can remove or extend styles at any time by editing your optional <code>ascc_overrides.css</code> file.</p>
-          <h4>Optional wallet buttons on product and cart pages</h4>
-          <p class="bodyText">PayPal Advanced Checkout can display wallet payment buttons (Google Pay, Apple Pay, Venmo) directly on shopping cart and product pages for faster checkout. These buttons allow customers to complete purchases without navigating to the standard checkout flow.</p>
-          <p class="bodyText"><strong>Shopping cart page integration:</strong></p>
-          <ol>
-            <li>Open your active template&rsquo;s shopping cart file: <code>includes/templates/YOUR_TEMPLATE/templates/tpl_shopping_cart_default.php</code></li>
-            <li>Locate the "Continue Checkout" or "Proceed to Checkout" button section (typically near the bottom after order totals)</li>
-            <li>Add the following code immediately before or after the checkout button:</li>
-          </ol>
-          <pre style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>&lt;?php
-  // PayPal Wallet Buttons (Google Pay, Apple Pay, Venmo)
-  $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_paypalac_shopping_cart.php';
-  if (!file_exists($template_path)) {
-    $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_paypalac_shopping_cart.php';
-  }
-  if (file_exists($template_path)) {
-    include($template_path);
-  }
-?&gt;</code></pre>
-          <p class="bodyText"><strong>Product page integration:</strong></p>
-          <ol>
-            <li>Open your active template&rsquo;s product info display file: <code>includes/templates/YOUR_TEMPLATE/templates/tpl_product_info_display.php</code></li>
-            <li>Locate the "Add to Cart" button section (typically within the product options/quantity form)</li>
-            <li>Add the following code immediately after the "Add to Cart" button:</li>
-          </ol>
-          <pre style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>&lt;?php
-  // PayPal Wallet Buttons (Google Pay, Apple Pay, Venmo)
-  $template_path = DIR_WS_TEMPLATES . $template_dir . '/templates/tpl_paypalac_product_info.php';
-  if (!file_exists($template_path)) {
-    $template_path = DIR_WS_TEMPLATES . 'template_default/templates/tpl_paypalac_product_info.php';
-  }
-  if (file_exists($template_path)) {
-    include($template_path);
-  }
-?&gt;</code></pre>
-          <p class="bodyText">After adding these snippets, wallet buttons appear automatically when their corresponding payment modules (PayPal Google Pay, PayPal Apple Pay, PayPal Venmo) are installed and enabled. Each button handles payment authorization, shipping address collection, shipping method selection, order total calculation, and order creation&mdash;all without leaving the page.</p>
         </div>
       </div>
-      <!--EOF INSTALLATION-->
+      <!--EOF UN/INSTALLATION-->
 
-      <!--BOF CONFIGURATION-->
+
+<!--BOF CONFIGURATION-->
       <div class="bodyHeaderContainer" id="Configuration">
         <div class="bodyHeader" id="green">
           <span class="bodyHeaderTxt">Configuration</span>
@@ -327,204 +290,67 @@ class zcObserverMyPaylaterCustomizer extends base
           <span class="bodyHeaderTxt">Usage</span>
         </div>
         <div class="bodyWrapper">
-          <p class="bodyText">After configuration, enable the module via <strong>Modules → Payment</strong> and move it into the preferred display order. Test both sandbox and live transactions before accepting production orders.</p>
-          <ol class="steps">
-            <li>
-              <h4 class="step-title">Complete a sandbox transaction</h4>
-              <p>Switch the module to Sandbox mode, place a test order using PayPal Checkout or a direct credit card, and confirm that the order status and PayPal transaction IDs are recorded correctly.</p>
-            </li>
-            <li>
-              <h4 class="step-title">Validate live credentials</h4>
-              <p>After a successful sandbox test, switch to Live mode, copy in the production client ID and secret, and run a low-value transaction to verify settlement.</p>
-            </li>
-            <li>
-              <h4 class="step-title">Manage orders</h4>
-              <p>Use the Zen Cart orders screen to capture authorized payments, issue refunds, or void transactions. The module relays those actions to PayPal and synchronizes the order history.</p>
-            </li>
-            <li>
-              <h4 class="step-title">Leverage vaulted cards</h4>
-              <p>When customers opt to save their cards, retrieve the vault token using <code>paypalac::getVaultedCardsForCustomer()</code> or <code>PayPalAdvancedCheckout\Common\VaultManager::getCustomerVaultedCards()</code> and submit subsequent captures through <code>PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi</code>.</p>
-            </li>
-          </ol>
-          <h4>Card vaulting behavior</h4>
-          <p class="bodyText"><strong>All card payments are automatically vaulted with PayPal for security and recurring billing support.</strong> The module controls card visibility separately through a <code>visible</code> flag in the vault table:</p>
-          <ul class="bodyList">
-            <li><strong>Visible cards</strong> (<code>visible = 1</code>): Customer explicitly checked &ldquo;Save this card for future checkouts&rdquo; during checkout. These cards appear in the checkout payment selection page (when <code>MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT</code> is enabled) and the <code>account_saved_credit_cards</code> page for customer management.</li>
-            <li><strong>Hidden cards</strong> (<code>visible = 0</code>): Customer did not check the save checkbox, but the card is still vaulted for PCI compliance and security best practices, recurring billing and subscription processing, and merchant-initiated transactions (when using <code>$activeOnly = false</code>).</li>
-          </ul>
-          <p class="bodyText">When a customer pays by card, PayPal returns a <code>payment_source.card</code> element that includes the vaulted token. The module saves that response in the vault table via <code>PayPalAdvancedCheckout\Common\VaultManager::saveVaultedCard</code> and raises the <code>NOTIFY_PAYPALAC_VAULT_CARD_SAVED</code> observer event so other plugins can react to the new or updated token.</p>
-          <h5>Charging vaulted cards from custom code</h5>
-          <p class="bodyText">Third-party integrations can use the stored information to perform subsequent charges (for example, recurring subscriptions) without asking the customer to re-enter their card details:</p>
+          <p class="bodyText">This section is for store owners and operations teams after installation is complete.</p>
+          <h4>Daily operation checklist</h4>
           <ol>
-            <li><strong>Include the payment module&rsquo;s autoloader</strong> before referencing any of its classes:
-              <pre class="sh_php" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/pprAutoload.php';</code></pre>
-            </li>
-            <li><strong>Retrieve the customer&rsquo;s vaulted cards.</strong> The helper <code>paypalac::getVaultedCardsForCustomer($customers_id, $activeOnly = true)</code> returns an array of normalized records (vault identifier, status, masked digits, expiry, billing address, and the original <code>payment_source.card</code> payload).
-              <ul>
-                <li>Use <code>$activeOnly = true</code> (default) to get only visible cards for checkout display.</li>
-                <li>Use <code>$activeOnly = false</code> to get all cards (visible and hidden) for merchant-initiated billing.</li>
-              </ul>
-              You can also call <code>PayPalAdvancedCheckout\Common\VaultManager::getCustomerVaultedCards</code> directly if you prefer.
-            </li>
-            <li><strong>Build a new PayPal order with the vaulted instrument.</strong> Instantiate <code>PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi</code> using the environment credentials returned by <code>paypalac::getEnvironmentInfo()</code>, create an order payload that references the stored <code>vault_id</code>, and then authorize or capture the order. A minimal example that immediately captures a payment:
-              <pre class="sh_php" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>[$clientId, $clientSecret] = paypalac::getEnvironmentInfo();
-$api = new \PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER, $clientId, $clientSecret);
-
-$card = $vaultCards[0]; // Result from step 2
-
-$orderRequest = [
-    'intent' =&gt; 'CAPTURE',
-    'purchase_units' =&gt; [[
-        'amount' =&gt; [
-            'currency_code' =&gt; 'USD',
-            'value' =&gt; '10.00',
-        ],
-    ]],
-    'payment_source' =&gt; [
-        'card' =&gt; [
-            'vault_id' =&gt; $card['vault_id'],
-            'expiry' =&gt; $card['expiry'],
-            'last_digits' =&gt; $card['last_digits'],
-            'billing_address' =&gt; $card['billing_address'],
-            'attributes' =&gt; [
-                'stored_credential' =&gt; [
-                    'payment_initiator' =&gt; 'MERCHANT',
-                    'payment_type' =&gt; 'RECURRING',
-                    'usage' =&gt; 'SUBSEQUENT',
-                ],
-            ],
-        ],
-    ],
-];
-
-$createResponse = $api-&gt;createOrder($orderRequest);
-$captureResponse = $api-&gt;captureOrder($createResponse['id']);</code></pre>
-              <p>Adjust the purchase units, intent, and stored credential attributes to match your billing use case. PayPal&rsquo;s <a href="https://developer.paypal.com/docs/multiparty/seller/checkout/facilitator/vault/" target="_blank" rel="noopener">vault documentation</a> describes additional optional fields such as previous network transaction references.</p>
-            </li>
-            <li><strong>Update the vault record.</strong> After PayPal returns the new capture or authorization, call <code>VaultManager::saveVaultedCard</code> with the updated <code>payment_source.card</code> element so the module records the <code>last_used</code> timestamp and any status changes for future reuse.</li>
+            <li>Run a Sandbox checkout test any time you change credentials or major settings.</li>
+            <li>Run one low-value Live transaction before major launches.</li>
+            <li>Monitor orders for captures/refunds/voids and confirm statuses sync to PayPal.</li>
+            <li>Review <code>/logs/paypalac/</code> regularly for API errors, timeouts, or webhook issues.</li>
           </ol>
-          <h4>Integrated Sign-Up (ISU)</h4>
-          <p class="bodyText">Launch the <strong>Complete PayPal setup</strong> button on the Payment Modules page to onboard merchants directly with PayPal. The portal returns credentials to the administrator and records whether the process completed or was cancelled.</p>
-          <h4>Recurring products and subscriptions</h4>
-          <p class="bodyText">PayPal Advanced Checkout does not create subscription catalog entries inside Zen Cart automatically, but it exposes the PayPal Billing Plans and Subscriptions REST endpoints so you can build recurring offers without leaving the storefront. The helper lives in <code>PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi</code> and supports plan creation, activation, subscription lifecycle management, and cancellations via dedicated methods.</p>
-          <ol class="steps">
-            <li>
-              <h4 class="step-title">Create a billing product and plan</h4>
-              <p>Use the PayPal developer dashboard or a short script that calls <code>$api-&gt;createPlan()</code> to define pricing, billing cycles, and trial periods. The API class requires the same credentials retrieved via <code>paypalac::getEnvironmentInfo()</code>, so you can reuse the bootstrap code from the vaulted-card example above. Activate the plan with <code>$api-&gt;activatePlan($planId)</code> once PayPal returns the identifier.</p>
-            </li>
-            <li>
-              <h4 class="step-title">Map plans to Zen Cart products</h4>
-              <p>Store the PayPal plan ID in a custom product field (for example, a product meta tag, an attribute, or a dedicated table) so your subscription purchase flow can retrieve it later. Update the product description to explain the billing frequency, renewal price, cancellation policy, and how the subscription appears on the customer&rsquo;s PayPal account.</p>
-            </li>
-            <li>
-              <h4 class="step-title">Launch the subscription sign-up</h4>
-              <p>When the customer checks out, detect the subscription product in your cart observer, instantiate <code>PayPalAdvancedCheckoutApi</code>, and call <code>$api-&gt;createSubscription()</code> with the plan ID, subscriber details, and <code>application_context</code> return URLs that point to a dedicated confirmation page. Redirect the customer to the approval link PayPal returns so they can accept the billing agreement.</p>
-            </li>
-            <li>
-              <h4 class="step-title">Handle webhooks and order fulfillment</h4>
-              <p>Configure PayPal to send <code>BILLING.SUBSCRIPTION.ACTIVATED</code>, <code>PAYMENT.SALE.COMPLETED</code>, and related events to <code>ppr_webhook.php</code>. The webhook controller authenticates incoming messages and dispatches them to event handlers, giving you a single place to update order status, extend service periods, or flag delinquencies.</p>
-            </li>
-            <li>
-              <h4 class="step-title">Let customers manage stored cards</h4>
-              <p>Direct subscribers to the optional saved-card management page (<code>account_saved_credit_cards</code>) so they can update billing addresses or remove expired cards. The page renders editable vault entries, validates address updates, and issues PATCH requests to PayPal when the customer edits a card.</p>
-            </li>
+
+          <h4>Recurring subscriptions: cron setup</h4>
+          <p class="bodyText">If you use saved-card recurring billing, schedule the recurring cron script so subscription renewals process automatically.</p>
+          <ol>
+            <li>Confirm this file exists in your store: <code>cron/paypalac_saved_card_recurring.php</code>.</li>
+            <li>Add a server cron entry (example: run every 15 minutes):</li>
           </ol>
-          <h5>Pause or cancel subscriptions</h5>
-          <p class="bodyText">To pause or cancel an active subscription, call <code>$api-&gt;suspendSubscription()</code> or <code>$api-&gt;cancelSubscription()</code> with the PayPal subscription ID and an explanatory note. Reactivations use <code>$api-&gt;activateSubscription()</code>. Each helper validates the input identifier and sends the appropriate REST call, logging the response for audit purposes.</p>
-          <h5>Configure product attributes</h5>
-          <p class="bodyText">The checkout observer watches each line item that flows through <code>NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_CREATE_ADD_PRODUCTS</code>. A product is treated as a subscription only when it includes the attribute labels listed below. Create the option names in <strong>Catalog &rarr; Option Name Manager</strong> and assign them to the product via the <strong>Attributes Controller</strong> so the order writer copies the values into <code>orders_products_attributes</code>. The observer lowercases and slugifies the option labels, so keep the exact wording shown below.</p>
-          <table class="bodyTable">
-            <thead>
-              <tr>
-                <th>Attribute label</th>
-                <th>Suggested type</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>PayPal Subscription Plan ID</td>
-                <td>Text</td>
-                <td>Required. Stores the PayPal plan identifier returned by <code>createPlan()</code>.</td>
-              </tr>
-              <tr>
-                <td>PayPal Subscription Billing Period</td>
-                <td>Dropdown</td>
-                <td>Required. Accepts Day, Week, Month, Year, or Semi-Month. The observer normalizes common variants to PayPal&rsquo;s interval units.</td>
-              </tr>
-              <tr>
-                <td>PayPal Subscription Billing Frequency</td>
-                <td>Text</td>
-                <td>Required. Numeric value representing the number of intervals between charges. Values less than 1 are ignored.</td>
-              </tr>
-              <tr>
-                <td>PayPal Subscription Total Billing Cycles</td>
-                <td>Text</td>
-                <td>Optional. Use <code>0</code> to renew indefinitely.</td>
-              </tr>
-              <tr>
-                <td>PayPal Subscription Trial Period</td>
-                <td>Dropdown</td>
-                <td>Optional. Uses the same vocabulary as the billing period column. Leave blank to skip trials.</td>
-              </tr>
-              <tr>
-                <td>PayPal Subscription Trial Frequency</td>
-                <td>Text</td>
-                <td>Optional. Only applied when a trial period is present.</td>
-              </tr>
-              <tr>
-                <td>PayPal Subscription Trial Total Billing Cycles</td>
-                <td>Text</td>
-                <td>Optional. Limits the number of trial renewals.</td>
-              </tr>
-              <tr>
-                <td>PayPal Subscription Setup Fee</td>
-                <td>Text</td>
-                <td>Optional. Parsed as a decimal amount; currency symbols are stripped automatically.</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="bodyText">Assign the attributes to each subscription SKU. The observer ignores products that are missing any of the required fields so that partial records are never written.</p>
-          <h5>Subscription logging &amp; troubleshooting</h5>
-          <p class="bodyText">When the buyer saves their card during checkout, the observer records a row in the <code>paypal_subscriptions</code> table for every qualifying line item. Each entry captures the order and product identifiers, normalized billing metadata, and the vault profile so follow-up captures can reuse the saved card token.</p>
+          <pre class="sh_bash" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>*/15 * * * * /usr/bin/php /path/to/your/store/cron/paypalac_saved_card_recurring.php &gt;&gt; /path/to/your/store/logs/paypalac/recurring-cron.log 2&gt;&amp;1</code></pre>
+          <ol start="3">
+            <li>Test manually from your store root:</li>
+          </ol>
+          <pre class="sh_bash" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>php cron/paypalac_saved_card_recurring.php</code></pre>
+          <ol start="4">
+            <li>Verify output and logs show processed records. The recurring job processes subscriptions that are due with status <code>scheduled</code> and failed retries configured for automatic retry.</li>
+            <li>If nothing processes, check subscription status, <code>next_payment_date</code>, and schema health in your database.</li>
+          </ol>
+
+          <h4>Store-owner troubleshooting highlights</h4>
           <ul class="bodyList">
-            <li><strong>Status values:</strong> <code>pending</code> indicates a vault token was present. <code>awaiting_vault</code> means no vault metadata was returned; confirm the shopper opted to store the card and that the payment captured successfully.</li>
-            <li><strong>Attribute typos:</strong> Verify the option names match the labels above exactly if a subscription fails to appear in the log.</li>
-            <li><strong>Vault lookups:</strong> The observer consults the customer&rsquo;s saved cards to locate the vault token. If <code>paypal_vault_id</code> is <code>0</code>, review the customer&rsquo;s saved cards page or enable PayPal Advanced Checkout debug logging.</li>
-            <li><strong>Notifier hook:</strong> The module raises <code>NOTIFY_RECURRING_ORDER_LOGGED</code> after logging at least one subscription so legacy observers continue to fire.</li>
-          </ul>
-          <h4>Operations and maintenance</h4>
-          <p class="bodyText">Fold these recurring tasks into your runbook to keep the integration healthy.</p>
-          <ul class="bodyList">
-            <li><strong>Webhooks:</strong> Configure PayPal webhooks to notify your store of disputes, subscription updates, and risk events. Extend the bundled listeners if you need to trigger custom workflows.</li>
-            <li><strong>Logging:</strong> Review <code>/logs/paypalac/</code> for API failures or timeouts and rotate logs regularly, especially on shared hosting.</li>
-            <li><strong>Credentials:</strong> Rotate your PayPal client secrets periodically, then rerun sandbox smoke tests before resuming live traffic.</li>
-            <li><strong>Extensions:</strong> Consult the project wiki for recipes that automate vaulted card captures, payment retries, or ERP integrations.</li>
+            <li><strong>Google Pay button missing:</strong> Make sure Google Pay is enabled in PayPal for your environment and your site is HTTPS.</li>
+            <li><strong>Apple Pay missing:</strong> Verify domain association file, Apple merchant setup, and certificate installation with PayPal.</li>
+            <li><strong>Venmo missing:</strong> Confirm Venmo is enabled for your account and a valid Venmo business profile ID is configured.</li>
           </ul>
         </div>
       </div>
       <!--EOF USAGE-->
 
-
-      <!--BOF UNINSTALLATION-->
-      <div class="bodyHeaderContainer" id="Uninstallation">
+      <!--BOF DEVELOPERS-->
+      <div class="bodyHeaderContainer" id="Developers">
         <div class="bodyHeader" id="blue">
-          <span class="bodyHeaderTxt">Uninstallation</span>
+          <span class="bodyHeaderTxt">Developers</span>
         </div>
         <div class="bodyWrapper">
-          <ol>
-            <li>Switch the module to Sandbox mode and confirm that no live transactions are processing.</li>
-            <li>In <strong>Modules → Payment</strong>, select <strong>PayPal Advanced Checkout</strong> and click <strong>Remove</strong> to clear the configuration keys from your database.</li>
-            <li>Delete the uploaded module files from <code>includes/modules/payment/</code>, <code>includes/languages/</code>, <code>includes/classes/observers/</code>, and your admin directory.</li>
-            <li>If no other plugins rely on it, remove the notifier patch from <code>includes/classes/order_total.php</code> or restore the backup you created prior to installation.</li>
-            <li>Revoke the REST API credentials in the PayPal developer dashboard to prevent unintended access.</li>
-          </ol>
-          <p class="bodyText">Keep a copy of your deployment notes and prior release documentation outside of your production store if you need historical context or upgrade guidance in the future.</p>
+          <p class="bodyText">This section consolidates implementation details, extension points, and maintenance notes for developers.</p>
+          <h4>Key files and extension points</h4>
+          <ul class="bodyList">
+            <li><code>cron/paypalac_saved_card_recurring.php</code> &mdash; recurring billing processor.</li>
+            <li><code>includes/classes/paypalSavedCardRecurring.php</code> &mdash; scheduled payment queries and recurring data helpers.</li>
+            <li><code>admin/paypalac_saved_card_recurring.php</code> &mdash; admin recurring subscription management UI.</li>
+            <li><code>NOTIFY_RECURRING_ORDER_LOGGED</code> and <code>NOTIFY_PAYPALAC_VAULT_CARD_SAVED</code> observer events are available for integrations.</li>
+          </ul>
+          <h4>Advanced customization topics</h4>
+          <ul class="bodyList">
+            <li>Vaulted-card charging workflows and API helpers belong in custom observer/service code, not in template overrides.</li>
+            <li>For recurring behavior changes, update both cron logic and status/date query behavior together to avoid skipped renewals.</li>
+            <li>When debugging recurring issues, test with manual cron execution before changing scheduler cadence.</li>
+          </ul>
         </div>
       </div>
-      <!--EOF UNINSTALLATION-->
+      <!--EOF DEVELOPERS-->
 
-      <!--BOF TROUBLESHOOTING-->
+
+<!--BOF TROUBLESHOOTING-->
       <div class="bodyHeaderContainer" id="Troubleshooting">
         <div class="bodyHeader" id="blue">
           <span class="bodyHeaderTxt">Troubleshooting</span>
@@ -637,7 +463,7 @@ $captureResponse = $api-&gt;captureOrder($createResponse['id']);</code></pre>
               <h4>Documentation</h4>
               <div class="links-list">
                 <a href="#Overview">Overview</a>
-                <a href="#Installation">Installation</a>
+                <a href="#UnInstallation">Un/Installation</a>
                 <a href="#Configuration">Configuration</a>
                 <a href="#Usage">Usage</a>
                 <a href="#Troubleshooting">Troubleshooting</a>
@@ -647,7 +473,7 @@ $captureResponse = $api-&gt;captureOrder($createResponse['id']);</code></pre>
               <h4>Maintenance</h4>
               <div class="links-list">
                 <a href="#Usage">Operations &amp; runbooks</a>
-                <a href="#Uninstallation">Uninstallation</a>
+                <a href="#Developers">Developers</a>
                 <a href="#Support">Support</a>
               </div>
             </div>
