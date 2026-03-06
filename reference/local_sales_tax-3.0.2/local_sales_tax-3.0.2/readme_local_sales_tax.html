@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Local Sales Tax</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="vinos_favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+  <style>
+.nav-pills-custom .nav-link {
+    color: #aaa;
+    background: #fff;
+    position: relative;
+}
+.nav-pills-custom .nav-link.active {
+    color: #306eff;
+    background: #fff;
+}
+/* Add indicator arrow for the active tab */
+@media (min-width: 992px) {
+    .nav-pills-custom .nav-link::before {
+        content: '';
+        display: block;
+        border-top: 8px solid transparent;
+        border-left: 10px solid #fff;
+        border-bottom: 8px solid transparent;
+        position: absolute;
+        top: 50%;
+        right: -10px;
+        transform: translateY(-50%);
+        opacity: 0;
+    }
+}
+.nav-pills-custom .nav-link.active::before {
+    opacity: 1;
+}
+body {
+    min-height: 100vh;
+    background: radial-gradient(ellipse at center, rgba(240,249,255,1) 0%,rgba(203,235,255,1) 47%,rgba(161,219,255,1) 100%);
+}
+  </style>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct" crossorigin="anonymous"></script>
+</head>
+<body>
+<section class="py-5 header">
+    <div class="container py-4">
+        <header class="pb-2">
+            <h1 class="display-4 text-center">Local Sales Tax</h1>
+            <ul>
+                <li>Zen Cart download link: <a href="https://www.zen-cart.com/downloads.php?do=file&id=422" target="_blank">https://www.zen-cart.com/downloads.php?do=file&id=422</a></li>
+                <li>Zen Cart support thread: <a href="https://www.zen-cart.com/showthread.php?111782-Local-Sales-Tax-Mod-Support-Thread/" target="_blank">https://www.zen-cart.com/showthread.php?111782-Local-Sales-Tax-Mod-Support-Thread/</a></li>
+                <li>GitHub repository: <a href="https://github.com/lat9/local_sales_tax" target="_blank">https://github.com/lat9/local_sales_tax</a></li>
+                <li>GitHub wiki articles: <a href="https://github.com/lat9/local_sales_tax/wiki" target="_blank">https://github.com/lat9/local_sales_tax/wiki</a></li>
+            </ul>
+
+            <h3>Prerequisites</h3>
+            <p>This version of the <b><em>Local Sales Tax</em></b> requires:<ol>
+                <li>A working copy of Zen Cart 2.1.0 or later.</li>
+                <li>The site must use a PHP version greater than or equal to PHP 8.0.</li>
+                <li>(optional) A working copy of Edit Orders, v5.0.0 or later.</li>
+             </ol>
+        </header>
+
+        <div class="row">
+            <div class="col-md-3">
+                <!-- Tabs nav -->
+                <div class="nav flex-column nav-pills nav-pills-custom" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+                    <a class="nav-link mb-3 p-3 shadow active" id="v-pills-1-tab" data-toggle="pill" href="#v-pills-1" role="tab" aria-controls="v-pills-1" aria-selected="true">
+                        <span class="font-weight-bold small text-uppercase">Overview</span></a>
+                    <a class="nav-link mb-3 p-3 shadow" id="v-pills-2-tab" data-toggle="pill" href="#v-pills-2" role="tab" aria-controls="v-pills-2" aria-selected="false">
+                        <span class="font-weight-bold small text-uppercase">Installation</span></a>
+                    <a class="nav-link mb-3 p-3 shadow" id="v-pills-3-tab" data-toggle="pill" href="#v-pills-3" role="tab" aria-controls="v-pills-3" aria-selected="false">
+                        <span class="font-weight-bold small text-uppercase">Configuring</span></a>
+                    <a class="nav-link mb-3 p-3 shadow" id="v-pills-4-tab" data-toggle="pill" href="#v-pills-4" role="tab" aria-controls="v-pills-4" aria-selected="false">
+                        <span class="font-weight-bold small text-uppercase">Credits and History</span></a>
+                    <a class="nav-link mb-3 p-3 shadow" id="v-pills-6-tab" data-toggle="pill" href="#v-pills-6" role="tab" aria-controls="v-pills-6" aria-selected="false">
+                        <span class="font-weight-bold small text-uppercase">License</span></a>
+                </div>
+            </div>
+
+            <div class="col-md-9">
+                <!-- Tabs content -->
+                <div class="tab-content" id="v-pills-tabContent">
+                    <div class="tab-pane fade shadow rounded bg-white show active p-4" id="v-pills-1" role="tabpanel" aria-labelledby="v-pills-1-tab">
+                        <h4 class="font-italic mb-4">Overview</h4>
+                        <p>This plugin adds the support for local sales tax zones. In the United States a local sales tax is a additional tax levied by the county or city in addition to the tax levied by a state.</p>
+                        <p>You should consult your local tax authority for tax advice as it relates to your business.</p>
+                    </div>
+
+                    <div class="tab-pane fade shadow rounded bg-white p-4" id="v-pills-2" role="tabpanel" aria-labelledby="v-pills-2-tab">
+                        <h4 class="font-italic mb-4">Installation</h4>
+                        <p>Follow these steps to install the plugin:</p>
+                        <ol>
+                            <li>Unzip the plugin's zip-file distribution.</li>
+                            <li>Copy the <em>contents</em> for the distribution's <code>zc_plugins</code> directory to your site's <code>/zc_plugins</code> directory.</b> 
+                            <li>Log into your Zen Cart admin and navigate to <b>Modules :: Plugin Manager</b>.</li>
+                            <li>Click on the row that displays a <var>Plugin Key</var> of <b>LocalSalesTax</b> and click the associated <b>Install</b> button.</li>
+                            <li>Next, you'll need to configure your site's local sales taxes; see the <em>Configuring</em> tab for more information.</li>
+                        </ol>
+                         <div class="card mt-3">
+                            <div class="card-header text-center bg-secondary text-white">Uninstalling</div>
+                            <div class="card-body">
+                                <p>To uninstall the plugin:</p>
+                                <ol>
+                                    <li>Log into your Zen Cart admin  and navigate to <b>Modules :: Plugin Manager</b>.</li>
+                                    <li>Click on the row that displays a <var>Plugin Key</var> of <b>LocalSalesTax</b> and click the associated <b>Un-Install</b> button.<ul>
+                                        <li>That button-click will remove the plugin's configuration settings and &quot;inactivate&quot; the plugin.</li>
+                                        <li>The database table (<code>tax_rates_local</code>) added during the plugin's installation <em>is not removed when the plugin is uninstalled</em>! To remove that table from your site's database, enter the following SQL in your admin's <b>Tools :: Install SQL Patches</b>:<br><code>DROP TABLE tax_rates_local;</code></li>
+                                    </ul></li>
+                                    <li>If you also want to remove the files associated with the plugin, click the <b>Clean Up</b> button.</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade shadow rounded bg-white p-4" id="v-pills-3" role="tabpanel" aria-labelledby="v-pills-3-tab">
+                        <h4 class="font-italic mb-4">Configuring</h4>
+                        <p>The plugin is released with a tool you'll use to configure your local sales taxes and an order-total module that uses those definitions.</o>
+                        <p>First, set up the local sales taxes.  Refer to the plugin's <a href="https://github.com/lat9/local_sales_tax/wiki/Managing-Taxes" target="_blank">wiki article</a> for additional instructions.</p>
+                        <p>Once the site's local sales taxes are set up, navigate to the admin's <em>Modules :: Order Total</em>; you'll see an order-total named <b>Local Sales Tax</b>. Click on the associated <code>Install</code> button, and configure the order-total.</p>
+                    </div>
+
+                    <div class="tab-pane fade shadow rounded bg-white p-4" id="v-pills-4" role="tabpanel" aria-labelledby="v-pills-4-tab">
+                        <h4 class="font-italic mb-4">Credits and History</h4>
+                        <ul>
+                            <li>v3.0.2, 2025-08-16 (proseLA, lat9):<ul>
+                                <li>BUGFIX: Incorrect tax-rate <em>still</em> charged for <code>storepickup</code> orders.</li>
+                            </ul></li>
+                            <li>v3.0.1, 2025-05-13 (lat9, retched, scottcwilson):<ul>
+                                <li>BUGFIX: Include state's <em>base</em> tax-rate in the local sales tax.</li>
+                                <li>BUGFIX: Correct previous plugin removal; the base admin tool's name was <em>local_sales_tax<b>es</b>.php</em>.</li>
+                                <li>BUGFIX: Incorrect tax-rate charged for <code>storepickup</code> orders.</li>
+                            </ul></li>
+                            <li>v3.0.0, 2025-03-12 (lat9):<ul>
+                                <li>Released as a Zen Cart encapsulated plugin, based on v2.6 of the <a href="https://www.zen-cart.com/downloads.php?do=file&id=422" target="_blank">previous implementation</a>. Refer to that version's readme for previous change-history.</li>
+                                <li>Updated to work with Zen Cart versions 2.1.0 and later, PHP versions 8.0 and later, Edit Orders v5.0.0 and later and One-Page Checkout v2.4.6 and later.</li>
+                            </ul></li>
+                         </ul>
+                    </div>
+
+                    <div class="tab-pane fade shadow rounded bg-white p-4" id="v-pills-6" role="tabpanel" aria-labelledby="v-pills-6-tab">
+                        <h4 class="font-italic mb-4">License</h4>
+                        <p><b>Optional/Required Shipping Insurance</b> is released under the General Public License (see license.txt). This script is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</p>
+                        <p>Always backup your shop and database before making changes.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+</body>
+</html>
