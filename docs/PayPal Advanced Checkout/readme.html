@@ -316,6 +316,27 @@ class zcObserverMyPaylaterCustomizer extends base
             <li>If nothing processes, check subscription status, <code>next_payment_date</code>, and schema health in your database.</li>
           </ol>
 
+          <h4>Additional maintenance cron jobs</h4>
+          <p class="bodyText">If you use subscription lifecycle features and saved cards, schedule these companion cron jobs as well.</p>
+          <ul class="bodyList">
+            <li><strong>Expired card cleanup:</strong> <code>cron/paypalac_remove_expired_cards.php</code><br>Marks expired cards as deleted in <code>TABLE_SAVED_CREDIT_CARDS</code> and sets expired PayPal vault records to <code>status=expired</code> in <code>TABLE_PAYPAL_VAULT</code>.</li>
+            <li><strong>Scheduled cancellation processing:</strong> <code>cron/paypalac_subscription_cancellations.php</code><br>Applies scheduled subscription cancellations by removing customer group pricing after the cancellation expiration date and deleting processed rows from <code>TABLE_SUBSCRIPTION_CANCELLATIONS</code>.</li>
+            <li><strong>Reminder and notice emails:</strong> <code>cron/paypalac_recurring_reminders.php</code><br>Sends renewal reminders, upcoming payment reminders, and expiration notices for recurring subscriptions (including legacy recurring profiles when enabled).</li>
+          </ul>
+          <p class="bodyText">Example scheduling cadence:</p>
+          <pre class="sh_bash" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code># every 6 hours: flag expired saved/vault cards
+0 */6 * * * /usr/bin/php /path/to/your/store/cron/paypalac_remove_expired_cards.php &gt;&gt; /path/to/your/store/logs/paypalac/remove-expired-cards.log 2&gt;&amp;1
+
+# once daily: apply scheduled subscription cancellations
+15 2 * * * /usr/bin/php /path/to/your/store/cron/paypalac_subscription_cancellations.php &gt;&gt; /path/to/your/store/logs/paypalac/subscription-cancellations.log 2&gt;&amp;1
+
+# once daily: send reminders/notices
+30 2 * * * /usr/bin/php /path/to/your/store/cron/paypalac_recurring_reminders.php &gt;&gt; /path/to/your/store/logs/paypalac/recurring-reminders.log 2&gt;&amp;1</code></pre>
+          <p class="bodyText">Manual run checks from your store root:</p>
+          <pre class="sh_bash" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>php cron/paypalac_remove_expired_cards.php
+php cron/paypalac_subscription_cancellations.php
+php cron/paypalac_recurring_reminders.php</code></pre>
+
           <h4>Store-owner troubleshooting highlights</h4>
           <ul class="bodyList">
             <li><strong>Google Pay button missing:</strong> Make sure Google Pay is enabled in PayPal for your environment and your site is HTTPS.</li>
