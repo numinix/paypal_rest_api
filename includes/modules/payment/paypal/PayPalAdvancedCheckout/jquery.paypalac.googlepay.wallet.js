@@ -70,6 +70,15 @@
     // Utility Functions
     // -------------------------------------------------------------------------
 
+    /**
+     * Get the PayPal SDK namespace.
+     * The header observer may load the SDK with data-namespace="PayPalSDK",
+     * placing it at window.PayPalSDK instead of window.paypal.
+     */
+    function getPayPalNamespace() {
+        return window.paypal || window.PayPalSDK;
+    }
+
     function normalizeWalletContainer(element) {
         if (!element) {
             return;
@@ -597,19 +606,22 @@
 
         var desiredKey = buildSdkKey(config);
         var googleMerchantId = config.googleMerchantId || config.merchantId || '';
-        var existingScript = document.querySelector('script[data-paypal-sdk="true"]');
+        // Also detect the header-loaded SDK script (id="PayPalJSSDK") which does
+        // not carry the data-paypal-sdk attribute but uses data-namespace="PayPalSDK".
+        var existingScript = document.querySelector('script[data-paypal-sdk="true"]') || document.getElementById('PayPalJSSDK');
         var isSandbox = config.environment === 'sandbox';
 
-        if (sharedSdkLoader.promise && sharedSdkLoader.key === desiredKey && window.paypal && typeof window.paypal.Googlepay === 'function') {
-            return sharedSdkLoader.promise.then(function () { return window.paypal; });
+        // Check if the SDK is already available under either namespace
+        var paypalNs = getPayPalNamespace();
+        if (sharedSdkLoader.promise && sharedSdkLoader.key === desiredKey && paypalNs && typeof paypalNs.Googlepay === 'function') {
+            return sharedSdkLoader.promise.then(function () { return getPayPalNamespace(); });
         }
 
-        // Detect PayPal SDK already loaded by another template (e.g. Apple Pay's <script> tag)
-        // even when sharedSdkLoader hasn't been set. Avoids duplicate SDK loading which can
-        // cause the second load to silently fail and leave the promise chain unresolved.
-        if (!existingScript && window.paypal && typeof window.paypal.Googlepay === 'function') {
+        // SDK already fully loaded (e.g. by the header observer or another template)
+        // even when sharedSdkLoader hasn't been set. Reuse it immediately.
+        if (paypalNs && typeof paypalNs.Googlepay === 'function') {
             sharedSdkLoader.key = desiredKey;
-            sharedSdkLoader.promise = Promise.resolve(window.paypal);
+            sharedSdkLoader.promise = Promise.resolve(paypalNs);
             return sharedSdkLoader.promise;
         }
 
@@ -618,9 +630,10 @@
             var matchesCurrency = existingScript.src.indexOf('currency=' + encodeURIComponent(config.currency || 'USD')) !== -1;
 
             if (matchesClient && matchesCurrency) {
-                if (existingScript.dataset.loaded === 'true' && window.paypal && typeof window.paypal.Googlepay === 'function') {
+                var loadedNs = getPayPalNamespace();
+                if (loadedNs && typeof loadedNs.Googlepay === 'function') {
                     sharedSdkLoader.key = desiredKey;
-                    sharedSdkLoader.promise = Promise.resolve(window.paypal);
+                    sharedSdkLoader.promise = Promise.resolve(loadedNs);
                     return sharedSdkLoader.promise;
                 }
 
@@ -628,7 +641,7 @@
                     existingScript.addEventListener('load', function () {
                         existingScript.dataset.loaded = 'true';
                         sharedSdkLoader.key = desiredKey;
-                        resolve(window.paypal);
+                        resolve(getPayPalNamespace());
                     });
                     existingScript.addEventListener('error', function (event) {
                         sharedSdkLoader.promise = null;
@@ -637,7 +650,11 @@
                 });
             }
 
-            existingScript.parentNode.removeChild(existingScript);
+            // Only remove the script if it was one we created (has data-paypal-sdk),
+            // never remove the header-loaded SDK.
+            if (existingScript.dataset && existingScript.dataset.paypalSdk === 'true') {
+                existingScript.parentNode.removeChild(existingScript);
+            }
         }
 
         // Build SDK URL with all wallet components to support multiple payment methods
@@ -687,7 +704,7 @@
                     googleMerchantId: config.googleMerchantId || config.merchantId,
                     environment: config.environment
                 };
-                resolve(window.paypal);
+                resolve(getPayPalNamespace());
             };
             script.onerror = function (event) {
                 sharedSdkLoader.promise = null;

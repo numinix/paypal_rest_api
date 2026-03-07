@@ -593,7 +593,7 @@ class zcObserverPaypaladvcheckout
         }
 ?>
 
-<script title="PayPalSDK" id="PayPalJSSDK" src="<?= $js_url . '?'. str_replace('%2C', ',', http_build_query($js_fields)) ?>" <?= implode(' ', $js_scriptparams) ?> async></script>
+<script title="PayPalSDK" id="PayPalJSSDK" data-paypal-sdk="true" src="<?= $js_url . '?'. str_replace('%2C', ',', http_build_query($js_fields)) ?>" <?= implode(' ', $js_scriptparams) ?> async></script>
 
 <?php
     }
