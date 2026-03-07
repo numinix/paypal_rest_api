@@ -63,6 +63,50 @@ class SavedCreditCardsManager
                 KEY idx_vault_id (vault_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+
+        self::ensureSavedCreditCardsColumns();
+    }
+
+    /**
+     * Add columns that may be missing on upgraded installations.
+     *
+     * Some stores have a legacy saved_credit_cards table that predates vault support.
+     * Ensure required columns exist so code paths querying by vault_id do not fatal.
+     */
+    private static function ensureSavedCreditCardsColumns(): void
+    {
+        global $db;
+
+        $columns = [
+            'customers_id' => "INT UNSIGNED NOT NULL DEFAULT 0",
+            'type' => "VARCHAR(32) NOT NULL DEFAULT ''",
+            'last_digits' => "VARCHAR(4) NOT NULL DEFAULT ''",
+            'expiry_month' => "CHAR(2) NOT NULL DEFAULT ''",
+            'expiry_year' => "CHAR(4) NOT NULL DEFAULT ''",
+            'holder_name' => "VARCHAR(96) NOT NULL DEFAULT ''",
+            'billing_address_id' => "INT UNSIGNED NOT NULL DEFAULT 0",
+            'is_default' => "TINYINT(1) NOT NULL DEFAULT 0",
+            'is_deleted' => "TINYINT(1) NOT NULL DEFAULT 0",
+            'vault_id' => "VARCHAR(64) NOT NULL DEFAULT ''",
+            'date_added' => "DATETIME DEFAULT NULL",
+            'last_modified' => "DATETIME DEFAULT NULL",
+        ];
+
+        foreach ($columns as $column => $definition) {
+            if (!self::savedCreditCardsColumnExists($column)) {
+                $db->Execute(
+                    'ALTER TABLE ' . TABLE_SAVED_CREDIT_CARDS . ' ADD ' . $column . ' ' . $definition
+                );
+            }
+        }
+
+        if (!self::savedCreditCardsIndexExists('idx_customer')) {
+            $db->Execute('ALTER TABLE ' . TABLE_SAVED_CREDIT_CARDS . ' ADD KEY idx_customer (customers_id)');
+        }
+
+        if (!self::savedCreditCardsIndexExists('idx_vault_id')) {
+            $db->Execute('ALTER TABLE ' . TABLE_SAVED_CREDIT_CARDS . ' ADD KEY idx_vault_id (vault_id)');
+        }
     }
 
     /**
@@ -159,6 +203,34 @@ class SavedCreditCardsManager
 
         $result = $db->Execute(
             "SHOW COLUMNS FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " LIKE '" . zen_db_input($column) . "'"
+        );
+
+        return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+    }
+
+    /**
+     * Check if a column exists in the saved_credit_cards table.
+     */
+    private static function savedCreditCardsColumnExists(string $column): bool
+    {
+        global $db;
+
+        $result = $db->Execute(
+            "SHOW COLUMNS FROM " . TABLE_SAVED_CREDIT_CARDS . " LIKE '" . zen_db_input($column) . "'"
+        );
+
+        return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+    }
+
+    /**
+     * Check if an index exists in the saved_credit_cards table.
+     */
+    private static function savedCreditCardsIndexExists(string $indexName): bool
+    {
+        global $db;
+
+        $result = $db->Execute(
+            "SHOW INDEX FROM " . TABLE_SAVED_CREDIT_CARDS . " WHERE Key_name = '" . zen_db_input($indexName) . "'"
         );
 
         return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
