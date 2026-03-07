@@ -19,6 +19,7 @@ For complete installation, configuration, usage, and troubleshooting instruction
 - **Zen Cart:** 1.5.7c or later
 - **PHP:** 7.4 through 8.4 (PHP 7.3 and older are not supported)
 - **Required Patch:** Apply the [order_total notifier patch](https://github.com/numinix/paypal_rest_api/wiki/Required-changes-to-%60-includes-classes-order_total.php%60) for Zen Cart versions prior to 1.5.8a
+- **Plugin Compatibility:** Automatically supports the Zen Cart Local Sales Tax plugin (`ot_local_sales_taxes`) when it is installed/enabled; if it is missing or disabled, paypalac continues without it
 
 ## Support
 

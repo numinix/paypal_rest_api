@@ -64,7 +64,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.11';
+    protected const CURRENT_VERSION = '1.3.12';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,

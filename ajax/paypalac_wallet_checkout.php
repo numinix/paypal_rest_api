@@ -679,7 +679,7 @@ for ($i = 0, $n = sizeof($order_totals); $i < $n; $i++) {
     if ($order_totals[$i]['code'] === 'ot_subtotal') $order_subtotal = $order_totals[$i]['value'];
     if (!empty(${$order_totals[$i]['code']}->credit_class)) $credits_applied += $order_totals[$i]['value'];
     if ($order_totals[$i]['code'] === 'ot_total') $ototal = $order_totals[$i]['value'];
-    if ($order_totals[$i]['code'] === 'ot_tax') $otax = $order_totals[$i]['value'];
+    if (in_array($order_totals[$i]['code'], ['ot_tax', 'ot_local_sales_taxes'], true)) $otax += $order_totals[$i]['value'];
     if ($order_totals[$i]['code'] === 'ot_shipping') $oshipping = $order_totals[$i]['value'];
 }
 $commissionable_order = ($order_subtotal - $credits_applied);

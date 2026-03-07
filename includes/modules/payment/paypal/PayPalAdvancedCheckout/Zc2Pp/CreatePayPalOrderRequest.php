@@ -400,6 +400,15 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $item_total += $next_item['quantity'] * $next_item['unit_amount']['value'];
             $item_tax_total += $next_item['quantity'] * $next_item['tax']['value'];
         }
+
+        // -----
+        // Compatibility: The Local Sales Tax plugin can add taxes via an order-total
+        // observer (ot_local_sales_taxes) that are not reflected in item-level tax
+        // values. Include those taxes in the PayPal breakdown when the plugin is
+        // enabled, while gracefully ignoring disabled/missing plugin files.
+        //
+        $item_tax_total += $this->getLocalSalesTaxTotal($order, $ot_diffs);
+
         $shipping_total = (float)($order->info['shipping_cost'] + $order_info['shipping_tax']);
         $breakdown = [
             'item_total' => $this->amount->setValue($item_total),
@@ -532,6 +541,55 @@ class CreatePayPalOrderRequest extends ErrorInfo
         }
 
         return $discount_total;
+    }
+
+    protected function getLocalSalesTaxTotal(\order $order, array $ot_diffs): float
+    {
+        if (!$this->localSalesTaxPluginEnabled()) {
+            return 0.0;
+        }
+
+        // Preferred source: observer-captured diffs from order-total processing.
+        if (isset($ot_diffs['ot_local_sales_taxes']['diff']) && is_array($ot_diffs['ot_local_sales_taxes']['diff'])) {
+            $local_diff = $ot_diffs['ot_local_sales_taxes']['diff'];
+            if (isset($local_diff['tax']) && is_numeric($local_diff['tax']) && (float)$local_diff['tax'] > 0.0) {
+                return (float)$local_diff['tax'];
+            }
+            if (isset($local_diff['total']) && is_numeric($local_diff['total']) && (float)$local_diff['total'] > 0.0) {
+                return (float)$local_diff['total'];
+            }
+        }
+
+        // Fallback source: order totals line produced by the local sales tax module.
+        if (!isset($order->totals) || !is_array($order->totals)) {
+            return 0.0;
+        }
+
+        foreach ($order->totals as $order_total) {
+            if (!is_array($order_total)) {
+                continue;
+            }
+            if (($order_total['class'] ?? '') !== 'ot_local_sales_taxes') {
+                continue;
+            }
+            if (!isset($order_total['value']) || !is_numeric($order_total['value'])) {
+                continue;
+            }
+            $value = (float)$order_total['value'];
+            if ($value > 0.0) {
+                return $value;
+            }
+        }
+
+        return 0.0;
+    }
+
+    protected function localSalesTaxPluginEnabled(): bool
+    {
+        return (
+            defined('MODULE_ORDER_TOTAL_COUNTY_LOCAL_TAX_STATUS') &&
+            strtolower((string)MODULE_ORDER_TOTAL_COUNTY_LOCAL_TAX_STATUS) === 'true'
+        );
     }
 
     // -----
