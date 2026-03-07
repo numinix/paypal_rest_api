@@ -1100,13 +1100,29 @@ class PayPalCommon {
         // Check for captures and authorizations in the correct location - they're stored in the 'current' subkey
         $captures = $_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['payments']['captures'] ?? [];
         $authorizations = $_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['payments']['authorizations'] ?? [];
+        $failed_payment_status = $this->findFailedPaymentStatus([
+            'purchase_units' => [
+                [
+                    'payments' => [
+                        'captures' => $captures,
+                        'authorizations' => $authorizations,
+                    ],
+                ],
+            ],
+        ]);
 
         $log->write(
             "processCreditCardPayment: Order status check.\n" .
             "  Order status: $order_status\n" .
             "  Has captures: " . (!empty($captures) ? 'yes (' . count($captures) . ')' : 'no') . "\n" .
-            "  Has authorizations: " . (!empty($authorizations) ? 'yes (' . count($authorizations) . ')' : 'no')
+            "  Has authorizations: " . (!empty($authorizations) ? 'yes (' . count($authorizations) . ')' : 'no') . "\n" .
+            "  Failed payment status found: " . ($failed_payment_status ?: 'no')
         );
+
+        if ($failed_payment_status !== '') {
+            $log->write("processCreditCardPayment: FAILED - existing PayPal payment status is $failed_payment_status");
+            return false;
+        }
 
         // If the order was already completed (captured or authorized) during createOrder,
         // skip the duplicate capture/authorize call and fetch the order details instead.
@@ -1278,6 +1294,22 @@ class PayPalCommon {
             return false;
         }
 
+        $failed_payment_status = $this->findFailedPaymentStatus($paypal_order);
+        if ($failed_payment_status !== '') {
+            $log->write(
+                "createPayPalOrder($ppac_type): PayPal order creation FAILED due to payment status.\n" .
+                "  PayPal payment status: $failed_payment_status"
+            );
+            if (method_exists($paymentModule, 'getErrorInfo')) {
+                $paymentModule->getErrorInfo()->copyErrorInfo([
+                    'message' => "PayPal payment status is $failed_payment_status",
+                    'order_id' => $paypal_order['id'] ?? '',
+                    'status' => $paypal_order['status'] ?? '',
+                ]);
+            }
+            return false;
+        }
+
         $paypal_id = $paypal_order['id'];
         $status = $paypal_order['status'];
 
@@ -1306,6 +1338,52 @@ class PayPalCommon {
         ];
 
         return true;
+    }
+
+    /**
+     * Return the first failed payment status found in a PayPal order response.
+     *
+     * @param array $paypal_order PayPal order response
+     * @return string Failed status (e.g. DECLINED), or empty string if none
+     */
+    protected function findFailedPaymentStatus(array $paypal_order): string
+    {
+        $failed_statuses = ['DECLINED', 'DENIED', 'FAILED'];
+        $purchase_units = $paypal_order['purchase_units'] ?? [];
+        if (!is_array($purchase_units)) {
+            return '';
+        }
+
+        foreach ($purchase_units as $purchase_unit) {
+            if (!is_array($purchase_unit)) {
+                continue;
+            }
+
+            $payments = $purchase_unit['payments'] ?? [];
+            if (!is_array($payments)) {
+                continue;
+            }
+
+            foreach (['captures', 'authorizations'] as $payment_key) {
+                $entries = $payments[$payment_key] ?? [];
+                if (!is_array($entries)) {
+                    continue;
+                }
+
+                foreach ($entries as $entry) {
+                    if (!is_array($entry)) {
+                        continue;
+                    }
+
+                    $status = strtoupper((string)($entry['status'] ?? ''));
+                    if (in_array($status, $failed_statuses, true)) {
+                        return $status;
+                    }
+                }
+            }
+        }
+
+        return '';
     }
 
     /**
