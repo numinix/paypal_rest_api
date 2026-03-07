@@ -78,6 +78,7 @@
             <li>Validated in Zen Cart 1.5.7c+, 2.0.x, and 2.1.0 with both <code>responsive_classic</code> and <code>ZCA Bootstrap</code> templates.</li>
             <li>Requires PHP 7.4 through 8.4 with cURL, JSON, and OpenSSL enabled. PHP 7.3 and older are not supported.</li>
             <li>Supports 3-page checkout, One Page Checkout (OPC 2.4.6-2.5.3), guest checkout, and vaulted card reuse.</li>
+            <li>Automatically supports the Local Sales Tax plugin (<code>ot_local_sales_taxes</code>) when it is installed and enabled; if missing or disabled, checkout remains unaffected.</li>
           </ul>
           <h4>Compatibility &amp; requirements</h4>
           <p class="bodyText">Install the provided notifier patch for <code>includes/classes/order_total.php</code> before enabling the module. Without the notifier, PayPal Advanced Checkout detects the missing integration point and automatically disables itself.</p>

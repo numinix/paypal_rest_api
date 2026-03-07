@@ -753,12 +753,12 @@ foreach ($order_totals as $ot) {
             'status' => ($valueDisplay > 0 ? 'FINAL' : 'PENDING'),
         ];
         continue;
-    } elseif ($ot['code'] === 'ot_tax') {
-        // Accumulate all tax amounts instead of adding each as a separate display item
-        // This ensures payment gateways receive a single combined tax amount
+    } elseif (in_array($ot['code'], ['ot_tax', 'ot_local_sales_taxes'], true)) {
+        // Accumulate tax lines (core + local sales tax plugin) into one TAX item so
+        // wallet modals show the expected totals while preserving a single tax display.
         $totalTaxBase += $valueBase;
         $calculatedTotalBase += $valueBase;
-        log_paypalac_wallet_message('Accumulated tax (base): ' . $valueBase . ', total tax so far (base): ' . $totalTaxBase . ', new total (base): ' . $calculatedTotalBase);
+        log_paypalac_wallet_message('Accumulated tax line ' . $ot['code'] . ' (base): ' . $valueBase . ', total tax so far (base): ' . $totalTaxBase . ', new total (base): ' . $calculatedTotalBase);
         continue; // Skip adding individual tax items to displayItems
     } elseif (!empty($GLOBALS[$ot['code']]->deduction) || !empty($GLOBALS[$ot['code']]->credit_class)) {
         $type = 'DISCOUNT';
