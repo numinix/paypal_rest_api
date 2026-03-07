@@ -1,6 +1,6 @@
 <?php
 /**
- * Test that verifies the wallet modules (Google Pay, Apple Pay, Venmo) 
+ * Test that verifies the wallet modules (Google Pay, Apple Pay, Venmo, Pay Later) 
  * have JavaScript that hides their radio buttons and auto-selects when clicked.
  */
 
@@ -12,6 +12,7 @@ $errors = [];
 $googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.googlepay.js');
 $applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
 $venmoJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.venmo.js');
+$payLaterJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.paylater.js');
 
 // Test 1: Google Pay JS contains radio selection function
 if (strpos($googlePayJs, 'selectGooglePayRadio') === false) {
@@ -107,6 +108,39 @@ if (strpos($venmoJs, 'paypalac-venmo-button') === false || strpos($venmoJs, 'add
     $errors[] = "Venmo JS should add click handler to container";
 } else {
     echo "✓ Venmo JS adds click handler to container\n";
+}
+
+
+// Test 13: Pay Later JS contains radio selection function
+if (strpos($payLaterJs, 'selectPaylaterRadio') === false) {
+    $testPassed = false;
+    $errors[] = "Pay Later JS should contain selectPaylaterRadio function";
+} else {
+    echo "✓ Pay Later JS contains radio selection function\n";
+}
+
+// Test 14: Pay Later JS targets correct radio button
+if (strpos($payLaterJs, 'pmt-paypalac_paylater') === false) {
+    $testPassed = false;
+    $errors[] = "Pay Later JS should target pmt-paypalac_paylater radio";
+} else {
+    echo "✓ Pay Later JS targets correct radio button\n";
+}
+
+// Test 15: Pay Later JS hides radio button
+if (strpos($payLaterJs, 'hideModuleRadio') === false || strpos($payLaterJs, 'paypalac-wallet-radio-hidden') === false) {
+    $testPassed = false;
+    $errors[] = "Pay Later JS should hide the radio button";
+} else {
+    echo "✓ Pay Later JS hides radio button\n";
+}
+
+// Test 16: Pay Later JS hides module label when unavailable
+if (strpos($payLaterJs, 'hideModuleLabel') === false || strpos($payLaterJs, 'paypalac-wallet-label-hidden') === false) {
+    $testPassed = false;
+    $errors[] = "Pay Later JS should hide the module label when unavailable";
+} else {
+    echo "✓ Pay Later JS hides module label when unavailable\n";
 }
 
 // Test 13: CSS file exists and contains wallet radio hidden class

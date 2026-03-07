@@ -5,7 +5,7 @@
 define('MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE', 'PayPal Pay Later');
 define('MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE_ADMIN', 'PayPal Pay Later via PayPal Advanced Checkout');
 define('MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_DESCRIPTION', 'Accept PayPal Pay Later payments (Pay in 4, Pay Monthly) using your existing PayPal Advanced Checkout credentials.');
-define('MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_SELECTION', 'Pay Later');
+define('MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_SELECTION', 'PayPal Pay Later');
 define('MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_PAYPAL_REQUIRED', ' The PayPal Pay Later module requires the primary PayPal Advanced Checkout extension to be installed.');
 define('MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_PAYLOAD_MISSING', 'We were unable to process your Pay Later payment. Please select Pay Later again to continue.');
 define('MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_PAYLOAD_INVALID', 'The Pay Later details we received were invalid. Please try again.');

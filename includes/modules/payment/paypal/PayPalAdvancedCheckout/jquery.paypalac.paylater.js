@@ -146,7 +146,42 @@
         var moduleRadio = document.getElementById('pmt-paypalac_paylater');
         if (moduleRadio) {
             moduleRadio.classList.add('paypalac-wallet-radio-hidden');
+            return true;
         }
+
+        return false;
+    }
+
+    function hideModuleLabel() {
+        var moduleLabel = document.querySelector('label[for="pmt-paypalac_paylater"]');
+        if (moduleLabel) {
+            moduleLabel.classList.add('paypalac-wallet-label-hidden');
+            moduleLabel.style.display = 'none';
+            moduleLabel.setAttribute('aria-hidden', 'true');
+            return true;
+        }
+
+        return false;
+    }
+
+    function findPaymentMethodWrapper() {
+        var moduleRadio = document.getElementById('pmt-paypalac_paylater');
+        if (moduleRadio) {
+            return moduleRadio.closest('[id*="paypalac_paylater"][id*="container"]')
+                || moduleRadio.closest('.moduleRow')
+                || moduleRadio.closest('[class*="paypalac_paylater"]')
+                || moduleRadio.parentElement;
+        }
+
+        var container = document.getElementById('paypalac-paylater-button');
+        if (!container) {
+            return null;
+        }
+
+        return container.closest('[id*="paypalac_paylater"][id*="container"]')
+            || container.closest('.moduleRow')
+            || container.closest('[class*="paypalac_paylater"]')
+            || container.parentElement;
     }
 
     /**
@@ -155,46 +190,19 @@
      * so the user doesn't see an unavailable payment option.
      */
     function hidePaymentMethodContainer() {
+        hideModuleRadio();
+        hideModuleLabel();
+
+        var wrapper = findPaymentMethodWrapper();
+        if (wrapper) {
+            wrapper.style.display = 'none';
+            return;
+        }
+
         var container = document.getElementById('paypalac-paylater-button');
-        if (!container) {
-            return;
+        if (container) {
+            container.style.display = 'none';
         }
-
-        // Find the parent container that wraps this payment method
-        // Common patterns: closest .moduleRow, closest payment container div, or parent with class containing 'container'
-        var parentContainer = container.closest('[id*="paypalac_paylater"][id*="container"]') 
-            || container.closest('.moduleRow')
-            || container.closest('[class*="paypalac_paylater"]');
-
-        // If we found a specific parent container, hide it
-        if (parentContainer) {
-            parentContainer.style.display = 'none';
-            return;
-        }
-
-        // Fallback: traverse up and hide a suitable parent
-        // Look for common payment module wrapper patterns
-        var parent = container.parentElement;
-        var depth = 0;
-        var maxDepth = 5;
-
-        while (parent && depth < maxDepth) {
-            // Check if parent has an ID or class indicating it's a payment container
-            var parentId = (parent.id || '').toLowerCase();
-            var parentClass = (parent.className || '').toLowerCase();
-
-            if (parentId.indexOf('paypalac_paylater') !== -1 || 
-                parentClass.indexOf('paypalac_paylater') !== -1 ||
-                parentClass.indexOf('modulerow') !== -1) {
-                parent.style.display = 'none';
-                return;
-            }
-            parent = parent.parentElement;
-            depth++;
-        }
-
-        // Last resort: just hide the button container itself and clear content
-        container.style.display = 'none';
     }
 
     function rerenderPaylaterButton() {

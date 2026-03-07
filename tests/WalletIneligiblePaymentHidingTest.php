@@ -1,6 +1,6 @@
 <?php
 /**
- * Test that verifies the wallet modules (Google Pay, Apple Pay, Venmo) 
+ * Test that verifies the wallet modules (Google Pay, Apple Pay, Venmo, Pay Later) 
  * properly hide their parent container when the payment method is ineligible.
  *
  * When a user or device is ineligible for a payment method (e.g., Venmo unavailable
@@ -19,6 +19,7 @@ $errors = [];
 $googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.googlepay.js');
 $applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
 $venmoJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.venmo.js');
+$payLaterJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.paylater.js');
 
 // Helper regex pattern for detecting 'unavailable' text that shouldn't appear
 $unavailableTextPattern = '/innerHTML\s*=\s*[\'"]<span[^>]*unavailable/i';
@@ -126,6 +127,23 @@ if (strpos($venmoJs, "hidePaymentMethodContainer()") === false) {
     echo "✓ Venmo JS calls hidePaymentMethodContainer when ineligible\n";
 }
 
+
+// Test 13: Pay Later has hidePaymentMethodContainer function
+if (strpos($payLaterJs, 'function hidePaymentMethodContainer()') === false) {
+    $testPassed = false;
+    $errors[] = "Pay Later JS should have hidePaymentMethodContainer function";
+} else {
+    echo "✓ Pay Later JS has hidePaymentMethodContainer function\n";
+}
+
+// Test 14: Pay Later checks button eligibility and hides when ineligible
+if (strpos($payLaterJs, 'buttonInstance.isEligible') === false || strpos($payLaterJs, "hidePaymentMethodContainer()") === false) {
+    $testPassed = false;
+    $errors[] = "Pay Later JS should check eligibility and hide when ineligible";
+} else {
+    echo "✓ Pay Later JS checks eligibility and hides when ineligible\n";
+}
+
 // Test 13: All JS files no longer show "unavailable" text when config fails
 // They should hide the container instead
 $showsUnavailableText = false;
@@ -140,6 +158,10 @@ if (preg_match($unavailableTextPattern, $googlePayJs)) {
 if (preg_match($unavailableTextPattern, $venmoJs)) {
     $showsUnavailableText = true;
     $errors[] = "Venmo JS should not show 'unavailable' text; should hide container instead";
+}
+if (preg_match($unavailableTextPattern, $payLaterJs)) {
+    $showsUnavailableText = true;
+    $errors[] = "Pay Later JS should not show 'unavailable' text; should hide container instead";
 }
 
 if (!$showsUnavailableText) {
@@ -168,6 +190,13 @@ if (strpos($venmoJs, "style.display = 'none'") === false) {
     $errors[] = "Venmo JS hidePaymentMethodContainer should use display:none";
 } else {
     echo "✓ Venmo JS hidePaymentMethodContainer uses display:none\n";
+}
+
+if (strpos($payLaterJs, "style.display = 'none'") === false) {
+    $testPassed = false;
+    $errors[] = "Pay Later JS hidePaymentMethodContainer should use display:none";
+} else {
+    echo "✓ Pay Later JS hidePaymentMethodContainer uses display:none\n";
 }
 
 // Test 15: All JS files create appropriate eligibility check mechanisms
@@ -200,7 +229,7 @@ echo "\n";
 if ($testPassed) {
     echo "All tests passed! ✓\n\n";
     echo "Summary of functionality:\n";
-    echo "- Apple Pay, Google Pay, and Venmo all have hidePaymentMethodContainer() function\n";
+    echo "- Apple Pay, Google Pay, Venmo, and Pay Later all have hidePaymentMethodContainer() function\n";
     echo "- All wallet modules check eligibility with buttonInstance.isEligible()\n";
     echo "- When ineligible, the parent container is hidden (not just showing 'unavailable' text)\n";
     echo "- Google Pay validates merchant ID configuration before rendering\n";
