@@ -108,13 +108,14 @@ class SavedCreditCardsManager
     }
 
     /**
-     * Add legacy columns that may be needed for backward compatibility.
-     * 
-     * These columns are not included in the base CREATE TABLE statement so that
-     * new installations have a minimal schema. Sites upgrading from legacy payment
-     * modules get these columns added automatically during the upgrade process.
-     * 
-     * Legacy columns supported:
+     * Add columns that may be missing from tables created by older plugin versions.
+     *
+     * These columns are included in the current CREATE TABLE statement, but existing
+     * tables are not automatically updated when the schema changes. This method ensures
+     * any missing columns are added so that all required functionality works correctly.
+     *
+     * Columns ensured:
+     * - next_payment_date: Required by the cron job to find subscriptions due for billing
      * - domain: Used by some legacy implementations to track subscription domains
      * - comments: Used by legacy admin pages to append payment history notes
      * - billing_*: Billing address fields for subscription independence
@@ -125,6 +126,7 @@ class SavedCreditCardsManager
         global $db;
 
         $columns = [
+            'next_payment_date' => "DATE DEFAULT NULL",
             'domain' => "VARCHAR(255) NOT NULL DEFAULT ''",
             'comments' => "TEXT",
             'is_archived' => "TINYINT(1) NOT NULL DEFAULT 0",

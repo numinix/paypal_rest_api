@@ -64,7 +64,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.12';
+    protected const CURRENT_VERSION = '1.3.13';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -770,6 +770,22 @@ class paypalac extends base
                                 ADD verification_status VARCHAR(16) NOT NULL DEFAULT 'verified'
                                     AFTER request_headers"
                         );
+                    }
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.13', '<'): //- Fall through from above
+                    // Add next_payment_date column to saved_credit_cards_recurring table if missing.
+                    // This column is required by the cron job to find due subscriptions and may be
+                    // absent from tables created by older plugin versions.
+                    if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+                        $table_exists = $db->Execute("SHOW TABLES LIKE '" . TABLE_SAVED_CREDIT_CARDS_RECURRING . "'");
+                        if (!$table_exists->EOF) {
+                            if ($sniffer->field_exists(TABLE_SAVED_CREDIT_CARDS_RECURRING, 'next_payment_date') === false) {
+                                $db->Execute(
+                                    "ALTER TABLE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
+                                       ADD next_payment_date DATE DEFAULT NULL AFTER profile_id"
+                                );
+                            }
+                        }
                     }
 
                 default:    //- Fall through from above
