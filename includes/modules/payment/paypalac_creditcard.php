@@ -770,6 +770,20 @@ class paypalac_creditcard extends base
         $paypal_order_created = $this->createPayPalOrder('card');
         if ($paypal_order_created === false) {
             $error_info = $this->ppr->getErrorInfo();
+            $error_name = $error_info['name'] ?? '';
+
+            // Check if this is a payment decline (card was rejected during order creation)
+            // rather than an API error. Payment declines have error names like PAYMENT_DECLINED.
+            if (strpos($error_name, 'PAYMENT_') === 0) {
+                $card_message = $this->paypalCommon->buildCardDeclineMessage($error_info, $this);
+                $this->sendAlertEmail(
+                    MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN,
+                    MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
+                );
+                $this->setMessageAndRedirect($card_message, FILENAME_CHECKOUT_PAYMENT);
+            }
+
+            // API error - show the generic create-order-issue message
             $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
             $this->sendAlertEmail(
                 MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN,
@@ -1066,6 +1080,17 @@ class paypalac_creditcard extends base
         $txn_type = $this->orderInfo['intent'];
         $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
         $payment_status = ($payment['status'] !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalAdvancedCheckoutApi::STATUS_CAPTURED : PayPalAdvancedCheckoutApi::STATUS_APPROVED);
+
+        // -----
+        // If the capture/authorization was declined, denied, or failed, do NOT create the
+        // order. Redirect the customer back to checkout with an error message so they can
+        // choose a different payment method.
+        //
+        if (in_array($payment['status'], ['DECLINED', 'DENIED', 'FAILED'], true)) {
+            $this->log->write("==> Credit Card::before_process: Payment {$payment['status']}; redirecting to checkout.");
+            unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_CAPTURE_FAILED, FILENAME_CHECKOUT_PAYMENT);
+        }
 
         $this->orderInfo['payment_status'] = $payment_status;
         $this->orderInfo['paypal_payment_status'] = $payment['status'];

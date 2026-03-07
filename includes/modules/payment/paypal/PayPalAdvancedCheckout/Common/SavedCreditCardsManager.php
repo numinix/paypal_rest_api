@@ -159,6 +159,9 @@ class SavedCreditCardsManager
      * modules get these columns added automatically during the upgrade process.
      * 
      * Legacy columns supported:
+     * - date_added: Creation timestamp; the original schema used `date` — this ensures
+     *   upgraded installations gain the column so admin queries do not fatal.
+     * - last_modified: Last update timestamp added alongside date_added.
      * - domain: Used by some legacy implementations to track subscription domains
      * - comments: Used by legacy admin pages to append payment history notes
      * - billing_*: Billing address fields for subscription independence
@@ -169,6 +172,8 @@ class SavedCreditCardsManager
         global $db;
 
         $columns = [
+            'date_added' => "DATETIME DEFAULT NULL",
+            'last_modified' => "DATETIME DEFAULT NULL",
             'domain' => "VARCHAR(255) NOT NULL DEFAULT ''",
             'comments' => "TEXT",
             'is_archived' => "TINYINT(1) NOT NULL DEFAULT 0",

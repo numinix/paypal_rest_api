@@ -172,6 +172,19 @@ class PayPalCommon {
             $paypal_order_created = $this->paymentModule->createPayPalOrder($walletType);
             if ($paypal_order_created === false) {
                 $error_info = $this->paymentModule->ppr->getErrorInfo();
+                $error_name = $error_info['name'] ?? '';
+
+                // Check if this is a payment decline (payment was rejected during order creation)
+                if (strpos($error_name, 'PAYMENT_') === 0) {
+                    $card_message = $this->buildCardDeclineMessage($error_info, $this->paymentModule);
+                    $this->paymentModule->sendAlertEmail(
+                        MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN,
+                        MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
+                    );
+                    $this->paymentModule->setMessageAndRedirect($card_message, FILENAME_CHECKOUT_PAYMENT);
+                }
+
+                // API error - show the generic create-order-issue message
                 $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
                 $this->paymentModule->sendAlertEmail(
                     MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN,
@@ -1300,13 +1313,28 @@ class PayPalCommon {
                 "createPayPalOrder($ppac_type): PayPal order creation FAILED due to payment status.\n" .
                 "  PayPal payment status: $failed_payment_status"
             );
-            if (method_exists($paymentModule, 'getErrorInfo')) {
-                $paymentModule->getErrorInfo()->copyErrorInfo([
-                    'message' => "PayPal payment status is $failed_payment_status",
-                    'order_id' => $paypal_order['id'] ?? '',
-                    'status' => $paypal_order['status'] ?? '',
-                ]);
-            }
+
+            // Extract the processor response from the failed payment so the caller
+            // can provide a meaningful card-declined message to the customer.
+            $failed_payment = $this->extractFailedPaymentEntry($paypal_order);
+            $paymentModule->ppr->copyErrorInfo([
+                'errNum' => 0,
+                'errMsg' => "Payment $failed_payment_status",
+                'curlErrno' => 0,
+                'name' => 'PAYMENT_' . $failed_payment_status,
+                'message' => "Payment was $failed_payment_status",
+                'details' => [
+                    [
+                        'issue' => 'INSTRUMENT_DECLINED',
+                        'description' => "Payment capture was $failed_payment_status",
+                    ]
+                ],
+                'debug_id' => '',
+                'processor_response' => $failed_payment['processor_response'] ?? [],
+                'payment_source' => $paypal_order['payment_source'] ?? [],
+                'cc_info' => $cc_info,
+            ]);
+
             return false;
         }
 
@@ -1384,6 +1412,134 @@ class PayPalCommon {
         }
 
         return '';
+    }
+
+    /**
+     * Extract the first failed payment entry (capture or authorization) from a PayPal order response.
+     *
+     * Used to provide the processor_response and other details for meaningful error messages
+     * when a payment is declined during order creation.
+     *
+     * @param array $paypal_order PayPal order response
+     * @return array The failed payment entry, or empty array if none found
+     */
+    protected function extractFailedPaymentEntry(array $paypal_order): array
+    {
+        $failed_statuses = ['DECLINED', 'DENIED', 'FAILED'];
+        foreach ($paypal_order['purchase_units'] ?? [] as $purchase_unit) {
+            if (!is_array($purchase_unit)) {
+                continue;
+            }
+            foreach (['captures', 'authorizations'] as $payment_key) {
+                foreach ($purchase_unit['payments'][$payment_key] ?? [] as $entry) {
+                    if (is_array($entry) && in_array(strtoupper((string)($entry['status'] ?? '')), $failed_statuses, true)) {
+                        return $entry;
+                    }
+                }
+            }
+        }
+        return [];
+    }
+
+    /**
+     * Build a customer-facing error message for a card payment decline.
+     *
+     * Uses the processor response code from the PayPal error info to determine
+     * the specific decline reason, mirroring the logic in the main paypalac
+     * module's checkCardPaymentResponse().
+     *
+     * @param array $error_info Error info from ppr->getErrorInfo(), populated
+     *                          by createPayPalOrder() when a payment decline is detected.
+     * @param object|null $paymentModule Payment module instance (for sending alert emails)
+     * @return string Customer-facing error message
+     */
+    public function buildCardDeclineMessage(array $error_info, $paymentModule = null): string
+    {
+        $payment_source = $error_info['payment_source'] ?? [];
+        $card_source = $payment_source['card'] ?? [];
+        $cc_info = $error_info['cc_info'] ?? [];
+        $last_digits = !empty($cc_info['last_digits']) ? $cc_info['last_digits'] : ($card_source['last_digits'] ?? '');
+        $processor_response = $error_info['processor_response'] ?? [];
+        $response_code = $processor_response['response_code'] ?? '';
+
+        $failed_status = str_replace('PAYMENT_', '', $error_info['name'] ?? '');
+        if ($failed_status === 'FAILED') {
+            return MODULE_PAYMENT_PAYPALAC_TEXT_CC_ERROR . ' ' . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN;
+        }
+
+        // DECLINED or DENIED — determine specific reason from processor response
+        if ($last_digits === '') {
+            return MODULE_PAYMENT_PAYPALAC_TEXT_CAPTURE_FAILED;
+        }
+
+        $response_message = '';
+        switch ($response_code) {
+            case '5400':    //- Expired card
+                $response_message = sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_CC_EXPIRED, $card_source['brand'] ?? '', $last_digits);
+                break;
+
+            case '5120':    //- Insufficient funds
+                $response_message = sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_INSUFFICIENT_FUNDS, $card_source['brand'] ?? '', $last_digits);
+                break;
+
+            case '00N7':    //- CVV check failed
+            case '5110':    //- CVV check failed
+                $response_message = sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_CVV_FAILED, $card_source['brand'] ?? '', $last_digits);
+                break;
+
+            case '9500':    //- Fraudulent card
+            case '9520':    //- Lost or stolen card
+                $response_message = sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_CARD_DECLINED, $last_digits);
+                if ($paymentModule !== null && method_exists($paymentModule, 'sendAlertEmail')) {
+                    $paymentModule->sendAlertEmail(
+                        MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_LOST_STOLEN_CARD,
+                        sprintf(MODULE_PAYMENT_PAYPALAC_ALERT_LOST_STOLEN_CARD,
+                            ($response_code === '9500') ? MODULE_PAYMENT_PAYPALAC_CARD_FRAUDULENT : MODULE_PAYMENT_PAYPALAC_CARD_LOST,
+                            $_SESSION['customers_ip_address'] ?? '',
+                            $_SESSION['customer_first_name'] ?? '',
+                            $_SESSION['customer_last_name'] ?? '',
+                            $_SESSION['customer_id'] ?? 0
+                        ) . "\n" .
+                        json_encode($card_source, JSON_PRETTY_PRINT)
+                    );
+                }
+                break;
+
+            case '0500':    //- Card refused
+            case '1330':    //- Card not valid
+            case '1380':    //- Invalid expiration / Invalid card verification value
+            case '5100':    //- Generic decline
+            case '5140':    //- Card closed
+            case '5180':    //- Luhn check failed
+            case '5930':    //- Card not activated
+            case '5950':    //- External decline, updated card issued
+            case '9100':    //- Declined, please retry
+            case '9510':    //- Security violation
+            case '9540':    //- Card refused
+                $response_message = sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_CARD_DECLINED, $last_digits);
+                break;
+
+            default:
+                $response_message = sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_CARD_DECLINED, $last_digits);
+                if ($response_code !== '') {
+                    $response_message .= ' ' . sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_DECLINED_REASON_UNKNOWN, $response_code);
+                    if ($paymentModule !== null && method_exists($paymentModule, 'sendAlertEmail')) {
+                        $paymentModule->sendAlertEmail(
+                            MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_UNKNOWN_DENIAL,
+                            sprintf(MODULE_PAYMENT_PAYPALAC_ALERT_UNKNOWN_DENIAL,
+                                $response_code,
+                                $_SESSION['customer_first_name'] ?? '',
+                                $_SESSION['customer_last_name'] ?? '',
+                                $_SESSION['customer_id'] ?? 0
+                            ) . "\n" .
+                            json_encode($card_source, JSON_PRETTY_PRINT)
+                        );
+                    }
+                }
+                break;
+        }
+
+        return $response_message . ' ' . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN;
     }
 
     /**

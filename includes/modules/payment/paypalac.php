@@ -1299,6 +1299,15 @@ class paypalac extends base
         $paypal_order_created = $this->createPayPalOrder('paypal');
         if ($paypal_order_created === false) {
             $error_info = $this->ppr->getErrorInfo();
+            $error_name = $error_info['name'] ?? '';
+
+            // Check if this is a payment decline (payment was rejected during order creation)
+            if (strpos($error_name, 'PAYMENT_') === 0) {
+                $card_message = $this->paypalCommon->buildCardDeclineMessage($error_info, $this);
+                $this->sendAlertEmail(MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN, MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE . Logger::logJSON($error_info));
+                $this->setMessageAndRedirect($card_message, FILENAME_CHECKOUT_PAYMENT);
+            }
+
             $error_code = $error_info['details'][0]['issue'] ?? 'OTHER';
             $this->sendAlertEmail(MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN, MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE . Logger::logJSON($error_info));
             $this->setMessageAndRedirect(sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALAC_TEXT_TITLE, $error_code), FILENAME_CHECKOUT_PAYMENT);
@@ -2415,7 +2424,7 @@ class paypalac extends base
             case 'DECLINED':
                 $card_payment_source = $response['payment_source']['card'];
                 $card_type = $card_payment_source['brand'] ?? '';
-                $last_digits = $card_payment_source['last_digits'];
+                $last_digits = !empty($this->ccInfo['last_digits']) ? $this->ccInfo['last_digits'] : ($card_payment_source['last_digits'] ?? '');
 
                 $response_code = $payment['processor_response']['response_code'] ?? '-- not supplied --';
                 switch ($response_code) {
