@@ -1173,13 +1173,17 @@ if ($paymentRecords instanceof queryFactoryResult) {
 }
 
 // Pagination setup
-$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-$perPage = isset($_GET['per_page']) ? max(10, min(100, (int)$_GET['per_page'])) : 20;
+$requestedPage = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+$requestedPerPage = isset($_GET['per_page']) ? max(10, min(100, (int) $_GET['per_page'])) : 20;
 
-// Defensive type check: ensure $page remains a valid positive integer
-$page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
-if ($page === false) {
-    $page = 1;
+$currentPage = filter_var($requestedPage, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
+if ($currentPage === false) {
+    $currentPage = 1;
+}
+
+$currentPerPage = filter_var($requestedPerPage, FILTER_VALIDATE_INT, ['options' => ['default' => 20, 'min_range' => 10, 'max_range' => 100]]);
+if ($currentPerPage === false) {
+    $currentPerPage = 20;
 }
 
 // Fetch subscriptions from both tables
@@ -1313,13 +1317,13 @@ usort($allSubscriptions, function ($a, $b) {
 
 // Apply pagination
 $totalRecords = count($allSubscriptions);
-$totalPages = ($totalRecords > 0) ? ceil($totalRecords / $perPage) : 1;
+$totalPages = ($totalRecords > 0) ? ceil($totalRecords / $currentPerPage) : 1;
 
 // Ensure page stays within bounds so navigation can always return to page 1.
-$page = min($page, $totalPages);
-$offset = ($page - 1) * $perPage;
+$currentPage = min($currentPage, $totalPages);
+$offset = ($currentPage - 1) * $currentPerPage;
 
-$subscriptionRows = array_slice($allSubscriptions, $offset, $perPage);
+$subscriptionRows = array_slice($allSubscriptions, $offset, $currentPerPage);
 
 $vaultCache = [];
 
@@ -1463,21 +1467,21 @@ function paypalac_get_table_columns($tableName)
         <!-- Pagination controls -->
         <div class="pagination-controls">
             <div class="pagination-info">
-                Showing <?php echo $totalRecords > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + $perPage, $totalRecords); ?> of <?php echo $totalRecords; ?> subscriptions
+                Showing <?php echo $totalRecords > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + $currentPerPage, $totalRecords); ?> of <?php echo $totalRecords; ?> subscriptions
             </div>
             <div class="per-page-selector">
                 <label for="per-page-select">Per page:</label>
                 <select id="per-page-select" onchange="changePerPage(this.value)">
-                    <option value="10"<?php echo $perPage === 10 ? ' selected' : ''; ?>>10</option>
-                    <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
-                    <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
-                    <option value="100"<?php echo $perPage === 100 ? ' selected' : ''; ?>>100</option>
+                    <option value="10"<?php echo $currentPerPage === 10 ? ' selected' : ''; ?>>10</option>
+                    <option value="20"<?php echo $currentPerPage === 20 ? ' selected' : ''; ?>>20</option>
+                    <option value="50"<?php echo $currentPerPage === 50 ? ' selected' : ''; ?>>50</option>
+                    <option value="100"<?php echo $currentPerPage === 100 ? ' selected' : ''; ?>>100</option>
                 </select>
             </div>
             <div class="pagination-links">
-                <?php if ($page > 1): ?>
-                    <a href="<?php echo paypalac_pagination_url(1, $perPage, $activeQuery); ?>">&laquo; First</a>
-                    <a href="<?php echo paypalac_pagination_url($page - 1, $perPage, $activeQuery); ?>">&lsaquo; Prev</a>
+                <?php if ($currentPage > 1): ?>
+                    <a href="<?php echo paypalac_pagination_url(1, $currentPerPage, $activeQuery); ?>">&laquo; First</a>
+                    <a href="<?php echo paypalac_pagination_url($currentPage - 1, $currentPerPage, $activeQuery); ?>">&lsaquo; Prev</a>
                 <?php else: ?>
                     <span class="disabled">&laquo; First</span>
                     <span class="disabled">&lsaquo; Prev</span>
@@ -1485,23 +1489,23 @@ function paypalac_get_table_columns($tableName)
                 
                 <?php
                 // Show page numbers
-                $startPage = max(1, $page - 2);
-                $endPage = min($totalPages, $page + 2);
+                $startPage = max(1, $currentPage - 2);
+                $endPage = min($totalPages, $currentPage + 2);
                 
                 for ($i = $startPage; $i <= $endPage; $i++):
-                    if ($i === $page):
+                    if ($i === $currentPage):
                 ?>
                     <span class="current"><?php echo $i; ?></span>
                 <?php else: ?>
-                    <a href="<?php echo paypalac_pagination_url($i, $perPage, $activeQuery); ?>"><?php echo $i; ?></a>
+                    <a href="<?php echo paypalac_pagination_url($i, $currentPerPage, $activeQuery); ?>"><?php echo $i; ?></a>
                 <?php
                     endif;
                 endfor;
                 ?>
                 
-                <?php if ($page < $totalPages): ?>
-                    <a href="<?php echo paypalac_pagination_url($page + 1, $perPage, $activeQuery); ?>">Next &rsaquo;</a>
-                    <a href="<?php echo paypalac_pagination_url($totalPages, $perPage, $activeQuery); ?>">Last &raquo;</a>
+                <?php if ($currentPage < $totalPages): ?>
+                    <a href="<?php echo paypalac_pagination_url($currentPage + 1, $currentPerPage, $activeQuery); ?>">Next &rsaquo;</a>
+                    <a href="<?php echo paypalac_pagination_url($totalPages, $currentPerPage, $activeQuery); ?>">Last &raquo;</a>
                 <?php else: ?>
                     <span class="disabled">Next &rsaquo;</span>
                     <span class="disabled">Last &raquo;</span>
@@ -2016,21 +2020,21 @@ function paypalac_get_table_columns($tableName)
         <!-- Bottom Pagination controls -->
         <div class="pagination-controls">
             <div class="pagination-info">
-                Showing <?php echo $totalRecords > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + $perPage, $totalRecords); ?> of <?php echo $totalRecords; ?> subscriptions
+                Showing <?php echo $totalRecords > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + $currentPerPage, $totalRecords); ?> of <?php echo $totalRecords; ?> subscriptions
             </div>
             <div class="per-page-selector">
                 <label for="per-page-select-bottom">Per page:</label>
                 <select id="per-page-select-bottom" onchange="changePerPage(this.value)">
-                    <option value="10"<?php echo $perPage === 10 ? ' selected' : ''; ?>>10</option>
-                    <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
-                    <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
-                    <option value="100"<?php echo $perPage === 100 ? ' selected' : ''; ?>>100</option>
+                    <option value="10"<?php echo $currentPerPage === 10 ? ' selected' : ''; ?>>10</option>
+                    <option value="20"<?php echo $currentPerPage === 20 ? ' selected' : ''; ?>>20</option>
+                    <option value="50"<?php echo $currentPerPage === 50 ? ' selected' : ''; ?>>50</option>
+                    <option value="100"<?php echo $currentPerPage === 100 ? ' selected' : ''; ?>>100</option>
                 </select>
             </div>
             <div class="pagination-links">
-                <?php if ($page > 1): ?>
-                    <a href="<?php echo paypalac_pagination_url(1, $perPage, $activeQuery); ?>">&laquo; First</a>
-                    <a href="<?php echo paypalac_pagination_url($page - 1, $perPage, $activeQuery); ?>">&lsaquo; Prev</a>
+                <?php if ($currentPage > 1): ?>
+                    <a href="<?php echo paypalac_pagination_url(1, $currentPerPage, $activeQuery); ?>">&laquo; First</a>
+                    <a href="<?php echo paypalac_pagination_url($currentPage - 1, $currentPerPage, $activeQuery); ?>">&lsaquo; Prev</a>
                 <?php else: ?>
                     <span class="disabled">&laquo; First</span>
                     <span class="disabled">&lsaquo; Prev</span>
@@ -2038,23 +2042,23 @@ function paypalac_get_table_columns($tableName)
                 
                 <?php
                 // Show page numbers
-                $startPage = max(1, $page - 2);
-                $endPage = min($totalPages, $page + 2);
+                $startPage = max(1, $currentPage - 2);
+                $endPage = min($totalPages, $currentPage + 2);
                 
                 for ($i = $startPage; $i <= $endPage; $i++):
-                    if ($i === $page):
+                    if ($i === $currentPage):
                 ?>
                     <span class="current"><?php echo $i; ?></span>
                 <?php else: ?>
-                    <a href="<?php echo paypalac_pagination_url($i, $perPage, $activeQuery); ?>"><?php echo $i; ?></a>
+                    <a href="<?php echo paypalac_pagination_url($i, $currentPerPage, $activeQuery); ?>"><?php echo $i; ?></a>
                 <?php
                     endif;
                 endfor;
                 ?>
                 
-                <?php if ($page < $totalPages): ?>
-                    <a href="<?php echo paypalac_pagination_url($page + 1, $perPage, $activeQuery); ?>">Next &rsaquo;</a>
-                    <a href="<?php echo paypalac_pagination_url($totalPages, $perPage, $activeQuery); ?>">Last &raquo;</a>
+                <?php if ($currentPage < $totalPages): ?>
+                    <a href="<?php echo paypalac_pagination_url($currentPage + 1, $currentPerPage, $activeQuery); ?>">Next &rsaquo;</a>
+                    <a href="<?php echo paypalac_pagination_url($totalPages, $currentPerPage, $activeQuery); ?>">Last &raquo;</a>
                 <?php else: ?>
                     <span class="disabled">Next &rsaquo;</span>
                     <span class="disabled">Last &raquo;</span>
