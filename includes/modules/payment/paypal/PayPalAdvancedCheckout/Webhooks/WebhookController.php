@@ -139,6 +139,8 @@ class WebhookController
      */
     protected function saveToDatabase(string $user_agent, string $request_method, string $request_body, $request_headers, string $verification_status = 'verified'): void
     {
+        global $db;
+
         $json_body = json_decode($request_body, true);
 
         $sql_data_array = [
@@ -155,7 +157,9 @@ class WebhookController
         $this->createDatabaseTable();
 
         // store
-        zen_db_perform(TABLE_PAYPAL_WEBHOOKS, $sql_data_array);
+        $columns = implode(', ', array_keys($sql_data_array));
+        $values = implode(', ', array_map(static fn($v) => "'" . $db->prepare_input((string)$v) . "'", $sql_data_array));
+        $db->Execute("INSERT INTO " . TABLE_PAYPAL_WEBHOOKS . " ($columns) VALUES ($values)");
     }
 
     /**
