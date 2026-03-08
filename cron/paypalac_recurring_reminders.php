@@ -67,6 +67,11 @@ $remindersProcessed = 0;
 $paymentsReminded = 0;
 $expiredNotices = 0;
 
+$run_date = date('Y-m-d');
+$timezone = date_default_timezone_get();
+$report_id = uniqid();
+$generated_at = date('Y-m-d H:i:s');
+
 /**
  * Process legacy PayPal recurring subscriptions
  */
@@ -338,6 +343,39 @@ if (!empty($log)) {
     foreach ($log as $entry) {
         echo "- " . $entry . "\n";
     }
+}
+
+$summary = "Recurring Reminders — {$run_date} ({$timezone})\n"
+    . "Renewal Reminders Sent: {$remindersProcessed}\n\n"
+    . "Payment Reminders Sent: {$paymentsReminded}\n\n"
+    . "Expiration Notices Sent: {$expiredNotices}\n\n"
+    . "Report ID: {$report_id}\n\n"
+    . "Generated: {$generated_at}";
+
+$summary_html = '<h1 style="margin: 0 0 16px; font-size: 22px; color: #0f172a;">Recurring Reminders &mdash; '
+    . htmlspecialchars($run_date, ENT_QUOTES, 'UTF-8') . ' (' . htmlspecialchars($timezone, ENT_QUOTES, 'UTF-8') . ')</h1>'
+    . '<p><strong>Renewal Reminders Sent:</strong> ' . (int)$remindersProcessed . '</p>'
+    . '<p><strong>Payment Reminders Sent:</strong> ' . (int)$paymentsReminded . '</p>'
+    . '<p><strong>Expiration Notices Sent:</strong> ' . (int)$expiredNotices . '</p>'
+    . '<p><strong>Report ID:</strong> ' . htmlspecialchars($report_id, ENT_QUOTES, 'UTF-8') . '</p>'
+    . '<p><strong>Generated:</strong> ' . htmlspecialchars($generated_at, ENT_QUOTES, 'UTF-8') . '</p>';
+
+$notification_email = '';
+if (defined('MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL')) {
+    $notification_email = trim((string)MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL);
+}
+
+if ($notification_email !== '') {
+    zen_mail(
+        $notification_email,
+        $notification_email,
+        'PayPal Advanced Checkout Recurring Reminders Log',
+        $summary,
+        STORE_NAME,
+        EMAIL_FROM,
+        array('EMAIL_MESSAGE_HTML' => $summary_html),
+        'recurring_reminders_log'
+    );
 }
 
 require_once 'includes/application_bottom.php';

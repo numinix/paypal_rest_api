@@ -116,9 +116,18 @@ if (!function_exists('recurring_build_email_text')) {
         $lines = array();
         $lines[] = "Recurring Payments — $run_date ($timezone)";
         $lines[] = "Processed: $total_processed";
-        $lines[] = "Paid: $success_count | Failed: $fail_count | Skipped: $skipped_count";
+        $lines[] = "";
+        $lines[] = "Paid: $success_count";
+        $lines[] = "";
+        $lines[] = "Failed: $fail_count";
+        $lines[] = "";
+        $lines[] = "Skipped: $skipped_count";
+        $lines[] = "";
         $lines[] = "Collected: {$currency}" . number_format($total_collected, 2);
-        $lines[] = "Report ID $report_id • Generated $generated_at";
+        $lines[] = "";
+        $lines[] = "Report ID: $report_id";
+        $lines[] = "";
+        $lines[] = "Generated: $generated_at";
         $lines[] = "";
 
         if (!empty($sections['success'])) {
@@ -830,12 +839,8 @@ $_SESSION['in_cron'] = false;
 
 // Determine email recipient with fallback chain
 $notification_email = '';
-if (defined('MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL')) {
-    $notification_email = MODULE_PAYMENT_PAYPALSAVEDCARD_ERROR_NOTIFICATION_EMAIL;
-} elseif (defined('STORE_OWNER_EMAIL_ADDRESS')) {
-    $notification_email = STORE_OWNER_EMAIL_ADDRESS;
-} elseif (defined('EMAIL_FROM')) {
-    $notification_email = EMAIL_FROM;
+if (defined('MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL')) {
+    $notification_email = trim((string)MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL);
 }
 
 // Only send email if we have a valid recipient
@@ -843,7 +848,7 @@ if (!empty($notification_email)) {
     zen_mail(
         $notification_email,
         $notification_email,
-        'Recurring Payment Log',
+        'PayPal Advanced Checkout Recurring Payment Log',
         $log,
         STORE_NAME,
         EMAIL_FROM,

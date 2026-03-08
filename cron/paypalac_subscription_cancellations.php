@@ -24,6 +24,11 @@ $customersProcessed = 0;
 $cancellationsDeleted = 0;
 $log = [];
 
+$run_date = date('Y-m-d');
+$timezone = date_default_timezone_get();
+$report_id = uniqid();
+$generated_at = date('Y-m-d H:i:s');
+
 // Check if the subscription cancellations table exists
 if (defined('TABLE_SUBSCRIPTION_CANCELLATIONS')) {
     // Find all cancellations that have reached their expiration date
@@ -84,6 +89,37 @@ if (!empty($log)) {
     foreach ($log as $entry) {
         echo "- " . $entry . "\n";
     }
+}
+
+$summary = "Subscription Cancellations — {$run_date} ({$timezone})\n"
+    . "Processed Customers: {$customersProcessed}\n\n"
+    . "Deleted Records: {$cancellationsDeleted}\n\n"
+    . "Report ID: {$report_id}\n\n"
+    . "Generated: {$generated_at}";
+
+$summary_html = '<h1 style="margin: 0 0 16px; font-size: 22px; color: #0f172a;">Subscription Cancellations &mdash; '
+    . htmlspecialchars($run_date, ENT_QUOTES, 'UTF-8') . ' (' . htmlspecialchars($timezone, ENT_QUOTES, 'UTF-8') . ')</h1>'
+    . '<p><strong>Processed Customers:</strong> ' . (int)$customersProcessed . '</p>'
+    . '<p><strong>Deleted Records:</strong> ' . (int)$cancellationsDeleted . '</p>'
+    . '<p><strong>Report ID:</strong> ' . htmlspecialchars($report_id, ENT_QUOTES, 'UTF-8') . '</p>'
+    . '<p><strong>Generated:</strong> ' . htmlspecialchars($generated_at, ENT_QUOTES, 'UTF-8') . '</p>';
+
+$notification_email = '';
+if (defined('MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL')) {
+    $notification_email = trim((string)MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL);
+}
+
+if ($notification_email !== '') {
+    zen_mail(
+        $notification_email,
+        $notification_email,
+        'PayPal Advanced Checkout Subscription Cancellations Log',
+        $summary,
+        STORE_NAME,
+        EMAIL_FROM,
+        array('EMAIL_MESSAGE_HTML' => $summary_html),
+        'subscription_cancellations_log'
+    );
 }
 
 require_once 'includes/application_bottom.php';
