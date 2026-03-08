@@ -1348,6 +1348,36 @@ function paypalac_render_select_options(array $options, $selectedValue): string
     return $html;
 }
 
+/**
+ * Return available column names for a table.
+ *
+ * @return array<string,bool>
+ */
+function paypalac_get_table_columns($tableName)
+{
+    global $db;
+
+    static $columnCache = [];
+
+    if (isset($columnCache[$tableName])) {
+        return $columnCache[$tableName];
+    }
+
+    $columns = [];
+    $columnResult = $db->Execute('SHOW COLUMNS FROM ' . $tableName);
+    while ($columnResult instanceof queryFactoryResult && !$columnResult->EOF) {
+        $columnName = (string) ($columnResult->fields['Field'] ?? '');
+        if ($columnName !== '') {
+            $columns[$columnName] = true;
+        }
+        $columnResult->MoveNext();
+    }
+
+    $columnCache[$tableName] = $columns;
+
+    return $columns;
+}
+
 ?>
 <!doctype html>
 <html <?php echo HTML_PARAMS; ?>>
@@ -1559,13 +1589,43 @@ function paypalac_render_select_options(array $options, $selectedValue): string
                     $subscriptionType = $row['subscription_type'] ?? 'rest';
                     $savedCardOptions = ['0' => 'None'];
                     if ($subscriptionType === 'savedcard' && $customersId > 0 && defined('TABLE_SAVED_CREDIT_CARDS')) {
-                        $savedCardsQuery = $db->Execute(
-                            "SELECT saved_credit_card_id, type, last_digits, holder_name, is_default
-                             FROM " . TABLE_SAVED_CREDIT_CARDS . "
-                             WHERE customers_id = " . (int)$customersId . "
-                               AND is_deleted = 0
-                             ORDER BY is_default DESC, saved_credit_card_id DESC"
-                        );
+                        $savedCardColumns = paypalac_get_table_columns(TABLE_SAVED_CREDIT_CARDS);
+
+                        if (!empty($savedCardColumns)) {
+                            $selectColumns = ['saved_credit_card_id'];
+                            if (isset($savedCardColumns['type'])) {
+                                $selectColumns[] = 'type';
+                            }
+                            if (isset($savedCardColumns['last_digits'])) {
+                                $selectColumns[] = 'last_digits';
+                            }
+                            if (isset($savedCardColumns['holder_name'])) {
+                                $selectColumns[] = 'holder_name';
+                            }
+                            if (isset($savedCardColumns['is_default'])) {
+                                $selectColumns[] = 'is_default';
+                            }
+
+                            $whereConditions = ['customers_id = ' . (int) $customersId];
+                            if (isset($savedCardColumns['is_deleted'])) {
+                                $whereConditions[] = 'is_deleted = 0';
+                            }
+
+                            $orderBy = 'saved_credit_card_id DESC';
+                            if (isset($savedCardColumns['is_default'])) {
+                                $orderBy = 'is_default DESC, ' . $orderBy;
+                            }
+
+                            $savedCardsQuery = $db->Execute(
+                                'SELECT ' . implode(', ', $selectColumns)
+                                . ' FROM ' . TABLE_SAVED_CREDIT_CARDS
+                                . ' WHERE ' . implode(' AND ', $whereConditions)
+                                . ' ORDER BY ' . $orderBy
+                            );
+                        } else {
+                            $savedCardsQuery = false;
+                        }
+
                         if ($savedCardsQuery instanceof queryFactoryResult) {
                             while (!$savedCardsQuery->EOF) {
                                 $cardId = (int)$savedCardsQuery->fields['saved_credit_card_id'];
