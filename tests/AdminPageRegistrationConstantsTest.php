@@ -60,7 +60,7 @@ namespace {
     require_once DIR_FS_CATALOG . 'admin/includes/languages/english/extra_definitions/paypalac_admin_names.php';
     
     $box_constants = [
-        'BOX_PAYPALAC_SUBSCRIPTIONS' => 'Vaulted Subscriptions',
+        'BOX_PAYPALAC_SUBSCRIPTIONS' => 'PayPal Vaulted Subscriptions',
         'BOX_PAYPALAC_SAVED_CARD_RECURRING' => 'Saved Card Subscriptions',
         'BOX_PAYPALAC_SUBSCRIPTIONS_REPORT' => 'Active Subscriptions Report',
     ];

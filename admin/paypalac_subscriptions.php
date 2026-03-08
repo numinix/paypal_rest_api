@@ -45,7 +45,7 @@ VaultManager::ensureSchema();
 define('FILENAME_PAYPALAC_SUBSCRIPTIONS', basename(__FILE__));
 
 if (!defined('HEADING_TITLE')) {
-    define('HEADING_TITLE', 'Vaulted Subscriptions');
+    define('HEADING_TITLE', 'PayPal Vaulted Subscriptions');
 }
 
 /**
@@ -1481,7 +1481,7 @@ function paypalac_render_select_options(array $options, $selectedValue): string
         
         <div class="nmx-panel">
             <div class="nmx-panel-heading">
-                <div class="nmx-panel-title">Vaulted Subscriptions</div>
+                <div class="nmx-panel-title">PayPal Vaulted Subscriptions</div>
             </div>
             <div class="nmx-panel-body">
                 <!-- Bulk Actions Form -->
