@@ -16,6 +16,11 @@ require_once 'includes/application_top.php';
 $cardsUpdated = 0;
 $log = [];
 
+$run_date = date('Y-m-d');
+$timezone = date_default_timezone_get();
+$report_id = uniqid();
+$generated_at = date('Y-m-d H:i:s');
+
 // Check if the saved credit cards table exists and has the expected structure
 if (defined('TABLE_SAVED_CREDIT_CARDS')) {
     // Mark cards as deleted where expiry date has passed
@@ -70,6 +75,35 @@ if (!empty($log)) {
     foreach ($log as $entry) {
         echo "- " . $entry . "\n";
     }
+}
+
+$summary = "Expired Cards Cleanup — {$run_date} ({$timezone})\n"
+    . "Total Cards Processed: {$cardsUpdated}\n\n"
+    . "Report ID: {$report_id}\n\n"
+    . "Generated: {$generated_at}";
+
+$summary_html = '<h1 style="margin: 0 0 16px; font-size: 22px; color: #0f172a;">Expired Cards Cleanup &mdash; '
+    . htmlspecialchars($run_date, ENT_QUOTES, 'UTF-8') . ' (' . htmlspecialchars($timezone, ENT_QUOTES, 'UTF-8') . ')</h1>'
+    . '<p><strong>Total Cards Processed:</strong> ' . (int)$cardsUpdated . '</p>'
+    . '<p><strong>Report ID:</strong> ' . htmlspecialchars($report_id, ENT_QUOTES, 'UTF-8') . '</p>'
+    . '<p><strong>Generated:</strong> ' . htmlspecialchars($generated_at, ENT_QUOTES, 'UTF-8') . '</p>';
+
+$notification_email = '';
+if (defined('MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL')) {
+    $notification_email = trim((string)MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL);
+}
+
+if ($notification_email !== '') {
+    zen_mail(
+        $notification_email,
+        $notification_email,
+        'PayPal Advanced Checkout Expired Cards Cleanup Log',
+        $summary,
+        STORE_NAME,
+        EMAIL_FROM,
+        array('EMAIL_MESSAGE_HTML' => $summary_html),
+        'expired_cards_cleanup_log'
+    );
 }
 
 require_once 'includes/application_bottom.php';
