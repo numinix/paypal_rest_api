@@ -1294,16 +1294,29 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
     }
 }
 
-// Sort by date descending
+// Sort newest to oldest by creation date.
 // Note: Using in-memory sort for simplicity. For large datasets, consider using database UNION queries
 // with ORDER BY and LIMIT/OFFSET for better performance and memory efficiency.
-usort($allSubscriptions, function($a, $b) {
-    return $b['sort_date'] - $a['sort_date'];
+usort($allSubscriptions, function ($a, $b) {
+    $leftDate = isset($a['sort_date']) ? (int) $a['sort_date'] : 0;
+    $rightDate = isset($b['sort_date']) ? (int) $b['sort_date'] : 0;
+
+    if ($leftDate !== $rightDate) {
+        return ($leftDate < $rightDate) ? 1 : -1;
+    }
+
+    // If dates are identical, keep the newest record first by identifier.
+    $leftId = (int) ($a['paypal_subscription_id'] ?? 0);
+    $rightId = (int) ($b['paypal_subscription_id'] ?? 0);
+    return ($leftId < $rightId) ? 1 : -1;
 });
 
 // Apply pagination
 $totalRecords = count($allSubscriptions);
 $totalPages = ($totalRecords > 0) ? ceil($totalRecords / $perPage) : 1;
+
+// Ensure page stays within bounds so navigation can always return to page 1.
+$page = min($page, $totalPages);
 $offset = ($page - 1) * $perPage;
 
 $subscriptionRows = array_slice($allSubscriptions, $offset, $perPage);
@@ -1416,21 +1429,6 @@ function paypalac_render_select_options(array $options, $selectedValue): string
                 </form>
             </div>
         </div>
-        
-        <?php
-        // Re-validate $page and $perPage to protect against framework-level variable extraction
-        // that may have occurred after the initial validation (e.g., extract($_GET) in included
-        // Zen Cart framework files). This ensures both are always valid integers even if
-        // overwritten with array values.
-        $page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
-        if ($page === false) {
-            $page = 1;
-        }
-        $perPage = filter_var($perPage, FILTER_VALIDATE_INT, ['options' => ['default' => 20, 'min_range' => 10, 'max_range' => 100]]);
-        if ($perPage === false) {
-            $perPage = 20;
-        }
-        ?>
         
         <!-- Pagination controls -->
         <div class="pagination-controls">
