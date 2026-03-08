@@ -9,7 +9,7 @@
 
 // Admin menu labels for PayPal subscription pages
 if (!defined('BOX_PAYPALAC_SUBSCRIPTIONS')) {
-    define('BOX_PAYPALAC_SUBSCRIPTIONS', 'Vaulted Subscriptions');
+    define('BOX_PAYPALAC_SUBSCRIPTIONS', 'PayPal Vaulted Subscriptions');
 }
 if (!defined('BOX_PAYPALAC_SAVED_CARD_RECURRING')) {
     define('BOX_PAYPALAC_SAVED_CARD_RECURRING', 'Saved Card Subscriptions');
