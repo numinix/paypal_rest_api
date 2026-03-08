@@ -1460,6 +1460,19 @@ function paypalac_get_table_columns($tableName)
             </div>
         </div>
         
+        <?php
+        // Guard against framework-level variable extraction (e.g. extract($_GET))
+        // clobbering pagination variables after initial normalization.
+        $page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
+        if ($page === false) {
+            $page = 1;
+        }
+        $perPage = filter_var($perPage, FILTER_VALIDATE_INT, ['options' => ['default' => 20, 'min_range' => 10, 'max_range' => 100]]);
+        if ($perPage === false) {
+            $perPage = 20;
+        }
+        ?>
+
         <!-- Pagination controls -->
         <div class="pagination-controls">
             <div class="pagination-info">
