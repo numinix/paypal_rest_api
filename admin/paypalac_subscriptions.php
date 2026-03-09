@@ -1048,7 +1048,7 @@ if ($action === 'export_csv') {
 $filters = [
     'customers_id' => (int) ($_GET['customers_id'] ?? 0),
     'products_id' => (int) ($_GET['products_id'] ?? 0),
-    'status' => trim((string) ($_GET['status'] ?? '')),
+    'status' => trim((string) ($_GET['status'] ?? 'scheduled')),
     'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
     'show_archived' => trim((string) ($_GET['show_archived'] ?? '')),
     'subscription_type' => trim((string) ($_GET['subscription_type'] ?? '')),
@@ -1299,8 +1299,8 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
             // Map saved card fields to match REST subscription structure
             // Note: 'date' field is aliased from 'date_added' for compatibility with code expecting creation date
             $row['date_added'] = $row['date'];
-            // Use actual next_payment_date from DB if available, otherwise fall back to date_added
-            $row['next_payment_date'] = $row['next_payment_date'] ?? $row['date'];
+            // Keep the stored next_payment_date value for sorting and display.
+            $row['next_payment_date'] = isset($row['next_payment_date']) ? trim((string) $row['next_payment_date']) : '';
             $row['sort_date'] = strtotime($row['date'] ?? 'now');
             // Saved card subscriptions don't have quantity field, always 1
             $row['products_quantity'] = 1;
@@ -1310,21 +1310,33 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT
     }
 }
 
-// Sort newest to oldest by creation date.
+// Sort subscriptions by next billing date, oldest first.
+// Records without a next payment date are sorted last.
 // Note: Using in-memory sort for simplicity. For large datasets, consider using database UNION queries
 // with ORDER BY and LIMIT/OFFSET for better performance and memory efficiency.
 usort($allSubscriptions, function ($a, $b) {
-    $leftDate = isset($a['sort_date']) ? (int) $a['sort_date'] : 0;
-    $rightDate = isset($b['sort_date']) ? (int) $b['sort_date'] : 0;
+    $leftNextPaymentRaw = trim((string) ($a['next_payment_date'] ?? ''));
+    $rightNextPaymentRaw = trim((string) ($b['next_payment_date'] ?? ''));
 
-    if ($leftDate !== $rightDate) {
-        return ($leftDate < $rightDate) ? 1 : -1;
+    $leftDate = strtotime($leftNextPaymentRaw);
+    $rightDate = strtotime($rightNextPaymentRaw);
+
+    // Put missing/invalid next dates at the end.
+    if ($leftDate === false) {
+        $leftDate = PHP_INT_MAX;
+    }
+    if ($rightDate === false) {
+        $rightDate = PHP_INT_MAX;
     }
 
-    // If dates are identical, keep the newest record first by identifier.
+    if ($leftDate !== $rightDate) {
+        return ($leftDate < $rightDate) ? -1 : 1;
+    }
+
+    // If dates are identical, keep the oldest record first by identifier.
     $leftId = (int) ($a['paypal_subscription_id'] ?? 0);
     $rightId = (int) ($b['paypal_subscription_id'] ?? 0);
-    return ($leftId < $rightId) ? 1 : -1;
+    return ($leftId < $rightId) ? -1 : 1;
 });
 
 // Apply pagination

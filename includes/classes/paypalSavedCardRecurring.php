@@ -2207,12 +2207,16 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		// Only process subscriptions in 'scheduled' status
 		// Failed subscriptions (max retries exceeded) should NOT be retried
 		// Subscriptions stay 'scheduled' during retry attempts until max retries is exceeded
-		$sql = 'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE status = \'scheduled\' AND next_payment_date <= \'' . $today . '\'';
+		$sql = 'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING
+			. " WHERE LOWER(TRIM(status)) = 'scheduled'"
+			. " AND next_payment_date IS NOT NULL"
+			. " AND next_payment_date <> '0000-00-00'"
+			. " AND DATE(next_payment_date) <= '" . $today . "'";
 		
 		// Debug logging for cron
 		if (!empty($_SESSION['in_cron'])) {
 			error_log('PayPal Cron - get_scheduled_payments() SQL: ' . $sql);
-			error_log('PayPal Cron - Looking for subscriptions with status = scheduled and next_payment_date <= ' . $today);
+			error_log('PayPal Cron - Looking for subscriptions with normalized status scheduled and DATE(next_payment_date) <= ' . $today);
 		}
 		
 		$result = $db->Execute($sql);

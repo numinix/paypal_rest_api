@@ -837,24 +837,50 @@ $html_email = recurring_build_email_html(
 print recurring_format_output($log);
 $_SESSION['in_cron'] = false;
 
-// Determine email recipient with fallback chain
-$notification_email = '';
+// Determine email recipients with fallback chain
+$notification_candidates = array();
+
 if (defined('MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL')) {
-    $notification_email = trim((string)MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL);
+    $configuredRecipients = trim((string) MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL);
+    if ($configuredRecipients !== '') {
+        $notification_candidates = preg_split('/[;,]+/', $configuredRecipients);
+    }
 }
 
-// Only send email if we have a valid recipient
-if (!empty($notification_email)) {
-    zen_mail(
-        $notification_email,
-        $notification_email,
-        'PayPal Advanced Checkout Recurring Payment Log',
-        $log,
-        STORE_NAME,
-        EMAIL_FROM,
-        array('EMAIL_MESSAGE_HTML' => $html_email),
-        'recurring_log'
-    );
+if (empty($notification_candidates) && function_exists('zen_get_configuration_key_value')) {
+    $configuredRecipients = trim((string) zen_get_configuration_key_value('MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL'));
+    if ($configuredRecipients !== '') {
+        $notification_candidates = preg_split('/[;,]+/', $configuredRecipients);
+    }
+}
+
+if (empty($notification_candidates) && defined('STORE_OWNER_EMAIL_ADDRESS')) {
+    $notification_candidates[] = STORE_OWNER_EMAIL_ADDRESS;
+}
+
+if (empty($notification_candidates) && defined('EMAIL_FROM')) {
+    $notification_candidates[] = EMAIL_FROM;
+}
+
+$notification_recipients = array_values(array_unique(array_filter(array_map('trim', $notification_candidates), function ($email) {
+    return $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL);
+})));
+
+if (empty($notification_recipients)) {
+    error_log('PayPal Cron - No valid cron report email recipient configured.');
+} else {
+    foreach ($notification_recipients as $recipient) {
+        zen_mail(
+            $recipient,
+            $recipient,
+            'PayPal Advanced Checkout Recurring Payment Log',
+            $log,
+            STORE_NAME,
+            EMAIL_FROM,
+            array('EMAIL_MESSAGE_HTML' => $html_email),
+            'recurring_log'
+        );
+    }
 }
 
 $additional_failure_recipients = array();
@@ -876,7 +902,7 @@ if (function_exists('zen_get_configuration_key_value')) {
 }
 
 if (is_string($raw_recipients) && $raw_recipients !== '') {
-    $additional_failure_recipients = array_filter(array_map('trim', explode(',', $raw_recipients)), function ($email) {
+    $additional_failure_recipients = array_filter(array_map('trim', preg_split('/[;,]+/', $raw_recipients)), function ($email) {
         return $email !== '';
     });
 }
