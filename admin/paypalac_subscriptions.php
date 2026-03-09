@@ -162,6 +162,7 @@ if ($action === 'update_subscription') {
     // Route to saved card handler for saved card subscriptions
     if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
         $paypalSavedCardRecurring = new paypalSavedCardRecurring();
+        $savedCardMetadata = [];
         
         // Handle status change for saved card
         if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
@@ -181,9 +182,20 @@ if ($action === 'update_subscription') {
         }
         if (isset($_POST['products_id'])) {
             $updateData['product'] = (int) zen_db_prepare_input($_POST['products_id']);
+            $savedCardMetadata['products_id'] = (int) zen_db_prepare_input($_POST['products_id']);
         }
         if (isset($_POST['saved_credit_card_id'])) {
             $updateData['saved_credit_card_id'] = (int) zen_db_prepare_input($_POST['saved_credit_card_id']);
+        }
+
+        if (isset($_POST['billing_period'])) {
+            $savedCardMetadata['billing_period'] = strtoupper(str_replace([' ', "\t"], '_', (string) zen_db_prepare_input($_POST['billing_period'])));
+        }
+        if (isset($_POST['billing_frequency'])) {
+            $savedCardMetadata['billing_frequency'] = (int) zen_db_prepare_input($_POST['billing_frequency']);
+        }
+        if (isset($_POST['total_billing_cycles'])) {
+            $savedCardMetadata['total_billing_cycles'] = (int) zen_db_prepare_input($_POST['total_billing_cycles']);
         }
         
         // Add billing address fields
@@ -217,7 +229,7 @@ if ($action === 'update_subscription') {
         
         if (!empty($updateData)) {
             $updateData['comments'] = 'Updated by admin via unified subscriptions page.';
-            $paypalSavedCardRecurring->update_payment_info($subscriptionId, $updateData);
+            $paypalSavedCardRecurring->update_payment_info($subscriptionId, $updateData, $savedCardMetadata);
             $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId), 'success');
         }
         
