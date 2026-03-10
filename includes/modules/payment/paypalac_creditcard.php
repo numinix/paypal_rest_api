@@ -402,14 +402,16 @@ class paypalac_creditcard extends base
                   '    }' . "\n" .
                   '    var using_saved_card = saved_card_value && saved_card_value !== "new";' . "\n" .
                   '    if (!using_saved_card) {' . "\n" .
-                  '      var cc_owner_field = document.checkout_payment.paypalac_cc_owner;' . "\n" .
+                  '      var cc_firstname_field = document.checkout_payment.paypalac_cc_firstname;' . "\n" .
+                  '      var cc_lastname_field = document.checkout_payment.paypalac_cc_lastname;' . "\n" .
                   '      var cc_number_field = document.checkout_payment.paypalac_cc_number;' . "\n" .
-                  '      if (cc_owner_field && cc_number_field) {' . "\n" .
-                  '        var cc_owner = cc_owner_field.value;' . "\n" .
+                  '      if (cc_firstname_field && cc_lastname_field && cc_number_field) {' . "\n" .
+                  '        var cc_firstname = cc_firstname_field.value;' . "\n" .
+                  '        var cc_lastname = cc_lastname_field.value;' . "\n" .
                   '        var cc_number = cc_number_field.value;' . "\n";
             
             if (CC_OWNER_MIN_LENGTH > 0) {
-                $js .= '        if (cc_owner == "" || cc_owner.length < ' . CC_OWNER_MIN_LENGTH . ') {' . "\n" .
+                $js .= '        if (cc_firstname == "" || cc_lastname == "") {' . "\n" .
                        '          error_message = error_message + "' . MODULE_PAYMENT_PAYPALAC_TEXT_JS_CC_OWNER . '";' . "\n" .
                        '          error = 1;' . "\n" .
                        '        }' . "\n";
@@ -485,7 +487,8 @@ class paypalac_creditcard extends base
             $forceSaveCard = false;
         }
 
-        $billing_name = zen_output_string_protected($order->billing['firstname'] . ' ' . $order->billing['lastname']);
+        $billing_firstname = zen_output_string_protected($order->billing['firstname']);
+        $billing_lastname = zen_output_string_protected($order->billing['lastname']);
 
         // Check if bootstrap template
         $is_bootstrap_template = (function_exists('zca_bootstrap_active') && zca_bootstrap_active() === true);
@@ -496,11 +499,18 @@ class paypalac_creditcard extends base
         // Build fields array
         $fields = [];
 
-        // Card owner name
+        // Cardholder first name
         $fields[] = [
-            'title' => MODULE_PAYMENT_PAYPALAC_CC_OWNER ?? 'Cardholder Name',
-            'field' => zen_draw_input_field('paypalac_cc_owner', $billing_name, 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-owner" autocomplete="cc-name"' . $onFocus),
-            'tag' => 'paypalac-cc-owner',
+            'title' => MODULE_PAYMENT_PAYPALAC_CC_FIRSTNAME ?? 'First name',
+            'field' => zen_draw_input_field('paypalac_cc_firstname', $billing_firstname, 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-firstname" autocomplete="cc-given-name"' . $onFocus),
+            'tag' => 'paypalac-cc-firstname',
+        ];
+
+        // Cardholder last name
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALAC_CC_LASTNAME ?? 'Last name',
+            'field' => zen_draw_input_field('paypalac_cc_lastname', $billing_lastname, 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-lastname" autocomplete="cc-family-name"' . $onFocus),
+            'tag' => 'paypalac-cc-lastname',
         ];
 
         // Card number
@@ -510,22 +520,25 @@ class paypalac_creditcard extends base
             'tag' => 'paypalac-cc-number',
         ];
 
-        // Expiry date
-        $fields[] = [
-            'title' => MODULE_PAYMENT_PAYPALAC_CC_EXPIRES ?? 'Expiration Date',
-            'field' =>
-                '<div class="ppr-cc-expiration">' .
-                zen_draw_pull_down_menu('paypalac_cc_expires_month', $expires_month, date('m'), 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-expires-month"' . $onFocus) .
-                zen_draw_pull_down_menu('paypalac_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-expires-year"' . $onFocus) .
-                '</div>',
-            'tag' => 'paypalac-cc-expires-month',
-        ];
-
         // CVV
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALAC_CC_CVV ?? 'CVV',
             'field' => zen_draw_input_field('paypalac_cc_cvv', '', 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-cvv" size="4" maxlength="4" autocomplete="cc-csc"' . $onFocus),
             'tag' => 'paypalac-cc-cvv',
+        ];
+
+        // Expiry month
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALAC_CC_EXPIRES ?? 'Expiry date',
+            'field' => zen_draw_pull_down_menu('paypalac_cc_expires_month', $expires_month, date('m'), 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-expires-month"' . $onFocus),
+            'tag' => 'paypalac-cc-expires-month',
+        ];
+
+        // Expiry year
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALAC_CC_EXPIRES_YEAR ?? 'Year',
+            'field' => zen_draw_pull_down_menu('paypalac_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-expires-year"' . $onFocus),
+            'tag' => 'paypalac-cc-expires-year',
         ];
 
         // Save card checkbox / subscription notice
@@ -852,7 +865,14 @@ class paypalac_creditcard extends base
 
         // Validate new card entry
         // Support fallback field names that might be forwarded from the checkout confirmation page
-        $cc_owner = $_POST['paypalac_cc_owner'] ?? ($_POST['ppac_cc_owner'] ?? '');
+        $cc_firstname = $_POST['paypalac_cc_firstname'] ?? ($_POST['ppac_cc_firstname'] ?? '');
+        $cc_lastname = $_POST['paypalac_cc_lastname'] ?? ($_POST['ppac_cc_lastname'] ?? '');
+        // Compose full name; fall back to legacy combined owner field if new fields are absent
+        if ($cc_firstname === '' && $cc_lastname === '') {
+            $cc_owner = $_POST['paypalac_cc_owner'] ?? ($_POST['ppac_cc_owner'] ?? '');
+        } else {
+            $cc_owner = trim($cc_firstname . ' ' . $cc_lastname);
+        }
         $cc_number_raw = $_POST['paypalac_cc_number'] ?? ($_POST['ppac_cc_number'] ?? '');
         $cc_number = preg_replace('/[^0-9]/', '', $cc_number_raw);
         $cc_cvv = $_POST['paypalac_cc_cvv'] ?? ($_POST['ppac_cc_cvv'] ?? '');
@@ -994,7 +1014,8 @@ class paypalac_creditcard extends base
         $hiddenFields = zen_draw_hidden_field('ppac_saved_card', $savedCardSelection);
         
         if ($savedCardSelection === 'new') {
-            $hiddenFields .= zen_draw_hidden_field('ppac_cc_owner', $_POST['paypalac_cc_owner'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppac_cc_firstname', $_POST['paypalac_cc_firstname'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppac_cc_lastname', $_POST['paypalac_cc_lastname'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppac_cc_expires_month', $_POST['paypalac_cc_expires_month'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppac_cc_expires_year', $_POST['paypalac_cc_expires_year'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppac_cc_number', $_POST['paypalac_cc_number'] ?? '');
@@ -1020,7 +1041,8 @@ class paypalac_creditcard extends base
             ],
         ];
         if ($savedCardSelection === 'new') {
-            $ccFields['ccFields']['ppac_cc_owner'] = 'paypalac_cc_owner';
+            $ccFields['ccFields']['ppac_cc_firstname'] = 'paypalac_cc_firstname';
+            $ccFields['ccFields']['ppac_cc_lastname'] = 'paypalac_cc_lastname';
             $ccFields['ccFields']['ppac_cc_expires_month'] = 'paypalac_cc_expires_month';
             $ccFields['ccFields']['ppac_cc_expires_year'] = 'paypalac_cc_expires_year';
             $ccFields['ccFields']['ppac_cc_number'] = 'paypalac_cc_number';
