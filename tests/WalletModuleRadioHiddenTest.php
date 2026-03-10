@@ -30,12 +30,12 @@ if (strpos($googlePayJs, 'pmt-paypalac_googlepay') === false) {
     echo "✓ Google Pay JS targets correct radio button\n";
 }
 
-// Test 3: Google Pay JS hides radio button
-if (strpos($googlePayJs, 'hideModuleRadio') === false || strpos($googlePayJs, 'paypalac-wallet-radio-hidden') === false) {
+// Test 3: Google Pay JS hides module label (radio remains visible)
+if (strpos($googlePayJs, 'hideModuleLabel') === false || strpos($googlePayJs, 'paypalac-wallet-label-hidden') === false) {
     $testPassed = false;
-    $errors[] = "Google Pay JS should hide the radio button";
+    $errors[] = "Google Pay JS should hide only the module label";
 } else {
-    echo "✓ Google Pay JS hides radio button\n";
+    echo "✓ Google Pay JS hides module label\n";
 }
 
 // Test 4: Google Pay JS adds click handler to container
@@ -62,12 +62,12 @@ if (strpos($applePayJs, 'pmt-paypalac_applepay') === false) {
     echo "✓ Apple Pay JS targets correct radio button\n";
 }
 
-// Test 7: Apple Pay JS hides radio button
-if (strpos($applePayJs, 'hideModuleRadio') === false || strpos($applePayJs, 'paypalac-wallet-radio-hidden') === false) {
+// Test 7: Apple Pay JS hides module label (radio remains visible)
+if (strpos($applePayJs, 'hideModuleLabel') === false || strpos($applePayJs, 'paypalac-wallet-label-hidden') === false) {
     $testPassed = false;
-    $errors[] = "Apple Pay JS should hide the radio button";
+    $errors[] = "Apple Pay JS should hide only the module label";
 } else {
-    echo "✓ Apple Pay JS hides radio button\n";
+    echo "✓ Apple Pay JS hides module label\n";
 }
 
 // Test 8: Apple Pay JS adds click handler to container
