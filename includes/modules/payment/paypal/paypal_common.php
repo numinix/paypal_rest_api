@@ -1332,7 +1332,6 @@ class PayPalCommon {
                 'debug_id' => '',
                 'processor_response' => $failed_payment['processor_response'] ?? [],
                 'payment_source' => $paypal_order['payment_source'] ?? [],
-                'cc_info' => $cc_info,
             ]);
 
             return false;
@@ -1457,8 +1456,7 @@ class PayPalCommon {
     {
         $payment_source = $error_info['payment_source'] ?? [];
         $card_source = $payment_source['card'] ?? [];
-        $cc_info = $error_info['cc_info'] ?? [];
-        $last_digits = !empty($cc_info['last_digits']) ? $cc_info['last_digits'] : ($card_source['last_digits'] ?? '');
+        $last_digits = $card_source['last_digits'] ?? '';
         $processor_response = $error_info['processor_response'] ?? [];
         $response_code = $processor_response['response_code'] ?? '';
 

@@ -504,7 +504,8 @@
         setPaylaterPayload(event.detail || {});
     });
 
-    hideModuleRadio();
+    // Keep the mock radio button visible so the user can click it
+    // to select this payment method.
 
     var container = document.getElementById('paypalac-paylater-button');
     if (container) {

@@ -74,9 +74,23 @@
      * Get the PayPal SDK namespace.
      * The header observer may load the SDK with data-namespace="PayPalSDK",
      * placing it at window.PayPalSDK instead of window.paypal.
+     *
+     * Prefer the namespace that already exposes the Googlepay component.
+     * In sandbox mode the header SDK uses client-id=sb while our custom
+     * script uses the actual sandbox client-id; this can leave window.paypal
+     * as a stub without Googlepay while window.PayPalSDK (the header SDK,
+     * loaded with the googlepay component) already has the API ready.
      */
     function getPayPalNamespace() {
-        return window.paypal || window.PayPalSDK;
+        var primary = window.paypal;
+        var secondary = window.PayPalSDK;
+        if (primary && typeof primary.Googlepay === 'function') {
+            return primary;
+        }
+        if (secondary && typeof secondary.Googlepay === 'function') {
+            return secondary;
+        }
+        return primary || secondary;
     }
 
     function normalizeWalletContainer(element) {
@@ -336,26 +350,10 @@
     }
 
     function ensureWalletSelectionHidden() {
-        hideModuleRadio();
-        hideModuleLabel();
-
-        if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') {
-            return;
-        }
-
-        var attempts = 0;
-        var observer = new MutationObserver(function () {
-            var radioHidden = hideModuleRadio();
-            var labelHidden = hideModuleLabel();
-
-            attempts++;
-
-            if ((radioHidden && labelHidden) || attempts >= 20) {
-                observer.disconnect();
-            }
-        });
-
-        observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+        // No-op: the mock radio button (label) should remain visible
+        // so the user can click it to select Google Pay.  The native
+        // radio input is already hidden by the base checkout CSS
+        // (visibility: hidden; position: absolute).
     }
 
     function rerenderGooglePayButton() {
@@ -556,17 +554,52 @@
                 return Promise.resolve();
             }
 
-            googlePayJsPromise = new Promise(function (resolve, reject) {
-                existingScript.addEventListener('load', function () {
-                    googlePayJsLoaded = true;
-                    resolve();
-                });
-                existingScript.addEventListener('error', function (event) {
-                    googlePayJsPromise = null;
-                    reject(new Error('Failed to load Google Pay JS'));
-                });
-            });
+            // Detect whether the script has already finished loading.
+            // If it has, the load event already fired and attaching new
+            // listeners would create a Promise that never settles.
+            // Also check readyState (like the Braintree Google Pay module)
+            // to catch scripts loaded from the browser cache that never
+            // fire a 'load' event for late-attached listeners.
+            var scriptAlreadyLoaded = !!(
+                (existingScript.dataset && existingScript.dataset.loaded === 'true') ||
+                existingScript.readyState === 'complete' ||
+                existingScript.readyState === 'loaded'
+            );
 
+            if (!scriptAlreadyLoaded) {
+                // Script is still loading – safe to wait for its events.
+                googlePayJsPromise = new Promise(function (resolve, reject) {
+                    existingScript.addEventListener('load', function () {
+                        existingScript.dataset.loaded = 'true';
+                        googlePayJsLoaded = true;
+                        resolve();
+                    });
+                    existingScript.addEventListener('error', function (event) {
+                        googlePayJsPromise = null;
+                        reject(new Error('Failed to load Google Pay JS'));
+                    });
+                });
+                return googlePayJsPromise;
+            }
+
+            // The script has loaded but google.payments.api is not yet
+            // available (async initialisation).  Poll briefly.
+            googlePayJsPromise = new Promise(function (resolve, reject) {
+                var attempts = 0;
+                var maxAttempts = 25; // 25 × 200ms = 5 seconds
+                var check = setInterval(function () {
+                    attempts++;
+                    if (typeof google !== 'undefined' && google.payments && google.payments.api) {
+                        clearInterval(check);
+                        googlePayJsLoaded = true;
+                        resolve();
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(check);
+                        googlePayJsPromise = null;
+                        reject(new Error('Google Pay JS loaded but google.payments.api not available after timeout'));
+                    }
+                }, 200);
+            });
             return googlePayJsPromise;
         }
 
@@ -628,8 +661,12 @@
         if (existingScript) {
             var matchesClient = existingScript.src.indexOf(encodeURIComponent(config.clientId)) !== -1;
             var matchesCurrency = existingScript.src.indexOf('currency=' + encodeURIComponent(config.currency || 'USD')) !== -1;
+            // Only reuse a script that actually includes the googlepay component.
+            // The header SDK may match client-id and currency but omit googlepay,
+            // which would leave us polling forever and resolving without Googlepay.
+            var matchesComponents = existingScript.src.indexOf('googlepay') !== -1;
 
-            if (matchesClient && matchesCurrency) {
+            if (matchesClient && matchesCurrency && matchesComponents) {
                 var loadedNs = getPayPalNamespace();
                 if (loadedNs && typeof loadedNs.Googlepay === 'function') {
                     sharedSdkLoader.key = desiredKey;
@@ -637,22 +674,60 @@
                     return sharedSdkLoader.promise;
                 }
 
-                return new Promise(function (resolve, reject) {
-                    existingScript.addEventListener('load', function () {
-                        existingScript.dataset.loaded = 'true';
-                        sharedSdkLoader.key = desiredKey;
-                        resolve(getPayPalNamespace());
+                // Detect whether the script has already finished loading.
+                // If the SDK namespace object exists or the element carries a
+                // loaded marker set by a previous onload handler, the load
+                // event has already fired.  Attaching new listeners at this
+                // point would create a Promise that never settles.
+                // Also check readyState (like the Braintree Google Pay module)
+                // to handle scripts served from the browser cache that never
+                // re-fire the 'load' event for late-attached listeners.
+                var scriptAlreadyLoaded = !!(
+                    loadedNs ||
+                    (existingScript.dataset && existingScript.dataset.loaded === 'true') ||
+                    existingScript.readyState === 'complete' ||
+                    existingScript.readyState === 'loaded'
+                );
+
+                if (!scriptAlreadyLoaded) {
+                    // Script is still loading – safe to wait for its events.
+                    return new Promise(function (resolve, reject) {
+                        existingScript.addEventListener('load', function () {
+                            existingScript.dataset.loaded = 'true';
+                            sharedSdkLoader.key = desiredKey;
+                            resolve(getPayPalNamespace());
+                        });
+                        existingScript.addEventListener('error', function (event) {
+                            sharedSdkLoader.promise = null;
+                            reject(event);
+                        });
                     });
-                    existingScript.addEventListener('error', function (event) {
-                        sharedSdkLoader.promise = null;
-                        reject(event);
-                    });
+                }
+
+                // The SDK has loaded but the Googlepay component is not yet
+                // available.  This can happen when the SDK components are
+                // still initializing asynchronously after the script's load
+                // event.  Poll briefly so the caller can use the component
+                // once it appears, or degrade gracefully after the timeout.
+                sharedSdkLoader.key = desiredKey;
+                sharedSdkLoader.promise = new Promise(function (resolve) {
+                    var attempts = 0;
+                    var maxAttempts = 25; // 25 × 200ms = 5 seconds
+                    var check = setInterval(function () {
+                        var ns = getPayPalNamespace();
+                        attempts++;
+                        if ((ns && typeof ns.Googlepay === 'function') || attempts >= maxAttempts) {
+                            clearInterval(check);
+                            resolve(ns || loadedNs);
+                        }
+                    }, 200);
                 });
+                return sharedSdkLoader.promise;
             }
 
             // Only remove the script if it was one we created (has data-paypal-sdk),
-            // never remove the header-loaded SDK.
-            if (existingScript.dataset && existingScript.dataset.paypalSdk === 'true') {
+            // never remove the header-loaded SDK (identified by its id).
+            if (existingScript.dataset && existingScript.dataset.paypalSdk === 'true' && existingScript.id !== 'PayPalJSSDK') {
                 existingScript.parentNode.removeChild(existingScript);
             }
         }
@@ -704,7 +779,31 @@
                     googleMerchantId: config.googleMerchantId || config.merchantId,
                     environment: config.environment
                 };
-                resolve(getPayPalNamespace());
+                // Check if Googlepay is immediately available after the script runs.
+                var ns = getPayPalNamespace();
+                if (ns && typeof ns.Googlepay === 'function') {
+                    resolve(ns);
+                    return;
+                }
+                // The SDK script executed but the Googlepay component may not be
+                // registered yet (async SDK initialisation, or the SDK silently
+                // declined to set window.paypal due to a client-id conflict with
+                // the header SDK).  Poll briefly; the header SDK namespace
+                // (window.PayPalSDK) may already carry Googlepay and getPayPalNamespace()
+                // will return it once available.
+                var attempts = 0;
+                var maxAttempts = 25; // 25 × 200ms = 5 seconds
+                var check = setInterval(function () {
+                    attempts++;
+                    var pollNs = getPayPalNamespace();
+                    if (pollNs && typeof pollNs.Googlepay === 'function') {
+                        clearInterval(check);
+                        resolve(pollNs);
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(check);
+                        resolve(getPayPalNamespace());
+                    }
+                }, 200);
             };
             script.onerror = function (event) {
                 sharedSdkLoader.promise = null;
@@ -1138,8 +1237,31 @@
                 // Verify PayPal Googlepay API is available
                 if (typeof paypal.Googlepay !== 'function') {
                     console.warn('[Google Pay] PayPal Googlepay API not available');
+                    // Reset the SDK loader state so the next attempt re-evaluates
+                    // the available PayPal namespaces rather than reusing the
+                    // stale cached promise that resolved without Googlepay.
+                    sharedSdkLoader.promise = null;
+                    sharedSdkLoader.key = null;
                     renderState.renderingInProgress = false;
                     hidePaymentMethodContainer();
+                    // Schedule one retry after a short delay, following the
+                    // Braintree Google Pay pattern: the PayPal SDK (especially
+                    // in sandbox where a separate client-id script is loaded
+                    // alongside the header SDK) may finish async initialisation
+                    // after the load event has already fired.
+                    // The flag is reset by the IIFE init on every execution so
+                    // we only schedule one retry per render attempt; clearing it
+                    // inside the timer would allow concurrent retries if OPRC
+                    // refreshes the payment section during the delay.
+                    if (!window._paypalacGooglePayApiRetry) {
+                        window._paypalacGooglePayApiRetry = true;
+                        setTimeout(function () {
+                            renderState.renderingInProgress = false;
+                            if (typeof window.paypalacGooglePayRender === 'function') {
+                                window.paypalacGooglePayRender();
+                            }
+                        }, 500);
+                    }
                     return null;
                 }
 
@@ -1341,6 +1463,10 @@
     if (typeof window !== 'undefined') {
         window.paypalacGooglePayRender = renderGooglePayButton;
     }
+
+    // Reset the API retry flag on every IIFE execution so each fresh
+    // execution can schedule a retry if the Googlepay API is unavailable.
+    window._paypalacGooglePayApiRetry = false;
 
     renderGooglePayButton();
 

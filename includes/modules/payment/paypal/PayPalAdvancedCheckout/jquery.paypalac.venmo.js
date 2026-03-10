@@ -646,7 +646,8 @@
         setVenmoPayload(event.detail || {});
     });
 
-    hideModuleRadio();
+    // Keep the mock radio button visible so the user can click it
+    // to select this payment method.
 
     var container = document.getElementById('paypalac-venmo-button');
     if (container) {

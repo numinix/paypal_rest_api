@@ -482,10 +482,10 @@ class paypalac_paylater extends base
 
         return [
             'id' => $this->code,
-            'module' => MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_SELECTION ?? 'Pay Later',
+            'module' => $buttonContainer,
             'fields' => [
                 [
-                    'title' => $buttonContainer,
+                    'title' => '',
                     'field' => $hiddenFields . $script,
                 ],
             ],

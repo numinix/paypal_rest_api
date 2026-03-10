@@ -199,6 +199,23 @@
         }
     }
 
+    /**
+     * Hide the module's radio button using CSS.
+     * The radio is still functional but visually hidden.
+     */
+    function hideModuleRadio() {
+        var moduleRadio = document.getElementById('pmt-paypalac_applepay');
+        if (moduleRadio) {
+            moduleRadio.classList.add('paypalac-wallet-radio-hidden');
+            moduleRadio.style.display = 'none';
+            moduleRadio.setAttribute('aria-hidden', 'true');
+            moduleRadio.tabIndex = -1;
+            return true;
+        }
+
+        return false;
+    }
+
     function getApplePayButton() {
         var container = document.getElementById('paypalac-applepay-button');
         if (!container) {
@@ -284,24 +301,15 @@
     }
 
     function ensureWalletSelectionDisplay() {
-        hideModuleLabel();
+        // No-op: the wallet button container is now placed inside the
+        // module label by PHP, so there is no separate label to hide.
+    }
 
-        if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') {
-            return;
-        }
-
-        var attempts = 0;
-        var observer = new MutationObserver(function () {
-            var labelHidden = hideModuleLabel();
-
-            attempts++;
-
-            if (labelHidden || attempts >= 20) {
-                observer.disconnect();
-            }
-        });
-
-        observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+    function ensureWalletSelectionHidden() {
+        // No-op: the wallet button container is placed inside the module
+        // label by PHP, so the radio and label are managed by the
+        // template.  The native radio input does not need to be hidden
+        // here because the checkout CSS already handles its visibility.
     }
 
     function rerenderApplePayButton() {
@@ -1048,8 +1056,8 @@
         setApplePayPayload(event.detail || {});
     });
 
-    // Keep the radio visible and hide only the redundant text label.
-    ensureWalletSelectionDisplay();
+    // Hide the radio button on page load
+    ensureWalletSelectionHidden();
 
     // If a user still clicks the hidden radio, select the payment method
     // but do NOT launch the modal - only the button click or form submit should do that

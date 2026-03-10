@@ -511,10 +511,10 @@ class paypalac_venmo extends base
 
         return [
             'id' => $this->code,
-            'module' => MODULE_PAYMENT_PAYPALAC_VENMO_TEXT_SELECTION ?? 'Venmo',
+            'module' => $buttonContainer,
             'fields' => [
                 [
-                    'title' => $buttonContainer,
+                    'title' => '',
                     'field' => $hiddenFields . $script,
                 ],
             ],

@@ -362,26 +362,10 @@
     }
 
     function ensureWalletSelectionHidden() {
-        hideModuleRadio();
-        hideModuleLabel();
-
-        if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') {
-            return;
-        }
-
-        var attempts = 0;
-        var observer = new MutationObserver(function () {
-            var radioHidden = hideModuleRadio();
-            var labelHidden = hideModuleLabel();
-
-            attempts++;
-
-            if ((radioHidden && labelHidden) || attempts >= 20) {
-                observer.disconnect();
-            }
-        });
-
-        observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+        // No-op: the mock radio button (label) should remain visible
+        // so the user can click it to select Apple Pay.  The native
+        // radio input is already hidden by the base checkout CSS
+        // (visibility: hidden; position: absolute).
     }
 
     function rerenderApplePayButton() {
