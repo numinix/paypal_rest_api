@@ -162,23 +162,6 @@
         }
     }
 
-    /**
-     * Hide the module's radio button using CSS.
-     * The radio is still functional but visually hidden.
-     */
-    function hideModuleRadio() {
-        var moduleRadio = document.getElementById('pmt-paypalac_googlepay');
-        if (moduleRadio) {
-            moduleRadio.classList.add('paypalac-wallet-radio-hidden');
-            moduleRadio.style.display = 'none';
-            moduleRadio.setAttribute('aria-hidden', 'true');
-            moduleRadio.tabIndex = -1;
-            return true;
-        }
-
-        return false;
-    }
-
     function getGooglePayButton() {
         var container = document.getElementById('paypalac-googlepay-button');
         if (!container) {
@@ -287,8 +270,7 @@
         return false;
     }
 
-    function ensureWalletSelectionHidden() {
-        hideModuleRadio();
+    function ensureWalletSelectionDisplay() {
         hideModuleLabel();
 
         if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') {
@@ -297,12 +279,11 @@
 
         var attempts = 0;
         var observer = new MutationObserver(function () {
-            var radioHidden = hideModuleRadio();
             var labelHidden = hideModuleLabel();
 
             attempts++;
 
-            if ((radioHidden && labelHidden) || attempts >= 20) {
+            if (labelHidden || attempts >= 20) {
                 observer.disconnect();
             }
         });
@@ -1120,8 +1101,8 @@
         setGooglePayPayload(event.detail || {});
     });
 
-    // Hide the radio button on page load
-    ensureWalletSelectionHidden();
+    // Keep the radio visible and hide only the redundant text label.
+    ensureWalletSelectionDisplay();
 
     // If a user still clicks the hidden radio, select the payment method
     // but do NOT launch the modal - only the button click or form submit should do that
