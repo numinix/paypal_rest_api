@@ -1778,9 +1778,9 @@ function paypalac_get_table_columns($tableName)
                     
                     <!-- Details rows (hidden by default) -->
                     <tr class="details-row" data-subscription-id="<?php echo $subscriptionId; ?>">
-                        <td colspan="7">
-                            <div style="padding: 16px; background: #f9f9f9; border-radius: 4px;">
-                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                        <td colspan="10">
+                            <div class="paypalac-details-panel" style="padding: 16px; background: #f9f9f9; border-radius: 4px;">
+                                <div class="paypalac-details-top-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
                                     <!-- Subscription Details Column -->
                                     <div>
                                         <h4 style="margin-top: 0; color: #00618d;">Subscription Details</h4>
@@ -1841,9 +1841,9 @@ function paypalac_get_table_columns($tableName)
                                 </div>
                                 
                                 <!-- Billing Details (Full Width) -->
-                                <div style="margin-top: 20px;">
-                                    <h4 style="margin-top: 0; color: #00618d;">Billing Configuration</h4>
-                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                                <details class="paypalac-form-section" open>
+                                    <summary>Billing Configuration</summary>
+                                    <div class="paypalac-form-section-content" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
                                         <div>
                                             <label>Billing Period</label>
                                             <input type="text" name="billing_period" value="<?php echo zen_output_string_protected((string) ($row['billing_period'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
@@ -1861,12 +1861,12 @@ function paypalac_get_table_columns($tableName)
                                             <input type="date" name="next_payment_date" value="<?php echo zen_output_string_protected((string) ($row['next_payment_date'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
                                         </div>
                                     </div>
-                                </div>
+                                </details>
                                 
                                 <!-- Trial Configuration -->
-                                <div style="margin-top: 16px;">
-                                    <h4 style="margin-top: 0; color: #00618d;">Trial Configuration</h4>
-                                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                                <details class="paypalac-form-section">
+                                    <summary>Trial Configuration</summary>
+                                    <div class="paypalac-form-section-content" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
                                         <div>
                                             <label>Trial Period</label>
                                             <input type="text" name="trial_period" value="<?php echo zen_output_string_protected((string) ($row['trial_period'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
@@ -1880,12 +1880,12 @@ function paypalac_get_table_columns($tableName)
                                             <input type="number" name="trial_total_cycles" value="<?php echo (int) ($row['trial_total_cycles'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
                                         </div>
                                     </div>
-                                </div>
+                                </details>
                                 
                                 <!-- Financial Details -->
-                                <div style="margin-top: 16px;">
-                                    <h4 style="margin-top: 0; color: #00618d;">Financial Details</h4>
-                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                                <details class="paypalac-form-section">
+                                    <summary>Financial Details</summary>
+                                    <div class="paypalac-form-section-content" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
                                         <div>
                                             <label>Setup Fee</label>
                                             <input type="number" step="0.01" name="setup_fee" value="<?php echo (float) ($row['setup_fee'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
@@ -1903,13 +1903,13 @@ function paypalac_get_table_columns($tableName)
                                             <input type="number" step="0.000001" name="currency_value" value="<?php echo (float) ($row['currency_value'] ?? 1); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
                                         </div>
                                     </div>
-                                </div>
+                                </details>
                                 
                                 <!-- Billing Address -->
                                 <?php if ($subscriptionType === 'savedcard') { ?>
-                                <div style="margin-top: 16px;">
-                                    <h4 style="margin-top: 0; color: #00618d;">Billing Address</h4>
-                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                <details class="paypalac-form-section">
+                                    <summary>Billing Address</summary>
+                                    <div class="paypalac-form-section-content" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
                                         <div>
                                             <label>Billing Name</label>
                                             <input type="text" name="billing_name" value="<?php echo zen_output_string_protected((string) ($row['billing_name'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
@@ -1943,12 +1943,12 @@ function paypalac_get_table_columns($tableName)
                                             <input type="text" maxlength="2" pattern="[A-Z]{2}" name="billing_country_code" value="<?php echo zen_output_string_protected((string) ($row['billing_country_code'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" style="text-transform: uppercase;" placeholder="CA" />
                                         </div>
                                     </div>
-                                </div>
+                                </details>
                                 
                                 <!-- Shipping Information -->
-                                <div style="margin-top: 16px;">
-                                    <h4 style="margin-top: 0; color: #00618d;">Shipping Information</h4>
-                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                <details class="paypalac-form-section">
+                                    <summary>Shipping Information</summary>
+                                    <div class="paypalac-form-section-content" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
                                         <div>
                                             <label>Shipping Method</label>
                                             <input type="text" name="shipping_method" value="<?php echo zen_output_string_protected((string) ($row['shipping_method'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
@@ -1961,12 +1961,13 @@ function paypalac_get_table_columns($tableName)
                                     <p style="margin: 8px 0 0 0; font-size: 0.9em; color: #666;">
                                         <em>Note: Shipping rate was locked at subscription creation and will be reused for recurring orders.</em>
                                     </p>
-                                </div>
+                                </details>
                                 <?php } ?>
                                 
                                 <!-- Order Log -->
-                                <div style="margin-top: 16px;">
-                                    <h4 style="margin-top: 0; color: #00618d;"><?php echo TEXT_PAYPALAC_SUBSCRIPTION_ORDER_LOG; ?></h4>
+                                <details class="paypalac-form-section">
+                                    <summary><?php echo TEXT_PAYPALAC_SUBSCRIPTION_ORDER_LOG; ?></summary>
+                                    <div class="paypalac-form-section-content">
                                     <?php if (!empty($orderLogEntries)) { ?>
                                         <ul style="margin: 0; padding-left: 18px;">
                                             <?php foreach ($orderLogEntries as $entry) { ?>
@@ -1983,16 +1984,19 @@ function paypalac_get_table_columns($tableName)
                                     <?php } else { ?>
                                         <em><?php echo TEXT_PAYPALAC_SUBSCRIPTION_ORDER_LOG_EMPTY; ?></em>
                                     <?php } ?>
-                                </div>
+                                    </div>
+                                </details>
 
                                 <!-- Attributes -->
-                                <div style="margin-top: 16px;">
-                                    <label for="attributes-<?php echo $subscriptionId; ?>">Attributes (JSON)</label>
-                                    <textarea id="attributes-<?php echo $subscriptionId; ?>" name="attributes" form="<?php echo $formId; ?>" placeholder="{ }" class="nmx-form-control" style="min-height: 100px; font-family: monospace;"><?php echo zen_output_string_protected($attributesPretty); ?></textarea>
-                                </div>
+                                <details class="paypalac-form-section">
+                                    <summary>Attributes (JSON)</summary>
+                                    <div class="paypalac-form-section-content">
+                                        <textarea id="attributes-<?php echo $subscriptionId; ?>" name="attributes" form="<?php echo $formId; ?>" placeholder="{ }" class="nmx-form-control" style="min-height: 100px; font-family: monospace;"><?php echo zen_output_string_protected($attributesPretty); ?></textarea>
+                                    </div>
+                                </details>
                                 
                                 <!-- Actions -->
-                                <div style="margin-top: 20px; padding-top: 16px; border-top: 2px solid #ddd;">
+                                <div class="paypalac-details-actions" style="margin-top: 20px; padding-top: 16px; border-top: 2px solid #ddd;">
                                     <h4 style="margin-top: 0; color: #00618d;">Actions</h4>
                                     <div class="paypalac-subscription-actions">
                                         <button type="submit" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-primary">Save Changes</button>
@@ -2006,7 +2010,7 @@ function paypalac_get_table_columns($tableName)
                                             <button type="submit" name="set_status" value="pending" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-secondary">Mark Pending</button>
                                         <?php } ?>
                                     </div>
-                                    <div class="paypalac-subscription-actions" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+                                    <div class="paypalac-subscription-actions paypalac-subscription-actions-secondary" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
                                         <?php
                                         $actionParams = $activeQuery !== '' ? $activeQuery . '&' : '';
                                         $subscriptionType = $row['subscription_type'] ?? 'rest';
