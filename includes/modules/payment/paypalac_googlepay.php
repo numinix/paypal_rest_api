@@ -458,7 +458,7 @@ class paypalac_googlepay extends base
             return false;
         }
 
-        // Check using paypalacSavedCardRecurring class if available
+        // Check using paypalSavedCardRecurring class if available
         if (!class_exists('paypalacSavedCardRecurring')) {
             $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
             if (file_exists($savedCardRecurringPath)) {
@@ -553,11 +553,11 @@ class paypalac_googlepay extends base
 
         return [
             'id' => $this->code,
-            'module' => $buttonContainer,
+            'module' => $selectionLabel,
             'fields' => [
                 [
-                    'title' => '',
-                    'field' => $hiddenFields . $script,
+                    'title' => $selectionLabel,
+                    'field' => $buttonContainer . $hiddenFields . $script,
                 ],
             ],
         ];

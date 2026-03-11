@@ -388,7 +388,7 @@ class paypalac_paylater extends base
             return false;
         }
 
-        // Check using paypalacSavedCardRecurring class if available
+        // Check using paypalSavedCardRecurring class if available
         if (!class_exists('paypalacSavedCardRecurring')) {
             $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
             if (file_exists($savedCardRecurringPath)) {
@@ -482,10 +482,10 @@ class paypalac_paylater extends base
 
         return [
             'id' => $this->code,
-            'module' => $buttonContainer,
+            'module' => MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_SELECTION ?? 'Pay Later',
             'fields' => [
                 [
-                    'title' => '',
+                    'title' => $buttonContainer,
                     'field' => $hiddenFields . $script,
                 ],
             ],

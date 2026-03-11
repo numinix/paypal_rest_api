@@ -499,7 +499,7 @@ class paypalac_creditcard extends base
         // Build fields array
         $fields = [];
 
-        // Cardholder first name
+        // Card owner name
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALAC_CC_FIRSTNAME ?? 'First name',
             'field' => zen_draw_input_field('paypalac_cc_firstname', $billing_firstname, 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-firstname" autocomplete="cc-given-name"' . $onFocus),
@@ -520,25 +520,22 @@ class paypalac_creditcard extends base
             'tag' => 'paypalac-cc-number',
         ];
 
+        // Expiry date
+        $fields[] = [
+            'title' => MODULE_PAYMENT_PAYPALAC_CC_EXPIRES ?? 'Expiration Date',
+            'field' =>
+                '<div class="ppr-cc-expiration">' .
+                zen_draw_pull_down_menu('paypalac_cc_expires_month', $expires_month, date('m'), 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-expires-month"' . $onFocus) .
+                zen_draw_pull_down_menu('paypalac_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-expires-year"' . $onFocus) .
+                '</div>',
+            'tag' => 'paypalac-cc-expires-month',
+        ];
+
         // CVV
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALAC_CC_CVV ?? 'CVV',
             'field' => zen_draw_input_field('paypalac_cc_cvv', '', 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-cvv" size="4" maxlength="4" autocomplete="cc-csc"' . $onFocus),
             'tag' => 'paypalac-cc-cvv',
-        ];
-
-        // Expiry month
-        $fields[] = [
-            'title' => MODULE_PAYMENT_PAYPALAC_CC_EXPIRES ?? 'Expiry date',
-            'field' => zen_draw_pull_down_menu('paypalac_cc_expires_month', $expires_month, date('m'), 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-expires-month"' . $onFocus),
-            'tag' => 'paypalac-cc-expires-month',
-        ];
-
-        // Expiry year
-        $fields[] = [
-            'title' => MODULE_PAYMENT_PAYPALAC_CC_EXPIRES_YEAR ?? 'Year',
-            'field' => zen_draw_pull_down_menu('paypalac_cc_expires_year', $expires_year, $this_year, 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-expires-year"' . $onFocus),
-            'tag' => 'paypalac-cc-expires-year',
         ];
 
         // Save card checkbox / subscription notice
@@ -869,7 +866,7 @@ class paypalac_creditcard extends base
         $cc_lastname = $_POST['paypalac_cc_lastname'] ?? ($_POST['ppac_cc_lastname'] ?? '');
         // Compose full name; fall back to legacy combined owner field if new fields are absent
         if ($cc_firstname === '' && $cc_lastname === '') {
-            $cc_owner = $_POST['paypalac_cc_owner'] ?? ($_POST['ppac_cc_owner'] ?? '');
+        $cc_owner = $_POST['paypalac_cc_owner'] ?? ($_POST['ppac_cc_owner'] ?? '');
         } else {
             $cc_owner = trim($cc_firstname . ' ' . $cc_lastname);
         }
