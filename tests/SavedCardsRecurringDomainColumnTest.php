@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Test to verify that the paypalSavedCardRecurring class properly handles
+ * Test to verify that the paypalacSavedCardRecurring class properly handles
  * the optional 'domain' column in the saved_credit_cards_recurring table.
  *
  * This test addresses the issue:
@@ -207,9 +207,9 @@ namespace {
 
     // Test 1: Verify saved_cards_recurring_has_column() method exists
     fwrite(STDOUT, "Test 1: Checking if saved_cards_recurring_has_column() method exists...\n");
-    require_once DIR_FS_CATALOG . 'includes/classes/paypalSavedCardRecurring.php';
+    require_once DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
     
-    if (!method_exists('paypalSavedCardRecurring', 'saved_cards_recurring_has_column')) {
+    if (!method_exists('paypalacSavedCardRecurring', 'saved_cards_recurring_has_column')) {
         fwrite(STDERR, "✗ CRITICAL: saved_cards_recurring_has_column() method does not exist\n");
         $failures++;
     } else {
@@ -221,7 +221,7 @@ namespace {
     $db = new mockDb(false); // No domain column
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     $reflection = new ReflectionClass($recurringObj);
     $method = $reflection->getMethod('saved_cards_recurring_has_column');
     $method->setAccessible(true);
@@ -240,7 +240,7 @@ namespace {
     $GLOBALS['db'] = $db;
     
     // Create new instance to test with fresh state
-    $recurringObj2 = new paypalSavedCardRecurring();
+    $recurringObj2 = new paypalacSavedCardRecurring();
     $reflection2 = new ReflectionClass($recurringObj2);
     $method2 = $reflection2->getMethod('saved_cards_recurring_has_column');
     $method2->setAccessible(true);
@@ -258,7 +258,7 @@ namespace {
     $db = new mockDb(false); // No domain column
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     $reflection = new ReflectionClass($recurringObj);
     
     $method = $reflection->getMethod('get_attributes');
@@ -302,7 +302,7 @@ namespace {
     $db = new mockDb(true); // Has domain column
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     $reflection = new ReflectionClass($recurringObj);
     
     $method = $reflection->getMethod('saved_cards_recurring_has_column');
@@ -323,7 +323,7 @@ namespace {
     $db = new mockDb(true); // Has domain column
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     $reflection = new ReflectionClass($recurringObj);
     
     $method = $reflection->getMethod('saved_cards_recurring_has_column');

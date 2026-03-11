@@ -16,8 +16,8 @@ chdir(DIR_FS_CATALOG);
 require_once 'includes/application_top.php';
 
 // Load saved card recurring class for group pricing methods
-if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php')) {
-    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php')) {
+    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
 }
 
 $customersProcessed = 0;

@@ -388,16 +388,16 @@ class paypalac_paylater extends base
             return false;
         }
 
-        // Check using paypalSavedCardRecurring class if available
-        if (!class_exists('paypalSavedCardRecurring')) {
-            $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+        // Check using paypalacSavedCardRecurring class if available
+        if (!class_exists('paypalacSavedCardRecurring')) {
+            $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
             if (file_exists($savedCardRecurringPath)) {
                 require_once $savedCardRecurringPath;
             }
         }
 
-        if (class_exists('paypalSavedCardRecurring')) {
-            $recurring = new \paypalSavedCardRecurring();
+        if (class_exists('paypalacSavedCardRecurring')) {
+            $recurring = new \paypalacSavedCardRecurring();
             $subscriptions = $recurring->find_subscription_products_in_order($products);
             if (!empty($subscriptions)) {
                 return true;

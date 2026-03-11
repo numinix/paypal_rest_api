@@ -19,7 +19,7 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify correct constant names are used
 fwrite(STDOUT, "Test 1: Checking PayPal REST client uses correct constant names...\n");
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     
@@ -60,7 +60,7 @@ if (file_exists($savedCardRecurringFile)) {
     fwrite(STDOUT, "✓ No old incorrect constant names found\n");
     fwrite(STDOUT, "\n");
 } else {
-    fwrite(STDERR, "✗ paypalSavedCardRecurring.php not found\n\n");
+    fwrite(STDERR, "✗ paypalacSavedCardRecurring.php not found\n\n");
     exit(1);
 }
 

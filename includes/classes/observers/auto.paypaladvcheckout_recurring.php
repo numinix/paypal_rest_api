@@ -261,19 +261,19 @@ class zcObserverPaypaladvcheckoutRecurring
                 $nextBillingDate = $this->calculateNextBillingDate($subscriptionAttributes);
                 
                 // Create subscription using saved card recurring class
-                if (!class_exists('paypalSavedCardRecurring')) {
-                    $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+                if (!class_exists('paypalacSavedCardRecurring')) {
+                    $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
                     if (file_exists($savedCardRecurringPath)) {
                         require_once $savedCardRecurringPath;
                     }
                 }
-                if (!class_exists('paypalSavedCardRecurring')) {
-                    $this->log->write("    ERROR: paypalSavedCardRecurring class not available.");
+                if (!class_exists('paypalacSavedCardRecurring')) {
+                    $this->log->write("    ERROR: paypalacSavedCardRecurring class not available.");
                     $products->MoveNext();
                     continue;
                 }
                 
-                $savedCardRecurring = new paypalSavedCardRecurring();
+                $savedCardRecurring = new paypalacSavedCardRecurring();
                 $subscriptionId = $savedCardRecurring->schedule_payment(
                     (float)$products->fields['final_price'],
                     $nextBillingDate,

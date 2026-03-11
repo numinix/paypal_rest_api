@@ -19,19 +19,19 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify skip_next_payment method exists and calculates dates
 echo "Test 1: Checking for skip_next_payment method with date calculation...\n";
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     if (strpos($content, 'function skip_next_payment') !== false &&
         strpos($content, 'DateInterval') !== false &&
         strpos($content, 'update_payment_info') !== false) {
-        echo "✓ paypalSavedCardRecurring has skip_next_payment method with date calculation\n\n";
+        echo "✓ paypalacSavedCardRecurring has skip_next_payment method with date calculation\n\n";
     } else {
-        echo "✗ paypalSavedCardRecurring missing complete skip_next_payment implementation\n\n";
+        echo "✗ paypalacSavedCardRecurring missing complete skip_next_payment implementation\n\n";
         exit(1);
     }
 } else {
-    echo "✗ paypalSavedCardRecurring.php not found\n\n";
+    echo "✗ paypalacSavedCardRecurring.php not found\n\n";
     exit(1);
 }
 

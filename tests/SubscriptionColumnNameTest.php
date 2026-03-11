@@ -180,14 +180,14 @@ namespace {
     $failures = 0;
 
     // Load the class
-    require_once DIR_FS_CATALOG . 'includes/classes/paypalSavedCardRecurring.php';
+    require_once DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
 
     // Test 1: Verify get_attributes() uses correct column name
     fwrite(STDOUT, "Test 1: Verifying get_attributes() uses 'orders_products_id' instead of 'original_orders_products_id'...\n");
     $db = new mockDb();
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     $reflection = new ReflectionClass($recurringObj);
     
     $method = $reflection->getMethod('get_attributes');
@@ -220,7 +220,7 @@ namespace {
     $db = new mockDb();
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     $reflection = new ReflectionClass($recurringObj);
     
     $method = $reflection->getMethod('get_domain');
@@ -250,7 +250,7 @@ namespace {
 
     // Test 3: Verify build_subscription_scope_sql() uses correct column name
     fwrite(STDOUT, "\nTest 3: Verifying build_subscription_scope_sql() uses 'orders_products_id' instead of 'original_orders_products_id'...\n");
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     $reflection = new ReflectionClass($recurringObj);
     
     $method = $reflection->getMethod('build_subscription_scope_sql');

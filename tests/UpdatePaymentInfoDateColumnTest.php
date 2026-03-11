@@ -207,14 +207,14 @@ namespace {
     $failures = 0;
 
     // Load the class
-    require_once DIR_FS_CATALOG . 'includes/classes/paypalSavedCardRecurring.php';
+    require_once DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
 
     // Test 1: Verify update_payment_info() uses 'next_payment_date' instead of 'date'
     fwrite(STDOUT, "Test 1: Verifying update_payment_info() uses 'next_payment_date' for date updates...\n");
     $db = new mockDb();
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     
     try {
         // Call update_payment_info with a date parameter
@@ -259,7 +259,7 @@ namespace {
     $db = new mockDb();
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     
     try {
         $updateData = [

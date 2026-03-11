@@ -18,7 +18,7 @@ require_once 'includes/application_top.php';
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 
 // Load saved card recurring class
-require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
 
 // Load PayPalProfileManager if available
 if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.php')) {
@@ -100,8 +100,8 @@ if (defined('TABLE_PAYPAL_RECURRING')) {
         
         // Initialize PayPalProfileManager
         if (class_exists('PayPalProfileManager')) {
-            $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-            $PayPalApiClient = $paypalSavedCardRecurring->get_paypal_api_client();
+            $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+            $PayPalApiClient = $paypalacSavedCardRecurring->get_paypal_api_client();
             $PayPalProfileManager = PayPalProfileManager::create($PayPalApiClient, $PayPal);
         }
         

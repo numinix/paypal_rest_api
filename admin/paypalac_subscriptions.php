@@ -30,8 +30,8 @@ if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.p
 }
 
 // Load saved card recurring class
-if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php')) {
-    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php')) {
+    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
 }
 
 use PayPalAdvancedCheckout\Common\SubscriptionManager;
@@ -104,9 +104,9 @@ function paypalac_get_profile_manager()
         }
         
         $PayPalRestClient = null;
-        if (class_exists('paypalSavedCardRecurring')) {
-            $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-            $PayPalRestClient = $paypalSavedCardRecurring->get_paypal_rest_client();
+        if (class_exists('paypalacSavedCardRecurring')) {
+            $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+            $PayPalRestClient = $paypalacSavedCardRecurring->get_paypal_rest_client();
         }
         
         $profileManager = PayPalProfileManager::create($PayPalRestClient, $PayPal);
@@ -145,10 +145,18 @@ function paypalac_is_subscription_active($subscriptionType, $subscriptionId)
     return false;
 }
 
+/**
+ * This admin page now manages REST subscriptions only.
+ */
+function paypalac_normalize_subscription_type($subscriptionType)
+{
+    return 'rest';
+}
+
 $action = strtolower(trim((string) ($_POST['action'] ?? $_GET['action'] ?? '')));
 
 if ($action === 'update_subscription') {
-    $subscriptionType = trim((string) ($_POST['subscription_type'] ?? 'rest'));
+    $subscriptionType = paypalac_normalize_subscription_type($_POST['subscription_type'] ?? 'rest');
     $subscriptionId = (int) zen_db_prepare_input($_POST['paypal_subscription_id'] ?? 0);
     $customersId = (int) zen_db_prepare_input($_POST['customers_id'] ?? 0);
     $redirectQuery = trim((string) ($_POST['redirect_query'] ?? ''));
@@ -160,14 +168,14 @@ if ($action === 'update_subscription') {
     }
     
     // Route to saved card handler for saved card subscriptions
-    if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
-        $paypalSavedCardRecurring = new paypalSavedCardRecurring();
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
         $savedCardMetadata = [];
         
         // Handle status change for saved card
         if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
             $status = strtolower(trim((string) zen_db_prepare_input($_POST['set_status'])));
-            $paypalSavedCardRecurring->update_payment_status($subscriptionId, $status, 'Status updated by admin');
+            $paypalacSavedCardRecurring->update_payment_status($subscriptionId, $status, 'Status updated by admin');
             $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_STATUS_UPDATED, $subscriptionId, $status), 'success');
             zen_redirect($redirectUrl);
         }
@@ -229,7 +237,7 @@ if ($action === 'update_subscription') {
         
         if (!empty($updateData)) {
             $updateData['comments'] = 'Updated by admin via unified subscriptions page.';
-            $paypalSavedCardRecurring->update_payment_info($subscriptionId, $updateData, $savedCardMetadata);
+            $paypalacSavedCardRecurring->update_payment_info($subscriptionId, $updateData, $savedCardMetadata);
             $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId), 'success');
         }
         
@@ -390,7 +398,7 @@ if ($action === 'update_subscription') {
 
 // Cancel subscription action
 if ($action === 'cancel_subscription') {
-    $subscriptionType = trim((string) ($_GET['subscription_type'] ?? 'rest'));
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
     $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
     $redirectQuery = zen_get_all_get_params(['action', 'subscription_id', 'subscription_type']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
@@ -401,13 +409,13 @@ if ($action === 'cancel_subscription') {
     }
     
     // Route to saved card handler
-    if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
-        $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-        $paypalSavedCardRecurring->update_payment_status($subscriptionId, 'cancelled', 'Cancelled by admin');
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'cancelled', 'Cancelled by admin');
         
-        $subscription = $paypalSavedCardRecurring->get_payment_details($subscriptionId);
-        if ($subscription && method_exists($paypalSavedCardRecurring, 'remove_group_pricing')) {
-            $paypalSavedCardRecurring->remove_group_pricing($subscription['customers_id'], $subscription['products_id']);
+        $subscription = $paypalacSavedCardRecurring->get_payment_details($subscriptionId);
+        if ($subscription && method_exists($paypalacSavedCardRecurring, 'remove_group_pricing')) {
+            $paypalacSavedCardRecurring->remove_group_pricing($subscription['customers_id'], $subscription['products_id']);
         }
         
         $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
@@ -445,7 +453,7 @@ if ($action === 'cancel_subscription') {
 
 // Suspend subscription action
 if ($action === 'suspend_subscription') {
-    $subscriptionType = trim((string) ($_GET['subscription_type'] ?? 'rest'));
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
     $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
     $redirectQuery = zen_get_all_get_params(['action', 'subscription_id', 'subscription_type']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
@@ -456,9 +464,9 @@ if ($action === 'suspend_subscription') {
     }
     
     // Route to saved card handler
-    if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
-        $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-        $paypalSavedCardRecurring->update_payment_status($subscriptionId, 'suspended', 'Suspended by admin');
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'suspended', 'Suspended by admin');
         
         $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_SUSPENDED, $subscriptionId), 'success');
         zen_redirect($redirectUrl);
@@ -494,7 +502,7 @@ if ($action === 'suspend_subscription') {
 
 // Reactivate subscription action
 if ($action === 'reactivate_subscription') {
-    $subscriptionType = trim((string) ($_GET['subscription_type'] ?? 'rest'));
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
     $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
     $redirectQuery = zen_get_all_get_params(['action', 'subscription_id', 'subscription_type']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
@@ -505,13 +513,13 @@ if ($action === 'reactivate_subscription') {
     }
     
     // Route to saved card handler
-    if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
-        $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-        $paypalSavedCardRecurring->update_payment_status($subscriptionId, 'scheduled', 'Re-activated by admin');
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'scheduled', 'Re-activated by admin');
         
-        $subscription = $paypalSavedCardRecurring->get_payment_details($subscriptionId);
-        if ($subscription && method_exists($paypalSavedCardRecurring, 'create_group_pricing')) {
-            $paypalSavedCardRecurring->create_group_pricing($subscription['products_id'], $subscription['customers_id']);
+        $subscription = $paypalacSavedCardRecurring->get_payment_details($subscriptionId);
+        if ($subscription && method_exists($paypalacSavedCardRecurring, 'create_group_pricing')) {
+            $paypalacSavedCardRecurring->create_group_pricing($subscription['products_id'], $subscription['customers_id']);
         }
         
         $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_REACTIVATED, $subscriptionId), 'success');
@@ -548,7 +556,7 @@ if ($action === 'reactivate_subscription') {
 
 // Skip next payment action
 if ($action === 'skip_next_payment') {
-    $subscriptionType = trim((string) ($_GET['subscription_type'] ?? 'rest'));
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
     $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
     $redirectQuery = zen_get_all_get_params(['action', 'subscription_id', 'subscription_type']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
@@ -559,9 +567,9 @@ if ($action === 'skip_next_payment') {
     }
     
     // Route to saved card handler
-    if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
-        $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-        $success = $paypalSavedCardRecurring->skip_next_payment($subscriptionId);
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $success = $paypalacSavedCardRecurring->skip_next_payment($subscriptionId);
         if ($success) {
             $messageStack->add_session('Payment skipped for subscription #' . $subscriptionId . '. The next billing date has been calculated and updated.', 'success');
         } else {
@@ -697,7 +705,7 @@ if ($action === 'skip_next_payment') {
 // Archive subscription action
 if ($action === 'archive_subscription') {
     $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
-    $subscriptionType = strtolower(trim((string) ($_GET['subscription_type'] ?? 'rest')));
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
     $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
     
@@ -735,7 +743,7 @@ if ($action === 'archive_subscription') {
 // Unarchive subscription action
 if ($action === 'unarchive_subscription') {
     $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
-    $subscriptionType = strtolower(trim((string) ($_GET['subscription_type'] ?? 'rest')));
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
     $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
     $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
     
@@ -1051,7 +1059,7 @@ $filters = [
     'status' => trim((string) ($_GET['status'] ?? 'scheduled')),
     'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
     'show_archived' => trim((string) ($_GET['show_archived'] ?? '')),
-    'subscription_type' => trim((string) ($_GET['subscription_type'] ?? '')),
+    'subscription_type' => 'rest',
 ];
 
 $queryString = [];
@@ -1077,21 +1085,6 @@ if ($statusRecords instanceof queryFactoryResult && $statusRecords->RecordCount(
         $statusRecords->MoveNext();
     }
 }
-if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
-    $savedCardStatusRecords = $db->Execute(
-        'SELECT DISTINCT status FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' ORDER BY status'
-    );
-    if ($savedCardStatusRecords instanceof queryFactoryResult && $savedCardStatusRecords->RecordCount() > 0) {
-        while (!$savedCardStatusRecords->EOF) {
-            $statusValue = (string) $savedCardStatusRecords->fields['status'];
-            if ($statusValue !== '' && !isset($availableStatuses[$statusValue])) {
-                $availableStatuses[$statusValue] = ucwords(str_replace('_', ' ', $statusValue));
-            }
-            $savedCardStatusRecords->MoveNext();
-        }
-    }
-}
-
 // Get customers from both tables
 $customersOptions = [];
 $customerRecords = $db->Execute(
@@ -1109,25 +1102,6 @@ if ($customerRecords instanceof queryFactoryResult) {
         $customerRecords->MoveNext();
     }
 }
-if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT_CARDS')) {
-    $savedCardCustomerRecords = $db->Execute(
-        'SELECT DISTINCT scc.customers_id, c.customers_firstname, c.customers_lastname'
-        . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
-        . ' LEFT JOIN ' . TABLE_SAVED_CREDIT_CARDS . ' scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id'
-        . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = scc.customers_id'
-        . ' ORDER BY c.customers_lastname, c.customers_firstname'
-    );
-    if ($savedCardCustomerRecords instanceof queryFactoryResult) {
-        while (!$savedCardCustomerRecords->EOF) {
-            $cid = (int) $savedCardCustomerRecords->fields['customers_id'];
-            if ($cid > 0 && !isset($customersOptions[$cid])) {
-                $customersOptions[$cid] = trim($savedCardCustomerRecords->fields['customers_lastname'] . ', ' . $savedCardCustomerRecords->fields['customers_firstname']);
-            }
-            $savedCardCustomerRecords->MoveNext();
-        }
-    }
-}
-
 // Get products from both tables
 $productOptions = [];
 $productRecords = $db->Execute(
@@ -1144,23 +1118,6 @@ if ($productRecords instanceof queryFactoryResult) {
         $productRecords->MoveNext();
     }
 }
-if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
-    $savedCardProductRecords = $db->Execute(
-        'SELECT DISTINCT sccr.products_id, sccr.products_name'
-        . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
-        . ' ORDER BY sccr.products_name'
-    );
-    if ($savedCardProductRecords instanceof queryFactoryResult) {
-        while (!$savedCardProductRecords->EOF) {
-            $pid = (int) $savedCardProductRecords->fields['products_id'];
-            if ($pid > 0 && !isset($productOptions[$pid])) {
-                $productOptions[$pid] = $savedCardProductRecords->fields['products_name'];
-            }
-            $savedCardProductRecords->MoveNext();
-        }
-    }
-}
-
 $paymentModuleOptions = [];
 $paymentRecords = $db->Execute(
     'SELECT DISTINCT o.payment_module_code, o.payment_method'
@@ -1248,67 +1205,7 @@ if ($filters['subscription_type'] === '' || $filters['subscription_type'] === 'r
     }
 }
 
-// Fetch Saved Card subscriptions
-// Note: Saved cards don't support payment_module filters
-if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_SAVED_CREDIT_CARDS') 
-    && ($filters['subscription_type'] === '' || $filters['subscription_type'] === 'savedcard')
-    ) {
-    $savedCardWhereClauses = [];
-    
-    if ($filters['customers_id'] > 0) {
-        $savedCardWhereClauses[] = 'scc.customers_id = ' . (int) $filters['customers_id'];
-    }
-    if ($filters['products_id'] > 0) {
-        $savedCardWhereClauses[] = 'sccr.products_id = ' . (int) $filters['products_id'];
-    }
-    if ($filters['status'] !== '') {
-        $savedCardWhereClauses[] = "sccr.status = '" . zen_db_input($filters['status']) . "'";
-    }
-    if ($filters['show_archived'] === 'only') {
-        $savedCardWhereClauses[] = 'sccr.is_archived = 1';
-    } elseif ($filters['show_archived'] !== 'all') {
-        $savedCardWhereClauses[] = 'sccr.is_archived = 0';
-    }
-    
-    $savedCardSql = 'SELECT sccr.saved_credit_card_recurring_id AS paypal_subscription_id,'
-        . ' scc.customers_id, sccr.products_id, sccr.products_name,'
-        . ' sccr.amount, sccr.currency_code, sccr.billing_period, sccr.billing_frequency,'
-        . ' sccr.total_billing_cycles, sccr.status, sccr.date_added AS date,'
-        . ' sccr.next_payment_date, sccr.comments, sccr.domain, sccr.is_archived,'
-        . ' c.customers_firstname, c.customers_lastname, c.customers_email_address,'
-        . ' scc.type AS vault_card_type, scc.last_digits AS vault_last_digits,'
-        . ' sccr.saved_credit_card_id,'
-        . ' sccr.billing_name, sccr.billing_company, sccr.billing_street_address,'
-        . ' sccr.billing_suburb, sccr.billing_city, sccr.billing_state,'
-        . ' sccr.billing_postcode, sccr.billing_country_id, sccr.billing_country_code,'
-        . ' sccr.shipping_method, sccr.shipping_cost'
-        . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
-        . ' LEFT JOIN ' . TABLE_SAVED_CREDIT_CARDS . ' scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id'
-        . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = scc.customers_id';
-    
-    if (!empty($savedCardWhereClauses)) {
-        $savedCardSql .= ' WHERE ' . implode(' AND ', $savedCardWhereClauses);
-    }
-    
-    $savedCardSubscriptions = $db->Execute($savedCardSql);
-    
-    if ($savedCardSubscriptions instanceof queryFactoryResult) {
-        while (!$savedCardSubscriptions->EOF) {
-            $row = $savedCardSubscriptions->fields;
-            $row['subscription_type'] = 'savedcard';
-            // Map saved card fields to match REST subscription structure
-            // Note: 'date' field is aliased from 'date_added' for compatibility with code expecting creation date
-            $row['date_added'] = $row['date'];
-            // Keep the stored next_payment_date value for sorting and display.
-            $row['next_payment_date'] = isset($row['next_payment_date']) ? trim((string) $row['next_payment_date']) : '';
-            $row['sort_date'] = strtotime($row['date'] ?? 'now');
-            // Saved card subscriptions don't have quantity field, always 1
-            $row['products_quantity'] = 1;
-            $allSubscriptions[] = $row;
-            $savedCardSubscriptions->MoveNext();
-        }
-    }
-}
+// Legacy saved-card subscriptions are intentionally excluded from this admin page.
 
 // Sort subscriptions by next billing date, oldest first.
 // Records without a next payment date are sorted last.
@@ -1458,12 +1355,8 @@ function paypalac_get_table_columns($tableName)
                         </select>
                     </div>
                     <div class="nmx-form-group">
-                        <label for="filter-subscription-type">Subscription Type</label>
-                        <select name="subscription_type" id="filter-subscription-type" class="nmx-form-control">
-                            <option value="">All Types</option>
-                            <option value="rest"<?php echo ($filters['subscription_type'] === 'rest' ? ' selected' : ''); ?>>REST API</option>
-                            <option value="savedcard"<?php echo ($filters['subscription_type'] === 'savedcard' ? ' selected' : ''); ?>>Saved Card</option>
-                        </select>
+                        <label>Subscription Type</label>
+                        <span class="nmx-form-control" style="display:inline-block;min-width:140px;background:#f8f9fa;">REST API only</span>
                     </div>
                     <div class="nmx-form-group">
                         <label for="filter-payment">Payment Method</label>

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Test to verify that paypalSavedCardRecurring has no site-specific customizations.
+ * Test to verify that paypalacSavedCardRecurring has no site-specific customizations.
  *
  * This test ensures the plugin code is clean and doesn't contain:
  * - Hardcoded site-specific constants (CATEGORY_ID_PLANS, etc.)
@@ -26,7 +26,7 @@ namespace {
 
     $failures = 0;
 
-    $sourceFile = DIR_FS_CATALOG . 'includes/classes/paypalSavedCardRecurring.php';
+    $sourceFile = DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
     if (!file_exists($sourceFile)) {
         fwrite(STDERR, "✗ Source file not found: $sourceFile\n");
         exit(1);

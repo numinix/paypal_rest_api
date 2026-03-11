@@ -227,7 +227,7 @@ namespace {
     $failures = 0;
 
     // Load the class
-    require_once DIR_FS_CATALOG . 'includes/classes/paypalSavedCardRecurring.php';
+    require_once DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
 
     // Test: Verify schedule_payment() uses 'next_payment_date' instead of 'date'
     fwrite(STDOUT, "Test: Verifying schedule_payment() uses 'next_payment_date' instead of 'date'...\n");
@@ -235,7 +235,7 @@ namespace {
     $db = new mockDb();
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     
     try {
         // Call schedule_payment with test data

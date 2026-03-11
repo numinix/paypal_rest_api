@@ -543,7 +543,7 @@ Every file with `use PayPalRestful\...` must be updated to `use PayPalAdvancedCh
 - AJAX handlers
 - Root entry points (`ppac_webhook.php`, `ppac_listener.php`, etc.)
 - `webhook.core.php` autoloader
-- `paypalSavedCardRecurring.php` class
+- `paypalacSavedCardRecurring.php` class
 
 ### 7.5 String References to Namespace
 
@@ -796,7 +796,7 @@ Some test files have `paypalr` in their filename:
 
 ### 14.2 Class Files
 
-- [ ] `includes/classes/paypalSavedCardRecurring.php` — update all `paypalr` / `PayPalRestful` references
+- [ ] `includes/classes/paypalacSavedCardRecurring.php` — update all `paypalr` / `PayPalRestful` references
 
 ### 14.3 Template Overrides
 
