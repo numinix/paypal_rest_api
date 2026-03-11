@@ -452,18 +452,29 @@ $calculateNextScheduledBillingDate = function (DateTime $currentNextPaymentDate,
     return $advanceBillingCycle($currentNextPaymentDate, $attributes);
 };
 
-// Debug: Check what subscriptions exist in the database (excluding cancelled)
-$debug_sql = 'SELECT saved_credit_card_recurring_id, status, next_payment_date, products_name FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE status != \'cancelled\' ORDER BY saved_credit_card_recurring_id';
+// Debug: Show only due paypalac* subscriptions handled by this cron.
+$debug_sql = 'SELECT sccr.saved_credit_card_recurring_id, sccr.status, sccr.next_payment_date, sccr.products_name'
+    . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
+    . ' INNER JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = sccr.orders_id'
+    . " WHERE LOWER(TRIM(sccr.status)) = 'scheduled'"
+    . " AND sccr.next_payment_date IS NOT NULL"
+    . " AND sccr.next_payment_date <> '0000-00-00'"
+    . " AND DATE(sccr.next_payment_date) <= '" . date('Y-m-d') . "'"
+    . " AND o.payment_module_code LIKE 'paypalac%'"
+    . ' ORDER BY sccr.saved_credit_card_recurring_id';
 $debug_result = $db->Execute($debug_sql);
-$debug_output = "\n=== DEBUG: Active Subscriptions in Database ===\n";
+$debug_output = "
+=== DEBUG: Due REST Subscriptions in Database ===
+";
 while (!$debug_result->EOF) {
-    $debug_output .= sprintf("ID: %d | Status: %s | Next Payment: %s | Product: %s\n", 
+    $debug_output .= sprintf("ID: %d | Status: %s | Next Payment: %s | Product: %s
+", 
         $debug_result->fields['saved_credit_card_recurring_id'],
         $debug_result->fields['status'],
         $debug_result->fields['next_payment_date'],
         $debug_result->fields['products_name']
     );
-    error_log('PayPal Cron - Subscription: ' . sprintf('ID: %d, Status: %s, Next Payment: %s, Product: %s', 
+    error_log('PayPal Cron - Due subscription: ' . sprintf('ID: %d, Status: %s, Next Payment: %s, Product: %s', 
         $debug_result->fields['saved_credit_card_recurring_id'],
         $debug_result->fields['status'],
         $debug_result->fields['next_payment_date'],
@@ -471,7 +482,9 @@ while (!$debug_result->EOF) {
     ));
     $debug_result->MoveNext();
 }
-$debug_output .= "=== END DEBUG ===\n\n";
+$debug_output .= "=== END DEBUG ===
+
+";
 print recurring_format_output($debug_output);
 
 $todays_payments = $paypalSavedCardRecurring->get_scheduled_payments();
