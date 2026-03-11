@@ -2,7 +2,7 @@
 // Do not eager-load core Zen Cart classes here.
 // Storefront bootstrap/autoload handles these and duplicate includes can trigger
 // class redeclaration fatals (e.g., includes/classes/order.php on checkout pages).
-class paypalSavedCardRecurring {
+class paypalacSavedCardRecurring {
 var $PayPal, $PayPalAdvancedCheckout, $paypalsavedcard, $paymentModuleCode;
 function __construct($paypalsavedcard = null) {
 $this->PayPal = null;

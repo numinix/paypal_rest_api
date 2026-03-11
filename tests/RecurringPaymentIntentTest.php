@@ -21,10 +21,10 @@ declare(strict_types=1);
 fwrite(STDOUT, "Running Recurring Payment Intent Test...\n\n");
 
 $basePath = dirname(__DIR__);
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
 
 if (!file_exists($savedCardRecurringFile)) {
-    fwrite(STDERR, "✗ paypalSavedCardRecurring.php not found\n\n");
+    fwrite(STDERR, "✗ paypalacSavedCardRecurring.php not found\n\n");
     exit(1);
 }
 

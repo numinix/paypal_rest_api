@@ -35,9 +35,9 @@ namespace {
         define('DIR_WS_CLASSES', 'includes/classes/');
     }
 
-    // Mock paypalSavedCardRecurring class
-    if (!class_exists('paypalSavedCardRecurring')) {
-        class paypalSavedCardRecurring {
+    // Mock paypalacSavedCardRecurring class
+    if (!class_exists('paypalacSavedCardRecurring')) {
+        class paypalacSavedCardRecurring {
             public function schedule_payment($amount, $nextBillingDate, $savedCreditCardId, $ordersProductsId, $description, $metadata = []) {
                 return 1; // Return mock subscription ID
             }

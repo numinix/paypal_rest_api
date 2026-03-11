@@ -29,7 +29,7 @@ if (class_exists('PayPalAdvancedCheckout\\Common\\SavedCreditCardsManager')) {
 }
 
 // Load saved card recurring class
-require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
 
 // Load extra datafiles if available
 if (file_exists(DIR_FS_CATALOG . DIR_WS_INCLUDES . 'extra_datafiles/saved_credit_cards.php')) {
@@ -44,7 +44,7 @@ if (!defined('HEADING_TITLE')) {
 
 
 
-$paypalSavedCardRecurring = new paypalSavedCardRecurring();
+$paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
 
 /**
  * Format array for zen_draw_pull_down_menu
@@ -68,32 +68,32 @@ $redirectAfterAction = false;
 switch ($action) {
     case 'cancel_scheduled_payment':
         if ($_GET['saved_card_recurring_id'] > 0) {
-            $paypalSavedCardRecurring->update_payment_status($_GET['saved_card_recurring_id'], 'cancelled', 'Cancelled by admin');
+            $paypalacSavedCardRecurring->update_payment_status($_GET['saved_card_recurring_id'], 'cancelled', 'Cancelled by admin');
             $messageStack->add_session( sprintf(SUCCESS_SAVED_CARD_SUBSCRIPTION_CANCELLED, $_GET['saved_card_recurring_id']), 'success');
             
             // Cancel group pricing
-            $subscription = $paypalSavedCardRecurring->get_payment_details($_GET['saved_card_recurring_id']);
-            if ($subscription && method_exists($paypalSavedCardRecurring, 'remove_group_pricing')) {
-                $paypalSavedCardRecurring->remove_group_pricing($subscription['customers_id'], $subscription['products_id']);
+            $subscription = $paypalacSavedCardRecurring->get_payment_details($_GET['saved_card_recurring_id']);
+            if ($subscription && method_exists($paypalacSavedCardRecurring, 'remove_group_pricing')) {
+                $paypalacSavedCardRecurring->remove_group_pricing($subscription['customers_id'], $subscription['products_id']);
             }
         }
         $redirectAfterAction = true;
         break;
 
     case 'reactivate_scheduled_payment':
-        $paypalSavedCardRecurring->update_payment_status($_GET['saved_card_recurring_id'], 'scheduled', 'Re-activated by admin');
+        $paypalacSavedCardRecurring->update_payment_status($_GET['saved_card_recurring_id'], 'scheduled', 'Re-activated by admin');
         $messageStack->add_session( sprintf(SUCCESS_SAVED_CARD_SUBSCRIPTION_REACTIVATED, $_GET['saved_card_recurring_id']), 'success');
         
         // Re-activate group pricing
-        $subscription = $paypalSavedCardRecurring->get_payment_details($_GET['saved_card_recurring_id']);
-        if ($subscription && method_exists($paypalSavedCardRecurring, 'create_group_pricing')) {
-            $paypalSavedCardRecurring->create_group_pricing($subscription['products_id'], $subscription['customers_id']);
+        $subscription = $paypalacSavedCardRecurring->get_payment_details($_GET['saved_card_recurring_id']);
+        if ($subscription && method_exists($paypalacSavedCardRecurring, 'create_group_pricing')) {
+            $paypalacSavedCardRecurring->create_group_pricing($subscription['products_id'], $subscription['customers_id']);
         }
         $redirectAfterAction = true;
         break;
 
     case 'update_credit_card':
-        $paypalSavedCardRecurring->update_payment_info($_GET['saved_card_recurring_id'], [
+        $paypalacSavedCardRecurring->update_payment_info($_GET['saved_card_recurring_id'], [
             'saved_credit_card_id' => $_GET['set_card'],
             'comments' => '  Credit card updated by admin. '
         ]);
@@ -102,7 +102,7 @@ switch ($action) {
         break;
 
     case 'update_payment_date':
-        $paypalSavedCardRecurring->update_payment_info($_GET['saved_card_recurring_id'], [
+        $paypalacSavedCardRecurring->update_payment_info($_GET['saved_card_recurring_id'], [
             'date' => $_GET['set_date'],
             'comments' => '  Date updated by admin to ' . $_GET['set_date'] . '  '
         ]);
@@ -111,7 +111,7 @@ switch ($action) {
         break;
 
     case 'update_amount_subscription':
-        $paypalSavedCardRecurring->update_payment_info($_GET['saved_card_recurring_id'], [
+        $paypalacSavedCardRecurring->update_payment_info($_GET['saved_card_recurring_id'], [
             'amount' => $_GET['set_amount'],
             'comments' => '  Amount updated by admin to ' . $_GET['set_amount'] . '  '
         ]);
@@ -120,7 +120,7 @@ switch ($action) {
         break;
 
     case 'update_product_id':
-        $paypalSavedCardRecurring->update_payment_info($_GET['saved_card_recurring_id'], [
+        $paypalacSavedCardRecurring->update_payment_info($_GET['saved_card_recurring_id'], [
             'product' => $_GET['set_products_id'],
             'comments' => '  Product updated by admin  ',
             'original_orders_products_id' => $_GET['original_orders_products_id']
@@ -131,7 +131,7 @@ switch ($action) {
     
     case 'skip_next_payment':
         if ($_GET['saved_card_recurring_id'] > 0) {
-            $success = $paypalSavedCardRecurring->skip_next_payment($_GET['saved_card_recurring_id']);
+            $success = $paypalacSavedCardRecurring->skip_next_payment($_GET['saved_card_recurring_id']);
             if ($success) {
                 $messageStack->add_session('Payment skipped for subscription #' . $_GET['saved_card_recurring_id'] . '. The next billing date has been calculated and updated.', 'success');
             } else {
@@ -166,7 +166,7 @@ switch ($action) {
             }
             
             $addressData['comments'] = '  Billing address updated by admin  ';
-            $paypalSavedCardRecurring->update_payment_info($_POST['saved_card_recurring_id'], $addressData);
+            $paypalacSavedCardRecurring->update_payment_info($_POST['saved_card_recurring_id'], $addressData);
             $messageStack->add_session('Billing address updated for subscription #' . $_POST['saved_card_recurring_id'], 'success');
         }
         $redirectAfterAction = true;

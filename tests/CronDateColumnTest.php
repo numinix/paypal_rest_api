@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Test to verify that paypalSavedCardRecurring methods use correct column name 'next_payment_date'
+ * Test to verify that paypalacSavedCardRecurring methods use correct column name 'next_payment_date'
  * instead of 'date' in SQL queries.
  *
  * This test addresses the issue:
@@ -208,14 +208,14 @@ namespace {
     $failures = 0;
 
     // Load the class
-    require_once DIR_FS_CATALOG . 'includes/classes/paypalSavedCardRecurring.php';
+    require_once DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
 
     // Test 1: Verify get_scheduled_payments() uses 'next_payment_date'
     fwrite(STDOUT, "Test 1: Verifying get_scheduled_payments() uses 'next_payment_date' in WHERE clause...\n");
     $db = new mockDb();
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     
     try {
         $payments = $recurringObj->get_scheduled_payments();
@@ -244,7 +244,7 @@ namespace {
     $db = new mockDb();
     $GLOBALS['db'] = $db;
     
-    $recurringObj = new paypalSavedCardRecurring();
+    $recurringObj = new paypalacSavedCardRecurring();
     
     try {
         $reflection = new ReflectionClass($recurringObj);
@@ -293,7 +293,7 @@ namespace {
     fwrite(STDOUT, "\nTest 3: Verifying customer_has_subscription() uses 'next_payment_date' from subscription array...\n");
     
     // Read the source code to verify the array access
-    $sourceFile = DIR_FS_CATALOG . 'includes/classes/paypalSavedCardRecurring.php';
+    $sourceFile = DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
     $content = file_get_contents($sourceFile);
     
     if (preg_match('/customer_has_subscription.*?{.*?}.*?}/s', $content, $matches)) {

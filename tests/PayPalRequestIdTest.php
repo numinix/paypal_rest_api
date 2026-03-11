@@ -19,7 +19,7 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify PayPal-Request-Id is set before createOrder
 fwrite(STDOUT, "Test 1: Checking PayPal-Request-Id is set in process_rest_payment...\n");
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     
@@ -69,7 +69,7 @@ if (file_exists($savedCardRecurringFile)) {
     
     fwrite(STDOUT, "\n");
 } else {
-    fwrite(STDERR, "✗ paypalSavedCardRecurring.php not found\n\n");
+    fwrite(STDERR, "✗ paypalacSavedCardRecurring.php not found\n\n");
     exit(1);
 }
 

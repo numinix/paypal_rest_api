@@ -72,9 +72,9 @@ fwrite(STDOUT, "\n");
 // Test 4: Verify extract_rest_payment_id does NOT fall back to order ID
 fwrite(STDOUT, "Test 4: Verify extract_rest_payment_id() does NOT fall back to order ID...\n");
 
-$recurringPath = $basePath . '/includes/classes/paypalSavedCardRecurring.php';
+$recurringPath = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
 if (!file_exists($recurringPath)) {
-    fwrite(STDERR, "✗ paypalSavedCardRecurring.php not found\n");
+    fwrite(STDERR, "✗ paypalacSavedCardRecurring.php not found\n");
     exit(1);
 }
 

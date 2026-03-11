@@ -52,7 +52,7 @@ if (file_exists($cronFile)) {
 
 // Test 2: Verify REST API subscription detection fallback
 echo "Test 2: Checking REST API subscription detection with vault card fallback...\n";
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     
@@ -69,7 +69,7 @@ if (file_exists($savedCardRecurringFile)) {
     
     echo "\n";
 } else {
-    echo "✗ paypalSavedCardRecurring.php not found\n\n";
+    echo "✗ paypalacSavedCardRecurring.php not found\n\n";
     exit(1);
 }
 
@@ -89,7 +89,7 @@ if (file_exists($savedCardRecurringFile)) {
     
     echo "\n";
 } else {
-    echo "✗ paypalSavedCardRecurring.php not found\n\n";
+    echo "✗ paypalacSavedCardRecurring.php not found\n\n";
     exit(1);
 }
 

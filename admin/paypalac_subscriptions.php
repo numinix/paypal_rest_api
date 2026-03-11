@@ -30,8 +30,8 @@ if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.p
 }
 
 // Load saved card recurring class
-if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php')) {
-    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php')) {
+    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
 }
 
 use PayPalAdvancedCheckout\Common\SubscriptionManager;
@@ -104,9 +104,9 @@ function paypalac_get_profile_manager()
         }
         
         $PayPalRestClient = null;
-        if (class_exists('paypalSavedCardRecurring')) {
-            $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-            $PayPalRestClient = $paypalSavedCardRecurring->get_paypal_rest_client();
+        if (class_exists('paypalacSavedCardRecurring')) {
+            $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+            $PayPalRestClient = $paypalacSavedCardRecurring->get_paypal_rest_client();
         }
         
         $profileManager = PayPalProfileManager::create($PayPalRestClient, $PayPal);
@@ -168,14 +168,14 @@ if ($action === 'update_subscription') {
     }
     
     // Route to saved card handler for saved card subscriptions
-    if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
-        $paypalSavedCardRecurring = new paypalSavedCardRecurring();
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
         $savedCardMetadata = [];
         
         // Handle status change for saved card
         if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
             $status = strtolower(trim((string) zen_db_prepare_input($_POST['set_status'])));
-            $paypalSavedCardRecurring->update_payment_status($subscriptionId, $status, 'Status updated by admin');
+            $paypalacSavedCardRecurring->update_payment_status($subscriptionId, $status, 'Status updated by admin');
             $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_STATUS_UPDATED, $subscriptionId, $status), 'success');
             zen_redirect($redirectUrl);
         }
@@ -237,7 +237,7 @@ if ($action === 'update_subscription') {
         
         if (!empty($updateData)) {
             $updateData['comments'] = 'Updated by admin via unified subscriptions page.';
-            $paypalSavedCardRecurring->update_payment_info($subscriptionId, $updateData, $savedCardMetadata);
+            $paypalacSavedCardRecurring->update_payment_info($subscriptionId, $updateData, $savedCardMetadata);
             $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId), 'success');
         }
         
@@ -409,13 +409,13 @@ if ($action === 'cancel_subscription') {
     }
     
     // Route to saved card handler
-    if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
-        $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-        $paypalSavedCardRecurring->update_payment_status($subscriptionId, 'cancelled', 'Cancelled by admin');
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'cancelled', 'Cancelled by admin');
         
-        $subscription = $paypalSavedCardRecurring->get_payment_details($subscriptionId);
-        if ($subscription && method_exists($paypalSavedCardRecurring, 'remove_group_pricing')) {
-            $paypalSavedCardRecurring->remove_group_pricing($subscription['customers_id'], $subscription['products_id']);
+        $subscription = $paypalacSavedCardRecurring->get_payment_details($subscriptionId);
+        if ($subscription && method_exists($paypalacSavedCardRecurring, 'remove_group_pricing')) {
+            $paypalacSavedCardRecurring->remove_group_pricing($subscription['customers_id'], $subscription['products_id']);
         }
         
         $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
@@ -464,9 +464,9 @@ if ($action === 'suspend_subscription') {
     }
     
     // Route to saved card handler
-    if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
-        $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-        $paypalSavedCardRecurring->update_payment_status($subscriptionId, 'suspended', 'Suspended by admin');
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'suspended', 'Suspended by admin');
         
         $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_SUSPENDED, $subscriptionId), 'success');
         zen_redirect($redirectUrl);
@@ -513,13 +513,13 @@ if ($action === 'reactivate_subscription') {
     }
     
     // Route to saved card handler
-    if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
-        $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-        $paypalSavedCardRecurring->update_payment_status($subscriptionId, 'scheduled', 'Re-activated by admin');
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'scheduled', 'Re-activated by admin');
         
-        $subscription = $paypalSavedCardRecurring->get_payment_details($subscriptionId);
-        if ($subscription && method_exists($paypalSavedCardRecurring, 'create_group_pricing')) {
-            $paypalSavedCardRecurring->create_group_pricing($subscription['products_id'], $subscription['customers_id']);
+        $subscription = $paypalacSavedCardRecurring->get_payment_details($subscriptionId);
+        if ($subscription && method_exists($paypalacSavedCardRecurring, 'create_group_pricing')) {
+            $paypalacSavedCardRecurring->create_group_pricing($subscription['products_id'], $subscription['customers_id']);
         }
         
         $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_REACTIVATED, $subscriptionId), 'success');
@@ -567,9 +567,9 @@ if ($action === 'skip_next_payment') {
     }
     
     // Route to saved card handler
-    if ($subscriptionType === 'savedcard' && class_exists('paypalSavedCardRecurring')) {
-        $paypalSavedCardRecurring = new paypalSavedCardRecurring();
-        $success = $paypalSavedCardRecurring->skip_next_payment($subscriptionId);
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $success = $paypalacSavedCardRecurring->skip_next_payment($subscriptionId);
         if ($success) {
             $messageStack->add_session('Payment skipped for subscription #' . $subscriptionId . '. The next billing date has been calculated and updated.', 'success');
         } else {

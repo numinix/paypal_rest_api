@@ -24,7 +24,7 @@ namespace {
 
     $failures = 0;
 
-    $sourceFile = DIR_FS_CATALOG . 'includes/classes/paypalSavedCardRecurring.php';
+    $sourceFile = DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
     if (!file_exists($sourceFile)) {
         fwrite(STDERR, "✗ Source file not found: $sourceFile\n");
         exit(1);

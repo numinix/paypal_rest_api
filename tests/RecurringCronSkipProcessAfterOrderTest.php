@@ -15,7 +15,7 @@ declare(strict_types=1);
  * PayPal transaction records because the payment module's orderInfo wasn't properly set in cron context.
  *
  * The fix ensures that cron-generated orders are handled exclusively by record_paypal_transaction()
- * in paypalSavedCardRecurring, which has access to the correct payment result data.
+ * in paypalacSavedCardRecurring, which has access to the correct payment result data.
  *
  * @copyright Copyright 2026 Zen Cart Development Team
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
