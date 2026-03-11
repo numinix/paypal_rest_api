@@ -583,6 +583,249 @@ if (!function_exists('paypalac_delete_payflow_card')) {
     }
 }
 
+if (!function_exists('paypalac_render_card_field_containers')) {
+    /**
+     * Render PayPal CardFields hosted-field containers and initialisation script
+     * for the "Add a new card" form on the saved credit cards account page.
+     *
+     * The PayPal SDK (loaded with the card-fields component via auto.paypaladvcheckout.php)
+     * injects an iframe into each .ppac-card-field container.  On form submit the
+     * JavaScript calls cardFields.submit(), which triggers createVaultSetupToken to
+     * obtain a setup token (via ppac_add_card.php), collects the card data through
+     * the hosted fields, and fires onApprove with the approved setup token ID.
+     * The setup_token_id hidden field is then populated and the PHP form is submitted
+     * so header_php.php can create the payment token.
+     *
+     * @param array $expiry_month_options Month options array (kept for API compatibility)
+     * @param array $expiry_year_options  Year options array (kept for API compatibility)
+     * @param array $add_form_values      Current form values (kept for API compatibility)
+     * @return string HTML markup and inline script
+     */
+    function paypalac_render_card_field_containers(array $expiry_month_options, array $expiry_year_options, array $add_form_values): string
+    {
+        $addCardAjaxUrl = HTTP_SERVER . DIR_WS_CATALOG . 'ppac_add_card.php';
+
+        $labelName    = defined('TEXT_ADD_CARD_CARDHOLDER')    ? TEXT_ADD_CARD_CARDHOLDER    : 'Name on card';
+        $labelNumber  = defined('TEXT_ADD_CARD_CARD_NUMBER')   ? TEXT_ADD_CARD_CARD_NUMBER   : 'Card number';
+        $labelExpiry  = defined('TEXT_ADD_CARD_EXPIRY')        ? TEXT_ADD_CARD_EXPIRY        : 'Expiration date';
+        $labelCvv     = defined('TEXT_ADD_CARD_SECURITY_CODE') ? TEXT_ADD_CARD_SECURITY_CODE : 'Security code (CVV)';
+        $msgError     = defined('TEXT_ADD_CARD_ERROR_GENERAL') ? TEXT_ADD_CARD_ERROR_GENERAL : 'We were unable to save your card. Please try again or contact us for help.';
+        $msgProcess   = defined('TEXT_ADD_CARD_PROCESSING')    ? TEXT_ADD_CARD_PROCESSING    : 'Processing...';
+
+        ob_start();
+        ?>
+        <div class="ppac-vault-card-fields row g-3">
+          <div class="col-12">
+            <div class="ppac-card-field-group">
+              <label class="form-label" for="ppac-card-name"><?php echo $labelName; ?></label>
+              <div id="ppac-card-name" class="ppac-card-field"></div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="ppac-card-field-group">
+              <label class="form-label" for="ppac-card-number"><?php echo $labelNumber; ?></label>
+              <div id="ppac-card-number" class="ppac-card-field"></div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="ppac-card-field-group">
+              <label class="form-label" for="ppac-card-expiry"><?php echo $labelExpiry; ?></label>
+              <div id="ppac-card-expiry" class="ppac-card-field"></div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="ppac-card-field-group">
+              <label class="form-label" for="ppac-card-cvv"><?php echo $labelCvv; ?></label>
+              <div id="ppac-card-cvv" class="ppac-card-field"></div>
+            </div>
+          </div>
+        </div>
+        <input type="hidden" name="setup_token_id" value="">
+        <div id="ppac-add-card-error" class="alert alert-danger mt-3" style="display:none"></div>
+        <script>
+        (function () {
+            'use strict';
+
+            var AJAX_URL   = <?php echo json_encode($addCardAjaxUrl); ?>;
+            var MSG_ERROR  = <?php echo json_encode($msgError); ?>;
+            var MSG_PROCESS = <?php echo json_encode($msgProcess); ?>;
+
+            function showError(message) {
+                var el = document.getElementById('ppac-add-card-error');
+                if (el) {
+                    el.textContent = message || MSG_ERROR;
+                    el.style.display = '';
+                }
+            }
+
+            function hideError() {
+                var el = document.getElementById('ppac-add-card-error');
+                if (el) {
+                    el.style.display = 'none';
+                }
+            }
+
+            function getBillingAddressPayload() {
+                var modeRadio = document.querySelector('input[name="add_address_mode"]:checked');
+                if (!modeRadio) {
+                    return null;
+                }
+
+                if (modeRadio.value === 'existing') {
+                    var sel = document.querySelector('[name="add_address_book_id"]');
+                    if (!sel || !sel.value) {
+                        return null;
+                    }
+                    return { address_book_id: parseInt(sel.value, 10) };
+                }
+
+                var street = (document.querySelector('[name="add_new_street_address"]') || {}).value || '';
+                var city   = (document.querySelector('[name="add_new_city"]') || {}).value || '';
+                var post   = (document.querySelector('[name="add_new_postcode"]') || {}).value || '';
+                var countryEl = document.querySelector('[name="add_new_country_id"]');
+                var iso2 = '';
+                if (countryEl && countryEl.selectedIndex >= 0) {
+                    iso2 = countryEl.options[countryEl.selectedIndex].getAttribute('data-iso2') || '';
+                }
+
+                var addr = {
+                    address_line_1: street.trim(),
+                    admin_area_2:   city.trim(),
+                    postal_code:    post.trim(),
+                    country_code:   iso2.trim().toUpperCase()
+                };
+
+                var street2 = (document.querySelector('[name="add_new_street_address_2"]') || {}).value || '';
+                if (street2.trim()) {
+                    addr.address_line_2 = street2.trim();
+                }
+
+                var state = (document.querySelector('[name="add_new_state"]') || {}).value || '';
+                if (state.trim()) {
+                    addr.admin_area_1 = state.trim();
+                }
+
+                return { billing_address: addr };
+            }
+
+            function initCardFields() {
+                if (typeof PayPalSDK === 'undefined' || typeof PayPalSDK.CardFields !== 'function') {
+                    return;
+                }
+
+                var form = document.getElementById('add-card-form');
+                if (!form) {
+                    return;
+                }
+
+                var cardFields = PayPalSDK.CardFields({
+                    createVaultSetupToken: function () {
+                        var addressPayload = getBillingAddressPayload();
+                        if (!addressPayload) {
+                            return Promise.reject(new Error('billing_address_required'));
+                        }
+
+                        var body = JSON.stringify(Object.assign({ action: 'create_setup_token' }, addressPayload));
+
+                        return fetch(AJAX_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: body
+                        })
+                        .then(function (response) { return response.json(); })
+                        .then(function (data) {
+                            if (!data.success || !data.setup_token_id) {
+                                return Promise.reject(new Error(data.message || 'setup_token_failed'));
+                            }
+                            return data.setup_token_id;
+                        });
+                    },
+
+                    onApprove: function (data) {
+                        var tokenInput = form.querySelector('[name="setup_token_id"]');
+                        if (tokenInput) {
+                            tokenInput.value = data.vaultSetupToken;
+                        }
+                        form.submit();
+                    },
+
+                    onError: function () {
+                        showError(MSG_ERROR);
+                        restoreSubmit();
+                    }
+                });
+
+                if (!cardFields.isEligible()) {
+                    return;
+                }
+
+                cardFields.NameField().mount('#ppac-card-name');
+                cardFields.NumberField().mount('#ppac-card-number');
+                cardFields.ExpiryField().mount('#ppac-card-expiry');
+                cardFields.CVVField().mount('#ppac-card-cvv');
+
+                var submitBtn = null;
+                var originalText = '';
+
+                function disableSubmit() {
+                    submitBtn = form.querySelector('[type="submit"]');
+                    if (submitBtn) {
+                        originalText = submitBtn.textContent;
+                        submitBtn.textContent = MSG_PROCESS;
+                        submitBtn.disabled = true;
+                    }
+                }
+
+                function restoreSubmit() {
+                    if (submitBtn) {
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                        submitBtn = null;
+                    }
+                }
+
+                form.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    hideError();
+                    disableSubmit();
+                    cardFields.submit().catch(function () {
+                        showError(MSG_ERROR);
+                        restoreSubmit();
+                    });
+                });
+            }
+
+            if (typeof PayPalSDK !== 'undefined' && typeof PayPalSDK.CardFields === 'function') {
+                initCardFields();
+            } else {
+                var sdkScript = document.getElementById('PayPalJSSDK');
+                if (sdkScript && sdkScript.dataset && sdkScript.dataset.loaded === 'true') {
+                    initCardFields();
+                } else if (sdkScript) {
+                    sdkScript.addEventListener('load', initCardFields);
+                } else {
+                    document.addEventListener('DOMContentLoaded', function () {
+                        var attempts = 0;
+                        var maxAttempts = 100;
+                        var interval = setInterval(function () {
+                            attempts++;
+                            if (typeof PayPalSDK !== 'undefined' && typeof PayPalSDK.CardFields === 'function') {
+                                clearInterval(interval);
+                                initCardFields();
+                            } else if (attempts >= maxAttempts) {
+                                clearInterval(interval);
+                            }
+                        }, 100);
+                    });
+                }
+            }
+        }());
+        </script>
+        <?php
+        return ob_get_clean();
+    }
+}
+
 $zco_notifier->notify('NOTIFY_HEADER_START_ACCOUNT_SAVED_CREDIT_CARDS');
 
 if (empty($_SESSION['customer_id'])) {
