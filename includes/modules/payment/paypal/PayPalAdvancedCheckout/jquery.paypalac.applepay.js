@@ -238,50 +238,22 @@
 
     /**
      * Hide the entire payment method container when payment is not eligible.
-     * This hides the parent element (e.g., paypalac_applepay-custom-control-container)
-     * so the user doesn't see an unavailable payment option.
+     * Hides the radio button so that the CSS :has(.paypalac-wallet-radio-hidden)
+     * rule collapses the entire .custom-control row (radio + label/button).
      */
     function hidePaymentMethodContainer() {
+        // Hiding the radio triggers the CSS rule:
+        //   .custom-control:has(.paypalac-wallet-radio-hidden) { display: none; }
+        // which collapses the entire row including the button inside the label.
+        if (hideModuleRadio()) {
+            return;
+        }
+
+        // Fallback: hide the button container directly.
         var container = document.getElementById('paypalac-applepay-button');
-        if (!container) {
-            return;
+        if (container) {
+            container.style.display = 'none';
         }
-
-        // Find the parent container that wraps this payment method
-        // Common patterns: closest .moduleRow, closest payment container div, or parent with class containing 'container'
-        var parentContainer = container.closest('[id*="paypalac_applepay"][id*="container"]')
-            || container.closest('.moduleRow')
-            || container.closest('[class*="paypalac_applepay"]');
-
-        // If we found a specific parent container, hide it
-        if (parentContainer) {
-            parentContainer.style.display = 'none';
-            return;
-        }
-
-        // Fallback: traverse up and hide a suitable parent
-        // Look for common payment module wrapper patterns
-        var parent = container.parentElement;
-        var depth = 0;
-        var maxDepth = 5;
-
-        while (parent && depth < maxDepth) {
-            // Check if parent has an ID or class indicating it's a payment container
-            var parentId = (parent.id || '').toLowerCase();
-            var parentClass = (parent.className || '').toLowerCase();
-
-            if (parentId.indexOf('paypalac_applepay') !== -1 ||
-                parentClass.indexOf('paypalac_applepay') !== -1 ||
-                parentClass.indexOf('modulerow') !== -1) {
-                parent.style.display = 'none';
-                return;
-            }
-            parent = parent.parentElement;
-            depth++;
-        }
-
-        // Last resort: just hide the button container itself and clear content
-        container.style.display = 'none';
     }
 
     /**

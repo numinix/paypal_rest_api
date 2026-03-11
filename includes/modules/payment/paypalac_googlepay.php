@@ -553,11 +553,11 @@ class paypalac_googlepay extends base
 
         return [
             'id' => $this->code,
-            'module' => $selectionLabel,
+            'module' => $buttonContainer,
             'fields' => [
                 [
-                    'title' => $selectionLabel,
-                    'field' => $buttonContainer . $hiddenFields . $script,
+                    'title' => '',
+                    'field' => $hiddenFields . $script,
                 ],
             ],
         ];
