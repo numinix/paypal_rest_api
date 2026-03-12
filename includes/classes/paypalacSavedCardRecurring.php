@@ -420,9 +420,6 @@ return $countryCode;
 }
 
 protected function build_vault_payment_source(array $cardDetails, array $options = array()) {
-if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'buildVaultPaymentSource')) {
-return $this->paypalsavedcard->buildVaultPaymentSource($cardDetails, $options);
-}
 $vaultId = $this->extract_vault_id_from_card($cardDetails);
 if ($vaultId === '') {
 return array();
@@ -547,8 +544,16 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                error_log('PayPal REST createOrder normalized response: ' . json_encode($normalized_create));
                $order_id = isset($normalized_create['id']) ? $normalized_create['id'] : '';
                if (strlen($order_id) == 0) {
-                       $this->notify_error('PayPal REST order creation failed', 'PayPal REST order creation did not return an order id. Response: ' . json_encode($normalized_create), 'error');
-                       return array('success' => false, 'error' => 'Unable to create PayPal order');
+                       $error_detail = '';
+                       $api_error = [];
+                       if (method_exists($client, 'getErrorInfo')) {
+                               $api_error = $client->getErrorInfo();
+                               error_log('PayPal REST createOrder error info: ' . json_encode($api_error));
+                               $error_detail = isset($api_error['message']) ? $api_error['message'] : (isset($api_error['errMsg']) ? $api_error['errMsg'] : '');
+                       }
+                       $error_msg = 'Unable to create PayPal order' . ($error_detail !== '' ? ': ' . $error_detail : '');
+                       $this->notify_error('PayPal REST order creation failed', 'PayPal REST order creation did not return an order id. Response: ' . json_encode($normalized_create) . ' Error info: ' . json_encode($api_error ?? []), 'error');
+                       return array('success' => false, 'error' => $error_msg);
                }
                try {
                        $capture_response = $this->finalize_paypal_rest_order($client, $intent, $order_id);
@@ -1627,7 +1632,8 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
 
                 $hasDomainColumn = $this->saved_cards_recurring_has_column('domain');
                 $domainSelect = $hasDomainColumn ? 'domain, ' : '';
-                $snapshotRow = $db->Execute('SELECT subscription_attributes_json, billing_period, billing_frequency, total_billing_cycles, ' . $domainSelect . 'currency_code FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE orders_products_id = ' . $orders_products_id . ' ORDER BY saved_credit_card_recurring_id DESC LIMIT 1;');
+                $opIdColName = $this->saved_cards_recurring_has_column('orders_products_id') ? 'orders_products_id' : 'original_orders_products_id';
+                $snapshotRow = $db->Execute('SELECT subscription_attributes_json, billing_period, billing_frequency, total_billing_cycles, ' . $domainSelect . 'currency_code FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE ' . $opIdColName . ' = ' . $orders_products_id . ' ORDER BY saved_credit_card_recurring_id DESC LIMIT 1;');
                 if ($snapshotRow->RecordCount() > 0) {
                         $attributes = $this->get_snapshot_attributes($snapshotRow->fields);
                         if (is_array($attributes) && count($attributes) > 0) {
@@ -2207,32 +2213,64 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		// Only process subscriptions in 'scheduled' status
 		// Failed subscriptions (max retries exceeded) should NOT be retried
 		// Subscriptions stay 'scheduled' during retry attempts until max retries is exceeded
+
+		// Use TABLE_PAYPAL_SUBSCRIPTIONS for the paypalac cron.  Vault-linked
+		// subscriptions are migrated there by LegacySubscriptionMigrator which
+		// runs at the start of each cron cycle.  This avoids any dependency on
+		// the legacy TABLE_SAVED_CREDIT_CARDS_RECURRING schema (which may lack
+		// columns like orders_id on older installations).
+		if (defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
+			$sql = "SELECT ps.legacy_subscription_id"
+				. " FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " ps"
+				. " WHERE LOWER(TRIM(ps.status)) = 'scheduled'"
+				. " AND ps.next_payment_date IS NOT NULL"
+				. " AND ps.next_payment_date <> '0000-00-00'"
+				. " AND DATE(ps.next_payment_date) <= '" . $today . "'"
+				. " AND ps.legacy_subscription_id > 0"
+				. " AND ps.vault_id <> ''";
+
+			if (!empty($_SESSION['in_cron'])) {
+				error_log('PayPal Cron - get_scheduled_payments() SQL: ' . $sql);
+				error_log('PayPal Cron - Looking for vault-linked subscriptions with status scheduled and DATE(next_payment_date) <= ' . $today);
+			}
+
+			$result = $db->Execute($sql);
+			$payments = array();
+			while (!$result->EOF) {
+				$payments[] = $result->fields['legacy_subscription_id'];
+				$result->MoveNext();
+			}
+
+			if (!empty($_SESSION['in_cron'])) {
+				error_log('PayPal Cron - Found ' . count($payments) . ' scheduled payments to process: ' . implode(', ', $payments));
+			}
+
+			return $payments;
+		}
+
+		// Fallback: TABLE_PAYPAL_SUBSCRIPTIONS not available – query the legacy
+		// table directly so the cron can still function on older installations.
 		$sql = 'SELECT sccr.saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
-			. ' INNER JOIN ' . TABLE_ORDERS . " o ON o.orders_id = sccr.orders_id"
 			. " WHERE LOWER(TRIM(sccr.status)) = 'scheduled'"
 			. " AND sccr.next_payment_date IS NOT NULL"
 			. " AND sccr.next_payment_date <> '0000-00-00'"
-			. " AND DATE(sccr.next_payment_date) <= '" . $today . "'"
-			. " AND o.payment_module_code LIKE 'paypalac%'";
-		
-		// Debug logging for cron
+			. " AND DATE(sccr.next_payment_date) <= '" . $today . "'";
+
 		if (!empty($_SESSION['in_cron'])) {
-			error_log('PayPal Cron - get_scheduled_payments() SQL: ' . $sql);
-			error_log('PayPal Cron - Looking for paypalac* subscriptions with normalized status scheduled and DATE(next_payment_date) <= ' . $today);
+			error_log('PayPal Cron - get_scheduled_payments() SQL (fallback): ' . $sql);
 		}
-		
+
 		$result = $db->Execute($sql);
 		$payments = array();
 		while (!$result->EOF) {
 			$payments[] = $result->fields['saved_credit_card_recurring_id'];
 			$result->MoveNext();
 		}
-		
-		// Debug logging for cron
+
 		if (!empty($_SESSION['in_cron'])) {
-			error_log('PayPal Cron - Found ' . count($payments) . ' scheduled payments to process: ' . implode(', ', $payments));
+			error_log('PayPal Cron - Found ' . count($payments) . ' scheduled payments to process (fallback): ' . implode(', ', $payments));
 		}
-		
+
 		return $payments;
 	}
 /*
@@ -2280,6 +2318,15 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 		}
 		$sql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' SET status = \'' . $status . '\', comments = CONCAT(comments, \'' . $comments . '\') WHERE saved_credit_card_recurring_id = ' . $paypal_saved_card_recurring_id;
                 $db->Execute($sql);
+                // Keep TABLE_PAYPAL_SUBSCRIPTIONS in sync so get_scheduled_payments()
+                // sees the updated status on the next cron run.
+                if (defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
+                        $db->Execute(
+                                'UPDATE ' . TABLE_PAYPAL_SUBSCRIPTIONS
+                                . " SET status = '" . zen_db_input($status) . "', last_modified = NOW()"
+                                . ' WHERE legacy_subscription_id = ' . (int) $paypal_saved_card_recurring_id
+                        );
+                }
                 //notify admin of cancellation
                 if ($status == 'cancelled' || $status == 'failed') {
                         $details = $this->get_payment_details($paypal_saved_card_recurring_id);
@@ -2583,6 +2630,23 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 
                 $sql .= ' WHERE saved_credit_card_recurring_id = ' . $paypal_saved_card_recurring_id;
                 $db->Execute($sql);
+
+                // Keep TABLE_PAYPAL_SUBSCRIPTIONS in sync so get_scheduled_payments()
+                // picks up updated next_payment_date and amount values.
+                if (defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
+                        $syncParts = array('last_modified = NOW()');
+                        if (isset($data['date'])) {
+                                $syncParts[] = "next_payment_date = '" . $this->escape_db_value($data['date']) . "'";
+                        }
+                        if (isset($data['amount'])) {
+                                $syncParts[] = "amount = '" . $this->escape_db_value(preg_replace("/[^0-9\\.]/", '', $data['amount'])) . "'";
+                        }
+                        $db->Execute(
+                                'UPDATE ' . TABLE_PAYPAL_SUBSCRIPTIONS
+                                . ' SET ' . implode(', ', $syncParts)
+                                . ' WHERE legacy_subscription_id = ' . (int) $paypal_saved_card_recurring_id
+                        );
+                }
         }
 
         function count_failed_payments($paypal_saved_card_recurring_id, array $payment_details = null) {
