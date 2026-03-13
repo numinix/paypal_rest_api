@@ -1019,6 +1019,12 @@
                     transactionInfo: {
                         totalPriceStatus: 'FINAL',
                         totalPrice: orderConfig.amount,
+                        totalPriceLabel: (merchantInfo && merchantInfo.merchantName) ? merchantInfo.merchantName : 'Total',
+                        displayItems: [{
+                            label: 'Order total',
+                            type: 'LINE_ITEM',
+                            price: orderConfig.amount
+                        }],
                         currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
                         countryCode: 'US'
                     },

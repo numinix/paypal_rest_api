@@ -120,6 +120,12 @@
             transactionInfo: {
                 totalPriceStatus: 'FINAL',
                 totalPrice: googlePayFinalTotal,
+                totalPriceLabel: config.storeName || 'Total',
+                displayItems: [{
+                    label: 'Order total',
+                    type: 'LINE_ITEM',
+                    price: googlePayFinalTotal
+                }],
                 currencyCode: config.currencyCode || 'USD',
                 countryCode: config.storeCountryCode || 'US'
             },
