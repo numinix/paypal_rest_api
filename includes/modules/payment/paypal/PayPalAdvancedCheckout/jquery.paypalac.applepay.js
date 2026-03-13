@@ -674,6 +674,11 @@
                 amount: orderTotal.amount,
                 type: 'final'
             },
+            lineItems: [{
+                label: 'Order total',
+                amount: orderTotal.amount,
+                type: 'final'
+            }],
             // Request billing contact fields required by PayPal's API
             requiredBillingContactFields: ['postalAddress', 'name', 'email']
         };

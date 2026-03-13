@@ -87,6 +87,11 @@
                 label: config.storeName || 'Store',
                 amount: applePayFinalTotal
             },
+            lineItems: [{
+                label: 'Order total',
+                amount: applePayFinalTotal,
+                type: 'final'
+            }],
             supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
             merchantCapabilities: ['supports3DS'],
             requiredBillingContactFields: ['postalAddress', 'name', 'phone', 'email'],

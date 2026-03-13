@@ -781,6 +781,11 @@
                 amount: orderTotal.amount,
                 type: 'final'
             },
+            lineItems: [{
+                label: 'Order total',
+                amount: orderTotal.amount,
+                type: 'final'
+            }],
             // Request billing contact fields - email only for guest users
             requiredBillingContactFields: billingFields
         };
