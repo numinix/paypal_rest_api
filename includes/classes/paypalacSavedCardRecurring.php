@@ -888,6 +888,13 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         }
                 }
                 
+                // Persist orders_id (the parent order that created this subscription) when
+                // available from the metadata lookup.  This is the FK used by
+                // get_scheduled_payments() to join orders and filter by payment_module_code.
+                if (isset($metadata['orders_id']) && (int) $metadata['orders_id'] > 0) {
+                        $sql_data_array[] = array('fieldName' => 'orders_id', 'value' => (int) $metadata['orders_id'], 'type' => 'integer');
+                }
+                
                 $db->perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, $sql_data_array);
                 $paypal_saved_card_recurring_id = $db->insert_ID();
                 return $paypal_saved_card_recurring_id;
@@ -2208,7 +2215,8 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		// Failed subscriptions (max retries exceeded) should NOT be retried
 		// Subscriptions stay 'scheduled' during retry attempts until max retries is exceeded
 		$sql = 'SELECT sccr.saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
-			. ' INNER JOIN ' . TABLE_ORDERS . " o ON o.orders_id = sccr.orders_id"
+			. ' INNER JOIN ' . TABLE_ORDERS_PRODUCTS . ' op ON op.orders_products_id = sccr.orders_products_id'
+			. ' INNER JOIN ' . TABLE_ORDERS . " o ON o.orders_id = op.orders_id"
 			. " WHERE LOWER(TRIM(sccr.status)) = 'scheduled'"
 			. " AND sccr.next_payment_date IS NOT NULL"
 			. " AND sccr.next_payment_date <> '0000-00-00'"

@@ -453,9 +453,13 @@ $calculateNextScheduledBillingDate = function (DateTime $currentNextPaymentDate,
 };
 
 // Debug: Show only due paypalac* subscriptions handled by this cron.
+// Join through orders_products_id → orders_products → orders to get the
+// payment_module_code.  The orders_id column on the recurring table is not
+// reliably populated (it defaults to 0), so we must traverse the FK chain.
 $debug_sql = 'SELECT sccr.saved_credit_card_recurring_id, sccr.status, sccr.next_payment_date, sccr.products_name'
     . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
-    . ' INNER JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = sccr.orders_id'
+    . ' INNER JOIN ' . TABLE_ORDERS_PRODUCTS . ' op ON op.orders_products_id = sccr.orders_products_id'
+    . ' INNER JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = op.orders_id'
     . " WHERE LOWER(TRIM(sccr.status)) = 'scheduled'"
     . " AND sccr.next_payment_date IS NOT NULL"
     . " AND sccr.next_payment_date <> '0000-00-00'"
