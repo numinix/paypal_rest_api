@@ -36,6 +36,7 @@ define('SUCCESS_SUBSCRIPTION_UPDATED', 'Subscription #%d has been updated.');
 define('SUCCESS_BULK_ARCHIVED', 'Successfully archived %d subscription(s).');
 define('SUCCESS_BULK_UNARCHIVED', 'Successfully unarchived %d subscription(s).');
 define('WARNING_BULK_ARCHIVE_SKIPPED_ACTIVE', 'Skipped %d active subscription(s); active subscriptions cannot be archived.');
+define('SUCCESS_SUBSCRIPTION_CREATED_MANUALLY', 'Subscription #%d has been created manually for order #%d.');
 
 // Order log labels
 if (!defined('TEXT_PAYPALAC_SUBSCRIPTION_ORDER_LOG')) {

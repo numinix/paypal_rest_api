@@ -1415,11 +1415,16 @@ class paypalac extends base
             // Save the posted variables from the payment phase of checkout; the ppac_listener will use those to restore after
             // PayPal returns.
             //
+            // Strip the 'request' key so that the ppac_listener's self-submitting browser form POST back to this
+            // page is not mistakenly detected as an AJAX request (which would output raw JSON instead of redirecting).
+            //
             global $current_page_base;
+            $savedPosts = $_POST;
+            unset($savedPosts['request']);
             $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'] = [
                 'current_page_base' => $current_page_base,
                 'redirect_page' => $this->determinePayerActionRedirectPage($current_page_base, $_POST),
-                'savedPosts' => $_POST,
+                'savedPosts' => $savedPosts,
                 'payer_action_link' => $action_link,
             ];
             $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $response_status;

@@ -3,12 +3,13 @@
  * Saved credit cards page template
  */
 ?>
-<div class="centerColumn account-page" id="savedCreditCardsDefault">
+<div class="centerColumn ac-main" id="savedCreditCardsDefault">
+  <?php require $template->get_template_dir('tpl_modules_account_menu.php', DIR_WS_TEMPLATE, $current_page_base, 'templates') . '/tpl_modules_account_menu.php'; ?>
+
+  <div class="ac-content-wrapper">
   <header class="page-header">
     <h1><?php echo HEADING_TITLE; ?></h1>
   </header>
-
-  <?php require $template->get_template_dir('tpl_modules_account_menu.php', DIR_WS_TEMPLATE, $current_page_base, 'templates') . '/tpl_modules_account_menu.php'; ?>
 
   <?php if ($messageStack->size('saved_credit_cards') > 0) echo $messageStack->output('saved_credit_cards'); ?>
 
@@ -61,20 +62,15 @@
 
             <div class="row g-3">
               <div class="col-12 col-md-6">
-                <div class="mb-3">
-                  <span class="badge <?php echo zen_output_string_protected($edit_card['status_class']); ?> mb-2"><?php echo zen_output_string_protected($edit_card['status_label']); ?></span>
-                  <div class="fw-semibold">&nbsp;<?php echo zen_output_string_protected($edit_card['brand']); ?></div>
-                  <?php if ($edit_card['last_digits'] !== '') { ?>
-                    <small class="text-muted"><?php echo sprintf(TEXT_CARD_ENDING_IN, zen_output_string_protected($edit_card['last_digits'])); ?></small>
-                  <?php } ?>
-                </div>
+                <div class="fw-semibold"><?php echo zen_output_string_protected($edit_card['brand']); ?></div>
+                <?php if ($edit_card['last_digits'] !== '') { ?>
+                  <small class="text-muted"><?php echo sprintf(TEXT_CARD_ENDING_IN, zen_output_string_protected($edit_card['last_digits'])); ?></small>
+                <?php } ?>
               </div>
 
               <div class="col-12">
-                <div class="mb-3">
-                  <label class="form-label" for="edit_cardholder_name"><?php echo TEXT_EDIT_CARD_CARDHOLDER; ?></label>
-                  <?php echo zen_draw_input_field('cardholder_name', $edit_form_values['cardholder_name'] ?? '', 'class="form-control" id="edit_cardholder_name" required', 'text', true); ?>
-                </div>
+                <label class="form-label" for="edit_cardholder_name"><?php echo TEXT_EDIT_CARD_CARDHOLDER; ?></label>
+                <?php echo zen_draw_input_field('cardholder_name', $edit_form_values['cardholder_name'] ?? '', 'class="form-control" id="edit_cardholder_name" required', 'text', true); ?>
               </div>
 
               <div class="col-12 col-md-6">
@@ -90,11 +86,9 @@
               </div>
 
               <div class="col-12 col-md-6">
-                <div class="mb-3">
-                  <label class="form-label" for="edit_security_code"><?php echo TEXT_EDIT_CARD_SECURITY_CODE; ?></label>
-                  <?php echo zen_draw_input_field('security_code', '', 'class="form-control" id="edit_security_code" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="***"', 'text', false); ?>
-                  <small class="form-text text-muted"><?php echo TEXT_EDIT_CARD_SECURITY_CODE_HELP; ?></small>
-                </div>
+                <label class="form-label" for="edit_security_code"><?php echo TEXT_EDIT_CARD_SECURITY_CODE; ?></label>
+                <?php echo zen_draw_input_field('security_code', '', 'class="form-control" id="edit_security_code" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="***"', 'text', false); ?>
+                <small class="form-text text-muted"><?php echo TEXT_EDIT_CARD_SECURITY_CODE_HELP; ?></small>
               </div>
 
               <div class="col-12">
@@ -182,10 +176,6 @@
     <?php } ?>
 
     <?php if ($add_card_mode === true) { ?>
-      <script>
-        // Expose PayPal client ID for JavaScript
-        window.PAYPAL_CLIENT_ID = '<?php echo MODULE_PAYMENT_PAYPALAC_SERVER === "live" ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : MODULE_PAYMENT_PAYPALAC_CLIENTID_S; ?>';
-      </script>
       <section class="saved-cards-add-form card mb-4">
         <div class="card-body">
           <h2 class="card-title h4 mb-3"><?php echo HEADING_TITLE_ADD_CARD; ?></h2>
@@ -203,7 +193,6 @@
 
           <?php echo zen_draw_form('add_card', zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'), 'post', 'class="saved-card__form" id="add-card-form"'); ?>
             <?php echo zen_draw_hidden_field('action', 'add-card'); ?>
-            <?php echo zen_draw_hidden_field('setup_token_id', '', 'id="setup_token_id"'); ?>
             <?php echo zen_draw_hidden_field('securityToken', $_SESSION['securityToken']); ?>
 
             <div class="row g-3">
@@ -276,7 +265,7 @@
                         <label class="form-label" for="add_new_country"><?php echo TEXT_ADD_CARD_NEW_COUNTRY; ?></label>
                         <select name="add_new_country_id" class="form-select" id="add_new_country">
                           <?php foreach ($country_dropdown as $country) { ?>
-                            <option value="<?php echo $country['id']; ?>" data-iso2="<?php echo zen_output_string_protected($country['iso2']); ?>">
+                            <option value="<?php echo $country['id']; ?>" data-iso2="<?php echo zen_output_string_protected($country['iso2']); ?>"<?php echo ($default_country_id !== null && (int)$country['id'] === (int)$default_country_id) ? ' selected' : ''; ?>>
                               <?php echo $country['text']; ?>
                             </option>
                           <?php } ?>
@@ -320,18 +309,13 @@
                   </ul>
                   <small class="text-muted"><?php echo TEXT_ADD_CARD_SUPPORTED_BRANDS_NOTE; ?></small>
                 </div>
-                <div id="card-fields-container" class="mb-3">
-                  <!-- PayPal Advanced Card Fields will be inserted here by JavaScript -->
-                  <div class="alert alert-info">
-                    <span id="card-fields-loading"><?php echo TEXT_ADD_CARD_PROCESSING; ?></span>
-                  </div>
-                </div>
+                <?php echo paypalac_render_card_field_containers($expiry_month_options, $expiry_year_options, $add_form_values); ?>
               </div>
             </div>
 
-            <div class="d-flex flex-wrap gap-2 mt-4">
-              <button type="submit" class="btn btn-primary" id="submit-card-btn" disabled><?php echo TEXT_ADD_CARD_SUBMIT_BUTTON; ?></button>
+            <div class="saved-card-add__actions d-flex flex-wrap gap-2 mt-4">
               <a class="btn btn-outline-secondary" href="<?php echo zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'); ?>"><?php echo TEXT_ADD_CARD_CANCEL_BUTTON; ?></a>
+              <button type="submit" class="btn btn-primary"><?php echo TEXT_ADD_CARD_SUBMIT_BUTTON; ?></button>
             </div>
           </form>
         </div>
@@ -409,11 +393,11 @@
                 </button>
               <?php } ?>
               <?php if (!empty($card['edit_href'])) { ?>
-                <a class="btn btn-outline-primary" href="<?php echo zen_output_string_protected($card['edit_href']); ?>">
+                <a class="btn btn-outline-primary" href="<?php echo $card['edit_href']; ?>">
                   <?php echo TEXT_SAVED_CARD_EDIT_BUTTON; ?>
                 </a>
               <?php } ?>
-              <a class="btn btn-outline-danger" href="<?php echo zen_output_string_protected($card['delete_href']); ?>">
+              <a class="btn btn-outline-danger" href="<?php echo $card['delete_href']; ?>">
                 <?php echo TEXT_SAVED_CARD_DELETE_BUTTON; ?>
               </a>
             </div>
@@ -422,4 +406,5 @@
       </div>
     <?php } ?>
   <?php } ?>
+  </div><!-- /.ac-content-wrapper -->
 </div>

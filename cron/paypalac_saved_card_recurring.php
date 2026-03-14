@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/../includes/configure.php';
+require '../includes/configure.php';
 ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'));
 chdir(DIR_FS_CATALOG);
 require_once 'includes/application_top.php';
@@ -453,16 +453,15 @@ $calculateNextScheduledBillingDate = function (DateTime $currentNextPaymentDate,
 };
 
 // Debug: Show only due paypalac* subscriptions handled by this cron.
-// Query TABLE_PAYPAL_SUBSCRIPTIONS (the canonical source after migration).
-$debug_sql = 'SELECT ps.legacy_subscription_id AS saved_credit_card_recurring_id, ps.status, ps.next_payment_date, ps.products_name'
-    . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
-    . " WHERE LOWER(TRIM(ps.status)) = 'scheduled'"
-    . " AND ps.next_payment_date IS NOT NULL"
-    . " AND ps.next_payment_date <> '0000-00-00'"
-    . " AND DATE(ps.next_payment_date) <= '" . date('Y-m-d') . "'"
-    . " AND ps.legacy_subscription_id > 0"
-    . " AND ps.vault_id <> ''"
-    . ' ORDER BY ps.legacy_subscription_id';
+$debug_sql = 'SELECT sccr.saved_credit_card_recurring_id, sccr.status, sccr.next_payment_date, sccr.products_name'
+    . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
+    . ' INNER JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = sccr.orders_id'
+    . " WHERE LOWER(TRIM(sccr.status)) = 'scheduled'"
+    . " AND sccr.next_payment_date IS NOT NULL"
+    . " AND sccr.next_payment_date <> '0000-00-00'"
+    . " AND DATE(sccr.next_payment_date) <= '" . date('Y-m-d') . "'"
+    . " AND o.payment_module_code LIKE 'paypalac%'"
+    . ' ORDER BY sccr.saved_credit_card_recurring_id';
 $debug_result = $db->Execute($debug_sql);
 $debug_output = "
 === DEBUG: Due REST Subscriptions in Database ===

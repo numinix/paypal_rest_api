@@ -90,6 +90,8 @@
 .paypalac-card-logo {
     display: inline-block;
     vertical-align: middle;
+    height: 27px;
+    width: auto;
 }
 
 /* Wallet module (Google Pay, Apple Pay, Venmo) radio button hiding */

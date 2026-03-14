@@ -425,6 +425,14 @@ class paypalac_creditcard extends base
             }
             
             $js .= '      }' . "\n" .
+                   '      var cc_cvv_field = document.checkout_payment.paypalac_cc_cvv;' . "\n" .
+                   '      if (cc_cvv_field) {' . "\n" .
+                   '        var cc_cvv = cc_cvv_field.value;' . "\n" .
+                   '        if (cc_cvv == "" || cc_cvv.length < 3 || cc_cvv.length > 4) {' . "\n" .
+                   '          error_message = error_message + "' . MODULE_PAYMENT_PAYPALAC_TEXT_JS_CC_CVV . '";' . "\n" .
+                   '          error = 1;' . "\n" .
+                   '        }' . "\n" .
+                   '      }' . "\n" .
                    '    }' . "\n" .
                    '  }' . "\n";
         }
@@ -773,6 +781,14 @@ class paypalac_creditcard extends base
         if (!$this->validateCardInformation(true)) {
             // Validation failed, redirect back to payment page
             // Error messages will already be set by validateCardInformation
+            // For non-AJAX (3-page checkout) contexts, redirect back to the
+            // payment page so the customer can correct the card details.
+            $isAjax = (isset($_SESSION['request']) && $_SESSION['request'] === 'ajax')
+                || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+                || (isset($_REQUEST['request']) && $_REQUEST['request'] === 'ajax');
+            if (!$isAjax) {
+                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
+            }
             return;
         }
         
@@ -904,9 +920,6 @@ class paypalac_creditcard extends base
         }
 
         if ($error) {
-            if ($is_preconfirmation) {
-                zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
-            }
             return false;
         }
 

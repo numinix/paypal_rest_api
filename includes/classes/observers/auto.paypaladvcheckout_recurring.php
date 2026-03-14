@@ -596,7 +596,24 @@ class zcObserverPaypaladvcheckoutRecurring
             }
         }
 
-        // Do not fall back to other vault records - this would incorrectly associate
+        // Fallback for saved card payments (e.g. paypalac_savedcard module):
+        // When the customer pays with a previously-saved card, the vault record belongs
+        // to an earlier order so it will never match $ordersId above. The payment
+        // module stores the explicitly-selected vault_id in session, so we can use
+        // that to find the correct vault record without risk of accidentally associating
+        // a subscription with an unrelated payment instrument.
+        $sessionVaultId = (string)($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? '');
+        if ($sessionVaultId !== '') {
+            foreach ($records as $record) {
+                if ((string)($record['vault_id'] ?? '') === $sessionVaultId) {
+                    $this->log->write("    Found vault record via session saved_card vault_id: $sessionVaultId (originally linked to order #" . ($record['orders_id'] ?? 0) . ")");
+                    return $record;
+                }
+            }
+            $this->log->write("    Session has saved_card vault_id $sessionVaultId but no matching vault record found for customer #$customersId.");
+        }
+
+        // Do not fall back to arbitrary vault records - this would incorrectly associate
         // a subscription with a payment method from a different order.
         // For example, a customer paying with Google Pay should not have their
         // subscription linked to a saved credit card from a previous order.

@@ -184,7 +184,29 @@
   background: #f9fafb;
 }
 
+/* Remove column padding inside billing fieldsets so fields align with the legend */
+#savedCreditCardsDefault .saved-card-editor__billing .col-12,
+#savedCreditCardsDefault .saved-card-editor__billing .col-md-6,
+#savedCreditCardsDefault .saved-card-add__billing .col-12,
+#savedCreditCardsDefault .saved-card-add__billing .col-md-6 {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 #savedCreditCardsDefault .saved-card-editor__billing legend {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+#savedCreditCardsDefault .saved-card-add__billing {
+  border: 1px solid rgba(82, 96, 109, 0.25);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  background: #f9fafb;
+}
+
+#savedCreditCardsDefault .saved-card-add__billing legend {
   font-size: 1rem;
   font-weight: 600;
   margin-bottom: 0.75rem;
@@ -245,4 +267,350 @@
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
+}
+
+/* Form-check alignment for radio buttons (Bootstrap 5 compatible) */
+#savedCreditCardsDefault .form-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-height: 1.5rem;
+  margin-bottom: 0.25rem;
+  padding-left: 0;
+}
+
+#savedCreditCardsDefault .form-check-input[type="radio"],
+#savedCreditCardsDefault .form-check-input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.2em;
+  cursor: pointer;
+  appearance: auto;
+}
+
+#savedCreditCardsDefault .form-check-label {
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+/* Form controls */
+#savedCreditCardsDefault .form-control,
+#savedCreditCardsDefault .form-select {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #212529;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  box-sizing: border-box;
+}
+
+#savedCreditCardsDefault .form-control:focus,
+#savedCreditCardsDefault .form-select:focus {
+  border-color: #86b7fe;
+  outline: 0;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Grid layout */
+#savedCreditCardsDefault .row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: -0.75rem;
+  margin-left: -0.75rem;
+}
+
+#savedCreditCardsDefault .g-3 {
+  gap: 1rem;
+  margin-right: 0;
+  margin-left: 0;
+}
+
+#savedCreditCardsDefault .g-2 {
+  gap: 0.5rem;
+  margin-right: 0;
+  margin-left: 0;
+}
+
+#savedCreditCardsDefault .g-3 > [class*="col"],
+#savedCreditCardsDefault .g-2 > [class*="col"] {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+#savedCreditCardsDefault .align-items-end {
+  align-items: flex-end;
+}
+
+#savedCreditCardsDefault .col-12 {
+  flex: 0 0 100%;
+  max-width: 100%;
+  padding-right: 0.75rem;
+  padding-left: 0.75rem;
+  box-sizing: border-box;
+}
+
+#savedCreditCardsDefault .col-md-6 {
+  padding-right: 0.75rem;
+  padding-left: 0.75rem;
+  box-sizing: border-box;
+  flex: 0 0 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  #savedCreditCardsDefault .col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+}
+
+#savedCreditCardsDefault .col-6 {
+  flex: 0 0 calc(50% - 0.25rem);
+  max-width: calc(50% - 0.25rem);
+  box-sizing: border-box;
+}
+
+/* Buttons */
+#savedCreditCardsDefault .btn {
+  display: inline-block;
+  font-weight: 400;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  user-select: none;
+  padding: 0.375rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  border-radius: 58px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+
+#savedCreditCardsDefault .btn-primary {
+  color: #fff;
+  background: linear-gradient(to right, #15b0f2, #21b96f);
+  border-color: transparent;
+}
+
+#savedCreditCardsDefault .btn-primary:hover {
+  opacity: 0.9;
+}
+
+#savedCreditCardsDefault .btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+#savedCreditCardsDefault .btn-outline-secondary {
+  color: #6c757d;
+  border-color: #6c757d;
+  background-color: transparent;
+}
+
+#savedCreditCardsDefault .btn-outline-secondary:hover {
+  color: #fff;
+  background-color: #6c757d;
+}
+
+#savedCreditCardsDefault .btn-outline-primary {
+  color: #0686d4;
+  border-color: #0686d4;
+  background-color: transparent;
+}
+
+#savedCreditCardsDefault .btn-outline-primary:hover {
+  color: #fff;
+  background-color: #0686d4;
+}
+
+#savedCreditCardsDefault .btn-outline-danger {
+  color: #dc3545;
+  border-color: #dc3545;
+  background-color: transparent;
+}
+
+#savedCreditCardsDefault .btn-outline-danger:hover {
+  color: #fff;
+  background-color: #dc3545;
+}
+
+#savedCreditCardsDefault .btn-link {
+  color: #0686d4;
+  background-color: transparent;
+  border-color: transparent;
+  text-decoration: underline;
+}
+
+#savedCreditCardsDefault .btn-link:hover {
+  color: #056ba8;
+}
+
+#savedCreditCardsDefault .btn-danger {
+  color: #fff;
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+/* Display utilities */
+#savedCreditCardsDefault .d-none {
+  display: none !important;
+}
+
+/* Flex utilities */
+#savedCreditCardsDefault .d-flex {
+  display: flex !important;
+}
+
+#savedCreditCardsDefault .flex-wrap {
+  flex-wrap: wrap !important;
+}
+
+#savedCreditCardsDefault .gap-2 {
+  gap: 0.5rem !important;
+}
+
+#savedCreditCardsDefault .mt-4 {
+  margin-top: 1.5rem !important;
+}
+
+#savedCreditCardsDefault .mt-3 {
+  margin-top: 1rem !important;
+}
+
+#savedCreditCardsDefault .mb-3 {
+  margin-bottom: 1rem;
+}
+
+/* Inside a g-3 grid, .mb-3 wrappers are redundant — gap handles spacing */
+#savedCreditCardsDefault .g-3 > [class*="col"] > .mb-3 {
+  margin-bottom: 0;
+}
+
+#savedCreditCardsDefault .mb-4 {
+  margin-bottom: 1.5rem !important;
+}
+
+#savedCreditCardsDefault .mb-0 {
+  margin-bottom: 0 !important;
+}
+
+/* Card component */
+#savedCreditCardsDefault .card {
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.125);
+  border-radius: 0.375rem;
+}
+
+#savedCreditCardsDefault .card-body {
+  padding: 1.5rem;
+}
+
+#savedCreditCardsDefault .saved-card-add__actions {
+  justify-content: flex-end;
+}
+
+#savedCreditCardsDefault .card-title {
+  margin-bottom: 0.5rem;
+}
+
+/* Form label */
+#savedCreditCardsDefault .form-label {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+/* Alert */
+#savedCreditCardsDefault .alert {
+  padding: 0.75rem 1.25rem;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  margin-bottom: 1rem;
+}
+
+#savedCreditCardsDefault .alert-danger {
+  color: #842029;
+  background-color: #f8d7da;
+  border-color: #f5c2c7;
+}
+
+#savedCreditCardsDefault .alert-info {
+  color: #055160;
+  background-color: #cff4fc;
+  border-color: #b6effb;
+}
+
+/* Text utilities */
+#savedCreditCardsDefault .text-muted {
+  color: #6c757d !important;
+}
+
+#savedCreditCardsDefault .ms-2 {
+  margin-left: 0.5rem !important;
+}
+
+#savedCreditCardsDefault small,
+#savedCreditCardsDefault .small {
+  font-size: 0.875em;
+}
+
+/* Badge */
+#savedCreditCardsDefault .badge {
+  display: inline-block;
+  padding: 0.35em 0.65em;
+  font-size: 0.75em;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+  border-radius: 0.375rem;
+}
+
+/* Fieldset */
+#savedCreditCardsDefault fieldset {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+#savedCreditCardsDefault fieldset legend {
+  display: block;
+  float: none;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: inherit;
+}
+
+/* fw-semibold */
+#savedCreditCardsDefault .fw-semibold {
+  font-weight: 600 !important;
+}
+
+/* PayPal hosted card field containers */
+#savedCreditCardsDefault .ppac-card-field {
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  height: 2.5rem;
+  overflow: hidden;
+  padding: 0;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+#savedCreditCardsDefault .ppac-card-field:focus-within {
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }

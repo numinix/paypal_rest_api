@@ -155,6 +155,234 @@ function paypalac_normalize_subscription_type($subscriptionType)
 
 $action = strtolower(trim((string) ($_POST['action'] ?? $_GET['action'] ?? '')));
 
+// AJAX: return order info (products + customer saved cards) for the manual create form
+if ($action === 'get_order_info') {
+    header('Content-Type: application/json');
+    $ordersId = (int) ($_GET['orders_id'] ?? 0);
+    if ($ordersId <= 0) {
+        echo json_encode(['error' => 'Invalid order ID']);
+        exit;
+    }
+
+    $orderRow = $db->Execute(
+        "SELECT o.orders_id, o.customers_id, o.currency, o.currency_value,
+                c.customers_firstname, c.customers_lastname
+           FROM " . TABLE_ORDERS . " o
+           LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = o.customers_id
+          WHERE o.orders_id = " . $ordersId . " LIMIT 1"
+    );
+    if (!($orderRow instanceof queryFactoryResult) || $orderRow->EOF) {
+        echo json_encode(['error' => 'Order not found']);
+        exit;
+    }
+
+    $customersId  = (int) $orderRow->fields['customers_id'];
+    $currency     = (string) ($orderRow->fields['currency'] ?? '');
+    $customerName = trim(($orderRow->fields['customers_firstname'] ?? '') . ' ' . ($orderRow->fields['customers_lastname'] ?? ''));
+
+    // Get products for this order
+    $productsResult = $db->Execute(
+        "SELECT op.orders_products_id, op.products_id, op.products_name, op.final_price, op.products_quantity
+           FROM " . TABLE_ORDERS_PRODUCTS . " op
+          WHERE op.orders_id = " . $ordersId
+    );
+    $products = [];
+    if ($productsResult instanceof queryFactoryResult) {
+        while (!$productsResult->EOF) {
+            $products[] = [
+                'orders_products_id' => (int) $productsResult->fields['orders_products_id'],
+                'products_id'        => (int) $productsResult->fields['products_id'],
+                'products_name'      => $productsResult->fields['products_name'],
+                'final_price'        => (float) $productsResult->fields['final_price'],
+                'quantity'           => (float) $productsResult->fields['products_quantity'],
+            ];
+            $productsResult->MoveNext();
+        }
+    }
+
+    // Get saved cards for this customer
+    $savedCards = [];
+    if (defined('TABLE_SAVED_CREDIT_CARDS')) {
+        $cardsResult = $db->Execute(
+            "SELECT saved_credit_card_id, type, last_digits, expiry_month, expiry_year, holder_name, vault_id
+               FROM " . TABLE_SAVED_CREDIT_CARDS . "
+              WHERE customers_id = " . $customersId . " AND is_deleted = 0
+              ORDER BY is_default DESC, saved_credit_card_id DESC"
+        );
+        if ($cardsResult instanceof queryFactoryResult) {
+            while (!$cardsResult->EOF) {
+                $savedCards[] = [
+                    'saved_credit_card_id' => (int) $cardsResult->fields['saved_credit_card_id'],
+                    'label'                => trim(
+                        ($cardsResult->fields['type'] ?? '') . ' ending in ' .
+                        ($cardsResult->fields['last_digits'] ?? '') . ' (exp ' .
+                        ($cardsResult->fields['expiry_month'] ?? '') . '/' .
+                        ($cardsResult->fields['expiry_year'] ?? '') . ')'
+                    ),
+                    'vault_id'             => $cardsResult->fields['vault_id'] ?? '',
+                ];
+                $cardsResult->MoveNext();
+            }
+        }
+    }
+
+    // Also check vault records for this customer (newer PayPal Advanced Checkout cards)
+    $vaultCards = VaultManager::getCustomerVaultedCards($customersId, false);
+    foreach ($vaultCards as $vc) {
+        // Check whether this vault_id already appears in saved_credit_cards
+        $alreadyListed = false;
+        foreach ($savedCards as $sc) {
+            if ($sc['vault_id'] === ($vc['vault_id'] ?? '')) {
+                $alreadyListed = true;
+                break;
+            }
+        }
+        if (!$alreadyListed) {
+            // Look up saved_credit_card_id by vault_id
+            $savedCcId = 0;
+            if (defined('TABLE_SAVED_CREDIT_CARDS') && !empty($vc['vault_id'])) {
+                $vaultLookup = $db->Execute(
+                    "SELECT saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . "
+                      WHERE vault_id = '" . zen_db_input($vc['vault_id']) . "'
+                        AND is_deleted = 0
+                      LIMIT 1"
+                );
+                if ($vaultLookup instanceof queryFactoryResult && !$vaultLookup->EOF) {
+                    $savedCcId = (int) $vaultLookup->fields['saved_credit_card_id'];
+                }
+            }
+            $savedCards[] = [
+                'saved_credit_card_id' => $savedCcId,
+                'label'                => trim(
+                    ($vc['brand'] ?? $vc['card_type'] ?? 'Card') . ' ending in ' .
+                    ($vc['last_digits'] ?? '') . ' (vault: ' . substr($vc['vault_id'] ?? '', 0, 8) . '...)'
+                ),
+                'vault_id'             => $vc['vault_id'] ?? '',
+            ];
+        }
+    }
+
+    echo json_encode([
+        'orders_id'     => $ordersId,
+        'customers_id'  => $customersId,
+        'customer_name' => $customerName,
+        'currency'      => $currency,
+        'products'      => $products,
+        'saved_cards'   => $savedCards,
+    ]);
+    exit;
+}
+
+// Create subscription manually
+if ($action === 'create_subscription') {
+    $redirectQuery = trim((string) ($_POST['redirect_query'] ?? ''));
+    $redirectUrl   = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+
+    $ordersId           = (int) zen_db_prepare_input($_POST['orders_id'] ?? 0);
+    $ordersProductsId   = (int) zen_db_prepare_input($_POST['orders_products_id'] ?? 0);
+    $savedCreditCardId  = (int) zen_db_prepare_input($_POST['saved_credit_card_id'] ?? 0);
+    $nextPaymentDate    = trim((string) zen_db_prepare_input($_POST['next_payment_date'] ?? ''));
+    $billingPeriod      = strtoupper(str_replace([' ', "\t"], '_', (string) zen_db_prepare_input($_POST['billing_period'] ?? '')));
+    $billingFrequency   = (int) zen_db_prepare_input($_POST['billing_frequency'] ?? 1);
+    $totalBillingCycles = (int) zen_db_prepare_input($_POST['total_billing_cycles'] ?? 0);
+    $amount             = (float) zen_db_prepare_input($_POST['amount'] ?? 0);
+    $currencyCode       = substr(strtoupper((string) zen_db_prepare_input($_POST['currency_code'] ?? '')), 0, 3);
+
+    // Basic validation
+    if ($ordersId <= 0 || $ordersProductsId <= 0 || $savedCreditCardId <= 0) {
+        $messageStack->add_session('Create subscription failed: order, product and saved card are required.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    if ($nextPaymentDate === '') {
+        $messageStack->add_session('Create subscription failed: next payment date is required.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    $dateObj = DateTime::createFromFormat('Y-m-d', $nextPaymentDate);
+    if (!$dateObj || $dateObj->format('Y-m-d') !== $nextPaymentDate) {
+        $messageStack->add_session('Create subscription failed: invalid next payment date format (use YYYY-MM-DD).', 'error');
+        zen_redirect($redirectUrl);
+    }
+    if ($billingPeriod === '' || $billingFrequency <= 0) {
+        $messageStack->add_session('Create subscription failed: billing period and frequency are required.', 'error');
+        zen_redirect($redirectUrl);
+    }
+
+    // Look up order to validate it exists and get customer/currency info
+    $orderCheck = $db->Execute(
+        "SELECT o.customers_id, o.currency
+           FROM " . TABLE_ORDERS . " o
+          WHERE o.orders_id = " . $ordersId . " LIMIT 1"
+    );
+    if (!($orderCheck instanceof queryFactoryResult) || $orderCheck->EOF) {
+        $messageStack->add_session('Create subscription failed: order #' . $ordersId . ' not found.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    $customersId = (int) $orderCheck->fields['customers_id'];
+    if (empty($currencyCode)) {
+        $currencyCode = (string) ($orderCheck->fields['currency'] ?? (defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : 'USD'));
+    }
+
+    // Look up product details
+    $productCheck = $db->Execute(
+        "SELECT products_id, products_name, final_price
+           FROM " . TABLE_ORDERS_PRODUCTS . "
+          WHERE orders_products_id = " . $ordersProductsId . "
+            AND orders_id = " . $ordersId . " LIMIT 1"
+    );
+    if (!($productCheck instanceof queryFactoryResult) || $productCheck->EOF) {
+        $messageStack->add_session('Create subscription failed: order product #' . $ordersProductsId . ' not found in order #' . $ordersId . '.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    $productsId   = (int) $productCheck->fields['products_id'];
+    $productsName = (string) $productCheck->fields['products_name'];
+    if ($amount <= 0) {
+        $amount = (float) $productCheck->fields['final_price'];
+    }
+
+    // Validate saved card belongs to this customer
+    if (defined('TABLE_SAVED_CREDIT_CARDS')) {
+        $cardCheck = $db->Execute(
+            "SELECT saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . "
+              WHERE saved_credit_card_id = " . $savedCreditCardId . "
+                AND customers_id = " . $customersId . "
+                AND is_deleted = 0 LIMIT 1"
+        );
+        if (!($cardCheck instanceof queryFactoryResult) || $cardCheck->EOF) {
+            $messageStack->add_session('Create subscription failed: saved card #' . $savedCreditCardId . ' not found for this customer.', 'error');
+            zen_redirect($redirectUrl);
+        }
+    }
+
+    if (!class_exists('paypalSavedCardRecurring')) {
+        $messageStack->add_session('Create subscription failed: paypalSavedCardRecurring class not available.', 'error');
+        zen_redirect($redirectUrl);
+    }
+
+    $savedCardRecurring = new paypalSavedCardRecurring();
+    $subscriptionId     = $savedCardRecurring->schedule_payment(
+        $amount,
+        $nextPaymentDate,
+        $savedCreditCardId,
+        $ordersProductsId,
+        'Subscription created manually by admin for order #' . $ordersId,
+        [
+            'products_id'          => $productsId,
+            'products_name'        => $productsName,
+            'currency_code'        => $currencyCode,
+            'billing_period'       => $billingPeriod,
+            'billing_frequency'    => $billingFrequency,
+            'total_billing_cycles' => $totalBillingCycles,
+        ]
+    );
+
+    if ($subscriptionId > 0) {
+        $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_CREATED_MANUALLY, $subscriptionId, $ordersId), 'success');
+    } else {
+        $messageStack->add_session('Create subscription failed: schedule_payment returned an error. Check the saved card and order details.', 'error');
+    }
+    zen_redirect($redirectUrl);
+}
+
 if ($action === 'update_subscription') {
     $subscriptionType = paypalac_normalize_subscription_type($_POST['subscription_type'] ?? 'rest');
     $subscriptionId = (int) zen_db_prepare_input($_POST['paypal_subscription_id'] ?? 0);
@@ -1328,6 +1556,74 @@ function paypalac_get_table_columns($tableName)
         </div>
         
         <div class="nmx-panel">
+            <div class="nmx-panel-heading" style="cursor:pointer;" onclick="paypalacToggleCreatePanel();">
+                <div class="nmx-panel-title">&#43; Create Subscription Manually</div>
+            </div>
+            <div class="nmx-panel-body" id="create-sub-body" style="display:none;">
+                <p style="margin:0 0 12px;color:#666;">Use this form to manually create a saved-card subscription for an order where automatic subscription creation was missed (e.g. payment captured but no subscription record was created).</p>
+                <?php echo zen_draw_form('create_subscription_form', FILENAME_PAYPALAC_SUBSCRIPTIONS, '', 'post', 'id="create-subscription-form"'); ?>
+                    <?php echo zen_draw_hidden_field('action', 'create_subscription'); ?>
+                    <?php echo zen_draw_hidden_field('redirect_query', $activeQuery); ?>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;">
+                        <div class="nmx-form-group">
+                            <label for="cs-orders-id"><strong>Order ID</strong></label>
+                            <div style="display:flex;gap:6px;">
+                                <input type="number" id="cs-orders-id" name="orders_id" class="nmx-form-control" placeholder="e.g. 12345" min="1" style="flex:1;" />
+                                <button type="button" class="nmx-btn nmx-btn-info nmx-btn-sm" onclick="paypalacLoadOrderInfo()">Load</button>
+                            </div>
+                            <small id="cs-customer-name" style="color:#555;"></small>
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-product"><strong>Order Product</strong></label>
+                            <select id="cs-product" name="orders_products_id" class="nmx-form-control">
+                                <option value="">-- Enter Order ID first --</option>
+                            </select>
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-saved-card"><strong>Saved Card</strong></label>
+                            <select id="cs-saved-card" name="saved_credit_card_id" class="nmx-form-control">
+                                <option value="">-- Enter Order ID first --</option>
+                            </select>
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-next-payment"><strong>Next Payment Date</strong></label>
+                            <input type="date" id="cs-next-payment" name="next_payment_date" class="nmx-form-control" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" />
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-amount"><strong>Amount</strong></label>
+                            <input type="number" id="cs-amount" name="amount" class="nmx-form-control" placeholder="Auto from product" min="0" step="0.01" />
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-currency"><strong>Currency</strong></label>
+                            <input type="text" id="cs-currency" name="currency_code" class="nmx-form-control" placeholder="e.g. CAD" maxlength="3" style="text-transform:uppercase;" />
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-period"><strong>Billing Period</strong></label>
+                            <select id="cs-period" name="billing_period" class="nmx-form-control">
+                                <option value="MONTH">Monthly</option>
+                                <option value="YEAR">Yearly</option>
+                                <option value="WEEK">Weekly</option>
+                                <option value="DAY">Daily</option>
+                                <option value="SEMI_MONTH">Semi-Monthly</option>
+                            </select>
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-frequency"><strong>Billing Frequency</strong></label>
+                            <input type="number" id="cs-frequency" name="billing_frequency" class="nmx-form-control" value="1" min="1" />
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-cycles"><strong>Total Billing Cycles</strong> <small>(0 = unlimited)</small></label>
+                            <input type="number" id="cs-cycles" name="total_billing_cycles" class="nmx-form-control" value="0" min="0" />
+                        </div>
+                    </div>
+                    <div style="margin-top:12px;">
+                        <button type="submit" class="nmx-btn nmx-btn-primary" onclick="return paypalacConfirmCreateSubscription();">Create Subscription</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="nmx-panel">
             <div class="nmx-panel-heading">
                 <div class="nmx-panel-title">Filter Subscriptions</div>
             </div>
@@ -2012,6 +2308,95 @@ function paypalac_get_table_columns($tableName)
 
 <script>
 var paypalacSubscriptionsBaseUrl = <?php echo json_encode(zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, '')); ?>;
+
+function paypalacToggleCreatePanel() {
+    var panel = document.getElementById('create-sub-body');
+    if (panel) {
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function paypalacConfirmCreateSubscription() {
+    var ordersId = parseInt(document.getElementById('cs-orders-id').value, 10) || 0;
+    return confirm('Create subscription manually for order #' + ordersId + '?');
+}
+
+function paypalacLoadOrderInfo() {
+    var ordersId = parseInt(document.getElementById('cs-orders-id').value, 10);
+    if (!ordersId || ordersId <= 0) {
+        alert('Please enter a valid Order ID.');
+        return;
+    }
+    var separator = paypalacSubscriptionsBaseUrl.indexOf('?') >= 0 ? '&' : '?';
+    var url = paypalacSubscriptionsBaseUrl + separator + 'action=get_order_info&orders_id=' + encodeURIComponent(ordersId);
+    fetch(url)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            // Show customer name
+            var nameEl = document.getElementById('cs-customer-name');
+            if (nameEl) {
+                nameEl.textContent = 'Customer: ' + data.customer_name + ' (#' + data.customers_id + ')';
+            }
+            // Populate currency
+            var currEl = document.getElementById('cs-currency');
+            if (currEl && data.currency) {
+                currEl.value = data.currency;
+            }
+            // Populate products
+            var productSel = document.getElementById('cs-product');
+            productSel.innerHTML = '';
+            if (data.products && data.products.length > 0) {
+                data.products.forEach(function(p) {
+                    var opt = document.createElement('option');
+                    opt.value = p.orders_products_id;
+                    opt.textContent = p.products_name + ' ($' + parseFloat(p.final_price).toFixed(2) + ')';
+                    opt.dataset.price = p.final_price;
+                    productSel.appendChild(opt);
+                });
+                // Auto-fill amount from first product
+                var amtEl = document.getElementById('cs-amount');
+                if (amtEl && data.products[0]) {
+                    amtEl.value = parseFloat(data.products[0].final_price).toFixed(2);
+                }
+            } else {
+                productSel.innerHTML = '<option value="">No products found</option>';
+            }
+            // Populate saved cards
+            var cardSel = document.getElementById('cs-saved-card');
+            cardSel.innerHTML = '';
+            if (data.saved_cards && data.saved_cards.length > 0) {
+                data.saved_cards.forEach(function(c) {
+                    var opt = document.createElement('option');
+                    opt.value = c.saved_credit_card_id;
+                    opt.textContent = c.label;
+                    cardSel.appendChild(opt);
+                });
+            } else {
+                cardSel.innerHTML = '<option value="">No saved cards found for this customer</option>';
+            }
+        })
+        .catch(function(err) {
+            alert('Failed to load order info: ' + err);
+        });
+}
+
+// Update amount when a different product is selected
+document.addEventListener('DOMContentLoaded', function() {
+    var productSel = document.getElementById('cs-product');
+    if (productSel) {
+        productSel.addEventListener('change', function() {
+            var selected = productSel.options[productSel.selectedIndex];
+            var amtEl = document.getElementById('cs-amount');
+            if (amtEl && selected && selected.dataset.price) {
+                amtEl.value = parseFloat(selected.dataset.price).toFixed(2);
+            }
+        });
+    }
+});
 </script>
 <script src="includes/javascript/paypalac_subscriptions.js"></script>
 

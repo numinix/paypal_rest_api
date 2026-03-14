@@ -54,7 +54,11 @@ class ConfirmPayPalPaymentChoiceRequest
         //
         $this->userAction = 'CONTINUE';
         global $current_page_base;
-        if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && defined('CHECKOUT_ONE_CONFIRMATION_REQUIRED') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
+        // For OPRC One-Page mode the customer returns from PayPal directly to the order-processing
+        // page with no confirmation/review step, so "Pay Now" accurately reflects what clicking will do.
+        if (defined('FILENAME_OPRC_CHECKOUT_PROCESS') && $current_page_base === FILENAME_OPRC_CHECKOUT_PROCESS) {
+            $this->userAction = 'PAY_NOW';
+        } elseif (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && defined('CHECKOUT_ONE_CONFIRMATION_REQUIRED') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
             if (!in_array('paypalac', explode(',', str_replace(' ', '', CHECKOUT_ONE_CONFIRMATION_REQUIRED)))) {
                 $this->userAction = 'PAY_NOW';
             }

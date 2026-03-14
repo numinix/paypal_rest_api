@@ -8,6 +8,9 @@ $define = [
     'MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE' => 'Credit Card',
     'MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE_ADMIN' => 'Credit Cards via PayPal Advanced Checkout',
     'MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_DESCRIPTION' => 'Accept credit card payments via PayPal Advanced Checkout (v%s). Requires the main PayPal Advanced Checkout module to be installed and configured with valid API credentials.',
+    'MODULE_PAYMENT_PAYPALAC_CC_FIRSTNAME' => 'First name',
+    'MODULE_PAYMENT_PAYPALAC_CC_LASTNAME' => 'Last name',
+    'MODULE_PAYMENT_PAYPALAC_CC_EXPIRES_YEAR' => 'Year',
 ];
 
 return $define;
