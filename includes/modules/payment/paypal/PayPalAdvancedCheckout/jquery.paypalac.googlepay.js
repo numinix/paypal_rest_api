@@ -18,7 +18,9 @@
     var sdkState = {
         config: null,
         googlepay: null,
-        paymentsClient: null
+        paymentsClient: null,
+        pendingOrderId: null,
+        pendingPayload: null
     };
 
     var WALLET_BUTTON_MIN_WIDTH = '200px';
@@ -819,6 +821,70 @@
     }
 
     /**
+     * Handle Google Pay payment authorization (PAYMENT_AUTHORIZATION callback).
+     * Called by Google Pay after the user taps "Pay" in the payment sheet.
+     *
+     * Registering this callback causes Google Pay to render the full "order summary"
+     * view that displays the order total — the same view shown on the cart/product
+     * pages. Without paymentDataCallbacks, Google Pay shows a simplified sheet with
+     * no total visible.
+     *
+     * @param {Object} paymentData - The full payment data from Google Pay
+     * @returns {Promise<{transactionState: string}>} SUCCESS or ERROR result
+     */
+    function onPaymentAuthorized(paymentData) {
+        return new Promise(function (resolve) {
+            console.log('[Google Pay] onPaymentAuthorized called');
+
+            var googlepay = sdkState.googlepay;
+            var orderId = sdkState.pendingOrderId;
+
+            if (!googlepay || !orderId) {
+                console.error('[Google Pay] onPaymentAuthorized: not initialized - googlepay:', !!googlepay, 'orderId:', orderId);
+                resolve({
+                    transactionState: 'ERROR',
+                    error: {
+                        reason: 'OTHER_ERROR',
+                        message: 'Payment not initialized. Please try again.'
+                    }
+                });
+                return;
+            }
+
+            console.log('[Google Pay] Calling paypal.Googlepay().confirmOrder, orderId:', orderId);
+
+            googlepay.confirmOrder({
+                orderId: orderId,
+                paymentMethodData: paymentData.paymentMethodData
+            }).then(function (confirmResult) {
+                console.log('[Google Pay] confirmOrder result:', confirmResult);
+
+                var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
+                var email = paymentData.email || billingAddress.emailAddress || '';
+
+                sdkState.pendingPayload = {
+                    confirmed: true,
+                    orderID: orderId,
+                    email: email,
+                    confirmResult: confirmResult
+                };
+
+                resolve({ transactionState: 'SUCCESS' });
+            }).catch(function (confirmError) {
+                console.error('[Google Pay] confirmOrder failed in onPaymentAuthorized:', confirmError);
+                sdkState.pendingPayload = null;
+                resolve({
+                    transactionState: 'ERROR',
+                    error: {
+                        reason: 'OTHER_ERROR',
+                        message: confirmError.message || 'Order confirmation failed. Please try again.'
+                    }
+                });
+            });
+        });
+    }
+
+    /**
      * Handle the Google Pay button click event.
      * Creates a PayPal order and initiates the Google Pay payment flow.
      * 
@@ -915,7 +981,14 @@
                 sdkState.config = orderConfig;
                 var orderId = orderConfig.orderID;
 
-                // Build payment data request with the actual order amount
+                // Store the order ID so onPaymentAuthorized can access it
+                sdkState.pendingOrderId = orderId;
+                sdkState.pendingPayload = null;
+
+                // Build payment data request with the actual order amount.
+                // callbackIntents: ['PAYMENT_AUTHORIZATION'] activates paymentDataCallbacks,
+                // which causes Google Pay to render the full order summary view including
+                // the order total — the same view shown on cart/product pages.
                 var paymentDataRequest = {
                     apiVersion: basePaymentDataRequest.apiVersion || 2,
                     apiVersionMinor: basePaymentDataRequest.apiVersionMinor || 0,
@@ -923,18 +996,19 @@
                     transactionInfo: {
                         totalPriceStatus: 'FINAL',
                         totalPrice: orderConfig.amount,
-                        totalPriceLabel: (basePaymentDataRequest.merchantInfo && basePaymentDataRequest.merchantInfo.merchantName)
-                            ? basePaymentDataRequest.merchantInfo.merchantName
-                            : 'Total',
+                        totalPriceLabel: 'Total',
                         displayItems: [{
                             label: 'Order total',
                             type: 'LINE_ITEM',
                             price: orderConfig.amount
                         }],
                         currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
-                        countryCode: 'US'
+                        countryCode: basePaymentDataRequest.transactionInfo?.countryCode || orderConfig.storeCountryCode || 'US'
                     },
                     merchantInfo: basePaymentDataRequest.merchantInfo || {},
+                    // PAYMENT_AUTHORIZATION enables paymentDataCallbacks without requiring
+                    // shipping address or offer-code UI in the modal.
+                    callbackIntents: ['PAYMENT_AUTHORIZATION'],
                     // Enable email collection from Google Pay
                     emailRequired: true
                     // NOTE: Shipping address and shipping option selection are handled
@@ -947,53 +1021,23 @@
 
                 console.log('[Google Pay] Step 2: Requesting payment data from Google Pay, total:', paymentDataRequest.transactionInfo.totalPrice);
 
-                // Step 2: Invoke Google Pay payment sheet with actual amount
-                // This is called in the .then() callback but remains within user gesture context
-                return paymentsClient.loadPaymentData(paymentDataRequest).then(function (paymentData) {
-                    console.log('[Google Pay] Payment data received from Google Pay sheet');
-                    console.log('[Google Pay] Payment method data:', paymentData.paymentMethodData);
-                    
-                    // Step 3: Confirm the order using PayPal's client-side API
-                    // Similar to Apple Pay, Google Pay now uses client-side confirmation via confirmOrder()
-                    // This is the recommended flow per PayPal's Advanced Integration documentation
-                    console.log('[Google Pay] Calling paypal.Googlepay().confirmOrder...', orderId);
-                    
-                    return googlepay.confirmOrder({
-                        orderId: orderId,
-                        paymentMethodData: paymentData.paymentMethodData
-                    }).then(function (confirmResult) {
-                        console.log('[Google Pay] confirmOrder result:', confirmResult);
-                        
-                        // For checkout flow: Store payment data and submit form
-                        // The checkout form submission goes to normal checkout processing
-                        // No AJAX request needed - everything handled by payment module
-                        var billingAddress = paymentData.paymentMethodData.info.billingAddress || {};
-                        var email = paymentData.email || billingAddress.emailAddress || '';
-                        
-                        // Build the payload for the hidden form field
-                        // Set confirmed: true to indicate client-side confirmation was successful
-                        var checkoutPayload = {
-                            confirmed: true,
-                            orderID: orderId,
-                            email: email,
-                            confirmResult: confirmResult
-                            // Note: No shipping_address or billing_address
-                            // Checkout uses addresses already in session
-                        };
-                        
-                        console.log('[Google Pay] Storing payload and submitting checkout form');
-                        
-                        // Store payload in hidden field and submit form
-                        // This triggers normal checkout processing via payment module
-                        setGooglePayPayload(checkoutPayload);
-                    }).catch(function (confirmError) {
-                        console.error('[Google Pay] confirmOrder failed:', confirmError);
+                // Step 2: Invoke Google Pay payment sheet with actual amount.
+                // confirmOrder is called inside onPaymentAuthorized (registered on the
+                // PaymentsClient) before loadPaymentData resolves with SUCCESS.
+                return paymentsClient.loadPaymentData(paymentDataRequest).then(function () {
+                    // onPaymentAuthorized has already confirmed the order and stored the
+                    // payload in sdkState.pendingPayload.  Submit the checkout form now.
+                    console.log('[Google Pay] Payment sheet closed with success, submitting form');
+                    if (sdkState.pendingPayload) {
+                        setGooglePayPayload(sdkState.pendingPayload);
+                        sdkState.pendingPayload = null;
+                    } else {
+                        console.warn('[Google Pay] No pending payload after authorization');
                         setGooglePayPayload({});
                         if (typeof window.oprcHideProcessingOverlay === 'function') {
                             window.oprcHideProcessingOverlay();
                         }
-                        throw confirmError;
-                    });
+                    }
                 });
             });
         }).catch(function (error) {
@@ -1121,9 +1165,14 @@
                 // Use environment from config (stored in sdkState) to determine Google Pay environment
                 var googlePayEnvironment = (sdkState.config && sdkState.config.environment === 'sandbox') ? 'TEST' : 'PRODUCTION';
                 console.log('[Google Pay] Creating PaymentsClient with environment:', googlePayEnvironment);
-                // Note: No paymentDataCallbacks for checkout since we don't collect shipping in the modal
+                // Register onPaymentAuthorized so Google Pay renders the full order summary
+                // view (with the order total) instead of the simplified "no-total" sheet.
+                // This mirrors how the cart/product pages show the total via paymentDataCallbacks.
                 var paymentsClient = new google.payments.api.PaymentsClient({
-                    environment: googlePayEnvironment
+                    environment: googlePayEnvironment,
+                    paymentDataCallbacks: {
+                        onPaymentAuthorized: onPaymentAuthorized
+                    }
                 });
                 sdkState.paymentsClient = paymentsClient;
 

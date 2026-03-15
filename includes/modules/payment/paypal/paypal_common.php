@@ -887,13 +887,14 @@ class PayPalCommon {
      * Generates a fixed-length UUID-like GUID (36 chars) from a SHA-256
      * hash of the order's state. This ensures the PayPal-Request-Id header
      * stays within PayPal's character limit while still detecting changes
-     * in cart contents, order totals, and wallet payloads.
+     * in cart contents, order totals, wallet payloads, and credit card details.
      *
      * @param \order $order Order object
      * @param string $ppac_type Payment type
+     * @param array $cc_info Credit card info array (optional, used for card payments)
      * @return string
      */
-    public function createOrderGuid($order, string $ppac_type): string
+    public function createOrderGuid($order, string $ppac_type, array $cc_info = []): string
     {
         $orders_completed = $_SESSION['PayPalAdvancedCheckout']['CompletedOrders'] ?? 0;
 
@@ -921,6 +922,27 @@ class PayPalCommon {
             if (is_array($wallet_payload) && !empty($wallet_payload)) {
                 $hash_data .= json_encode($wallet_payload);
             }
+        }
+
+        // Include credit card info in the GUID for card payments so that
+        // switching cards produces a new PayPal-Request-Id and avoids
+        // reusing a cached PayPal order created for a different card.
+        // Pipe delimiters prevent accidental hash collisions between
+        // different field-value combinations.
+        if ($ppac_type === 'card' && !empty($cc_info)) {
+            $hash_data .= '|' . ($cc_info['number'] ?? '')
+                . '|' . ($cc_info['vault_id'] ?? '')
+                . '|' . ($cc_info['expiry_month'] ?? '')
+                . '|' . ($cc_info['expiry_year'] ?? '')
+                . '|' . ($cc_info['name'] ?? '');
+        }
+
+        // Include the card-attempt counter so that each card payment
+        // submission gets a unique GUID even when retrying the same card.
+        // This prevents PayPal from returning a cached decline response
+        // via its server-side idempotency for the PayPal-Request-Id header.
+        if ($ppac_type === 'card') {
+            $hash_data .= '|card_attempt:' . ($_SESSION['PayPalAdvancedCheckout']['CardAttempts'] ?? 0);
         }
 
         $hash = hash('sha256', $hash_data);
@@ -1210,24 +1232,44 @@ class PayPalCommon {
 
         $log = new Logger();
 
-        // Create a GUID (Globally Unique IDentifier) for the order's current 'state'.
-        $order_guid = $this->createOrderGuid($order, $ppac_type);
-
-        // If a PayPal order already exists in the session for this GUID, reuse it.
-        if (isset($_SESSION['PayPalAdvancedCheckout']['Order']['guid']) && $_SESSION['PayPalAdvancedCheckout']['Order']['guid'] === $order_guid) {
-            $log->write("createPayPalOrder($ppac_type): Reusing existing PayPal order with GUID: $order_guid");
-            return true;
-        }
-
         // Get credit card info using the public getter method if available,
         // otherwise fall back to direct property access (for backward compatibility).
         // The getter method is required because ccInfo is a protected property
         // that cannot be accessed directly from this class.
+        //
+        // Note: cc_info must be retrieved BEFORE creating the GUID so that card
+        // details are included in the hash. This prevents reusing a cached PayPal
+        // order when the customer switches to a different card.
         if (method_exists($paymentModule, 'getCcInfo')) {
             $cc_info = $paymentModule->getCcInfo();
         } else {
             // Fallback for modules that don't have the getter (e.g., paypalac main module)
             $cc_info = property_exists($paymentModule, 'ccInfo') ? ($paymentModule->ccInfo ?? []) : [];
+        }
+
+        // For card payments, increment a per-session attempt counter so that
+        // each card submission produces a unique GUID / PayPal-Request-Id.
+        // This prevents PayPal from returning a cached decline response when
+        // the customer retries. Duplicate protection is still provided by
+        // PayPal's server-side idempotency for the same Request-Id.
+        if ($ppac_type === 'card') {
+            $_SESSION['PayPalAdvancedCheckout']['CardAttempts'] = ($_SESSION['PayPalAdvancedCheckout']['CardAttempts'] ?? 0) + 1;
+        }
+
+        // Create a GUID (Globally Unique IDentifier) for the order's current 'state',
+        // including credit card info so that different cards produce different GUIDs.
+        $order_guid = $this->createOrderGuid($order, $ppac_type, $cc_info);
+
+        // For card payments, never reuse a session-cached PayPal order.
+        // Card data must always come fresh from POST, and a new PayPal order
+        // must be created each time. PayPal's own idempotency mechanism
+        // (via the PayPal-Request-Id header) handles duplicate protection.
+        // For non-card payments (PayPal wallet, Google Pay, etc.), the
+        // session GUID reuse is still safe because the payment source is
+        // managed by PayPal's SDK, not by session-stored card data.
+        if ($ppac_type !== 'card' && isset($_SESSION['PayPalAdvancedCheckout']['Order']['guid']) && $_SESSION['PayPalAdvancedCheckout']['Order']['guid'] === $order_guid) {
+            $log->write("createPayPalOrder($ppac_type): Reusing existing PayPal order with GUID: $order_guid");
+            return true;
         }
 
         // Log the cc_info data for debugging (mask sensitive data)

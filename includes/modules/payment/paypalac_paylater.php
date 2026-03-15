@@ -732,6 +732,17 @@ class paypalac_paylater extends base
         $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
         $payment_status = ($payment['status'] !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalAdvancedCheckoutApi::STATUS_CAPTURED : PayPalAdvancedCheckoutApi::STATUS_APPROVED);
 
+        // -----
+        // If the capture/authorization was declined, denied, or failed, do NOT create the
+        // order. Redirect the customer back to checkout with an error message so they can
+        // choose a different payment method.
+        //
+        if (in_array($payment['status'], ['DECLINED', 'DENIED', 'FAILED'], true)) {
+            $this->log->write("==> Pay Later::before_process: Payment {$payment['status']}; redirecting to checkout.");
+            unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_CAPTURE_FAILED, FILENAME_CHECKOUT_PAYMENT);
+        }
+
         $this->orderInfo['payment_status'] = $payment_status;
         $this->orderInfo['paypal_payment_status'] = $payment['status'];
         $this->orderInfo['txn_type'] = $txn_type;

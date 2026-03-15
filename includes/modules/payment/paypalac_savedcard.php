@@ -618,9 +618,10 @@ class paypalac_savedcard extends base
         // Set payment type - this module always uses saved card payments
         $_SESSION['PayPalAdvancedCheckout']['ppac_type'] = 'card';
 
-        // Get the selected vault ID from POST or session
-        // The radio button directly submits the vault_id value
-        $vaultId = $_POST['paypalac_savedcard_vault_id'] ?? ($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? '');
+        // Get the selected vault ID from POST only — never fall back to
+        // session data, which could contain a stale card from a previous
+        // attempt.  The radio button directly submits the vault_id value.
+        $vaultId = $_POST['paypalac_savedcard_vault_id'] ?? '';
 
         if (empty($vaultId)) {
             $this->setMessageAndRedirect(

@@ -1019,14 +1019,14 @@
                     transactionInfo: {
                         totalPriceStatus: 'FINAL',
                         totalPrice: orderConfig.amount,
-                        totalPriceLabel: (merchantInfo && merchantInfo.merchantName) ? merchantInfo.merchantName : 'Total',
+                        totalPriceLabel: 'Total',
                         displayItems: [{
                             label: 'Order total',
                             type: 'LINE_ITEM',
                             price: orderConfig.amount
                         }],
                         currencyCode: orderConfig.currency || basePaymentDataRequest.transactionInfo?.currencyCode || 'USD',
-                        countryCode: 'US'
+                        countryCode: basePaymentDataRequest.transactionInfo?.countryCode || orderConfig.storeCountryCode || 'US'
                     },
                     merchantInfo: merchantInfo,
                     // Email: guests must provide it; logged-in users have it in their session

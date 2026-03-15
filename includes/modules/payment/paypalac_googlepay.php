@@ -634,6 +634,7 @@ class paypalac_googlepay extends base
             'environment' => MODULE_PAYMENT_PAYPALAC_SERVER,
             'enableGuestWallet' => (defined('MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_ENABLE_GUEST_WALLET') && MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_ENABLE_GUEST_WALLET === 'True'),
             'cartRequiresShipping' => $requiresShipping,
+            'storeCountryCode' => $this->getStoreCountryCode(),
         ];
     }
 
@@ -755,6 +756,7 @@ class paypalac_googlepay extends base
             'clientId' => $client_id,
             'merchantId' => $googleMerchantId,
             'googleMerchantId' => $googleMerchantId,
+            'storeCountryCode' => $this->getStoreCountryCode(),
         ];
     }
 
@@ -847,6 +849,17 @@ class paypalac_googlepay extends base
         $txn_type = $this->orderInfo['intent'];
         $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
         $payment_status = ($payment['status'] !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalAdvancedCheckoutApi::STATUS_CAPTURED : PayPalAdvancedCheckoutApi::STATUS_APPROVED);
+
+        // -----
+        // If the capture/authorization was declined, denied, or failed, do NOT create the
+        // order. Redirect the customer back to checkout with an error message so they can
+        // choose a different payment method.
+        //
+        if (in_array($payment['status'], ['DECLINED', 'DENIED', 'FAILED'], true)) {
+            $this->log->write("==> Google Pay::before_process: Payment {$payment['status']}; redirecting to checkout.");
+            unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_CAPTURE_FAILED, FILENAME_CHECKOUT_PAYMENT);
+        }
 
         $this->orderInfo['payment_status'] = $payment_status;
         $this->orderInfo['paypal_payment_status'] = $payment['status'];
@@ -1068,6 +1081,31 @@ class paypalac_googlepay extends base
             'MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_ENVIRONMENT',
             'MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_ENABLE_GUEST_WALLET',
         ];
+    }
+
+    /**
+     * Return the store's ISO 3166-1 alpha-2 country code based on STORE_COUNTRY.
+     * Used as a fallback when the PayPal SDK does not provide a countryCode
+     * in its Google Pay configuration.
+     *
+     * @return string Two-letter country code, e.g. 'US', 'CA', 'GB'
+     */
+    protected function getStoreCountryCode(): string
+    {
+        global $db;
+
+        if (!defined('STORE_COUNTRY') || !defined('TABLE_COUNTRIES')) {
+            return 'US';
+        }
+
+        $result = $db->Execute(
+            "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES .
+            " WHERE countries_id = " . (int)STORE_COUNTRY . " LIMIT 1"
+        );
+
+        return (!$result->EOF && !empty($result->fields['countries_iso_code_2']))
+            ? $result->fields['countries_iso_code_2']
+            : 'US';
     }
 
     /**

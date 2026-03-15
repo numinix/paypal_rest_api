@@ -826,7 +826,7 @@ class paypalac_creditcard extends base
     {
         global $messageStack, $order;
 
-        $saved_card = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? ($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? 'new'));
+        $saved_card = $_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? 'new');
 
         // If using a saved card, minimal validation needed
         if ($saved_card !== 'new') {
@@ -1130,16 +1130,22 @@ class paypalac_creditcard extends base
 
         $this->orderInfo['expiration_time'] = $payment['expiration_time'] ?? null;
 
-        if ($payment['status'] !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED) {
-            $pending_status = (int)MODULE_PAYMENT_PAYPALAC_HELD_STATUS_ID;
-            if ($pending_status > 0) {
-                $this->order_status = $pending_status;
-                $order->info['order_status'] = $pending_status;
-            }
+        // -----
+        // If the order's PayPal status doesn't indicate successful capture, ensure that
+        // the overall order's status is set to this payment-module's PENDING status and set
+        // a processing flag so that the after_process method will alert the store admin if
+        // configured. Authorized payments (STATUS_CREATED) should use pending status since
+        // they have not been captured yet.
+        //
+        $this->orderInfo['admin_alert_needed'] = false;
+        if ($payment_status !== PayPalAdvancedCheckoutApi::STATUS_CAPTURED) {
+            $this->order_status = (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID;
+            $order->info['order_status'] = $this->order_status;
             $this->orderInfo['admin_alert_needed'] = true;
+
+            $this->log->write("==> Credit Card::before_process: Payment status {$payment['status']} received from PayPal; order's status forced to pending.");
         } else {
             $order->info['order_status'] = $this->order_status;
-            $this->orderInfo['admin_alert_needed'] = false;
         }
 
         // Store vault card data in session if present

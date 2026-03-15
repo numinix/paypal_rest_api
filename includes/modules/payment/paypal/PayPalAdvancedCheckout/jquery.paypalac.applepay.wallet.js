@@ -777,7 +777,7 @@
             merchantCapabilities: applePayConfig.merchantCapabilities || ['supports3DS'],
             supportedNetworks: applePayConfig.supportedNetworks || ['visa', 'masterCard', 'amex', 'discover'],
             total: {
-                label: applePayConfig.merchantName || 'Total',
+                label: 'Total',
                 amount: orderTotal.amount,
                 type: 'final'
             },
