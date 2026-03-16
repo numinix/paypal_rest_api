@@ -760,15 +760,9 @@ class paypalac_savedcard extends base
 
     public function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
     {
-        global $messageStack;
-
         $this->log->write('Saved Card redirect: ' . $error_message);
 
-        if ($log_only === false) {
-            $messageStack->add_session('checkout_payment', $error_message, 'error');
-        }
-
-        zen_redirect(zen_href_link($redirect_page, '', 'SSL'));
+        $this->paypalCommon->setMessageAndRedirect($error_message, $redirect_page, $log_only);
     }
 
     public function confirmation()
