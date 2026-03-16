@@ -1006,7 +1006,16 @@ class paypalac_creditcard extends base
         $this->log->write('Credit Cards redirect: ' . $error_message);
 
         if ($log_only === false) {
-            $messageStack->add_session('checkout_payment', $error_message, 'error');
+            $messageTargets = ['checkout_payment'];
+
+            // Some OPC checkouts (e.g. one_page_checkout/oprc) render messages
+            // from a different stack key than checkout_payment.
+            $messageTargets[] = 'one_page_checkout';
+            $messageTargets[] = 'oprc_checkout_payment';
+
+            foreach (array_unique($messageTargets) as $messageTarget) {
+                $messageStack->add_session($messageTarget, $error_message, 'error');
+            }
         }
 
         zen_redirect(zen_href_link($redirect_page, '', 'SSL'));
