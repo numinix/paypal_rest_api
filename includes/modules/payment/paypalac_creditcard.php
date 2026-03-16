@@ -1018,6 +1018,29 @@ class paypalac_creditcard extends base
             }
         }
 
+        // In an AJAX checkout context (one_page_checkout/oprc), throw an exception
+        // instead of calling zen_redirect() so that the AJAX handler can return a
+        // proper JSON error response that the page JavaScript will display inline,
+        // rather than relying on a redirect through checkout_payment back to OPC.
+        if (class_exists('OprcAjaxCheckoutException')) {
+            // Use $_POST (not $_REQUEST) to avoid cookie-based spoofing. The OPC
+            // flow is always a POST; $_SESSION['request'] is set server-side.
+            $isAjax = (isset($_SESSION['request']) && $_SESSION['request'] === 'ajax')
+                || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+                || (isset($_POST['request']) && strtolower($_POST['request']) === 'ajax');
+            if ($isAjax) {
+                // $error_message is intentional HTML (built from a language-constant
+                // template that already contains markup such as <b> tags for the
+                // error code). This matches how the same string is rendered by the
+                // existing session-based message stack throughout the codebase.
+                throw new OprcAjaxCheckoutException(
+                    '',
+                    null,
+                    $log_only === false ? '<div class="messageStackError larger">' . $error_message . '</div>' : null
+                );
+            }
+        }
+
         zen_redirect(zen_href_link($redirect_page, '', 'SSL'));
     }
 
