@@ -1348,7 +1348,6 @@ $filters = [
     'status' => trim((string) ($_GET['status'] ?? 'scheduled')),
     'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
     'show_archived' => trim((string) ($_GET['show_archived'] ?? '')),
-    'subscription_type' => 'rest',
 ];
 
 $queryString = [];
@@ -1447,50 +1446,48 @@ if ($currentPerPage === false) {
 // Fetch subscriptions from both tables
 $allSubscriptions = [];
 
-// Fetch REST API subscriptions
-if ($filters['subscription_type'] === '' || $filters['subscription_type'] === 'rest') {
-    $restWhereClauses = [];
-    
-    if ($filters['customers_id'] > 0) {
-        $restWhereClauses[] = 'ps.customers_id = ' . (int) $filters['customers_id'];
-    }
-    if ($filters['products_id'] > 0) {
-        $restWhereClauses[] = 'ps.products_id = ' . (int) $filters['products_id'];
-    }
-    if ($filters['status'] !== '') {
-        $restWhereClauses[] = "ps.status = '" . zen_db_input($filters['status']) . "'";
-    }
-    if ($filters['payment_module'] !== '') {
-        $restWhereClauses[] = "o.payment_module_code = '" . zen_db_input($filters['payment_module']) . "'";
-    }
-    if ($filters['show_archived'] === 'only') {
-        $restWhereClauses[] = 'ps.is_archived = 1';
-    } elseif ($filters['show_archived'] !== 'all') {
-        $restWhereClauses[] = 'ps.is_archived = 0';
-    }
-    
-    $restSql = 'SELECT ps.*, c.customers_firstname, c.customers_lastname, c.customers_email_address,'
-        . ' o.payment_module_code, o.payment_method,'
-        . ' pv.brand AS vault_brand, pv.last_digits AS vault_last_digits, pv.card_type AS vault_card_type, pv.status AS vault_status, pv.expiry AS vault_expiry'
-        . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
-        . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = ps.customers_id'
-        . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = ps.orders_id'
-        . ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.paypal_vault_id = ps.paypal_vault_id';
-    
-    if (!empty($restWhereClauses)) {
-        $restSql .= ' WHERE ' . implode(' AND ', $restWhereClauses);
-    }
-    
-    $restSubscriptions = $db->Execute($restSql);
-    
-    if ($restSubscriptions instanceof queryFactoryResult) {
-        while (!$restSubscriptions->EOF) {
-            $row = $restSubscriptions->fields;
-            $row['subscription_type'] = 'rest';
-            $row['sort_date'] = strtotime($row['date_added'] ?? 'now');
-            $allSubscriptions[] = $row;
-            $restSubscriptions->MoveNext();
-        }
+// Fetch REST API subscriptions only.
+$restWhereClauses = [];
+
+if ($filters['customers_id'] > 0) {
+    $restWhereClauses[] = 'ps.customers_id = ' . (int) $filters['customers_id'];
+}
+if ($filters['products_id'] > 0) {
+    $restWhereClauses[] = 'ps.products_id = ' . (int) $filters['products_id'];
+}
+if ($filters['status'] !== '') {
+    $restWhereClauses[] = "ps.status = '" . zen_db_input($filters['status']) . "'";
+}
+if ($filters['payment_module'] !== '') {
+    $restWhereClauses[] = "o.payment_module_code = '" . zen_db_input($filters['payment_module']) . "'";
+}
+if ($filters['show_archived'] === 'only') {
+    $restWhereClauses[] = 'ps.is_archived = 1';
+} elseif ($filters['show_archived'] !== 'all') {
+    $restWhereClauses[] = 'ps.is_archived = 0';
+}
+
+$restSql = 'SELECT ps.*, c.customers_firstname, c.customers_lastname, c.customers_email_address,'
+    . ' o.payment_module_code, o.payment_method,'
+    . ' pv.brand AS vault_brand, pv.last_digits AS vault_last_digits, pv.card_type AS vault_card_type, pv.status AS vault_status, pv.expiry AS vault_expiry'
+    . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
+    . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = ps.customers_id'
+    . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = ps.orders_id'
+    . ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.paypal_vault_id = ps.paypal_vault_id';
+
+if (!empty($restWhereClauses)) {
+    $restSql .= ' WHERE ' . implode(' AND ', $restWhereClauses);
+}
+
+$restSubscriptions = $db->Execute($restSql);
+
+if ($restSubscriptions instanceof queryFactoryResult) {
+    while (!$restSubscriptions->EOF) {
+        $row = $restSubscriptions->fields;
+        $row['subscription_type'] = 'rest';
+        $row['sort_date'] = strtotime($row['date_added'] ?? 'now');
+        $allSubscriptions[] = $row;
+        $restSubscriptions->MoveNext();
     }
 }
 
@@ -1710,10 +1707,6 @@ function paypalac_get_table_columns($tableName)
                             <option value="">All Statuses</option>
                             <?php echo paypalac_render_select_options($availableStatuses, $filters['status']); ?>
                         </select>
-                    </div>
-                    <div class="nmx-form-group">
-                        <label>Subscription Type</label>
-                        <span class="nmx-form-control" style="display:inline-block;min-width:140px;background:#f8f9fa;">REST API only</span>
                     </div>
                     <div class="nmx-form-group">
                         <label for="filter-payment">Payment Method</label>
