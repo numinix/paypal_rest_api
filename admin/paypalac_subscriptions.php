@@ -200,14 +200,16 @@ if ($action === 'get_order_info') {
         }
     }
 
-    // Get saved cards for this customer
+    // Get saved cards for this customer — only PayPal AC vaulted cards.
+    // Legacy (Payflow / WPP) cards are excluded so that the two systems remain separate.
     $savedCards = [];
-    if (defined('TABLE_SAVED_CREDIT_CARDS')) {
+    if (defined('TABLE_SAVED_CREDIT_CARDS') && defined('TABLE_PAYPAL_VAULT')) {
         $cardsResult = $db->Execute(
-            "SELECT saved_credit_card_id, type, last_digits, expiry_month, expiry_year, holder_name, vault_id
-               FROM " . TABLE_SAVED_CREDIT_CARDS . "
-              WHERE customers_id = " . $customersId . " AND is_deleted = 0
-              ORDER BY is_default DESC, saved_credit_card_id DESC"
+            "SELECT sc.saved_credit_card_id, sc.type, sc.last_digits, sc.expiry_month, sc.expiry_year, sc.holder_name, sc.vault_id
+               FROM " . TABLE_SAVED_CREDIT_CARDS . " sc
+               INNER JOIN " . TABLE_PAYPAL_VAULT . " pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id
+              WHERE sc.customers_id = " . $customersId . " AND sc.is_deleted = 0 AND sc.vault_id != ''
+              ORDER BY sc.is_default DESC, sc.saved_credit_card_id DESC"
         );
         if ($cardsResult instanceof queryFactoryResult) {
             while (!$cardsResult->EOF) {
@@ -226,7 +228,7 @@ if ($action === 'get_order_info') {
         }
     }
 
-    // Also check vault records for this customer (newer PayPal Advanced Checkout cards)
+    // Also check vault records that may not yet be synced to saved_credit_cards
     $vaultCards = VaultManager::getCustomerVaultedCards($customersId, false);
     foreach ($vaultCards as $vc) {
         // Check whether this vault_id already appears in saved_credit_cards
@@ -339,26 +341,34 @@ if ($action === 'create_subscription') {
         $amount = (float) $productCheck->fields['final_price'];
     }
 
-    // Validate saved card belongs to this customer
-    if (defined('TABLE_SAVED_CREDIT_CARDS')) {
+    // Validate saved card belongs to this customer AND is a PayPal AC vaulted card.
+    // Legacy (Payflow / WPP) cards must not be used in the new system.
+    if (defined('TABLE_SAVED_CREDIT_CARDS') && defined('TABLE_PAYPAL_VAULT')) {
         $cardCheck = $db->Execute(
-            "SELECT saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . "
-              WHERE saved_credit_card_id = " . $savedCreditCardId . "
-                AND customers_id = " . $customersId . "
-                AND is_deleted = 0 LIMIT 1"
+            "SELECT sc.saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . " sc
+               INNER JOIN " . TABLE_PAYPAL_VAULT . " pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id
+              WHERE sc.saved_credit_card_id = " . $savedCreditCardId . "
+                AND sc.customers_id = " . $customersId . "
+                AND sc.is_deleted = 0 AND sc.vault_id != '' LIMIT 1"
         );
         if (!($cardCheck instanceof queryFactoryResult) || $cardCheck->EOF) {
-            $messageStack->add_session('Create subscription failed: saved card #' . $savedCreditCardId . ' not found for this customer.', 'error');
+            $messageStack->add_session('Create subscription failed: saved card #' . $savedCreditCardId . ' not found for this customer or is not a PayPal AC vaulted card.', 'error');
             zen_redirect($redirectUrl);
         }
     }
 
-    if (!class_exists('paypalSavedCardRecurring')) {
-        $messageStack->add_session('Create subscription failed: paypalSavedCardRecurring class not available.', 'error');
+    if (!class_exists('paypalacSavedCardRecurring')) {
+        $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+        if (file_exists($savedCardRecurringPath)) {
+            require_once $savedCardRecurringPath;
+        }
+    }
+    if (!class_exists('paypalacSavedCardRecurring')) {
+        $messageStack->add_session('Create subscription failed: paypalacSavedCardRecurring class not available.', 'error');
         zen_redirect($redirectUrl);
     }
 
-    $savedCardRecurring = new paypalSavedCardRecurring();
+    $savedCardRecurring = new paypalacSavedCardRecurring();
     $subscriptionId     = $savedCardRecurring->schedule_payment(
         $amount,
         $nextPaymentDate,
@@ -421,7 +431,22 @@ if ($action === 'update_subscription') {
             $savedCardMetadata['products_id'] = (int) zen_db_prepare_input($_POST['products_id']);
         }
         if (isset($_POST['saved_credit_card_id'])) {
-            $updateData['saved_credit_card_id'] = (int) zen_db_prepare_input($_POST['saved_credit_card_id']);
+            $newCardId = (int) zen_db_prepare_input($_POST['saved_credit_card_id']);
+            // Validate the card is a PayPal AC vaulted card before allowing update
+            if ($newCardId > 0 && defined('TABLE_SAVED_CREDIT_CARDS') && defined('TABLE_PAYPAL_VAULT')) {
+                $cardValidation = $db->Execute(
+                    "SELECT sc.saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . " sc
+                       INNER JOIN " . TABLE_PAYPAL_VAULT . " pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id
+                      WHERE sc.saved_credit_card_id = " . $newCardId . "
+                        AND sc.customers_id = " . $customersId . "
+                        AND sc.is_deleted = 0 AND sc.vault_id != '' LIMIT 1"
+                );
+                if ($cardValidation instanceof queryFactoryResult && !$cardValidation->EOF) {
+                    $updateData['saved_credit_card_id'] = $newCardId;
+                }
+            } elseif ($newCardId === 0) {
+                $updateData['saved_credit_card_id'] = 0;
+            }
         }
 
         if (isset($_POST['billing_period'])) {
@@ -581,6 +606,42 @@ if ($action === 'update_subscription') {
         'update',
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
+
+    // Cancel the corresponding legacy subscription if one exists.
+    // When a legacy subscription was migrated to PayPal AC by updating its card to a
+    // vault card, the legacy entry in TABLE_SAVED_CREDIT_CARDS_RECURRING was not cancelled.
+    // This "EDIT and SAVE" action completes that missed migration step.
+    if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
+        $legacyIdRow = $db->Execute(
+            "SELECT legacy_subscription_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS
+            . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+            . " AND legacy_subscription_id > 0 LIMIT 1"
+        );
+        if ($legacyIdRow instanceof queryFactoryResult && !$legacyIdRow->EOF) {
+            $legacySubId = (int) $legacyIdRow->fields['legacy_subscription_id'];
+            $legacyEntry = $db->Execute(
+                "SELECT saved_credit_card_recurring_id FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                . " WHERE saved_credit_card_recurring_id = " . $legacySubId
+                . " AND status = 'scheduled' LIMIT 1"
+            );
+            if ($legacyEntry instanceof queryFactoryResult && !$legacyEntry->EOF) {
+                if (!class_exists('paypalacSavedCardRecurring')) {
+                    $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+                    if (file_exists($savedCardRecurringPath)) {
+                        require_once $savedCardRecurringPath;
+                    }
+                }
+                if (class_exists('paypalacSavedCardRecurring')) {
+                    $legacyCanceller = new paypalacSavedCardRecurring();
+                    $legacyCanceller->update_payment_status(
+                        $legacySubId,
+                        'cancelled',
+                        'Cancelled by admin - subscription migrated to PayPal AC (subscription #' . $subscriptionId . ')'
+                    );
+                }
+            }
+        }
+    }
 
     // Try to update via PayPal API if plan_id exists
     if (!empty($planId)) {
@@ -1815,40 +1876,42 @@ function paypalac_get_table_columns($tableName)
                         }
                     }
                     
-                    // Prepare saved credit card options for savedcard subscriptions
+                    // Prepare saved credit card options for savedcard subscriptions — PayPal AC cards only.
+                    // Legacy (Payflow / WPP) cards are excluded to prevent cross-contamination.
                     $subscriptionType = $row['subscription_type'] ?? 'rest';
                     $savedCardOptions = ['0' => 'None'];
-                    if ($subscriptionType === 'savedcard' && $customersId > 0 && defined('TABLE_SAVED_CREDIT_CARDS')) {
+                    if ($subscriptionType === 'savedcard' && $customersId > 0 && defined('TABLE_SAVED_CREDIT_CARDS') && defined('TABLE_PAYPAL_VAULT')) {
                         $savedCardColumns = paypalac_get_table_columns(TABLE_SAVED_CREDIT_CARDS);
 
                         if (!empty($savedCardColumns)) {
-                            $selectColumns = ['saved_credit_card_id'];
+                            $selectColumns = ['sc.saved_credit_card_id'];
                             if (isset($savedCardColumns['type'])) {
-                                $selectColumns[] = 'type';
+                                $selectColumns[] = 'sc.type';
                             }
                             if (isset($savedCardColumns['last_digits'])) {
-                                $selectColumns[] = 'last_digits';
+                                $selectColumns[] = 'sc.last_digits';
                             }
                             if (isset($savedCardColumns['holder_name'])) {
-                                $selectColumns[] = 'holder_name';
+                                $selectColumns[] = 'sc.holder_name';
                             }
                             if (isset($savedCardColumns['is_default'])) {
-                                $selectColumns[] = 'is_default';
+                                $selectColumns[] = 'sc.is_default';
                             }
 
-                            $whereConditions = ['customers_id = ' . (int) $customersId];
+                            $whereConditions = ['sc.customers_id = ' . (int) $customersId, "sc.vault_id != ''"];
                             if (isset($savedCardColumns['is_deleted'])) {
-                                $whereConditions[] = 'is_deleted = 0';
+                                $whereConditions[] = 'sc.is_deleted = 0';
                             }
 
-                            $orderBy = 'saved_credit_card_id DESC';
+                            $orderBy = 'sc.saved_credit_card_id DESC';
                             if (isset($savedCardColumns['is_default'])) {
-                                $orderBy = 'is_default DESC, ' . $orderBy;
+                                $orderBy = 'sc.is_default DESC, ' . $orderBy;
                             }
 
                             $savedCardsQuery = $db->Execute(
                                 'SELECT ' . implode(', ', $selectColumns)
-                                . ' FROM ' . TABLE_SAVED_CREDIT_CARDS
+                                . ' FROM ' . TABLE_SAVED_CREDIT_CARDS . ' sc'
+                                . ' INNER JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id'
                                 . ' WHERE ' . implode(' AND ', $whereConditions)
                                 . ' ORDER BY ' . $orderBy
                             );

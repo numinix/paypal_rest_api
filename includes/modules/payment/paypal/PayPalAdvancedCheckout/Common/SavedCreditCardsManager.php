@@ -107,6 +107,25 @@ class SavedCreditCardsManager
         if (!self::savedCreditCardsIndexExists('idx_vault_id')) {
             $db->Execute('ALTER TABLE ' . TABLE_SAVED_CREDIT_CARDS . ' ADD KEY idx_vault_id (vault_id)');
         }
+
+        // Set DEFAULT values on legacy NOT NULL columns that were created without defaults.
+        // Without defaults, INSERT statements that omit these columns fail in MySQL strict mode.
+        // The legacy installer (1_0_0.php) created these as NOT NULL with no DEFAULT:
+        //   name_on_card varchar(255) NOT NULL
+        //   paypal_transaction_id varchar(255) NOT NULL
+        //   is_primary tinyint(1) NOT NULL
+        $legacyDefaults = [
+            'name_on_card' => "''",
+            'paypal_transaction_id' => "''",
+            'is_primary' => "0",
+        ];
+        foreach ($legacyDefaults as $column => $default) {
+            if (self::savedCreditCardsColumnExists($column)) {
+                $db->Execute(
+                    'ALTER TABLE ' . TABLE_SAVED_CREDIT_CARDS . ' ALTER COLUMN ' . $column . ' SET DEFAULT ' . $default
+                );
+            }
+        }
     }
 
     /**

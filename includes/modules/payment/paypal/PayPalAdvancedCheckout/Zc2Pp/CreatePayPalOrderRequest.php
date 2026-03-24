@@ -90,6 +90,12 @@ class CreatePayPalOrderRequest extends ErrorInfo
         } else {
             $intent = 'AUTHORIZE';
         }
+
+        // Override intent to AUTHORIZE when a subscription product with a future start date
+        // is in the order. This prevents charging the customer before the subscription begins.
+        if (!empty($_SESSION['PayPalAdvancedCheckout']['force_authorize'])) {
+            $intent = 'AUTHORIZE';
+        }
         $this->request = [
             'intent' => $intent,
             'purchase_units' => [

@@ -647,6 +647,16 @@ class paypalac_savedcard extends base
             $this->title = $this->buildCardTitle($this->selectedCard);
         }
 
+        // Check if the order contains subscription products with a future start date.
+        // When a future start date is present, the payment must be authorized (not captured)
+        // so the customer is not charged until the subscription begins.
+        if ($this->orderContainsFutureStartDate()) {
+            $_SESSION['PayPalAdvancedCheckout']['force_authorize'] = true;
+            $this->log->write('Saved Card: Future start date detected in order, forcing AUTHORIZE intent.');
+        } else {
+            unset($_SESSION['PayPalAdvancedCheckout']['force_authorize']);
+        }
+
         // Create PayPal order for saved card payment
         $paypal_order_created = $this->createPayPalOrder('card');
         if ($paypal_order_created === false) {
@@ -875,10 +885,19 @@ class paypalac_savedcard extends base
 
     protected function captureOrAuthorizePayment(string $payment_source): array
     {
+        $transaction_mode = MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE;
+
+        // Force authorization for orders with subscription products that have a future start date.
+        // This prevents the customer from being charged before the subscription begins.
+        if (!empty($_SESSION['PayPalAdvancedCheckout']['force_authorize'])) {
+            $transaction_mode = PayPalCommon::TRANSACTION_MODE_AUTH_ALL;
+            $this->log->write('Saved Card: Overriding transaction mode to AUTH_ALL for future start date subscription.');
+        }
+
         $response = $this->paypalCommon->processCreditCardPayment(
             $this->ppr,
             $this->log,
-            MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE,
+            $transaction_mode,
             'card'
         );
 
@@ -887,6 +906,31 @@ class paypalac_savedcard extends base
         }
 
         return $response;
+    }
+
+    /**
+     * Check if the current order contains subscription products with a future start date.
+     *
+     * This is used to determine whether the payment should be authorized (not captured)
+     * so the customer is not charged until the subscription begins.
+     *
+     * @return bool True if the order contains a future start date subscription
+     */
+    protected function orderContainsFutureStartDate(): bool
+    {
+        if (!class_exists('paypalacSavedCardRecurring')) {
+            $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+            if (file_exists($savedCardRecurringPath)) {
+                require_once $savedCardRecurringPath;
+            }
+        }
+
+        if (!class_exists('paypalacSavedCardRecurring')) {
+            return false;
+        }
+
+        $recurring = new \paypalacSavedCardRecurring();
+        return $recurring->order_contains_future_start_date();
     }
 
     public function after_order_create($orders_id)

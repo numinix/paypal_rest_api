@@ -683,6 +683,18 @@ class zcObserverPaypaladvcheckoutRecurring
      */
     protected function calculateNextBillingDate(array $subscriptionAttributes): string
     {
+        // Check for a future start date in the product's order attributes.
+        // If the subscription has a start date that is in the future, use it as the
+        // next billing date instead of calculating from today + billing period.
+        $attributeMap = $subscriptionAttributes['attributes'] ?? [];
+        $startDate = $attributeMap['start_date'] ?? ($attributeMap['startdate'] ?? '');
+        if ($startDate !== '') {
+            $startTimestamp = strtotime($startDate);
+            if ($startTimestamp !== false && $startTimestamp > strtotime('today')) {
+                return date('Y-m-d', $startTimestamp);
+            }
+        }
+
         $billingPeriod = $subscriptionAttributes['billing_period'] ?? 'MONTH';
         $billingFrequency = (int)($subscriptionAttributes['billing_frequency'] ?? 1);
         
@@ -748,16 +760,34 @@ class zcObserverPaypaladvcheckoutRecurring
             return;
         }
         
-        // Check if record already exists
+        // Check if an active (non-deleted) record already exists for this vault_id.
+        // The is_deleted=0 filter must match getSavedCreditCardId() so that both methods
+        // agree on whether a usable record exists. Without this, a soft-deleted record
+        // would cause syncVault to skip creation while getSavedCreditCardId returns 0.
         $safeVaultId = zen_db_input($vaultId);
         $existing = $db->Execute(
-            "SELECT saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . "
+            "SELECT saved_credit_card_id, is_deleted FROM " . TABLE_SAVED_CREDIT_CARDS . "
              WHERE vault_id = '$safeVaultId'
              LIMIT 1"
         );
         
         if (!$existing->EOF) {
-            $this->log->write("    Saved credit card record already exists for vault_id: $vaultId (ID: " . $existing->fields['saved_credit_card_id'] . ")");
+            $existingId = (int)$existing->fields['saved_credit_card_id'];
+            $isDeleted = (int)($existing->fields['is_deleted'] ?? 0);
+            
+            if ($isDeleted === 0) {
+                $this->log->write("    Saved credit card record already exists for vault_id: $vaultId (ID: $existingId)");
+                return;
+            }
+            
+            // Record exists but is soft-deleted. Reactivate it so getSavedCreditCardId can find it.
+            $this->log->write("    Reactivating soft-deleted saved credit card #$existingId for vault_id: $vaultId");
+            $now = date('Y-m-d H:i:s');
+            $db->Execute(
+                "UPDATE " . TABLE_SAVED_CREDIT_CARDS . "
+                 SET is_deleted = 0, last_modified = '$now'
+                 WHERE saved_credit_card_id = $existingId"
+            );
             return;
         }
         
@@ -782,22 +812,43 @@ class zcObserverPaypaladvcheckoutRecurring
             $expiryMonth = $matches[2];
         }
         
-        // Insert into saved_credit_cards (using explicit integer for customersId for safety)
+        // Build the INSERT dynamically to include legacy columns if they exist.
+        // The legacy saved_credit_cards table (created by installer 1_0_0.php) has
+        // NOT NULL columns without DEFAULT values (name_on_card, paypal_transaction_id,
+        // is_primary). Omitting these from the INSERT causes a failure in MySQL strict mode.
+        // ensureSchema() sets DEFAULT values on these columns, but we also include them
+        // explicitly as a safety net in case ensureSchema hasn't run yet for this request.
         $now = date('Y-m-d H:i:s');
-        $safeCustomersId = (int)$customersId; // Ensure integer type
+        $safeCustomersId = (int)$customersId;
         $safeType = zen_db_input($cardType);
         $safeLastDigits = zen_db_input($lastDigits);
         $safeExpiryMonth = zen_db_input($expiryMonth);
         $safeExpiryYear = zen_db_input($expiryYear);
         $safeHolderName = zen_db_input($holderName);
         
+        $columns = 'customers_id, type, last_digits, expiry_month, expiry_year, holder_name, '
+                 . 'billing_address_id, is_default, is_deleted, vault_id, date_added, last_modified';
+        $values = "$safeCustomersId, '$safeType', '$safeLastDigits', '$safeExpiryMonth', '$safeExpiryYear', "
+                . "'$safeHolderName', 0, 0, 0, '$safeVaultId', '$now', '$now'";
+        
+        // Include legacy columns if they exist in the table to avoid strict mode errors
+        $legacyColumns = [
+            'name_on_card' => "'" . zen_db_input($holderName) . "'",
+            'paypal_transaction_id' => "''",
+            'is_primary' => "0",
+        ];
+        foreach ($legacyColumns as $col => $val) {
+            $check = $db->Execute(
+                "SHOW COLUMNS FROM " . TABLE_SAVED_CREDIT_CARDS . " LIKE '$col'"
+            );
+            if ($check instanceof \queryFactoryResult && $check->RecordCount() > 0) {
+                $columns .= ", $col";
+                $values .= ", $val";
+            }
+        }
+        
         $db->Execute(
-            "INSERT INTO " . TABLE_SAVED_CREDIT_CARDS . "
-             (customers_id, type, last_digits, expiry_month, expiry_year, holder_name, 
-              billing_address_id, is_default, is_deleted, vault_id, date_added, last_modified)
-             VALUES 
-             ($safeCustomersId, '$safeType', '$safeLastDigits', '$safeExpiryMonth', '$safeExpiryYear', 
-              '$safeHolderName', 0, 0, 0, '$safeVaultId', '$now', '$now')"
+            "INSERT INTO " . TABLE_SAVED_CREDIT_CARDS . " ($columns) VALUES ($values)"
         );
         
         $savedCreditCardId = $db->Insert_ID();

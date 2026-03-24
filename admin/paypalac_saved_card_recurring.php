@@ -93,11 +93,28 @@ switch ($action) {
         break;
 
     case 'update_credit_card':
-        $paypalacSavedCardRecurring->update_payment_info($_GET['saved_card_recurring_id'], [
-            'saved_credit_card_id' => $_GET['set_card'],
-            'comments' => '  Credit card updated by admin. '
-        ]);
-        $messageStack->add_session( sprintf(SUCCESS_SAVED_CARD_CREDIT_CARD_UPDATED, $_GET['saved_card_recurring_id']), 'success');
+        $newCardId = (int) ($_GET['set_card'] ?? 0);
+        $recurringId = (int) ($_GET['saved_card_recurring_id'] ?? 0);
+        // Validate the card is a PayPal AC vaulted card before allowing update
+        $cardIsValid = false;
+        if ($newCardId > 0 && defined('TABLE_SAVED_CREDIT_CARDS') && defined('TABLE_PAYPAL_VAULT')) {
+            $cardValidation = $db->Execute(
+                "SELECT sc.saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . " sc
+                   INNER JOIN " . TABLE_PAYPAL_VAULT . " pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id
+                  WHERE sc.saved_credit_card_id = " . $newCardId . "
+                    AND sc.is_deleted = 0 AND sc.vault_id != '' LIMIT 1"
+            );
+            $cardIsValid = ($cardValidation instanceof queryFactoryResult && !$cardValidation->EOF);
+        }
+        if ($cardIsValid) {
+            $paypalacSavedCardRecurring->update_payment_info($recurringId, [
+                'saved_credit_card_id' => $newCardId,
+                'comments' => '  Credit card updated by admin. '
+            ]);
+            $messageStack->add_session( sprintf(SUCCESS_SAVED_CARD_CREDIT_CARD_UPDATED, $recurringId), 'success');
+        } else {
+            $messageStack->add_session('Credit card update failed: card #' . $newCardId . ' is not a valid PayPal AC vaulted card.', 'error');
+        }
         $redirectAfterAction = true;
         break;
 
@@ -364,13 +381,14 @@ foreach ($subscriptions as $subscription) {
     $subscriptionRows[] = $subscription;
 }
 
-// Get data for search select menus
+// Get data for search select menus — only PayPal AC vaulted cards, not legacy ones.
 $customers_sql = "SELECT c.customers_id, c.customers_firstname, c.customers_lastname, 
         scc.saved_credit_card_id, scc.type, scc.last_digits, scc.is_deleted
     FROM " . TABLE_SAVED_CREDIT_CARDS . " scc
+    INNER JOIN " . TABLE_PAYPAL_VAULT . " pv ON pv.vault_id = scc.vault_id AND pv.customers_id = scc.customers_id
     LEFT JOIN " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " sccr ON scc.saved_credit_card_id = sccr.saved_credit_card_id
     LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = scc.customers_id
-    WHERE c.customers_id > 0
+    WHERE c.customers_id > 0 AND scc.vault_id != ''
     ORDER BY c.customers_lastname ASC";
 
 $result = $db->Execute($customers_sql);
