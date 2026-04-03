@@ -486,8 +486,6 @@ class zcObserverPaypaladvcheckout
             $js_fields['debug'] = 'true'; // sandbox only, un-minifies the JS
             $js_fields['buyer-country'] = $paypalSandboxBuyerCountryCodeOverride ?? $buyerCountry; // sandbox only
             $js_fields['locale'] = $paypalSandboxLocaleOverride ?? 'en_US'; // only passing this in sandbox to allow override testing; otherwise just letting it default to customer's browser
-        } else {
-            $js_fields['buyer-country'] = $buyerCountry;
         }
 
         if (!empty($order->info['currency'])) {

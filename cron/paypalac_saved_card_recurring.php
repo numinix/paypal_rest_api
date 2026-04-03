@@ -806,6 +806,15 @@ foreach ($todays_payments as $payment_id) {
     sleep(1);
 }
 
+// Re-sync legacy subscriptions after processing all payments.
+// The initial syncLegacySubscriptions() call at the top of this cron copies
+// next_payment_date from TABLE_SAVED_CREDIT_CARDS_RECURRING to TABLE_PAYPAL_SUBSCRIPTIONS
+// BEFORE payments are processed.  The payment loop above updates next_payment_date in
+// TABLE_SAVED_CREDIT_CARDS_RECURRING only, leaving TABLE_PAYPAL_SUBSCRIPTIONS stale until
+// the next cron run.  This second sync copies the freshly-updated dates so the admin UI
+// (paypalac_subscriptions.php) reflects the correct next billing date immediately.
+\PayPalAdvancedCheckout\Common\LegacySubscriptionMigrator::syncLegacySubscriptions();
+
 $run_date = date('Y-m-d');
 $timezone = date_default_timezone_get();
 $report_id = uniqid();

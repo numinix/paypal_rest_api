@@ -1888,6 +1888,16 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
 //$products = $_SESSION['cart']->get_products();
 //print_r($products);
 //die();
+// load core checkout classes that are not auto-loaded in cron context
+		if (!class_exists('payment')) {
+			require_once(DIR_FS_CATALOG . DIR_WS_CLASSES . 'payment.php');
+		}
+		if (!class_exists('order')) {
+			require_once(DIR_FS_CATALOG . DIR_WS_CLASSES . 'order.php');
+		}
+		if (!class_exists('order_total')) {
+			require_once(DIR_FS_CATALOG . DIR_WS_CLASSES . 'order_total.php');
+		}
 // process payment
 $_SESSION['payment'] = $this->paymentModuleCode; //use available payment module for recurring payments
 $payment_modules = new payment($_SESSION['payment']);
@@ -2214,14 +2224,22 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		// Only process subscriptions in 'scheduled' status
 		// Failed subscriptions (max retries exceeded) should NOT be retried
 		// Subscriptions stay 'scheduled' during retry attempts until max retries is exceeded
-		$sql = 'SELECT sccr.saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
+		//
+		// Include subscriptions that either:
+		// 1. Were originally placed via a PayPal AC payment module (payment_module_code LIKE 'paypalac%'), OR
+		// 2. Have a saved card with a vault_id linked to TABLE_PAYPAL_VAULT (migrated from legacy PayFlow).
+		//    These subscriptions were updated to use a PayPal AC vault card and should be
+		//    processed by the PayPal AC cron instead of the legacy cron.
+		$sql = 'SELECT DISTINCT sccr.saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
 			. ' INNER JOIN ' . TABLE_ORDERS_PRODUCTS . ' op ON op.orders_products_id = sccr.orders_products_id'
 			. ' INNER JOIN ' . TABLE_ORDERS . " o ON o.orders_id = op.orders_id"
+			. ' LEFT JOIN ' . TABLE_SAVED_CREDIT_CARDS . " scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id"
+			. ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . " pv ON pv.vault_id = scc.vault_id AND pv.customers_id = scc.customers_id"
 			. " WHERE LOWER(TRIM(sccr.status)) = 'scheduled'"
 			. " AND sccr.next_payment_date IS NOT NULL"
 			. " AND sccr.next_payment_date <> '0000-00-00'"
 			. " AND DATE(sccr.next_payment_date) <= '" . $today . "'"
-			. " AND o.payment_module_code LIKE 'paypalac%'";
+			. " AND (o.payment_module_code LIKE 'paypalac%' OR (scc.vault_id IS NOT NULL AND scc.vault_id <> '' AND pv.vault_id IS NOT NULL))";
 		
 		// Debug logging for cron
 		if (!empty($_SESSION['in_cron'])) {
@@ -2649,7 +2667,7 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
         FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr
         LEFT JOIN ' . TABLE_SAVED_CREDIT_CARDS . ' scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id
         LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = scc.customers_id
-        WHERE scc.customers_id = ' . (int) $customer_id . " AND sccr.status IN ('cancelled', 'scheduled')";
+        WHERE scc.customers_id = ' . (int) $customer_id . " AND sccr.status IN ('cancelled', 'scheduled', 'failed')";
                 if ($category_id != null) {
                         $sql .= ' AND sccr.products_id IN (SELECT products_id FROM ' . TABLE_PRODUCTS . ' WHERE master_categories_id = ' . (int) $category_id . ')';
                 }

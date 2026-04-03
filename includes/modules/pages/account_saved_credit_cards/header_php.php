@@ -759,10 +759,10 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                     return;
                 }
 
-                cardFields.NameField().mount('#ppac-card-name');
-                cardFields.NumberField().mount('#ppac-card-number');
-                cardFields.ExpiryField().mount('#ppac-card-expiry');
-                cardFields.CVVField().mount('#ppac-card-cvv');
+                cardFields.NameField().render('#ppac-card-name');
+                cardFields.NumberField().render('#ppac-card-number');
+                cardFields.ExpiryField().render('#ppac-card-expiry');
+                cardFields.CVVField().render('#ppac-card-cvv');
 
                 var submitBtn = null;
                 var originalText = '';
