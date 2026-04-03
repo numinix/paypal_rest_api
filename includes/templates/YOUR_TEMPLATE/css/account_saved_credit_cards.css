@@ -605,7 +605,8 @@
   border: 1px solid #ced4da;
   border-radius: 0.375rem;
   height: 2.5rem;
-  overflow: hidden;
+  overflow: hidden; /* fallback for browsers without overflow: clip support */
+  overflow: clip;   /* clip without creating a scroll container; fixes touch events on Android Chrome */
   padding: 0;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
