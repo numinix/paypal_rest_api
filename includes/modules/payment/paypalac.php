@@ -64,7 +64,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.14';
+    protected const CURRENT_VERSION = '1.3.15';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -795,6 +795,14 @@ class paypalac extends base
                             (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
                          VALUES
                             ('Cron Report Notification Email', 'MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL', '', 'Optional email address used for PayPal Advanced Checkout cron summary reports. Leave blank to use store defaults.', 6, 0, NULL, NULL, now())"
+                    );
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.15', '<'): //- Fall through from above
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Additional SDK Pages', 'MODULE_PAYMENT_PAYPALAC_SDK_PAGES', '', 'Provide a comma-separated list of additional <code>current_page_base</code> page names that should load the PayPal JS SDK. Core checkout/cart/search and all product-info handlers are always supported by default.', 6, 0, NULL, NULL, now())"
                     );
 
                 default:    //- Fall through from above
@@ -3112,6 +3120,8 @@ class paypalac extends base
 
                 ('List <var>discount</var> Order-Totals', 'MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_coupon</code>, <code>ot_gv</code> and <code>ot_group_pricing</code> &mdash; that add a <em>discount</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
+                ('Additional SDK Pages', 'MODULE_PAYMENT_PAYPALAC_SDK_PAGES', '', 'Provide a comma-separated list of additional <code>current_page_base</code> page names that should load the PayPal JS SDK. Core checkout/cart/search and all product-info handlers are always supported by default.', 6, 0, NULL, NULL, now()),
+
                 ('Debug Mode', 'MODULE_PAYMENT_PAYPALAC_DEBUGGING', 'Off', 'Would you like to enable debug mode?  A complete detailed log of failed transactions will be emailed to the store owner.', 6, 0, 'zen_cfg_select_option([\'Off\', \'Alerts Only\', \'Log File\', \'Log and Email\'], ', NULL, now()),
 
                 ('Cron Report Notification Email', 'MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL', '', 'Optional email address used for PayPal Advanced Checkout cron summary reports. Leave blank to use store defaults.', 6, 0, NULL, NULL, now())"
@@ -3244,6 +3254,7 @@ class paypalac extends base
             'MODULE_PAYMENT_PAYPALAC_HANDLING_OT',
             'MODULE_PAYMENT_PAYPALAC_INSURANCE_OT',
             'MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT',
+            'MODULE_PAYMENT_PAYPALAC_SDK_PAGES',
             'MODULE_PAYMENT_PAYPALAC_DEBUGGING',
             'MODULE_PAYMENT_PAYPALAC_CRON_REPORT_EMAIL',
         ];

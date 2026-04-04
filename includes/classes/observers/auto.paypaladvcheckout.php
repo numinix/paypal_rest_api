@@ -111,11 +111,13 @@ class zcObserverPaypaladvcheckout
         }
 
         // -----
-        // Attach to header to render JS SDK assets.
-        $this->attach($this, ['NOTIFY_HTML_HEAD_JS_BEGIN']); // NOTE: this might come too early to detect pageType properly
-        $this->attach($this, ['NOTIFY_HTML_HEAD_END']);
-        // Attach to footer to instantiate the JS.
-        $this->attach($this, ['NOTIFY_FOOTER_END']);
+        // Attach to header/footer to render JS SDK assets only on pages that
+        // are known to need PayPal SDK support.
+        if ($this->shouldLoadJsSdkForPage((string)$current_page_base)) {
+            $this->attach($this, ['NOTIFY_HTML_HEAD_JS_BEGIN']); // NOTE: this might come too early to detect pageType properly
+            $this->attach($this, ['NOTIFY_HTML_HEAD_END']);
+            $this->attach($this, ['NOTIFY_FOOTER_END']);
+        }
     }
 
     // -----
@@ -224,6 +226,76 @@ class zcObserverPaypaladvcheckout
         }
 
         return array_values(array_unique($pageKeys));
+    }
+
+    protected function shouldLoadJsSdkForPage(string $current_page): bool
+    {
+        if ($current_page === '' || $current_page === 'page_not_found') {
+            return false;
+        }
+        if (defined('FILENAME_PAGE_NOT_FOUND') && $current_page === FILENAME_PAGE_NOT_FOUND) {
+            return false;
+        }
+
+        if (strpos($current_page, 'checkout') === 0) {
+            return true;
+        }
+
+        $corePages = [
+            $this->getPageNameFromConstant('FILENAME_DEFAULT', 'index'),
+            $this->getPageNameFromConstant('FILENAME_PRODUCTS_ALL', 'products_all'),
+            $this->getPageNameFromConstant('FILENAME_FEATURED_PRODUCTS', 'featured_products'),
+            $this->getPageNameFromConstant('FILENAME_PRODUCTS_NEW', 'new_products'),
+            $this->getPageNameFromConstant('FILENAME_NEW_PRODUCTS', 'new_products'),
+            $this->getPageNameFromConstant('FILENAME_SPECIALS', 'specials'),
+            $this->getPageNameFromConstant('FILENAME_SHOPPING_CART', 'shopping_cart'),
+            $this->getPageNameFromConstant('FILENAME_AJAX_SHOPPING_CART', 'ajax_shopping_cart'),
+            $this->getPageNameFromConstant('FILENAME_ADVANCED_SEARCH_RESULT', 'advanced_search_result'),
+            $this->getPageNameFromConstant('FILENAME_ACCOUNT_SAVED_CREDIT_CARDS', 'account_saved_credit_cards'),
+        ];
+        $corePages = array_merge($corePages, $this->getNuminixOpcPageKeys(), zen_get_buyable_product_type_handlers());
+        $corePages = array_filter($corePages, static function ($pageName) {
+            return is_string($pageName) && $pageName !== '';
+        });
+
+        if (in_array($current_page, $corePages, true)) {
+            return true;
+        }
+
+        foreach ($this->getConfiguredSdkPages() as $configuredPage) {
+            if ($configuredPage === $current_page) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function getConfiguredSdkPages(): array
+    {
+        if (!defined('MODULE_PAYMENT_PAYPALAC_SDK_PAGES')) {
+            return [];
+        }
+
+        $configuredPages = explode(',', MODULE_PAYMENT_PAYPALAC_SDK_PAGES);
+        $configuredPages = array_map('trim', $configuredPages);
+        $configuredPages = array_filter($configuredPages, static function ($pageName) {
+            return $pageName !== '';
+        });
+
+        return array_values(array_unique($configuredPages));
+    }
+
+    protected function getPageNameFromConstant(string $constantName, string $fallback): string
+    {
+        if (defined($constantName)) {
+            $constantValue = constant($constantName);
+            if (is_string($constantValue) && $constantValue !== '') {
+                return $constantValue;
+            }
+        }
+
+        return $fallback;
     }
 
     // -----
@@ -559,7 +631,11 @@ class zcObserverPaypaladvcheckout
         // Log SDK configuration for debugging purposes. This helps diagnose issues
         // like 400 errors from PayPal SDK when components are not enabled for the account.
         //
-        if ($this->log !== null) {
+        // Skip 404 pages to avoid log noise from bot traffic and broken links.
+        $isNotFoundPage = ($current_page === 'page_not_found')
+            || (defined('FILENAME_PAGE_NOT_FOUND') && $current_page === FILENAME_PAGE_NOT_FOUND);
+
+        if ($this->log !== null && !$isNotFoundPage) {
             $sdk_url = $js_url . '?' . str_replace('%2C', ',', http_build_query($js_fields));
             $loggedClientId = (strlen($js_fields['client-id']) > 10)
                 ? substr($js_fields['client-id'], 0, 6) . '...' . substr($js_fields['client-id'], -4)
