@@ -1091,6 +1091,8 @@ class paypalac_creditcard extends base
         
         $response = $this->captureOrAuthorizePayment('card');
 
+        $this->applyCardDetailsToOrder($order, $response);
+
         $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $response['status'];
         unset($response['links']);
         $this->orderInfo = $response;
@@ -1144,6 +1146,49 @@ class paypalac_creditcard extends base
 
         // Store vault card data in session if present
         $this->storeVaultCardDataInSession($this->orderInfo);
+    }
+
+    protected function applyCardDetailsToOrder(&$order, array $response): void
+    {
+        if (!is_object($order) || !isset($order->info) || !is_array($order->info)) {
+            return;
+        }
+
+        $payment_source = $response['payment_source']['card'] ?? [];
+        $card_source = $payment_source['card'] ?? $this->extractCardSource($response) ?? [];
+
+        $cc_type = trim((string)($card_source['brand'] ?? ($this->ccInfo['type'] ?? '')));
+
+        $cc_owner = trim((string)($this->ccInfo['name'] ?? ''));
+        $response_name = $payment_source['name'] ?? '';
+        if (is_array($response_name)) {
+            $response_name = trim((string)($response_name['given_name'] ?? '') . ' ' . (string)($response_name['surname'] ?? ''));
+        } else {
+            $response_name = trim((string)$response_name);
+        }
+        if ($response_name !== '') {
+            $cc_owner = $response_name;
+        }
+
+        $last4_candidate = (string)($card_source['last_digits'] ?? ($this->ccInfo['last_digits'] ?? ''));
+        if ($last4_candidate === '' && !empty($this->ccInfo['number'])) {
+            $last4_candidate = substr((string)$this->ccInfo['number'], -4);
+        }
+        $cc_last4 = preg_replace('/\D+/', '', $last4_candidate);
+        if (strlen($cc_last4) > 4) {
+            $cc_last4 = substr($cc_last4, -4);
+        }
+
+        if ($cc_type !== '') {
+            $order->info['cc_type'] = $cc_type;
+        }
+        if ($cc_owner !== '') {
+            $order->info['cc_owner'] = $cc_owner;
+        }
+        if (strlen($cc_last4) === 4) {
+            $order->info['cc_number'] = 'XXXX' . $cc_last4;
+        }
+        $order->info['cc_expires'] = '';
     }
 
     protected function storeVaultCardDataInSession(array $response): void
