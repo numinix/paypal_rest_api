@@ -14,7 +14,7 @@ if (!defined('IS_ADMIN_FLAG')) {
 // This autoloader is intended only for webhook bootstrap requests.
 // On storefront pages (e.g. checkout_shipping), loading webhook compatibility
 // classes can conflict with core class loading and trigger redeclaration fatals.
-if (($loaderPrefix ?? '') !== 'webhook') {
+if (($GLOBALS['loaderPrefix'] ?? '') !== 'webhook') {
     return;
 }
 

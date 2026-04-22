@@ -32,6 +32,8 @@ if (is_file($autoloaderPath)) {
 }
 
 $loaderPrefix = 'webhook';
+// Prevent Magic SEO URLs from loading in webhook context (it calls mysql_* functions removed in PHP 7.0)
+define('MSU_SEO_URL_ZC', true);
 require 'includes/application_top.php';
 $current_page_base = 'ppac_webhook';
 require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
