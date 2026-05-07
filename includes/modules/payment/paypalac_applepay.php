@@ -471,7 +471,6 @@ class paypalac_applepay extends base
     {
         unset($_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed']);
 
-        $selectionLabel = MODULE_PAYMENT_PAYPALAC_APPLEPAY_TEXT_SELECTION ?? 'Apple Pay';
         $buttonContainer = '<div id="paypalac-applepay-button" class="paypalac-applepay-button"></div>';
         $hiddenFields =
             zen_draw_hidden_field('ppac_type', 'apple_pay') .

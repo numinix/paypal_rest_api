@@ -542,7 +542,6 @@ class paypalac_googlepay extends base
     {
         unset($_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed']);
 
-        $selectionLabel = MODULE_PAYMENT_PAYPALAC_GOOGLEPAY_TEXT_SELECTION ?? 'Google Pay';
         $buttonContainer = '<div id="paypalac-googlepay-button" class="paypalac-googlepay-button"></div>';
         $hiddenFields =
             zen_draw_hidden_field('ppac_type', 'google_pay') .
