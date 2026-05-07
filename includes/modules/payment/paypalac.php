@@ -976,9 +976,13 @@ class paypalac extends base
         $this->enabled = false;
         trigger_error("Setting configuration disabled: $error_message", E_USER_WARNING);
 
-        $auto_disable = $force_disable;
-        if ($auto_disable === false) {
-            $auto_disable = (defined('MODULE_PAYMENT_PAYPALAC_DISABLE_ON_ERROR') && MODULE_PAYMENT_PAYPALAC_DISABLE_ON_ERROR === 'True');
+        // If the admin has explicitly configured the "Disable on Error" setting,
+        // that setting always takes precedence - even over force_disable - so the
+        // module can never be auto-disabled when the feature is turned off.
+        if (defined('MODULE_PAYMENT_PAYPALAC_DISABLE_ON_ERROR')) {
+            $auto_disable = MODULE_PAYMENT_PAYPALAC_DISABLE_ON_ERROR === 'True';
+        } else {
+            $auto_disable = $force_disable;
         }
 
         if ($auto_disable === true) {
