@@ -236,20 +236,183 @@
         return false;
     }
 
+    var PAYPALAC_NATIVE_ROW_HIDDEN = 'paypalac-checkout-row-hidden';
+
     /**
-     * Hide the entire payment method container when payment is not eligible.
-     * Hides the radio button so that the CSS :has(.paypalac-wallet-radio-hidden)
-     * rule collapses the entire .custom-control row (radio + label/button).
+     * Find wrapper around the wallet button: OPRC (.payment-method), Bootstrap (.custom-control),
+     * module-specific ids, or legacy patterns.
+     */
+    function findPaymentMethodWrapper() {
+        var container = document.getElementById('paypalac-applepay-button');
+        if (!container) {
+            return null;
+        }
+
+        var wrapper = container.closest('.payment-method')
+            || container.closest('[id*="paypalac_applepay"][id*="container"]')
+            || container.closest('.moduleRow')
+            || container.closest('[class*="paypalac_applepay"]')
+            || container.closest('.custom-control');
+
+        if (wrapper) {
+            return wrapper;
+        }
+
+        var parent = container.parentElement;
+        var depth = 0;
+        var maxDepth = 5;
+
+        while (parent && depth < maxDepth) {
+            var parentId = (parent.id || '').toLowerCase();
+            var parentClass = (parent.className || '').toString().toLowerCase();
+
+            if (parentId.indexOf('paypalac_applepay') !== -1 ||
+                parentClass.indexOf('paypalac_applepay') !== -1 ||
+                parentClass.indexOf('modulerow') !== -1) {
+                return parent;
+            }
+            parent = parent.parentElement;
+            depth++;
+        }
+
+        return null;
+    }
+
+    /**
+     * Default Zen Cart checkout (no per-method wrapper): radio + label + optional ccinfo.
+     */
+    function hideNativeCheckoutWalletRow(moduleCode) {
+        if (moduleCode !== 'paypalac_applepay') {
+            return false;
+        }
+
+        var rid = 'pmt-' + moduleCode;
+        var radio = document.getElementById(rid);
+        var label = document.querySelector('label[for="' + rid + '"]');
+        var innerBtn = document.getElementById('paypalac-applepay-button');
+
+        if (!radio || !label || !innerBtn || label.contains(innerBtn) === false) {
+            return false;
+        }
+
+        [radio, label].forEach(function (el) {
+            el.classList.add(PAYPALAC_NATIVE_ROW_HIDDEN);
+            el.style.display = 'none';
+            el.setAttribute('hidden', 'hidden');
+        });
+
+        var node = label.nextElementSibling;
+        while (node) {
+            if (node.matches && (node.matches('input[type="radio"][name="payment"]') || node.matches('input[type="hidden"][name="payment"]'))) {
+                break;
+            }
+            var next = node.nextElementSibling;
+            if (node.classList && node.classList.contains('ccinfo')) {
+                node.classList.add(PAYPALAC_NATIVE_ROW_HIDDEN);
+                node.style.display = 'none';
+                node.setAttribute('hidden', 'hidden');
+                break;
+            }
+            if (node.tagName === 'BR') {
+                node.classList.add(PAYPALAC_NATIVE_ROW_HIDDEN);
+                node.style.display = 'none';
+            }
+            node = next;
+        }
+
+        return true;
+    }
+
+    function showNativeCheckoutWalletRow(moduleCode) {
+        if (moduleCode !== 'paypalac_applepay') {
+            return;
+        }
+
+        var rid = 'pmt-' + moduleCode;
+        var radio = document.getElementById(rid);
+        var label = document.querySelector('label[for="' + rid + '"]');
+
+        [radio, label].forEach(function (el) {
+            if (!el) {
+                return;
+            }
+            el.classList.remove(PAYPALAC_NATIVE_ROW_HIDDEN);
+            el.style.display = '';
+            el.removeAttribute('hidden');
+        });
+
+        if (!label) {
+            return;
+        }
+
+        var node = label.nextElementSibling;
+        while (node) {
+            if (node.matches && (node.matches('input[type="radio"][name="payment"]') || node.matches('input[type="hidden"][name="payment"]'))) {
+                break;
+            }
+            var next = node.nextElementSibling;
+            if (node.classList && node.classList.contains(PAYPALAC_NATIVE_ROW_HIDDEN)) {
+                node.classList.remove(PAYPALAC_NATIVE_ROW_HIDDEN);
+                node.style.display = '';
+                node.removeAttribute('hidden');
+            }
+            if (node.classList && node.classList.contains('ccinfo')) {
+                break;
+            }
+            node = next;
+        }
+    }
+
+    function showPaymentMethodContainer() {
+        var wrapper = findPaymentMethodWrapper();
+        if (wrapper) {
+            wrapper.style.display = '';
+            wrapper.removeAttribute('hidden');
+        }
+
+        showNativeCheckoutWalletRow('paypalac_applepay');
+
+        var container = document.getElementById('paypalac-applepay-button');
+        if (container) {
+            container.style.display = '';
+            container.removeAttribute('hidden');
+        }
+
+        var moduleRadio = document.getElementById('pmt-paypalac_applepay');
+        if (moduleRadio) {
+            moduleRadio.classList.remove('paypalac-wallet-radio-hidden');
+            moduleRadio.style.display = '';
+            moduleRadio.removeAttribute('aria-hidden');
+            moduleRadio.tabIndex = 0;
+        }
+
+        var moduleLabel = document.querySelector('label[for="pmt-paypalac_applepay"]');
+        if (moduleLabel) {
+            moduleLabel.classList.remove('paypalac-wallet-label-hidden');
+            moduleLabel.style.display = '';
+            moduleLabel.removeAttribute('aria-hidden');
+        }
+    }
+
+    /**
+     * Hide the entire payment method when Apple Pay is not eligible on this device.
      */
     function hidePaymentMethodContainer() {
-        // Hiding the radio triggers the CSS rule:
-        //   .custom-control:has(.paypalac-wallet-radio-hidden) { display: none; }
-        // which collapses the entire row including the button inside the label.
+        var wrapper = findPaymentMethodWrapper();
+        if (wrapper) {
+            wrapper.style.display = 'none';
+            wrapper.setAttribute('hidden', 'hidden');
+            return;
+        }
+
+        if (hideNativeCheckoutWalletRow('paypalac_applepay')) {
+            return;
+        }
+
         if (hideModuleRadio()) {
             return;
         }
 
-        // Fallback: hide the button container directly.
         var container = document.getElementById('paypalac-applepay-button');
         if (container) {
             container.style.display = 'none';
@@ -880,6 +1043,8 @@
         if (!container) {
             return;
         }
+
+        showPaymentMethodContainer();
 
         container.innerHTML = '';
 

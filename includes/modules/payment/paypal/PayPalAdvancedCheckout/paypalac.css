@@ -183,3 +183,56 @@ apple-pay-button {
     width: 100%;
     box-sizing: border-box;
 }
+
+/*
+ * Wallet layout for:
+ * - Zen Cart default checkout (fieldset.payment, label.radioButtonLabel)
+ * - OPRC / One Page Responsive Checkout (#paymentMethodContainer, label.payment-method-item-label)
+ * - Other integrations using #paymentMethodContainer (e.g. some One Page Checkout builds)
+ */
+.paypalac-checkout-row-hidden {
+    display: none !important;
+}
+
+fieldset.payment input[id^="pmt-paypalac_"],
+#paymentMethodContainer input[id^="pmt-paypalac_"] {
+    display: inline-block;
+    vertical-align: middle;
+    float: none !important;
+    margin-right: 0.5rem;
+    margin-top: 0;
+}
+
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"],
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    max-width: calc(100% - 2rem);
+}
+
+/* OPRC uses payment-method-item-label instead of radioButtonLabel */
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    max-width: calc(100% - 2rem);
+}
+
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-googlepay-button,
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-applepay-button,
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-venmo-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-googlepay-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-applepay-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-venmo-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] .paypalac-googlepay-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] .paypalac-applepay-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] .paypalac-venmo-button {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: min(320px, 100%);
+}

@@ -224,9 +224,11 @@
             return null;
         }
 
-        var wrapper = container.closest('[id*="paypalac_googlepay"][id*="container"]')
+        var wrapper = container.closest('.payment-method')
+            || container.closest('[id*="paypalac_googlepay"][id*="container"]')
             || container.closest('.moduleRow')
-            || container.closest('[class*="paypalac_googlepay"]');
+            || container.closest('[class*="paypalac_googlepay"]')
+            || container.closest('.custom-control');
 
         if (wrapper) {
             return wrapper;
@@ -252,6 +254,90 @@
         return null;
     }
 
+    var PAYPALAC_NATIVE_ROW_HIDDEN = 'paypalac-checkout-row-hidden';
+
+    function hideNativeCheckoutWalletRow(moduleCode) {
+        if (moduleCode !== 'paypalac_googlepay') {
+            return false;
+        }
+
+        var rid = 'pmt-' + moduleCode;
+        var radio = document.getElementById(rid);
+        var label = document.querySelector('label[for="' + rid + '"]');
+        var innerBtn = document.getElementById('paypalac-googlepay-button');
+
+        if (!radio || !label || !innerBtn || label.contains(innerBtn) === false) {
+            return false;
+        }
+
+        [radio, label].forEach(function (el) {
+            el.classList.add(PAYPALAC_NATIVE_ROW_HIDDEN);
+            el.style.display = 'none';
+            el.setAttribute('hidden', 'hidden');
+        });
+
+        var node = label.nextElementSibling;
+        while (node) {
+            if (node.matches && (node.matches('input[type="radio"][name="payment"]') || node.matches('input[type="hidden"][name="payment"]'))) {
+                break;
+            }
+            var next = node.nextElementSibling;
+            if (node.classList && node.classList.contains('ccinfo')) {
+                node.classList.add(PAYPALAC_NATIVE_ROW_HIDDEN);
+                node.style.display = 'none';
+                node.setAttribute('hidden', 'hidden');
+                break;
+            }
+            if (node.tagName === 'BR') {
+                node.classList.add(PAYPALAC_NATIVE_ROW_HIDDEN);
+                node.style.display = 'none';
+            }
+            node = next;
+        }
+
+        return true;
+    }
+
+    function showNativeCheckoutWalletRow(moduleCode) {
+        if (moduleCode !== 'paypalac_googlepay') {
+            return;
+        }
+
+        var rid = 'pmt-' + moduleCode;
+        var radio = document.getElementById(rid);
+        var label = document.querySelector('label[for="' + rid + '"]');
+
+        [radio, label].forEach(function (el) {
+            if (!el) {
+                return;
+            }
+            el.classList.remove(PAYPALAC_NATIVE_ROW_HIDDEN);
+            el.style.display = '';
+            el.removeAttribute('hidden');
+        });
+
+        if (!label) {
+            return;
+        }
+
+        var node = label.nextElementSibling;
+        while (node) {
+            if (node.matches && (node.matches('input[type="radio"][name="payment"]') || node.matches('input[type="hidden"][name="payment"]'))) {
+                break;
+            }
+            var next = node.nextElementSibling;
+            if (node.classList && node.classList.contains(PAYPALAC_NATIVE_ROW_HIDDEN)) {
+                node.classList.remove(PAYPALAC_NATIVE_ROW_HIDDEN);
+                node.style.display = '';
+                node.removeAttribute('hidden');
+            }
+            if (node.classList && node.classList.contains('ccinfo')) {
+                break;
+            }
+            node = next;
+        }
+    }
+
     /**
      * Hide the entire payment method container when payment is not eligible.
      * This hides the parent element (e.g., paypalac_googlepay-custom-control-container)
@@ -261,6 +347,11 @@
         var wrapper = findPaymentMethodWrapper();
         if (wrapper) {
             wrapper.style.display = 'none';
+            wrapper.setAttribute('hidden', 'hidden');
+            return;
+        }
+
+        if (hideNativeCheckoutWalletRow('paypalac_googlepay')) {
             return;
         }
 
@@ -279,11 +370,15 @@
         var wrapper = findPaymentMethodWrapper();
         if (wrapper) {
             wrapper.style.display = '';
+            wrapper.removeAttribute('hidden');
         }
+
+        showNativeCheckoutWalletRow('paypalac_googlepay');
 
         var container = document.getElementById('paypalac-googlepay-button');
         if (container) {
             container.style.display = '';
+            container.removeAttribute('hidden');
         }
     }
 
