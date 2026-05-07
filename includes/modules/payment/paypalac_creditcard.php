@@ -542,7 +542,9 @@ class paypalac_creditcard extends base
         // CVV
         $fields[] = [
             'title' => MODULE_PAYMENT_PAYPALAC_CC_CVV ?? 'CVV',
-            'field' => zen_draw_input_field('paypalac_cc_cvv', '', 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-cvv" size="4" maxlength="4" autocomplete="cc-csc"' . $onFocus),
+            'field' =>
+                zen_draw_input_field('paypalac_cc_cvv', '', 'class="ppr-creditcard-field ppr-card-new" id="paypalac-cc-cvv" size="4" maxlength="4" autocomplete="cc-csc"' . $onFocus) .
+                zen_draw_hidden_field('paypalac_cc_code', '', 'id="paypalac-cc-code"'),
             'tag' => 'paypalac-cc-cvv',
         ];
 
@@ -888,7 +890,11 @@ class paypalac_creditcard extends base
         }
         $cc_number_raw = $_POST['paypalac_cc_number'] ?? ($_POST['ppac_cc_number'] ?? '');
         $cc_number = preg_replace('/[^0-9]/', '', $cc_number_raw);
-        $cc_cvv = $_POST['paypalac_cc_cvv'] ?? ($_POST['ppac_cc_cvv'] ?? '');
+        $cc_cvv_raw = $_POST['paypalac_cc_cvv']
+            ?? ($_POST['ppac_cc_cvv']
+            ?? ($_POST['paypalac_cc_code']
+            ?? ($_POST['ppac_cc_code'] ?? '')));
+        $cc_cvv = preg_replace('/[^0-9]/', '', (string)$cc_cvv_raw);
 
         $error = false;
 
@@ -1023,7 +1029,8 @@ class paypalac_creditcard extends base
             $hiddenFields .= zen_draw_hidden_field('ppac_cc_expires_month', $_POST['paypalac_cc_expires_month'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppac_cc_expires_year', $_POST['paypalac_cc_expires_year'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppac_cc_number', $_POST['paypalac_cc_number'] ?? '');
-            $hiddenFields .= zen_draw_hidden_field('ppac_cc_cvv', $_POST['paypalac_cc_cvv'] ?? '');
+            $hiddenFields .= zen_draw_hidden_field('ppac_cc_cvv', $_POST['paypalac_cc_cvv'] ?? ($_POST['paypalac_cc_code'] ?? ''));
+            $hiddenFields .= zen_draw_hidden_field('ppac_cc_code', $_POST['paypalac_cc_code'] ?? ($_POST['paypalac_cc_cvv'] ?? ''));
             if (!empty($_POST['paypalac_cc_save_card'])) {
                 $hiddenFields .= zen_draw_hidden_field('ppac_cc_save_card', $_POST['paypalac_cc_save_card']);
             }
@@ -1051,6 +1058,7 @@ class paypalac_creditcard extends base
             $ccFields['ccFields']['ppac_cc_expires_year'] = 'paypalac_cc_expires_year';
             $ccFields['ccFields']['ppac_cc_number'] = 'paypalac_cc_number';
             $ccFields['ccFields']['ppac_cc_cvv'] = 'paypalac_cc_cvv';
+            $ccFields['ccFields']['ppac_cc_code'] = 'paypalac_cc_code';
             if (!empty($_POST['paypalac_cc_save_card'])) {
                 $ccFields['ccFields']['ppac_cc_save_card'] = 'paypalac_cc_save_card';
             }

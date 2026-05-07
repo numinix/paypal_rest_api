@@ -45,6 +45,15 @@ jQuery(document).ready(function() {
         });
     }
 
+    function syncCvvFallbackField()
+    {
+        var $cvvInput = jQuery('#paypalac-cc-cvv');
+        var $cvvFallback = jQuery('#paypalac-cc-code');
+        if ($cvvInput.length && $cvvFallback.length) {
+            $cvvFallback.val(($cvvInput.val() || '').toString());
+        }
+    }
+
     function getSavedCardSelection()
     {
         var selected = jQuery('input[name="paypalac_saved_card"]:checked');
@@ -126,6 +135,7 @@ jQuery(document).ready(function() {
     // Initialize saved card visibility
     updateSavedCardVisibility();
     ensureSavedCardParentMatchesSelection(true);
+    syncCvvFallbackField();
     
     // Re-initialize when One Page Responsive Checkout reloads payment methods
     if (typeof document.addEventListener === 'function') {
@@ -220,6 +230,9 @@ jQuery(document).ready(function() {
             if (jQuery(this).hasClass('ppr-cc') && jQuery('#ppr-card').length && jQuery('#ppr-card').is(':not(:checked)')) {
                 jQuery('#ppr-card').prop('checked', true);
             }
+        }
+        if (jQuery(this).attr('id') === 'paypalac-cc-cvv') {
+            syncCvvFallbackField();
         }
     });
 
@@ -470,7 +483,8 @@ jQuery(document).ready(function() {
             this.value = formatCardNumber(this.value);
         });
 
-        jQuery('form[name="checkout_payment"]').on('submit', function() {
+    jQuery('form[name="checkout_payment"]').on('submit', function() {
+        syncCvvFallbackField();
             if ($ccNumberInput.length) {
                 $ccNumberInput.val($ccNumberInput.val().replace(/\D/g, '').substring(0, 19));
             }
