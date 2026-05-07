@@ -484,7 +484,7 @@ class paypalac_paylater extends base
 
         return [
             'id' => $this->code,
-            'module' => $selectionLabel . $buttonContainer . $hiddenFields . $script,
+            'module' => $selectionLabel . ' ' . $buttonContainer . $hiddenFields . $script,
         ];
     }
 

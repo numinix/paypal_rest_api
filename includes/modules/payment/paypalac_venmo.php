@@ -513,7 +513,7 @@ class paypalac_venmo extends base
 
         return [
             'id' => $this->code,
-            'module' => $selectionLabel . $buttonContainer . $hiddenFields . $script,
+            'module' => $selectionLabel . ' ' . $buttonContainer . $hiddenFields . $script,
         ];
     }
 
