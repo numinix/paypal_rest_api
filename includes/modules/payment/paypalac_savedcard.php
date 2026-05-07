@@ -107,8 +107,8 @@ class paypalac_savedcard extends base
      */
     public function getCcInfo(): array
     {
-        // Return a copy to prevent external modification of internal state
-        return [...$this->ccInfo];
+        // Shallow copy (PHP 8+ rejects [...$assoc] when keys are strings)
+        return array_merge([], $this->ccInfo);
     }
 
     /**
