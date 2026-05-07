@@ -1232,14 +1232,11 @@ class paypalac extends base
         // Note: Since paypalac is now wallet-only (cardsAccepted = false), this condition is always true.
         //
         if ($this->cardsAccepted === false || $this->shippingCountryIsSupported === false) {
-            // Load the checkout script to handle radio button selection
-            // Add it as a hidden field to avoid placing script tags inside the label element
+            // Attach checkout.js to the module markup so tpl_checkout_payment does not wrap an
+            // empty-title row in .ccinfo (empty label + clearBoth Brs create large gaps between methods).
             $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.checkout.js"></script>';
-            $scriptField = [
-                'title' => '',
-                'field' => $checkoutScript,
-            ];
-            
+            $selection['module'] .= $checkoutScript;
+
             if ($this->shippingCountryIsSupported === false) {
                 $selection['fields'] = [
                     [
@@ -1248,10 +1245,7 @@ class paypalac extends base
                             '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.disable.js"></script>' .
                             '<small>' . MODULE_PAYMENT_PAYPALAC_UNSUPPORTED_SHIPPING_COUNTRY . '</small>',
                     ],
-                    $scriptField,
                 ];
-            } else {
-                $selection['fields'] = [$scriptField];
             }
             return $selection;
         }

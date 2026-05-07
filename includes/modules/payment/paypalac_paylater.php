@@ -480,15 +480,11 @@ class paypalac_paylater extends base
 
         $script = $this->getWalletAssets('jquery.paypalac.paylater.js');
 
+        $selectionLabel = MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_SELECTION ?? 'Pay Later';
+
         return [
             'id' => $this->code,
-            'module' => MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_SELECTION ?? 'Pay Later',
-            'fields' => [
-                [
-                    'title' => $buttonContainer,
-                    'field' => $hiddenFields . $script,
-                ],
-            ],
+            'module' => $selectionLabel . $buttonContainer . $hiddenFields . $script,
         ];
     }
 

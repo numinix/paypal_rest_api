@@ -482,13 +482,7 @@ class paypalac_applepay extends base
 
         return [
             'id' => $this->code,
-            'module' => $buttonContainer,
-            'fields' => [
-                [
-                    'title' => '',
-                    'field' => $hiddenFields . $script,
-                ],
-            ],
+            'module' => $buttonContainer . $hiddenFields . $script,
         ];
     }
 

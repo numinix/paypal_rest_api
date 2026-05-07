@@ -509,15 +509,11 @@ class paypalac_venmo extends base
 
         $script = $this->getWalletAssets('jquery.paypalac.venmo.js');
 
+        $selectionLabel = MODULE_PAYMENT_PAYPALAC_VENMO_TEXT_SELECTION ?? 'Venmo';
+
         return [
             'id' => $this->code,
-            'module' => MODULE_PAYMENT_PAYPALAC_VENMO_TEXT_SELECTION ?? 'Venmo',
-            'fields' => [
-                [
-                    'title' => $buttonContainer,
-                    'field' => $hiddenFields . $script,
-                ],
-            ],
+            'module' => $selectionLabel . $buttonContainer . $hiddenFields . $script,
         ];
     }
 
