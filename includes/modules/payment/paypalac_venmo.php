@@ -748,7 +748,9 @@ class paypalac_venmo extends base
             unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
         }
-        
+
+        $this->paypalCommon->acquireAdvancedCheckoutMysqlOrderLock();
+
         $response = $this->captureOrAuthorizePayment('venmo');
 
         $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $response['status'];
@@ -801,6 +803,8 @@ class paypalac_venmo extends base
         } else {
             $order->info['order_status'] = $this->order_status;
         }
+
+        $this->paypalCommon->reservePayPalOrderIdOrFinishExistingCheckout();
     }
 
     protected function captureOrAuthorizePayment(string $payment_source): array
@@ -822,13 +826,14 @@ class paypalac_venmo extends base
 
     public function after_order_create($orders_id)
     {
-        // Placeholder for future functionality
+        $this->paypalCommon->markCheckoutReservationOrderCreated((int)$orders_id);
     }
 
     public function after_process()
     {
         $this->paypalCommon->processAfterOrder($this->orderInfo);
         $this->paypalCommon->updateOrderHistory($this->orderInfo, 'venmo');
+        $this->paypalCommon->releaseAdvancedCheckoutMysqlOrderLock();
         $this->paypalCommon->resetOrder();
     }
 

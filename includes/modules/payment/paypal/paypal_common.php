@@ -10,12 +10,28 @@
  * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  */
 
+use PayPalAdvancedCheckout\Admin\GetPayPalOrderTransactions;
 use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
 use PayPalAdvancedCheckout\Common\Helpers;
 use PayPalAdvancedCheckout\Common\Logger;
 use PayPalAdvancedCheckout\Common\VaultManager;
 
 class PayPalCommon {
+    /**
+     * MySQL advisory lock for the in-flight PayPal order during checkout_process,
+     * so parallel/double POST cannot run two captures + two order creates for the same PayPal order.
+     */
+    private static ?string $advancedCheckoutMysqlLockName = null;
+
+    /**
+     * Serialize PayPal AC credit-card checkout for one customer or guest session.
+     * The card flow creates a new PayPal order on each attempt, so the per–PayPal-order
+     * lock alone cannot stop double POST / parallel finalize from creating two captures.
+     */
+    private static ?string $advancedCheckoutCreditCardScopeMysqlLockName = null;
+
+    private static bool $advancedCheckoutMysqlShutdownRegistered = false;
+
     /**
      * Transaction mode constants
      */
@@ -1721,5 +1737,240 @@ class PayPalCommon {
 
         $do_void = new \PayPalAdvancedCheckout\Admin\DoVoid($oID, $ppr, $module_code, $module_version);
         return true;
+    }
+
+    /**
+     * Serialize in-flight credit card (paypalac_creditcard) checkout for this customer or guest.
+     * Complements acquireAdvancedCheckoutMysqlOrderLock when two requests would otherwise hold
+     * different PayPal order ids (card module always creates a fresh PayPal order per submit).
+     */
+    public function acquireAdvancedCheckoutCreditCardCustomerSessionLock(): void
+    {
+        global $db;
+
+        if (!isset($db) || !is_object($db)) {
+            return;
+        }
+
+        if (self::$advancedCheckoutCreditCardScopeMysqlLockName !== null) {
+            return;
+        }
+
+        $customer_id = (int)($_SESSION['customer_id'] ?? 0);
+        if ($customer_id > 0) {
+            $lock_suffix = 'cust' . $customer_id;
+        } else {
+            $sid = session_id();
+            $lock_suffix = 'gs' . ($sid !== '' ? md5($sid) : md5((string)microtime(true)));
+        }
+
+        $lock_name = 'ppac_cc_' . $lock_suffix;
+        if (strlen($lock_name) > 64) {
+            $lock_name = substr($lock_name, 0, 64);
+        }
+
+        self::$advancedCheckoutCreditCardScopeMysqlLockName = $lock_name;
+
+        if (self::$advancedCheckoutMysqlShutdownRegistered === false) {
+            self::$advancedCheckoutMysqlShutdownRegistered = true;
+            register_shutdown_function([self::class, 'releaseAdvancedCheckoutMysqlOrderLockShutdown']);
+        }
+
+        $escaped = $db->prepare_input($lock_name);
+        $result = $db->Execute("SELECT GET_LOCK('" . $escaped . "', 60) AS ppac_cc_lock_acquired");
+        $acquired = isset($result->fields['ppac_cc_lock_acquired']) ? (int)$result->fields['ppac_cc_lock_acquired'] : 0;
+
+        if ($acquired !== 1) {
+            if (method_exists($this->paymentModule, 'log') && is_object($this->paymentModule->log)) {
+                $this->paymentModule->log->write('PayPalCommon::acquireAdvancedCheckoutCreditCardCustomerSessionLock GET_LOCK failed or timed out (scope ' . $lock_name . ')');
+            }
+            self::$advancedCheckoutCreditCardScopeMysqlLockName = null;
+            $this->setMessageAndRedirect(
+                (defined('MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN') ? MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN : 'Please try again.'),
+                defined('FILENAME_CHECKOUT_PAYMENT') ? FILENAME_CHECKOUT_PAYMENT : 'checkout_payment'
+            );
+        }
+    }
+
+    /**
+     * Serialize checkout_process for a single PayPal order id (same DB connection for GET/RELEASE).
+     * Safe no-op when session has no PayPal order id yet.
+     */
+    public function acquireAdvancedCheckoutMysqlOrderLock(): void
+    {
+        global $db;
+
+        $paypal_order_id = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '');
+        if ($paypal_order_id === '' || !isset($db) || !is_object($db)) {
+            return;
+        }
+
+        if (self::$advancedCheckoutMysqlLockName !== null) {
+            return;
+        }
+
+        $lock_name = 'ppac_' . md5($paypal_order_id);
+        self::$advancedCheckoutMysqlLockName = $lock_name;
+
+        if (self::$advancedCheckoutMysqlShutdownRegistered === false) {
+            self::$advancedCheckoutMysqlShutdownRegistered = true;
+            register_shutdown_function([self::class, 'releaseAdvancedCheckoutMysqlOrderLockShutdown']);
+        }
+
+        $escaped = $db->prepare_input($lock_name);
+        $result = $db->Execute("SELECT GET_LOCK('" . $escaped . "', 60) AS ppac_lock_acquired");
+        $acquired = isset($result->fields['ppac_lock_acquired']) ? (int)$result->fields['ppac_lock_acquired'] : 0;
+
+        if ($acquired !== 1) {
+            if (method_exists($this->paymentModule, 'log') && is_object($this->paymentModule->log)) {
+                $this->paymentModule->log->write('PayPalCommon::acquireAdvancedCheckoutMysqlOrderLock GET_LOCK failed or timed out for PayPal order ' . $paypal_order_id);
+            }
+            self::$advancedCheckoutMysqlLockName = null;
+            $this->setMessageAndRedirect(
+                (defined('MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN') ? MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN : 'Please try again.'),
+                defined('FILENAME_CHECKOUT_PAYMENT') ? FILENAME_CHECKOUT_PAYMENT : 'checkout_payment'
+            );
+        }
+    }
+
+    public function releaseAdvancedCheckoutMysqlOrderLock(): void
+    {
+        self::releaseAdvancedCheckoutMysqlOrderLockShutdown();
+    }
+
+    /**
+     * Releases advisory locks acquired during Advanced Checkout (PayPal order scope and/or card scope).
+     */
+    public static function releaseAdvancedCheckoutMysqlOrderLockShutdown(): void
+    {
+        global $db;
+
+        if (!isset($db) || !is_object($db)) {
+            self::$advancedCheckoutMysqlLockName = null;
+            self::$advancedCheckoutCreditCardScopeMysqlLockName = null;
+            return;
+        }
+
+        if (self::$advancedCheckoutMysqlLockName !== null) {
+            $escaped = $db->prepare_input(self::$advancedCheckoutMysqlLockName);
+            $db->Execute("SELECT RELEASE_LOCK('" . $escaped . "')");
+            self::$advancedCheckoutMysqlLockName = null;
+        }
+
+        if (self::$advancedCheckoutCreditCardScopeMysqlLockName !== null) {
+            $escaped = $db->prepare_input(self::$advancedCheckoutCreditCardScopeMysqlLockName);
+            $db->Execute("SELECT RELEASE_LOCK('" . $escaped . "')");
+            self::$advancedCheckoutCreditCardScopeMysqlLockName = null;
+        }
+    }
+
+    protected function checkoutReservationTableName(): string
+    {
+        return (defined('DB_PREFIX') ? DB_PREFIX : '') . 'paypal_ac_checkout_reservation';
+    }
+
+    /**
+     * One row per PayPal order id while checkout completes; prevents a second Zen Cart order
+     * for the same PayPal order when GET_LOCK is unavailable (e.g. different DB connections).
+     */
+    public function ensureCheckoutReservationTable(): void
+    {
+        global $db;
+
+        if (!isset($db) || !is_object($db)) {
+            return;
+        }
+
+        $table = $this->checkoutReservationTableName();
+        $db->Execute(
+            "CREATE TABLE IF NOT EXISTS " . $table . " (
+                paypal_order_id VARCHAR(64) NOT NULL,
+                customers_id INT UNSIGNED NOT NULL DEFAULT 0,
+                orders_id INT UNSIGNED NOT NULL DEFAULT 0,
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY (paypal_order_id),
+                KEY idx_ppac_res_orders (orders_id),
+                KEY idx_ppac_res_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+    }
+
+    /**
+     * After a successful before_process: claim this PayPal order id. If another request already
+     * claimed it, wait for orders_id then redirect to checkout success (no second order).
+     */
+    public function reservePayPalOrderIdOrFinishExistingCheckout(): void
+    {
+        global $db;
+
+        $paypal_order_id = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '');
+        if ($paypal_order_id === '' || !isset($db) || !is_object($db)) {
+            return;
+        }
+
+        $this->ensureCheckoutReservationTable();
+        $esc = $db->prepare_input($paypal_order_id);
+        $cid = (int)($_SESSION['customer_id'] ?? 0);
+        $table = $this->checkoutReservationTableName();
+
+        $db->Execute(
+            "INSERT IGNORE INTO " . $table . " (paypal_order_id, customers_id, orders_id, created_at) VALUES ('" . $esc . "', " . $cid . ", 0, NOW())"
+        );
+
+        if ($db->affectedRows() > 0) {
+            return;
+        }
+
+        $existing_oid = 0;
+        for ($i = 0; $i < 80; $i++) {
+            $chk = $db->Execute(
+                "SELECT orders_id FROM " . $table . " WHERE paypal_order_id = '" . $esc . "' LIMIT 1"
+            );
+            if (!$chk->EOF) {
+                $existing_oid = (int)($chk->fields['orders_id'] ?? 0);
+            }
+            if ($existing_oid <= 0) {
+                $existing_oid = (int)GetPayPalOrderTransactions::getOrderIdFromPayPalTxnId($paypal_order_id);
+            }
+            if ($existing_oid > 0) {
+                break;
+            }
+            usleep(125000);
+        }
+
+        if ($existing_oid > 0) {
+            $_SESSION['order_number_created'] = $existing_oid;
+            zen_redirect(zen_href_link(FILENAME_CHECKOUT_SUCCESS, '', 'SSL'));
+        }
+
+        $this->setMessageAndRedirect(
+            (defined('MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN') ? MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN : 'Please try again.'),
+            defined('FILENAME_CHECKOUT_PAYMENT') ? FILENAME_CHECKOUT_PAYMENT : 'checkout_payment'
+        );
+    }
+
+    /**
+     * Link the reservation row to the new orders_id after order->create.
+     */
+    public function markCheckoutReservationOrderCreated(int $orders_id): void
+    {
+        global $db;
+
+        if ($orders_id <= 0 || !isset($db) || !is_object($db)) {
+            return;
+        }
+
+        $paypal_order_id = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '');
+        if ($paypal_order_id === '') {
+            return;
+        }
+
+        $this->ensureCheckoutReservationTable();
+        $esc = $db->prepare_input($paypal_order_id);
+        $table = $this->checkoutReservationTableName();
+
+        $db->Execute(
+            "UPDATE " . $table . " SET orders_id = " . (int)$orders_id . " WHERE paypal_order_id = '" . $esc . "' AND orders_id = 0 LIMIT 1"
+        );
     }
 }

@@ -2134,6 +2134,9 @@ class paypalac extends base
             unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
         }
+
+        $this->paypalCommon->acquireAdvancedCheckoutMysqlOrderLock();
+
         $response = $this->captureOrAuthorizePayment('paypal');
 
         // -----
@@ -2205,6 +2208,8 @@ class paypalac extends base
         } else {
             $order->info['order_status'] = $this->order_status;
         }
+
+        $this->paypalCommon->reservePayPalOrderIdOrFinishExistingCheckout();
 
         $this->notify('NOTIFY_PAYPALAC_BEFORE_PROCESS_FINISHED', $this->orderInfo);
     }
@@ -2871,7 +2876,8 @@ class paypalac extends base
      */
     public function after_order_create($orders_id)
     {
-        
+        $this->paypalCommon->markCheckoutReservationOrderCreated((int)$orders_id);
+
     }
 
     /**
@@ -2935,6 +2941,7 @@ class paypalac extends base
             );
         }
 
+        $this->paypalCommon->releaseAdvancedCheckoutMysqlOrderLock();
         $this->resetOrder();
     }
 

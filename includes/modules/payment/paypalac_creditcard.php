@@ -1096,7 +1096,13 @@ class paypalac_creditcard extends base
             unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
         }
-        
+
+        // Card module creates a new PayPal order on each submit; serialize finalize for this
+        // customer/session so parallel requests cannot each capture a different PayPal order.
+        $this->paypalCommon->acquireAdvancedCheckoutCreditCardCustomerSessionLock();
+
+        $this->paypalCommon->acquireAdvancedCheckoutMysqlOrderLock();
+
         $response = $this->captureOrAuthorizePayment('card');
 
         $this->applyCardDetailsToOrder($order, $response);
@@ -1154,6 +1160,8 @@ class paypalac_creditcard extends base
 
         // Store vault card data in session if present
         $this->storeVaultCardDataInSession($this->orderInfo);
+
+        $this->paypalCommon->reservePayPalOrderIdOrFinishExistingCheckout();
     }
 
     protected function applyCardDetailsToOrder(&$order, array $response): void
@@ -1257,6 +1265,8 @@ class paypalac_creditcard extends base
 
     public function after_order_create($orders_id)
     {
+        $this->paypalCommon->markCheckoutReservationOrderCreated((int)$orders_id);
+
         // Store vaulted card data if present in the response
         $card_source = $this->extractCardSource($this->orderInfo);
 
@@ -1269,6 +1279,7 @@ class paypalac_creditcard extends base
     {
         $this->paypalCommon->processAfterOrder($this->orderInfo);
         $this->paypalCommon->updateOrderHistory($this->orderInfo, 'card');
+        $this->paypalCommon->releaseAdvancedCheckoutMysqlOrderLock();
         $this->paypalCommon->resetOrder();
     }
 
