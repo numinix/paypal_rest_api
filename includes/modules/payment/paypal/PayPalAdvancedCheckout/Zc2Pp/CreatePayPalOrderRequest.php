@@ -498,6 +498,34 @@ class CreatePayPalOrderRequest extends ErrorInfo
         if ($discount_total > 0) {
             $breakdown['discount'] = $this->setRateConvertedValue($discount_total);
         }
+
+        // -----
+        // Keep the amount-breakdown sum aligned with the order-total value. Tiny
+        // rounding deltas can appear when per-line taxes are rounded differently
+        // than the order-level total. Prefer adjusting tax_total by that delta so
+        // the detailed breakdown can still be sent to PayPal.
+        //
+        $breakdown_delta = (float)$amount['value'];
+        foreach ($breakdown as $name => $next_amount) {
+            $next_value = (float)$next_amount['value'];
+            if (in_array($name, ['discount', 'shipping_discount'], true)) {
+                $breakdown_delta += $next_value;
+            } else {
+                $breakdown_delta -= $next_value;
+            }
+        }
+
+        $currency_decimals = $this->amount->getCurrencyDecimals();
+        $epsilon = 1 / pow(10, $currency_decimals);
+        if (isset($breakdown['tax_total']) && abs($breakdown_delta) <= $epsilon) {
+            $breakdown['tax_total']['value'] = number_format(
+                (float)$breakdown['tax_total']['value'] + $breakdown_delta,
+                $currency_decimals,
+                '.',
+                ''
+            );
+        }
+
         $amount['breakdown'] = $breakdown;
 
         // -----
