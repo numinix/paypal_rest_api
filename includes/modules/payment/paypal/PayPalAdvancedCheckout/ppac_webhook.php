@@ -26,6 +26,7 @@
  * Set supporting application_top parameters, and boot up
  */
 $loaderPrefix = 'webhook';
+$GLOBALS['loaderPrefix'] = $loaderPrefix;
 require 'includes/application_top.php';
 $current_page_base = 'ppac_webhook';
 require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';

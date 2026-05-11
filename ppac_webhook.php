@@ -32,6 +32,7 @@ if (is_file($autoloaderPath)) {
 }
 
 $loaderPrefix = 'webhook';
+$GLOBALS['loaderPrefix'] = $loaderPrefix;
 // Prevent Magic SEO URLs from loading in webhook context (it calls mysql_* functions removed in PHP 7.0)
 define('MSU_SEO_URL_ZC', true);
 require 'includes/application_top.php';
