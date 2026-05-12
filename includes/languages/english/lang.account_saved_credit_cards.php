@@ -98,6 +98,14 @@ $define = [
     'TEXT_ADD_CARD_ERROR_ADDRESS_SELECTION' => 'Select a billing address from your address book or provide a new address.',
     'TEXT_ADD_CARD_ERROR_ADDRESS_NEW' => 'Enter a complete billing address, including street, city, postal code, and country.',
     'TEXT_ADD_CARD_PROCESSING' => 'Processing...',
+
+    // Legacy PayFlow-style add-card form (jscript_main.php)
+    'SAVED_CREDIT_CARD_ERROR_NAME' => 'Enter the name on the card (at least 2 characters).',
+    'SAVED_CREDIT_CARD_ERROR_TYPE' => 'Select a card type.',
+    'SAVED_CREDIT_CARD_ERROR_NUMBER' => 'Enter a valid card number (15 or 16 digits).',
+    'SAVED_CREDIT_CARD_ERROR_EXPIRY_MONTH' => 'Select the expiration month.',
+    'SAVED_CREDIT_CARD_ERROR_EXPIRY_YEAR' => 'Select the expiration year.',
+    'SAVED_CREDIT_CARD_ERROR_CVV' => 'Enter the security code (at least 3 digits).',
 ];
 
 return $define;

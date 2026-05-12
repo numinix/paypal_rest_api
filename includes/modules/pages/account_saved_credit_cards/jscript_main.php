@@ -160,7 +160,7 @@ function check_form(form_name) {
   }
 
   check_input('monthexpiry', 2, '<?php echo SAVED_CREDIT_CARD_ERROR_EXPIRY_MONTH; ?>');
-  check_input('yearexpiry', 2, '<?php echo SAVED_CREDIT_CARD_EXPIRY_YEAR; ?>');
+  check_input('yearexpiry', 2, '<?php echo SAVED_CREDIT_CARD_ERROR_EXPIRY_YEAR; ?>');
   check_input('cvv', 3, '<?php echo SAVED_CREDIT_CARD_ERROR_CVV; ?>');
 
   if (error == true) {
