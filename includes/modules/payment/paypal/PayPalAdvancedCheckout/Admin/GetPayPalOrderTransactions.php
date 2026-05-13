@@ -240,9 +240,13 @@ class GetPayPalOrderTransactions
             }
 
             $this->externalTxnAdded = true;
-            $parent_txn_id = $authorizations[0]['id'];
-            $this->addDbTransaction('CAPTURE', $next_capture, 'Externally added.', true, $parent_txn_id);
-            $parent_txn_response = $this->getParentTxnStatus($parent_txn_id, $authorizations);
+            // Direct capture (e.g. createOrder + CAPTURE with no AUTHORIZE row) has no authorization
+            // parent; pass '' so addDbTransaction resolves parent from capture HATEOAS links.
+            $parent_txn_id = (isset($authorizations[0]['id']) && $authorizations[0]['id'] !== null && $authorizations[0]['id'] !== '')
+                ? (string)$authorizations[0]['id']
+                : '';
+            $resolved_parent_txn_id = $this->addDbTransaction('CAPTURE', $next_capture, 'Externally added.', true, $parent_txn_id);
+            $parent_txn_response = $this->getParentTxnStatus($resolved_parent_txn_id, $authorizations);
             if (!empty($parent_txn_response)) {
                 $this->updateParentTxnDateAndStatus($parent_txn_response);
             }
