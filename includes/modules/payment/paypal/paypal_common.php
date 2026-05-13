@@ -1473,6 +1473,17 @@ class PayPalCommon {
             'amount_mismatch' => $order_amount_mismatch,
         ];
 
+        // Card checkout: PayPal may capture/authorize during createOrder (vault / fast path). Claim the
+        // payment resource id immediately so a concurrent finalize cannot insert a second Zen order
+        // before before_process runs. before_process calls reserve again; reserve detects the same
+        // PayPal order id on the row and returns without waiting (see reservePayPalCaptureResourceOrFinishExistingCheckout).
+        if ($ppac_type === 'card') {
+            $immediate_payment_id = $this->extractFirstSuccessfulPaymentResourceId($paypal_order);
+            if ($immediate_payment_id !== '') {
+                $this->reservePayPalCaptureResourceOrFinishExistingCheckout($immediate_payment_id);
+            }
+        }
+
         return true;
     }
 
@@ -1514,6 +1525,50 @@ class PayPalCommon {
                     $status = strtoupper((string)($entry['status'] ?? ''));
                     if (in_array($status, $failed_statuses, true)) {
                         return $status;
+                    }
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Return the first capture or authorization id on a PayPal order that is not in a failed state.
+     * Used to reserve payment resources as soon as createOrder returns a settled payment (vault / fast path).
+     */
+    protected function extractFirstSuccessfulPaymentResourceId(array $paypal_order): string
+    {
+        $failed_statuses = ['DECLINED', 'DENIED', 'FAILED'];
+        $purchase_units = $paypal_order['purchase_units'] ?? [];
+        if (!is_array($purchase_units)) {
+            return '';
+        }
+
+        foreach ($purchase_units as $purchase_unit) {
+            if (!is_array($purchase_unit)) {
+                continue;
+            }
+            $payments = $purchase_unit['payments'] ?? [];
+            if (!is_array($payments)) {
+                continue;
+            }
+            foreach (['captures', 'authorizations'] as $payment_key) {
+                $entries = $payments[$payment_key] ?? [];
+                if (!is_array($entries)) {
+                    continue;
+                }
+                foreach ($entries as $entry) {
+                    if (!is_array($entry)) {
+                        continue;
+                    }
+                    $status = strtoupper((string)($entry['status'] ?? ''));
+                    if (in_array($status, $failed_statuses, true)) {
+                        continue;
+                    }
+                    $id = trim((string)($entry['id'] ?? ''));
+                    if ($id !== '') {
+                        return $id;
                     }
                 }
             }
@@ -2032,6 +2087,19 @@ class PayPalCommon {
 
         if ($db->affectedRows() > 0) {
             return;
+        }
+
+        // Same checkout pipeline may call reserve twice (createPayPalOrder then before_process). The row
+        // already belongs to this PayPal order with orders_id still 0 — do not wait (would deadlock).
+        $ownerChk = $db->Execute(
+            "SELECT orders_id, paypal_order_id FROM " . $table . " WHERE capture_resource_id = '" . $esc . "' LIMIT 1"
+        );
+        if (!$ownerChk->EOF) {
+            $row_orders_id = (int)($ownerChk->fields['orders_id'] ?? 0);
+            $row_paypal_order_id = (string)($ownerChk->fields['paypal_order_id'] ?? '');
+            if ($row_orders_id === 0 && $row_paypal_order_id !== '' && $row_paypal_order_id === $paypal_order_id) {
+                return;
+            }
         }
 
         $existing_oid = 0;

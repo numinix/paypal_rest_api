@@ -657,6 +657,8 @@ class paypalac_savedcard extends base
             unset($_SESSION['PayPalAdvancedCheckout']['force_authorize']);
         }
 
+        $this->paypalCommon->acquireAdvancedCheckoutCreditCardCustomerSessionLock();
+
         // Create PayPal order for saved card payment
         $paypal_order_created = $this->createPayPalOrder('card');
         if ($paypal_order_created === false) {

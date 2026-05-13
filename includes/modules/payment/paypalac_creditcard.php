@@ -793,7 +793,11 @@ class paypalac_creditcard extends base
             }
             return;
         }
-        
+
+        // Serialize with before_process so two concurrent finalizes cannot each create a PayPal order
+        // before either claims the capture row (card always mints a new PayPal order per attempt).
+        $this->paypalCommon->acquireAdvancedCheckoutCreditCardCustomerSessionLock();
+
         // Create PayPal order for credit card payment
         $paypal_order_created = $this->createPayPalOrder('card');
         if ($paypal_order_created === false) {
