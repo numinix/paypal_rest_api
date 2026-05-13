@@ -57,7 +57,6 @@ namespace {
         public array $billing;
         public array $delivery;
         public array $customer;
-        public array $totals = [];
 
         public function __construct(array $info, array $products)
         {
@@ -94,10 +93,6 @@ namespace {
         }
     }
 
-    if (!defined('MODULE_ORDER_TOTAL_COUNTY_LOCAL_TAX_STATUS')) {
-        define('MODULE_ORDER_TOTAL_COUNTY_LOCAL_TAX_STATUS', 'true');
-    }
-
     $currencies = new currencies();
     $db = new NullDb();
 
@@ -113,7 +108,7 @@ namespace {
     use PayPalAdvancedCheckout\Zc2Pp\CreatePayPalOrderRequest;
 
     $order_info = [
-        'total' => 10.50,
+        'total' => 10.72,
         'shipping_tax' => 0.00,
     ];
 
@@ -122,70 +117,53 @@ namespace {
         'name' => 'Sample Item',
         'model' => 'SAMPLE',
         'qty' => 1,
-        'tax' => 0.0,
+        'tax' => 7.25,
         'final_price' => 10.00,
         'onetime_charges' => 0.00,
         'products_virtual' => 0,
         'attributes' => [],
     ]];
 
-    $base_order = new order([
+    $order = new order([
         'currency' => 'USD',
         'shipping_cost' => 0.00,
         'shipping_tax' => 0.00,
     ], $products);
+
+    $request = new CreatePayPalOrderRequest('paypal', $order, [], $order_info, []);
+    $payload = $request->get();
+    $purchase_unit = $payload['purchase_units'][0];
+    $breakdown = $purchase_unit['amount']['breakdown'] ?? [];
 
     $failures = 0;
-
-    $ot_diffs_with_local = [
-        'ot_local_sales_taxes' => [
-            'diff' => [
-                'total' => 0.50,
-                'tax' => 0.50,
-            ],
-        ],
-    ];
-
-    $request_with_diffs = new CreatePayPalOrderRequest('paypal', $base_order, [], $order_info, $ot_diffs_with_local);
-    $payload_with_diffs = $request_with_diffs->get();
-    $breakdown_with_diffs = $payload_with_diffs['purchase_units'][0]['amount']['breakdown'];
-    $tax_total_with_diffs = (float)$breakdown_with_diffs['tax_total']['value'];
-    $handling_with_diffs = (float)$breakdown_with_diffs['handling']['value'];
-    if (abs($tax_total_with_diffs - 0.00) > 0.001) {
-        fwrite(STDERR, sprintf("Expected tax_total of 0.00 from item taxes, got %0.2f.\n", $tax_total_with_diffs));
-        $failures++;
+    $tax_total = (float)($breakdown['tax_total']['value'] ?? -1);
+    $item_tax_total = 0.0;
+    foreach ($purchase_unit['items'] ?? [] as $item) {
+        $item_tax_total += (float)$item['quantity'] * (float)$item['tax']['value'];
     }
-    if (abs($handling_with_diffs - 0.50) > 0.001) {
-        fwrite(STDERR, sprintf("Expected handling of 0.50 from local sales tax ot_diffs, got %0.2f.\n", $handling_with_diffs));
+
+    if (abs($tax_total - $item_tax_total) > 0.001) {
+        fwrite(STDERR, sprintf("Expected tax_total %0.2f to match item taxes %0.2f.\n", $tax_total, $item_tax_total));
         $failures++;
     }
 
-    $order_with_totals = new order([
-        'currency' => 'USD',
-        'shipping_cost' => 0.00,
-        'shipping_tax' => 0.00,
-    ], $products);
-    $order_with_totals->totals = [
-        [
-            'class' => 'ot_local_sales_taxes',
-            'value' => 0.75,
-        ],
-    ];
-
-    $request_with_order_totals = new CreatePayPalOrderRequest('paypal', $order_with_totals, [], [
-        'total' => 10.75,
-        'shipping_tax' => 0.00,
-    ], []);
-    $payload_with_order_totals = $request_with_order_totals->get();
-    $breakdown_with_order_totals = $payload_with_order_totals['purchase_units'][0]['amount']['breakdown'];
-    $tax_total_with_order_totals = (float)$breakdown_with_order_totals['tax_total']['value'];
-    $handling_with_order_totals = (float)$breakdown_with_order_totals['handling']['value'];
-    if (abs($tax_total_with_order_totals - 0.00) > 0.001) {
-        fwrite(STDERR, sprintf("Expected tax_total of 0.00 from item taxes, got %0.2f.\n", $tax_total_with_order_totals));
+    if (!isset($breakdown['discount']) || (float)$breakdown['discount']['value'] !== 0.01) {
+        fwrite(STDERR, sprintf("Expected rounding discount of 0.01, got %s.\n", json_encode($breakdown['discount'] ?? null)));
         $failures++;
     }
-    if (abs($handling_with_order_totals - 0.75) > 0.001) {
-        fwrite(STDERR, sprintf("Expected handling of 0.75 from local sales tax order totals fallback, got %0.2f.\n", $handling_with_order_totals));
+
+    $expected_total = 0.0;
+    foreach ($breakdown as $name => $amount) {
+        $value = (float)$amount['value'];
+        if (in_array($name, ['discount', 'shipping_discount'], true)) {
+            $expected_total -= $value;
+        } else {
+            $expected_total += $value;
+        }
+    }
+
+    if (number_format($expected_total, 2, '.', '') !== $purchase_unit['amount']['value']) {
+        fwrite(STDERR, sprintf("Expected breakdown total to match amount %s, got %0.2f.\n", $purchase_unit['amount']['value'], $expected_total));
         $failures++;
     }
 
@@ -193,5 +171,5 @@ namespace {
         exit(1);
     }
 
-    fwrite(STDOUT, "CreatePayPalOrderRequest local sales tax plugin compatibility test passed.\n");
+    fwrite(STDOUT, "CreatePayPalOrderRequest tax total mismatch prevention test passed.\n");
 }

@@ -225,6 +225,10 @@ class CreatePayPalOrderRequest extends ErrorInfo
     protected function validateOrderAmounts()
     {
         $purchase_amount = $this->request['purchase_units'][0]['amount'];
+        if (!isset($purchase_amount['breakdown'])) {
+            return;
+        }
+
         $summed_amount = 0;
         foreach ($purchase_amount['breakdown'] as $name => $amount) {
             if (in_array($name, ['discount', 'shipping_discount'], true)) {
@@ -240,7 +244,35 @@ class CreatePayPalOrderRequest extends ErrorInfo
                 $this->request['purchase_units'][0]['amount']['breakdown'],
                 $this->request['purchase_units'][0]['items']
             );
+            return;
         }
+
+        if ($this->taxTotalMismatchesItems($purchase_amount)) {
+            $this->log->write("\n***--> CreatePayPalOrderRequest, tax_total mismatch with item taxes. No items or cost breakdown included in the submission to PayPal. Error amount:\n" . Logger::logJSON($purchase_amount));
+            $this->itemBreakdown['breakdown_mismatch'] = $purchase_amount;
+            unset(
+                $this->request['purchase_units'][0]['amount']['breakdown'],
+                $this->request['purchase_units'][0]['items']
+            );
+        }
+    }
+
+    protected function taxTotalMismatchesItems(array $purchase_amount): bool
+    {
+        if (
+            !isset($purchase_amount['breakdown']['tax_total']['value']) ||
+            empty($this->request['purchase_units'][0]['items']) ||
+            !is_array($this->request['purchase_units'][0]['items'])
+        ) {
+            return false;
+        }
+
+        $item_tax_total = 0.0;
+        foreach ($this->request['purchase_units'][0]['items'] as $next_item) {
+            $item_tax_total += (float)$next_item['quantity'] * (float)$next_item['tax']['value'];
+        }
+
+        return number_format($item_tax_total, $this->amount->getCurrencyDecimals(), '.', '') !== $purchase_amount['breakdown']['tax_total']['value'];
     }
 
     // -----
@@ -407,14 +439,6 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $item_tax_total += $next_item['quantity'] * $next_item['tax']['value'];
         }
 
-        // -----
-        // Compatibility: The Local Sales Tax plugin can add taxes via an order-total
-        // observer (ot_local_sales_taxes) that are not reflected in item-level tax
-        // values. Include those taxes in the PayPal breakdown when the plugin is
-        // enabled, while gracefully ignoring disabled/missing plugin files.
-        //
-        $item_tax_total += $this->getLocalSalesTaxTotal($order, $ot_diffs);
-
         $shipping_total = (float)($order->info['shipping_cost'] + $order_info['shipping_tax']);
         $breakdown = [
             'item_total' => $this->amount->setValue($item_total),
@@ -426,7 +450,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // Calculate any handling fees (including products' onetime-charges) and,
         // if non-zero, include that value in the breakdown.
         //
-        $handling_total = $this->calculateHandling($ot_diffs);
+        $local_sales_tax_total = $this->getLocalSalesTaxTotal($order, $ot_diffs);
+        $handling_total = $this->calculateHandling($ot_diffs) + $local_sales_tax_total;
         if ($handling_total > 0) {
             $breakdown['handling'] = $this->setRateConvertedValue($handling_total);
         }
@@ -500,10 +525,9 @@ class CreatePayPalOrderRequest extends ErrorInfo
         }
 
         // -----
-        // Keep the amount-breakdown sum aligned with the order-total value. Tiny
-        // rounding deltas can appear when per-line taxes are rounded differently
-        // than the order-level total. Prefer adjusting tax_total by that delta so
-        // the detailed breakdown can still be sent to PayPal.
+        // Keep the amount-breakdown sum aligned with the order-total value. PayPal
+        // requires tax_total to equal the sum of item-level taxes, so small deltas
+        // are carried by handling or discount instead.
         //
         $breakdown_delta = (float)$amount['value'];
         foreach ($breakdown as $name => $next_amount) {
@@ -517,9 +541,40 @@ class CreatePayPalOrderRequest extends ErrorInfo
 
         $currency_decimals = $this->amount->getCurrencyDecimals();
         $epsilon = 1 / pow(10, $currency_decimals);
-        if (isset($breakdown['tax_total']) && abs($breakdown_delta) <= $epsilon) {
+        $breakdown_delta = round($breakdown_delta, $currency_decimals);
+        if (abs($breakdown_delta) <= $epsilon) {
+            if ($breakdown_delta > 0) {
+                $breakdown['handling'] = $this->amount->setValue(
+                    (float)($breakdown['handling']['value'] ?? 0.0) + $breakdown_delta
+                );
+            } elseif ($breakdown_delta < 0) {
+                $discount_delta = abs($breakdown_delta);
+                $breakdown['discount'] = $this->amount->setValue(
+                    (float)($breakdown['discount']['value'] ?? 0.0) + $discount_delta
+                );
+                $discount_total += $discount_delta;
+            }
+        }
+
+        if ($local_sales_tax_total > 0) {
+            $this->log->write(
+                sprintf(
+                    'CreatePayPalOrderRequest: included local sales tax %.2f in handling to keep PayPal item tax validation aligned.',
+                    $local_sales_tax_total
+                )
+            );
+        }
+
+        if (isset($breakdown['handling']) && (float)$breakdown['handling']['value'] === 0.0) {
+            unset($breakdown['handling']);
+        }
+        if (isset($breakdown['discount']) && (float)$breakdown['discount']['value'] === 0.0) {
+            unset($breakdown['discount']);
+        }
+
+        if (isset($breakdown['tax_total'])) {
             $breakdown['tax_total']['value'] = number_format(
-                (float)$breakdown['tax_total']['value'] + $breakdown_delta,
+                (float)$breakdown['tax_total']['value'],
                 $currency_decimals,
                 '.',
                 ''
