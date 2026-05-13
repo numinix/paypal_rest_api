@@ -1161,6 +1161,10 @@ class paypalac_creditcard extends base
         // Store vault card data in session if present
         $this->storeVaultCardDataInSession($this->orderInfo);
 
+        $paymentRow = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0] ?? [];
+        $captureOrAuthId = (string)($paymentRow['id'] ?? '');
+        $this->paypalCommon->reservePayPalCaptureResourceOrFinishExistingCheckout($captureOrAuthId);
+
         $this->paypalCommon->reservePayPalOrderIdOrFinishExistingCheckout();
     }
 
@@ -1266,6 +1270,10 @@ class paypalac_creditcard extends base
     public function after_order_create($orders_id)
     {
         $this->paypalCommon->markCheckoutReservationOrderCreated((int)$orders_id);
+
+        $paymentRow = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0] ?? [];
+        $captureOrAuthId = (string)($paymentRow['id'] ?? '');
+        $this->paypalCommon->markCaptureCheckoutReservationOrderCreated((int)$orders_id, $captureOrAuthId);
 
         // Store vaulted card data if present in the response
         $card_source = $this->extractCardSource($this->orderInfo);

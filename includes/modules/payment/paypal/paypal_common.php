@@ -1973,4 +1973,115 @@ class PayPalCommon {
             "UPDATE " . $table . " SET orders_id = " . (int)$orders_id . " WHERE paypal_order_id = '" . $esc . "' AND orders_id = 0 LIMIT 1"
         );
     }
+
+    protected function checkoutCaptureReservationTableName(): string
+    {
+        return (defined('DB_PREFIX') ? DB_PREFIX : '') . 'paypal_ac_capture_reservation';
+    }
+
+    /**
+     * One row per successful capture/authorization id so a second checkout cannot create
+     * another Zen Cart order for the same PayPal payment (idempotent replay / double POST).
+     */
+    public function ensureCaptureCheckoutReservationTable(): void
+    {
+        global $db;
+
+        if (!isset($db) || !is_object($db)) {
+            return;
+        }
+
+        $table = $this->checkoutCaptureReservationTableName();
+        $db->Execute(
+            "CREATE TABLE IF NOT EXISTS " . $table . " (
+                capture_resource_id VARCHAR(64) NOT NULL,
+                customers_id INT UNSIGNED NOT NULL DEFAULT 0,
+                paypal_order_id VARCHAR(64) NOT NULL DEFAULT '',
+                orders_id INT UNSIGNED NOT NULL DEFAULT 0,
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY (capture_resource_id),
+                KEY idx_ppac_cap_orders (orders_id),
+                KEY idx_ppac_cap_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+    }
+
+    /**
+     * Claim this capture/authorization id before Zen creates the order. Duplicate claims
+     * wait for orders_id then redirect to checkout success (same as PayPal order reservation).
+     */
+    public function reservePayPalCaptureResourceOrFinishExistingCheckout(string $capture_resource_id): void
+    {
+        global $db;
+
+        $capture_resource_id = trim($capture_resource_id);
+        if ($capture_resource_id === '' || !isset($db) || !is_object($db)) {
+            return;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $esc = $db->prepare_input($capture_resource_id);
+        $cid = (int)($_SESSION['customer_id'] ?? 0);
+        $paypal_order_id = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '');
+        $esc_po = $db->prepare_input($paypal_order_id);
+        $table = $this->checkoutCaptureReservationTableName();
+
+        $db->Execute(
+            "INSERT IGNORE INTO " . $table . " (capture_resource_id, customers_id, paypal_order_id, orders_id, created_at) VALUES ('" . $esc . "', " . $cid . ", '" . $esc_po . "', 0, NOW())"
+        );
+
+        if ($db->affectedRows() > 0) {
+            return;
+        }
+
+        $existing_oid = 0;
+        for ($i = 0; $i < 80; $i++) {
+            $chk = $db->Execute(
+                "SELECT orders_id FROM " . $table . " WHERE capture_resource_id = '" . $esc . "' LIMIT 1"
+            );
+            if (!$chk->EOF) {
+                $existing_oid = (int)($chk->fields['orders_id'] ?? 0);
+            }
+            if ($existing_oid <= 0) {
+                $existing_oid = (int)GetPayPalOrderTransactions::getOrderIdFromPayPalTxnId($capture_resource_id);
+            }
+            if ($existing_oid > 0) {
+                break;
+            }
+            usleep(125000);
+        }
+
+        if ($existing_oid > 0) {
+            if (method_exists($this->paymentModule, 'log') && is_object($this->paymentModule->log)) {
+                $this->paymentModule->log->write(
+                    'PayPalCommon::reservePayPalCaptureResourceOrFinishExistingCheckout: duplicate capture/authorization id ' . $capture_resource_id . '; redirecting to existing order #' . $existing_oid
+                );
+            }
+            $_SESSION['order_number_created'] = $existing_oid;
+            zen_redirect(zen_href_link(FILENAME_CHECKOUT_SUCCESS, '', 'SSL'));
+        }
+
+        $this->setMessageAndRedirect(
+            (defined('MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN') ? MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN : 'Please try again.'),
+            defined('FILENAME_CHECKOUT_PAYMENT') ? FILENAME_CHECKOUT_PAYMENT : 'checkout_payment'
+        );
+    }
+
+    public function markCaptureCheckoutReservationOrderCreated(int $orders_id, string $capture_resource_id): void
+    {
+        global $db;
+
+        $capture_resource_id = trim($capture_resource_id);
+        if ($orders_id <= 0 || $capture_resource_id === '' || !isset($db) || !is_object($db)) {
+            return;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $esc = $db->prepare_input($capture_resource_id);
+        $table = $this->checkoutCaptureReservationTableName();
+
+        $db->Execute(
+            "UPDATE " . $table . " SET orders_id = " . (int)$orders_id . " WHERE capture_resource_id = '" . $esc . "' AND orders_id = 0 LIMIT 1"
+        );
+    }
 }
