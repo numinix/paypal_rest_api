@@ -1022,6 +1022,30 @@ class PayPalCommon {
     }
 
     /**
+     * First capture or authorization row on the PayPal order that has an id (some API shapes
+     * omit [0] or nest multiple captures).
+     */
+    protected function extractFirstPaymentEntryFromOrderInfo(array $orderInfo): array
+    {
+        $payments = $orderInfo['purchase_units'][0]['payments'] ?? null;
+        if (!is_array($payments)) {
+            return [];
+        }
+        foreach (['captures', 'authorizations'] as $bucket) {
+            if (empty($payments[$bucket]) || !is_array($payments[$bucket])) {
+                continue;
+            }
+            foreach ($payments[$bucket] as $row) {
+                if (is_array($row) && !empty($row['id'])) {
+                    return $row;
+                }
+            }
+        }
+
+        return [];
+    }
+
+    /**
      * Common update order history logic
      *
      * @param array $orderInfo Order information
@@ -1031,25 +1055,47 @@ class PayPalCommon {
     public function updateOrderHistory(array $orderInfo, string $payment_type)
     {
         $payment_info = $orderInfo['payment_info'] ?? [];
+        $payment_row = $this->extractFirstPaymentEntryFromOrderInfo($orderInfo);
+
+        if (($payment_info['amount'] ?? '') === '' && $payment_row !== []) {
+            $payment_info['amount'] = ($payment_row['amount']['value'] ?? '') . ' ' . ($payment_row['amount']['currency_code'] ?? '');
+        }
+        if (($payment_info['payment_type'] ?? '') === '') {
+            $payment_info['payment_type'] = $payment_type;
+        }
+        if (($payment_info['created_date'] ?? '') === '' && isset($payment_row['create_time'])) {
+            $payment_info['created_date'] = (string)$payment_row['create_time'];
+        }
+
         $timestamp = '';
         if (isset($payment_info['created_date']) && $payment_info['created_date'] !== '') {
             $timestamp = 'Timestamp: ' . $payment_info['created_date'] . "\n";
         }
 
         $paypal_order_id = $orderInfo['id'] ?? '';
-        $paypal_payment_id = $orderInfo['purchase_units'][0]['payments']['captures'][0]['id']
-            ?? $orderInfo['purchase_units'][0]['payments']['authorizations'][0]['id']
-            ?? '';
+        $paypal_payment_id = (string)($payment_row['id'] ?? '');
+        if ($paypal_payment_id === '') {
+            $paypal_payment_id = (string)(
+                $orderInfo['purchase_units'][0]['payments']['captures'][0]['id']
+                ?? $orderInfo['purchase_units'][0]['payments']['authorizations'][0]['id']
+                ?? ''
+            );
+        }
+
+        $hist_payment_status = (string)($orderInfo['payment_status'] ?? '');
+        if ($hist_payment_status === '' && $payment_row !== []) {
+            $hist_payment_status = (string)($payment_row['status'] ?? '');
+        }
 
         $message =
             MODULE_PAYMENT_PAYPALAC_PAYMENT_TRANSACTION_ID . (($paypal_payment_id === '') ? 'n/a' : $paypal_payment_id) . "\n" .
             MODULE_PAYMENT_PAYPALAC_PAYPAL_ORDER_ID . (($paypal_order_id === '') ? 'n/a' : $paypal_order_id) . "\n" .
             sprintf(MODULE_PAYMENT_PAYPALAC_TRANSACTION_TYPE, $payment_info['payment_type'] ?? $payment_type) . "\n" .
             $timestamp .
-            MODULE_PAYMENT_PAYPALAC_TRANSACTION_PAYMENT_STATUS . ($orderInfo['payment_status'] ?? '') . "\n" .
+            MODULE_PAYMENT_PAYPALAC_TRANSACTION_PAYMENT_STATUS . $hist_payment_status . "\n" .
             MODULE_PAYMENT_PAYPALAC_TRANSACTION_AMOUNT . ($payment_info['amount'] ?? '') . "\n";
 
-        $payment_source_type = $orderInfo['payment_info']['payment_type'] ?? $payment_type;
+        $payment_source_type = $payment_info['payment_type'] ?? $payment_type;
         $message .= MODULE_PAYMENT_PAYPALAC_FUNDING_SOURCE . $payment_source_type . "\n";
 
         if (!empty($orderInfo['payment_source'][$payment_source_type]['email_address'])) {
