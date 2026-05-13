@@ -837,7 +837,7 @@ class paypalac_googlepay extends base
 
         $txn_type = $this->orderInfo['intent'];
         $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
-        $payment_status = ($payment['status'] !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED) ? $payment['status'] : (($txn_type === 'CAPTURE') ? PayPalAdvancedCheckoutApi::STATUS_CAPTURED : PayPalAdvancedCheckoutApi::STATUS_APPROVED);
+        $payment_status = $this->paypalCommon->deriveZenPaymentStatusForPpacOrder($this->orderInfo, $payment);
 
         // -----
         // If the capture/authorization was declined, denied, or failed, do NOT create the

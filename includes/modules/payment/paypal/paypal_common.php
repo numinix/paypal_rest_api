@@ -1174,6 +1174,45 @@ class PayPalCommon {
     }
 
     /**
+     * Map a PayPal capture/authorization row plus order context to internal payment_status
+     * (CAPTURED vs APPROVED) used when choosing Zen Cart orders_status. PayPal may omit or vary
+     * casing on the top-level intent; a COMPLETED row in the captures collection is always treated
+     * as captured so Final Sale orders do not incorrectly use the "unpaid" pending status.
+     */
+    public function deriveZenPaymentStatusForPpacOrder(array $orderInfo, array $payment): string
+    {
+        $statusRaw = (string)($payment['status'] ?? '');
+        $ps = strtoupper($statusRaw);
+        $pid = (string)($payment['id'] ?? '');
+
+        $captures = $orderInfo['purchase_units'][0]['payments']['captures'] ?? [];
+        if (!is_array($captures)) {
+            $captures = [];
+        }
+        $isCaptureRow = false;
+        foreach ($captures as $c) {
+            if (is_array($c) && (string)($c['id'] ?? '') === $pid) {
+                $isCaptureRow = true;
+                break;
+            }
+        }
+
+        if ($ps === PayPalAdvancedCheckoutApi::STATUS_COMPLETED) {
+            if ($isCaptureRow) {
+                return PayPalAdvancedCheckoutApi::STATUS_CAPTURED;
+            }
+            $intent = strtoupper((string)($orderInfo['intent'] ?? ''));
+            return ($intent === 'CAPTURE') ? PayPalAdvancedCheckoutApi::STATUS_CAPTURED : PayPalAdvancedCheckoutApi::STATUS_APPROVED;
+        }
+
+        if ($isCaptureRow && ($ps === PayPalAdvancedCheckoutApi::STATUS_PARTIALLY_REFUNDED || $ps === PayPalAdvancedCheckoutApi::STATUS_REFUNDED)) {
+            return PayPalAdvancedCheckoutApi::STATUS_CAPTURED;
+        }
+
+        return $statusRaw;
+    }
+
+    /**
      * Process credit card payment (capture or authorize)
      * 
      * @param PayPalAdvancedCheckoutApi $ppr PayPal API instance
