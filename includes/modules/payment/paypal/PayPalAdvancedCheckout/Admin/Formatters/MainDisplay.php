@@ -61,7 +61,7 @@ class MainDisplay
     {
         $this->paypalDbTxns = $paypal_db_txns;
 
-        $this->currencyCode = $paypal_db_txns[0]['mc_currency'];
+        $this->currencyCode = (string)($paypal_db_txns[0]['mc_currency'] ?? '');
         $this->amount = new Amount($this->currencyCode);
 
         $this->mainDisplay =

@@ -19,7 +19,7 @@ class Amount
     ];
     /** @var array */
     protected static $defaultCurrencyCode = [
-        'value' => '',
+        'code' => '',
         'no_decimals' => false,
         'in_country_only' => false,
     ];
@@ -68,6 +68,13 @@ class Amount
             $this->setDefaultCurrency($default_currency_code);
         }
 
+        if (($this->getDefaultCurrencyCode()) === '') {
+            $fallback = (defined('DEFAULT_CURRENCY') && is_string(DEFAULT_CURRENCY) && DEFAULT_CURRENCY !== '')
+                ? DEFAULT_CURRENCY
+                : (defined('MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK') ? MODULE_PAYMENT_PAYPALAC_CURRENCY_FALLBACK : 'USD');
+            $this->setDefaultCurrency((string)$fallback);
+        }
+
         $this->amount['currency_code'] = $this->getDefaultCurrencyCode();
     }
 
@@ -106,8 +113,8 @@ class Amount
 
         self::$defaultCurrencyCode = [
             'code' => $default_currency,
-            'no_decimals' => isset(self::$defaultCurrencyCode[$default_currency]['no_decimals']),
-            'in_country_only' => isset(self::$defaultCurrencyCode[$default_currency]['in_country_only']),
+            'no_decimals' => !empty(self::$supportedCurrencyCodes[$default_currency]['no_decimals']),
+            'in_country_only' => !empty(self::$supportedCurrencyCodes[$default_currency]['in_country_only']),
         ];
 
         $this->amount['currency_code'] = $default_currency;
@@ -120,7 +127,7 @@ class Amount
 
     public function getDefaultCurrencyCode(): string
     {
-        return self::$defaultCurrencyCode['code'];
+        return (string)(self::$defaultCurrencyCode['code'] ?? '');
     }
 
     public function getValueFromFloat(float $value): string
