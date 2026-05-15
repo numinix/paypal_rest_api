@@ -130,7 +130,8 @@ function paypalac_is_subscription_active($subscriptionType, $subscriptionId)
             "SELECT status FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE saved_credit_card_recurring_id = " . (int) $subscriptionId . " LIMIT 1"
         );
         if ($statusResult instanceof queryFactoryResult && $statusResult->RecordCount() > 0) {
-            return strtolower((string) ($statusResult->fields['status'] ?? '')) === 'active';
+            $s = strtolower((string) ($statusResult->fields['status'] ?? ''));
+            return $s === 'active' || $s === 'scheduled';
         }
         return false;
     }
@@ -139,7 +140,8 @@ function paypalac_is_subscription_active($subscriptionType, $subscriptionId)
         "SELECT status FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId . " LIMIT 1"
     );
     if ($statusResult instanceof queryFactoryResult && $statusResult->RecordCount() > 0) {
-        return strtolower((string) ($statusResult->fields['status'] ?? '')) === 'active';
+        $s = strtolower((string) ($statusResult->fields['status'] ?? ''));
+        return $s === 'active' || $s === 'scheduled';
     }
 
     return false;

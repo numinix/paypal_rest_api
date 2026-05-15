@@ -253,9 +253,9 @@ class SubscriptionManager
      * Link pending subscriptions with a newly vaulted payment token and activate them.
      *
      * This method is called when a vault card becomes available (either saved immediately
-     * after order or updated via webhook). It finds all subscriptions that are awaiting
-     * vault for the given customer/order and updates them with the vault information,
-     * changing their status from 'awaiting_vault' to 'active'.
+     * after order or updated via webhook). It finds subscriptions for the given customer/order
+     * that are awaiting vault (or active-but-missing paypal_vault_id from authorize-only checkout)
+     * and updates them with the vault information, setting status to active.
      *
      * @param int $customersId The customer ID
      * @param int $ordersId The order ID
@@ -274,14 +274,16 @@ class SubscriptionManager
 
         global $db;
 
-        // Find all subscriptions for this order that are awaiting vault
+        // Find subscriptions for this order that still need vault linkage (including authorize-only
+        // checkouts that were marked active before paypal_vault_id was assigned).
         $subscriptions = $db->Execute(
             "SELECT paypal_subscription_id, status
                FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . "
               WHERE customers_id = " . (int)$customersId . "
                 AND orders_id = " . (int)$ordersId . "
                 AND (status = '" . zen_db_input(self::STATUS_AWAITING_VAULT) . "'
-                     OR (status = '" . zen_db_input(self::STATUS_PENDING) . "' AND (vault_id IS NULL OR vault_id = '')))
+                     OR (status = '" . zen_db_input(self::STATUS_PENDING) . "' AND (vault_id IS NULL OR vault_id = ''))
+                     OR (status = '" . zen_db_input(self::STATUS_ACTIVE) . "' AND paypal_vault_id = 0))
                 AND paypal_vault_id = 0"
         );
 

@@ -300,27 +300,30 @@ class zcObserverPaypaladvcheckoutRecurring
             } else {
                 // PayPal-managed subscription (has plan_id) -> Save to paypal_subscriptions table
                 $this->log->write("    Product #$ordersProductsId: PayPal-managed subscription (has plan_id), routing to paypal_subscriptions.");
-                
-                $status = SubscriptionManager::STATUS_PENDING;
+
                 $paypalVaultId = 0;
                 $vaultId = '';
-
                 if ($vaultRecord !== null) {
                     $paypalVaultId = (int)($vaultRecord['paypal_vault_id'] ?? 0);
                     $vaultId = (string)($vaultRecord['vault_id'] ?? '');
-                    if ($vaultId === '' || $paypalVaultId === 0) {
-                        // Vault is incomplete or not yet available
-                        $status = SubscriptionManager::STATUS_AWAITING_VAULT;
-                        $this->log->write("    Vault incomplete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: AWAITING_VAULT");
-                    } else {
-                        // Vault is fully available (e.g., using a saved card from a previous order)
-                        // Set status to 'active' immediately instead of 'pending'
-                        $status = SubscriptionManager::STATUS_ACTIVE;
-                        $this->log->write("    Vault complete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: ACTIVE");
-                    }
-                } else {
+                }
+
+                $authorizeIntentCatalog = $this->paypalacCheckoutUsesAuthorizeIntent();
+                if ($vaultRecord === null) {
                     $status = SubscriptionManager::STATUS_AWAITING_VAULT;
                     $this->log->write("    No vault record, status: AWAITING_VAULT");
+                } elseif ($vaultId !== '' && $paypalVaultId > 0) {
+                    $status = SubscriptionManager::STATUS_ACTIVE;
+                    $this->log->write("    Vault complete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: ACTIVE");
+                } elseif ($authorizeIntentCatalog) {
+                    // Authorize-only checkout: order funds are not captured yet, but the subscription
+                    // should still be treated as active in admin. Recurring runs use AUTHORIZE intent
+                    // so staff capture settlements manually (see paypalacSavedCardRecurring::process_rest_payment).
+                    $status = SubscriptionManager::STATUS_ACTIVE;
+                    $this->log->write("    Authorize-only checkout: subscription status ACTIVE for order #$ordersId (vault row present; paypal_vault_id=$paypalVaultId, vault_id len=" . strlen($vaultId) . ').');
+                } else {
+                    $status = SubscriptionManager::STATUS_AWAITING_VAULT;
+                    $this->log->write("    Vault incomplete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: AWAITING_VAULT");
                 }
 
                 $subscriptionId = SubscriptionManager::logSubscription([
@@ -853,5 +856,14 @@ class zcObserverPaypaladvcheckoutRecurring
         
         $savedCreditCardId = $db->Insert_ID();
         $this->log->write("    SUCCESS: Created saved_credit_card record #$savedCreditCardId for vault_id: $vaultId");
+    }
+
+    /**
+     * True when PayPal Advanced Checkout is configured for authorize (not final capture) on checkout.
+     */
+    protected function paypalacCheckoutUsesAuthorizeIntent(): bool
+    {
+        return defined('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE')
+            && MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE !== 'Final Sale';
     }
 }

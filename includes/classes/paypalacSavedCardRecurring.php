@@ -504,7 +504,9 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                if (!(strlen($credential_id) > 0)) {
                        return array('success' => false, 'error' => 'Missing stored credential identifier');
                }
-               // Determine intent based on transaction mode setting - recurring card payments should respect the authorize/capture mode
+               // Determine intent from MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE.
+               // When not Final Sale, recurring uses AUTHORIZE: PayPal places a hold / authorization only;
+               // funds are not settled until staff capture (same as checkout in authorize mode).
                $transaction_mode = defined('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE') ? MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE : 'Final Sale';
                // For card payments, 'Auth Only (All Txns)' and 'Auth Only (Card-Only)' both mean AUTHORIZE
                // 'Final Sale' means CAPTURE
