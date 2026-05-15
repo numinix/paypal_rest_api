@@ -64,7 +64,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.15';
+    protected const CURRENT_VERSION = '1.3.17';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -804,6 +804,29 @@ class paypalac extends base
                          VALUES
                             ('Additional SDK Pages', 'MODULE_PAYMENT_PAYPALAC_SDK_PAGES', '', 'Provide a comma-separated list of additional <code>current_page_base</code> page names that should load the PayPal JS SDK. Core checkout/cart/search and all product-info handlers are always supported by default.', 6, 0, NULL, NULL, now())"
                     );
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.17', '<'): //- Fall through from above
+                    // Remove legacy admin menu / RBAC registration for paypal_subscriptions (cmd=paypal_subscriptions).
+                    $zc150 = (PROJECT_VERSION_MAJOR > 1 || (PROJECT_VERSION_MAJOR == 1 && substr(PROJECT_VERSION_MINOR, 0, 3) >= 5));
+                    if ($zc150 && defined('TABLE_ADMIN_PAGES') && defined('TABLE_ADMIN_PAGES_TO_PROFILES')) {
+                        $db->Execute(
+                            "DELETE ap2p FROM " . TABLE_ADMIN_PAGES_TO_PROFILES . " ap2p
+                              INNER JOIN " . TABLE_ADMIN_PAGES . " ap ON ap.page_key = ap2p.page_key
+                             WHERE ap.main_page = 'FILENAME_PAYPAL_SUBSCRIPTIONS'"
+                        );
+                        $db->Execute(
+                            "DELETE FROM " . TABLE_ADMIN_PAGES . "
+                              WHERE main_page = 'FILENAME_PAYPAL_SUBSCRIPTIONS'"
+                        );
+                        $db->Execute(
+                            "DELETE FROM " . TABLE_ADMIN_PAGES_TO_PROFILES . "
+                              WHERE page_key IN ('paypalSubscriptionsLegacy','paypal_subscriptions','paypalSubscriptions')"
+                        );
+                        $db->Execute(
+                            "DELETE FROM " . TABLE_ADMIN_PAGES . "
+                              WHERE page_key IN ('paypalSubscriptionsLegacy','paypal_subscriptions','paypalSubscriptions')"
+                        );
+                    }
 
                 default:    //- Fall through from above
                     break;
