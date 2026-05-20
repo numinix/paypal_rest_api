@@ -1104,6 +1104,163 @@ class paypalac extends base
             $this->log->write('update_status: Module disabled because the cart mixes a subscription product with one-off items; the PayPal-account flow does not support mixed carts.');
             return;
         }
+
+        // The PayPal Subscriptions API approves one plan per checkout. A cart that
+        // carries more than one subscription line (or qty > 1) cannot be expressed
+        // as a single subscription, so we hide paypalac in that case and let the
+        // customer split the order or pay via paypalac_creditcard / paypalac_savedcard.
+        if (class_exists('\\PayPalAdvancedCheckout\\Common\\SubscriptionCartHelper')) {
+            $cartSummary = \PayPalAdvancedCheckout\Common\SubscriptionCartHelper::summarize();
+            if ($cartSummary['has_subscription'] && !$cartSummary['is_single_subscription_cart']) {
+                $this->enabled = false;
+                $this->log->write('update_status: Module disabled because the cart contains multiple subscription lines or qty>1; PayPal Subscriptions accepts only one plan per approval.');
+                return;
+            }
+        }
+    }
+
+    /**
+     * Resolve a PayPal plan_id for a single-subscription cart. Returns null when
+     * the cart isn't a single-subscription cart, when the product is misconfigured,
+     * or when PayPal rejected the auto-provision request. Callers should fall
+     * back to the regular order path (one-off purchase) on null.
+     *
+     * @return array{plan_id:string,product:array<string,mixed>}|null
+     */
+    protected function resolveSubscriptionPlanForCart(): ?array
+    {
+        if (!class_exists('\\PayPalAdvancedCheckout\\Common\\SubscriptionCartHelper')) {
+            return null;
+        }
+
+        $summary = \PayPalAdvancedCheckout\Common\SubscriptionCartHelper::summarize();
+        if (!$summary['is_single_subscription_cart']) {
+            return null;
+        }
+
+        $product = $summary['subscription_products'][0];
+
+        // Product-attribute-supplied plan id always wins; admins who want a specific
+        // PayPal plan (e.g. one curated outside this store) just set the
+        // paypal_subscription_plan_id attribute on the product.
+        if (!empty($product['has_plan_id']) && $product['plan_id'] !== '') {
+            return ['plan_id' => (string)$product['plan_id'], 'product' => $product];
+        }
+
+        if (!class_exists('\\PayPalAdvancedCheckout\\Common\\PayPalPlanProvisioner')) {
+            require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/Common/PayPalPlanProvisioner.php';
+        }
+        $provisioner = new \PayPalAdvancedCheckout\Common\PayPalPlanProvisioner($this->ppr, $this->log);
+        $planId = $provisioner->provisionPlan($product);
+        if ($planId === null) {
+            $this->log->write('resolveSubscriptionPlanForCart: PayPalPlanProvisioner returned null; cannot route through PayPal Subscriptions.');
+            return null;
+        }
+
+        return ['plan_id' => $planId, 'product' => $product];
+    }
+
+    /**
+     * Build the PayPal subscription create request from the current cart + order
+     * context, call v1/billing/subscriptions, and stash the resulting subscription
+     * id + approval URL in the session. The approval URL is returned so the
+     * caller can issue the customer redirect.
+     *
+     * Returns null on hard failure (network/API error); the caller should kick
+     * the customer back to the payment phase with a message.
+     */
+    protected function createPayPalSubscription(): ?string
+    {
+        $resolved = $this->resolveSubscriptionPlanForCart();
+        if ($resolved === null) {
+            return null;
+        }
+        $planId = $resolved['plan_id'];
+        $subscriptionProduct = $resolved['product'];
+
+        global $order;
+
+        $listenerEndpoint = $this->getListenerEndpoint();
+        $returnUrl = $listenerEndpoint . '?op=sub_return';
+        $cancelUrl = $listenerEndpoint . '?op=sub_cancel';
+
+        $subscriberName = [];
+        if (!empty($order->customer['firstname'])) {
+            $subscriberName['given_name'] = (string)$order->customer['firstname'];
+        }
+        if (!empty($order->customer['lastname'])) {
+            $subscriberName['surname'] = (string)$order->customer['lastname'];
+        }
+
+        $request = [
+            'plan_id' => $planId,
+            'application_context' => [
+                'brand_name' => defined('STORE_NAME') ? STORE_NAME : 'Online Store',
+                'locale' => 'en-US',
+                'shipping_preference' => 'NO_SHIPPING',
+                'user_action' => 'SUBSCRIBE_NOW',
+                'payment_method' => [
+                    'payer_selected' => 'PAYPAL',
+                    'payee_preferred' => 'IMMEDIATE_PAYMENT_REQUIRED',
+                ],
+                'return_url' => $returnUrl,
+                'cancel_url' => $cancelUrl,
+            ],
+        ];
+
+        if (!empty($subscriberName)) {
+            $request['subscriber']['name'] = $subscriberName;
+        }
+        if (!empty($order->customer['email_address'])) {
+            $request['subscriber']['email_address'] = (string)$order->customer['email_address'];
+        }
+
+        $response = $this->ppr->createSubscription($request);
+        if ($response === false) {
+            $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
+            $this->log->write('createPayPalSubscription: createSubscription failed; ' . Logger::logJSON($this->errorInfo->getErrorInfo()));
+            return null;
+        }
+
+        $subscriptionId = (string)($response['id'] ?? '');
+        $approveUrl = '';
+        foreach ($response['links'] ?? [] as $link) {
+            $rel = strtolower((string)($link['rel'] ?? ''));
+            if (in_array($rel, ['approve', 'payer-action'], true)) {
+                $approveUrl = (string)$link['href'];
+                break;
+            }
+        }
+        if ($subscriptionId === '' || $approveUrl === '') {
+            $this->log->write('createPayPalSubscription: response missing id or approval link. ' . Logger::logJSON($response));
+            return null;
+        }
+
+        $_SESSION['PayPalAdvancedCheckout']['Subscription'] = [
+            'id' => $subscriptionId,
+            'plan_id' => $planId,
+            'status' => (string)($response['status'] ?? ''),
+            'approve_url' => $approveUrl,
+            'subscription_product' => $subscriptionProduct,
+            'currency_code' => (string)$subscriptionProduct['currency_code'],
+            'confirmed' => false,
+            'created_at' => date('Y-m-d H:i:s'),
+        ];
+
+        $this->log->write("createPayPalSubscription: provisioned subscription $subscriptionId (plan $planId); approval URL captured.");
+
+        return $approveUrl;
+    }
+
+    /**
+     * True when this checkout cycle is operating against a PayPal-managed
+     * subscription (set up via createPayPalSubscription). Used to skip the
+     * regular order-capture flow in before_process() and to drive the
+     * recurring observer's write to paypal_subscriptions.
+     */
+    protected function hasActivePayPalSubscription(): bool
+    {
+        return !empty($_SESSION['PayPalAdvancedCheckout']['Subscription']['id']);
     }
 
     protected function resetOrder()
@@ -1345,6 +1502,43 @@ class paypalac extends base
         //
         $ppac_type = 'paypal';
         $_SESSION['PayPalAdvancedCheckout']['ppac_type'] = $ppac_type;
+
+        // -----
+        // PayPal-managed subscription branch. When the cart is a single subscription
+        // line, we create a PayPal Subscription (rather than a PayPal Order) so PayPal
+        // can own the billing schedule, payment method, and lifecycle. The customer
+        // is redirected to PayPal's subscription approval URL the same way the
+        // regular flow redirects them to the payer-action URL; the listener handles
+        // the return via op=sub_return.
+        //
+        // If we're already returning from a confirmed subscription approval, fall
+        // through to the rest of the method (which will see Subscription.confirmed
+        // and skip createPayPalOrder).
+        //
+        if (class_exists('\\PayPalAdvancedCheckout\\Common\\SubscriptionCartHelper')) {
+            $cartSummary = \PayPalAdvancedCheckout\Common\SubscriptionCartHelper::summarize();
+            if ($cartSummary['is_single_subscription_cart']) {
+                if (!empty($_SESSION['PayPalAdvancedCheckout']['Subscription']['confirmed'])) {
+                    $this->log->write('pre_confirmation_check, subscription already confirmed; proceeding to confirmation page.', true, 'after');
+                    return;
+                }
+
+                $approveUrl = $this->createPayPalSubscription();
+                if ($approveUrl === null) {
+                    $this->sendAlertEmail(
+                        MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN,
+                        'createPayPalSubscription failed. ' . Logger::logJSON($this->errorInfo->getErrorInfo())
+                    );
+                    $this->setMessageAndRedirect(
+                        sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALAC_TEXT_TITLE, 'SUBSCRIPTION_CREATE'),
+                        FILENAME_CHECKOUT_PAYMENT
+                    );
+                }
+
+                $this->log->write('pre_confirmation_check, redirecting to PayPal for subscription approval.', true, 'after');
+                zen_redirect($approveUrl);
+            }
+        }
 
         // -----
         // Build the *inital* request for the PayPal order's "Create" and send to off to PayPal.
@@ -2144,6 +2338,52 @@ class paypalac extends base
         // the checkCardPaymentResponse method.
         //
         $this->paymentIsPending = false;
+
+        // -----
+        // PayPal-managed subscription path. When the cart was approved as a subscription
+        // (Subscription.confirmed set by ppac_listener after PayPal's return), we don't
+        // capture an Order: PayPal will independently bill the customer on activation
+        // and send PAYMENT.SALE.COMPLETED via webhook. We verify the subscription is
+        // approved/active at PayPal, hold the order in "subscription pending" status,
+        // and let the recurring observer write the paypal_subscriptions row.
+        //
+        if ($this->hasActivePayPalSubscription()) {
+            $subscriptionId = (string)($_SESSION['PayPalAdvancedCheckout']['Subscription']['id'] ?? '');
+            $subscriptionStatus = $this->ppr->getSubscription($subscriptionId);
+            if ($subscriptionStatus === false || !is_array($subscriptionStatus)) {
+                $this->log->write('before_process: getSubscription failed for ' . $subscriptionId . '; ' . Logger::logJSON($this->ppr->getErrorInfo()));
+                unset($_SESSION['PayPalAdvancedCheckout']['Subscription'], $_SESSION['payment']);
+                $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
+            }
+
+            $remoteStatus = strtoupper((string)($subscriptionStatus['status'] ?? ''));
+            if (!in_array($remoteStatus, ['APPROVAL_PENDING', 'APPROVED', 'ACTIVE'], true)) {
+                $this->log->write("before_process: subscription $subscriptionId status is $remoteStatus; cannot finalize order.");
+                unset($_SESSION['PayPalAdvancedCheckout']['Subscription'], $_SESSION['payment']);
+                $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH, FILENAME_CHECKOUT_PAYMENT);
+            }
+
+            $_SESSION['PayPalAdvancedCheckout']['Subscription']['status'] = $remoteStatus;
+
+            // Mark the order pending until BILLING.SUBSCRIPTION.ACTIVATED arrives;
+            // see BillingSubscriptionActivated webhook handler for the flip to paid.
+            $pendingStatus = defined('MODULE_PAYMENT_PAYPALAC_HELD_STATUS_ID') ? (int)MODULE_PAYMENT_PAYPALAC_HELD_STATUS_ID : 0;
+            if ($pendingStatus > 0) {
+                $this->order_status = $pendingStatus;
+                $order->info['order_status'] = $pendingStatus;
+            }
+            $this->paymentIsPending = true;
+
+            // Stash a minimal orderInfo so after_order_create has something to log.
+            $this->orderInfo = [
+                'id' => $subscriptionId,
+                'status' => $remoteStatus,
+                'payment_source' => ['paypal_subscription' => ['subscription_id' => $subscriptionId]],
+            ];
+
+            $this->log->write("before_process: paypal subscription $subscriptionId status=$remoteStatus; skipping capture, marking order pending activation.");
+            return;
+        }
 
         // -----
         // Since this module is wallet-only, the payment source must be 'paypal'.

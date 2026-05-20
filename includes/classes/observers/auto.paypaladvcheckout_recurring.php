@@ -124,6 +124,20 @@ class zcObserverPaypaladvcheckoutRecurring
 
         global $db, $zco_notifier;
 
+        // PayPal-managed subscription branch: when paypalac::createPayPalSubscription
+        // ran during pre_confirmation_check and the customer approved at PayPal, the
+        // session carries the PayPal subscription remote id (I-XXXXXX) plus the
+        // resolved subscription_product config. Persist a paypal_subscriptions row
+        // tagged with paypal_subscription_remote_id and skip the Zen Cart-managed
+        // (saved_credit_cards_recurring) path: PayPal owns the billing schedule
+        // from here on, BILLING.SUBSCRIPTION.ACTIVATED will flip the order paid,
+        // and PAYMENT.SALE.COMPLETED reports each recurring payment via webhook.
+        if (!empty($_SESSION['PayPalAdvancedCheckout']['Subscription']['confirmed'])) {
+            $this->logPayPalManagedSubscription($ordersId);
+            unset($_SESSION['PayPalAdvancedCheckout']['Subscription']);
+            return;
+        }
+
         $orderInfo = $db->Execute(
             "SELECT customers_id, currency, currency_value,
                     billing_name, billing_company,
@@ -239,129 +253,74 @@ class zcObserverPaypaladvcheckoutRecurring
             
             $this->log->write("    Product #$ordersProductsId: Valid subscription attributes extracted: " . Logger::logJSON($subscriptionAttributes));
 
-            // Check if this is a Zen Cart-managed subscription (no plan_id)
-            // If so, use saved_credit_cards_recurring table instead of vaulted subscriptions
+            // Legacy saved-card / Zen Cart-managed subscriptions are no longer created during checkout.
+            // Only PayPal-managed subscriptions (products that carry a paypal_subscription_plan_id
+            // attribute) are routed below to TABLE_PAYPAL_SUBSCRIPTIONS.
             $hasPlanId = !empty($subscriptionAttributes['plan_id']);
-            
+
             if (!$hasPlanId) {
-                // Zen Cart-managed subscription -> Save to saved_credit_cards_recurring table
-                $this->log->write("    Product #$ordersProductsId: Zen Cart-managed subscription (no plan_id), routing to saved_credit_cards_recurring.");
-                
-                // Ensure saved_credit_cards_recurring table and billing address columns exist
-                // This must be called unconditionally because the table constants are always defined
-                // in extra_datafiles/ppac_database_tables.php, so conditional checks won't work
-                if (class_exists('PayPalAdvancedCheckout\\Common\\SavedCreditCardsManager')) {
-                    \PayPalAdvancedCheckout\Common\SavedCreditCardsManager::ensureSchema();
-                }
-                
-                $savedCreditCardId = $this->getSavedCreditCardId($vaultRecord);
-                if ($savedCreditCardId === 0) {
-                    $this->log->write("    WARNING: No saved_credit_card_id found for vault, subscription cannot be created yet.");
-                    $products->MoveNext();
-                    continue;
-                }
-                
-                // Calculate next billing date
-                $nextBillingDate = $this->calculateNextBillingDate($subscriptionAttributes);
-                
-                // Create subscription using saved card recurring class
-                if (!class_exists('paypalacSavedCardRecurring')) {
-                    $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
-                    if (file_exists($savedCardRecurringPath)) {
-                        require_once $savedCardRecurringPath;
-                    }
-                }
-                if (!class_exists('paypalacSavedCardRecurring')) {
-                    $this->log->write("    ERROR: paypalacSavedCardRecurring class not available.");
-                    $products->MoveNext();
-                    continue;
-                }
-                
-                $savedCardRecurring = new paypalacSavedCardRecurring();
-                $subscriptionId = $savedCardRecurring->schedule_payment(
-                    (float)$products->fields['final_price'],
-                    $nextBillingDate,
-                    $savedCreditCardId,
-                    $ordersProductsId,
-                    'Subscription created from order #' . $ordersId,
-                    array_merge([
-                        'customers_id' => $customersId,
-                        'orders_id' => $ordersId,
-                        'products_id' => (int)$products->fields['products_id'],
-                        'products_name' => (string)$products->fields['products_name'],
-                        'currency_code' => $currency,
-                        'billing_period' => $subscriptionAttributes['billing_period'],
-                        'billing_frequency' => $subscriptionAttributes['billing_frequency'],
-                        'total_billing_cycles' => $subscriptionAttributes['total_billing_cycles'],
-                        'subscription_attributes' => $attributeMap,
-                    ], $billingAddress, $shippingInfo) // Include billing address and shipping info from order
-                );
-                
-                if ($subscriptionId > 0) {
-                    $loggedAny = true;
-                    $this->log->write("    SUCCESS: Saved card subscription #$subscriptionId created for product #$ordersProductsId.");
-                } else {
-                    $this->log->write("    ERROR: Failed to create saved card subscription for product #$ordersProductsId.");
-                }
+                $this->log->write("    Product #$ordersProductsId: No paypal_subscription_plan_id attribute on this product; legacy saved-card subscription creation is disabled. Skipping subscription record for this line item.");
+                $products->MoveNext();
+                continue;
+            }
+
+            // PayPal-managed subscription (has plan_id) -> Save to paypal_subscriptions table
+            $this->log->write("    Product #$ordersProductsId: PayPal-managed subscription (has plan_id), routing to paypal_subscriptions.");
+
+            $paypalVaultId = 0;
+            $vaultId = '';
+            if ($vaultRecord !== null) {
+                $paypalVaultId = (int)($vaultRecord['paypal_vault_id'] ?? 0);
+                $vaultId = (string)($vaultRecord['vault_id'] ?? '');
+            }
+
+            $authorizeIntentCatalog = $this->paypalacCheckoutUsesAuthorizeIntent();
+            if ($vaultRecord === null) {
+                $status = SubscriptionManager::STATUS_AWAITING_VAULT;
+                $this->log->write("    No vault record, status: AWAITING_VAULT");
+            } elseif ($vaultId !== '' && $paypalVaultId > 0) {
+                $status = SubscriptionManager::STATUS_ACTIVE;
+                $this->log->write("    Vault complete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: ACTIVE");
+            } elseif ($authorizeIntentCatalog) {
+                // Authorize-only checkout: order funds are not captured yet, but the subscription
+                // should still be treated as active in admin. Recurring runs use AUTHORIZE intent
+                // so staff capture settlements manually.
+                $status = SubscriptionManager::STATUS_ACTIVE;
+                $this->log->write("    Authorize-only checkout: subscription status ACTIVE for order #$ordersId (vault row present; paypal_vault_id=$paypalVaultId, vault_id len=" . strlen($vaultId) . ').');
             } else {
-                // PayPal-managed subscription (has plan_id) -> Save to paypal_subscriptions table
-                $this->log->write("    Product #$ordersProductsId: PayPal-managed subscription (has plan_id), routing to paypal_subscriptions.");
+                $status = SubscriptionManager::STATUS_AWAITING_VAULT;
+                $this->log->write("    Vault incomplete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: AWAITING_VAULT");
+            }
 
-                $paypalVaultId = 0;
-                $vaultId = '';
-                if ($vaultRecord !== null) {
-                    $paypalVaultId = (int)($vaultRecord['paypal_vault_id'] ?? 0);
-                    $vaultId = (string)($vaultRecord['vault_id'] ?? '');
-                }
+            $subscriptionId = SubscriptionManager::logSubscription([
+                'customers_id' => $customersId,
+                'orders_id' => $ordersId,
+                'orders_products_id' => $ordersProductsId,
+                'products_id' => (int)$products->fields['products_id'],
+                'products_name' => (string)$products->fields['products_name'],
+                'products_quantity' => (float)$products->fields['products_quantity'],
+                'plan_id' => $subscriptionAttributes['plan_id'],
+                'billing_period' => $subscriptionAttributes['billing_period'],
+                'billing_frequency' => $subscriptionAttributes['billing_frequency'],
+                'total_billing_cycles' => $subscriptionAttributes['total_billing_cycles'],
+                'trial_period' => $subscriptionAttributes['trial_period'],
+                'trial_frequency' => $subscriptionAttributes['trial_frequency'],
+                'trial_total_cycles' => $subscriptionAttributes['trial_total_cycles'],
+                'setup_fee' => $subscriptionAttributes['setup_fee'],
+                'amount' => (float)$products->fields['final_price'],
+                'currency_code' => $currency,
+                'currency_value' => $currencyValue,
+                'paypal_vault_id' => $paypalVaultId,
+                'vault_id' => $vaultId,
+                'status' => $status,
+                'attributes' => $attributeMap,
+            ]);
 
-                $authorizeIntentCatalog = $this->paypalacCheckoutUsesAuthorizeIntent();
-                if ($vaultRecord === null) {
-                    $status = SubscriptionManager::STATUS_AWAITING_VAULT;
-                    $this->log->write("    No vault record, status: AWAITING_VAULT");
-                } elseif ($vaultId !== '' && $paypalVaultId > 0) {
-                    $status = SubscriptionManager::STATUS_ACTIVE;
-                    $this->log->write("    Vault complete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: ACTIVE");
-                } elseif ($authorizeIntentCatalog) {
-                    // Authorize-only checkout: order funds are not captured yet, but the subscription
-                    // should still be treated as active in admin. Recurring runs use AUTHORIZE intent
-                    // so staff capture settlements manually (see paypalacSavedCardRecurring::process_rest_payment).
-                    $status = SubscriptionManager::STATUS_ACTIVE;
-                    $this->log->write("    Authorize-only checkout: subscription status ACTIVE for order #$ordersId (vault row present; paypal_vault_id=$paypalVaultId, vault_id len=" . strlen($vaultId) . ').');
-                } else {
-                    $status = SubscriptionManager::STATUS_AWAITING_VAULT;
-                    $this->log->write("    Vault incomplete (paypal_vault_id=$paypalVaultId, vault_id=$vaultId), status: AWAITING_VAULT");
-                }
-
-                $subscriptionId = SubscriptionManager::logSubscription([
-                    'customers_id' => $customersId,
-                    'orders_id' => $ordersId,
-                    'orders_products_id' => $ordersProductsId,
-                    'products_id' => (int)$products->fields['products_id'],
-                    'products_name' => (string)$products->fields['products_name'],
-                    'products_quantity' => (float)$products->fields['products_quantity'],
-                    'plan_id' => $subscriptionAttributes['plan_id'],
-                    'billing_period' => $subscriptionAttributes['billing_period'],
-                    'billing_frequency' => $subscriptionAttributes['billing_frequency'],
-                    'total_billing_cycles' => $subscriptionAttributes['total_billing_cycles'],
-                    'trial_period' => $subscriptionAttributes['trial_period'],
-                    'trial_frequency' => $subscriptionAttributes['trial_frequency'],
-                    'trial_total_cycles' => $subscriptionAttributes['trial_total_cycles'],
-                    'setup_fee' => $subscriptionAttributes['setup_fee'],
-                    'amount' => (float)$products->fields['final_price'],
-                    'currency_code' => $currency,
-                    'currency_value' => $currencyValue,
-                    'paypal_vault_id' => $paypalVaultId,
-                    'vault_id' => $vaultId,
-                    'status' => $status,
-                    'attributes' => $attributeMap,
-                ]);
-
-                if ($subscriptionId > 0) {
-                    $loggedAny = true;
-                    $this->log->write("    SUCCESS: Vaulted subscription #$subscriptionId created for product #$ordersProductsId.");
-                } else {
-                    $this->log->write("    ERROR: Failed to create vaulted subscription for product #$ordersProductsId.");
-                }
+            if ($subscriptionId > 0) {
+                $loggedAny = true;
+                $this->log->write("    SUCCESS: Vaulted subscription #$subscriptionId created for product #$ordersProductsId.");
+            } else {
+                $this->log->write("    ERROR: Failed to create vaulted subscription for product #$ordersProductsId.");
             }
 
             $products->MoveNext();
@@ -709,6 +668,95 @@ class zcObserverPaypaladvcheckoutRecurring
      * (paypalac, paypalac_creditcard, paypalac_savedcard, paypalac_applepay,
      * paypalac_googlepay, paypalac_venmo, paypalac_paylater).
      */
+    /**
+     * Persist a paypal_subscriptions row for a PayPal-managed subscription that
+     * the customer just approved during checkout. We use the resolved
+     * subscription_product from the session (set by
+     * paypalac::resolveSubscriptionPlanForCart()) to seed the row's billing
+     * metadata. The orders_products_id of the matching line item is attached
+     * so the admin manager can join cleanly.
+     */
+    protected function logPayPalManagedSubscription(int $ordersId): void
+    {
+        $sessionSubscription = $_SESSION['PayPalAdvancedCheckout']['Subscription'] ?? [];
+        $remoteId = (string)($sessionSubscription['id'] ?? '');
+        if ($remoteId === '') {
+            $this->log->write('    PayPal subscription session present but no remote id; nothing logged.');
+            return;
+        }
+
+        $product = $sessionSubscription['subscription_product'] ?? [];
+        $productsId = (int)($product['products_id'] ?? 0);
+        if ($productsId <= 0) {
+            $this->log->write('    PayPal subscription session present but no products_id; nothing logged.');
+            return;
+        }
+
+        global $db;
+
+        // Look up the matching orders_products row so we can attach the
+        // orders_products_id; if absent we still log against orders_id.
+        $orderProductRow = $db->Execute(
+            "SELECT orders_products_id, products_name, products_quantity, final_price"
+            . " FROM " . TABLE_ORDERS_PRODUCTS
+            . " WHERE orders_id = " . (int)$ordersId
+            . " AND products_id = " . (int)$productsId
+            . " LIMIT 1"
+        );
+
+        $ordersProductsId = 0;
+        $productsName = (string)($product['products_name'] ?? '');
+        $productsQuantity = 1.0;
+        $finalPrice = (float)($product['amount'] ?? 0);
+
+        if (is_object($orderProductRow) && !$orderProductRow->EOF) {
+            $ordersProductsId = (int)$orderProductRow->fields['orders_products_id'];
+            $productsName = (string)($orderProductRow->fields['products_name'] ?? $productsName);
+            $productsQuantity = (float)($orderProductRow->fields['products_quantity'] ?? $productsQuantity);
+            $finalPrice = (float)($orderProductRow->fields['final_price'] ?? $finalPrice);
+        }
+
+        $orderRow = $db->Execute(
+            "SELECT customers_id, currency, currency_value"
+            . " FROM " . TABLE_ORDERS
+            . " WHERE orders_id = " . (int)$ordersId
+            . " LIMIT 1"
+        );
+        $customersId = is_object($orderRow) && !$orderRow->EOF ? (int)$orderRow->fields['customers_id'] : 0;
+        $currencyCode = is_object($orderRow) && !$orderRow->EOF ? (string)$orderRow->fields['currency'] : (string)($product['currency_code'] ?? 'USD');
+        $currencyValue = is_object($orderRow) && !$orderRow->EOF ? (float)$orderRow->fields['currency_value'] : 1.0;
+
+        $subscriptionRecordId = SubscriptionManager::logSubscription([
+            'customers_id' => $customersId,
+            'orders_id' => $ordersId,
+            'orders_products_id' => $ordersProductsId,
+            'products_id' => $productsId,
+            'products_name' => $productsName,
+            'products_quantity' => $productsQuantity,
+            'plan_id' => (string)($sessionSubscription['plan_id'] ?? ''),
+            'paypal_subscription_remote_id' => $remoteId,
+            'billing_period' => (string)($product['billing_period'] ?? ''),
+            'billing_frequency' => (int)($product['billing_frequency'] ?? 0),
+            'total_billing_cycles' => (int)($product['total_billing_cycles'] ?? 0),
+            'trial_period' => (string)($product['trial_period'] ?? ''),
+            'trial_frequency' => (int)($product['trial_frequency'] ?? 0),
+            'trial_total_cycles' => (int)($product['trial_total_cycles'] ?? 0),
+            'setup_fee' => (float)($product['setup_fee'] ?? 0),
+            'amount' => $finalPrice > 0 ? $finalPrice : (float)($product['amount'] ?? 0),
+            'currency_code' => $currencyCode,
+            'currency_value' => $currencyValue,
+            'paypal_vault_id' => 0,
+            'vault_id' => '',
+            'status' => 'pending', // BILLING.SUBSCRIPTION.ACTIVATED webhook flips this to active
+        ]);
+
+        $this->log->write(
+            "    Logged PayPal-managed subscription row #$subscriptionRecordId for order #$ordersId"
+            . " (remote $remoteId, plan " . ($sessionSubscription['plan_id'] ?? '?')
+            . ", product $productsId)."
+        );
+    }
+
     protected function orderUsesPaypalacFamilyModule(int $ordersId): bool
     {
         if ($ordersId <= 0) {

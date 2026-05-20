@@ -42,7 +42,7 @@ if (strpos(MODULE_PAYMENT_PAYPALAC_DEBUGGING, 'Log') !== false) {
 }
 $logger->write("ppac_listener ($op, " . MODULE_PAYMENT_PAYPALAC_SERVER . ") starts.\n" . Logger::logJSON($_GET), true, 'before');
 
-$valid_operations = ['cancel', 'return', '3ds_cancel', '3ds_return'];
+$valid_operations = ['cancel', 'return', '3ds_cancel', '3ds_return', 'sub_return', 'sub_cancel'];
 if (!in_array($op, $valid_operations, true)) {
     unset($_SESSION['PayPalAdvancedCheckout']['Order']);
     $zco_notifier->notify('NOTIFY_PPR_LISTENER_UNKNOWN_OPERATION', ['op' => $op]);
@@ -63,6 +63,60 @@ if (!in_array($op, $valid_operations, true)) {
 if ($op === 'cancel' || $op === '3ds_cancel') {
     unset($_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']);
     zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
+}
+
+// -----
+// PayPal-managed subscription branch. When op == sub_return / sub_cancel the
+// customer is returning from PayPal's Subscriptions approval page. The token
+// PayPal sends is subscription_id, not order id. We validate it against the
+// session, mark Subscription.confirmed, and redirect to checkout_confirmation
+// so the customer can finalize the order. Cancel returns the customer to the
+// payment phase with the session cleared.
+//
+if ($op === 'sub_cancel') {
+    unset($_SESSION['PayPalAdvancedCheckout']['Subscription']);
+    $logger->write('ppac_listener: subscription cancelled by customer at PayPal; redirecting to checkout_payment.', true, 'after');
+    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
+}
+
+if ($op === 'sub_return') {
+    $incomingSubscriptionId = (string)($_GET['subscription_id'] ?? $_GET['token'] ?? '');
+    $sessionSubscriptionId = (string)($_SESSION['PayPalAdvancedCheckout']['Subscription']['id'] ?? '');
+
+    if ($incomingSubscriptionId === '' || $incomingSubscriptionId !== $sessionSubscriptionId) {
+        $logger->write(
+            'ppac_listener: subscription return token mismatch (got "' . $incomingSubscriptionId
+            . '", session has "' . $sessionSubscriptionId . '"); redirecting to default.',
+            true,
+            'after'
+        );
+        unset($_SESSION['PayPalAdvancedCheckout']['Subscription']);
+        zen_redirect(zen_href_link(FILENAME_DEFAULT));
+    }
+
+    // Verify status at PayPal before passing the customer to checkout_confirmation.
+    require DIR_WS_MODULES . 'payment/paypalac.php';
+    [$client_id, $secret] = paypalac::getEnvironmentInfo();
+    $ppr = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER, $client_id, $secret);
+    $subscriptionStatusResponse = $ppr->getSubscription($incomingSubscriptionId);
+    if (!is_array($subscriptionStatusResponse) || !isset($subscriptionStatusResponse['status'])) {
+        $logger->write('ppac_listener: getSubscription failed on return; redirecting to shopping cart.', true, 'after');
+        unset($_SESSION['PayPalAdvancedCheckout']['Subscription']);
+        zen_redirect(zen_href_link(FILENAME_SHOPPING_CART));
+    }
+
+    $remoteStatus = strtoupper((string)$subscriptionStatusResponse['status']);
+    if (!in_array($remoteStatus, ['APPROVAL_PENDING', 'APPROVED', 'ACTIVE'], true)) {
+        $logger->write("ppac_listener: subscription $incomingSubscriptionId returned with unexpected status $remoteStatus; redirecting to checkout_payment.", true, 'after');
+        unset($_SESSION['PayPalAdvancedCheckout']['Subscription']);
+        zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
+    }
+
+    $_SESSION['PayPalAdvancedCheckout']['Subscription']['status'] = $remoteStatus;
+    $_SESSION['PayPalAdvancedCheckout']['Subscription']['confirmed'] = true;
+
+    $logger->write("ppac_listener: subscription $incomingSubscriptionId approved (status=$remoteStatus); redirecting to checkout_confirmation.", true, 'after');
+    zen_redirect(zen_href_link(FILENAME_CHECKOUT_CONFIRMATION, '', 'SSL'));
 }
 
 if ($op === 'return' && (!isset($_GET['token'], $_SESSION['PayPalAdvancedCheckout']['Order']['id']) || $_GET['token'] !== $_SESSION['PayPalAdvancedCheckout']['Order']['id'])) {
