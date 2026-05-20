@@ -12,6 +12,9 @@ if (!defined('TABLE_PAYPAL_VAULT')) {
 if (!defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
     define('TABLE_PAYPAL_SUBSCRIPTIONS', DB_PREFIX . 'paypal_subscriptions');
 }
+if (!defined('TABLE_PAYPAL_PLAN_CACHE')) {
+    define('TABLE_PAYPAL_PLAN_CACHE', DB_PREFIX . 'paypal_plan_cache');
+}
 if (!defined('TABLE_PAYPAL_RECURRING')) {
     /**
      * Keep legacy recurring scripts pointed at the REST-managed subscription table

@@ -12,6 +12,9 @@ if (!defined('TABLE_PAYPAL_VAULT')) {
 if (!defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
     define('TABLE_PAYPAL_SUBSCRIPTIONS', DB_PREFIX . 'paypal_subscriptions');
 }
+if (!defined('TABLE_PAYPAL_PLAN_CACHE')) {
+    define('TABLE_PAYPAL_PLAN_CACHE', DB_PREFIX . 'paypal_plan_cache');
+}
 if (!defined('TABLE_PAYPAL_RECURRING')) {
     /**
      * Legacy recurring components expect this constant; map it to the REST-managed subscriptions table
