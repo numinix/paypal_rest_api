@@ -646,7 +646,7 @@ class zcObserverPaypaladvcheckoutRecurring
         // that to find the correct vault record without risk of accidentally associating
         // a subscription with an unrelated payment instrument.
         $sessionVaultId = (string)($_SESSION['PayPalAdvancedCheckout']['saved_card'] ?? '');
-        if ($sessionVaultId !== '') {
+        if ($sessionVaultId !== '' && $sessionVaultId !== 'new') {
             foreach ($records as $record) {
                 if ((string)($record['vault_id'] ?? '') === $sessionVaultId) {
                     $this->log->write("    Found vault record via session saved_card vault_id: $sessionVaultId (originally linked to order #" . ($record['orders_id'] ?? 0) . ")");
@@ -656,11 +656,80 @@ class zcObserverPaypaladvcheckoutRecurring
             $this->log->write("    Session has saved_card vault_id $sessionVaultId but no matching vault record found for customer #$customersId.");
         }
 
-        // Do not fall back to arbitrary vault records - this would incorrectly associate
-        // a subscription with a payment method from a different order.
-        // For example, a customer paying with Google Pay should not have their
-        // subscription linked to a saved credit card from a previous order.
+        // Final fallback for paypalac-family orders: if the customer has active vaulted
+        // cards but none specifically match this order, use the most recently used active
+        // vault. This is needed because the PayPal Smart Buttons flow does not always
+        // populate session VaultCardData or the saved-card selector before the
+        // AFTER_ORDER_CREATE_ADD_PRODUCTS notification fires (timing/UX variability),
+        // which would otherwise leave the subscription row unwritten even though the
+        // customer has stored payment methods we can charge against.
+        //
+        // We restrict this fallback to paypalac-family payment modules so that a
+        // subscription is never silently linked to a vault belonging to an unrelated
+        // payment instrument (e.g. a one-off card the customer entered for a different
+        // order).
+        if ($this->orderUsesPaypalacFamilyModule($ordersId)) {
+            $bestRecord = null;
+            $bestTimestamp = '';
+            foreach ($records as $record) {
+                $status = strtoupper((string)($record['status'] ?? ''));
+                if (!in_array($status, ['VAULTED', 'ACTIVE', 'APPROVED'], true)) {
+                    continue;
+                }
+                if ((int)($record['visible'] ?? 1) !== 1) {
+                    continue;
+                }
+                $timestamp = (string)($record['last_used'] ?? $record['last_modified'] ?? $record['date_added'] ?? '');
+                if ($bestRecord === null || strcmp($timestamp, $bestTimestamp) > 0) {
+                    $bestRecord = $record;
+                    $bestTimestamp = $timestamp;
+                }
+            }
+            if ($bestRecord !== null) {
+                $this->log->write(
+                    "    Found vault record via paypalac-family fallback: vault #"
+                    . ($bestRecord['paypal_vault_id'] ?? '?')
+                    . " (most recently used active vault for customer #$customersId, originally linked to order #"
+                    . ($bestRecord['orders_id'] ?? 0)
+                    . ")."
+                );
+                return $bestRecord;
+            }
+        }
+
+        // Do not fall back to arbitrary vault records when the payment module is not
+        // part of the paypalac family. This guards against incorrectly associating a
+        // subscription with a payment method from a different order (e.g. a Google Pay
+        // token stored from a one-off purchase).
         return null;
+    }
+
+    /**
+     * Determine whether the order was paid with one of the paypalac-family modules
+     * (paypalac, paypalac_creditcard, paypalac_savedcard, paypalac_applepay,
+     * paypalac_googlepay, paypalac_venmo, paypalac_paylater).
+     */
+    protected function orderUsesPaypalacFamilyModule(int $ordersId): bool
+    {
+        if ($ordersId <= 0) {
+            return false;
+        }
+
+        global $db;
+
+        $result = $db->Execute(
+            "SELECT payment_module_code"
+            . " FROM " . TABLE_ORDERS
+            . " WHERE orders_id = " . (int)$ordersId
+            . " LIMIT 1"
+        );
+
+        if (!is_object($result) || $result->EOF) {
+            return false;
+        }
+
+        $module = strtolower((string)$result->fields['payment_module_code']);
+        return $module === 'paypalac' || strpos($module, 'paypalac_') === 0;
     }
 
     protected function normalizeAttributeKey(string $label): string
