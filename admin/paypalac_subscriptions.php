@@ -148,10 +148,20 @@ function paypalac_is_subscription_active($subscriptionType, $subscriptionId)
 }
 
 /**
- * This admin page now manages REST subscriptions only.
+ * Normalize a request-provided subscription type to one of the supported values.
+ *
+ * This admin page manages both PayPal REST API subscriptions
+ * (TABLE_PAYPAL_SUBSCRIPTIONS) and Zen Cart-managed saved-card subscriptions
+ * (TABLE_SAVED_CREDIT_CARDS_RECURRING). Action handlers branch on the return
+ * value of this function, so a stubbed-out implementation would silently route
+ * every saved-card cancel/suspend/reactivate request to the REST table.
  */
 function paypalac_normalize_subscription_type($subscriptionType)
 {
+    $subscriptionType = strtolower(trim((string) $subscriptionType));
+    if ($subscriptionType === 'savedcard' || $subscriptionType === 'saved_card' || $subscriptionType === 'saved-card') {
+        return 'savedcard';
+    }
     return 'rest';
 }
 
@@ -712,16 +722,34 @@ if ($action === 'cancel_subscription') {
     if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
         $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
         $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'cancelled', 'Cancelled by admin');
-        
+
         $subscription = $paypalacSavedCardRecurring->get_payment_details($subscriptionId);
         if ($subscription && method_exists($paypalacSavedCardRecurring, 'remove_group_pricing')) {
             $paypalacSavedCardRecurring->remove_group_pricing($subscription['customers_id'], $subscription['products_id']);
         }
-        
+
+        // If this saved-card row is also linked to a PayPal-managed plan/profile
+        // (rare but possible when a subscription was migrated to PayPal), cancel
+        // the remote subscription too so PayPal stops billing the customer.
+        $savedCardProfileId = '';
+        if (is_array($subscription) && isset($subscription['profile_id'])) {
+            $savedCardProfileId = trim((string) $subscription['profile_id']);
+        }
+        if ($savedCardProfileId !== '') {
+            $profileManager = paypalac_get_profile_manager();
+            if ($profileManager !== null) {
+                try {
+                    $profileManager->cancelProfile(['profile_id' => $savedCardProfileId]);
+                } catch (Exception $e) {
+                    error_log('Failed to cancel linked PayPal profile for saved-card subscription #' . $subscriptionId . ': ' . $e->getMessage());
+                }
+            }
+        }
+
         $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
         zen_redirect($redirectUrl);
     }
-    
+
     // Update local status for REST subscriptions
     zen_db_perform(
         TABLE_PAYPAL_SUBSCRIPTIONS,
@@ -729,12 +757,12 @@ if ($action === 'cancel_subscription') {
         'update',
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
-    
-    // Try to cancel via PayPal API if profile_id exists
+
+    // Try to cancel via PayPal API if plan_id exists
     $subscription = $db->Execute(
         "SELECT plan_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId
     );
-    
+
     if ($subscription->RecordCount() > 0 && !empty($subscription->fields['plan_id'])) {
         $profileManager = paypalac_get_profile_manager();
         if ($profileManager !== null) {
@@ -746,7 +774,7 @@ if ($action === 'cancel_subscription') {
             }
         }
     }
-    
+
     $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
     zen_redirect($redirectUrl);
 }
