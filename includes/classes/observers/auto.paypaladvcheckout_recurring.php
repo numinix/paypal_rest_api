@@ -207,6 +207,10 @@ class zcObserverPaypaladvcheckoutRecurring
             return;
         }
 
+        // init_observers loads this class before auto.paypaladvcheckout_vault.php (alphabetical order),
+        // so session VaultCardData may not be in paypal_vault yet when this handler runs.
+        $this->ensureSessionVaultPersistedForOrder($ordersId, $customersId);
+
         $vaultRecord = $this->findVaultRecord($customersId, $ordersId);
         $loggedAny = false;
         
@@ -281,6 +285,8 @@ class zcObserverPaypaladvcheckoutRecurring
                     $ordersProductsId,
                     'Subscription created from order #' . $ordersId,
                     array_merge([
+                        'customers_id' => $customersId,
+                        'orders_id' => $ordersId,
                         'products_id' => (int)$products->fields['products_id'],
                         'products_name' => (string)$products->fields['products_name'],
                         'currency_code' => $currency,
@@ -570,6 +576,40 @@ class zcObserverPaypaladvcheckoutRecurring
         $normalized = preg_replace('/[^0-9\.-]/', '', $normalized) ?? '';
 
         return (float)$normalized;
+    }
+
+    /**
+     * Persist PayPal vault token from session before findVaultRecord(), matching auto.paypaladvcheckout_vault.
+     * Required because this observer often runs first on NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_CREATE_ADD_PRODUCTS.
+     *
+     * @return void
+     */
+    protected function ensureSessionVaultPersistedForOrder(int $ordersId, int $customersId): void
+    {
+        if ($ordersId <= 0 || $customersId <= 0) {
+            return;
+        }
+
+        if (!isset($_SESSION['PayPalAdvancedCheckout']['VaultCardData'])) {
+            return;
+        }
+
+        $vaultCardData = $_SESSION['PayPalAdvancedCheckout']['VaultCardData'];
+        if (!is_array($vaultCardData) || empty($vaultCardData['card_source'])) {
+            return;
+        }
+
+        $cardSource = $vaultCardData['card_source'];
+        $visible = $vaultCardData['visible'] ?? true;
+        $storedVault = VaultManager::saveVaultedCard($customersId, $ordersId, $cardSource, $visible);
+        if ($storedVault !== null) {
+            global $zco_notifier;
+            if (is_object($zco_notifier) && method_exists($zco_notifier, 'notify')) {
+                $zco_notifier->notify('NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $storedVault);
+            }
+            $this->log->write('    Session VaultCardData persisted before subscription loop (observer load order).');
+            unset($_SESSION['PayPalAdvancedCheckout']['VaultCardData']);
+        }
     }
 
     /**

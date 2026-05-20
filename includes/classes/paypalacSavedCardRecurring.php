@@ -896,6 +896,11 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                 if (isset($metadata['orders_id']) && (int) $metadata['orders_id'] > 0) {
                         $sql_data_array[] = array('fieldName' => 'orders_id', 'value' => (int) $metadata['orders_id'], 'type' => 'integer');
                 }
+
+                // Persist customers_id so admin subscription pages can filter by customer.
+                if (isset($metadata['customers_id']) && (int) $metadata['customers_id'] > 0) {
+                        $sql_data_array[] = array('fieldName' => 'customers_id', 'value' => (int) $metadata['customers_id'], 'type' => 'integer');
+                }
                 
                 $db->perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, $sql_data_array);
                 $paypal_saved_card_recurring_id = $db->insert_ID();
@@ -1076,7 +1081,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         return array($values, $attributes);
                 }
 
-                $query = $db->Execute('SELECT op.*, o.currency, o.date_purchased FROM ' . TABLE_ORDERS_PRODUCTS . ' op LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = op.orders_id WHERE op.orders_products_id = ' . $original_orders_products_id . ' LIMIT 1;');
+                $query = $db->Execute('SELECT op.*, o.currency, o.date_purchased, o.customers_id FROM ' . TABLE_ORDERS_PRODUCTS . ' op LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = op.orders_id WHERE op.orders_products_id = ' . $original_orders_products_id . ' LIMIT 1;');
                 if ($query->RecordCount() > 0) {
                         if (isset($query->fields['products_id'])) {
                                 $values['products_id'] = (int) $query->fields['products_id'];
@@ -1090,6 +1095,9 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         if (isset($query->fields['orders_id'])) {
                                 $values['orders_id'] = (int) $query->fields['orders_id'];
                                 $values['original_orders_id'] = (int) $query->fields['orders_id'];
+                        }
+                        if (isset($query->fields['customers_id'])) {
+                                $values['customers_id'] = (int) $query->fields['customers_id'];
                         }
                         if (isset($query->fields['date_purchased']) && $query->fields['date_purchased'] !== '') {
                                 $values['order_date_purchased'] = $query->fields['date_purchased'];
