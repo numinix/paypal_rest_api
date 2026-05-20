@@ -82,12 +82,22 @@ class SubscriptionCartHelper
         $nonSubscriptionLineCount = 0;
 
         foreach ($cart->contents as $productIdRaw => $lineItem) {
-            $productId = (int)preg_replace('/[^0-9]/', '', (string)$productIdRaw);
+            // Cart keys are Zen Cart "uprid" values: a bare products_id (e.g. "195") for
+            // attribute-less items, or "{products_id}:{md5HashOfAttributeSelections}" when
+            // attributes are present. PHP's (int) cast mirrors Zen Cart's own
+            // zen_get_prid() helper: it consumes leading digits and stops at the colon,
+            // so "195:9b2c4f8a" yields 195. Using preg_replace to strip non-digits would
+            // mistakenly include hex digits from the hash and produce a junk product id.
+            $productId = (int)$productIdRaw;
             if ($productId <= 0) {
                 continue;
             }
 
-            $attributeProfile = self::analyseProduct($productId);
+            $selectedAttributes = isset($lineItem['attributes']) && is_array($lineItem['attributes'])
+                ? $lineItem['attributes']
+                : [];
+
+            $attributeProfile = self::analyseProduct($productId, $selectedAttributes);
 
             if ($attributeProfile['is_subscription']) {
                 $quantity = (float)($lineItem['qty'] ?? 1);
@@ -150,6 +160,12 @@ class SubscriptionCartHelper
      * normalized subscription configuration so callers can immediately feed
      * the result into PayPalPlanProvisioner.
      *
+     * @param int   $productId       Zen Cart products_id (catalog primary key).
+     * @param array $selectedAttributes Optional map of {options_id => options_values_id} as
+     *                                  stored on $cart->contents[$uprid]['attributes']. When
+     *                                  provided, the customer's actual selection wins over
+     *                                  the catalog-default value for that option.
+     *
      * @return array{
      *     is_subscription: bool,
      *     has_plan_id: bool,
@@ -166,7 +182,7 @@ class SubscriptionCartHelper
      *     currency_code: string
      * }
      */
-    public static function analyseProduct(int $productId): array
+    public static function analyseProduct(int $productId, array $selectedAttributes = []): array
     {
         global $db, $currencies;
 
@@ -190,12 +206,16 @@ class SubscriptionCartHelper
             return $profile;
         }
 
-        // Look at all option/value pairs available for this product. We treat
-        // the FIRST default-value of each option as the "configured" subscription
-        // value; admins set subscription products up with a single mandatory
-        // value (e.g. Billing Period = Monthly) rather than a true choice list.
-        $sql = "SELECT po.products_options_name,
+        // Walk every option/value pair configured for this product. Each row carries
+        // the normalized option name (e.g. "billing_period") and the value, plus the
+        // options_id and options_values_id so we can match against the customer's
+        // selection from the cart. When the customer has explicitly chosen an
+        // options_values_id for a given options_id (via cart attributes), we prefer
+        // that value; otherwise we fall back to the first default value defined for
+        // the option in the catalog.
+        $sql = "SELECT pa.options_id,
                        pa.options_values_id,
+                       po.products_options_name,
                        pov.products_options_values_name
                   FROM " . TABLE_PRODUCTS_ATTRIBUTES . " pa
                   JOIN " . TABLE_PRODUCTS_OPTIONS . " po
@@ -208,15 +228,42 @@ class SubscriptionCartHelper
               ORDER BY pa.products_attributes_id ASC";
         $result = $db->Execute($sql);
 
-        $attributeMap = [];
+        // Group rows by normalized option name so we can apply the cart-selected
+        // value (if any) when assembling the final attribute map.
+        $rowsByOption = [];
         if (is_object($result)) {
             while (!$result->EOF) {
                 $name = self::normalizeKey((string)$result->fields['products_options_name']);
-                if ($name !== '' && !isset($attributeMap[$name])) {
-                    $attributeMap[$name] = trim((string)$result->fields['products_options_values_name']);
+                if ($name !== '') {
+                    $rowsByOption[$name][] = [
+                        'options_id' => (int)$result->fields['options_id'],
+                        'options_values_id' => (int)$result->fields['options_values_id'],
+                        'value' => trim((string)$result->fields['products_options_values_name']),
+                    ];
                 }
                 $result->MoveNext();
             }
+        }
+
+        $attributeMap = [];
+        foreach ($rowsByOption as $name => $rows) {
+            $chosenValue = '';
+            // Prefer the customer's selection when the cart specifies an options_values_id
+            // for this options_id. selectedAttributes keys are options_id, values are
+            // options_values_id (this is how shopping_cart::add_cart stores them).
+            foreach ($rows as $row) {
+                if ($row['options_id'] > 0
+                    && isset($selectedAttributes[$row['options_id']])
+                    && (int)$selectedAttributes[$row['options_id']] === $row['options_values_id']
+                ) {
+                    $chosenValue = $row['value'];
+                    break;
+                }
+            }
+            if ($chosenValue === '') {
+                $chosenValue = $rows[0]['value']; // catalog default
+            }
+            $attributeMap[$name] = $chosenValue;
         }
 
         if (empty($attributeMap)) {
