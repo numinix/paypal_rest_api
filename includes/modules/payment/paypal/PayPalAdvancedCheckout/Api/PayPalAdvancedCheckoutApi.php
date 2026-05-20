@@ -75,6 +75,15 @@ class PayPalAdvancedCheckoutApi extends ErrorInfo
         'PAYMENT.CAPTURE.REFUNDED',
         'PAYMENT.CAPTURE.REVERSED',
         'VAULT.PAYMENT-TOKEN.UPDATED',
+        // Subscription lifecycle events for PayPal-managed (REST) subscriptions.
+        // The handlers under Webhooks/Events/ mirror PayPal's state into the
+        // local paypal_subscriptions row so the admin manager and recurring
+        // cron stay in sync with PayPal's source of truth.
+        'BILLING.SUBSCRIPTION.ACTIVATED',
+        'BILLING.SUBSCRIPTION.CANCELLED',
+        'BILLING.SUBSCRIPTION.SUSPENDED',
+        'BILLING.SUBSCRIPTION.EXPIRED',
+        'BILLING.SUBSCRIPTION.PAYMENT.FAILED',
     ];
     /**
      * Variables associated with interface logging;

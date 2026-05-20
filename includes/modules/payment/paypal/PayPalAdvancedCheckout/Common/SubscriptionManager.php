@@ -84,6 +84,10 @@ class SubscriptionManager
             'expiration_date' => "DATE DEFAULT NULL",
             'domain' => "VARCHAR(255) NOT NULL DEFAULT ''",
             'is_archived' => "TINYINT(1) NOT NULL DEFAULT 0",
+            // Stores the PayPal-side subscription identifier (e.g. I-BW452GLLEP1G) returned
+            // by v1/billing/subscriptions when a subscription is created. Distinguished
+            // from the primary key paypal_subscription_id (an internal autoincrement).
+            'paypal_subscription_remote_id' => "VARCHAR(64) NOT NULL DEFAULT ''",
         ];
 
         foreach ($columns as $column => $definition) {
@@ -98,6 +102,7 @@ class SubscriptionManager
             'idx_profile_id' => ['profile_id'],
             'idx_legacy_subscription' => ['legacy_subscription_id'],
             'idx_is_archived' => ['is_archived'],
+            'idx_paypal_remote_id' => ['paypal_subscription_remote_id'],
         ];
 
         foreach ($indexes as $index => $columns) {
@@ -107,6 +112,90 @@ class SubscriptionManager
                 );
             }
         }
+    }
+
+    /**
+     * Find a subscription record by its PayPal-side remote id (I-XXXXXX).
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function findByRemoteId(string $remoteId): ?array
+    {
+        $remoteId = trim($remoteId);
+        if ($remoteId === '') {
+            return null;
+        }
+
+        self::ensureSchema();
+
+        global $db;
+
+        $safe = zen_db_input($remoteId);
+        $result = $db->Execute(
+            "SELECT * FROM " . TABLE_PAYPAL_SUBSCRIPTIONS
+            . " WHERE paypal_subscription_remote_id = '$safe'"
+            . " LIMIT 1"
+        );
+
+        if (!is_object($result) || $result->EOF) {
+            return null;
+        }
+
+        return $result->fields;
+    }
+
+    /**
+     * Update the status of a subscription identified by its PayPal-side remote id.
+     * Returns true when the row was found and updated. Extra columns (e.g.
+     * next_billing_date) may be supplied via $extraColumns and will be written
+     * alongside status if they're present in the existing schema.
+     *
+     * @param array<string,scalar|null> $extraColumns
+     */
+    public static function updateStatusByRemoteId(string $remoteId, string $status, array $extraColumns = []): bool
+    {
+        $remoteId = trim($remoteId);
+        if ($remoteId === '') {
+            return false;
+        }
+
+        $existing = self::findByRemoteId($remoteId);
+        if ($existing === null) {
+            return false;
+        }
+
+        global $db;
+
+        $sets = [
+            'status' => substr($status, 0, 32),
+            'last_modified' => date('Y-m-d H:i:s'),
+        ];
+
+        foreach ($extraColumns as $col => $val) {
+            if (!is_string($col) || $col === '' || !self::columnExists($col)) {
+                continue;
+            }
+            $sets[$col] = $val;
+        }
+
+        $assignments = [];
+        foreach ($sets as $col => $val) {
+            if ($val === null) {
+                $assignments[] = "`$col` = NULL";
+                continue;
+            }
+            $assignments[] = "`$col` = '" . zen_db_input((string)$val) . "'";
+        }
+        $assignmentSql = implode(', ', $assignments);
+
+        $safeRemote = zen_db_input($remoteId);
+        $db->Execute(
+            "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS
+            . " SET $assignmentSql"
+            . " WHERE paypal_subscription_remote_id = '$safeRemote'"
+        );
+
+        return true;
     }
 
     private static function columnExists(string $column): bool
@@ -200,6 +289,7 @@ class SubscriptionManager
             'paypal_vault_id' => (int)($subscriptionData['paypal_vault_id'] ?? 0),
             'vault_id' => substr((string)($subscriptionData['vault_id'] ?? ''), 0, 64),
             'status' => substr((string)($subscriptionData['status'] ?? self::STATUS_PENDING), 0, 32),
+            'paypal_subscription_remote_id' => substr((string)($subscriptionData['paypal_subscription_remote_id'] ?? ''), 0, 64),
         ];
 
         $attributes = $subscriptionData['attributes'] ?? [];
