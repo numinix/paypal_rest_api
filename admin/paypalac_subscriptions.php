@@ -1916,7 +1916,12 @@ function paypalac_get_table_columns($tableName)
                             <?php }
                 foreach ($subscriptionRows as $row) {
                     $subscriptionId = (int) ($row['paypal_subscription_id'] ?? 0);
-                    $formId = 'subscription-form-' . $subscriptionId;
+                    // REST paypal_subscription_id and saved-card saved_credit_card_recurring_id
+                    // share an integer space, so HTML element ids must include the type to
+                    // stay unique within the page (form ids, toggle target keys, etc.).
+                    $rowSubscriptionType = $row['subscription_type'] ?? 'rest';
+                    $rowKey = $rowSubscriptionType . '-' . $subscriptionId;
+                    $formId = 'subscription-form-' . $rowKey;
                     $currentStatus = strtolower($row['status'] ?? '');
                     $customerName = trim(($row['customers_firstname'] ?? '') . ' ' . ($row['customers_lastname'] ?? ''));
                     $paymentSummary = trim(($row['payment_module_code'] ?? '') . ' ' . ($row['payment_method'] ?? ''));
@@ -2052,7 +2057,7 @@ function paypalac_get_table_columns($tableName)
                     </form>
                     
                     <!-- Summary row (always visible, clickable to expand/collapse) -->
-                    <tr class="subscription-summary subscription-row-collapsed" onclick="toggleSubscription(<?php echo $subscriptionId; ?>, event)" data-subscription-id="<?php echo $subscriptionId; ?>">
+                    <tr class="subscription-summary subscription-row-collapsed" onclick="toggleSubscription('<?php echo zen_output_string_protected($rowKey); ?>', event)" data-subscription-id="<?php echo zen_output_string_protected($rowKey); ?>">
                         <td onclick="event.stopPropagation();">
                             <input type="checkbox" name="subscription_ids[]" value="<?php echo $subscriptionId; ?>" class="subscription-checkbox" data-subscription-type="<?php echo zen_output_string_protected($subscriptionType); ?>">
                         </td>
@@ -2101,7 +2106,7 @@ function paypalac_get_table_columns($tableName)
                     </tr>
                     
                     <!-- Details rows (hidden by default) -->
-                    <tr class="details-row" data-subscription-id="<?php echo $subscriptionId; ?>">
+                    <tr class="details-row" data-subscription-id="<?php echo zen_output_string_protected($rowKey); ?>">
                         <td colspan="10">
                             <div class="paypalac-details-panel" style="padding: 16px; background: #f9f9f9; border-radius: 4px;">
                                 <div class="paypalac-details-top-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
@@ -2315,7 +2320,7 @@ function paypalac_get_table_columns($tableName)
                                 <details class="paypalac-form-section">
                                     <summary>Attributes (JSON)</summary>
                                     <div class="paypalac-form-section-content">
-                                        <textarea id="attributes-<?php echo $subscriptionId; ?>" name="attributes" form="<?php echo $formId; ?>" placeholder="{ }" class="nmx-form-control" style="min-height: 100px; font-family: monospace;"><?php echo zen_output_string_protected($attributesPretty); ?></textarea>
+                                        <textarea id="attributes-<?php echo zen_output_string_protected($rowKey); ?>" name="attributes" form="<?php echo $formId; ?>" placeholder="{ }" class="nmx-form-control" style="min-height: 100px; font-family: monospace;"><?php echo zen_output_string_protected($attributesPretty); ?></textarea>
                                     </div>
                                 </details>
                                 
