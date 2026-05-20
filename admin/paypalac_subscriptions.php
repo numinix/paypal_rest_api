@@ -282,15 +282,6 @@ if ($action === 'create_subscription') {
     $redirectQuery = trim((string) ($_POST['redirect_query'] ?? ''));
     $redirectUrl   = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
 
-    // Legacy saved-card subscription creation has been disabled. Only PayPal-managed
-    // (REST) subscriptions are supported going forward; those are created automatically
-    // when an order contains a product that has a paypal_subscription_plan_id attribute.
-    $messageStack->add_session(
-        'Manual saved-card subscription creation is disabled. Add a paypal_subscription_plan_id attribute to the product so the REST subscription system creates it during checkout.',
-        'error'
-    );
-    zen_redirect($redirectUrl);
-
     $ordersId           = (int) zen_db_prepare_input($_POST['orders_id'] ?? 0);
     $ordersProductsId   = (int) zen_db_prepare_input($_POST['orders_products_id'] ?? 0);
     $savedCreditCardId  = (int) zen_db_prepare_input($_POST['saved_credit_card_id'] ?? 0);
