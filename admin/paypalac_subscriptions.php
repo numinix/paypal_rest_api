@@ -282,6 +282,15 @@ if ($action === 'create_subscription') {
     $redirectQuery = trim((string) ($_POST['redirect_query'] ?? ''));
     $redirectUrl   = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
 
+    // Legacy saved-card subscription creation has been disabled. Only PayPal-managed
+    // (REST) subscriptions are supported going forward; those are created automatically
+    // when an order contains a product that has a paypal_subscription_plan_id attribute.
+    $messageStack->add_session(
+        'Manual saved-card subscription creation is disabled. Add a paypal_subscription_plan_id attribute to the product so the REST subscription system creates it during checkout.',
+        'error'
+    );
+    zen_redirect($redirectUrl);
+
     $ordersId           = (int) zen_db_prepare_input($_POST['orders_id'] ?? 0);
     $ordersProductsId   = (int) zen_db_prepare_input($_POST['orders_products_id'] ?? 0);
     $savedCreditCardId  = (int) zen_db_prepare_input($_POST['saved_credit_card_id'] ?? 0);
@@ -1493,7 +1502,75 @@ if ($restSubscriptions instanceof queryFactoryResult) {
     }
 }
 
-// Legacy saved-card subscriptions are intentionally excluded from this admin page.
+// Store-managed (saved_credit_cards_recurring) subscriptions are a first-class
+// PayPal Advanced Checkout subscription type: products that carry the three
+// Zen Cart subscription attributes (billing period, billing frequency, total
+// billing cycles) route here through paypalacSavedCardRecurring + the cron.
+// Pull them with the same filter semantics as the REST query and merge into
+// $allSubscriptions so the unified UI can display + act on both systems.
+if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+    $savedCardWhereClauses = [];
+
+    if ($filters['customers_id'] > 0) {
+        $savedCardWhereClauses[] = 'scr.customers_id = ' . (int) $filters['customers_id'];
+    }
+    if ($filters['products_id'] > 0) {
+        $savedCardWhereClauses[] = 'scr.products_id = ' . (int) $filters['products_id'];
+    }
+    if ($filters['status'] !== '') {
+        $savedCardWhereClauses[] = "scr.status = '" . zen_db_input($filters['status']) . "'";
+    }
+    if ($filters['payment_module'] !== '') {
+        $savedCardWhereClauses[] = "o.payment_module_code = '" . zen_db_input($filters['payment_module']) . "'";
+    }
+    if ($filters['show_archived'] === 'only') {
+        $savedCardWhereClauses[] = 'scr.is_archived = 1';
+    } elseif ($filters['show_archived'] !== 'all') {
+        $savedCardWhereClauses[] = 'scr.is_archived = 0';
+    }
+
+    $savedCardSql = 'SELECT scr.*,'
+        . ' c.customers_firstname, c.customers_lastname, c.customers_email_address,'
+        . ' o.payment_module_code, o.payment_method,'
+        . ' pv.brand AS vault_brand, pv.last_digits AS vault_last_digits, pv.card_type AS vault_card_type, pv.status AS vault_status, pv.expiry AS vault_expiry,'
+        . ' pv.paypal_vault_id AS scr_paypal_vault_id'
+        . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' scr'
+        . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = scr.customers_id'
+        . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = scr.orders_id'
+        . ' LEFT JOIN ' . TABLE_SAVED_CREDIT_CARDS . ' sc ON sc.saved_credit_card_id = scr.saved_credit_card_id'
+        . ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id';
+
+    if (!empty($savedCardWhereClauses)) {
+        $savedCardSql .= ' WHERE ' . implode(' AND ', $savedCardWhereClauses);
+    }
+
+    $savedCardSubscriptions = $db->Execute($savedCardSql);
+
+    if ($savedCardSubscriptions instanceof queryFactoryResult) {
+        while (!$savedCardSubscriptions->EOF) {
+            $scrFields = $savedCardSubscriptions->fields;
+
+            // Map saved_credit_cards_recurring columns onto the row shape the rest of
+            // this page renders (which is built around the REST paypal_subscriptions
+            // schema). Keep the original saved-card columns available too for the
+            // saved-card-specific rendering blocks already in this file.
+            $row = $scrFields;
+            $row['subscription_type'] = 'savedcard';
+            $row['paypal_subscription_id'] = (int) ($scrFields['saved_credit_card_recurring_id'] ?? 0);
+            $row['paypal_vault_id'] = (int) ($scrFields['scr_paypal_vault_id'] ?? 0);
+            $row['attributes'] = $scrFields['subscription_attributes_json'] ?? '';
+            $row['trial_period'] = '';
+            $row['trial_frequency'] = 0;
+            $row['trial_total_cycles'] = 0;
+            $row['setup_fee'] = 0;
+            $row['plan_id'] = '';
+            $row['vault_id'] = '';
+            $row['sort_date'] = strtotime($scrFields['next_payment_date'] ?? ($scrFields['date_added'] ?? 'now'));
+            $allSubscriptions[] = $row;
+            $savedCardSubscriptions->MoveNext();
+        }
+    }
+}
 
 // Sort subscriptions by next billing date, oldest first.
 // Records without a next payment date are sorted last.
