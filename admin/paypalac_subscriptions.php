@@ -165,6 +165,95 @@ function paypalac_normalize_subscription_type($subscriptionType)
     return 'rest';
 }
 
+/**
+ * Load a paypal_subscriptions row by its internal primary key, or return null.
+ * Used by the admin lock to decide whether a subscription is PayPal-managed
+ * (paypal_subscription_remote_id present) and therefore read-only.
+ *
+ * @return array<string,mixed>|null
+ */
+function paypalac_admin_load_rest_subscription(int $subscriptionId): ?array
+{
+    if ($subscriptionId <= 0) {
+        return null;
+    }
+
+    global $db;
+
+    $result = $db->Execute(
+        "SELECT * FROM " . TABLE_PAYPAL_SUBSCRIPTIONS
+        . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+        . " LIMIT 1"
+    );
+
+    if (!is_object($result) || $result->EOF) {
+        return null;
+    }
+
+    return $result->fields;
+}
+
+/**
+ * Return true when a paypal_subscriptions row represents a PayPal-managed
+ * subscription (i.e. PayPal owns the billing schedule and we hold a
+ * paypal_subscription_remote_id token like I-XXXXXX).
+ */
+function paypalac_admin_is_paypal_managed(?array $subscriptionRow): bool
+{
+    if (!is_array($subscriptionRow)) {
+        return false;
+    }
+    return trim((string) ($subscriptionRow['paypal_subscription_remote_id'] ?? '')) !== '';
+}
+
+/**
+ * Push a cancel/suspend/activate change up to PayPal for a PayPal-managed
+ * subscription. Returns true on a successful API call. On failure, the
+ * caller should keep the local state untouched and surface the error to
+ * the admin so they can retry.
+ */
+function paypalac_admin_push_remote_status(array $subscriptionRow, string $targetStatus): bool
+{
+    $remoteId = trim((string) ($subscriptionRow['paypal_subscription_remote_id'] ?? ''));
+    if ($remoteId === '') {
+        return false;
+    }
+
+    [$clientId, $secret] = \paypalac::getEnvironmentInfo();
+    if ($clientId === '' || $secret === '') {
+        return false;
+    }
+
+    $api = new \PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi(
+        MODULE_PAYMENT_PAYPALAC_SERVER,
+        $clientId,
+        $secret
+    );
+
+    $reason = ['reason' => 'Admin request via paypalac_subscriptions.php'];
+
+    switch ($targetStatus) {
+        case 'cancelled':
+        case 'canceled':
+            $response = $api->cancelSubscription($remoteId, $reason);
+            break;
+        case 'suspended':
+            $response = $api->suspendSubscription($remoteId, $reason);
+            break;
+        case 'active':
+        case 'activated':
+            $response = $api->activateSubscription($remoteId, $reason);
+            break;
+        default:
+            return false;
+    }
+
+    // PayPal returns null / empty body on successful 204; the API wrapper
+    // surfaces that as either null, true, or an empty array depending on
+    // the curl path. Treat anything that isn't an outright false as success.
+    return $response !== false;
+}
+
 $action = strtolower(trim((string) ($_POST['action'] ?? $_GET['action'] ?? '')));
 
 // AJAX: return order info (products + customer saved cards) for the manual create form
@@ -550,6 +639,24 @@ if ($action === 'update_subscription') {
 
     if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
         $status = strtolower(trim((string) zen_db_prepare_input($_POST['set_status'])));
+
+        // For PayPal-managed subscriptions (paypal_subscription_remote_id set), PayPal
+        // owns the schedule. Push the status change to PayPal first; the matching
+        // BILLING.SUBSCRIPTION.* webhook will mirror the new state back into the
+        // local row. If the API call fails, leave the local state alone so the admin
+        // can retry without ending up out of sync with PayPal.
+        $subscriptionRow = paypalac_admin_load_rest_subscription((int) $subscriptionId);
+        if (paypalac_admin_is_paypal_managed($subscriptionRow)) {
+            $remotePushed = paypalac_admin_push_remote_status($subscriptionRow, $status);
+            if (!$remotePushed) {
+                $messageStack->add_session(
+                    'PayPal rejected the status change for subscription #' . (int) $subscriptionId . '. The local record was not modified; please verify the subscription state at PayPal and try again.',
+                    'error'
+                );
+                zen_redirect($redirectUrl);
+            }
+        }
+
         // For quick status changes, only update the status field without validating other fields
         zen_db_perform(
             TABLE_PAYPAL_SUBSCRIPTIONS,
@@ -563,6 +670,18 @@ if ($action === 'update_subscription') {
             'success'
         );
         
+        zen_redirect($redirectUrl);
+    }
+
+    // For PayPal-managed subscriptions, the only permitted update is a status change
+    // (cancel/suspend/activate). Block any further field edits so admins can't
+    // desync the local row from PayPal's source of truth.
+    $subscriptionRow = isset($subscriptionRow) ? $subscriptionRow : paypalac_admin_load_rest_subscription((int) $subscriptionId);
+    if (paypalac_admin_is_paypal_managed($subscriptionRow)) {
+        $messageStack->add_session(
+            'Subscription #' . (int) $subscriptionId . ' is managed by PayPal and cannot be edited from the store. Use Cancel / Suspend / Activate to change its state.',
+            'error'
+        );
         zen_redirect($redirectUrl);
     }
 
@@ -1703,6 +1822,25 @@ function paypalac_get_table_columns($tableName)
     <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
     <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
     <link rel="stylesheet" href="includes/css/paypalac_subscriptions.css">
+    <style>
+        /* PayPal-managed subscriptions are read-only in the local manager: PayPal
+           owns the source of truth. Visually grey out all editable fields under
+           the locked panel so admins don't expect their edits to be saved. The
+           server-side update handler also rejects writes to these rows. */
+        .paypalac-details-panel-paypal-managed input,
+        .paypalac-details-panel-paypal-managed select,
+        .paypalac-details-panel-paypal-managed textarea {
+            background-color: #f5f5f5 !important;
+            color: #666 !important;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .paypalac-details-panel-paypal-managed input,
+        .paypalac-details-panel-paypal-managed select,
+        .paypalac-details-panel-paypal-managed textarea {
+            opacity: 0.7;
+        }
+    </style>
 </head>
 <body>
 <?php require DIR_WS_INCLUDES . 'header.php'; ?>
@@ -2075,6 +2213,17 @@ function paypalac_get_table_columns($tableName)
                         ];
                     }
 
+                    // Subscriptions backed by a PayPal-side remote id (I-XXXXXX) are
+                    // managed by PayPal: PayPal owns the billing schedule, payment
+                    // method, and lifecycle. Local field edits would silently desync
+                    // from PayPal's source of truth, so the form is presented read-only
+                    // with only Cancel / Suspend / Activate buttons enabled. The
+                    // matching BILLING.SUBSCRIPTION.* webhook handler mirrors any state
+                    // change back into the local row.
+                    $isPaypalManaged = (($row['subscription_type'] ?? 'rest') === 'rest')
+                        && trim((string) ($row['paypal_subscription_remote_id'] ?? '')) !== '';
+                    $readonlyAttr = $isPaypalManaged ? ' readonly' : '';
+                    $disabledAttr = $isPaypalManaged ? ' disabled' : '';
                     ?>
                     <?php echo zen_draw_form($formId, FILENAME_PAYPALAC_SUBSCRIPTIONS, '', 'post', 'id="' . $formId . '"'); ?>
                         <?php echo zen_draw_hidden_field('action', 'update_subscription'); ?>
@@ -2136,7 +2285,16 @@ function paypalac_get_table_columns($tableName)
                     <!-- Details rows (hidden by default) -->
                     <tr class="details-row" data-subscription-id="<?php echo zen_output_string_protected($rowKey); ?>">
                         <td colspan="10">
-                            <div class="paypalac-details-panel" style="padding: 16px; background: #f9f9f9; border-radius: 4px;">
+                            <div class="paypalac-details-panel<?php echo $isPaypalManaged ? ' paypalac-details-panel-paypal-managed' : ''; ?>" style="padding: 16px; background: #f9f9f9; border-radius: 4px;">
+                                <?php if ($isPaypalManaged) { ?>
+                                <div style="background: #e7f3ff; border: 1px solid #b3d8ff; color: #00538a; padding: 10px 14px; border-radius: 4px; margin-bottom: 16px;">
+                                    <strong>Managed by PayPal.</strong>
+                                    This subscription is owned by PayPal (remote id
+                                    <code><?php echo zen_output_string_protected((string) $row['paypal_subscription_remote_id']); ?></code>).
+                                    Field edits are disabled to prevent the local record from drifting away from PayPal's source of truth.
+                                    Use <em>Cancel</em>, <em>Suspend</em>, or <em>Activate</em> below; PayPal's webhook will mirror the new state back into this row.
+                                </div>
+                                <?php } ?>
                                 <div class="paypalac-details-top-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
                                     <!-- Subscription Details Column -->
                                     <div>
@@ -2356,14 +2514,25 @@ function paypalac_get_table_columns($tableName)
                                 <div class="paypalac-details-actions" style="margin-top: 20px; padding-top: 16px; border-top: 2px solid #ddd;">
                                     <h4 style="margin-top: 0; color: #00618d;">Actions</h4>
                                     <div class="paypalac-subscription-actions">
-                                        <button type="submit" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-primary">Save Changes</button>
-                                        <?php if ($currentStatus !== 'active') { ?>
-                                            <button type="submit" name="set_status" value="cancelled" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-warning">Mark Cancelled</button>
+                                        <?php if (!$isPaypalManaged) { ?>
+                                            <button type="submit" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-primary">Save Changes</button>
+                                        <?php } ?>
+                                        <?php if ($currentStatus !== 'cancelled') { ?>
+                                            <button type="submit" name="set_status" value="cancelled" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-warning">
+                                                <?php echo $isPaypalManaged ? 'Cancel at PayPal' : 'Mark Cancelled'; ?>
+                                            </button>
                                         <?php } ?>
                                         <?php if ($currentStatus !== 'active') { ?>
-                                            <button type="submit" name="set_status" value="active" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-success">Mark Active</button>
+                                            <button type="submit" name="set_status" value="active" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-success">
+                                                <?php echo $isPaypalManaged ? 'Activate at PayPal' : 'Mark Active'; ?>
+                                            </button>
                                         <?php } ?>
-                                        <?php if ($currentStatus !== 'pending') { ?>
+                                        <?php if ($isPaypalManaged && $currentStatus !== 'suspended') { ?>
+                                            <button type="submit" name="set_status" value="suspended" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-secondary">
+                                                Suspend at PayPal
+                                            </button>
+                                        <?php } ?>
+                                        <?php if (!$isPaypalManaged && $currentStatus !== 'pending') { ?>
                                             <button type="submit" name="set_status" value="pending" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-secondary">Mark Pending</button>
                                         <?php } ?>
                                     </div>
