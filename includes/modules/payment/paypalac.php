@@ -1088,6 +1088,22 @@ class paypalac extends base
                 return;
             }
         }
+
+        // When the cart mixes a subscription product (3 attributes or
+        // paypal_subscription_plan_id) with a one-off product, the PayPal-account
+        // (paypalac) button cannot service the order: PayPal's Subscriptions API
+        // approves exactly one plan at a time, and bundling the one-off items into
+        // a one-shot capture would split the customer's PayPal experience across
+        // two transactions. Hide this module so the customer is steered to
+        // paypalac_creditcard / paypalac_savedcard, which still complete the
+        // purchase via the Zen Cart-managed recurring path.
+        if (class_exists('\\PayPalAdvancedCheckout\\Common\\SubscriptionCartHelper')
+            && \PayPalAdvancedCheckout\Common\SubscriptionCartHelper::cartIsMixedSubscription()
+        ) {
+            $this->enabled = false;
+            $this->log->write('update_status: Module disabled because the cart mixes a subscription product with one-off items; the PayPal-account flow does not support mixed carts.');
+            return;
+        }
     }
 
     protected function resetOrder()
