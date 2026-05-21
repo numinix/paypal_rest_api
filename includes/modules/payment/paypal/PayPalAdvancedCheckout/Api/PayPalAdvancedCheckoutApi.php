@@ -84,6 +84,15 @@ class PayPalAdvancedCheckoutApi extends ErrorInfo
         'BILLING.SUBSCRIPTION.SUSPENDED',
         'BILLING.SUBSCRIPTION.EXPIRED',
         'BILLING.SUBSCRIPTION.PAYMENT.FAILED',
+        // Per-cycle billing events on a PayPal-managed subscription. Each cycle
+        // (the activation cycle and every renewal) lands as a PAYMENT.SALE.*
+        // notification carrying billing_agreement_id (= our remote I-XXXXX id)
+        // and a sale id. Our handlers create a cloned Zen Cart order for each
+        // billing cycle so the admin orders page can void/refund individual
+        // payments the same way it does for one-off paypalac orders.
+        'PAYMENT.SALE.COMPLETED',
+        'PAYMENT.SALE.REFUNDED',
+        'PAYMENT.SALE.REVERSED',
     ];
     /**
      * Variables associated with interface logging;
