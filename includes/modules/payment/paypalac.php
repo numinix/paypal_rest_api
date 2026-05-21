@@ -1236,6 +1236,23 @@ class paypalac extends base
             return null;
         }
 
+        // Mirror the regular paypalac return flow: stash the current page + POST
+        // values so that when the customer comes back from PayPal's subscription
+        // approval, ppac_listener can render a self-submitting form back to that
+        // page with the original POST replayed. This is what lets OPRC (and any
+        // other checkout flavor) auto-finalize on return -- without it, customers
+        // land on the unstyled stock checkout_confirmation page and have to click
+        // Confirm Order manually.
+        global $current_page_base;
+        $savedPosts = $_POST;
+        unset($savedPosts['request']); // avoid being re-interpreted as an AJAX request
+        $payerActionPayload = [
+            'current_page_base' => $current_page_base,
+            'redirect_page' => $this->determinePayerActionRedirectPage((string)$current_page_base, $_POST),
+            'savedPosts' => $savedPosts,
+            'subscription_id' => $subscriptionId,
+        ];
+
         $_SESSION['PayPalAdvancedCheckout']['Subscription'] = [
             'id' => $subscriptionId,
             'plan_id' => $planId,
@@ -1245,9 +1262,13 @@ class paypalac extends base
             'currency_code' => (string)$subscriptionProduct['currency_code'],
             'confirmed' => false,
             'created_at' => date('Y-m-d H:i:s'),
+            'PayerAction' => $payerActionPayload,
         ];
 
-        $this->log->write("createPayPalSubscription: provisioned subscription $subscriptionId (plan $planId); approval URL captured.");
+        $this->log->write(
+            "createPayPalSubscription: provisioned subscription $subscriptionId (plan $planId); "
+            . "approval URL captured; return redirect_page='" . $payerActionPayload['redirect_page'] . "'."
+        );
 
         return $approveUrl;
     }
@@ -1536,6 +1557,18 @@ class paypalac extends base
                 }
 
                 $this->log->write('pre_confirmation_check, redirecting to PayPal for subscription approval.', true, 'after');
+                // OPRC and other AJAX-driven checkouts expect a JSON payload they
+                // can act on (window.location = redirect_url) instead of a 302
+                // because the calling fetch() will follow same-origin redirects
+                // silently. Mirror the regular paypalac payer-action redirect path.
+                if ($this->isOpcAjaxRequest()) {
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'status' => 'redirect',
+                        'redirect_url' => $approveUrl,
+                    ]);
+                    exit;
+                }
                 zen_redirect($approveUrl);
             }
         }

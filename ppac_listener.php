@@ -94,7 +94,7 @@ if ($op === 'sub_return') {
         zen_redirect(zen_href_link(FILENAME_DEFAULT));
     }
 
-    // Verify status at PayPal before passing the customer to checkout_confirmation.
+    // Verify status at PayPal before letting the customer finalize the order.
     require DIR_WS_MODULES . 'payment/paypalac.php';
     [$client_id, $secret] = paypalac::getEnvironmentInfo();
     $ppr = new PayPalAdvancedCheckoutApi(MODULE_PAYMENT_PAYPALAC_SERVER, $client_id, $secret);
@@ -115,8 +115,80 @@ if ($op === 'sub_return') {
     $_SESSION['PayPalAdvancedCheckout']['Subscription']['status'] = $remoteStatus;
     $_SESSION['PayPalAdvancedCheckout']['Subscription']['confirmed'] = true;
 
-    $logger->write("ppac_listener: subscription $incomingSubscriptionId approved (status=$remoteStatus); redirecting to checkout_confirmation.", true, 'after');
-    zen_redirect(zen_href_link(FILENAME_CHECKOUT_CONFIRMATION, '', 'SSL'));
+    // Pull the PayerAction we stashed in createPayPalSubscription so we can
+    // replay the customer's original POST against the page they came from.
+    // For OPRC this is the AJAX checkout endpoint (current_page_base='checkout_process'),
+    // for stock Zen Cart it's checkout_confirmation -- in both cases the
+    // self-submitting form below drops the customer straight into the
+    // remainder of the checkout pipeline so paypalac::before_process can
+    // observe Subscription.confirmed and mark the order Pending Subscription
+    // Activation, then redirect to checkout_success. Without this the
+    // customer would land on the bare checkout_confirmation page and have
+    // to click Confirm Order by hand.
+    $payerAction = $_SESSION['PayPalAdvancedCheckout']['Subscription']['PayerAction'] ?? null;
+    if (!is_array($payerAction) || empty($payerAction['redirect_page'])) {
+        $logger->write(
+            "ppac_listener: subscription $incomingSubscriptionId approved (status=$remoteStatus) but PayerAction missing from session; falling back to checkout_confirmation.",
+            true,
+            'after'
+        );
+        zen_redirect(zen_href_link(FILENAME_CHECKOUT_CONFIRMATION, '', 'SSL'));
+    }
+
+    $logger->write(
+        "ppac_listener: subscription $incomingSubscriptionId approved (status=$remoteStatus); "
+        . "posting customer back to '" . $payerAction['redirect_page'] . "' to finalize.",
+        true,
+        'after'
+    );
+
+    $redirect_page = (string)$payerAction['redirect_page'];
+    $savedPosts = is_array($payerAction['savedPosts'] ?? null) ? $payerAction['savedPosts'] : [];
+
+    // Tail of this file already contains a self-submitting form that POSTs
+    // $savedPosts to $redirect_page using the same spinner UX as the regular
+    // return path. Reuse it by exposing those two variables and falling
+    // through to the rendering block at the bottom, after unsetting the
+    // PayerAction so a refresh/back doesn't replay it.
+    unset($_SESSION['PayPalAdvancedCheckout']['Subscription']['PayerAction']);
+    // From here, drop into the shared self-submitting form section. Note:
+    // the existing block expects $_SESSION['PayPalAdvancedCheckout']['Order']
+    // ['PayerAction']['savedPosts'] but we'll synthesize the relevant inputs
+    // inline below to keep the two code paths cleanly separated.
+    ?>
+<html>
+<body onload="document.transfer_form.submit();">
+    <style>
+#lds-wrapper { top: 0; left: 0; width: 100%; height: 100%; }
+.lds-ring { display: inline-block; position: relative; top: 50%; margin-top: -40px; left: 50%; margin-left: -40px; width: 80px; height: 80px; }
+.lds-ring div { box-sizing: border-box; display: block; position: absolute; width: 64px; height: 64px; margin: 8px; border: 8px solid #002b7f; border-radius: 50%; animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite; border-color: #002b7f transparent transparent transparent; }
+.lds-ring div:nth-child(1) { animation-delay: -0.45s; }
+.lds-ring div:nth-child(2) { animation-delay: -0.3s; }
+.lds-ring div:nth-child(3) { animation-delay: -0.15s; }
+@keyframes lds-ring { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+    <div id="lds-wrapper"><div class="lds-ring"><div></div><div></div><div></div><div></div></div></div>
+    <form action="<?php echo zen_href_link($redirect_page); ?>" name="transfer_form" method="post">
+<?php
+    foreach ($savedPosts as $key => $value) {
+        if (is_string($value)) {
+            echo zen_draw_hidden_field($key, $value);
+            continue;
+        }
+        if (is_array($value)) {
+            $array_key_name = $key . '[:sub_key:]';
+            foreach ($value as $sub_key => $sub_value) {
+                echo zen_draw_hidden_field(str_replace(':sub_key:', $sub_key, $array_key_name), (string)$sub_value);
+            }
+        }
+    }
+    ?>
+    </form>
+</body>
+</html>
+    <?php
+    require DIR_WS_INCLUDES . 'application_bottom.php';
+    exit;
 }
 
 if ($op === 'return' && (!isset($_GET['token'], $_SESSION['PayPalAdvancedCheckout']['Order']['id']) || $_GET['token'] !== $_SESSION['PayPalAdvancedCheckout']['Order']['id'])) {
