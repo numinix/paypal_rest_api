@@ -308,21 +308,32 @@ class PayPalPlanProvisioner
             ],
         ];
 
+        // Important: only include setup_fee in payment_preferences when it is
+        // actually >$0. Sending {value: "0.00"} causes PayPal to log a
+        // companion $0.00 "Recurring payment from <merchant>" entry in the
+        // customer's transaction history every time the subscription is
+        // activated (in addition to the real first-cycle billing), which is
+        // confusing and looks like a phantom charge attempt. Omitting the
+        // setup_fee field altogether prevents that.
+        $paymentPreferences = [
+            'auto_bill_outstanding' => true,
+            'payment_failure_threshold' => 3,
+        ];
+        if ($normalized['setup_fee'] > 0) {
+            $paymentPreferences['setup_fee'] = [
+                'value' => sprintf('%.2f', $normalized['setup_fee']),
+                'currency_code' => $normalized['currency_code'],
+            ];
+            $paymentPreferences['setup_fee_failure_action'] = 'CONTINUE';
+        }
+
         return [
             'product_id' => $paypalProductId,
             'name' => $normalized['products_name'],
             'description' => 'Auto-provisioned recurring plan for ' . $normalized['products_name'],
             'status' => self::STATUS_ACTIVE,
             'billing_cycles' => $billingCycles,
-            'payment_preferences' => [
-                'auto_bill_outstanding' => true,
-                'setup_fee' => [
-                    'value' => sprintf('%.2f', $normalized['setup_fee']),
-                    'currency_code' => $normalized['currency_code'],
-                ],
-                'setup_fee_failure_action' => 'CONTINUE',
-                'payment_failure_threshold' => 3,
-            ],
+            'payment_preferences' => $paymentPreferences,
         ];
     }
 
