@@ -211,11 +211,42 @@ function paypalac_admin_is_paypal_managed(?array $subscriptionRow): bool
  * subscription. Returns true on a successful API call. On failure, the
  * caller should keep the local state untouched and surface the error to
  * the admin so they can retry.
+ *
+ * @param string|null $errorMessage Out-param populated with a human-readable
+ *  description of the API failure (PayPal issue id / message) when this
+ *  function returns false. Useful for surfacing exact failure context in the
+ *  admin message stack so the operator doesn't have to dig through logs.
  */
-function paypalac_admin_push_remote_status(array $subscriptionRow, string $targetStatus): bool
+function paypalac_admin_push_remote_status(array $subscriptionRow, string $targetStatus, ?string &$errorMessage = null): bool
 {
+    global $messageStack;
+
     $remoteId = trim((string) ($subscriptionRow['paypal_subscription_remote_id'] ?? ''));
     if ($remoteId === '') {
+        return false;
+    }
+
+    // The `paypalac` class lives in the catalog tree and is not auto-loaded in
+    // the admin context (the ppacAutoload only registers the namespaced
+    // PayPalAdvancedCheckout\* classes). Calling \paypalac::getEnvironmentInfo()
+    // here without first requiring the module file throws
+    // "Uncaught Error: Class 'paypalac' not found", which surfaces as a 500
+    // when the admin clicks Cancel/Suspend/Activate at PayPal.
+    if (!class_exists('paypalac', false)) {
+        $modulePath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalac.php';
+        if (!is_file($modulePath)) {
+            if (isset($messageStack)) {
+                $messageStack->add_session('PayPal AC payment module not found; cannot push remote status.', 'error');
+            }
+            return false;
+        }
+        require_once $modulePath;
+    }
+
+    if (!class_exists('paypalac', false) || !method_exists('paypalac', 'getEnvironmentInfo')) {
+        if (isset($messageStack)) {
+            $messageStack->add_session('PayPal AC payment module is missing getEnvironmentInfo(); cannot push remote status.', 'error');
+        }
         return false;
     }
 
@@ -245,13 +276,23 @@ function paypalac_admin_push_remote_status(array $subscriptionRow, string $targe
             $response = $api->activateSubscription($remoteId, $reason);
             break;
         default:
+            $errorMessage = 'Unsupported target status: ' . $targetStatus;
             return false;
     }
 
     // PayPal returns null / empty body on successful 204; the API wrapper
     // surfaces that as either null, true, or an empty array depending on
     // the curl path. Treat anything that isn't an outright false as success.
-    return $response !== false;
+    if ($response === false) {
+        $errorInfo = method_exists($api, 'getErrorInfo') ? $api->getErrorInfo() : [];
+        $issue = (string) ($errorInfo['name'] ?? '');
+        $detailIssue = (string) ($errorInfo['details'][0]['issue'] ?? '');
+        $description = (string) ($errorInfo['message'] ?? ($errorInfo['details'][0]['description'] ?? ''));
+        $pieces = array_filter([$issue, $detailIssue, $description], static fn($v) => $v !== '');
+        $errorMessage = $pieces === [] ? 'PayPal API call failed with no details.' : implode(' / ', $pieces);
+        return false;
+    }
+    return true;
 }
 
 $action = strtolower(trim((string) ($_POST['action'] ?? $_GET['action'] ?? '')));
@@ -647,10 +688,12 @@ if ($action === 'update_subscription') {
         // can retry without ending up out of sync with PayPal.
         $subscriptionRow = paypalac_admin_load_rest_subscription((int) $subscriptionId);
         if (paypalac_admin_is_paypal_managed($subscriptionRow)) {
-            $remotePushed = paypalac_admin_push_remote_status($subscriptionRow, $status);
+            $remoteError = null;
+            $remotePushed = paypalac_admin_push_remote_status($subscriptionRow, $status, $remoteError);
             if (!$remotePushed) {
+                $detail = $remoteError !== null && $remoteError !== '' ? ' Details: ' . $remoteError : '';
                 $messageStack->add_session(
-                    'PayPal rejected the status change for subscription #' . (int) $subscriptionId . '. The local record was not modified; please verify the subscription state at PayPal and try again.',
+                    'PayPal rejected the status change for subscription #' . (int) $subscriptionId . '. The local record was not modified; please verify the subscription state at PayPal and try again.' . $detail,
                     'error'
                 );
                 zen_redirect($redirectUrl);
