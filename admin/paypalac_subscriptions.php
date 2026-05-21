@@ -1500,10 +1500,17 @@ if ($action === 'export_csv') {
     exit;
 }
 
+// Default to showing every status. The legacy default was 'scheduled', which
+// matched only Zen Cart-managed saved_credit_cards_recurring rows; once we
+// unified the page to also list paypal_subscriptions (status values like
+// 'pending', 'active', 'suspended', 'cancelled', 'expired'), filtering to
+// 'scheduled' by default silently hid every PayPal-managed subscription. An
+// empty default surfaces both systems and lets the user narrow with the
+// dropdown above the table.
 $filters = [
     'customers_id' => (int) ($_GET['customers_id'] ?? 0),
     'products_id' => (int) ($_GET['products_id'] ?? 0),
-    'status' => trim((string) ($_GET['status'] ?? 'scheduled')),
+    'status' => trim((string) ($_GET['status'] ?? '')),
     'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
     'show_archived' => trim((string) ($_GET['show_archived'] ?? '')),
 ];
