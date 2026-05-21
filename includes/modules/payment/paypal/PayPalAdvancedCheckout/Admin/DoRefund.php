@@ -52,13 +52,35 @@ class DoRefund
         $payer_note = $_POST['ppr-refund-note'];
         $invoice_id = $ppac_txns->getInvoiceId();
 
+        // -----
+        // Detect whether the capture row we're refunding came from a PayPal-managed
+        // subscription cycle (PAYMENT.SALE.* webhook) vs. a regular v2 checkout
+        // capture. Subscription cycles store the subscription remote id
+        // (e.g. "I-MDK9B2RL9TN1") in `parent_txn_id`; that namespace doesn't
+        // overlap with v2 capture-parent ids (which are PayPal order ids or
+        // authorization ids of a different shape). For subscription cycles we
+        // must call the v1 sale-refund endpoint -- v2/payments/captures/{id}
+        // returns RESOURCE_NOT_FOUND for sale ids.
+        //
+        $parent_txn_id_raw = (string)($capture_id_txn['parent_txn_id'] ?? '');
+        $is_subscription_cycle = (stripos($parent_txn_id_raw, 'I-') === 0);
+
         $full_refund = isset($_POST['ppr-refund-full']);
         $amount = new Amount($capture_currency);
-        if ($full_refund === true) {
-            $refund_response = $ppr->refundCaptureFull($_POST['capture_txn_id'], $invoice_id, $payer_note);
+        if ($is_subscription_cycle) {
+            if ($full_refund === true) {
+                $refund_response = $ppr->refundSaleFull($_POST['capture_txn_id'], $invoice_id, $payer_note);
+            } else {
+                $refund_amount = $amount->getValueFromString($_POST['ppr-amount']);
+                $refund_response = $ppr->refundSalePartial($_POST['capture_txn_id'], $capture_currency, $refund_amount, $invoice_id, $payer_note);
+            }
         } else {
-            $refund_amount = $amount->getValueFromString($_POST['ppr-amount']);
-            $refund_response = $ppr->refundCapturePartial($_POST['capture_txn_id'], $capture_currency, $refund_amount, $invoice_id, $payer_note);
+            if ($full_refund === true) {
+                $refund_response = $ppr->refundCaptureFull($_POST['capture_txn_id'], $invoice_id, $payer_note);
+            } else {
+                $refund_amount = $amount->getValueFromString($_POST['ppr-amount']);
+                $refund_response = $ppr->refundCapturePartial($_POST['capture_txn_id'], $capture_currency, $refund_amount, $invoice_id, $payer_note);
+            }
         }
 
         if ($refund_response === false) {
@@ -75,7 +97,14 @@ class DoRefund
 
         $ppac_txns->addDbTransaction('REFUND', $refund_response);
 
-        $parent_capture_status = $ppr->getCaptureStatus($_POST['capture_txn_id']);
+        // Use the matching status-fetch endpoint for the capture's namespace
+        // (v1 sale vs. v2 capture). Both helpers return v2-shaped payloads so
+        // updateParentTxnDateAndStatus stays unaware of the difference.
+        if ($is_subscription_cycle) {
+            $parent_capture_status = $ppr->getSaleStatus($_POST['capture_txn_id']);
+        } else {
+            $parent_capture_status = $ppr->getCaptureStatus($_POST['capture_txn_id']);
+        }
         if ($parent_capture_status === false) {
             $messageStack->add_session("Error retrieving capture status:\n" . json_encode($ppr->getErrorInfo()), 'warning');
         } else {
