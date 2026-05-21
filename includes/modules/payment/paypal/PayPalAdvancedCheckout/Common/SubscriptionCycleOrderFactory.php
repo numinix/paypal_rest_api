@@ -163,8 +163,18 @@ class SubscriptionCycleOrderFactory
             return;
         }
 
+        // module_name MUST be 'paypalac' so the existing admin_notification
+        // pipeline picks this row up; GetPayPalOrderTransactions filters with
+        // module_name IN ('paypalac', 'paypalr') and silently drops anything
+        // without a matching module_name, which means the order edit page
+        // shows no captures and therefore no Refund button. Same reason we
+        // populate payment_date with a real timestamp -- the MainDisplay
+        // formatter renders payment_date next to each row and a zero-date
+        // makes it look like the capture never landed.
+        $now = date('Y-m-d H:i:s');
         $row = [
             'order_id'              => (int)$newOrderId,
+            'module_name'           => 'paypalac',
             'txn_type'              => 'CAPTURE',
             'txn_id'                => $saleId,
             'parent_txn_id'         => $remoteSubscriptionId,
@@ -180,8 +190,9 @@ class SubscriptionCycleOrderFactory
             'payer_business_name'   => '',
             'receiver_email'        => '',
             'receiver_id'           => '',
-            'last_modified'         => date('Y-m-d H:i:s'),
-            'date_added'            => date('Y-m-d H:i:s'),
+            'payment_date'          => $now,
+            'last_modified'         => $now,
+            'date_added'            => $now,
             'memo'                  => json_encode([
                 'paypal_subscription_remote_id' => $remoteSubscriptionId,
                 'sale_id'                       => $saleId,

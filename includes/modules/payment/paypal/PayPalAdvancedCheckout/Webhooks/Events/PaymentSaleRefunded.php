@@ -84,6 +84,35 @@ class PaymentSaleRefunded extends WebhookHandlerContract
             return;
         }
 
+        // If an admin-initiated refund crashed mid-bookkeeping and we backfilled
+        // a placeholder row (txn_id prefixed BACKFILL_REFUND_), upgrade that row
+        // in place to the real refund id rather than inserting a duplicate. We
+        // match on parent_txn_id (sale id) + amount because the placeholder
+        // shares those values verbatim.
+        $placeholder = $db->Execute(
+            "SELECT paypal_ipn_id FROM " . TABLE_PAYPAL
+            . " WHERE txn_type = 'REFUND'"
+            . " AND parent_txn_id = '" . zen_db_input($saleId) . "'"
+            . " AND txn_id LIKE 'BACKFILL_REFUND_%'"
+            . " AND ABS(mc_gross - " . sprintf('%.4f', $refundAmount) . ") < 0.005"
+            . " LIMIT 1"
+        );
+        if (is_object($placeholder) && !$placeholder->EOF) {
+            $oldIpn = (int)$placeholder->fields['paypal_ipn_id'];
+            $db->Execute(
+                "UPDATE " . TABLE_PAYPAL
+                . " SET txn_id = '" . zen_db_input($refundId) . "',"
+                . " payment_status = 'REFUNDED',"
+                . " last_modified = '" . zen_db_input(date('Y-m-d H:i:s')) . "'"
+                . " WHERE paypal_ipn_id = " . $oldIpn
+            );
+            $this->log->write(
+                "PAYMENT.SALE.REFUNDED: upgraded backfill placeholder (ipn=$oldIpn) to "
+                . "real refund_id $refundId for sale $saleId."
+            );
+            return;
+        }
+
         $row = [
             'order_id'        => $orderId,
             'txn_type'        => 'REFUND',
