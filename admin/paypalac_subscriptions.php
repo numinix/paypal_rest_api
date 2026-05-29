@@ -790,11 +790,15 @@ if ($action === 'update_subscription') {
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
 
-    // Cancel the corresponding legacy subscription if one exists.
-    // When a legacy subscription was migrated to PayPal AC by updating its card to a
-    // vault card, the legacy entry in TABLE_SAVED_CREDIT_CARDS_RECURRING was not cancelled.
-    // This "EDIT and SAVE" action completes that missed migration step.
-    if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
+    // Cancel the corresponding legacy subscription only when this PayPal AC subscription
+    // is actually PayPal-managed (a remote PayPal Subscription/plan now drives billing).
+    // For saved-card-only PayPal AC subscriptions (plan_id empty / no remote profile)
+    // the legacy TABLE_SAVED_CREDIT_CARDS_RECURRING row is the only place the recurring
+    // cron can find the subscription to charge it -- cancelling it here strands the
+    // customer with no billing source (cron emails report 0 processed/skipped/failed
+    // because get_scheduled_payments() filters status='scheduled' on the legacy table).
+    $shouldCancelLegacy = ($planId !== '');
+    if ($shouldCancelLegacy && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
         $legacyIdRow = $db->Execute(
             "SELECT legacy_subscription_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS
             . " WHERE paypal_subscription_id = " . (int) $subscriptionId
@@ -819,7 +823,7 @@ if ($action === 'update_subscription') {
                     $legacyCanceller->update_payment_status(
                         $legacySubId,
                         'cancelled',
-                        'Cancelled by admin - subscription migrated to PayPal AC (subscription #' . $subscriptionId . ')'
+                        'Cancelled by admin - subscription migrated to PayPal-managed plan ' . $planId . ' (subscription #' . $subscriptionId . ')'
                     );
                 }
             }
