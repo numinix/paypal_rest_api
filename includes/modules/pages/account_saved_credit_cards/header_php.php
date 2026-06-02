@@ -550,11 +550,25 @@ if (!function_exists('paypalac_normalize_payflow_card')) {
 
 if (!function_exists('paypalac_delete_payflow_card')) {
     /**
-     * Delete a Payflow saved credit card
+     * Delete a saved credit card on file (originally written for legacy PayFlow
+     * cards, hence the name; also handles AC vault cards on storefronts that
+     * surface a delete action for them).
+     *
+     * If the card is currently attached to one or more scheduled recurring
+     * subscriptions, the deletion is conditional:
+     *   - When the customer has another usable card on file (legacy PayFlow
+     *     OR PayPal AC vault), we soft-delete and reassign the subscriptions
+     *     to that replacement card.
+     *   - When no replacement exists, the deletion is BLOCKED and the
+     *     customer is asked to add a new card first, so subscriptions are
+     *     never silently orphaned (which previously left them billing a
+     *     deleted card and being skipped on every cron run).
      *
      * @param int $customers_id
      * @param int $card_id
-     * @return bool
+     * @return bool true on successful soft-delete, false on validation /
+     *              guard / DB failure (an error message is added to the
+     *              global messageStack when blocked).
      */
     function paypalac_delete_payflow_card(int $customers_id, int $card_id): bool
     {
@@ -562,12 +576,31 @@ if (!function_exists('paypalac_delete_payflow_card')) {
             return false;
         }
 
-        global $db;
+        global $db, $messageStack;
 
         // Check if table exists
         $tableCheck = $db->Execute("SHOW TABLES LIKE '" . TABLE_SAVED_CREDIT_CARDS . "'");
         if ($tableCheck->EOF) {
             return false;
+        }
+
+        $activeSubs = paypalac_payflow_card_active_subscription_names($card_id);
+
+        if (!empty($activeSubs)) {
+            // Card is the only active payment method protecting these subs.
+            // If the customer has no other usable card we block the delete
+            // and ask them to add a new card first.
+            if (!paypalac_customer_has_other_usable_card($customers_id, $card_id)) {
+                if (isset($messageStack) && defined('TEXT_DELETE_CARD_BLOCKED_BY_SUBSCRIPTIONS')) {
+                    $subsList = htmlspecialchars(implode(', ', $activeSubs), ENT_QUOTES, 'UTF-8');
+                    $messageStack->add(
+                        'saved_credit_cards',
+                        sprintf(TEXT_DELETE_CARD_BLOCKED_BY_SUBSCRIPTIONS, $subsList),
+                        'error'
+                    );
+                }
+                return false;
+            }
         }
 
         // Soft delete the card
@@ -579,7 +612,168 @@ if (!function_exists('paypalac_delete_payflow_card')) {
 
         $db->Execute($sql);
 
+        // Reassign any scheduled subscriptions onto the replacement card.
+        // We prefer paypalSavedCardRecurring::card_was_deleted() because it
+        // also handles cancellation fallback and produces a customer-facing
+        // summary, but it lives in the legacy PayFlow plugin which may not
+        // be installed.  When it isn't, fall back to the AC plugin's own
+        // recurring class (always present here) and do a straight rebind to
+        // the replacement card so we never leave subscriptions orphaned.
+        if (!empty($activeSubs)) {
+            $reassignMessage = '';
+            $payflowClassFile = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalSavedCardRecurring.php';
+            $payflowAvailable = class_exists('paypalSavedCardRecurring');
+            if (!$payflowAvailable && file_exists($payflowClassFile)) {
+                require_once $payflowClassFile;
+                $payflowAvailable = class_exists('paypalSavedCardRecurring');
+            }
+
+            if ($payflowAvailable) {
+                $recurring = new paypalSavedCardRecurring();
+                $reassignMessage = trim((string)$recurring->card_was_deleted($card_id, $customers_id));
+            } else {
+                // AC-only fallback: rebind active subs to the replacement
+                // card directly via this plugin's recurring class.
+                $replacementId = paypalac_replacement_card_id($customers_id, $card_id);
+                if ($replacementId > 0) {
+                    if (!class_exists('paypalacSavedCardRecurring')) {
+                        require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+                    }
+                    $acRecurring = new paypalacSavedCardRecurring();
+                    $rebindSql = "SELECT saved_credit_card_recurring_id"
+                        . " FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                        . " WHERE saved_credit_card_id = " . (int)$card_id
+                        . "   AND LOWER(TRIM(status)) = 'scheduled'";
+                    $rebind = $db->Execute($rebindSql);
+                    while (!$rebind->EOF) {
+                        $acRecurring->update_payment_info(
+                            (int)$rebind->fields['saved_credit_card_recurring_id'],
+                            array(
+                                'saved_credit_card_id' => $replacementId,
+                                'comments' => '  Card replaced after deletion (AC-only fallback path).  '
+                            )
+                        );
+                        $rebind->MoveNext();
+                    }
+                }
+            }
+            if ($reassignMessage !== '' && isset($messageStack)) {
+                $messageStack->add_session('saved_credit_cards', $reassignMessage, 'success');
+            }
+        }
+
         return true;
+    }
+}
+
+if (!function_exists('paypalac_payflow_card_active_subscription_names')) {
+    /**
+     * Return product names of currently-scheduled subscriptions billed
+     * against the given saved card.  Used to (a) decide whether deletion
+     * needs to be blocked, and (b) tell the customer which subscriptions
+     * are at stake.
+     *
+     * @return string[] product names; empty array means the card has no active subs.
+     */
+    function paypalac_payflow_card_active_subscription_names(int $card_id): array
+    {
+        global $db;
+
+        if ($card_id <= 0) {
+            return [];
+        }
+
+        $sql = "SELECT products_name
+                FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
+                WHERE saved_credit_card_id = " . (int)$card_id . "
+                  AND LOWER(TRIM(status)) = 'scheduled'
+                ORDER BY saved_credit_card_recurring_id";
+
+        $result = $db->Execute($sql);
+        $names = [];
+        while (!$result->EOF) {
+            $name = trim((string)$result->fields['products_name']);
+            if ($name !== '') {
+                $names[] = $name;
+            }
+            $result->MoveNext();
+        }
+        return $names;
+    }
+}
+
+if (!function_exists('paypalac_customer_has_other_usable_card')) {
+    /**
+     * True when the customer has at least one OTHER saved card that is not
+     * soft-deleted and has not yet expired.  Used by the card deletion
+     * guard to decide whether subscriptions can safely be reassigned to a
+     * replacement card.
+     *
+     * Two storage models are checked:
+     *   1. Legacy PayFlow cards: expiry stored in TABLE_SAVED_CREDIT_CARDS.expiry as 'mmYY'.
+     *   2. PayPal AC vault cards: TABLE_SAVED_CREDIT_CARDS.expiry is NULL/empty;
+     *      the real expiry lives in TABLE_PAYPAL_VAULT.expiry as 'YYYY-MM'.
+     * Without the vault join the deletion guard would incorrectly block
+     * customers whose only "other usable card" is a vault card (the new
+     * normal post-PayFlow sunset).
+     */
+    function paypalac_customer_has_other_usable_card(int $customers_id, int $exclude_card_id): bool
+    {
+        return paypalac_replacement_card_id($customers_id, $exclude_card_id) > 0;
+    }
+}
+
+if (!function_exists('paypalac_replacement_card_id')) {
+    /**
+     * Find the customer's "next-best" usable card excluding $exclude_card_id.
+     * Returns saved_credit_card_id, or 0 if none qualify.  Vault-aware (see
+     * paypalac_customer_has_other_usable_card() docblock).
+     */
+    function paypalac_replacement_card_id(int $customers_id, int $exclude_card_id): int
+    {
+        global $db;
+
+        if ($customers_id <= 0) {
+            return 0;
+        }
+
+        if (defined('TABLE_PAYPAL_VAULT')) {
+            $sql = "SELECT scc.saved_credit_card_id
+                    FROM " . TABLE_SAVED_CREDIT_CARDS . " scc
+                    LEFT JOIN " . TABLE_PAYPAL_VAULT . " pv
+                      ON pv.vault_id = scc.vault_id AND pv.customers_id = scc.customers_id
+                    WHERE scc.customers_id = " . (int)$customers_id . "
+                      AND scc.saved_credit_card_id <> " . (int)$exclude_card_id . "
+                      AND scc.is_deleted = '0'
+                      AND (
+                        (scc.expiry IS NOT NULL AND scc.expiry <> ''
+                         AND LAST_DAY(STR_TO_DATE(scc.expiry, '%m%y')) > CURDATE())
+                        OR
+                        (scc.vault_id IS NOT NULL AND scc.vault_id <> ''
+                         AND pv.paypal_vault_id IS NOT NULL
+                         AND (pv.expiry IS NULL OR pv.expiry = ''
+                              OR LAST_DAY(STR_TO_DATE(pv.expiry, '%Y-%m')) > CURDATE()))
+                      )
+                    ORDER BY scc.is_primary, scc.saved_credit_card_id DESC
+                    LIMIT 1";
+        } else {
+            $sql = "SELECT saved_credit_card_id
+                    FROM " . TABLE_SAVED_CREDIT_CARDS . "
+                    WHERE customers_id = " . (int)$customers_id . "
+                      AND saved_credit_card_id <> " . (int)$exclude_card_id . "
+                      AND is_deleted = '0'
+                      AND expiry IS NOT NULL
+                      AND expiry <> ''
+                      AND LAST_DAY(STR_TO_DATE(expiry, '%m%y')) > CURDATE()
+                    ORDER BY is_primary, saved_credit_card_id DESC
+                    LIMIT 1";
+        }
+
+        $result = $db->Execute($sql);
+        if ($result->EOF) {
+            return 0;
+        }
+        return (int) $result->fields['saved_credit_card_id'];
     }
 }
 
@@ -1191,11 +1385,12 @@ if ($hide_saved_cards_page === false) {
             if ($payflow_card_id <= 0) {
                 $messageStack->add('saved_credit_cards', TEXT_SAVED_CARD_MISSING, 'error');
             } else {
+                // paypalac_delete_payflow_card() emits its own error messages via
+                // $messageStack on failure (e.g. blocked-because-active-subscriptions),
+                // so we only need to add the success message and redirect on true.
                 if (paypalac_delete_payflow_card($customers_id, $payflow_card_id)) {
                     $messageStack->add_session('saved_credit_cards', TEXT_DELETE_CARD_SUCCESS, 'success');
                     zen_redirect(zen_href_link(FILENAME_ACCOUNT_SAVED_CREDIT_CARDS, '', 'SSL'));
-                } else {
-                    $messageStack->add('saved_credit_cards', TEXT_DELETE_CARD_ERROR, 'error');
                 }
             }
         }

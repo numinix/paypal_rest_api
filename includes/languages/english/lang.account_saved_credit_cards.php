@@ -39,6 +39,7 @@ $define = [
     'TEXT_DELETE_CARD_CONFIRMATION' => 'Are you sure you want to remove the %1$s card ending in %2$s? You will need to re-enter the details the next time you check out.',
     'TEXT_DELETE_CARD_SUCCESS' => 'The saved card has been removed.',
     'TEXT_DELETE_CARD_ERROR' => 'We were unable to remove the selected card. Please try again or contact us for help.',
+    'TEXT_DELETE_CARD_BLOCKED_BY_SUBSCRIPTIONS' => 'This card is currently being used to bill the following active subscription(s): %s. Please add a new card first so we can move your subscription(s) onto it before removing this one.',
     'TEXT_SAVED_CARD_MISSING' => 'The requested saved card could not be found.',
 
     'TEXT_EDIT_CARD_CARDHOLDER' => 'Name on card',
