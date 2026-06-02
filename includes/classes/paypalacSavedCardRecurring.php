@@ -2187,7 +2187,37 @@ $GLOBALS[$_SESSION['payment']]->after_process();
 */
 	function get_customers_saved_card($customers_id) {
 		global $db;
-		$sql = 'SELECT saved_credit_card_id FROM ' . TABLE_SAVED_CREDIT_CARDS . ' WHERE customers_id = ' . $customers_id . ' AND is_deleted = \'0\' AND LAST_DAY(STR_TO_DATE(expiry, \'%m%y\')) > CURDATE() ORDER BY is_primary, saved_credit_card_id DESC;';
+		// Eligible card = not deleted AND not expired. There are two storage models:
+		//   1. Legacy PayFlow cards: expiry in TABLE_SAVED_CREDIT_CARDS.expiry as 'mmYY'.
+		//   2. PayPal AC vault cards: TABLE_SAVED_CREDIT_CARDS.expiry is NULL/empty;
+		//      the real expiry lives in TABLE_PAYPAL_VAULT.expiry as 'YYYY-MM'.
+		// Without this join the cron's automatic-replacement step would silently
+		// skip vault cards and report "no valid card" while a perfectly good
+		// vault card sits on file.  TABLE_PAYPAL_VAULT is defined by this plugin
+		// (see includes/extra_datafiles/ppac_database_tables.php), but we still
+		// fall back gracefully if the constant has not been loaded yet (test
+		// harnesses, very early bootstrap).
+		$customers_id = (int) $customers_id;
+		if (defined('TABLE_PAYPAL_VAULT')) {
+			$sql = 'SELECT scc.saved_credit_card_id'
+				. ' FROM ' . TABLE_SAVED_CREDIT_CARDS . ' scc'
+				. ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv'
+				. '   ON pv.vault_id = scc.vault_id AND pv.customers_id = scc.customers_id'
+				. ' WHERE scc.customers_id = ' . $customers_id
+				. " AND scc.is_deleted = '0'"
+				. ' AND ('
+				. "   (scc.expiry IS NOT NULL AND scc.expiry <> '' AND LAST_DAY(STR_TO_DATE(scc.expiry, '%m%y')) > CURDATE())"
+				. "   OR (scc.vault_id IS NOT NULL AND scc.vault_id <> '' AND pv.paypal_vault_id IS NOT NULL"
+				. "       AND (pv.expiry IS NULL OR pv.expiry = '' OR LAST_DAY(STR_TO_DATE(pv.expiry, '%Y-%m')) > CURDATE()))"
+				. ' )'
+				. ' ORDER BY scc.is_primary, scc.saved_credit_card_id DESC;';
+		} else {
+			$sql = 'SELECT saved_credit_card_id FROM ' . TABLE_SAVED_CREDIT_CARDS
+				. ' WHERE customers_id = ' . $customers_id
+				. " AND is_deleted = '0'"
+				. " AND LAST_DAY(STR_TO_DATE(expiry, '%m%y')) > CURDATE()"
+				. ' ORDER BY is_primary, saved_credit_card_id DESC;';
+		}
 		$result = $db->execute($sql);
 		if ($result->fields['saved_credit_card_id'] > 0) {
 			return $result->fields['saved_credit_card_id'];
