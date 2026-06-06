@@ -251,6 +251,73 @@ class GetPayPalOrderTransactions
                 $this->updateParentTxnDateAndStatus($parent_txn_response);
             }
             $this->updateMainTransaction($next_capture);
+
+            // -----
+            // The CAPTURE we just synced was placed outside of the Zen Cart admin
+            // (e.g. from PayPal's merchant console) so DoCapture never ran. Without
+            // intervention, the order would stay in its pending/unpaid status even
+            // though PayPal has actually settled the funds. When the parent
+            // authorization is now reported as fully CAPTURED, transition the
+            // order's status to the configured "captured" status, write a status
+            // history entry, and fire a notification so subscription observers can
+            // react to the funds being settled.
+            //
+            $this->finalizeOrderForExternalCapture($next_capture, $parent_txn_response);
+        }
+    }
+
+    /**
+     * When syncPaypalTxns brings in a CAPTURE that was added outside of the Zen
+     * Cart admin and the parent authorization is now reported as fully captured
+     * by PayPal, advance the order's status to the configured "captured" status
+     * and write an order-status-history entry describing the external settlement.
+     *
+     * @param array<string,mixed> $capture_response
+     * @param array<string,mixed> $parent_auth_response
+     */
+    protected function finalizeOrderForExternalCapture(array $capture_response, array $parent_auth_response): void
+    {
+        $auth_fully_captured = (
+            isset($parent_auth_response['status'])
+            && strtoupper((string)$parent_auth_response['status']) === 'CAPTURED'
+        );
+
+        if ($auth_fully_captured !== true) {
+            return;
+        }
+
+        if (!function_exists('zen_update_orders_history')) {
+            return;
+        }
+
+        $captured_status = defined('MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID') ? (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID : 0;
+        if ($captured_status <= 0) {
+            $captured_status = 2;
+        }
+
+        $amount = (string)($capture_response['amount']['value'] ?? '');
+        $currency = (string)($capture_response['amount']['currency_code'] ?? '');
+        $txn_id = (string)($capture_response['id'] ?? '');
+
+        $comments =
+            'FUNDS CAPTURED externally (PayPal Merchant Console).' . "\n" .
+            'Trans ID: ' . $txn_id . "\n" .
+            'Amount: ' . trim($amount . ' ' . $currency);
+
+        zen_update_orders_history($this->oID, $comments, null, $captured_status, 0);
+
+        global $zco_notifier;
+        if (isset($zco_notifier) && is_object($zco_notifier) && method_exists($zco_notifier, 'notify')) {
+            $zco_notifier->notify(
+                'NOTIFY_PAYPALAC_AUTHORIZATION_FULLY_CAPTURED',
+                [
+                    'orders_id' => $this->oID,
+                    'auth_txn_id' => (string)($parent_auth_response['id'] ?? ''),
+                    'capture_response' => $capture_response,
+                    'parent_auth_status' => $parent_auth_response,
+                    'externally_added' => true,
+                ]
+            );
         }
     }
 

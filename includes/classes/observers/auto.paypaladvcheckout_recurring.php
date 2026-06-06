@@ -94,6 +94,7 @@ class zcObserverPaypaladvcheckoutRecurring
         $this->attach($this, [
             'NOTIFY_CHECKOUT_PROCESS_AFTER_ORDER_CREATE_ADD_PRODUCTS',
             'NOTIFY_PAYPALAC_VAULT_CARD_SAVED',
+            'NOTIFY_PAYPALAC_AUTHORIZATION_FULLY_CAPTURED',
         ]);
     }
 
@@ -253,13 +254,38 @@ class zcObserverPaypaladvcheckoutRecurring
             
             $this->log->write("    Product #$ordersProductsId: Valid subscription attributes extracted: " . Logger::logJSON($subscriptionAttributes));
 
-            // Legacy saved-card / Zen Cart-managed subscriptions are no longer created during checkout.
-            // Only PayPal-managed subscriptions (products that carry a paypal_subscription_plan_id
-            // attribute) are routed below to TABLE_PAYPAL_SUBSCRIPTIONS.
+            // Two subscription creation paths are supported:
+            //   - PayPal-managed subscriptions: products that carry a
+            //     paypal_subscription_plan_id attribute. These are written to
+            //     TABLE_PAYPAL_SUBSCRIPTIONS and PayPal owns the billing schedule.
+            //   - Zen Cart-managed (legacy saved-card) subscriptions: products that
+            //     carry the three Zen Cart subscription attributes (Billing Period,
+            //     Billing Frequency, Total Billing Cycles) but no plan_id. These
+            //     are written to TABLE_SAVED_CREDIT_CARDS_RECURRING via
+            //     paypalacSavedCardRecurring::schedule_payment() and the cron
+            //     captures recurring payments using the customer's saved card.
             $hasPlanId = !empty($subscriptionAttributes['plan_id']);
 
             if (!$hasPlanId) {
-                $this->log->write("    Product #$ordersProductsId: No paypal_subscription_plan_id attribute on this product; legacy saved-card subscription creation is disabled. Skipping subscription record for this line item.");
+                $created = $this->createZenCartManagedSubscription(
+                    $customersId,
+                    $ordersId,
+                    $ordersProductsId,
+                    [
+                        'products_id' => (int)$products->fields['products_id'],
+                        'products_name' => (string)$products->fields['products_name'],
+                        'final_price' => (float)$products->fields['final_price'],
+                    ],
+                    $subscriptionAttributes,
+                    $attributeMap,
+                    $vaultRecord,
+                    $currency,
+                    $billingAddress,
+                    $shippingInfo
+                );
+                if ($created === true) {
+                    $loggedAny = true;
+                }
                 $products->MoveNext();
                 continue;
             }
@@ -668,6 +694,274 @@ class zcObserverPaypaladvcheckoutRecurring
      * (paypalac, paypalac_creditcard, paypalac_savedcard, paypalac_applepay,
      * paypalac_googlepay, paypalac_venmo, paypalac_paylater).
      */
+    /**
+     * Create a Zen Cart-managed (saved-card) subscription row in
+     * TABLE_SAVED_CREDIT_CARDS_RECURRING for a product that carries the three
+     * Zen Cart subscription attributes (Billing Period, Billing Frequency,
+     * Total Billing Cycles) but no paypal_subscription_plan_id. The cron
+     * paypalac_saved_card_recurring.php picks up these rows and bills the
+     * customer's saved card on the configured cadence.
+     *
+     * Returns true when a subscription row was created, false otherwise.
+     *
+     * @param array<string,scalar> $productInfo
+     * @param array<string,mixed> $subscriptionAttributes
+     * @param array<string,scalar> $attributeMap
+     * @param array<string,mixed>|null $vaultRecord
+     * @param array<string,scalar> $billingAddress
+     * @param array<string,scalar|null> $shippingInfo
+     */
+    protected function createZenCartManagedSubscription(
+        int $customersId,
+        int $ordersId,
+        int $ordersProductsId,
+        array $productInfo,
+        array $subscriptionAttributes,
+        array $attributeMap,
+        ?array $vaultRecord,
+        string $currency,
+        array $billingAddress,
+        array $shippingInfo
+    ): bool {
+        $this->log->write("    Product #$ordersProductsId: Zen Cart-managed subscription (no plan_id), routing to saved_credit_cards_recurring.");
+
+        if (class_exists('PayPalAdvancedCheckout\\Common\\SavedCreditCardsManager')) {
+            \PayPalAdvancedCheckout\Common\SavedCreditCardsManager::ensureSchema();
+        }
+
+        $savedCreditCardId = $this->getSavedCreditCardId($vaultRecord);
+        if ($savedCreditCardId === 0) {
+            $this->log->write("    WARNING: No saved_credit_card_id found for vault on order #$ordersId; subscription cannot be created yet. The recurring cron will pick it up once the vault completes (e.g. via NOTIFY_PAYPALAC_VAULT_CARD_SAVED) or once the order is captured.");
+            return false;
+        }
+
+        $nextBillingDate = $this->calculateNextBillingDate($subscriptionAttributes);
+
+        if (!class_exists('paypalacSavedCardRecurring')) {
+            $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+            if (file_exists($savedCardRecurringPath)) {
+                require_once $savedCardRecurringPath;
+            }
+        }
+        if (!class_exists('paypalacSavedCardRecurring')) {
+            $this->log->write("    ERROR: paypalacSavedCardRecurring class not available; legacy subscription cannot be scheduled.");
+            return false;
+        }
+
+        $savedCardRecurring = new \paypalacSavedCardRecurring();
+        $subscriptionId = $savedCardRecurring->schedule_payment(
+            (float)$productInfo['final_price'],
+            $nextBillingDate,
+            $savedCreditCardId,
+            $ordersProductsId,
+            'Subscription created from order #' . $ordersId,
+            array_merge(
+                [
+                    'customers_id' => $customersId,
+                    'orders_id' => $ordersId,
+                    'products_id' => (int)$productInfo['products_id'],
+                    'products_name' => (string)$productInfo['products_name'],
+                    'currency_code' => $currency,
+                    'billing_period' => $subscriptionAttributes['billing_period'],
+                    'billing_frequency' => $subscriptionAttributes['billing_frequency'],
+                    'total_billing_cycles' => $subscriptionAttributes['total_billing_cycles'],
+                    'subscription_attributes' => $attributeMap,
+                ],
+                $billingAddress,
+                $shippingInfo
+            )
+        );
+
+        if ($subscriptionId > 0) {
+            $this->log->write("    SUCCESS: Saved-card subscription #$subscriptionId created for product #$ordersProductsId.");
+            return true;
+        }
+
+        $this->log->write("    ERROR: Failed to create saved-card subscription for product #$ordersProductsId.");
+        return false;
+    }
+
+    /**
+     * Re-run subscription creation for an order whose authorization has just
+     * been fully captured. This recovers the case where the recurring observer
+     * could not write a saved_credit_cards_recurring row at order-create time
+     * (typically because the vault token wasn't yet available, or the legacy
+     * path was momentarily disabled when the order was placed) but the order
+     * has now been settled.
+     *
+     * @param object $class
+     * @param string $eventID
+     * @param array<string,mixed> $payload
+     */
+    public function updateNotifyPaypalacAuthorizationFullyCaptured(&$class, $eventID, $payload): void
+    {
+        $ordersId = (int)($payload['orders_id'] ?? 0);
+        if ($ordersId <= 0) {
+            return;
+        }
+
+        $this->log->write("==> Subscription Observer: NOTIFY_PAYPALAC_AUTHORIZATION_FULLY_CAPTURED fired for order #$ordersId.");
+
+        global $db;
+
+        $orderInfo = $db->Execute(
+            "SELECT customers_id, currency, currency_value,
+                    billing_name, billing_company,
+                    billing_street_address, billing_suburb, billing_city,
+                    billing_state, billing_postcode, billing_country,
+                    delivery_country
+               FROM " . TABLE_ORDERS . "
+              WHERE orders_id = " . $ordersId . "
+              LIMIT 1"
+        );
+
+        if ($orderInfo->EOF) {
+            $this->log->write("    ERROR: Order #$ordersId not found in database.");
+            return;
+        }
+
+        $customersId = (int)$orderInfo->fields['customers_id'];
+        $currency = (string)($orderInfo->fields['currency'] ?? (defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : ''));
+        $currencyValue = (float)($orderInfo->fields['currency_value'] ?? 1.0);
+
+        $billingAddress = [
+            'billing_name' => (string)($orderInfo->fields['billing_name'] ?? ''),
+            'billing_company' => (string)($orderInfo->fields['billing_company'] ?? ''),
+            'billing_street_address' => (string)($orderInfo->fields['billing_street_address'] ?? ''),
+            'billing_suburb' => (string)($orderInfo->fields['billing_suburb'] ?? ''),
+            'billing_city' => (string)($orderInfo->fields['billing_city'] ?? ''),
+            'billing_state' => (string)($orderInfo->fields['billing_state'] ?? ''),
+            'billing_postcode' => (string)($orderInfo->fields['billing_postcode'] ?? ''),
+            'billing_country' => (string)($orderInfo->fields['billing_country'] ?? ''),
+        ];
+
+        if (!empty($billingAddress['billing_country'])) {
+            $countryQuery = $db->Execute(
+                "SELECT countries_id, countries_iso_code_2
+                   FROM " . TABLE_COUNTRIES . "
+                  WHERE countries_name = '" . zen_db_input($billingAddress['billing_country']) . "'
+                  LIMIT 1"
+            );
+            if (!$countryQuery->EOF) {
+                $billingAddress['billing_country_id'] = (int)$countryQuery->fields['countries_id'];
+                $billingAddress['billing_country_code'] = (string)$countryQuery->fields['countries_iso_code_2'];
+            }
+        }
+
+        $shippingInfo = ['shipping_method' => '', 'shipping_cost' => null];
+        $shippingQuery = $db->Execute(
+            "SELECT class, title, value
+               FROM " . TABLE_ORDERS_TOTAL . "
+              WHERE orders_id = " . $ordersId . "
+                AND class = 'ot_shipping'
+              LIMIT 1"
+        );
+        if (!$shippingQuery->EOF) {
+            $shippingInfo['shipping_method'] = (string)$shippingQuery->fields['title'];
+            $shippingInfo['shipping_cost'] = (float)$shippingQuery->fields['value'];
+        }
+
+        $vaultRecord = $this->findVaultRecord($customersId, $ordersId);
+        if ($vaultRecord !== null) {
+            $this->syncVaultToSavedCreditCards($vaultRecord);
+        }
+
+        $products = $db->Execute(
+            "SELECT orders_products_id, products_id, products_name, products_quantity, final_price
+               FROM " . TABLE_ORDERS_PRODUCTS . "
+              WHERE orders_id = " . $ordersId
+        );
+
+        if ($products->EOF) {
+            return;
+        }
+
+        while (!$products->EOF) {
+            $ordersProductsId = (int)$products->fields['orders_products_id'];
+
+            // If a subscription row (either saved-card or REST) already exists for
+            // this orders_products_id, leave it alone. Re-running creation could
+            // duplicate billing schedules.
+            if ($this->subscriptionAlreadyExists($ordersProductsId)) {
+                $this->log->write("    Product #$ordersProductsId already has a subscription row; skipping.");
+                $products->MoveNext();
+                continue;
+            }
+
+            $attributeMap = $this->getAttributeMap($ordersProductsId);
+            $subscriptionAttributes = $this->extractSubscriptionAttributes($attributeMap);
+            if ($subscriptionAttributes === null) {
+                $products->MoveNext();
+                continue;
+            }
+
+            if (!empty($subscriptionAttributes['plan_id'])) {
+                // PayPal-managed subscriptions are written via the dedicated
+                // checkout-time path, not here. The BILLING.SUBSCRIPTION.* webhook
+                // family keeps these in sync with PayPal.
+                $products->MoveNext();
+                continue;
+            }
+
+            $this->createZenCartManagedSubscription(
+                $customersId,
+                $ordersId,
+                $ordersProductsId,
+                [
+                    'products_id' => (int)$products->fields['products_id'],
+                    'products_name' => (string)$products->fields['products_name'],
+                    'final_price' => (float)$products->fields['final_price'],
+                ],
+                $subscriptionAttributes,
+                $attributeMap,
+                $vaultRecord,
+                $currency,
+                $billingAddress,
+                $shippingInfo
+            );
+
+            $products->MoveNext();
+        }
+    }
+
+    /**
+     * Returns true when an active subscription row already exists for the given
+     * orders_products_id in either the legacy (saved_credit_cards_recurring) or
+     * the REST (paypal_subscriptions) table.
+     */
+    protected function subscriptionAlreadyExists(int $ordersProductsId): bool
+    {
+        if ($ordersProductsId <= 0) {
+            return false;
+        }
+
+        global $db;
+
+        if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+            $row = $db->Execute(
+                "SELECT saved_credit_card_recurring_id FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                . " WHERE orders_products_id = " . $ordersProductsId
+                . " LIMIT 1"
+            );
+            if (is_object($row) && !$row->EOF) {
+                return true;
+            }
+        }
+
+        if (defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
+            $row = $db->Execute(
+                "SELECT paypal_subscription_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS
+                . " WHERE orders_products_id = " . $ordersProductsId
+                . " LIMIT 1"
+            );
+            if (is_object($row) && !$row->EOF) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Persist a paypal_subscriptions row for a PayPal-managed subscription that
      * the customer just approved during checkout. We use the resolved

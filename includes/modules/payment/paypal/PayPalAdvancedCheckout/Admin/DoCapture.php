@@ -94,7 +94,20 @@ class DoCapture
             "Amount: $amount\n" .
             $payer_note;
 
-        if ($final_capture === false) {
+        // -----
+        // PayPal flips the parent authorization to status 'CAPTURED' once the full
+        // authorized amount has been captured. When that happens, treat this as a
+        // final capture for order-status purposes even when the admin didn't tick
+        // the "Final Capture" checkbox: the funds are settled and the order should
+        // move out of pending/unpaid into the configured "captured" status.
+        //
+        $auth_fully_captured = (
+            is_array($parent_auth_status)
+            && isset($parent_auth_status['status'])
+            && strtoupper((string)$parent_auth_status['status']) === 'CAPTURED'
+        );
+
+        if ($final_capture === false && $auth_fully_captured === false) {
             $capture_admin_message = MODULE_PAYMENT_PAYPALAC_PARTIAL_CAPTURE;
             $capture_status = -1;
         } else {
@@ -104,6 +117,29 @@ class DoCapture
         }
         zen_update_orders_history($oID, $comments, null, $capture_status, 0);
         zen_update_orders_history($oID, $capture_admin_message);
+
+        // -----
+        // If the authorization is now fully captured, fire a notification so other
+        // observers (e.g. the recurring-subscription observer) can react to the
+        // funds being settled for this order. This is what allows a subscription
+        // that was deferred at order creation (for example because the cart was
+        // placed in authorize-only mode) to be activated on first successful
+        // capture.
+        //
+        if ($auth_fully_captured === true) {
+            global $zco_notifier;
+            if (isset($zco_notifier) && is_object($zco_notifier) && method_exists($zco_notifier, 'notify')) {
+                $zco_notifier->notify(
+                    'NOTIFY_PAYPALAC_AUTHORIZATION_FULLY_CAPTURED',
+                    [
+                        'orders_id' => $oID,
+                        'auth_txn_id' => (string)$_POST['auth_txn_id'],
+                        'capture_response' => $capture_response,
+                        'parent_auth_status' => $parent_auth_status,
+                    ]
+                );
+            }
+        }
 
         $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_CAPTURE_COMPLETE, $oID), 'success');
     }
