@@ -182,6 +182,33 @@ class LegacySubscriptionMigrator
             return;
         }
 
+        // Defensive: re-check by orders_products_id immediately before INSERT.
+        // The earlier branched lookups above can in rare cases miss a row that
+        // exists for the same orders_products_id (e.g. when the legacy and
+        // profile keys differ between the two cron syncs run from
+        // syncLegacySubscriptions(); the column is also a UNIQUE index --
+        // idx_orders_product -- so a stale lookup result will trigger a fatal
+        // duplicate-key error and abort the cron after the customer's card has
+        // already been charged).  This final check guarantees the migrator
+        // always converts to UPDATE when an existing row matches the unique
+        // key, keeping the cron idempotent.
+        if (isset($record['orders_products_id']) && (int)$record['orders_products_id'] > 0) {
+            $opidGuard = $db->Execute(
+                'SELECT paypal_subscription_id FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS
+                . ' WHERE orders_products_id = ' . (int)$record['orders_products_id']
+                . ' LIMIT 1'
+            );
+            if ($opidGuard instanceof \queryFactoryResult && !$opidGuard->EOF) {
+                zen_db_perform(
+                    TABLE_PAYPAL_SUBSCRIPTIONS,
+                    $record,
+                    'update',
+                    'paypal_subscription_id = ' . (int)$opidGuard->fields['paypal_subscription_id']
+                );
+                return;
+            }
+        }
+
         zen_db_perform(TABLE_PAYPAL_SUBSCRIPTIONS, $record);
     }
 
