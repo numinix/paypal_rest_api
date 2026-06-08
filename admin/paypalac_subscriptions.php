@@ -790,15 +790,23 @@ if ($action === 'update_subscription') {
         'paypal_subscription_id = ' . (int) $subscriptionId
     );
 
-    // Cancel the corresponding legacy subscription only when this PayPal AC subscription
-    // is actually PayPal-managed (a remote PayPal Subscription/plan now drives billing).
-    // For saved-card-only PayPal AC subscriptions (plan_id empty / no remote profile)
-    // the legacy TABLE_SAVED_CREDIT_CARDS_RECURRING row is the only place the recurring
-    // cron can find the subscription to charge it -- cancelling it here strands the
-    // customer with no billing source (cron emails report 0 processed/skipped/failed
-    // because get_scheduled_payments() filters status='scheduled' on the legacy table).
-    $shouldCancelLegacy = ($planId !== '');
-    if ($shouldCancelLegacy && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
+    // Two distinct cases when this PayPal AC subscription has a legacy_subscription_id
+    // pointing at a TABLE_SAVED_CREDIT_CARDS_RECURRING (SCCR) row:
+    //
+    //   1. plan_id IS set -- a real PayPal-managed Subscription/plan now drives billing
+    //      remotely.  The legacy SCCR row must be CANCELLED so the saved-card cron
+    //      stops attempting to charge the card locally (PayPal will charge it via the
+    //      remote subscription instead).
+    //
+    //   2. plan_id is EMPTY -- this is a Zen-Cart-managed (saved-card) subscription
+    //      that lives in paypal_subscriptions only as a unified-UI mirror of the SCCR
+    //      row.  The recurring cron processes payments out of SCCR (see
+    //      paypalacSavedCardRecurring::get_scheduled_payments), so admin edits made
+    //      via the unified UI MUST be mirrored back to SCCR -- otherwise the new
+    //      next_payment_date / amount / status / billing schedule never reach the
+    //      cron and the customer is silently stranded.  Cancelling SCCR here would
+    //      strand the customer; instead we propagate the edits.
+    if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
         $legacyIdRow = $db->Execute(
             "SELECT legacy_subscription_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS
             . " WHERE paypal_subscription_id = " . (int) $subscriptionId
@@ -806,25 +814,90 @@ if ($action === 'update_subscription') {
         );
         if ($legacyIdRow instanceof queryFactoryResult && !$legacyIdRow->EOF) {
             $legacySubId = (int) $legacyIdRow->fields['legacy_subscription_id'];
-            $legacyEntry = $db->Execute(
-                "SELECT saved_credit_card_recurring_id FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING
-                . " WHERE saved_credit_card_recurring_id = " . $legacySubId
-                . " AND status = 'scheduled' LIMIT 1"
-            );
-            if ($legacyEntry instanceof queryFactoryResult && !$legacyEntry->EOF) {
-                if (!class_exists('paypalacSavedCardRecurring')) {
-                    $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
-                    if (file_exists($savedCardRecurringPath)) {
-                        require_once $savedCardRecurringPath;
+
+            if (!class_exists('paypalacSavedCardRecurring')) {
+                $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+                if (file_exists($savedCardRecurringPath)) {
+                    require_once $savedCardRecurringPath;
+                }
+            }
+
+            if ($planId !== '') {
+                // Case 1: PayPal-managed plan -- cancel the legacy SCCR row so the
+                // saved-card cron stops billing locally (PayPal charges remotely now).
+                $legacyEntry = $db->Execute(
+                    "SELECT saved_credit_card_recurring_id FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                    . " WHERE saved_credit_card_recurring_id = " . $legacySubId
+                    . " AND status = 'scheduled' LIMIT 1"
+                );
+                if ($legacyEntry instanceof queryFactoryResult && !$legacyEntry->EOF) {
+                    if (class_exists('paypalacSavedCardRecurring')) {
+                        $legacyCanceller = new paypalacSavedCardRecurring();
+                        $legacyCanceller->update_payment_status(
+                            $legacySubId,
+                            'cancelled',
+                            'Cancelled by admin - subscription migrated to PayPal-managed plan ' . $planId . ' (subscription #' . $subscriptionId . ')'
+                        );
                     }
                 }
-                if (class_exists('paypalacSavedCardRecurring')) {
-                    $legacyCanceller = new paypalacSavedCardRecurring();
-                    $legacyCanceller->update_payment_status(
-                        $legacySubId,
-                        'cancelled',
-                        'Cancelled by admin - subscription migrated to PayPal-managed plan ' . $planId . ' (subscription #' . $subscriptionId . ')'
+            } elseif (class_exists('paypalacSavedCardRecurring')) {
+                // Case 2: Zen-Cart-managed saved-card subscription.  Mirror the edits
+                // (next_payment_date, amount, status, billing schedule) back to SCCR
+                // because the recurring cron reads from SCCR, not paypal_subscriptions.
+                $legacyMirror = new paypalacSavedCardRecurring();
+
+                $mirrorData = array();
+                if ($nextPaymentDate !== '') {
+                    $mirrorData['date'] = $nextPaymentDate;
+                }
+                if ($amount > 0) {
+                    $mirrorData['amount'] = $amount;
+                }
+                if (!empty($mirrorData)) {
+                    $mirrorData['comments'] = ' Updated by admin via unified subscriptions page (mirrored to legacy saved-card record). ';
+                    $legacyMirror->update_payment_info($legacySubId, $mirrorData);
+                }
+
+                // Mirror billing schedule columns directly (update_payment_info doesn't
+                // accept these fields).
+                $scheduleSql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' SET saved_credit_card_recurring_id=saved_credit_card_recurring_id';
+                $hasScheduleUpdate = false;
+                if ($billingPeriod !== '') {
+                    $scheduleSql .= ", billing_period = '" . zen_db_input($billingPeriod) . "'";
+                    $hasScheduleUpdate = true;
+                }
+                if ($billingFrequency > 0) {
+                    $scheduleSql .= ', billing_frequency = ' . (int) $billingFrequency;
+                    $hasScheduleUpdate = true;
+                }
+                if ($totalCycles >= 0) {
+                    $scheduleSql .= ', total_billing_cycles = ' . (int) $totalCycles;
+                    $hasScheduleUpdate = true;
+                }
+                if ($hasScheduleUpdate) {
+                    $scheduleSql .= ' WHERE saved_credit_card_recurring_id = ' . (int) $legacySubId;
+                    $db->Execute($scheduleSql);
+                }
+
+                // Mirror status changes too (e.g. admin re-activated a previously
+                // cancelled subscription).  update_payment_status is preferred so its
+                // re-activation safety checks fire (validates saved card, etc.).
+                if ($status !== '') {
+                    $currentStatusRow = $db->Execute(
+                        'SELECT status FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                        . ' WHERE saved_credit_card_recurring_id = ' . (int) $legacySubId
+                        . ' LIMIT 1'
                     );
+                    $currentStatus = ($currentStatusRow instanceof queryFactoryResult && !$currentStatusRow->EOF)
+                        ? strtolower(trim((string) $currentStatusRow->fields['status']))
+                        : '';
+                    if ($currentStatus !== $status) {
+                        $legacyMirror->update_payment_status(
+                            $legacySubId,
+                            $status,
+                            ' Status mirrored from unified subscriptions page (subscription #' . $subscriptionId . '). '
+                        );
+                    }
                 }
             }
         }
