@@ -1,9 +1,20 @@
 (function () {
+    if (window.__paypalacPaylaterRuntime && window.__paypalacPaylaterRuntime.initialized) {
+        if (typeof window.paypalacPaylaterRender === 'function') {
+            window.paypalacPaylaterRender();
+        }
+        return;
+    }
+
+    window.__paypalacPaylaterRuntime = window.__paypalacPaylaterRuntime || {};
+    window.__paypalacPaylaterRuntime.initialized = true;
+
     var checkoutSubmitting = false;
     var sdkState = {
         config: null,
         loader: null,
     };
+    var renderRequestId = 0;
 
     var WALLET_BUTTON_MIN_WIDTH = '200px';
     var WALLET_BUTTON_MAX_WIDTH = '320px';
@@ -393,11 +404,18 @@
             return;
         }
 
+        renderRequestId++;
+        var currentRenderRequestId = renderRequestId;
+
         normalizeWalletContainer(container);
         container.innerHTML = '';
 
         // First, fetch only the SDK configuration (no order creation)
         fetchWalletConfig().then(function (config) {
+            if (currentRenderRequestId !== renderRequestId) {
+                return null;
+            }
+
             if (!config || config.success === false) {
                 console.warn('Unable to load Pay Later configuration', config);
                 hidePaymentMethodContainer();
@@ -406,6 +424,10 @@
 
             sdkState.config = config;
             return loadPayPalSdk(config).then(function (paypal) {
+                if (currentRenderRequestId !== renderRequestId) {
+                    return null;
+                }
+
                 // Create the button instance to check eligibility
                 var buttonInstance = paypal.Buttons({
                     fundingSource: paypal.FUNDING.PAYLATER,
@@ -465,9 +487,17 @@
                     return null;
                 }
 
+                if (currentRenderRequestId !== renderRequestId) {
+                    return null;
+                }
+
                 return buttonInstance.render('#paypalac-paylater-button');
             });
         }).catch(function (error) {
+            if (currentRenderRequestId !== renderRequestId) {
+                return;
+            }
+
             console.error('Failed to render Pay Later button', error);
             hidePaymentMethodContainer();
         });

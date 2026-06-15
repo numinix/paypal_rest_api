@@ -98,24 +98,8 @@ if (!function_exists('ppac_wallet_sanitize_error_message')) {
 }
 
 if (!$configOnly && $hasValidCart) {
-set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    // Only suppress non-critical errors - let fatal errors through
-    // E_ERROR and E_CORE_ERROR will still halt execution as expected
-    $suppressibleErrors = E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE | E_DEPRECATED | E_USER_DEPRECATED | E_STRICT;
-    
-    if (!($errno & $suppressibleErrors)) {
-        // This is a critical error - don't suppress it
-        restore_error_handler();
-        return false; // Let PHP handle it normally
-    }
-    
-    // Log but don't fail - let the fallback mechanism handle it
-    $sanitizedFile = basename($errfile);
-    $sanitizedError = ppac_wallet_sanitize_error_message($errstr);
-    
-    error_log("PayPal Wallet: Order totals initialization notice: $sanitizedError in $sanitizedFile:$errline");
-    return true; // Suppress the error
-});
+    $ppacWalletDebugEnabled = defined('MODULE_PAYMENT_PAYPALAC_DEBUGGING')
+        && strpos((string)MODULE_PAYMENT_PAYPALAC_DEBUGGING, 'Log') !== false;
 
 try {
     if (!isset($order) || !is_object($order)) {
@@ -133,11 +117,11 @@ try {
     $order_total_modules->pre_confirmation_check();
 } catch (\Exception $e) {
     // Log the error but continue - the observer fallback will use $order->info
-    $sanitizedMessage = ppac_wallet_sanitize_error_message($e->getMessage());
-    error_log('PayPal Wallet: Order totals initialization exception: ' . $sanitizedMessage);
+    if ($ppacWalletDebugEnabled) {
+        $sanitizedMessage = ppac_wallet_sanitize_error_message($e->getMessage());
+        error_log('PayPal Wallet: Order totals initialization exception: ' . $sanitizedMessage);
+    }
     // Do not exit - allow the request to continue with the fallback mechanism
-} finally {
-    restore_error_handler();
 }
 } // end if (!$configOnly && $hasValidCart)
 
