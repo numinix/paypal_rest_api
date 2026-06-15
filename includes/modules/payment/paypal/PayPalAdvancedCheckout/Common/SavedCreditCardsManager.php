@@ -178,6 +178,7 @@ class SavedCreditCardsManager
      * modules get these columns added automatically during the upgrade process.
      * 
      * Legacy columns supported:
+    * - customers_id: Customer FK; essential for subscriptions to join with customers table
      * - date_added: Creation timestamp; the original schema used `date` — this ensures
      *   upgraded installations gain the column so admin queries do not fatal.
      * - last_modified: Last update timestamp added alongside date_added.
@@ -191,6 +192,7 @@ class SavedCreditCardsManager
         global $db;
 
         $columns = [
+            'customers_id' => "INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Customer ID (FK to customers table)'",
             'date_added' => "DATETIME DEFAULT NULL",
             'last_modified' => "DATETIME DEFAULT NULL",
             'domain' => "VARCHAR(255) NOT NULL DEFAULT ''",
