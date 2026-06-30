@@ -67,14 +67,16 @@ class PayPalCommon {
         global $messageStack;
 
         if ($log_only === false) {
-            $messageTargets = ['checkout_payment'];
+            $messageTargets = ['checkout_payment', 'checkout', 'one_page_checkout', 'oprc_checkout_payment'];
 
-            // Some OPC checkouts (e.g. one_page_checkout/oprc) render messages
-            // from a different stack key than checkout_payment.
-            $messageTargets[] = 'one_page_checkout';
-            $messageTargets[] = 'oprc_checkout_payment';
+            $isAjax = (isset($_SESSION['request']) && $_SESSION['request'] === 'ajax')
+                || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+                || (isset($_POST['request']) && strtolower((string) $_POST['request']) === 'ajax');
 
             foreach (array_unique($messageTargets) as $messageTarget) {
+                if ($isAjax && is_object($messageStack) && method_exists($messageStack, 'add')) {
+                    $messageStack->add($messageTarget, $error_message, 'error');
+                }
                 $messageStack->add_session($messageTarget, $error_message, 'error');
             }
         }
@@ -84,11 +86,11 @@ class PayPalCommon {
         // proper JSON error response that the page JavaScript will display inline,
         // rather than relying on a redirect through checkout_payment back to OPC.
         if (class_exists('OprcAjaxCheckoutException')) {
-            // Use $_POST (not $_REQUEST) to avoid cookie-based spoofing. The OPC
-            // flow is always a POST; $_SESSION['request'] is set server-side.
-            $isAjax = (isset($_SESSION['request']) && $_SESSION['request'] === 'ajax')
-                || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
-                || (isset($_POST['request']) && strtolower($_POST['request']) === 'ajax');
+            if (!isset($isAjax)) {
+                $isAjax = (isset($_SESSION['request']) && $_SESSION['request'] === 'ajax')
+                    || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+                    || (isset($_POST['request']) && strtolower((string) $_POST['request']) === 'ajax');
+            }
             if ($isAjax) {
                 // $error_message is intentional HTML (built from a language-constant
                 // template that already contains markup such as <b> tags for the
@@ -1464,6 +1466,19 @@ class PayPalCommon {
             );
         }
 
+        // For card payments with vault setup (e.g. membership / subscription carts),
+        // PayPal may capture during createOrder before a Zen Cart order exists. Refund
+        // any prior orphan captures for this customer before minting a new PayPal order.
+        if ($ppac_type === 'card') {
+            $customers_id_for_orphan_sweep = (int)($_SESSION['customer_id'] ?? 0);
+            if ($customers_id_for_orphan_sweep > 0) {
+                $this->refundOrphanCaptureReservationsForCustomer(
+                    $customers_id_for_orphan_sweep,
+                    $paymentModule
+                );
+            }
+        }
+
         $paymentModule->ppr->setPayPalRequestId($order_guid);
         $order_request = $create_order_request->get();
 
@@ -2236,5 +2251,127 @@ class PayPalCommon {
         $db->Execute(
             "UPDATE " . $table . " SET orders_id = " . (int)$orders_id . " WHERE capture_resource_id = '" . $esc . "' AND orders_id = 0 LIMIT 1"
         );
+    }
+
+    /**
+     * Refund captures reserved for this customer that never received a Zen Cart order.
+     */
+    public function refundOrphanCaptureReservationsForCustomer(int $customers_id, $paymentModule): int
+    {
+        global $db;
+
+        if ($customers_id <= 0 || !isset($db) || !is_object($db)) {
+            return 0;
+        }
+        if ($paymentModule === null || !isset($paymentModule->ppr) || !is_object($paymentModule->ppr)) {
+            return 0;
+        }
+        if (!method_exists($paymentModule->ppr, 'refundCaptureFull')) {
+            return 0;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+
+        $candidates = $db->Execute(
+            "SELECT capture_resource_id, paypal_order_id, created_at
+               FROM " . $table . "
+              WHERE customers_id = " . (int)$customers_id . "
+                AND orders_id = 0
+                AND created_at < DATE_SUB(NOW(), INTERVAL 15 SECOND)
+                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+        );
+
+        $refunded = 0;
+        $logger = (isset($paymentModule->log) && is_object($paymentModule->log)) ? $paymentModule->log : null;
+
+        while (!$candidates->EOF) {
+            $capture_resource_id = (string)$candidates->fields['capture_resource_id'];
+            $paypal_order_id = (string)($candidates->fields['paypal_order_id'] ?? '');
+            $created_at = (string)($candidates->fields['created_at'] ?? '');
+
+            if ($capture_resource_id === '') {
+                $candidates->MoveNext();
+                continue;
+            }
+
+            $invoice_id = 'PPAC-ORPHAN-REFUND-' . substr($capture_resource_id, 0, 32);
+            $payer_note = 'Automatic refund of abandoned checkout pre-capture (no Zen Cart order created).';
+
+            if ($logger !== null) {
+                $logger->write(
+                    'PayPalCommon::refundOrphanCaptureReservationsForCustomer: refunding orphan capture '
+                    . $capture_resource_id . ' (paypal_order_id=' . $paypal_order_id
+                    . ', customer #' . (int)$customers_id
+                    . ', created ' . $created_at . ')'
+                );
+            }
+
+            $refund_response = $paymentModule->ppr->refundCaptureFull(
+                $capture_resource_id,
+                $invoice_id,
+                $payer_note
+            );
+
+            $refund_ok = false;
+            if (is_array($refund_response)) {
+                $status = strtoupper((string)($refund_response['status'] ?? ''));
+                if (in_array($status, ['COMPLETED', 'PENDING'], true)) {
+                    $refund_ok = true;
+                }
+            }
+
+            if ($refund_ok === true) {
+                $refunded++;
+                $esc = $db->prepare_input($capture_resource_id);
+                $db->Execute(
+                    "DELETE FROM " . $table
+                    . " WHERE capture_resource_id = '" . $esc . "'"
+                    . " AND orders_id = 0"
+                    . " AND customers_id = " . (int)$customers_id
+                    . " LIMIT 1"
+                );
+                if ($logger !== null) {
+                    $logger->write(
+                        'PayPalCommon::refundOrphanCaptureReservationsForCustomer: refund accepted for '
+                        . $capture_resource_id . ' (refund_id=' . (string)($refund_response['id'] ?? '') . ').'
+                    );
+                }
+            } else {
+                $error_info = method_exists($paymentModule->ppr, 'getErrorInfo')
+                    ? $paymentModule->ppr->getErrorInfo()
+                    : [];
+                if ($logger !== null) {
+                    $logger->write(
+                        'PayPalCommon::refundOrphanCaptureReservationsForCustomer: REFUND FAILED for '
+                        . $capture_resource_id . ' (customer #' . (int)$customers_id . '). '
+                        . 'Reservation row left in place for manual review. '
+                        . 'Response: ' . Logger::logJSON($refund_response) . ' '
+                        . 'Error: ' . Logger::logJSON($error_info)
+                    );
+                }
+                if (method_exists($paymentModule, 'sendAlertEmail')
+                    && defined('MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN')
+                ) {
+                    $paymentModule->sendAlertEmail(
+                        MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN,
+                        "Orphan PayPal capture refund failed.\n\n"
+                        . "Customer ID: " . (int)$customers_id . "\n"
+                        . "Capture ID:  " . $capture_resource_id . "\n"
+                        . "PayPal Order ID: " . $paypal_order_id . "\n"
+                        . "Created: " . $created_at . "\n\n"
+                        . "Refund attempted automatically before the customer's next checkout attempt "
+                        . "to prevent a duplicate PayPal charge. Manual refund required. "
+                        . "Reservation row was left in paypal_ac_capture_reservation for traceability.\n\n"
+                        . "Response: " . Logger::logJSON($refund_response) . "\n"
+                        . "Error: " . Logger::logJSON($error_info)
+                    );
+                }
+            }
+
+            $candidates->MoveNext();
+        }
+
+        return $refunded;
     }
 }
