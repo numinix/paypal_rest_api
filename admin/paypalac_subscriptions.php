@@ -67,6 +67,73 @@ function paypalac_known_status_labels()
 }
 
 /**
+ * Build a customer label for filter dropdowns; empty when no usable identity exists.
+ */
+function paypalac_subscription_customer_label(array $row): string
+{
+    $first = trim((string) ($row['customers_firstname'] ?? ''));
+    $last = trim((string) ($row['customers_lastname'] ?? ''));
+    $email = trim((string) ($row['customers_email_address'] ?? ''));
+    $memNum = trim((string) ($row['mem_num'] ?? ''));
+
+    $name = trim($last . ($last !== '' && $first !== '' ? ', ' : '') . $first);
+    if ($name !== '') {
+        if ($email !== '') {
+            return $name . ' (' . $email . ')';
+        }
+
+        return $name;
+    }
+    if ($email !== '') {
+        return $email;
+    }
+    if ($memNum !== '') {
+        return 'Member #' . $memNum;
+    }
+
+    return '';
+}
+
+/**
+ * @param array<int,array<string,mixed>> $subscriptions
+ * @return array<int,string>
+ */
+function paypalac_collect_subscription_customer_options(array $subscriptions): array
+{
+    $customers = [];
+    $customerEmailsSeen = [];
+
+    foreach ($subscriptions as $row) {
+        $customersId = (int) ($row['customers_id'] ?? 0);
+        if ($customersId <= 0) {
+            continue;
+        }
+
+        $customerLabel = paypalac_subscription_customer_label($row);
+        if ($customerLabel === '') {
+            continue;
+        }
+
+        $emailKey = strtolower(trim((string) ($row['customers_email_address'] ?? '')));
+        if ($emailKey !== '') {
+            if (!isset($customerEmailsSeen[$emailKey])) {
+                $customerEmailsSeen[$emailKey] = $customersId;
+                $customers[$customersId] = $customerLabel;
+            }
+            continue;
+        }
+
+        if (!isset($customers[$customersId])) {
+            $customers[$customersId] = $customerLabel;
+        }
+    }
+
+    asort($customers);
+
+    return $customers;
+}
+
+/**
  * Get PayPalProfileManager instance for API operations
  * @return PayPalProfileManager|null
  */
@@ -1658,23 +1725,6 @@ if ($statusRecords instanceof queryFactoryResult && $statusRecords->RecordCount(
         $statusRecords->MoveNext();
     }
 }
-// Get customers from both tables
-$customersOptions = [];
-$customerRecords = $db->Execute(
-    'SELECT DISTINCT ps.customers_id, c.customers_firstname, c.customers_lastname'
-    . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
-    . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = ps.customers_id'
-    . ' ORDER BY c.customers_lastname, c.customers_firstname'
-);
-if ($customerRecords instanceof queryFactoryResult) {
-    while (!$customerRecords->EOF) {
-        $cid = (int) $customerRecords->fields['customers_id'];
-        if ($cid > 0) {
-            $customersOptions[$cid] = trim($customerRecords->fields['customers_lastname'] . ', ' . $customerRecords->fields['customers_firstname']);
-        }
-        $customerRecords->MoveNext();
-    }
-}
 // Get products from both tables
 $productOptions = [];
 $productRecords = $db->Execute(
@@ -1845,6 +1895,8 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
         }
     }
 }
+
+$customersOptions = paypalac_collect_subscription_customer_options($allSubscriptions);
 
 // Sort subscriptions by next billing date, oldest first.
 // Records without a next payment date are sorted last.
