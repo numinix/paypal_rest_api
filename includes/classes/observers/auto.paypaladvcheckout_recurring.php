@@ -18,6 +18,10 @@ require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php'
 if (!trait_exists('Zencart\\Traits\\ObserverManager')) {
     require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/Compatibility/ObserverManager.php';
 }
+$paypalacSubscriptionHelper = DIR_FS_CATALOG . 'includes/functions/extra_functions/paypalac_subscription_functions.php';
+if (is_file($paypalacSubscriptionHelper)) {
+    require_once $paypalacSubscriptionHelper;
+}
 class zcObserverPaypaladvcheckoutRecurring
 {
     use ObserverManager;
@@ -119,6 +123,10 @@ class zcObserverPaypaladvcheckoutRecurring
                 $this->log->write("    Skipping: Order #$ordersId already processed.");
             }
             return;
+        }
+
+        if (function_exists('paypalac_materialize_accept_automatic_renewal_order_attributes')) {
+            paypalac_materialize_accept_automatic_renewal_order_attributes($ordersId);
         }
 
         $this->processedOrders[$ordersId] = true;
@@ -818,6 +826,10 @@ class zcObserverPaypaladvcheckoutRecurring
         if ($orderInfo->EOF) {
             $this->log->write("    ERROR: Order #$ordersId not found in database.");
             return;
+        }
+
+        if (function_exists('paypalac_materialize_accept_automatic_renewal_order_attributes')) {
+            paypalac_materialize_accept_automatic_renewal_order_attributes($ordersId);
         }
 
         $customersId = (int)$orderInfo->fields['customers_id'];
