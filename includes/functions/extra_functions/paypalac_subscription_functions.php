@@ -326,6 +326,28 @@ if (!function_exists('paypalac_renewal_attribute_value_is_present_and_accepted')
     }
 }
 
+if (!function_exists('paypalac_attribute_map_has_accepted_automatic_renewal')) {
+    /**
+     * Membership products carry billing period/frequency options for term length.
+     * Only create subscriptions when the customer accepted automatic renewal.
+     *
+     * @param array<string,string> $attributeMap normalized order-product attribute keys
+     */
+    function paypalac_attribute_map_has_accepted_automatic_renewal(array $attributeMap): bool
+    {
+        foreach ($attributeMap as $key => $value) {
+            $normalizedKey = preg_replace('/[^a-z0-9]/', '', strtolower((string) $key)) ?? '';
+            if ($normalizedKey !== 'acceptautomaticrenewal' && $normalizedKey !== 'automaticrenewal') {
+                continue;
+            }
+
+            return paypalac_renewal_attribute_value_is_present_and_accepted((string) $value);
+        }
+
+        return false;
+    }
+}
+
 if (!function_exists('paypalac_insert_order_product_subscription_attribute')) {
     function paypalac_insert_order_product_subscription_attribute(
         int $ordersId,

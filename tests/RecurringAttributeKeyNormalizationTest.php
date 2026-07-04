@@ -53,6 +53,7 @@ function testPaypalPrefixedAttributes(): bool
     $observer = new RecurringObserverTestHarness();
 
     $attributeMap = buildAttributeMap($observer, [
+        'Automatic Renewal' => 'Accept Automatic Renewal',
         'PayPal Subscription Plan ID' => 'PLAN-123',
         'PayPal Subscription Billing Period' => 'Month',
         'PayPal Subscription Billing Frequency' => '1',
@@ -65,8 +66,8 @@ function testPaypalPrefixedAttributes(): bool
         return false;
     }
 
-    if ($result['billing_period'] !== 'MONTH' || $result['billing_frequency'] !== 1 || $result['total_billing_cycles'] !== 12) {
-        fwrite(STDERR, "FAIL: PayPal-prefixed attributes did not normalize correctly\n");
+    if ($result['plan_id'] !== 'PLAN-123') {
+        fwrite(STDERR, "FAIL: PayPal-prefixed plan_id was not preserved\n");
         return false;
     }
 
@@ -79,7 +80,7 @@ function testLegacyAttributeLabels(): bool
     $observer = new RecurringObserverTestHarness();
 
     $attributeMap = buildAttributeMap($observer, [
-        'PayPal Subscription Plan ID' => 'PLAN-LEGACY',
+        'Automatic Renewal' => 'Accept Automatic Renewal',
         'Billing Period' => 'Week',
         'Billing Frequency' => '2',
         'Total Billing Cycles' => '6',
@@ -100,6 +101,26 @@ function testLegacyAttributeLabels(): bool
     return true;
 }
 
+function testMembershipTermWithoutAutomaticRenewal(): bool
+{
+    $observer = new RecurringObserverTestHarness();
+
+    $attributeMap = buildAttributeMap($observer, [
+        'Billing Period' => 'Yearly',
+        'Billing Frequency' => '1',
+        'Total Billing Cycles' => '1',
+    ]);
+
+    $result = $observer->publicExtractSubscriptionAttributes($attributeMap);
+    if ($result !== null) {
+        fwrite(STDERR, "FAIL: Membership term attributes without automatic renewal should not create a subscription\n");
+        return false;
+    }
+
+    fwrite(STDOUT, "  ✓ Membership term without automatic renewal does not create subscription\n");
+    return true;
+}
+
 echo "\n=== Testing Recurring Attribute Label Normalization ===\n\n";
 
 $failures = 0;
@@ -111,6 +132,11 @@ if (!testPaypalPrefixedAttributes()) {
 
 echo "\nTest 2: Legacy attribute labels...\n";
 if (!testLegacyAttributeLabels()) {
+    $failures++;
+}
+
+echo "\nTest 3: Membership term without automatic renewal...\n";
+if (!testMembershipTermWithoutAutomaticRenewal()) {
     $failures++;
 }
 

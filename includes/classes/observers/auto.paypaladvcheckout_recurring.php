@@ -456,6 +456,10 @@ class zcObserverPaypaladvcheckoutRecurring
      */
     protected function extractSubscriptionAttributes(array $attributeMap): ?array
     {
+        if (!$this->attributeMapHasAcceptedAutomaticRenewal($attributeMap)) {
+            return null;
+        }
+
         $normalized = [];
         foreach (self::ATTRIBUTE_KEY_MAP as $field => $keys) {
             foreach ($keys as $key) {
@@ -1091,6 +1095,30 @@ class zcObserverPaypaladvcheckoutRecurring
         $label = strtolower($label);
         $label = preg_replace('/[^a-z0-9]+/', '_', $label) ?? $label;
         return trim($label, '_');
+    }
+
+    /**
+     * @param array<string,string> $attributeMap
+     */
+    protected function attributeMapHasAcceptedAutomaticRenewal(array $attributeMap): bool
+    {
+        if (function_exists('paypalac_attribute_map_has_accepted_automatic_renewal')) {
+            return paypalac_attribute_map_has_accepted_automatic_renewal($attributeMap);
+        }
+
+        foreach ($attributeMap as $key => $value) {
+            $normalizedKey = preg_replace('/[^a-z0-9]/', '', strtolower((string) $key)) ?? '';
+            if ($normalizedKey !== 'acceptautomaticrenewal' && $normalizedKey !== 'automaticrenewal') {
+                continue;
+            }
+
+            $v = strtolower(trim((string) $value));
+            if ($v !== '' && !in_array($v, ['0', 'false', 'off', 'no', 'unchecked'], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
