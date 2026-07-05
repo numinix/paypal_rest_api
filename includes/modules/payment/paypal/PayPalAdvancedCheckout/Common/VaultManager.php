@@ -165,15 +165,23 @@ class VaultManager
         }, $columns);
         
         // Build the ON DUPLICATE KEY UPDATE clause
-        // Exclude date_added from updates since we want to preserve the original value
+        // Exclude date_added from updates since we want to preserve the original value.
+        // Never promote visible from 0 to 1 unless this write explicitly opts in.
         $updateClauses = [];
         foreach ($sqlData as $col => $val) {
-            if ($col !== 'date_added') {
-                if ($val === null) {
-                    $updateClauses[] = "`$col` = NULL";
-                } else {
-                    $updateClauses[] = "`$col` = '" . zen_db_input($val) . "'";
-                }
+            if ($col === 'date_added') {
+                continue;
+            }
+
+            if ($col === 'visible') {
+                $updateClauses[] = '`visible` = IF(' . (int)($visible ? 1 : 0) . ' = 1, 1, `visible`)';
+                continue;
+            }
+
+            if ($val === null) {
+                $updateClauses[] = "`$col` = NULL";
+            } else {
+                $updateClauses[] = "`$col` = '" . zen_db_input($val) . "'";
             }
         }
         

@@ -102,7 +102,7 @@ class zcObserverPaypaladvcheckoutVault
 
         // Save the vault card data
         $cardSource = $vaultCardData['card_source'];
-        $visible = $vaultCardData['visible'] ?? true;  // Default to visible for backward compatibility
+        $visible = (bool)($vaultCardData['visible'] ?? false);
         $storedVault = VaultManager::saveVaultedCard($customersId, $ordersId, $cardSource, $visible);
         
         if ($storedVault !== null) {
