@@ -548,6 +548,40 @@ class VaultManager
     }
 
     /**
+     * Saved cards the customer chose to keep for reuse (visible=1), including expired cards for account management.
+     *
+     * @return array[]
+     */
+    public static function getCustomerAccountSavedCards(int $customers_id): array
+    {
+        if ($customers_id <= 0) {
+            return [];
+        }
+
+        self::ensureSchema();
+
+        global $db;
+
+        $vaultedCards = [];
+        $records = $db->Execute(
+            "SELECT *
+               FROM " . TABLE_PAYPAL_VAULT . "
+              WHERE customers_id = " . (int)$customers_id . "
+                AND visible = 1
+           ORDER BY last_modified DESC"
+        );
+
+        if (is_object($records)) {
+            while (!$records->EOF) {
+                $vaultedCards[] = self::mapRow($records->fields);
+                $records->MoveNext();
+            }
+        }
+
+        return $vaultedCards;
+    }
+
+    /**
      * Retrieve a single vaulted card for the supplied customer.
      */
     public static function getCustomerVaultCard(int $customers_id, int $paypal_vault_id): ?array

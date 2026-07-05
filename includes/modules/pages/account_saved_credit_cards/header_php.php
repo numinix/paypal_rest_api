@@ -1458,8 +1458,8 @@ if ($hide_saved_cards_page === false) {
         }
     }
 
-    // Get PayPal Vault cards
-    $rawCards = VaultManager::getCustomerVaultedCards($customers_id, false);
+    // Get PayPal Vault cards the customer explicitly saved for reuse.
+    $rawCards = VaultManager::getCustomerAccountSavedCards($customers_id);
     foreach ($rawCards as $rawCard) {
         $normalized = paypalac_normalize_vault_card($rawCard, $statusMap);
         if ($normalized['paypal_vault_id'] > 0) {

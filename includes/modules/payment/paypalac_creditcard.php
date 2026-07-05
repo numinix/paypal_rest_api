@@ -489,7 +489,7 @@ class paypalac_creditcard extends base
 
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
         $forceSaveCard = $allowSaveCard && $savedCardSelection === 'new' && $this->orderRequiresVaultedCard();
-        $saveCardChecked = $allowSaveCard && ($forceSaveCard || !empty($_POST['paypalac_cc_save_card']) || (!empty($_SESSION['PayPalAdvancedCheckout']['save_card'])));
+        $saveCardChecked = $allowSaveCard && ($forceSaveCard || !empty($_POST['paypalac_cc_save_card']) || !empty($_POST['ppac_cc_save_card']));
         if ($savedCardSelection !== 'new') {
             $saveCardChecked = false;
             $forceSaveCard = false;
@@ -771,12 +771,14 @@ class paypalac_creditcard extends base
         }
         
         // Store save card preference
-        if (isset($_POST['paypalac_cc_save_card'])) {
-            $_SESSION['PayPalAdvancedCheckout']['save_card'] = $_POST['paypalac_cc_save_card'];
-        } elseif (isset($_POST['ppac_cc_save_card'])) {
-            $_SESSION['PayPalAdvancedCheckout']['save_card'] = $_POST['ppac_cc_save_card'];
-        } elseif ($this->orderRequiresVaultedCard()) {
+        $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
+        $forceSaveCard = $allowSaveCard && $this->orderRequiresVaultedCard();
+        if ($forceSaveCard) {
             $_SESSION['PayPalAdvancedCheckout']['save_card'] = true;
+        } elseif (!empty($_POST['paypalac_cc_save_card']) || !empty($_POST['ppac_cc_save_card'])) {
+            $_SESSION['PayPalAdvancedCheckout']['save_card'] = $_POST['paypalac_cc_save_card'] ?? $_POST['ppac_cc_save_card'];
+        } else {
+            unset($_SESSION['PayPalAdvancedCheckout']['save_card']);
         }
         
         // Validate card information

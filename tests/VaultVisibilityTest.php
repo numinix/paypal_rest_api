@@ -7,7 +7,7 @@ declare(strict_types=1);
  * This test verifies that:
  * 1. All cards are vaulted with PayPal
  * 2. Only cards where the user checked "Save for future use" are visible in checkout
- * 3. All cards (visible and hidden) are accessible in the account management page
+ * 3. Account saved-cards page lists only cards the customer chose to save (visible=1)
  */
 
 namespace {
@@ -369,9 +369,21 @@ namespace {
     $cards = VaultManager::getCustomerVaultedCards(1, false);
     
     if (count($cards) === 2) {
-        echo "  ✓ activeOnly=false returns all 2 cards (for account management)\n";
+        echo "  ✓ activeOnly=false returns all 2 cards (admin/internal use)\n";
     } else {
         fwrite(STDERR, "  ✗ Expected 2 cards, got " . count($cards) . "\n");
+        $failures++;
+    }
+
+    echo "\nTest 5: getCustomerAccountSavedCards returns only visible cards...\n";
+
+    $GLOBALS['db']->setMockResult('vault_select_visible', new queryFactoryResult($visibleCards, false));
+    $accountCards = VaultManager::getCustomerAccountSavedCards(1);
+
+    if (count($accountCards) === 1 && !empty($accountCards[0]['visible'])) {
+        echo "  ✓ Account saved-cards list returns only the visible card\n";
+    } else {
+        fwrite(STDERR, "  ✗ Expected 1 visible card, got " . count($accountCards) . "\n");
         $failures++;
     }
 
@@ -383,5 +395,5 @@ namespace {
     echo "\n✅ All vault visibility tests passed.\n";
     echo "   - All cards are vaulted with PayPal for security\n";
     echo "   - Only cards where user checked 'Save' are visible in checkout\n";
-    echo "   - All cards (visible and hidden) are accessible in account management\n";
+    echo "   - Account saved-cards page lists only visible cards\n";
 }
