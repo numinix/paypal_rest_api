@@ -12,6 +12,10 @@
  */
 require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 require_once(DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_common.php');
+$paypalacSubscriptionHelper = DIR_FS_CATALOG . DIR_WS_FUNCTIONS . 'extra_functions/paypalac_subscription_functions.php';
+if (is_file($paypalacSubscriptionHelper)) {
+    require_once $paypalacSubscriptionHelper;
+}
 
 use PayPalAdvancedCheckout\Admin\AdminMain;
 use PayPalAdvancedCheckout\Admin\DoAuthorization;
@@ -489,7 +493,7 @@ class paypalac_creditcard extends base
 
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
         $forceSaveCard = $allowSaveCard && $savedCardSelection === 'new' && $this->orderRequiresVaultedCard();
-        $saveCardChecked = $allowSaveCard && ($forceSaveCard || !empty($_POST['paypalac_cc_save_card']) || !empty($_POST['ppac_cc_save_card']));
+        $saveCardChecked = $allowSaveCard && ($forceSaveCard || paypalac_customer_checked_save_card_post());
         if ($savedCardSelection !== 'new') {
             $saveCardChecked = false;
             $forceSaveCard = false;
@@ -698,6 +702,11 @@ class paypalac_creditcard extends base
 
     protected function orderRequiresVaultedCard(): bool
     {
+        if (function_exists('paypalac_checkout_requires_visible_saved_card')
+            && paypalac_checkout_requires_visible_saved_card()) {
+            return true;
+        }
+
         if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart'])) {
             return false;
         }
@@ -707,22 +716,36 @@ class paypalac_creditcard extends base
             return false;
         }
 
-        if (!class_exists('paypalacSavedCardRecurring')) {
-            $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
-            if (file_exists($savedCardRecurringPath)) {
-                require_once $savedCardRecurringPath;
-            }
-        }
-
-        if (class_exists('paypalacSavedCardRecurring')) {
-            $recurring = new paypalacSavedCardRecurring();
-            $subscriptions = $recurring->find_subscription_products_in_order($products);
-            if (!empty($subscriptions)) {
-                return true;
-            }
-        }
-
         return $this->cartHasPlanIdSubscription($products);
+    }
+
+    protected function syncCheckoutSaveCardSession(bool $allowSaveCard, bool $usingNewCard): void
+    {
+        if (function_exists('paypalac_sync_checkout_save_card_session')) {
+            paypalac_sync_checkout_save_card_session($allowSaveCard, $usingNewCard);
+            return;
+        }
+
+        if (!$allowSaveCard || !$usingNewCard) {
+            unset($_SESSION['PayPalAdvancedCheckout']['save_card']);
+            return;
+        }
+
+        if ($this->orderRequiresVaultedCard() || paypalac_customer_checked_save_card_post()) {
+            $_SESSION['PayPalAdvancedCheckout']['save_card'] = true;
+            return;
+        }
+
+        unset($_SESSION['PayPalAdvancedCheckout']['save_card']);
+    }
+
+    protected function checkoutVaultCardVisible(): bool
+    {
+        if (function_exists('paypalac_checkout_vault_card_visible')) {
+            return paypalac_checkout_vault_card_visible();
+        }
+
+        return !empty($_SESSION['PayPalAdvancedCheckout']['save_card']);
     }
 
     protected function cartHasPlanIdSubscription(array $products): bool
@@ -772,14 +795,11 @@ class paypalac_creditcard extends base
         
         // Store save card preference
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
-        $forceSaveCard = $allowSaveCard && $this->orderRequiresVaultedCard();
-        if ($forceSaveCard) {
-            $_SESSION['PayPalAdvancedCheckout']['save_card'] = true;
-        } elseif (!empty($_POST['paypalac_cc_save_card']) || !empty($_POST['ppac_cc_save_card'])) {
-            $_SESSION['PayPalAdvancedCheckout']['save_card'] = $_POST['paypalac_cc_save_card'] ?? $_POST['ppac_cc_save_card'];
-        } else {
-            unset($_SESSION['PayPalAdvancedCheckout']['save_card']);
+        $savedCardSelection = (string)($_POST['paypalac_saved_card'] ?? ($_POST['ppac_saved_card'] ?? 'new'));
+        if ($savedCardSelection === '') {
+            $savedCardSelection = 'new';
         }
+        $this->syncCheckoutSaveCardSession($allowSaveCard, $savedCardSelection === 'new');
         
         // Validate card information
         if (!$this->validateCardInformation(true)) {
@@ -937,12 +957,8 @@ class paypalac_creditcard extends base
 
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
         $forceSaveCard = $allowSaveCard && $this->orderRequiresVaultedCard();
-        $storeCard = $allowSaveCard && ($forceSaveCard || !empty($_POST['paypalac_cc_save_card']) || !empty($_POST['ppac_cc_save_card']));
-        if ($storeCard === true) {
-            $_SESSION['PayPalAdvancedCheckout']['save_card'] = true;
-        } else {
-            unset($_SESSION['PayPalAdvancedCheckout']['save_card']);
-        }
+        $storeCard = $allowSaveCard && ($forceSaveCard || paypalac_customer_checked_save_card_post());
+        $this->syncCheckoutSaveCardSession($allowSaveCard, true);
 
         $this->ccInfo = [
             'type' => MODULE_PAYMENT_PAYPALAC_TEXT_CC_TYPE_GENERIC ?? 'Card',
@@ -1037,8 +1053,8 @@ class paypalac_creditcard extends base
             $hiddenFields .= zen_draw_hidden_field('ppac_cc_number', $_POST['paypalac_cc_number'] ?? '');
             $hiddenFields .= zen_draw_hidden_field('ppac_cc_cvv', $_POST['paypalac_cc_cvv'] ?? ($_POST['paypalac_cc_code'] ?? ''));
             $hiddenFields .= zen_draw_hidden_field('ppac_cc_code', $_POST['paypalac_cc_code'] ?? ($_POST['paypalac_cc_cvv'] ?? ''));
-            if (!empty($_POST['paypalac_cc_save_card'])) {
-                $hiddenFields .= zen_draw_hidden_field('ppac_cc_save_card', $_POST['paypalac_cc_save_card']);
+            if (paypalac_customer_checked_save_card_post()) {
+                $hiddenFields .= zen_draw_hidden_field('ppac_cc_save_card', $_POST['paypalac_cc_save_card'] ?? 'on');
             }
             if (!empty($_POST['paypalac_cc_sca_always'])) {
                 $hiddenFields .= zen_draw_hidden_field('ppac_cc_sca_always', $_POST['paypalac_cc_sca_always']);
@@ -1065,8 +1081,8 @@ class paypalac_creditcard extends base
             $ccFields['ccFields']['ppac_cc_number'] = 'paypalac_cc_number';
             $ccFields['ccFields']['ppac_cc_cvv'] = 'paypalac_cc_cvv';
             $ccFields['ccFields']['ppac_cc_code'] = 'paypalac_cc_code';
-            if (!empty($_POST['paypalac_cc_save_card'])) {
-                $ccFields['ccFields']['ppac_cc_save_card'] = 'paypalac_cc_save_card';
+        if (paypalac_customer_checked_save_card_post()) {
+            $ccFields['ccFields']['ppac_cc_save_card'] = 'paypalac_cc_save_card';
             }
             if (isset($_POST['paypalac_cc_sca_always'])) {
                 $ccFields['ccFields']['ppac_cc_sca_always'] = 'paypalac_cc_sca_always';
@@ -1225,7 +1241,7 @@ class paypalac_creditcard extends base
             return;
         }
 
-        $visible = !empty($_SESSION['PayPalAdvancedCheckout']['save_card']);
+        $visible = $this->checkoutVaultCardVisible();
 
         $_SESSION['PayPalAdvancedCheckout']['VaultCardData'] = [
             'card_source' => $card_source,

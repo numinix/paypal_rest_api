@@ -704,7 +704,9 @@ class PayPalCommon {
             return null;
         }
 
-        $visible = !empty($_SESSION['PayPalAdvancedCheckout']['save_card']);
+        $visible = function_exists('paypalac_checkout_vault_card_visible')
+            ? paypalac_checkout_vault_card_visible()
+            : !empty($_SESSION['PayPalAdvancedCheckout']['save_card']);
         $storedVault = VaultManager::saveVaultedCard($customers_id, $orders_id, $card_source, $visible);
         if ($storedVault !== null) {
             $this->paymentModule->notify('NOTIFY_PAYPALAC_VAULT_CARD_SAVED', $storedVault);

@@ -146,6 +146,59 @@ jQuery(document).ready(function() {
         });
     }
 
+    function syncLiveCreditCardFieldsToForm($targetForm)
+    {
+        if (!$targetForm || !$targetForm.length) {
+            return;
+        }
+
+        var fieldNames = [
+            'paypalac_saved_card',
+            'paypalac_cc_firstname',
+            'paypalac_cc_lastname',
+            'paypalac_cc_number',
+            'paypalac_cc_cvv',
+            'paypalac_cc_expires_month',
+            'paypalac_cc_expires_year',
+            'paypalac_cc_save_card'
+        ];
+
+        fieldNames.forEach(function(name) {
+            var $live = jQuery('form[name="checkout_payment"] [name="' + name + '"]');
+            if (!$live.length) {
+                return;
+            }
+
+            if (name === 'paypalac_cc_save_card') {
+                var $targetSaveCard = $targetForm.find('[name="' + name + '"]');
+                if (!$live.first().is(':checked')) {
+                    $targetSaveCard.remove();
+                    return;
+                }
+
+                var saveCardValue = $live.first().val() || 'on';
+                if ($targetSaveCard.length) {
+                    $targetSaveCard.val(saveCardValue);
+                } else {
+                    jQuery('<input type="hidden" />').attr('name', name).val(saveCardValue).appendTo($targetForm);
+                }
+                return;
+            }
+
+            var value = $live.first().val();
+            var $target = $targetForm.find('[name="' + name + '"]');
+            if ($target.length) {
+                $target.val(value);
+            } else {
+                jQuery('<input type="hidden" />').attr('name', name).val(value).appendTo($targetForm);
+            }
+        });
+    }
+
+    jQuery(document).on('oprc:beforeCheckoutProcess', function(event, $form) {
+        syncLiveCreditCardFieldsToForm($form);
+    });
+
     // Ensure parent module radio is selected when payment method changes
     jQuery('input[name=payment]').on('change', function() {
         if (jQuery('#pmt-paypalac').is(':not(:checked)')) {

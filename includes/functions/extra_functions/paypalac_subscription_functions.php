@@ -390,3 +390,129 @@ if (!function_exists('paypalac_insert_order_product_subscription_attribute')) {
         zen_db_perform(TABLE_ORDERS_PRODUCTS_ATTRIBUTES, $sql_data);
     }
 }
+
+if (!function_exists('paypalac_product_has_automatic_renewal_accept')) {
+    function paypalac_product_has_automatic_renewal_accept(array $product): bool
+    {
+        if (empty($product['attributes']) || !is_array($product['attributes'])) {
+            return false;
+        }
+
+        foreach ($product['attributes'] as $optionKey => $attributeValue) {
+            $optionName = '';
+            $valueName = '';
+
+            if (is_array($attributeValue)) {
+                if (isset($attributeValue['option'])) {
+                    $optionName = trim((string) $attributeValue['option']);
+                } elseif (isset($attributeValue['products_options_name'])) {
+                    $optionName = trim((string) $attributeValue['products_options_name']);
+                }
+
+                if (isset($attributeValue['value'])) {
+                    $valueName = trim(strip_tags((string) $attributeValue['value']));
+                } elseif (isset($attributeValue['value_id'])) {
+                    $valueName = trim(strip_tags((string) zen_values_name((int) $attributeValue['value_id'])));
+                } elseif (isset($attributeValue['products_options_values_name'])) {
+                    $valueName = trim((string) $attributeValue['products_options_values_name']);
+                }
+            } else {
+                $optionName = trim((string) zen_options_name((int) $optionKey));
+                $valueName = trim((string) zen_values_name((int) $attributeValue));
+            }
+
+            if ($optionName === 'Automatic Renewal' && stripos($valueName, 'Accept') === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('paypalac_cart_includes_automatic_renewal_accept')) {
+    function paypalac_cart_includes_automatic_renewal_accept(): bool
+    {
+        if (function_exists('ncrs_cart_includes_automatic_renewal_accept')) {
+            return ncrs_cart_includes_automatic_renewal_accept();
+        }
+
+        if (isset($_SESSION['cart']) && is_object($_SESSION['cart'])) {
+            $products = $_SESSION['cart']->get_products();
+            if (is_array($products) && !empty($products)) {
+                foreach ($products as $product) {
+                    if (paypalac_product_has_automatic_renewal_accept($product)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        global $order;
+        if (isset($order) && is_object($order) && !empty($order->products) && is_array($order->products)) {
+            foreach ($order->products as $product) {
+                if (paypalac_product_has_automatic_renewal_accept($product)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('paypalac_customer_checked_save_card_post')) {
+    function paypalac_customer_checked_save_card_post(): bool
+    {
+        foreach (['paypalac_cc_save_card', 'ppac_cc_save_card'] as $field) {
+            if (!array_key_exists($field, $_POST)) {
+                continue;
+            }
+
+            $value = $_POST[$field];
+            if (is_bool($value)) {
+                return $value;
+            }
+
+            $value = strtolower(trim(strip_tags((string) $value)));
+            if ($value === 'on' || $value === '1' || $value === 'yes' || $value === 'true') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('paypalac_checkout_requires_visible_saved_card')) {
+    function paypalac_checkout_requires_visible_saved_card(): bool
+    {
+        return paypalac_cart_includes_automatic_renewal_accept();
+    }
+}
+
+if (!function_exists('paypalac_sync_checkout_save_card_session')) {
+    function paypalac_sync_checkout_save_card_session(bool $allowSaveCard, bool $usingNewCard): void
+    {
+        if (!$allowSaveCard || !$usingNewCard) {
+            unset($_SESSION['PayPalAdvancedCheckout']['save_card']);
+            return;
+        }
+
+        if (paypalac_checkout_requires_visible_saved_card() || paypalac_customer_checked_save_card_post()) {
+            $_SESSION['PayPalAdvancedCheckout']['save_card'] = true;
+            return;
+        }
+
+        unset($_SESSION['PayPalAdvancedCheckout']['save_card']);
+    }
+}
+
+if (!function_exists('paypalac_checkout_vault_card_visible')) {
+    function paypalac_checkout_vault_card_visible(): bool
+    {
+        return !empty($_SESSION['PayPalAdvancedCheckout']['save_card']);
+    }
+}
