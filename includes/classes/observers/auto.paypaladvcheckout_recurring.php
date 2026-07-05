@@ -597,7 +597,7 @@ class zcObserverPaypaladvcheckoutRecurring
         }
 
         $cardSource = $vaultCardData['card_source'];
-        $visible = $vaultCardData['visible'] ?? true;
+        $visible = (bool)($vaultCardData['visible'] ?? false);
         $storedVault = VaultManager::saveVaultedCard($customersId, $ordersId, $cardSource, $visible);
         if ($storedVault !== null) {
             global $zco_notifier;
@@ -1251,6 +1251,11 @@ class zcObserverPaypaladvcheckoutRecurring
         $vaultId = (string)($vaultRecord['vault_id'] ?? '');
         if ($vaultId === '') {
             $this->log->write("    WARNING: Cannot sync vault to saved cards - vault_id is empty.");
+            return;
+        }
+
+        if ((int)($vaultRecord['visible'] ?? 0) !== 1) {
+            $this->log->write("    Skipping saved_credit_cards sync for backend-only vault token: $vaultId");
             return;
         }
         
