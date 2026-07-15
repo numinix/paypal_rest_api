@@ -575,19 +575,17 @@ class zcObserverPaypaladvcheckout
         //
         $components = ['messages'];
 
-        // Add 'buttons' only for modules that call paypal.Buttons() themselves.
-        // Do NOT include MODULE_PAYMENT_PAYPALAC_STATUS: wallet-only PayPal uses a
-        // static image + form submit/redirect, not Smart Buttons. Loading the
-        // global buttons component attaches document/html click handlers that
-        // throw (null.innerText) and can swallow Complete Purchase when another
-        // card module (e.g. Braintree) is selected on one-page checkout.
-        $needsButtonsComponent = (
-            (defined('MODULE_PAYMENT_PAYPALAC_VENMO_STATUS') && MODULE_PAYMENT_PAYPALAC_VENMO_STATUS === 'True') ||
-            (defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS') && MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS === 'True')
-        );
-        if ($needsButtonsComponent) {
-            $components[] = 'buttons';
-        }
+        // Never load the global `buttons` component here. Wallet modules that
+        // actually call paypal.Buttons() (Pay Later, Venmo, product/cart Smart
+        // Buttons) load `components=buttons` themselves.
+        //
+        // Loading buttons site-wide whenever PAYLATER_STATUS (or formerly
+        // PAYPALAC_STATUS) is True attaches HTML/document click handlers that
+        // throw `null.innerText` and can swallow OPRC Complete Purchase when
+        // Braintree/cards are selected — HAED regression around wallet-only +
+        // Braintree coexistence.
+        //
+        // Messages-only is enough for Pay Later messaging on this observer.
 
         // Load Google Pay SDK component based on user status and guest wallet setting
         // Per PayPal support guidance, we can use PayPal SDK for both logged-in and guest users
