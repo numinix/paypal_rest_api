@@ -1455,7 +1455,10 @@ class paypalac extends base
         if ($this->cardsAccepted === false || $this->shippingCountryIsSupported === false) {
             // Attach checkout.js to the module markup so tpl_checkout_payment does not wrap an
             // empty-title row in .ccinfo (empty label + clearBoth Brs create large gaps between methods).
-            $checkoutScript = '<script defer src="' . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.checkout.js"></script>';
+            $checkoutJsRel = DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.checkout.js';
+            $checkoutJsFs = DIR_FS_CATALOG . $checkoutJsRel;
+            $checkoutJsVer = is_file($checkoutJsFs) ? (int)filemtime($checkoutJsFs) : time();
+            $checkoutScript = '<script defer src="' . $checkoutJsRel . '?v=' . $checkoutJsVer . '"></script>';
             $selection['module'] .= $checkoutScript;
 
             if ($this->shippingCountryIsSupported === false) {
