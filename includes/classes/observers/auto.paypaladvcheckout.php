@@ -575,11 +575,13 @@ class zcObserverPaypaladvcheckout
         //
         $components = ['messages'];
 
-        // Add 'buttons' component if any wallet payment method is enabled that uses PayPal Buttons
-        // (Venmo uses buttons with FUNDING.VENMO, PayPal wallet uses buttons with default funding,
-        // Pay Later uses buttons with FUNDING.PAYLATER)
+        // Add 'buttons' only for modules that call paypal.Buttons() themselves.
+        // Do NOT include MODULE_PAYMENT_PAYPALAC_STATUS: wallet-only PayPal uses a
+        // static image + form submit/redirect, not Smart Buttons. Loading the
+        // global buttons component attaches document/html click handlers that
+        // throw (null.innerText) and can swallow Complete Purchase when another
+        // card module (e.g. Braintree) is selected on one-page checkout.
         $needsButtonsComponent = (
-            (defined('MODULE_PAYMENT_PAYPALAC_STATUS') && MODULE_PAYMENT_PAYPALAC_STATUS === 'True') ||
             (defined('MODULE_PAYMENT_PAYPALAC_VENMO_STATUS') && MODULE_PAYMENT_PAYPALAC_VENMO_STATUS === 'True') ||
             (defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS') && MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS === 'True')
         );
@@ -753,7 +755,14 @@ let paypalMessageableStyles = <?= !empty($messageStyles) ? json_encode($messageS
         $limit = explode(', ', $limit);
 
         $limitAllCheckout = !empty(array_intersect($limit, ['All', 'Checkout']));
-        if ($limitAllCheckout && strpos((string)$current_page_base, 'checkout') === 0) {
+        $pageBase = (string)$current_page_base;
+        // Numinix OPRC uses one_page_checkout / oprc_* keys, not checkout_*.
+        $isCheckoutPage = (
+            strpos($pageBase, 'checkout') === 0
+            || strpos($pageBase, 'one_page_checkout') === 0
+            || strpos($pageBase, 'oprc_checkout') === 0
+        );
+        if ($limitAllCheckout && $isCheckoutPage) {
             return 'checkout';
         }
 

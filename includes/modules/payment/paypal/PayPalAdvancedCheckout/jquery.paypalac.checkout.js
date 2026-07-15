@@ -26,6 +26,84 @@ jQuery(document).ready(function() {
         }
     }
 
+    // PayPal JS SDK may still probe #ppr-choice-paypal .ppr-choice-label on
+    // document clicks. Wallet-only markup omits the legacy choice UI.
+    function ensurePayPalChoiceSentinel() {
+        var label = document.querySelector('#ppr-choice-paypal .ppr-choice-label');
+        if (label) {
+            if (!String(label.textContent || '').trim()) {
+                label.textContent = 'PayPal';
+            }
+            return;
+        }
+        var wrap = document.getElementById('ppr-choice-paypal');
+        if (!wrap) {
+            wrap = document.createElement('div');
+            wrap.id = 'ppr-choice-paypal';
+            wrap.className = 'paypalac-ppr-choice-sentinel';
+            wrap.setAttribute('aria-hidden', 'true');
+            var host = document.getElementById('paymentModules')
+                || document.getElementById('paymentMethodContainer')
+                || document.querySelector('form[name="checkout_payment"]')
+                || document.body;
+            host.appendChild(wrap);
+        }
+        label = document.createElement('span');
+        label.className = 'ppr-choice-label';
+        label.textContent = 'PayPal';
+        wrap.appendChild(label);
+    }
+    ensurePayPalChoiceSentinel();
+
+    if (!window.__paypalacInnerTextGuardInstalled) {
+        window.__paypalacInnerTextGuardInstalled = true;
+        window.addEventListener('unhandledrejection', function (event) {
+            var msg = '';
+            try {
+                msg = (event && event.reason && (event.reason.message || event.reason)) || '';
+                msg = String(msg);
+            } catch (_e) { /* swallow */ }
+            if (msg.indexOf('innerText') !== -1) {
+                if (typeof event.preventDefault === 'function') {
+                    event.preventDefault();
+                }
+                debugLog('Suppressed PayPal SDK innerText rejection', msg);
+            }
+        });
+    }
+
+    // When Cards/Braintree (non-PayPal) is selected, shield Complete Purchase
+    // from PayPal Buttons SDK click handlers that can throw and swallow the click.
+    if (!window.__paypalacConfirmClickShieldInstalled) {
+        window.__paypalacConfirmClickShieldInstalled = true;
+        document.addEventListener('click', function (event) {
+            var submitRoot = document.getElementById('js-submit');
+            if (!submitRoot || !event.target || !submitRoot.contains(event.target)) {
+                return;
+            }
+
+            var selected = document.querySelector('#paymentModules input[name="payment"]:checked');
+            var code = selected ? String(selected.value || '') : '';
+            if (!code || code === 'paypalac' || code.indexOf('paypalac_') === 0) {
+                return;
+            }
+
+            debugLog('Shielding Complete Purchase click from PayPal SDK', { payment: code });
+            if (typeof event.preventDefault === 'function') {
+                event.preventDefault();
+            }
+            if (typeof event.stopImmediatePropagation === 'function') {
+                event.stopImmediatePropagation();
+            } else if (typeof event.stopPropagation === 'function') {
+                event.stopPropagation();
+            }
+
+            if (typeof window.oprcProcessCheckoutSubmission === 'function') {
+                window.oprcProcessCheckoutSubmission(event);
+            }
+        }, true);
+    }
+
     // No toggling needed - both PayPal and Credit Card fields are always visible
     // Only handle saved card selection logic
     
