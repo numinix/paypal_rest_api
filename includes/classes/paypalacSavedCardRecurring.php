@@ -1547,9 +1547,20 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
                         $scopeSql = 'orders_products_id = ' . $original_orders_products_id;
                 }
 
-                if ($completed_cycles === null && $scopeSql !== '') {
-                        $result = $db->Execute('SELECT COUNT(*) AS num_cycles FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE ' . $scopeSql);
-                        $completed_cycles = (int) $result->fields['num_cycles'];
+                if ($completed_cycles === null) {
+                        $subscriptionId = 0;
+                        if (isset($subscription_context['saved_credit_card_recurring_id'])) {
+                                $subscriptionId = (int) $subscription_context['saved_credit_card_recurring_id'];
+                        } elseif (isset($subscription_context['paypal_saved_card_recurring_id'])) {
+                                $subscriptionId = (int) $subscription_context['paypal_saved_card_recurring_id'];
+                        }
+                        if ($subscriptionId > 0) {
+                                $completed_cycles = $this->count_completed_billing_cycles($subscriptionId, $subscription_context);
+                        } elseif ($scopeSql !== '') {
+                                // Legacy multi-row fallback when we cannot resolve a subscription id.
+                                $result = $db->Execute('SELECT COUNT(*) AS num_cycles FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE ' . $scopeSql);
+                                $completed_cycles = (int) $result->fields['num_cycles'];
+                        }
                 }
                 if ($completed_cycles === null) {
                         $completed_cycles = 0;
@@ -2651,6 +2662,119 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                 $db->Execute($sql);
         }
 
+        /**
+         * Count billing cycles already consumed for a saved-card subscription.
+         *
+         * The original checkout order counts as cycle 1. Each later cron-created
+         * order (logged in orders_status_history as "Subscription #ID ...") adds one.
+         */
+        function count_completed_billing_cycles($paypal_saved_card_recurring_id, array $payment_details = null)
+        {
+                global $db;
+
+                $paypal_saved_card_recurring_id = (int) $paypal_saved_card_recurring_id;
+                if ($paypal_saved_card_recurring_id <= 0) {
+                        return 0;
+                }
+
+                if (!is_array($payment_details)) {
+                        $payment_details = $this->get_payment_details($paypal_saved_card_recurring_id);
+                }
+                if (!is_array($payment_details)) {
+                        return 0;
+                }
+
+                $completed = 0;
+                $ordersId = 0;
+                if (isset($payment_details['orders_id'])) {
+                        $ordersId = (int) $payment_details['orders_id'];
+                }
+                if ($ordersId <= 0 && isset($payment_details['original_orders_id'])) {
+                        $ordersId = (int) $payment_details['original_orders_id'];
+                }
+                if ($ordersId <= 0) {
+                        $ordersProductsId = 0;
+                        if (isset($payment_details['original_orders_products_id'])) {
+                                $ordersProductsId = (int) $payment_details['original_orders_products_id'];
+                        } elseif (isset($payment_details['orders_products_id'])) {
+                                $ordersProductsId = (int) $payment_details['orders_products_id'];
+                        }
+                        if ($ordersProductsId > 0) {
+                                $orderLookup = $db->Execute(
+                                        'SELECT orders_id FROM ' . TABLE_ORDERS_PRODUCTS
+                                        . ' WHERE orders_products_id = ' . $ordersProductsId
+                                        . ' LIMIT 1'
+                                );
+                                if ($orderLookup instanceof queryFactoryResult && !$orderLookup->EOF) {
+                                        $ordersId = (int) ($orderLookup->fields['orders_id'] ?? 0);
+                                }
+                        }
+                }
+                if ($ordersId > 0) {
+                        $completed = 1;
+                }
+
+                if (defined('TABLE_ORDERS_STATUS_HISTORY')) {
+                        $like = '%Subscription #' . $paypal_saved_card_recurring_id . '%';
+                        $sql = 'SELECT COUNT(DISTINCT orders_id) AS n FROM ' . TABLE_ORDERS_STATUS_HISTORY
+                                . " WHERE comments LIKE '" . $this->escape_db_value($like) . "'";
+                        if ($ordersId > 0) {
+                                $sql .= ' AND orders_id <> ' . $ordersId;
+                        }
+                        $historyCount = $db->Execute($sql);
+                        if ($historyCount instanceof queryFactoryResult && !$historyCount->EOF) {
+                                $completed += (int) ($historyCount->fields['n'] ?? 0);
+                        }
+                }
+
+                return $completed;
+        }
+
+        /**
+         * Resolve total_billing_cycles (0 = unlimited / good until cancelled).
+         */
+        function get_total_billing_cycles_limit(array $payment_details = null)
+        {
+                $limit = 0;
+                if (is_array($payment_details) && isset($payment_details['total_billing_cycles']) && is_numeric($payment_details['total_billing_cycles'])) {
+                        $limit = (int) $payment_details['total_billing_cycles'];
+                }
+
+                $attributes = is_array($payment_details) ? $this->get_snapshot_attributes($payment_details) : array();
+                if (is_array($attributes) && isset($attributes['totalbillingcycles']) && is_numeric($attributes['totalbillingcycles'])) {
+                        $limit = (int) $attributes['totalbillingcycles'];
+                }
+
+                return max(0, $limit);
+        }
+
+        /**
+         * True when more billing cycles remain (or the plan is unlimited).
+         *
+         * @param int $additionalCompletedPayments Cycles to treat as already done beyond
+         *                                          what count_completed_billing_cycles() sees
+         *                                          (e.g. 1 for the payment just processed).
+         */
+        function has_remaining_billing_cycles($paypal_saved_card_recurring_id, array $payment_details = null, $additionalCompletedPayments = 0)
+        {
+                if (!is_array($payment_details)) {
+                        $payment_details = $this->get_payment_details($paypal_saved_card_recurring_id);
+                }
+                if (!is_array($payment_details)) {
+                        return true;
+                }
+
+                $limit = $this->get_total_billing_cycles_limit($payment_details);
+                if ($limit <= 0) {
+                        return true;
+                }
+
+                $completed = $this->count_completed_billing_cycles($paypal_saved_card_recurring_id, $payment_details)
+                        + (int) $additionalCompletedPayments;
+
+                return $completed < $limit;
+        }
+
         function count_failed_payments($paypal_saved_card_recurring_id, array $payment_details = null) {
 		global $db;
 		if (!is_array($payment_details)) {
@@ -2801,31 +2925,31 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                 $completed_payments = null;
                 if (isset($precomputed['completed_payments'])) {
                         $completed_payments = (int) $precomputed['completed_payments'];
-                }
-                elseif ($scopeSql !== '') {
-                        $result = $db->Execute('SELECT COUNT(*) AS num_payments FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE " . $scopeSql . " AND status = 'complete'");
-                        $completed_payments = (int) $result->fields['num_payments'];
-                }
-                else {
-                        $completed_payments = 0;
+                } else {
+                        $completed_payments = $this->count_completed_billing_cycles(
+                                $paypal_saved_card_recurring_id,
+                                $payment_details
+                        );
                 }
 
-                $stats['payments_completed'] = $completed_payments + 1;
+                $stats['payments_completed'] = $completed_payments;
 
                 $context = is_array($payment_details) ? $payment_details : array();
+                $context['saved_credit_card_recurring_id'] = (int) $paypal_saved_card_recurring_id;
                 $context['original_orders_products_id'] = $original_orders_products_id;
                 $context['completed_payments'] = $completed_payments;
                 if ($scopeSql !== '') {
                         $context['subscription_scope'] = $scopeSql;
                 }
-                $stats['next_date'] = $this->next_billing_date($attributes, $context);
+                $stats['next_date'] = $this->has_remaining_billing_cycles($paypal_saved_card_recurring_id, $payment_details)
+                        ? $this->next_billing_date($attributes, $context)
+                        : false;
 
-                $totalCycles = isset($attributes['totalbillingcycles']) ? $attributes['totalbillingcycles'] : null;
-                if (!is_numeric($totalCycles)) {
-                        $stats['payments_remaining'] = $totalCycles;
-                }
-                else {
-                        $stats['payments_remaining'] = (int) $totalCycles - $stats['payments_completed'];
+                $totalCycles = $this->get_total_billing_cycles_limit($payment_details);
+                if ($totalCycles <= 0) {
+                        $stats['payments_remaining'] = null;
+                } else {
+                        $stats['payments_remaining'] = max(0, $totalCycles - $stats['payments_completed']);
                 }
 
                 $start_date = '';
