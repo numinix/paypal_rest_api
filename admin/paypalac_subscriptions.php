@@ -67,6 +67,184 @@ function paypalac_known_status_labels()
 }
 
 /**
+ * True when a DB date/datetime value is usable for expiry math.
+ */
+function paypalac_subscription_date_is_usable(?string $raw): bool
+{
+    $raw = trim((string) $raw);
+    return $raw !== '' && !str_starts_with($raw, '0000-00-00');
+}
+
+/**
+ * True when next_payment_date represents a future charge the system will attempt.
+ *
+ * @param array<string,mixed> $row
+ */
+function paypalac_subscription_next_payment_is_chargeable(array $row): bool
+{
+    if (!paypalac_subscription_date_is_usable(isset($row['next_payment_date']) ? (string) $row['next_payment_date'] : null)) {
+        return false;
+    }
+
+    $status = strtolower(trim((string) ($row['status'] ?? '')));
+    if (($row['subscription_type'] ?? '') === 'savedcard') {
+        if ($status !== 'scheduled') {
+            return false;
+        }
+        $cycles = (int) ($row['total_billing_cycles'] ?? 0);
+        if ($cycles <= 0) {
+            return true;
+        }
+        $completed = (int) ($row['payments_completed'] ?? 0);
+        return $completed < $cycles;
+    }
+
+    return in_array($status, ['active', 'scheduled', 'pending', 'awaiting_vault'], true);
+}
+
+/**
+ * Add N billing-period units to a date (Day/Week/Month/Year/SemiMonth).
+ */
+function paypalac_add_billing_periods(DateTimeImmutable $dt, string $period, int $amount): ?DateTimeImmutable
+{
+    if ($amount === 0) {
+        return $dt;
+    }
+
+    $period = strtolower(trim($period));
+    $sign = $amount >= 0 ? '+' : '-';
+    $abs = abs($amount);
+
+    switch ($period) {
+        case 'day':
+        case 'days':
+            $modified = $dt->modify($sign . $abs . ' days');
+            break;
+        case 'week':
+        case 'weeks':
+            $modified = $dt->modify($sign . $abs . ' weeks');
+            break;
+        case 'semimonth':
+            $modified = $dt->modify($sign . ($abs * 14) . ' days');
+            break;
+        case 'month':
+        case 'months':
+            $modified = $dt->modify($sign . $abs . ' months');
+            break;
+        case 'year':
+        case 'years':
+        case '':
+            $modified = $dt->modify($sign . $abs . ' years');
+            break;
+        default:
+            $modified = $dt->modify($sign . $abs . ' years');
+            break;
+    }
+
+    return $modified instanceof DateTimeImmutable ? $modified : null;
+}
+
+/**
+ * Calculate subscription expiry from start/next date and remaining billing cycles.
+ * total_billing_cycles of 0 means indefinite (returns null).
+ *
+ * @param array<string,mixed> $row
+ */
+function paypalac_calculate_subscription_expiry_date(array $row): ?string
+{
+    $cycles = (int) ($row['total_billing_cycles'] ?? 0);
+    if ($cycles <= 0) {
+        return null;
+    }
+
+    $frequency = (int) ($row['billing_frequency'] ?? 0);
+    if ($frequency <= 0) {
+        $frequency = 1;
+    }
+
+    $period = (string) ($row['billing_period'] ?? '');
+    $nextRaw = trim((string) ($row['next_payment_date'] ?? ''));
+    $completed = max(0, (int) ($row['payments_completed'] ?? 0));
+    $remaining = max(0, $cycles - $completed);
+
+    // Upcoming chargeable renewals: expiry is one period after the final remaining charge.
+    if (($row['subscription_type'] ?? '') === 'savedcard'
+        && paypalac_subscription_next_payment_is_chargeable($row)
+        && $remaining > 0
+    ) {
+        try {
+            $dt = new DateTimeImmutable(substr($nextRaw, 0, 10));
+        } catch (Exception $e) {
+            $dt = null;
+        }
+        if ($dt instanceof DateTimeImmutable) {
+            $expiry = paypalac_add_billing_periods($dt, $period, $remaining * $frequency);
+            return $expiry instanceof DateTimeImmutable ? $expiry->format('Y-m-d') : null;
+        }
+    }
+
+    $startCandidates = [
+        $row['date_added'] ?? null,
+        $row['date_purchased'] ?? null,
+        $row['order_date_purchased'] ?? null,
+    ];
+
+    $startRaw = '';
+    foreach ($startCandidates as $candidate) {
+        if (paypalac_subscription_date_is_usable(is_string($candidate) || is_numeric($candidate) ? (string) $candidate : null)) {
+            $startRaw = trim((string) $candidate);
+            break;
+        }
+    }
+
+    if ($startRaw !== '') {
+        try {
+            $dt = new DateTimeImmutable(substr($startRaw, 0, 10));
+        } catch (Exception $e) {
+            $dt = null;
+        }
+        if ($dt instanceof DateTimeImmutable) {
+            $expiry = paypalac_add_billing_periods($dt, $period, $cycles * $frequency);
+            return $expiry instanceof DateTimeImmutable ? $expiry->format('Y-m-d') : null;
+        }
+    }
+
+    // Non-chargeable marker date (common when next_payment was left as membership end).
+    if (!paypalac_subscription_date_is_usable($nextRaw)) {
+        return null;
+    }
+
+    try {
+        $dt = new DateTimeImmutable(substr($nextRaw, 0, 10));
+    } catch (Exception $e) {
+        return null;
+    }
+
+    return $dt->format('Y-m-d');
+}
+
+/**
+ * Human-readable expiry for admin table/export: date, "Indefinite", or em dash.
+ *
+ * @param array<string,mixed> $row
+ */
+function paypalac_format_subscription_expiry_display(array $row): string
+{
+    if ((int) ($row['total_billing_cycles'] ?? 0) <= 0) {
+        return defined('TEXT_PAYPALAC_SUBSCRIPTION_EXPIRY_INDEFINITE')
+            ? TEXT_PAYPALAC_SUBSCRIPTION_EXPIRY_INDEFINITE
+            : 'Indefinite';
+    }
+
+    $expiry = paypalac_calculate_subscription_expiry_date($row);
+    if ($expiry === null) {
+        return '—';
+    }
+
+    return zen_date_short($expiry);
+}
+
+/**
  * Build a customer label for filter dropdowns; empty when no usable identity exists.
  */
 function paypalac_subscription_customer_label(array $row): string
@@ -1647,6 +1825,7 @@ if ($action === 'export_csv') {
         'Billing Period',
         'Billing Frequency',
         'Total Cycles',
+        'Expiry Date',
         'Status',
         'Payment Method',
         'Vault Card Type',
@@ -1658,6 +1837,9 @@ if ($action === 'export_csv') {
     if ($exportResults instanceof queryFactoryResult && $exportResults->RecordCount() > 0) {
         while (!$exportResults->EOF) {
             $row = $exportResults->fields;
+            $expiryExport = ((int) ($row['total_billing_cycles'] ?? 0) <= 0)
+                ? 'Indefinite'
+                : (paypalac_calculate_subscription_expiry_date($row) ?? '');
             fputcsv($output, [
                 $row['paypal_subscription_id'],
                 $row['customers_id'],
@@ -1672,6 +1854,7 @@ if ($action === 'export_csv') {
                 $row['billing_period'] ?? '',
                 $row['billing_frequency'] ?? '',
                 $row['total_billing_cycles'] ?? '',
+                $expiryExport,
                 $row['status'] ?? '',
                 trim(($row['payment_module_code'] ?? '') . ' ' . ($row['payment_method'] ?? '')),
                 trim(($row['vault_card_type'] ?? '') . ' ' . ($row['vault_brand'] ?? '')),
@@ -1855,7 +2038,7 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
 
     $savedCardSql = 'SELECT scr.*,'
         . ' c.customers_firstname, c.customers_lastname, c.customers_email_address,'
-        . ' o.payment_module_code, o.payment_method,'
+        . ' o.payment_module_code, o.payment_method, o.date_purchased AS date_purchased,'
         . ' pv.brand AS vault_brand, pv.last_digits AS vault_last_digits, pv.card_type AS vault_card_type, pv.status AS vault_status, pv.expiry AS vault_expiry,'
         . ' pv.paypal_vault_id AS scr_paypal_vault_id'
         . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' scr'
@@ -1869,6 +2052,7 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
     }
 
     $savedCardSubscriptions = $db->Execute($savedCardSql);
+    $savedCardCycleHelper = class_exists('paypalacSavedCardRecurring') ? new paypalacSavedCardRecurring() : null;
 
     if ($savedCardSubscriptions instanceof queryFactoryResult) {
         while (!$savedCardSubscriptions->EOF) {
@@ -1889,7 +2073,15 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
             $row['setup_fee'] = 0;
             $row['plan_id'] = '';
             $row['vault_id'] = '';
-            $row['sort_date'] = strtotime($scrFields['next_payment_date'] ?? ($scrFields['date_added'] ?? 'now'));
+            if (!paypalac_subscription_date_is_usable($row['date_added'] ?? null)
+                && paypalac_subscription_date_is_usable($scrFields['date_purchased'] ?? null)
+            ) {
+                $row['date_added'] = $scrFields['date_purchased'];
+            }
+            $row['payments_completed'] = $savedCardCycleHelper instanceof paypalacSavedCardRecurring
+                ? $savedCardCycleHelper->count_completed_billing_cycles((int) $row['paypal_subscription_id'], $scrFields)
+                : ((int) ($scrFields['orders_id'] ?? 0) > 0 ? 1 : 0);
+            $row['sort_date'] = strtotime($row['date_added'] ?? ($scrFields['next_payment_date'] ?? 'now'));
             $allSubscriptions[] = $row;
             $savedCardSubscriptions->MoveNext();
         }
@@ -2432,9 +2624,10 @@ function paypalac_get_table_columns($tableName)
                         <td><?php echo zen_output_string_protected((string) ($row['products_name'] ?? 'N/A')); ?></td>
                         <td>
                             Every <?php echo (int) ($row['billing_frequency'] ?? 0); ?> <?php echo zen_output_string_protected((string) ($row['billing_period'] ?? '')); ?>(s)
-                            <?php if (!empty($row['next_payment_date'])) { ?>
+                            <?php if (paypalac_subscription_next_payment_is_chargeable($row)) { ?>
                                 <br><small>Next: <?php echo zen_date_short($row['next_payment_date']); ?></small>
                             <?php } ?>
+                            <br><small>Expiry: <?php echo zen_output_string_protected(paypalac_format_subscription_expiry_display($row)); ?></small>
                         </td>
                         <td>
                             <?php echo zen_output_string_protected((string) ($row['currency_code'] ?? '')); ?> <?php echo number_format((float) ($row['amount'] ?? 0), 2); ?>
@@ -2553,6 +2746,13 @@ function paypalac_get_table_columns($tableName)
                                         <div>
                                             <label>Next Billing Date</label>
                                             <input type="date" name="next_payment_date" value="<?php echo zen_output_string_protected((string) ($row['next_payment_date'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label><?php echo defined('TEXT_PAYPALAC_SUBSCRIPTION_EXPIRY_DATE') ? TEXT_PAYPALAC_SUBSCRIPTION_EXPIRY_DATE : 'Expiry Date'; ?></label>
+                                            <input type="text" value="<?php echo zen_output_string_protected(paypalac_format_subscription_expiry_display($row)); ?>" class="nmx-form-control" readonly />
+                                            <p style="margin: 4px 0 0 0; font-size: 0.85em; color: #666;">
+                                                <em>Calculated from start/next charge date and remaining billing cycles.</em>
+                                            </p>
                                         </div>
                                     </div>
                                 </details>

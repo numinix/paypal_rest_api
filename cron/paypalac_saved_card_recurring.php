@@ -513,6 +513,28 @@ foreach ($todays_payments as $payment_id) {
 
     $payment_details = $normalizePaymentDetails($payment_id, $paypalacSavedCardRecurring->get_payment_details($payment_id));
 
+    // Honor total_billing_cycles before attempting another charge. The original
+    // checkout order counts as cycle 1, so a 1-cycle plan must not renew.
+    if (!$paypalacSavedCardRecurring->has_remaining_billing_cycles($payment_id, $payment_details)) {
+        $paypalacSavedCardRecurring->update_payment_status(
+            $payment_id,
+            'complete',
+            '  Subscription completed - all billing cycles already processed. '
+        );
+        $results['skipped'][] = array(
+            'subscription_id' => $payment_id,
+            'customer_name' => trim(($payment_details['customers_firstname'] ?? '') . ' ' . ($payment_details['customers_lastname'] ?? '')),
+            'product_name' => $payment_details['products_name'] ?? '',
+            'skip_reason' => 'all billing cycles completed',
+            'card_brand' => 'N/A',
+            'card_last4_display' => 'N/A',
+            'customer_portal_url' => 'N/A',
+            'add_card_url' => 'N/A',
+        );
+        $log .= "\n Skipped subscription $payment_id | {$payment_details['products_name']} | all billing cycles completed";
+        continue;
+    }
+
     // -------------------------------------------------------------------
     // If the saved card attached to this payment has expired (or was marked
     // deleted), attempt to swap in another non-expired card.  When no valid
@@ -641,10 +663,17 @@ foreach ($todays_payments as $payment_id) {
                 $log .= ' Catch-up payment queued for ' . $nextCycleDue->format('Y-m-d') . '. ';
             }
 
-            $next_payment = $nextCycleDue->format('Y-m-d');
-            $next_payment_display = $next_payment;
-
-            $payment_details['subscription_attributes']['intended_billing_date'] = $nextCycleDue->format('Y-m-d');
+            // This successful charge consumes one cycle. Only keep scheduling when
+            // total_billing_cycles still allows another payment after this one.
+            if ($paypalacSavedCardRecurring->has_remaining_billing_cycles($payment_id, $payment_details, 1)) {
+                $next_payment = $nextCycleDue->format('Y-m-d');
+                $next_payment_display = $next_payment;
+                $payment_details['subscription_attributes']['intended_billing_date'] = $nextCycleDue->format('Y-m-d');
+            } else {
+                $next_payment = null;
+                $next_payment_display = 'N/A';
+                $log .= ' Final billing cycle reached. ';
+            }
         }
         $log .= ' Payment successful ';
         $order_id = $paypalacSavedCardRecurring->create_order($order, $payment_details['saved_credit_card_id'], $recurring_order_status); //create an order in Zen Cart
