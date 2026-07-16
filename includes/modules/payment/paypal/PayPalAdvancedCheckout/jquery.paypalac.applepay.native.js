@@ -15,36 +15,58 @@
     var cachedSelectedShippingId = null;
     var pendingRedirectUrl = null;
     var applePayFinalTotal = null;
+    var appleSdkLoader = { promise: null };
+
+    /**
+     * Load Apple's JS SDK so non-Safari browsers get ApplePaySession support (iOS 18+ QR flow).
+     */
+    function loadApplePayJsSdk() {
+        if (appleSdkLoader.promise) {
+            return appleSdkLoader.promise;
+        }
+
+        appleSdkLoader.promise = new Promise(function (resolve, reject) {
+            var existing = document.querySelector('script[data-apple-pay-sdk="true"]');
+
+            if (existing) {
+                if (existing.readyState === 'complete' || existing.readyState === 'loaded') {
+                    return resolve();
+                }
+
+                existing.addEventListener('load', function () { resolve(); });
+                existing.addEventListener('error', function (e) { reject(e); });
+                return;
+            }
+
+            var script = document.createElement('script');
+            script.src = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
+            script.dataset.applePaySdk = 'true';
+            script.onload = function () { resolve(); };
+            script.onerror = function (e) { reject(e); };
+            document.head.appendChild(script);
+        });
+
+        return appleSdkLoader.promise;
+    }
 
     /**
      * Initialize Apple Pay button
      */
     window.initPayPalRApplePay = function() {
-        if (typeof ApplePaySession === "undefined" || !ApplePaySession.canMakePayments()) {
-            console.log('[Apple Pay] Not available on this device/browser');
-            hideApplePayContainer();
-            return;
-        }
-
-        var config = window.paypalacApplePayConfig || {};
-        applePayFinalTotal = config.initialTotal || '0.00';
-
-        // Check if Apple Pay is available with active card
-        ApplePaySession.canMakePaymentsWithActiveCard(config.merchantId || 'merchant.com.paypal')
-            .then(function(canMakePayments) {
-                if (!canMakePayments) {
-                    console.log('[Apple Pay] No active cards available');
-                    hideApplePayContainer();
-                    return;
-                }
-
-                // Render Apple Pay button
-                renderApplePayButton();
-            })
-            .catch(function(error) {
-                console.error('[Apple Pay] Error checking payment availability:', error);
+        loadApplePayJsSdk().then(function () {
+            if (typeof ApplePaySession === "undefined" || !ApplePaySession.canMakePayments()) {
+                console.log('[Apple Pay] Not available on this device/browser');
                 hideApplePayContainer();
-            });
+                return;
+            }
+
+            var config = window.paypalacApplePayConfig || {};
+            applePayFinalTotal = config.initialTotal || '0.00';
+            renderApplePayButton();
+        }).catch(function (error) {
+            console.error('[Apple Pay] Failed to load Apple Pay SDK:', error);
+            hideApplePayContainer();
+        });
     };
 
     /**
@@ -60,11 +82,11 @@
         // Clear container
         container.innerHTML = '';
 
-        // Create Apple Pay button
-        var button = document.createElement('button');
-        button.className = 'apple-pay-button apple-pay-button-black';
-        button.type = 'button';
-        button.style.cssText = '-webkit-appearance: -apple-pay-button; -apple-pay-button-type: buy; -apple-pay-button-style: black; height: 44px; width: 100%; cursor: pointer;';
+        // Create Apple Pay button using Apple's JS SDK web component (required for non-Safari QR flow)
+        var button = document.createElement('apple-pay-button');
+        button.setAttribute('buttonstyle', 'black');
+        button.setAttribute('type', 'buy');
+        button.setAttribute('locale', 'en-US');
         
         button.addEventListener('click', function() {
             handleApplePayButtonClick();

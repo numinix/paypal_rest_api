@@ -1116,6 +1116,15 @@
     }
 
     /**
+     * Append the Apple Pay button after SDK and merchant eligibility checks pass.
+     */
+    function appendApplePayButton(container) {
+        var button = createApplePayButton();
+        container.appendChild(button);
+        return button;
+    }
+
+    /**
      * Render the native Apple Pay button.
      */
     function renderApplePayButton() {
@@ -1126,16 +1135,21 @@
 
         container.innerHTML = '';
 
-        // Check if Apple Pay is available on this device/browser
-        if (typeof window.ApplePaySession === 'undefined' || !ApplePaySession.canMakePayments()) {
-            console.log('Apple Pay is not available on this device/browser');
-            hidePaymentMethodContainer();
-            return;
-        }
+        // Load Apple's SDK first so non-Safari browsers get the ApplePaySession
+        // polyfill required for the iOS 18+ QR scan flow on desktop.
+        loadApplePayJsSdk().then(function () {
+            if (typeof window.ApplePaySession === 'undefined' || !ApplePaySession.canMakePayments()) {
+                console.log('Apple Pay is not available on this device/browser');
+                hidePaymentMethodContainer();
+                return null;
+            }
 
-        // First, fetch only the SDK configuration (no order creation)
-        fetchWalletConfig().then(function (config) {
-            if (!config || config.success === false) {
+            return fetchWalletConfig();
+        }).then(function (config) {
+            if (!config) {
+                return null;
+            }
+            if (config.success === false) {
                 console.warn('Unable to load Apple Pay configuration', config);
                 hidePaymentMethodContainer();
                 return null;
@@ -1174,24 +1188,14 @@
                             .then(function (canMakePayments) {
                                 if (!canMakePayments) {
                                     console.log('Apple Pay: User cannot make payments with active card');
-                                    // Still show button - user might add a card
+                                    // Still show button - user might add a card or scan QR on another device
                                 }
-                                // Load Apple Pay JS SDK and then create/render the button
-                                return loadApplePayJsSdk().then(function () {
-                                    var button = createApplePayButton();
-                                    container.appendChild(button);
-                                    return button;
-                                });
+                                return appendApplePayButton(container);
                             });
                     }
                 }
 
-                // Load Apple Pay JS SDK and then create/render the button
-                return loadApplePayJsSdk().then(function () {
-                    var button = createApplePayButton();
-                    container.appendChild(button);
-                    return button;
-                });
+                return appendApplePayButton(container);
             });
         }).catch(function (error) {
             console.error('Failed to render Apple Pay button', error);

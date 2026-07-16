@@ -77,21 +77,22 @@ if (strpos($js, 'document.querySelector(\'script[data-apple-pay-sdk="true"]\')')
     echo "✓ loadApplePayJsSdk checks for existing script tag\n";
 }
 
-// Test 7: loadApplePayJsSdk is called before creating the button
-// Look for the pattern: loadApplePayJsSdk().then(function () { ... createApplePayButton()
-if (preg_match('/loadApplePayJsSdk\(\)\.then\(function\s*\(\)\s*\{[^}]*createApplePayButton\(\)/s', $js) === 0) {
+// Test 7: loadApplePayJsSdk is called before the availability check
+// The SDK must load first so non-Safari browsers get the ApplePaySession polyfill
+// (iOS 18+ QR flow) before canMakePayments() is evaluated.
+if (preg_match('/loadApplePayJsSdk\(\)\.then\(function\s*\(\)\s*\{[^}]*ApplePaySession/s', $js) === 0) {
     $testPassed = false;
-    $errors[] = "loadApplePayJsSdk should be called before createApplePayButton()";
+    $errors[] = "loadApplePayJsSdk should be called before the ApplePaySession availability check";
 } else {
-    echo "✓ loadApplePayJsSdk is called before createApplePayButton()\n";
+    echo "✓ loadApplePayJsSdk is called before the availability check\n";
 }
 
-// Test 8: Button is appended after SDK loads
-if (preg_match('/loadApplePayJsSdk\(\)\.then\(function\s*\(\)\s*\{[^}]*container\.appendChild\(button\)/s', $js) === 0) {
+// Test 8: Button is created and appended once eligibility passes
+if (preg_match('/function appendApplePayButton\([^)]*\)\s*\{[^}]*createApplePayButton\(\)[^}]*container\.appendChild\(button\)/s', $js) === 0) {
     $testPassed = false;
-    $errors[] = "Button should be appended to container after SDK loads";
+    $errors[] = "appendApplePayButton should create the button and append it to the container";
 } else {
-    echo "✓ Button is appended to container after SDK loads\n";
+    echo "✓ Button is created and appended after eligibility passes\n";
 }
 
 // Test 9: loadApplePayJsSdk handles script load error
