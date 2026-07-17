@@ -20,11 +20,18 @@ use function json_encode;
  */
 class VaultManager
 {
+    /** @var bool Skip repeated schema work within a single request. */
+    private static bool $schemaReady = false;
+
     /**
      * Ensure that the paypal vault table exists.
      */
     public static function ensureSchema(): void
     {
+        if (self::$schemaReady) {
+            return;
+        }
+
         global $db;
 
         defined('TABLE_PAYPAL_VAULT') or define('TABLE_PAYPAL_VAULT', DB_PREFIX . 'paypal_vault');
@@ -68,6 +75,8 @@ class VaultManager
                  ADD COLUMN visible TINYINT(1) NOT NULL DEFAULT 1"
             );
         }
+
+        self::$schemaReady = true;
     }
 
     /**
