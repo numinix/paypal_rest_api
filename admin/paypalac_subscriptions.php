@@ -42,6 +42,12 @@ SubscriptionManager::ensureSchema();
 SavedCreditCardsManager::ensureSchema();
 VaultManager::ensureSchema();
 
+// One-time-ish backfill of saved-card expiration_date for active schedules.
+if (class_exists('paypalacSavedCardRecurring')) {
+    $paypalacExpiryBackfill = new paypalacSavedCardRecurring();
+    $paypalacExpiryBackfill->backfill_saved_card_expiration_dates();
+}
+
 define('FILENAME_PAYPALAC_SUBSCRIPTIONS', basename(__FILE__));
 
 if (!defined('HEADING_TITLE')) {
@@ -152,6 +158,12 @@ function paypalac_add_billing_periods(DateTimeImmutable $dt, string $period, int
  */
 function paypalac_calculate_subscription_expiry_date(array $row): ?string
 {
+    // Prefer the persisted creation-time expiration_date when present.
+    $stored = trim((string) ($row['expiration_date'] ?? ''));
+    if (paypalac_subscription_date_is_usable($stored)) {
+        return substr($stored, 0, 10);
+    }
+
     $cycles = (int) ($row['total_billing_cycles'] ?? 0);
     if ($cycles <= 0) {
         return null;
@@ -1008,6 +1020,33 @@ if ($action === 'update_subscription') {
         'last_modified' => date('Y-m-d H:i:s'),
     ];
 
+    // Keep stored expiration_date aligned with the configured billing schedule.
+    if (!function_exists('paypalac_compute_subscription_expiration_date')) {
+        $helper = DIR_FS_CATALOG . 'includes/functions/extra_functions/paypalac_subscription_functions.php';
+        if (is_file($helper)) {
+            require_once $helper;
+        }
+    }
+    if (function_exists('paypalac_compute_subscription_expiration_date')) {
+        $startForExpiry = '';
+        foreach (['date_added', 'date_purchased'] as $startKey) {
+            $candidate = trim((string) ($subscriptionRow[$startKey] ?? ''));
+            if (paypalac_subscription_date_is_usable($candidate)) {
+                $startForExpiry = $candidate;
+                break;
+            }
+        }
+        if ($startForExpiry === '') {
+            $startForExpiry = date('Y-m-d H:i:s');
+        }
+        $updateData['expiration_date'] = paypalac_compute_subscription_expiration_date(
+            $startForExpiry,
+            $billingPeriod,
+            $billingFrequency,
+            $totalCycles
+        );
+    }
+
     if ($attributesEncoded !== '') {
         $updateData['attributes'] = $attributesEncoded;
     } else {
@@ -1117,6 +1156,16 @@ if ($action === 'update_subscription') {
                 }
                 if ($totalCycles >= 0) {
                     $scheduleSql .= ', total_billing_cycles = ' . (int) $totalCycles;
+                    $hasScheduleUpdate = true;
+                }
+                if (array_key_exists('expiration_date', $updateData)
+                    && $legacyMirror->ensure_saved_cards_recurring_expiration_date_column()
+                ) {
+                    if ($updateData['expiration_date'] === null || $updateData['expiration_date'] === '') {
+                        $scheduleSql .= ', expiration_date = NULL';
+                    } else {
+                        $scheduleSql .= ", expiration_date = '" . zen_db_input((string) $updateData['expiration_date']) . "'";
+                    }
                     $hasScheduleUpdate = true;
                 }
                 if ($hasScheduleUpdate) {

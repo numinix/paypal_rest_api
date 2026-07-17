@@ -64,7 +64,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.18';
+    protected const CURRENT_VERSION = '1.3.19';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -831,6 +831,10 @@ class paypalac extends base
                 case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.18', '<'): //- Fall through from above
                     // Honor total_billing_cycles in saved-card recurring cron + show calculated expiry.
                     // No configuration schema changes required for this release.
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.19', '<'): //- Fall through from above
+                    // Persist expiration_date on paypal_subscriptions + saved_credit_cards_recurring.
+                    // Schema is ensured at runtime via SubscriptionManager / paypalacSavedCardRecurring.
 
                 default:    //- Fall through from above
                     break;

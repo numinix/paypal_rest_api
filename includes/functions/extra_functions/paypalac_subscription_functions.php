@@ -516,3 +516,83 @@ if (!function_exists('paypalac_checkout_vault_card_visible')) {
         return !empty($_SESSION['PayPalAdvancedCheckout']['save_card']);
     }
 }
+
+if (!function_exists('paypalac_add_billing_periods_to_date')) {
+    /**
+     * Add N billing-period units to a Y-m-d (or datetime) start date.
+     */
+    function paypalac_add_billing_periods_to_date(string $startDate, string $period, int $amount): ?string
+    {
+        $startDate = trim($startDate);
+        if ($startDate === '' || str_starts_with($startDate, '0000-00-00')) {
+            return null;
+        }
+
+        try {
+            $dt = new DateTimeImmutable(substr($startDate, 0, 10));
+        } catch (Exception $e) {
+            return null;
+        }
+
+        if ($amount === 0) {
+            return $dt->format('Y-m-d');
+        }
+
+        $period = strtolower(trim($period));
+        $sign = $amount >= 0 ? '+' : '-';
+        $abs = abs($amount);
+
+        switch ($period) {
+            case 'day':
+            case 'days':
+                $modified = $dt->modify($sign . $abs . ' days');
+                break;
+            case 'week':
+            case 'weeks':
+                $modified = $dt->modify($sign . $abs . ' weeks');
+                break;
+            case 'semimonth':
+                $modified = $dt->modify($sign . ($abs * 14) . ' days');
+                break;
+            case 'month':
+            case 'months':
+                $modified = $dt->modify($sign . $abs . ' months');
+                break;
+            case 'year':
+            case 'years':
+            case '':
+            default:
+                $modified = $dt->modify($sign . $abs . ' years');
+                break;
+        }
+
+        return $modified instanceof DateTimeImmutable ? $modified->format('Y-m-d') : null;
+    }
+}
+
+if (!function_exists('paypalac_compute_subscription_expiration_date')) {
+    /**
+     * Fixed membership/subscription end date from creation (or start) + total cycles.
+     * total_billing_cycles <= 0 means indefinite → null.
+     */
+    function paypalac_compute_subscription_expiration_date(
+        ?string $startDate,
+        string $billingPeriod,
+        int $billingFrequency,
+        int $totalBillingCycles
+    ): ?string {
+        if ($totalBillingCycles <= 0) {
+            return null;
+        }
+
+        if ($billingFrequency <= 0) {
+            $billingFrequency = 1;
+        }
+
+        return paypalac_add_billing_periods_to_date(
+            (string) $startDate,
+            $billingPeriod,
+            $totalBillingCycles * $billingFrequency
+        );
+    }
+}
