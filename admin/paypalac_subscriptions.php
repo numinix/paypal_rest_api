@@ -43,9 +43,15 @@ SavedCreditCardsManager::ensureSchema();
 VaultManager::ensureSchema();
 
 // One-time-ish backfill of saved-card expiration_date for active schedules.
+// Cheap probe first: do not scan/update the whole table on every page view.
 if (class_exists('paypalacSavedCardRecurring')) {
     $paypalacExpiryBackfill = new paypalacSavedCardRecurring();
-    $paypalacExpiryBackfill->backfill_saved_card_expiration_dates();
+    if (method_exists($paypalacExpiryBackfill, 'saved_card_expiration_backfill_needed')
+        ? $paypalacExpiryBackfill->saved_card_expiration_backfill_needed()
+        : true
+    ) {
+        $paypalacExpiryBackfill->backfill_saved_card_expiration_dates();
+    }
 }
 
 define('FILENAME_PAYPALAC_SUBSCRIPTIONS', basename(__FILE__));
@@ -2101,7 +2107,6 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
     }
 
     $savedCardSubscriptions = $db->Execute($savedCardSql);
-    $savedCardCycleHelper = class_exists('paypalacSavedCardRecurring') ? new paypalacSavedCardRecurring() : null;
 
     if ($savedCardSubscriptions instanceof queryFactoryResult) {
         while (!$savedCardSubscriptions->EOF) {
@@ -2127,9 +2132,10 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
             ) {
                 $row['date_added'] = $scrFields['date_purchased'];
             }
-            $row['payments_completed'] = $savedCardCycleHelper instanceof paypalacSavedCardRecurring
-                ? $savedCardCycleHelper->count_completed_billing_cycles((int) $row['paypal_subscription_id'], $scrFields)
-                : ((int) ($scrFields['orders_id'] ?? 0) > 0 ? 1 : 0);
+            // Defer expensive orders_status_history LIKE counts until after pagination.
+            // Running count_completed_billing_cycles() for every saved-card row on
+            // large stores was the primary cause of 60s+ admin page loads.
+            $row['payments_completed'] = ((int) ($scrFields['orders_id'] ?? 0) > 0 ? 1 : 0);
             $row['sort_date'] = strtotime($row['date_added'] ?? ($scrFields['next_payment_date'] ?? 'now'));
             $allSubscriptions[] = $row;
             $savedCardSubscriptions->MoveNext();
@@ -2178,7 +2184,22 @@ $offset = ($currentPage - 1) * $currentPerPage;
 
 $subscriptionRows = array_slice($allSubscriptions, $offset, $currentPerPage);
 
+// Accurate completed-cycle counts only for the visible page (typically 10–100 rows).
+$savedCardCycleHelper = class_exists('paypalacSavedCardRecurring') ? new paypalacSavedCardRecurring() : null;
+if ($savedCardCycleHelper instanceof paypalacSavedCardRecurring) {
+    foreach ($subscriptionRows as $rowIndex => $visibleRow) {
+        if (($visibleRow['subscription_type'] ?? '') !== 'savedcard') {
+            continue;
+        }
+        $subscriptionRows[$rowIndex]['payments_completed'] = $savedCardCycleHelper->count_completed_billing_cycles(
+            (int) ($visibleRow['paypal_subscription_id'] ?? 0),
+            $visibleRow
+        );
+    }
+}
+
 $vaultCache = [];
+$savedCardOptionsCache = [];
 
 /**
  * Generate pagination URL with filters preserved
@@ -2544,61 +2565,65 @@ function paypalac_get_table_columns($tableName)
                     $subscriptionType = $row['subscription_type'] ?? 'rest';
                     $savedCardOptions = ['0' => 'None'];
                     if ($subscriptionType === 'savedcard' && $customersId > 0 && defined('TABLE_SAVED_CREDIT_CARDS') && defined('TABLE_PAYPAL_VAULT')) {
-                        $savedCardColumns = paypalac_get_table_columns(TABLE_SAVED_CREDIT_CARDS);
+                        if (!array_key_exists($customersId, $savedCardOptionsCache)) {
+                            $savedCardOptionsCache[$customersId] = ['0' => 'None'];
+                            $savedCardColumns = paypalac_get_table_columns(TABLE_SAVED_CREDIT_CARDS);
 
-                        if (!empty($savedCardColumns)) {
-                            $selectColumns = ['sc.saved_credit_card_id'];
-                            if (isset($savedCardColumns['type'])) {
-                                $selectColumns[] = 'sc.type';
-                            }
-                            if (isset($savedCardColumns['last_digits'])) {
-                                $selectColumns[] = 'sc.last_digits';
-                            }
-                            if (isset($savedCardColumns['holder_name'])) {
-                                $selectColumns[] = 'sc.holder_name';
-                            }
-                            if (isset($savedCardColumns['is_default'])) {
-                                $selectColumns[] = 'sc.is_default';
+                            if (!empty($savedCardColumns)) {
+                                $selectColumns = ['sc.saved_credit_card_id'];
+                                if (isset($savedCardColumns['type'])) {
+                                    $selectColumns[] = 'sc.type';
+                                }
+                                if (isset($savedCardColumns['last_digits'])) {
+                                    $selectColumns[] = 'sc.last_digits';
+                                }
+                                if (isset($savedCardColumns['holder_name'])) {
+                                    $selectColumns[] = 'sc.holder_name';
+                                }
+                                if (isset($savedCardColumns['is_default'])) {
+                                    $selectColumns[] = 'sc.is_default';
+                                }
+
+                                $whereConditions = ['sc.customers_id = ' . (int) $customersId, "sc.vault_id != ''"];
+                                if (isset($savedCardColumns['is_deleted'])) {
+                                    $whereConditions[] = 'sc.is_deleted = 0';
+                                }
+
+                                $orderBy = 'sc.saved_credit_card_id DESC';
+                                if (isset($savedCardColumns['is_default'])) {
+                                    $orderBy = 'sc.is_default DESC, ' . $orderBy;
+                                }
+
+                                $savedCardsQuery = $db->Execute(
+                                    'SELECT ' . implode(', ', $selectColumns)
+                                    . ' FROM ' . TABLE_SAVED_CREDIT_CARDS . ' sc'
+                                    . ' INNER JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id'
+                                    . ' WHERE ' . implode(' AND ', $whereConditions)
+                                    . ' ORDER BY ' . $orderBy
+                                );
+                            } else {
+                                $savedCardsQuery = false;
                             }
 
-                            $whereConditions = ['sc.customers_id = ' . (int) $customersId, "sc.vault_id != ''"];
-                            if (isset($savedCardColumns['is_deleted'])) {
-                                $whereConditions[] = 'sc.is_deleted = 0';
+                            if ($savedCardsQuery instanceof queryFactoryResult) {
+                                while (!$savedCardsQuery->EOF) {
+                                    $cardId = (int)$savedCardsQuery->fields['saved_credit_card_id'];
+                                    $label = '#' . $cardId . ' ' . ($savedCardsQuery->fields['type'] ?? 'Card');
+                                    if (!empty($savedCardsQuery->fields['last_digits'])) {
+                                        $label .= ' ••••' . $savedCardsQuery->fields['last_digits'];
+                                    }
+                                    if (!empty($savedCardsQuery->fields['holder_name'])) {
+                                        $label .= ' - ' . $savedCardsQuery->fields['holder_name'];
+                                    }
+                                    if ((int)$savedCardsQuery->fields['is_default'] === 1) {
+                                        $label .= ' (Default)';
+                                    }
+                                    $savedCardOptionsCache[$customersId][(string)$cardId] = $label;
+                                    $savedCardsQuery->MoveNext();
+                                }
                             }
-
-                            $orderBy = 'sc.saved_credit_card_id DESC';
-                            if (isset($savedCardColumns['is_default'])) {
-                                $orderBy = 'sc.is_default DESC, ' . $orderBy;
-                            }
-
-                            $savedCardsQuery = $db->Execute(
-                                'SELECT ' . implode(', ', $selectColumns)
-                                . ' FROM ' . TABLE_SAVED_CREDIT_CARDS . ' sc'
-                                . ' INNER JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id'
-                                . ' WHERE ' . implode(' AND ', $whereConditions)
-                                . ' ORDER BY ' . $orderBy
-                            );
-                        } else {
-                            $savedCardsQuery = false;
                         }
-
-                        if ($savedCardsQuery instanceof queryFactoryResult) {
-                            while (!$savedCardsQuery->EOF) {
-                                $cardId = (int)$savedCardsQuery->fields['saved_credit_card_id'];
-                                $label = '#' . $cardId . ' ' . ($savedCardsQuery->fields['type'] ?? 'Card');
-                                if (!empty($savedCardsQuery->fields['last_digits'])) {
-                                    $label .= ' ••••' . $savedCardsQuery->fields['last_digits'];
-                                }
-                                if (!empty($savedCardsQuery->fields['holder_name'])) {
-                                    $label .= ' - ' . $savedCardsQuery->fields['holder_name'];
-                                }
-                                if ((int)$savedCardsQuery->fields['is_default'] === 1) {
-                                    $label .= ' (Default)';
-                                }
-                                $savedCardOptions[(string)$cardId] = $label;
-                                $savedCardsQuery->MoveNext();
-                            }
-                        }
+                        $savedCardOptions = $savedCardOptionsCache[$customersId];
                     }
 
                     $orderLogEntries = [];

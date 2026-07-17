@@ -22,11 +22,27 @@ class SubscriptionManager
     
     private const VAULT_ID_MAX_LENGTH = 64;
 
+    /** @var bool Skip repeated schema work within a single request. */
+    private static bool $schemaReady = false;
+
+    /** @var array<string,bool> */
+    private static array $columnCache = [];
+
+    /** @var array<string,bool> */
+    private static array $indexCache = [];
+
+    /** @var bool */
+    private static bool $expirationBackfillChecked = false;
+
     /**
      * Ensure the subscription logging table exists.
      */
     public static function ensureSchema(): void
     {
+        if (self::$schemaReady) {
+            return;
+        }
+
         defined('TABLE_PAYPAL_SUBSCRIPTIONS') or define('TABLE_PAYPAL_SUBSCRIPTIONS', DB_PREFIX . 'paypal_subscriptions');
 
         global $db;
@@ -68,6 +84,7 @@ class SubscriptionManager
 
         self::ensureLegacyColumns();
         self::migrateOrdersProductsIdToNullable();
+        self::$schemaReady = true;
     }
 
     private static function ensureLegacyColumns(): void
@@ -90,15 +107,25 @@ class SubscriptionManager
             'paypal_subscription_remote_id' => "VARCHAR(64) NOT NULL DEFAULT ''",
         ];
 
+        $addedExpirationDate = false;
         foreach ($columns as $column => $definition) {
             if (!self::columnExists($column)) {
                 $db->Execute(
                     'ALTER TABLE ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ADD ' . $column . ' ' . $definition
                 );
+                self::$columnCache[$column] = true;
+                if ($column === 'expiration_date') {
+                    $addedExpirationDate = true;
+                }
             }
         }
 
-        self::backfillExpirationDates();
+        // Only scan for missing expiration dates when the column was just added or
+        // a cheap existence check finds work. Running the full backfill on every
+        // admin page load was a major contributor to multi-minute load times.
+        if ($addedExpirationDate || self::expirationBackfillNeeded()) {
+            self::backfillExpirationDates();
+        }
 
         $indexes = [
             'idx_profile_id' => ['profile_id'],
@@ -112,6 +139,7 @@ class SubscriptionManager
                 $db->Execute(
                     'ALTER TABLE ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ADD INDEX ' . $index . ' (' . implode(',', $columns) . ')'
                 );
+                self::$indexCache[$index] = true;
             }
         }
     }
@@ -202,13 +230,44 @@ class SubscriptionManager
 
     private static function columnExists(string $column): bool
     {
+        if (isset(self::$columnCache[$column])) {
+            return self::$columnCache[$column];
+        }
+
         global $db;
 
         $result = $db->Execute(
             "SHOW COLUMNS FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " LIKE '" . zen_db_input($column) . "'"
         );
 
-        return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+        return self::$columnCache[$column] = ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+    }
+
+    /**
+     * Cheap check used to skip the full expiration backfill on warm requests.
+     */
+    private static function expirationBackfillNeeded(): bool
+    {
+        if (self::$expirationBackfillChecked) {
+            return false;
+        }
+        self::$expirationBackfillChecked = true;
+
+        if (!self::columnExists('expiration_date')) {
+            return false;
+        }
+
+        global $db;
+
+        $probe = $db->Execute(
+            'SELECT paypal_subscription_id FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS
+            . ' WHERE expiration_date IS NULL'
+            . ' AND total_billing_cycles > 0'
+            . " AND LOWER(status) IN ('active','scheduled','pending','awaiting_vault','suspended')"
+            . ' LIMIT 1'
+        );
+
+        return is_object($probe) && !$probe->EOF;
     }
 
     /**
@@ -274,13 +333,17 @@ class SubscriptionManager
 
     private static function indexExists(string $index): bool
     {
+        if (isset(self::$indexCache[$index])) {
+            return self::$indexCache[$index];
+        }
+
         global $db;
 
         $result = $db->Execute(
             "SHOW INDEX FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE Key_name = '" . zen_db_input($index) . "'"
         );
 
-        return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+        return self::$indexCache[$index] = ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
     }
 
     /**

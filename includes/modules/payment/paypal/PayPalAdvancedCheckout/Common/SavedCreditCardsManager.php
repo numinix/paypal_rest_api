@@ -17,6 +17,18 @@ use function zen_db_input;
 
 class SavedCreditCardsManager
 {
+    /** @var bool Skip repeated schema work within a single request. */
+    private static bool $schemaReady = false;
+
+    /** @var array<string,bool> */
+    private static array $recurringColumnCache = [];
+
+    /** @var array<string,bool> */
+    private static array $savedCardsColumnCache = [];
+
+    /** @var array<string,bool> */
+    private static array $savedCardsIndexCache = [];
+
     /**
      * Ensure the saved credit cards tables exist for backward compatibility.
      * 
@@ -30,8 +42,13 @@ class SavedCreditCardsManager
      */
     public static function ensureSchema(): void
     {
+        if (self::$schemaReady) {
+            return;
+        }
+
         self::ensureSavedCreditCardsTable();
         self::ensureSavedCreditCardsRecurringTable();
+        self::$schemaReady = true;
     }
 
     /**
@@ -225,13 +242,17 @@ class SavedCreditCardsManager
      */
     private static function columnExists(string $column): bool
     {
+        if (isset(self::$recurringColumnCache[$column])) {
+            return self::$recurringColumnCache[$column];
+        }
+
         global $db;
 
         $result = $db->Execute(
             "SHOW COLUMNS FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " LIKE '" . zen_db_input($column) . "'"
         );
 
-        return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+        return self::$recurringColumnCache[$column] = ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
     }
 
     /**
@@ -239,13 +260,17 @@ class SavedCreditCardsManager
      */
     private static function savedCreditCardsColumnExists(string $column): bool
     {
+        if (isset(self::$savedCardsColumnCache[$column])) {
+            return self::$savedCardsColumnCache[$column];
+        }
+
         global $db;
 
         $result = $db->Execute(
             "SHOW COLUMNS FROM " . TABLE_SAVED_CREDIT_CARDS . " LIKE '" . zen_db_input($column) . "'"
         );
 
-        return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+        return self::$savedCardsColumnCache[$column] = ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
     }
 
     /**
@@ -253,12 +278,16 @@ class SavedCreditCardsManager
      */
     private static function savedCreditCardsIndexExists(string $indexName): bool
     {
+        if (isset(self::$savedCardsIndexCache[$indexName])) {
+            return self::$savedCardsIndexCache[$indexName];
+        }
+
         global $db;
 
         $result = $db->Execute(
             "SHOW INDEX FROM " . TABLE_SAVED_CREDIT_CARDS . " WHERE Key_name = '" . zen_db_input($indexName) . "'"
         );
 
-        return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+        return self::$savedCardsIndexCache[$indexName] = ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
     }
 }

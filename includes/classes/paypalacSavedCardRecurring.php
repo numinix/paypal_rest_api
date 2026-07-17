@@ -254,10 +254,42 @@ return $this->PayPalAdvancedCheckout;
       }
 
       /**
+       * True when at least one saved-card schedule still needs an expiration_date.
+       * Used by the admin list page to skip a full-table backfill on warm loads.
+       */
+      public function saved_card_expiration_backfill_needed()
+      {
+              static $needed = null;
+              if ($needed !== null) {
+                      return $needed;
+              }
+              if (!$this->ensure_saved_cards_recurring_expiration_date_column()) {
+                      return $needed = false;
+              }
+
+              global $db;
+              $probe = $db->Execute(
+                      'SELECT saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                      . ' WHERE expiration_date IS NULL'
+                      . ' AND total_billing_cycles > 0'
+                      . " AND LOWER(status) IN ('scheduled','active','pending')"
+                      . ' LIMIT 1'
+              );
+
+              return $needed = (is_object($probe) && !$probe->EOF);
+      }
+
+      /**
        * Backfill expiration_date for active saved-card subscriptions missing one.
        */
       public function backfill_saved_card_expiration_dates()
       {
+              static $alreadyRan = false;
+              if ($alreadyRan) {
+                      return 0;
+              }
+              $alreadyRan = true;
+
               if (!$this->ensure_saved_cards_recurring_expiration_date_column()) {
                       return 0;
               }
