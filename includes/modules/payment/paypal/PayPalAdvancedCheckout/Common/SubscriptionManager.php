@@ -98,6 +98,8 @@ class SubscriptionManager
             }
         }
 
+        self::backfillExpirationDates();
+
         $indexes = [
             'idx_profile_id' => ['profile_id'],
             'idx_legacy_subscription' => ['legacy_subscription_id'],
@@ -207,6 +209,67 @@ class SubscriptionManager
         );
 
         return ($result instanceof \queryFactoryResult && $result->RecordCount() > 0);
+    }
+
+    /**
+     * Backfill expiration_date for active-ish rows that have a finite cycle count.
+     * Uses date_added (fallback date_purchased) + (cycles * frequency) periods.
+     */
+    private static function backfillExpirationDates(): void
+    {
+        if (!self::columnExists('expiration_date')) {
+            return;
+        }
+
+        if (!function_exists('paypalac_compute_subscription_expiration_date')) {
+            $helper = DIR_FS_CATALOG . 'includes/functions/extra_functions/paypalac_subscription_functions.php';
+            if (is_file($helper)) {
+                require_once $helper;
+            }
+        }
+        if (!function_exists('paypalac_compute_subscription_expiration_date')) {
+            return;
+        }
+
+        global $db;
+
+        $result = $db->Execute(
+            'SELECT ps.paypal_subscription_id, ps.date_added, ps.billing_period, ps.billing_frequency, ps.total_billing_cycles,'
+            . ' o.date_purchased'
+            . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
+            . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = ps.orders_id'
+            . ' WHERE ps.expiration_date IS NULL'
+            . ' AND ps.total_billing_cycles > 0'
+            . ' AND LOWER(ps.status) IN (\'active\',\'scheduled\',\'pending\',\'awaiting_vault\',\'suspended\')'
+        );
+
+        while (is_object($result) && !$result->EOF) {
+            $start = '';
+            foreach (['date_added', 'date_purchased'] as $key) {
+                $candidate = trim((string) ($result->fields[$key] ?? ''));
+                if ($candidate !== '' && !str_starts_with($candidate, '0000-00-00')) {
+                    $start = $candidate;
+                    break;
+                }
+            }
+            $expiry = $start !== ''
+                ? paypalac_compute_subscription_expiration_date(
+                    $start,
+                    (string) ($result->fields['billing_period'] ?? ''),
+                    (int) ($result->fields['billing_frequency'] ?? 0),
+                    (int) ($result->fields['total_billing_cycles'] ?? 0)
+                )
+                : null;
+            if ($expiry !== null) {
+                $db->Execute(
+                    'UPDATE ' . TABLE_PAYPAL_SUBSCRIPTIONS
+                    . " SET expiration_date = '" . zen_db_input($expiry) . "'"
+                    . ' WHERE paypal_subscription_id = ' . (int) $result->fields['paypal_subscription_id']
+                    . ' AND expiration_date IS NULL'
+                );
+            }
+            $result->MoveNext();
+        }
     }
 
     private static function indexExists(string $index): bool
@@ -319,6 +382,30 @@ class SubscriptionManager
             // as multiple records can have NULL values
             // Create empty result set (queryFactoryResult defaults to EOF = true)
             $existing = new \queryFactoryResult();
+        }
+
+        // Persist planned expiration at create/update when cycles are finite.
+        if (!array_key_exists('expiration_date', $subscriptionData)) {
+            if (!function_exists('paypalac_compute_subscription_expiration_date')) {
+                $helper = DIR_FS_CATALOG . 'includes/functions/extra_functions/paypalac_subscription_functions.php';
+                if (is_file($helper)) {
+                    require_once $helper;
+                }
+            }
+            if (function_exists('paypalac_compute_subscription_expiration_date')) {
+                $startForExpiry = (string)($subscriptionData['date_added'] ?? $now);
+                $computedExpiry = paypalac_compute_subscription_expiration_date(
+                    $startForExpiry,
+                    (string)($record['billing_period'] ?? ''),
+                    (int)($record['billing_frequency'] ?? 0),
+                    (int)($record['total_billing_cycles'] ?? 0)
+                );
+                $record['expiration_date'] = $computedExpiry;
+            }
+        } elseif ($subscriptionData['expiration_date'] === null || $subscriptionData['expiration_date'] === '') {
+            $record['expiration_date'] = null;
+        } else {
+            $record['expiration_date'] = substr((string)$subscriptionData['expiration_date'], 0, 10);
         }
 
         if ($existing->EOF) {

@@ -215,12 +215,15 @@ return $this->PayPalAdvancedCheckout;
               $columns[$column] = ($result && $result->RecordCount() > 0);
               return $columns[$column];
       }
-      protected function saved_cards_recurring_has_column($column)
+      protected function saved_cards_recurring_has_column($column, $reset = false)
       {
               static $columns = array();
               $column = trim((string) $column);
               if ($column === '' || !defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
                       return false;
+              }
+              if ($reset) {
+                      unset($columns[$column]);
               }
               if (array_key_exists($column, $columns)) {
                       return $columns[$column];
@@ -229,6 +232,89 @@ return $this->PayPalAdvancedCheckout;
               $result = $db->Execute("SHOW COLUMNS FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " LIKE '" . zen_db_input($column) . "'");
               $columns[$column] = ($result && $result->RecordCount() > 0);
               return $columns[$column];
+      }
+
+      /**
+       * Ensure saved_credit_cards_recurring.expiration_date exists (null = indefinite).
+       */
+      public function ensure_saved_cards_recurring_expiration_date_column()
+      {
+              if ($this->saved_cards_recurring_has_column('expiration_date')) {
+                      return true;
+              }
+              if (!defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+                      return false;
+              }
+              global $db;
+              $db->Execute(
+                      'ALTER TABLE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                      . ' ADD expiration_date DATE DEFAULT NULL'
+              );
+              return $this->saved_cards_recurring_has_column('expiration_date', true);
+      }
+
+      /**
+       * Backfill expiration_date for active saved-card subscriptions missing one.
+       */
+      public function backfill_saved_card_expiration_dates()
+      {
+              if (!$this->ensure_saved_cards_recurring_expiration_date_column()) {
+                      return 0;
+              }
+              if (!function_exists('paypalac_compute_subscription_expiration_date')) {
+                      $helper = DIR_FS_CATALOG . 'includes/functions/extra_functions/paypalac_subscription_functions.php';
+                      if (is_file($helper)) {
+                              require_once $helper;
+                      }
+              }
+              if (!function_exists('paypalac_compute_subscription_expiration_date')) {
+                      return 0;
+              }
+
+              global $db;
+              $updated = 0;
+              $orderJoin = defined('TABLE_ORDERS_PRODUCTS') && defined('TABLE_ORDERS')
+                      ? ' LEFT JOIN ' . TABLE_ORDERS_PRODUCTS . ' op ON op.orders_products_id = sccr.orders_products_id'
+                        . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = COALESCE(NULLIF(sccr.orders_id, 0), op.orders_id)'
+                      : '';
+              $result = $db->Execute(
+                      'SELECT sccr.saved_credit_card_recurring_id, sccr.date_added, sccr.billing_period, sccr.billing_frequency, sccr.total_billing_cycles,'
+                      . ($orderJoin !== '' ? ' o.date_purchased' : ' NULL AS date_purchased')
+                      . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
+                      . $orderJoin
+                      . ' WHERE sccr.expiration_date IS NULL'
+                      . ' AND sccr.total_billing_cycles > 0'
+                      . ' AND LOWER(sccr.status) IN (\'scheduled\',\'active\',\'pending\')'
+              );
+              while (is_object($result) && !$result->EOF) {
+                      $start = '';
+                      foreach (['date_added', 'date_purchased'] as $key) {
+                              $candidate = trim((string) ($result->fields[$key] ?? ''));
+                              if ($candidate !== '' && !str_starts_with($candidate, '0000-00-00')) {
+                                      $start = $candidate;
+                                      break;
+                              }
+                      }
+                      $expiry = $start !== ''
+                              ? paypalac_compute_subscription_expiration_date(
+                                      $start,
+                                      (string) ($result->fields['billing_period'] ?? ''),
+                                      (int) ($result->fields['billing_frequency'] ?? 0),
+                                      (int) ($result->fields['total_billing_cycles'] ?? 0)
+                              )
+                              : null;
+                      if ($expiry !== null) {
+                              $db->Execute(
+                                      'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                                      . " SET expiration_date = '" . zen_db_input($expiry) . "'"
+                                      . ' WHERE saved_credit_card_recurring_id = ' . (int) $result->fields['saved_credit_card_recurring_id']
+                                      . ' AND expiration_date IS NULL'
+                              );
+                              $updated++;
+                      }
+                      $result->MoveNext();
+              }
+              return $updated;
       }
 protected function ensure_vault_manager_loaded() {
 if (!class_exists('PayPalAdvancedCheckout\\Common\\VaultManager')) {
@@ -869,6 +955,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         array('fieldName' => 'total_billing_cycles', 'value' => $metadata['total_billing_cycles'], 'type' => 'integer'),
                         array('fieldName' => 'domain', 'value' => $metadata['domain'], 'type' => 'string'),
                         array('fieldName' => 'subscription_attributes_json', 'value' => $metadata['subscription_attributes_json'], 'type' => 'string'),
+                        array('fieldName' => 'date_added', 'value' => date('Y-m-d H:i:s'), 'type' => 'string'),
                 );
                 
                 // Add billing address fields if they exist
@@ -900,6 +987,32 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                 // Persist customers_id so admin subscription pages can filter by customer.
                 if (isset($metadata['customers_id']) && (int) $metadata['customers_id'] > 0) {
                         $sql_data_array[] = array('fieldName' => 'customers_id', 'value' => (int) $metadata['customers_id'], 'type' => 'integer');
+                }
+
+                // Planned end date from creation (null when total_billing_cycles is 0 / indefinite).
+                $this->ensure_saved_cards_recurring_expiration_date_column();
+                if ($this->saved_cards_recurring_has_column('expiration_date')) {
+                        if (!function_exists('paypalac_compute_subscription_expiration_date')) {
+                                $helper = DIR_FS_CATALOG . 'includes/functions/extra_functions/paypalac_subscription_functions.php';
+                                if (is_file($helper)) {
+                                        require_once $helper;
+                                }
+                        }
+                        $expiry = null;
+                        if (function_exists('paypalac_compute_subscription_expiration_date')) {
+                                $startForExpiry = !empty($metadata['date_added'])
+                                        ? (string) $metadata['date_added']
+                                        : date('Y-m-d H:i:s');
+                                $expiry = paypalac_compute_subscription_expiration_date(
+                                        $startForExpiry,
+                                        (string) ($metadata['billing_period'] ?? ''),
+                                        (int) ($metadata['billing_frequency'] ?? 0),
+                                        (int) ($metadata['total_billing_cycles'] ?? 0)
+                                );
+                        }
+                        if ($expiry !== null) {
+                                $sql_data_array[] = array('fieldName' => 'expiration_date', 'value' => $expiry, 'type' => 'string');
+                        }
                 }
                 
                 $db->perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, $sql_data_array);

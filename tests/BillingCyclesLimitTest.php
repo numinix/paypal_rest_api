@@ -70,13 +70,13 @@ if (strpos($admin, 'function paypalac_subscription_next_payment_is_chargeable') 
     echo "✓ Admin helpers and Billing Details expiry display are present\n";
 }
 
-echo "\nTest 5: Module version bumped to 1.3.18...\n";
+echo "\nTest 5: Module version bumped to 1.3.19...\n";
 $module = file_get_contents($moduleFile);
-if (strpos($module, "CURRENT_VERSION = '1.3.18'") === false) {
-    echo "✗ CURRENT_VERSION was not bumped to 1.3.18\n";
+if (strpos($module, "CURRENT_VERSION = '1.3.19'") === false) {
+    echo "✗ CURRENT_VERSION was not bumped to 1.3.19\n";
     $failures++;
 } else {
-    echo "✓ CURRENT_VERSION is 1.3.18\n";
+    echo "✓ CURRENT_VERSION is 1.3.19\n";
 }
 
 echo "\n=== Summary ===\n";
