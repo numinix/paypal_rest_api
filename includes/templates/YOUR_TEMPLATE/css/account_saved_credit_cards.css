@@ -600,18 +600,18 @@
   font-weight: 600 !important;
 }
 
-/* PayPal hosted card field containers.
- * CardFields iframes need an explicit height larger than a plain Bootstrap
- * .form-control; 2.5rem clipped the placeholder/input text. */
+/* PayPal hosted card fields — match .form-control look used at checkout.
+ * CardFields text is styled via the JS `style` object; this container only
+ * supplies the outer box. Do not stretch the iframe to 100% height or the
+ * placeholder sits at the top of empty space. */
 #savedCreditCardsDefault .ppac-card-field {
   background-color: #fff;
   border: 1px solid #ced4da;
   border-radius: 0.375rem;
   box-sizing: border-box;
-  height: 3.25rem;
-  min-height: 3.25rem;
-  overflow: hidden; /* fallback for browsers without overflow: clip support */
-  overflow: clip;   /* clip without creating a scroll container; fixes touch events on Android Chrome */
+  height: 2.375rem; /* ~form-control: 16px * 1.5 + 0.375rem*2 padding */
+  overflow: hidden;
+  overflow: clip;
   padding: 0;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
@@ -619,8 +619,7 @@
 #savedCreditCardsDefault .ppac-card-field iframe {
   border: 0 !important;
   display: block;
-  height: 100% !important;
-  min-height: 100%;
+  max-height: 100%;
   width: 100% !important;
 }
 

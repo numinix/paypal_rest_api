@@ -839,25 +839,25 @@ if (!function_exists('paypalac_render_card_field_containers')) {
           <div class="col-12">
             <div class="ppac-card-field-group">
               <label class="form-label" for="ppac-card-name"><?php echo $labelName; ?></label>
-              <div id="ppac-card-name" class="ppac-card-field"></div>
+              <div id="ppac-card-name" class="ppac-card-field ppr-creditcard-field"></div>
             </div>
           </div>
           <div class="col-12">
             <div class="ppac-card-field-group">
               <label class="form-label" for="ppac-card-number"><?php echo $labelNumber; ?></label>
-              <div id="ppac-card-number" class="ppac-card-field"></div>
+              <div id="ppac-card-number" class="ppac-card-field ppr-creditcard-field"></div>
             </div>
           </div>
           <div class="col-12 col-md-6">
             <div class="ppac-card-field-group">
               <label class="form-label" for="ppac-card-expiry"><?php echo $labelExpiry; ?></label>
-              <div id="ppac-card-expiry" class="ppac-card-field"></div>
+              <div id="ppac-card-expiry" class="ppac-card-field ppr-creditcard-field"></div>
             </div>
           </div>
           <div class="col-12 col-md-6">
             <div class="ppac-card-field-group">
               <label class="form-label" for="ppac-card-cvv"><?php echo $labelCvv; ?></label>
-              <div id="ppac-card-cvv" class="ppac-card-field"></div>
+              <div id="ppac-card-cvv" class="ppac-card-field ppr-creditcard-field"></div>
             </div>
           </div>
         </div>
@@ -947,14 +947,21 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                 initCardFields.done = true;
 
                 var cardFields = PayPalSDK.CardFields({
+                    // Mirror checkout .form-control / .ppr-creditcard-field text styling.
+                    // Border/background come from the .ppac-card-field container CSS.
                     style: {
                         'input': {
                             'font-size': '16px',
-                            'font-family': 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                            'font-family': 'inherit',
                             'font-weight': '400',
                             'line-height': '1.5',
                             'color': '#212529',
-                            'padding': '0.65rem 0.75rem'
+                            'padding': '0.375rem 0.75rem',
+                            'border': '0',
+                            'background-color': 'transparent'
+                        },
+                        ':focus': {
+                            'color': '#212529'
                         },
                         '.invalid': {
                             'color': '#842029'
