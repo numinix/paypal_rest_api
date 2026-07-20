@@ -950,25 +950,30 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                     // PayPal docs: style font/color here; size/border the container in CSS.
                     // Height/padding/line-height on the input fight the iframe layout and
                     // push placeholders onto the bottom border.
+                    // Matches the global input[type="text"] look used by the plain HTML
+                    // card fields on checkout. No padding here: the .ppac-card-field
+                    // container supplies the inset so it isn't duplicated (or fighting
+                    // the iframe's own layout) inside the hosted field. Adjust the
+                    // colors/font-size below to match your theme's own text inputs.
                     style: {
                         'input': {
-                            'font-size': '16px',
+                            'font-size': '12px',
                             'font-family': 'inherit',
                             'font-weight': '400',
-                            'color': '#212529',
+                            'color': '#4d4d4d',
                             'border': 'none',
                             'outline': 'none',
                             'box-shadow': 'none',
                             'background-color': 'transparent'
                         },
                         ':focus': {
-                            'color': '#212529',
+                            'color': '#4d4d4d',
                             'border': 'none',
                             'outline': 'none',
                             'box-shadow': 'none'
                         },
                         '.invalid': {
-                            'color': '#842029'
+                            'color': '#c00'
                         }
                     },
                     createVaultSetupToken: function () {

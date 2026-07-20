@@ -600,21 +600,25 @@
   font-weight: 600 !important;
 }
 
-/* PayPal hosted card fields — outer chrome only (height/border/focus).
- * Per PayPal docs, size the container in CSS; keep CardFields `style` limited
- * to font/color so the iframe can vertically center its own text.
+/* PayPal hosted card fields — styled to match the plain HTML card inputs
+ * used on checkout (see the theme's global `input[type="text"]` rule):
+ * 30px tall, 12px font, #A6A6A6 border, square corners. The horizontal/
+ * vertical inset lives on this container (via padding) rather than on the
+ * CardFields `style.input`, since the iframe itself can't take padding —
+ * only the container can. Adjust the colors/dimensions below to match
+ * your theme's own text-input styling.
  * `!important` on height is required: PayPal's SDK auto-sizes the container
  * via an inline style, which otherwise wins over a plain CSS rule and makes
  * the field taller than intended. `overflow: hidden` clips any excess so the
  * inline height can't visually inflate the box either. */
 #savedCreditCardsDefault .ppac-card-field {
   background-color: #fff;
-  border: 1px solid #ced4da;
-  border-radius: 0.375rem;
+  border: 1px solid #A6A6A6;
+  border-radius: 0;
   box-sizing: border-box;
-  height: 3rem !important;
+  height: 30px !important;
   overflow: hidden;
-  padding: 0;
+  padding: 5px 9px;
   position: relative;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
@@ -627,7 +631,7 @@
 }
 
 #savedCreditCardsDefault .ppac-card-field:focus-within {
-  border-color: #86b7fe;
-  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  border-color: #58862b;
+  box-shadow: 0 0 1px #58862b;
   outline: 0;
 }
