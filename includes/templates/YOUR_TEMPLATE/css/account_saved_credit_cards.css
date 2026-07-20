@@ -600,15 +600,28 @@
   font-weight: 600 !important;
 }
 
-/* PayPal hosted card field containers */
+/* PayPal hosted card field containers.
+ * CardFields iframes need an explicit height larger than a plain Bootstrap
+ * .form-control; 2.5rem clipped the placeholder/input text. */
 #savedCreditCardsDefault .ppac-card-field {
+  background-color: #fff;
   border: 1px solid #ced4da;
   border-radius: 0.375rem;
-  height: 2.5rem;
+  box-sizing: border-box;
+  height: 3.25rem;
+  min-height: 3.25rem;
   overflow: hidden; /* fallback for browsers without overflow: clip support */
   overflow: clip;   /* clip without creating a scroll container; fixes touch events on Android Chrome */
   padding: 0;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+#savedCreditCardsDefault .ppac-card-field iframe {
+  border: 0 !important;
+  display: block;
+  height: 100% !important;
+  min-height: 100%;
+  width: 100% !important;
 }
 
 #savedCreditCardsDefault .ppac-card-field:focus-within {

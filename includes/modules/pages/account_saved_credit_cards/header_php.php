@@ -947,6 +947,19 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                 initCardFields.done = true;
 
                 var cardFields = PayPalSDK.CardFields({
+                    style: {
+                        'input': {
+                            'font-size': '16px',
+                            'font-family': 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                            'font-weight': '400',
+                            'line-height': '1.5',
+                            'color': '#212529',
+                            'padding': '0.65rem 0.75rem'
+                        },
+                        '.invalid': {
+                            'color': '#842029'
+                        }
+                    },
                     createVaultSetupToken: function () {
                         var addressPayload = getBillingAddressPayload();
                         if (!addressPayload) {
