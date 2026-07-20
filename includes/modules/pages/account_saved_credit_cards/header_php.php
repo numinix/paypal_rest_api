@@ -959,15 +959,13 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                     style: {
                         'body': {
                             'padding': '0',
-                            'margin': '0',
-                            'height': '100%'
+                            'margin': '0'
                         },
                         'input': {
                             'font-size': '12px',
                             'font-family': 'inherit',
                             'font-weight': '400',
                             'color': '#4d4d4d',
-                            'height': '100%',
                             'padding': '0 9px',
                             'border': 'none',
                             'outline': 'none',
