@@ -953,8 +953,8 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                     // Matches the global input[type="text"] look used by the plain HTML
                     // card fields on checkout. PayPal's iframe applies a default
                     // body { padding: 0.375rem } which stacks with any container
-                    // padding and misaligns the text — zero body and input padding
-                    // here, and keep the .ppac-card-field container padding at 0.
+                    // padding and misaligns the text — zero body padding here, use 9px
+                    // horizontal input padding to match checkout, and keep container padding at 0.
                     // Adjust colors/font-size below to match your theme's text inputs.
                     style: {
                         'body': {
@@ -966,7 +966,7 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                             'font-family': 'inherit',
                             'font-weight': '400',
                             'color': '#4d4d4d',
-                            'padding': '0',
+                            'padding': '0 9px',
                             'border': 'none',
                             'outline': 'none',
                             'box-shadow': 'none',
