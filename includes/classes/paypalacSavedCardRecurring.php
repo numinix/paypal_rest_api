@@ -1076,6 +1076,21 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         } elseif (is_array($fallbackAttributes) && count($fallbackAttributes) > 0) {
                                 $normalized['subscription_attributes'] = array_merge($fallbackAttributes, $normalized['subscription_attributes']);
                         }
+                } elseif (
+                        $original_orders_products_id > 0
+                        && (
+                                empty($normalized['customers_id'])
+                                || empty($normalized['orders_id'])
+                        )
+                ) {
+                        // Even when billing metadata is complete, always recover
+                        // customers_id / orders_id from the parent order line.
+                        list($fallbackValues) = $this->extract_order_item_metadata($original_orders_products_id);
+                        foreach (array('customers_id', 'orders_id', 'original_orders_id') as $key) {
+                                if ((empty($normalized[$key]) || $normalized[$key] === null) && !empty($fallbackValues[$key])) {
+                                        $normalized[$key] = $fallbackValues[$key];
+                                }
+                        }
                 }
 
                 if ((!isset($normalized['domain']) || $normalized['domain'] === '') && $original_orders_products_id > 0 && function_exists('nmx_check_domain')) {
@@ -1139,6 +1154,8 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         'domain' => null,
                         'subscription_attributes' => array(),
                         'subscription_attributes_json' => '',
+                        'customers_id' => null,
+                        'orders_id' => null,
                         // Billing address fields
                         'billing_name' => null,
                         'billing_company' => null,
@@ -1163,6 +1180,8 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         'billing_frequency' => array('billing_frequency', 'billingfrequency'),
                         'total_billing_cycles' => array('total_billing_cycles', 'totalbillingcycles'),
                         'domain' => array('domain'),
+                        'customers_id' => array('customers_id', 'customer_id'),
+                        'orders_id' => array('orders_id', 'order_id', 'original_orders_id'),
                         // Billing address field mappings
                         'billing_name' => array('billing_name'),
                         'billing_company' => array('billing_company'),
@@ -2283,8 +2302,30 @@ $GLOBALS[$_SESSION['payment']]->after_process();
 
         function find_group_pricing($products_id) {
 		global $db;
-		$products_name = zen_get_products_name((int) $products_id);
-		$group = $db->Execute("SELECT group_id, group_percentage FROM " . TABLE_GROUP_PRICING . " WHERE group_name = '" . $products_name . "' LIMIT 1;");
+		$products_id = (int) $products_id;
+		if ($products_id <= 0) {
+			return false;
+		}
+
+		$products_name = '';
+		if (function_exists('zen_get_products_name')) {
+			$products_name = trim((string) zen_get_products_name($products_id));
+		}
+		if ($products_name === '') {
+			$nameRow = $db->Execute(
+				'SELECT products_name FROM ' . TABLE_PRODUCTS_DESCRIPTION
+				. ' WHERE products_id = ' . $products_id
+				. ' ORDER BY language_id ASC LIMIT 1'
+			);
+			if ($nameRow && !$nameRow->EOF) {
+				$products_name = trim((string) $nameRow->fields['products_name']);
+			}
+		}
+		if ($products_name === '') {
+			return false;
+		}
+
+		$group = $db->Execute("SELECT group_id, group_percentage FROM " . TABLE_GROUP_PRICING . " WHERE group_name = '" . zen_db_input($products_name) . "' LIMIT 1;");
 		if ($group->RecordCount() > 0 && (int) $group->fields['group_id'] > 0) {
 			return $group->fields['group_id'];
 		}
