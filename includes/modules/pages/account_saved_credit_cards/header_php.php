@@ -806,6 +806,33 @@ if (!function_exists('paypalac_render_card_field_containers')) {
         $msgError     = defined('TEXT_ADD_CARD_ERROR_GENERAL') ? TEXT_ADD_CARD_ERROR_GENERAL : 'We were unable to save your card. Please try again or contact us for help.';
         $msgProcess   = defined('TEXT_ADD_CARD_PROCESSING')    ? TEXT_ADD_CARD_PROCESSING    : 'Processing...';
 
+        // Fallback SDK URL for templates that never fire NOTIFY_HTML_HEAD_* (so the
+        // observer never injects #PayPalJSSDK). CardFields still needs card-fields.
+        $sdkClientId = '';
+        $sdkIsSandbox = defined('MODULE_PAYMENT_PAYPALAC_SERVER') && MODULE_PAYMENT_PAYPALAC_SERVER === 'sandbox';
+        if ($sdkIsSandbox) {
+            $sdkClientId = 'sb';
+        } elseif (defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L') && MODULE_PAYMENT_PAYPALAC_CLIENTID_L !== '') {
+            $sdkClientId = MODULE_PAYMENT_PAYPALAC_CLIENTID_L;
+        } elseif (defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S') && MODULE_PAYMENT_PAYPALAC_CLIENTID_S !== '') {
+            $sdkClientId = MODULE_PAYMENT_PAYPALAC_CLIENTID_S;
+        }
+        $sdkQuery = [
+            'client-id' => $sdkClientId,
+            'components' => 'card-fields',
+            'integration-date' => '2025-08-01',
+        ];
+        if ($sdkIsSandbox) {
+            $sdkQuery['debug'] = 'true';
+            $sdkQuery['buyer-country'] = 'US';
+            $sdkQuery['locale'] = 'en_US';
+        }
+        $sdkUrl = 'https://www.paypal.com/sdk/js?' . str_replace('%2C', ',', http_build_query($sdkQuery));
+        $partnerAttributionId = '';
+        if (class_exists('\\PayPalAdvancedCheckout\\Api\\PayPalAdvancedCheckoutApi')) {
+            $partnerAttributionId = \PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi::PARTNER_ATTRIBUTION_ID;
+        }
+
         ob_start();
         ?>
         <div class="ppac-vault-card-fields row g-3">
@@ -843,6 +870,9 @@ if (!function_exists('paypalac_render_card_field_containers')) {
             var AJAX_URL   = <?php echo json_encode($addCardAjaxUrl); ?>;
             var MSG_ERROR  = <?php echo json_encode($msgError); ?>;
             var MSG_PROCESS = <?php echo json_encode($msgProcess); ?>;
+            var SDK_URL = <?php echo json_encode($sdkUrl); ?>;
+            var SDK_PARTNER_ID = <?php echo json_encode($partnerAttributionId); ?>;
+            var SDK_CLIENT_ID = <?php echo json_encode($sdkClientId); ?>;
 
             function showError(message) {
                 var el = document.getElementById('ppac-add-card-error');
@@ -903,6 +933,9 @@ if (!function_exists('paypalac_render_card_field_containers')) {
             }
 
             function initCardFields() {
+                if (initCardFields.done) {
+                    return;
+                }
                 if (typeof PayPalSDK === 'undefined' || typeof PayPalSDK.CardFields !== 'function') {
                     return;
                 }
@@ -911,6 +944,7 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                 if (!form) {
                     return;
                 }
+                initCardFields.done = true;
 
                 var cardFields = PayPalSDK.CardFields({
                     createVaultSetupToken: function () {
@@ -989,29 +1023,95 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                 });
             }
 
-            if (typeof PayPalSDK !== 'undefined' && typeof PayPalSDK.CardFields === 'function') {
-                initCardFields();
-            } else {
-                var sdkScript = document.getElementById('PayPalJSSDK');
-                if (sdkScript && sdkScript.dataset && sdkScript.dataset.loaded === 'true') {
-                    initCardFields();
-                } else if (sdkScript) {
-                    sdkScript.addEventListener('load', initCardFields);
-                } else {
-                    document.addEventListener('DOMContentLoaded', function () {
-                        var attempts = 0;
-                        var maxAttempts = 100;
-                        var interval = setInterval(function () {
-                            attempts++;
-                            if (typeof PayPalSDK !== 'undefined' && typeof PayPalSDK.CardFields === 'function') {
-                                clearInterval(interval);
-                                initCardFields();
-                            } else if (attempts >= maxAttempts) {
-                                clearInterval(interval);
-                            }
-                        }, 100);
-                    });
+            function sdkHasCardFields() {
+                return typeof PayPalSDK !== 'undefined' && typeof PayPalSDK.CardFields === 'function';
+            }
+
+            function waitForCardFields(onReady, onTimeout) {
+                var attempts = 0;
+                var maxAttempts = 100;
+                var interval = setInterval(function () {
+                    attempts++;
+                    if (sdkHasCardFields()) {
+                        clearInterval(interval);
+                        onReady();
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(interval);
+                        if (typeof onTimeout === 'function') {
+                            onTimeout();
+                        }
+                    }
+                }, 100);
+            }
+
+            function loadCardFieldsSdk(onReady) {
+                if (!SDK_CLIENT_ID) {
+                    showError(MSG_ERROR);
+                    return;
                 }
+
+                var existing = document.getElementById('PayPalJSSDK')
+                    || document.querySelector('script[data-paypal-sdk="true"]');
+
+                if (existing) {
+                    // Header SDK may omit card-fields; only reuse when CardFields is present.
+                    if (sdkHasCardFields()) {
+                        onReady();
+                        return;
+                    }
+                    if (existing.src && existing.src.indexOf('card-fields') !== -1) {
+                        existing.addEventListener('load', onReady);
+                        waitForCardFields(onReady, function () { showError(MSG_ERROR); });
+                        return;
+                    }
+                }
+
+                var script = document.createElement('script');
+                script.id = 'PayPalJSSDK';
+                script.title = 'PayPalSDK';
+                script.async = true;
+                script.setAttribute('data-paypal-sdk', 'true');
+                script.setAttribute('data-namespace', 'PayPalSDK');
+                if (SDK_PARTNER_ID) {
+                    script.setAttribute('data-partner-attribution-id', SDK_PARTNER_ID);
+                }
+                script.src = SDK_URL;
+                script.addEventListener('load', function () {
+                    script.dataset.loaded = 'true';
+                    onReady();
+                });
+                script.addEventListener('error', function () {
+                    showError(MSG_ERROR);
+                });
+                document.head.appendChild(script);
+            }
+
+            function ensureCardFieldsReady() {
+                if (sdkHasCardFields()) {
+                    initCardFields();
+                    return;
+                }
+
+                var sdkScript = document.getElementById('PayPalJSSDK')
+                    || document.querySelector('script[data-paypal-sdk="true"]');
+
+                if (sdkScript && sdkScript.src && sdkScript.src.indexOf('card-fields') !== -1) {
+                    if (sdkScript.dataset && sdkScript.dataset.loaded === 'true') {
+                        initCardFields();
+                    } else {
+                        sdkScript.addEventListener('load', initCardFields);
+                        waitForCardFields(initCardFields, function () { showError(MSG_ERROR); });
+                    }
+                    return;
+                }
+
+                loadCardFieldsSdk(initCardFields);
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', ensureCardFieldsReady);
+            } else {
+                ensureCardFieldsReady();
             }
         }());
         </script>
