@@ -951,16 +951,22 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                     // Height/padding/line-height on the input fight the iframe layout and
                     // push placeholders onto the bottom border.
                     // Matches the global input[type="text"] look used by the plain HTML
-                    // card fields on checkout. No padding here: the .ppac-card-field
-                    // container supplies the inset so it isn't duplicated (or fighting
-                    // the iframe's own layout) inside the hosted field. Adjust the
-                    // colors/font-size below to match your theme's own text inputs.
+                    // card fields on checkout. PayPal's iframe applies a default
+                    // body { padding: 0.375rem } which stacks with any container
+                    // padding and misaligns the text — zero body and input padding
+                    // here, and keep the .ppac-card-field container padding at 0.
+                    // Adjust colors/font-size below to match your theme's text inputs.
                     style: {
+                        'body': {
+                            'padding': '0',
+                            'margin': '0'
+                        },
                         'input': {
                             'font-size': '12px',
                             'font-family': 'inherit',
                             'font-weight': '400',
                             'color': '#4d4d4d',
+                            'padding': '0',
                             'border': 'none',
                             'outline': 'none',
                             'box-shadow': 'none',

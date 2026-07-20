@@ -602,11 +602,11 @@
 
 /* PayPal hosted card fields — styled to match the plain HTML card inputs
  * used on checkout (see the theme's global `input[type="text"]` rule):
- * 30px tall, 12px font, #A6A6A6 border, square corners. The horizontal/
- * vertical inset lives on this container (via padding) rather than on the
- * CardFields `style.input`, since the iframe itself can't take padding —
- * only the container can. Adjust the colors/dimensions below to match
- * your theme's own text-input styling.
+ * 30px tall, #A6A6A6 border, square corners. Padding is NOT set here:
+ * PayPal's iframe body already has a default padding (0.375rem), and any
+ * container padding stacks with it and misaligns the text. CardFields
+ * `style` zeros body/input padding so the text can sit flush and centered
+ * in the 30px box. Adjust colors/dimensions below to match your theme.
  * `!important` on height is required: PayPal's SDK auto-sizes the container
  * via an inline style, which otherwise wins over a plain CSS rule and makes
  * the field taller than intended. `overflow: hidden` clips any excess so the
@@ -618,7 +618,7 @@
   box-sizing: border-box;
   height: 30px !important;
   overflow: hidden;
-  padding: 5px 9px;
+  padding: 0;
   position: relative;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
