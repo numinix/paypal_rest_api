@@ -959,13 +959,15 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                     style: {
                         'body': {
                             'padding': '0',
-                            'margin': '0'
+                            'margin': '0',
+                            'height': '100%'
                         },
                         'input': {
                             'font-size': '12px',
                             'font-family': 'inherit',
                             'font-weight': '400',
                             'color': '#4d4d4d',
+                            'height': '100%',
                             'padding': '0 9px',
                             'border': 'none',
                             'outline': 'none',
@@ -979,7 +981,16 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                             'box-shadow': 'none'
                         },
                         '.invalid': {
-                            'color': '#c00'
+                            'color': '#c00',
+                            'border': 'none',
+                            'outline': 'none',
+                            'box-shadow': 'none'
+                        },
+                        '.invalid:focus': {
+                            'color': '#c00',
+                            'border': 'none',
+                            'outline': 'none',
+                            'box-shadow': 'none'
                         }
                     },
                     createVaultSetupToken: function () {
