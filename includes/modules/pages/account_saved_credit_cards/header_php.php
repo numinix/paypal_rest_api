@@ -966,6 +966,7 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                             'font-family': 'inherit',
                             'font-weight': '400',
                             'color': '#4d4d4d',
+                            'height': '30px',
                             'padding': '0 9px',
                             'border': 'none',
                             'outline': 'none',
