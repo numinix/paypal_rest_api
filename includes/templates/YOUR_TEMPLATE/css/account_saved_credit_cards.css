@@ -600,30 +600,31 @@
   font-weight: 600 !important;
 }
 
-/* PayPal hosted card fields — match .form-control look used at checkout.
- * CardFields text is styled via the JS `style` object; this container only
- * supplies the outer box. Do not stretch the iframe to 100% height or the
- * placeholder sits at the top of empty space. */
+/* PayPal hosted card fields — match checkout .form-control chrome.
+ * Focus styling lives on this container (:focus-within). Suppress PayPal's
+ * inner focus border via the CardFields `style` object, and never clip the
+ * iframe or placeholders get cut off. */
 #savedCreditCardsDefault .ppac-card-field {
   background-color: #fff;
   border: 1px solid #ced4da;
   border-radius: 0.375rem;
   box-sizing: border-box;
-  height: 2.375rem; /* ~form-control: 16px * 1.5 + 0.375rem*2 padding */
-  overflow: hidden;
-  overflow: clip;
+  height: 2.5rem;
+  overflow: visible;
   padding: 0;
+  position: relative;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
 #savedCreditCardsDefault .ppac-card-field iframe {
   border: 0 !important;
   display: block;
-  max-height: 100%;
+  height: 2.5rem !important;
   width: 100% !important;
 }
 
 #savedCreditCardsDefault .ppac-card-field:focus-within {
   border-color: #86b7fe;
   box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  outline: 0;
 }

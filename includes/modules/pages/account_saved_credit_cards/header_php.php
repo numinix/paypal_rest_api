@@ -947,21 +947,28 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                 initCardFields.done = true;
 
                 var cardFields = PayPalSDK.CardFields({
-                    // Mirror checkout .form-control / .ppr-creditcard-field text styling.
-                    // Border/background come from the .ppac-card-field container CSS.
+                    // Mirror checkout .form-control: outer box + :focus-within ring
+                    // come from CSS. Kill PayPal's default inner focus border so it
+                    // cannot render taller than the container and get clipped.
                     style: {
                         'input': {
                             'font-size': '16px',
                             'font-family': 'inherit',
                             'font-weight': '400',
                             'line-height': '1.5',
+                            'height': '40px',
                             'color': '#212529',
-                            'padding': '0.375rem 0.75rem',
-                            'border': '0',
+                            'padding': '0 0.75rem',
+                            'border': 'none',
+                            'outline': 'none',
+                            'box-shadow': 'none',
                             'background-color': 'transparent'
                         },
                         ':focus': {
-                            'color': '#212529'
+                            'color': '#212529',
+                            'border': 'none',
+                            'outline': 'none',
+                            'box-shadow': 'none'
                         },
                         '.invalid': {
                             'color': '#842029'
