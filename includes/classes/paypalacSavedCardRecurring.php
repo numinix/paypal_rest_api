@@ -989,6 +989,13 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         array('fieldName' => 'subscription_attributes_json', 'value' => $metadata['subscription_attributes_json'], 'type' => 'string'),
                         array('fieldName' => 'date_added', 'value' => date('Y-m-d H:i:s'), 'type' => 'string'),
                 );
+
+                // Keep legacy `date` in sync with next_payment_date when the column
+                // exists. Some installs still have `date` as NOT NULL without a default;
+                // omitting it stores 0000-00-00 which can surface as the next payment date.
+                if ($this->saved_cards_recurring_has_column('date')) {
+                        array_unshift($sql_data_array, array('fieldName' => 'date', 'value' => $date, 'type' => 'string'));
+                }
                 
                 // Add billing address fields if they exist
                 $billingAddressFields = array('billing_name', 'billing_company', 'billing_street_address', 'billing_suburb',
@@ -2699,9 +2706,15 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                                 $sql .= ', recurring_orders_id = ' . (int) $data['order_id'];
                         }
                         $sql .= ", next_payment_date = '" . $this->escape_db_value($data['date']) . "'";
+                        if ($this->saved_cards_recurring_has_column('date')) {
+                                $sql .= ", date = '" . $this->escape_db_value($data['date']) . "'";
+                        }
                 }
                 elseif (isset($data['date'])) {
                         $sql .= ", next_payment_date = '" . $this->escape_db_value($data['date']) . "'";
+                        if ($this->saved_cards_recurring_has_column('date')) {
+                                $sql .= ", date = '" . $this->escape_db_value($data['date']) . "'";
+                        }
                 }
                 elseif (isset($data['saved_credit_card_id'])) {
                         $sql .= ', saved_credit_card_id = ' . (int) $data['saved_credit_card_id'];

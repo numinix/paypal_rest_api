@@ -504,12 +504,24 @@ class zcObserverPaypaladvcheckoutRecurring
             return null;
         }
 
-        $billingFrequency = (int)$normalized['billing_frequency'];
+        // Numinix and other catalogs often store frequency as a label ("Monthly",
+        // "1 Month", "30 Days") rather than a bare integer. Cast-to-int alone
+        // turns "Monthly" into 0 and silently drops the subscription.
+        $inferredPeriod = null;
+        $billingFrequency = $this->parseBillingFrequency(
+            (string)$normalized['billing_frequency'],
+            $inferredPeriod
+        );
         if ($billingFrequency <= 0) {
             return null;
         }
+        if ($inferredPeriod !== null && $billingPeriod !== $inferredPeriod) {
+            // Prefer the unit embedded in the frequency value when present
+            // (e.g. Billing Period=Monthly + Frequency="30 Days").
+            $billingPeriod = $inferredPeriod;
+        }
 
-        $totalCycles = (int)($normalized['total_billing_cycles'] ?? 0);
+        $totalCycles = $this->parseTotalBillingCycles((string)($normalized['total_billing_cycles'] ?? '0'));
 
         $trialPeriodRaw = (string)($normalized['trial_period'] ?? '');
         $trialPeriod = '';
@@ -560,6 +572,101 @@ class zcObserverPaypaladvcheckoutRecurring
         }
 
         return self::PERIOD_MAP[$value];
+    }
+
+    /**
+     * Parse a billing-frequency attribute value into a positive integer.
+     *
+     * Accepts bare integers ("1"), unit-qualified values ("1 Month", "30 Days"),
+     * and period labels used as frequency on some catalogs ("Monthly", "Quarterly").
+     *
+     * @param string|null $inferredPeriod Set to a PERIOD_MAP value when the
+     *                                    frequency string embeds a unit.
+     */
+    protected function parseBillingFrequency(string $raw, ?string &$inferredPeriod = null): int
+    {
+        if (function_exists('paypalac_parse_billing_frequency')) {
+            return paypalac_parse_billing_frequency($raw, $inferredPeriod);
+        }
+
+        $raw = trim($raw);
+        $inferredPeriod = null;
+        if ($raw === '') {
+            return 0;
+        }
+
+        if (preg_match('/^\d+$/', $raw) === 1) {
+            return (int) $raw;
+        }
+
+        if (preg_match('/^(\d+)\s*(day|days|week|weeks|month|months|year|years)\b/i', $raw, $m) === 1) {
+            $count = (int) $m[1];
+            $unit = strtolower($m[2]);
+            if (str_starts_with($unit, 'day')) {
+                $inferredPeriod = 'DAY';
+            } elseif (str_starts_with($unit, 'week')) {
+                $inferredPeriod = 'WEEK';
+            } elseif (str_starts_with($unit, 'month')) {
+                $inferredPeriod = 'MONTH';
+            } elseif (str_starts_with($unit, 'year')) {
+                $inferredPeriod = 'YEAR';
+            }
+            return $count > 0 ? $count : 0;
+        }
+
+        $named = [
+            'daily' => [1, 'DAY'],
+            'day' => [1, 'DAY'],
+            'weekly' => [1, 'WEEK'],
+            'week' => [1, 'WEEK'],
+            'monthly' => [1, 'MONTH'],
+            'month' => [1, 'MONTH'],
+            'quarterly' => [3, 'MONTH'],
+            'quarter' => [3, 'MONTH'],
+            'yearly' => [1, 'YEAR'],
+            'annually' => [1, 'YEAR'],
+            'annual' => [1, 'YEAR'],
+            'year' => [1, 'YEAR'],
+            'semimonthly' => [1, 'SEMI_MONTH'],
+            'semimonth' => [1, 'SEMI_MONTH'],
+        ];
+        $key = strtolower(preg_replace('/[^a-z]/', '', $raw) ?? '');
+        if (isset($named[$key])) {
+            $inferredPeriod = $named[$key][1];
+            return $named[$key][0];
+        }
+
+        if (preg_match('/(\d+)/', $raw, $m) === 1) {
+            return (int) $m[1];
+        }
+
+        return 0;
+    }
+
+    /**
+     * Parse total billing cycles; "Good until cancelled" and similar labels => 0.
+     */
+    protected function parseTotalBillingCycles(string $raw): int
+    {
+        if (function_exists('paypalac_parse_total_billing_cycles')) {
+            return paypalac_parse_total_billing_cycles($raw);
+        }
+
+        $raw = trim($raw);
+        if ($raw === '') {
+            return 0;
+        }
+
+        $normalized = strtolower(preg_replace('/[^a-z0-9]+/', '', $raw) ?? '');
+        if ($normalized === '' || str_contains($normalized, 'gooduntil') || str_contains($normalized, 'untilcancelled') || str_contains($normalized, 'indefinite') || str_contains($normalized, 'unlimited')) {
+            return 0;
+        }
+
+        if (preg_match('/(\d+)/', $raw, $m) === 1) {
+            return (int) $m[1];
+        }
+
+        return 0;
     }
 
     protected function parseAmount(string $raw): float

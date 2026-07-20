@@ -61,6 +61,17 @@ class LegacySubscriptionMigrator
 
         $attributes = self::normalizeAttributes($row, $billingPeriod, $billingFrequency, $totalCycles);
 
+        $nextPaymentDate = self::normalizeDateValue(
+            $row['next_payment_date'] ?? $row['next_payment_due'] ?? $row['next_billing_date'] ?? null
+        );
+        if ($nextPaymentDate === null) {
+            $nextPaymentDate = self::computeNextPaymentDateFromSchedule(
+                $billingPeriod,
+                $billingFrequency,
+                (int)($row['orders_id'] ?? 0)
+            );
+        }
+
         return [
             'legacy_subscription_id' => (int)($row['subscription_id'] ?? $row['paypal_subscription_id'] ?? 0),
             'customers_id' => (int)($row['customers_id'] ?? 0),
@@ -80,10 +91,10 @@ class LegacySubscriptionMigrator
             'vault_id' => substr((string)($row['vault_id'] ?? ''), 0, 64),
             'status' => strtolower((string)($row['status'] ?? SubscriptionManager::STATUS_PENDING)),
             'profile_id' => substr((string)($row['profile_id'] ?? ''), 0, 64),
-            'next_payment_date' => self::normalizeDateValue($row['next_payment_date'] ?? $row['next_payment_due'] ?? $row['next_billing_date'] ?? null),
+            'next_payment_date' => $nextPaymentDate,
             'next_payment_due' => self::normalizeDateValue($row['next_payment_due'] ?? null),
             'next_payment_due_date' => self::normalizeDateValue($row['next_payment_due_date'] ?? null),
-            'next_billing_date' => self::normalizeDateValue($row['next_billing_date'] ?? null),
+            'next_billing_date' => self::normalizeDateValue($row['next_billing_date'] ?? null) ?? $nextPaymentDate,
             'expiration_date' => self::normalizeDateValue($row['expiration_date'] ?? null),
             'domain' => (string)($row['domain'] ?? ''),
             'attributes' => $attributes,
@@ -138,6 +149,26 @@ class LegacySubscriptionMigrator
             }
         } else {
             $record['attributes'] = '';
+        }
+
+        // zen_db_perform turns null into '' which MySQL stores as 0000-00-00 for DATE
+        // columns. Drop empty date fields so we never reintroduce zero dates.
+        foreach (
+            [
+                'next_payment_date',
+                'next_payment_due',
+                'next_payment_due_date',
+                'next_billing_date',
+                'expiration_date',
+            ] as $dateField
+        ) {
+            if (!array_key_exists($dateField, $record)) {
+                continue;
+            }
+            $raw = $record[$dateField];
+            if ($raw === null || $raw === '' || (is_string($raw) && str_starts_with($raw, '0000-00-00'))) {
+                unset($record[$dateField]);
+            }
         }
 
         // Set orders_products_id to NULL if it's 0 to avoid UNIQUE constraint violations
@@ -214,14 +245,86 @@ class LegacySubscriptionMigrator
 
     private static function normalizeDateValue($value): ?string
     {
-        if (is_string($value) && trim($value) !== '') {
-            $timestamp = strtotime($value);
-            if ($timestamp !== false) {
-                return date('Y-m-d', $timestamp);
+        if (!is_string($value) && !is_numeric($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+        if ($value === '' || str_starts_with($value, '0000-00-00')) {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+        if ($timestamp === false) {
+            return null;
+        }
+
+        $normalized = date('Y-m-d', $timestamp);
+        if (str_starts_with($normalized, '0000-00-00') || (int) date('Y', $timestamp) < 1970) {
+            return null;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * When legacy rows lack a next payment date, advance from the parent order
+     * purchase date (or today) by billing_period x billing_frequency until the
+     * result is in the future. Prevents migrating 0000-00-00 into the admin UI.
+     */
+    private static function computeNextPaymentDateFromSchedule(
+        string $billingPeriod,
+        int $billingFrequency,
+        int $ordersId
+    ): ?string {
+        if ($billingFrequency <= 0) {
+            $billingFrequency = 1;
+        }
+
+        $anchor = time();
+        if ($ordersId > 0 && defined('TABLE_ORDERS')) {
+            global $db;
+            $order = $db->Execute(
+                'SELECT date_purchased FROM ' . TABLE_ORDERS
+                . ' WHERE orders_id = ' . (int) $ordersId
+                . ' LIMIT 1'
+            );
+            if ($order instanceof \queryFactoryResult && !$order->EOF) {
+                $purchased = strtotime((string) $order->fields['date_purchased']);
+                if ($purchased !== false) {
+                    $anchor = $purchased;
+                }
             }
         }
 
-        return null;
+        $period = strtoupper(trim($billingPeriod));
+        if (str_starts_with($period, 'DAY')) {
+            $modifier = '+' . $billingFrequency . ' days';
+        } elseif (str_starts_with($period, 'WEEK')) {
+            $modifier = '+' . ($billingFrequency * 7) . ' days';
+        } elseif (str_contains($period, 'SEMI')) {
+            $modifier = '+15 days';
+        } elseif (str_starts_with($period, 'YEAR')) {
+            $modifier = '+' . $billingFrequency . ' years';
+        } else {
+            $modifier = '+' . $billingFrequency . ' months';
+        }
+
+        $next = $anchor;
+        $today = strtotime('today');
+        // Cap iterations so a bad period cannot loop forever.
+        for ($i = 0; $i < 1200; $i++) {
+            $candidate = strtotime($modifier, $next);
+            if ($candidate === false) {
+                return null;
+            }
+            $next = $candidate;
+            if ($next > $today) {
+                return date('Y-m-d', $next);
+            }
+        }
+
+        return date('Y-m-d', $next);
     }
 
     private static function normalizeDateTime($value): ?string

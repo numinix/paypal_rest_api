@@ -328,23 +328,140 @@ if (!function_exists('paypalac_renewal_attribute_value_is_present_and_accepted')
 
 if (!function_exists('paypalac_attribute_map_has_accepted_automatic_renewal')) {
     /**
-     * Membership products carry billing period/frequency options for term length.
-     * Only create subscriptions when the customer accepted automatic renewal.
+     * Decide whether an order line should create a recurring subscription.
+     *
+     * - If an Automatic Renewal / Accept Automatic Renewal attribute is present,
+     *   the customer must have accepted it (membership opt-in flow).
+     * - If that attribute is absent, treat classic Billing Period + Frequency
+     *   products (Numinix plans, etc.) as subscription SKUs — except for a
+     *   single-cycle membership-style term (e.g. Yearly x 1) which is a one-shot
+     *   purchase without renewal opt-in.
      *
      * @param array<string,string> $attributeMap normalized order-product attribute keys
      */
     function paypalac_attribute_map_has_accepted_automatic_renewal(array $attributeMap): bool
     {
+        $hasRenewalAttribute = false;
         foreach ($attributeMap as $key => $value) {
             $normalizedKey = preg_replace('/[^a-z0-9]/', '', strtolower((string) $key)) ?? '';
             if ($normalizedKey !== 'acceptautomaticrenewal' && $normalizedKey !== 'automaticrenewal') {
                 continue;
             }
 
-            return paypalac_renewal_attribute_value_is_present_and_accepted((string) $value);
+            $hasRenewalAttribute = true;
+            if (paypalac_renewal_attribute_value_is_present_and_accepted((string) $value)) {
+                return true;
+            }
         }
 
-        return false;
+        if ($hasRenewalAttribute) {
+            return false;
+        }
+
+        // No Automatic Renewal attribute on the line: allow indefinite / multi-cycle
+        // classic subscriptions. Block single-cycle term purchases (membership year).
+        $cyclesRaw = '';
+        foreach ($attributeMap as $key => $value) {
+            $normalizedKey = preg_replace('/[^a-z0-9]/', '', strtolower((string) $key)) ?? '';
+            if ($normalizedKey === 'totalbillingcycles' || $normalizedKey === 'paypalsubscriptiontotalbillingcycles') {
+                $cyclesRaw = (string) $value;
+                break;
+            }
+        }
+
+        $cycles = function_exists('paypalac_parse_total_billing_cycles')
+            ? paypalac_parse_total_billing_cycles($cyclesRaw)
+            : (int) $cyclesRaw;
+
+        return $cycles !== 1;
+    }
+}
+
+if (!function_exists('paypalac_parse_billing_frequency')) {
+    /**
+     * @param string|null $inferredPeriod Set to DAY/WEEK/MONTH/YEAR/SEMI_MONTH when embedded in $raw
+     */
+    function paypalac_parse_billing_frequency(string $raw, ?string &$inferredPeriod = null): int
+    {
+        $raw = trim($raw);
+        $inferredPeriod = null;
+        if ($raw === '') {
+            return 0;
+        }
+
+        if (preg_match('/^\d+$/', $raw) === 1) {
+            return (int) $raw;
+        }
+
+        if (preg_match('/^(\d+)\s*(day|days|week|weeks|month|months|year|years)\b/i', $raw, $m) === 1) {
+            $count = (int) $m[1];
+            $unit = strtolower($m[2]);
+            if (str_starts_with($unit, 'day')) {
+                $inferredPeriod = 'DAY';
+            } elseif (str_starts_with($unit, 'week')) {
+                $inferredPeriod = 'WEEK';
+            } elseif (str_starts_with($unit, 'month')) {
+                $inferredPeriod = 'MONTH';
+            } elseif (str_starts_with($unit, 'year')) {
+                $inferredPeriod = 'YEAR';
+            }
+            return $count > 0 ? $count : 0;
+        }
+
+        $named = [
+            'daily' => [1, 'DAY'],
+            'day' => [1, 'DAY'],
+            'weekly' => [1, 'WEEK'],
+            'week' => [1, 'WEEK'],
+            'monthly' => [1, 'MONTH'],
+            'month' => [1, 'MONTH'],
+            'quarterly' => [3, 'MONTH'],
+            'quarter' => [3, 'MONTH'],
+            'yearly' => [1, 'YEAR'],
+            'annually' => [1, 'YEAR'],
+            'annual' => [1, 'YEAR'],
+            'year' => [1, 'YEAR'],
+            'semimonthly' => [1, 'SEMI_MONTH'],
+            'semimonth' => [1, 'SEMI_MONTH'],
+        ];
+        $key = strtolower(preg_replace('/[^a-z]/', '', $raw) ?? '');
+        if (isset($named[$key])) {
+            $inferredPeriod = $named[$key][1];
+            return $named[$key][0];
+        }
+
+        if (preg_match('/(\d+)/', $raw, $m) === 1) {
+            return (int) $m[1];
+        }
+
+        return 0;
+    }
+}
+
+if (!function_exists('paypalac_parse_total_billing_cycles')) {
+    function paypalac_parse_total_billing_cycles(string $raw): int
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return 0;
+        }
+
+        $normalized = strtolower(preg_replace('/[^a-z0-9]+/', '', $raw) ?? '');
+        if (
+            $normalized === ''
+            || str_contains($normalized, 'gooduntil')
+            || str_contains($normalized, 'untilcancelled')
+            || str_contains($normalized, 'indefinite')
+            || str_contains($normalized, 'unlimited')
+        ) {
+            return 0;
+        }
+
+        if (preg_match('/(\d+)/', $raw, $m) === 1) {
+            return (int) $m[1];
+        }
+
+        return 0;
     }
 }
 

@@ -121,6 +121,31 @@ function testMembershipTermWithoutAutomaticRenewal(): bool
     return true;
 }
 
+function testIndefinitePlanWithNamedMonthlyFrequency(): bool
+{
+    $observer = new RecurringObserverTestHarness();
+
+    $attributeMap = buildAttributeMap($observer, [
+        'Billing Period' => 'Monthly',
+        'Billing Frequency' => 'Monthly',
+        'Total Billing Cycles' => 'Good until cancelled',
+    ]);
+
+    $result = $observer->publicExtractSubscriptionAttributes($attributeMap);
+    if ($result === null) {
+        fwrite(STDERR, "FAIL: Indefinite plan with Billing Frequency=Monthly should create a subscription\n");
+        return false;
+    }
+
+    if ($result['billing_period'] !== 'MONTH' || (int) $result['billing_frequency'] !== 1 || (int) $result['total_billing_cycles'] !== 0) {
+        fwrite(STDERR, "FAIL: Monthly frequency label did not normalize correctly: " . json_encode($result) . "\n");
+        return false;
+    }
+
+    fwrite(STDOUT, "  ✓ Indefinite plan with named Monthly frequency accepted\n");
+    return true;
+}
+
 echo "\n=== Testing Recurring Attribute Label Normalization ===\n\n";
 
 $failures = 0;
@@ -137,6 +162,11 @@ if (!testLegacyAttributeLabels()) {
 
 echo "\nTest 3: Membership term without automatic renewal...\n";
 if (!testMembershipTermWithoutAutomaticRenewal()) {
+    $failures++;
+}
+
+echo "\nTest 4: Indefinite plan with Billing Frequency=Monthly...\n";
+if (!testIndefinitePlanWithNamedMonthlyFrequency()) {
     $failures++;
 }
 
