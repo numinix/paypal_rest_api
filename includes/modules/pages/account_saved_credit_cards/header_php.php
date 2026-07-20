@@ -947,20 +947,15 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                 initCardFields.done = true;
 
                 var cardFields = PayPalSDK.CardFields({
-                    // Mirror checkout .form-control: outer box + :focus-within ring
-                    // come from CSS. Kill PayPal's default inner focus border so it
-                    // cannot render taller than the container and get clipped.
+                    // PayPal docs: style font/color here; size/border the container in CSS.
+                    // Height/padding/line-height on the input fight the iframe layout and
+                    // push placeholders onto the bottom border.
                     style: {
                         'input': {
                             'font-size': '16px',
                             'font-family': 'inherit',
                             'font-weight': '400',
-                            // Match height to line-height so single-line text centers
-                            // vertically (padding alone left text sitting on the bottom).
-                            'height': '40px',
-                            'line-height': '40px',
                             'color': '#212529',
-                            'padding': '0 0.75rem',
                             'border': 'none',
                             'outline': 'none',
                             'box-shadow': 'none',

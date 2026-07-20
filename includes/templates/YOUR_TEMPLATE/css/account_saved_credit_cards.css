@@ -600,16 +600,15 @@
   font-weight: 600 !important;
 }
 
-/* PayPal hosted card fields — match checkout .form-control chrome.
- * Focus styling lives on this container (:focus-within). Suppress PayPal's
- * inner focus border via the CardFields `style` object, and never clip the
- * iframe or placeholders get cut off. */
+/* PayPal hosted card fields — outer chrome only (height/border/focus).
+ * Per PayPal docs, size the container in CSS; keep CardFields `style` limited
+ * to font/color so the iframe can vertically center its own text. */
 #savedCreditCardsDefault .ppac-card-field {
   background-color: #fff;
   border: 1px solid #ced4da;
   border-radius: 0.375rem;
   box-sizing: border-box;
-  height: 2.5rem;
+  height: 3rem;
   overflow: visible;
   padding: 0;
   position: relative;
@@ -619,7 +618,7 @@
 #savedCreditCardsDefault .ppac-card-field iframe {
   border: 0 !important;
   display: block;
-  height: 2.5rem !important;
+  height: 100% !important;
   width: 100% !important;
 }
 
