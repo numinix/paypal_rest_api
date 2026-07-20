@@ -955,8 +955,10 @@ if (!function_exists('paypalac_render_card_field_containers')) {
                             'font-size': '16px',
                             'font-family': 'inherit',
                             'font-weight': '400',
-                            'line-height': '1.5',
+                            // Match height to line-height so single-line text centers
+                            // vertically (padding alone left text sitting on the bottom).
                             'height': '40px',
+                            'line-height': '40px',
                             'color': '#212529',
                             'padding': '0 0.75rem',
                             'border': 'none',
