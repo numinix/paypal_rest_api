@@ -7,7 +7,7 @@
  * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
  * @version $Id: lat9 2023 Nov 16 Modified in v2.0.0 $
  *
- * Last updated: v1.3.1
+ * Last updated: v1.3.20
  */
 namespace PayPalAdvancedCheckout\Admin;
 
@@ -143,6 +143,29 @@ class DoRefund
             $payer_note;
 
         zen_update_orders_history($oID, $comments, null, $refund_status, 0);
+
+        // -----
+        // Publish the authoritative PayPal refund amount so site integrations
+        // (e.g. TaxJar) do not rely on the submitted $_POST['ppr-amount'] or
+        // the "full refund" checkbox, both of which can differ from what PayPal
+        // actually refunded for this capture.
+        //
+        global $zco_notifier;
+        if (isset($zco_notifier) && is_object($zco_notifier) && method_exists($zco_notifier, 'notify')) {
+            $zco_notifier->notify(
+                'NOTIFY_PAYPALAC_ADMIN_REFUND_COMPLETE',
+                [
+                    'orders_id' => $oID,
+                    'capture_txn_id' => (string)$_POST['capture_txn_id'],
+                    'refund_txn_id' => (string)($refund_response['id'] ?? ''),
+                    'refund_amount' => (float)($refund_response['amount']['value'] ?? 0),
+                    'currency_code' => (string)($refund_response['amount']['currency_code'] ?? $capture_currency),
+                    'full_refund_requested' => $full_refund,
+                    'is_subscription_cycle' => $is_subscription_cycle,
+                    'refund_response' => $refund_response,
+                ]
+            );
+        }
 
         $messageStack->add_session(sprintf(MODULE_PAYMENT_PAYPALAC_REFUND_COMPLETE, $amount_refunded), 'success');
     }
