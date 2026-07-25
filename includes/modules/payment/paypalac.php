@@ -64,7 +64,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.20';
+    protected const CURRENT_VERSION = '1.3.21';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -839,6 +839,10 @@ class paypalac extends base
                 case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.20', '<'): //- Fall through from above
                     // Notify site observers of the authoritative PayPal refund amount
                     // after a successful admin refund (NOTIFY_PAYPALAC_ADMIN_REFUND_COMPLETE).
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.21', '<'): //- Fall through from above
+                    // Saved Card Subscriptions admin lists only paypalac* origin
+                    // (or vault-migrated) rows so non-PayPal billing methods stay out.
 
                 default:    //- Fall through from above
                     break;
