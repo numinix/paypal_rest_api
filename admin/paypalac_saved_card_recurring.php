@@ -1,18 +1,16 @@
 <?php
 /**
- * Admin page for managing saved card recurring payments.
- * 
+ * Admin page for managing PayPal Advanced Checkout saved-card recurring payments.
+ *
+ * Only lists subscriptions originally placed via a paypalac* payment module
+ * (or migrated onto a PayPal AC vault card). Other billing methods have their
+ * own subscription managers and must not appear here.
+ *
  * Features:
  * - Filter by customer, product, status
  * - Cancel/re-activate scheduled payments
  * - Update credit card on subscription
  * - Update payment date, amount, product assignment
- * 
- * Compatible with:
- * - paypalwpp.php (Website Payments Pro)
- * - paypaldp.php (Direct Payments)
- * - paypalac.php (REST API)
- * - payflow.php (Payflow)
  */
 
 require 'includes/application_top.php';
@@ -45,6 +43,24 @@ if (!defined('HEADING_TITLE')) {
 
 
 $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+
+/**
+ * SQL joins + WHERE for subscriptions owned by this plugin.
+ * Include rows whose parent order used a paypalac* module, or whose saved
+ * card is linked in paypal_vault (legacy → AC migration). Other billing
+ * methods (offline invoice, etc.) must not appear here.
+ *
+ * @return array{0:string,1:string} [joins, where]
+ */
+function paypalac_saved_card_recurring_origin_sql_parts()
+{
+    $joins = ' INNER JOIN ' . TABLE_ORDERS_PRODUCTS . ' op_origin ON op_origin.orders_products_id = sccr.orders_products_id'
+        . ' INNER JOIN ' . TABLE_ORDERS . ' o_origin ON o_origin.orders_id = COALESCE(NULLIF(sccr.orders_id, 0), op_origin.orders_id)'
+        . ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv_origin ON pv_origin.vault_id = scc.vault_id AND pv_origin.customers_id = scc.customers_id';
+    $where = " AND (o_origin.payment_module_code LIKE 'paypalac%'"
+        . " OR (scc.vault_id IS NOT NULL AND scc.vault_id <> '' AND pv_origin.vault_id IS NOT NULL))";
+    return array($joins, $where);
+}
 
 /**
  * Format array for zen_draw_pull_down_menu
@@ -191,15 +207,17 @@ switch ($action) {
         
     case 'export_csv':
         // Build query with filters
+        list($originJoins, $originWhere) = paypalac_saved_card_recurring_origin_sql_parts();
         $exportSql = "SELECT sccr.*, scc.type AS card_type, scc.last_digits, scc.is_deleted,
                 c.customers_firstname, c.customers_lastname, c.customers_email_address
             FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " sccr
             LEFT JOIN " . TABLE_SAVED_CREDIT_CARDS . " scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id
-            LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = scc.customers_id
-            WHERE 1";
+            LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = COALESCE(NULLIF(sccr.customers_id, 0), scc.customers_id)
+            " . $originJoins . "
+            WHERE 1" . $originWhere;
         
         if (isset($_GET['customers_id']) && $_GET['customers_id'] > 0) {
-            $exportSql .= ' AND scc.customers_id = ' . (int)$_GET['customers_id'];
+            $exportSql .= ' AND COALESCE(NULLIF(sccr.customers_id, 0), scc.customers_id) = ' . (int)$_GET['customers_id'];
         }
         if (isset($_GET['products_id']) && $_GET['products_id'] > 0) {
             $exportSql .= ' AND sccr.products_id = ' . (int)$_GET['products_id'];
@@ -262,19 +280,21 @@ $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $perPage = isset($_GET['per_page']) ? max(10, min(100, (int)$_GET['per_page'])) : 20;
 $offset = ($page - 1) * $perPage;
 
-// Build subscriptions query
+// Build subscriptions query — PayPal AC module origin (or vault-migrated) only.
+list($originJoins, $originWhere) = paypalac_saved_card_recurring_origin_sql_parts();
 $sql = "SELECT sccr.*, scc.type AS card_type, scc.last_digits, scc.is_deleted,
         scc.customers_id AS saved_card_customer_id,
         c.customers_firstname, c.customers_lastname
     FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " sccr
     LEFT JOIN " . TABLE_SAVED_CREDIT_CARDS . " scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id
-    LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = scc.customers_id
-    WHERE 1";
+    LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = COALESCE(NULLIF(sccr.customers_id, 0), scc.customers_id)
+    " . $originJoins . "
+    WHERE 1" . $originWhere;
 
 $query_string = '';
 
 if (isset($_GET['customers_id']) && $_GET['customers_id'] > 0) {
-    $sql .= ' AND scc.customers_id = ' . (int)$_GET['customers_id'];
+    $sql .= ' AND COALESCE(NULLIF(sccr.customers_id, 0), scc.customers_id) = ' . (int)$_GET['customers_id'];
     $query_string .= '&customers_id=' . (int)$_GET['customers_id'];
 }
 if (isset($_GET['products_id']) && $_GET['products_id'] > 0) {
@@ -292,11 +312,12 @@ if (isset($_GET['status']) && strlen($_GET['status']) > 0 && $_GET['status'] != 
 $countSql = "SELECT COUNT(DISTINCT sccr.saved_credit_card_recurring_id) as total
     FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " sccr
     LEFT JOIN " . TABLE_SAVED_CREDIT_CARDS . " scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id
-    LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = scc.customers_id
-    WHERE 1";
+    LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = COALESCE(NULLIF(sccr.customers_id, 0), scc.customers_id)
+    " . $originJoins . "
+    WHERE 1" . $originWhere;
 
 if (isset($_GET['customers_id']) && $_GET['customers_id'] > 0) {
-    $countSql .= ' AND scc.customers_id = ' . (int)$_GET['customers_id'];
+    $countSql .= ' AND COALESCE(NULLIF(sccr.customers_id, 0), scc.customers_id) = ' . (int)$_GET['customers_id'];
 }
 if (isset($_GET['products_id']) && $_GET['products_id'] > 0) {
     $countSql .= ' AND sccr.products_id = ' . (int)$_GET['products_id'];
@@ -403,10 +424,13 @@ while (!$result->EOF) {
     $result->MoveNext();
 }
 
+list($productsOriginJoins, $productsOriginWhere) = paypalac_saved_card_recurring_origin_sql_parts();
 $products_sql = "SELECT sccr.products_id,
         MAX(CASE WHEN sccr.products_name IS NOT NULL AND sccr.products_name <> '' THEN sccr.products_name ELSE NULL END) AS products_name
     FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " sccr
-    WHERE sccr.products_id IS NOT NULL
+    LEFT JOIN " . TABLE_SAVED_CREDIT_CARDS . " scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id
+    " . $productsOriginJoins . "
+    WHERE sccr.products_id IS NOT NULL" . $productsOriginWhere . "
     GROUP BY sccr.products_id
     ORDER BY products_name ASC";
 $result = $db->Execute($products_sql);
