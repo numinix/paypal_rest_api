@@ -592,7 +592,10 @@ class PayPalCommon {
                 }
                 $email_address = $payment_source['email_address'] ?? '';
                 $payer_id = '';
-                $memo = ['source' => $payment_type];
+                $memo = [
+                    'source' => $payment_type,
+                    'card_info' => $card_source,
+                ];
             } else {
                 $card_source = $payment_source;
                 $first_name = $payment_source['name'] ?? '';
