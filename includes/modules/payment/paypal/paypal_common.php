@@ -12,6 +12,7 @@
 
 use PayPalAdvancedCheckout\Admin\GetPayPalOrderTransactions;
 use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Common\CheckoutRecovery;
 use PayPalAdvancedCheckout\Common\Helpers;
 use PayPalAdvancedCheckout\Common\Logger;
 use PayPalAdvancedCheckout\Common\VaultManager;
@@ -763,6 +764,10 @@ class PayPalCommon {
     {
         $emailAlerts = $this->paymentModule->emailAlerts ?? false;
         if ($emailAlerts === true || $force_send === true) {
+            $context = CheckoutRecovery::checkoutAlertContext();
+            if ($context !== '') {
+                $message = $context . $message;
+            }
             zen_mail(
                 STORE_NAME,
                 STORE_OWNER_EMAIL_ADDRESS,
@@ -878,34 +883,145 @@ class PayPalCommon {
      */
     public function captureWalletPayment(PayPalAdvancedCheckoutApi $ppr, Logger $log, string $payment_source, string $transaction_mode, string $ppac_type)
     {
-        $paypal_order_id = $_SESSION['PayPalAdvancedCheckout']['Order']['id'];
-        
+        $paypal_order_id = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '');
+        $guid = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['guid'] ?? '');
+
         // Determine if we should capture or authorize based on transaction mode
         // For wallets, "Auth Only (Card-Only)" should still use capture since wallet != card
         $should_capture = ($transaction_mode === self::TRANSACTION_MODE_FINAL_SALE ||
                           ($ppac_type !== 'card' && $transaction_mode === self::TRANSACTION_MODE_AUTH_CARD_ONLY));
-        
-        $log->write("$payment_source: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
 
-        if ($should_capture) {
-            $response = $ppr->captureOrder($paypal_order_id);
-            if ($response === false) {
-                $log->write($payment_source . ': capture failed. ' . Logger::logJSON($ppr->getErrorInfo()));
+        $response = $this->captureOrAuthorizePaymentWithRecovery(
+            $ppr,
+            $log,
+            $paypal_order_id,
+            $should_capture,
+            $guid,
+            $payment_source
+        );
+        if ($response === false) {
+            $error_info = $ppr->getErrorInfo();
+            $keep_order = CheckoutRecovery::shouldPreservePayPalOrderOnError()
+                && !CheckoutRecovery::isHardPaymentFailure($error_info);
+            if ($keep_order === false) {
                 unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
-                return false;
             }
-            $log->write("$payment_source: CAPTURE successful. Status: " . ($response['status'] ?? 'unknown'));
-        } else {
-            $response = $ppr->authorizeOrder($paypal_order_id);
-            if ($response === false) {
-                $log->write($payment_source . ': authorization failed. ' . Logger::logJSON($ppr->getErrorInfo()));
-                unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
-                return false;
-            }
-            $log->write("$payment_source: AUTHORIZATION successful. Status: " . ($response['status'] ?? 'unknown'));
         }
 
         return $response;
+    }
+
+    /**
+     * Capture or authorize a PayPal order using a Request-Id distinct from create-order,
+     * and recover ORDER_ALREADY_CAPTURED / ORDER_ALREADY_AUTHORIZED by GETting the
+     * live order (then recapturing APPROVED leftovers with a unique retry Request-Id).
+     *
+     * @return array|false PayPal order/capture payload, or false when recovery is impossible
+     */
+    public function captureOrAuthorizePaymentWithRecovery(
+        PayPalAdvancedCheckoutApi $ppr,
+        Logger $log,
+        string $paypal_order_id,
+        bool $should_capture,
+        string $base_request_id,
+        string $log_label = 'paypal'
+    ) {
+        if ($paypal_order_id === '') {
+            $log->write("$log_label: capture/authorize skipped; no PayPal order id.");
+            return false;
+        }
+
+        $request_id = CheckoutRecovery::paymentActionRequestId($base_request_id, $should_capture);
+        $action = $should_capture ? 'CAPTURE' : 'AUTHORIZE';
+        $log->write("$log_label: Will $action $paypal_order_id with PayPal-Request-Id $request_id");
+
+        $ppr->setPayPalRequestId($request_id);
+        $response = $should_capture ? $ppr->captureOrder($paypal_order_id) : $ppr->authorizeOrder($paypal_order_id);
+        if ($response !== false) {
+            $log->write("$log_label: $action successful. Status: " . ($response['status'] ?? 'unknown'));
+            return $response;
+        }
+
+        $error_info = $ppr->getErrorInfo();
+        $log->write("$log_label: $action failed. " . Logger::logJSON($error_info));
+
+        if (!CheckoutRecovery::isDuplicatePaymentActionIssue($error_info)) {
+            return false;
+        }
+
+        $log->write("$log_label: Duplicate payment-action issue; fetching PayPal order $paypal_order_id for recovery.");
+        $ppr->setPayPalRequestId('');
+        $existing = $ppr->getOrderStatus($paypal_order_id);
+        if ($existing === false) {
+            $log->write("$log_label: Recovery GET failed. " . Logger::logJSON($ppr->getErrorInfo()));
+            return false;
+        }
+
+        if (CheckoutRecovery::paypalOrderHasSuccessfulPaymentAction($existing, $should_capture)) {
+            $log->write("$log_label: Recovered existing successful $action. Status: " . ($existing['status'] ?? 'unknown'));
+            return $existing;
+        }
+
+        $status = strtoupper((string)($existing['status'] ?? ''));
+        if ($status === PayPalAdvancedCheckoutApi::STATUS_APPROVED || $status === PayPalAdvancedCheckoutApi::STATUS_CREATED) {
+            $retry_id = CheckoutRecovery::paymentActionRetryRequestId($request_id);
+            $log->write("$log_label: PayPal order still $status; retrying $action with PayPal-Request-Id $retry_id");
+            $ppr->setPayPalRequestId($retry_id);
+            $retry = $should_capture ? $ppr->captureOrder($paypal_order_id) : $ppr->authorizeOrder($paypal_order_id);
+            if ($retry !== false) {
+                $log->write("$log_label: Recovery retry succeeded. Status: " . ($retry['status'] ?? 'unknown'));
+                return $retry;
+            }
+            $log->write("$log_label: Recovery retry failed. " . Logger::logJSON($ppr->getErrorInfo()));
+        }
+
+        return false;
+    }
+
+    /**
+     * When createOrder fails with a duplicate-capture/authorize issue, GET the
+     * session PayPal order and reuse it if it is still a valid checkout.
+     *
+     * @return array|false Live PayPal order payload, or false
+     */
+    public function recoverExistingPayPalOrderAfterDuplicateCreate(
+        PayPalAdvancedCheckoutApi $ppr,
+        Logger $log,
+        array $error_info
+    ) {
+        if (!CheckoutRecovery::isDuplicatePaymentActionIssue($error_info)) {
+            return false;
+        }
+
+        $paypal_order_id = trim((string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''));
+        if ($paypal_order_id === '') {
+            $log->write('createPayPalOrder: ORDER_ALREADY_CAPTURED without a session PayPal order id; cannot recover.');
+            return false;
+        }
+
+        $log->write("createPayPalOrder: Duplicate-create issue; fetching existing PayPal order $paypal_order_id.");
+        $ppr->setPayPalRequestId('');
+        $existing = $ppr->getOrderStatus($paypal_order_id);
+        if ($existing === false) {
+            $log->write('createPayPalOrder: Duplicate-create recovery GET failed. ' . Logger::logJSON($ppr->getErrorInfo()));
+            return false;
+        }
+
+        if (!CheckoutRecovery::paypalOrderIsReusable($existing)) {
+            $log->write(
+                'createPayPalOrder: Duplicate-create recovery GET status ' .
+                ($existing['status'] ?? 'unknown') .
+                ' is not reusable.'
+            );
+            return false;
+        }
+
+        $log->write(
+            "createPayPalOrder: Recovered existing PayPal order $paypal_order_id (" .
+            ($existing['status'] ?? 'unknown') .
+            ') after duplicate-create error.'
+        );
+        return $existing;
     }
 
     /**
@@ -1342,23 +1458,15 @@ class PayPalCommon {
 
         $log->write("processCreditCardPayment: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
 
-        if ($should_capture) {
-            $response = $ppr->captureOrder($paypal_order_id);
-            if ($response === false) {
-                $log->write('processCreditCardPayment: CAPTURE FAILED. ' . Logger::logJSON($ppr->getErrorInfo()));
-                return false;
-            }
-            $log->write("processCreditCardPayment: CAPTURE successful. Status: " . ($response['status'] ?? 'unknown'));
-        } else {
-            $response = $ppr->authorizeOrder($paypal_order_id);
-            if ($response === false) {
-                $log->write('processCreditCardPayment: AUTHORIZATION FAILED. ' . Logger::logJSON($ppr->getErrorInfo()));
-                return false;
-            }
-            $log->write("processCreditCardPayment: AUTHORIZATION successful. Status: " . ($response['status'] ?? 'unknown'));
-        }
-
-        return $response;
+        $guid = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['guid'] ?? '');
+        return $this->captureOrAuthorizePaymentWithRecovery(
+            $ppr,
+            $log,
+            $paypal_order_id,
+            $should_capture,
+            $guid,
+            'processCreditCardPayment'
+        );
     }
 
     /**
@@ -1426,9 +1534,44 @@ class PayPalCommon {
         // For non-card payments (PayPal wallet, Google Pay, etc.), the
         // session GUID reuse is still safe because the payment source is
         // managed by PayPal's SDK, not by session-stored card data.
+        $create_request_id = $order_guid;
+
         if ($ppac_type !== 'card' && isset($_SESSION['PayPalAdvancedCheckout']['Order']['guid']) && $_SESSION['PayPalAdvancedCheckout']['Order']['guid'] === $order_guid) {
-            $log->write("createPayPalOrder($ppac_type): Reusing existing PayPal order with GUID: $order_guid");
-            return true;
+            $cached_status = strtoupper((string)($_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? ''));
+            if ($cached_status === '' || in_array($cached_status, ['CREATED', 'APPROVED', 'PAYER_ACTION_REQUIRED', 'SAVED'], true)) {
+                $log->write("createPayPalOrder($ppac_type): Reusing existing PayPal order with GUID: $order_guid (status $cached_status)");
+                return true;
+            }
+
+            $existing_id = trim((string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''));
+            if ($existing_id !== '') {
+                $paymentModule->ppr->setPayPalRequestId('');
+                $live = $paymentModule->ppr->getOrderStatus($existing_id);
+                if ($live === false) {
+                    if (CheckoutRecovery::shouldKeepExistingOrderWhenLiveLookupFails($cached_status)) {
+                        $log->write(
+                            "createPayPalOrder($ppac_type): GET failed for $existing_id; keeping the existing PayPal order instead of creating a replacement."
+                        );
+                        return true;
+                    }
+                    $log->write(
+                        "createPayPalOrder($ppac_type): GET failed for $existing_id and cached status ($cached_status) is terminal; creating a replacement PayPal order."
+                    );
+                } elseif (CheckoutRecovery::paypalOrderIsReusable($live)) {
+                    $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = (string)($live['status'] ?? $cached_status);
+                    $log->write(
+                        "createPayPalOrder($ppac_type): Live PayPal order $existing_id status " .
+                        ($live['status'] ?? '') .
+                        '; reusing instead of creating.'
+                    );
+                    return true;
+                }
+            }
+
+            $create_request_id = CheckoutRecovery::newCreateRequestId($order_guid);
+            $log->write(
+                "createPayPalOrder($ppac_type): GUID matches but status ($cached_status) is not reusable; creating a new PayPal order with Request-Id $create_request_id."
+            );
         }
 
         // Log the cc_info data for debugging (mask sensitive data)
@@ -1484,7 +1627,7 @@ class PayPalCommon {
             }
         }
 
-        $paymentModule->ppr->setPayPalRequestId($order_guid);
+        $paymentModule->ppr->setPayPalRequestId($create_request_id);
         $order_request = $create_order_request->get();
 
         // Log the payment source being sent to PayPal
@@ -1515,10 +1658,15 @@ class PayPalCommon {
                 "createPayPalOrder($ppac_type): PayPal order creation FAILED.\n" .
                 "  Error: " . Logger::logJSON($error_info)
             );
-            if (method_exists($paymentModule, 'getErrorInfo')) {
-                $paymentModule->getErrorInfo()->copyErrorInfo($error_info);
+            $recovered = $this->recoverExistingPayPalOrderAfterDuplicateCreate($paymentModule->ppr, $log, $error_info);
+            if ($recovered !== false) {
+                $paypal_order = $recovered;
+            } else {
+                if (method_exists($paymentModule, 'getErrorInfo')) {
+                    $paymentModule->getErrorInfo()->copyErrorInfo($error_info);
+                }
+                return false;
             }
-            return false;
         }
 
         $failed_payment_status = $this->findFailedPaymentStatus($paypal_order);
