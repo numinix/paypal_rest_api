@@ -22,6 +22,7 @@ use PayPalAdvancedCheckout\Admin\DoVoid;
 use PayPalAdvancedCheckout\Admin\GetPayPalOrderTransactions;
 use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
 use PayPalAdvancedCheckout\Api\Data\CountryCodes;
+use PayPalAdvancedCheckout\Common\CheckoutRecovery;
 use PayPalAdvancedCheckout\Common\ErrorInfo;
 use PayPalAdvancedCheckout\Common\Helpers;
 use PayPalAdvancedCheckout\Common\Logger;
@@ -64,7 +65,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.21';
+    protected const CURRENT_VERSION = '1.3.22';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -843,6 +844,10 @@ class paypalac extends base
                 case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.21', '<'): //- Fall through from above
                     // Saved Card Subscriptions admin lists only paypalac* origin
                     // (or vault-migrated) rows so non-PayPal billing methods stay out.
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.22', '<'): //- Fall through from above
+                    // Recover APPROVED leftover PayPal orders after ORDER_ALREADY_CAPTURED
+                    // instead of alerting and wiping the checkout session.
 
                 default:    //- Fall through from above
                     break;
@@ -2033,6 +2038,20 @@ class paypalac extends base
                 $this->log->write("\ncreatePayPalOrder($ppac_type), no change in order GUID ($order_guid) and status ($cached_status) is reusable; nothing further to do.\n");
                 return true;
             }
+
+            $existing_id = trim((string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''));
+            if ($existing_id !== '') {
+                $this->ppr->setPayPalRequestId('');
+                $live = $this->ppr->getOrderStatus($existing_id);
+                if ($live !== false && CheckoutRecovery::paypalOrderIsReusable($live)) {
+                    $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = (string)($live['status'] ?? $cached_status);
+                    $this->log->write(
+                        "\ncreatePayPalOrder($ppac_type), order GUID matches ($order_guid) but cached status ($cached_status); " .
+                        "live PayPal order $existing_id is " . ($live['status'] ?? '') . " and will be reused.\n"
+                    );
+                    return true;
+                }
+            }
             
             // Order has been processed (COMPLETED, REFUNDED, etc.), so create a new order
             $this->log->write("\ncreatePayPalOrder($ppac_type), order GUID matches ($order_guid) but status ($cached_status) indicates order was processed; creating new PayPal order.\n");
@@ -2058,12 +2077,24 @@ class paypalac extends base
         // -----
         // Send the request off to register the order at PayPal.
         //
-        $this->ppr->setPayPalRequestId($order_guid);
+        $create_request_id = $order_guid;
+        if (isset($_SESSION['PayPalAdvancedCheckout']['Order']['guid']) && $_SESSION['PayPalAdvancedCheckout']['Order']['guid'] === $order_guid) {
+            $cached_status = $_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? '';
+            if (!in_array($cached_status, self::REUSABLE_ORDER_STATUSES, true)) {
+                $create_request_id = CheckoutRecovery::newCreateRequestId($order_guid);
+            }
+        }
+        $this->ppr->setPayPalRequestId($create_request_id);
         $order_request = $create_order_request->get();
         $order_response = $this->ppr->createOrder($order_request);
         if ($order_response === false) {
-            $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
-            return false;
+            $error_info = $this->ppr->getErrorInfo();
+            $recovered = $this->paypalCommon->recoverExistingPayPalOrderAfterDuplicateCreate($this->ppr, $this->log, $error_info);
+            if ($recovered === false) {
+                $this->errorInfo->copyErrorInfo($error_info);
+                return false;
+            }
+            $order_response = $recovered;
         }
 
         // -----
@@ -2546,13 +2577,20 @@ class paypalac extends base
     }
     protected function captureOrAuthorizePayment(string $payment_source): array
     {
-        $paypal_id = $_SESSION['PayPalAdvancedCheckout']['Order']['id'];
-        $this->ppr->setPayPalRequestId($_SESSION['PayPalAdvancedCheckout']['Order']['guid']);
-        if (MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Final Sale' || ($payment_source !== 'card' && MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Auth Only (Card-Only)')) {
-            $response = $this->ppr->captureOrder($paypal_id);
-        } else {
-            $response = $this->ppr->authorizeOrder($paypal_id);
-        }
+        $paypal_id = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '');
+        $guid = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['guid'] ?? '');
+        $should_capture = (
+            MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Final Sale'
+            || ($payment_source !== 'card' && MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Auth Only (Card-Only)')
+        );
+        $response = $this->paypalCommon->captureOrAuthorizePaymentWithRecovery(
+            $this->ppr,
+            $this->log,
+            $paypal_id,
+            $should_capture,
+            $guid,
+            'paypalac::captureOrAuthorizePayment'
+        );
 
         if ($response === false) {
             $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());
@@ -2874,7 +2912,16 @@ class paypalac extends base
             $this->errorInfo->reset();
         }
         $this->log->write($log_message);
-        $this->resetOrder();
+        if (!CheckoutRecovery::shouldPreservePayPalOrderOnError()) {
+            $this->resetOrder();
+        } else {
+            $this->log->write(
+                'setMessageAndRedirect: preserving PayPal order ' .
+                ($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '') .
+                ' status ' .
+                ($_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? '')
+            );
+        }
         zen_redirect(zen_href_link($redirect_page, '', 'SSL'));
     }
 
