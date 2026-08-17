@@ -2917,12 +2917,16 @@ class paypalac extends base
             $messageStack->add_session('checkout', $error_message, 'error');
         }
         $log_message = $error_message;
+        $error_info_for_preserve = [];
         if ($this->errorInfo->hasErrorInfo()) {
-            $log_message .= "\n" . Logger::logJSON($this->errorInfo->getErrorInfo());
+            $error_info_for_preserve = $this->errorInfo->getErrorInfo();
+            $log_message .= "\n" . Logger::logJSON($error_info_for_preserve);
             $this->errorInfo->reset();
         }
         $this->log->write($log_message);
-        if (!CheckoutRecovery::shouldPreservePayPalOrderOnError()) {
+        $preserve_order = CheckoutRecovery::shouldPreservePayPalOrderOnError()
+            && !CheckoutRecovery::isHardPaymentFailure($error_info_for_preserve);
+        if (!$preserve_order) {
             $this->resetOrder();
         } else {
             $this->log->write(

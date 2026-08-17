@@ -84,7 +84,8 @@ $declined_error = [
 checkout_recovery_assert(CheckoutRecovery::isDuplicatePaymentActionIssue($captured_error), 'ORDER_ALREADY_CAPTURED is a duplicate issue');
 checkout_recovery_assert(CheckoutRecovery::isDuplicatePaymentActionIssue($authorized_error), 'ORDER_ALREADY_AUTHORIZED is a duplicate issue');
 checkout_recovery_assert(!CheckoutRecovery::isDuplicatePaymentActionIssue($declined_error), 'INSTRUMENT_DECLINED is not a duplicate issue');
-checkout_recovery_assert(CheckoutRecovery::paypalIssueFromErrorInfo($captured_error) === 'ORDER_ALREADY_CAPTURED', 'issue extracted from details');
+checkout_recovery_assert(!CheckoutRecovery::isHardPaymentFailure($captured_error), 'ORDER_ALREADY_CAPTURED is not a hard decline');
+checkout_recovery_assert(CheckoutRecovery::isHardPaymentFailure($declined_error), 'INSTRUMENT_DECLINED is a hard payment failure');
 
 echo "\nTest 4: Successful payment detection and APPROVED leftover retry\n";
 $approved_order = [

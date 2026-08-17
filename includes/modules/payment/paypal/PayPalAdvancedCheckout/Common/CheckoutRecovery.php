@@ -94,6 +94,21 @@ class CheckoutRecovery
         return in_array($name, self::DUPLICATE_PAYMENT_ACTION_ISSUES, true);
     }
 
+    public static function isHardPaymentFailure(array $error_info): bool
+    {
+        $issue = self::paypalIssueFromErrorInfo($error_info);
+        return in_array($issue, [
+            'INSTRUMENT_DECLINED',
+            'PAYER_CANNOT_PAY',
+            'TRANSACTION_REFUSED',
+            'PAYMENT_DENIED',
+            'CARD_EXPIRED',
+            'CARD_CLOSED',
+            'INVALID_ACCOUNT',
+            'REDIRECT_PAYER_FOR_ALTERNATE_FUNDING',
+        ], true);
+    }
+
     public static function paypalOrderHasSuccessfulPaymentAction(array $paypal_order, bool $should_capture): bool
     {
         $bucket = $should_capture ? 'captures' : 'authorizations';

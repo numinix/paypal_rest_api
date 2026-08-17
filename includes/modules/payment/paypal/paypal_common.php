@@ -896,8 +896,13 @@ class PayPalCommon {
             $guid,
             $payment_source
         );
-        if ($response === false && CheckoutRecovery::shouldPreservePayPalOrderOnError() === false) {
-            unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
+        if ($response === false) {
+            $error_info = $ppr->getErrorInfo();
+            $keep_order = CheckoutRecovery::shouldPreservePayPalOrderOnError()
+                && !CheckoutRecovery::isHardPaymentFailure($error_info);
+            if ($keep_order === false) {
+                unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
+            }
         }
 
         return $response;
