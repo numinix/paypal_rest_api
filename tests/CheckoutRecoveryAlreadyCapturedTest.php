@@ -127,6 +127,7 @@ $authorized_order = [
 ];
 checkout_recovery_assert(!CheckoutRecovery::paypalOrderHasSuccessfulPaymentAction($approved_order, true), 'APPROVED order is not a successful capture');
 checkout_recovery_assert(CheckoutRecovery::paypalOrderHasSuccessfulPaymentAction($completed_order, true), 'COMPLETED capture is successful');
+checkout_recovery_assert(!CheckoutRecovery::paypalOrderHasSuccessfulPaymentAction(['id' => 'EMPTY', 'status' => 'COMPLETED'], true), 'COMPLETED without payment rows is not success');
 checkout_recovery_assert(CheckoutRecovery::paypalOrderHasSuccessfulPaymentAction($authorized_order, false), 'CREATED authorization is successful');
 checkout_recovery_assert(CheckoutRecovery::paypalOrderIsReusable($approved_order), 'APPROVED leftover is reusable');
 $refunded_order = [
