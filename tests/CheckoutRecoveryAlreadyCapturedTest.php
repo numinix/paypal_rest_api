@@ -187,10 +187,9 @@ checkout_recovery_assert(
     str_contains($common, 'CheckoutRecovery::paymentActionRequestId'),
     'common capture helper sets a capture/authorize Request-Id suffix'
 );
-checkout_recovery_assert(
-    str_contains($common, 'keeping the existing PayPal order instead of creating a replacement'),
-    'createOrder keeps the existing PayPal order when live GET fails'
-);
+checkout_recovery_assert(CheckoutRecovery::shouldKeepExistingOrderWhenLiveLookupFails('COMPLETED'), 'COMPLETED cache is kept when live GET fails');
+checkout_recovery_assert(!CheckoutRecovery::shouldKeepExistingOrderWhenLiveLookupFails('VOIDED'), 'VOIDED cache is not kept when live GET fails');
+checkout_recovery_assert(!CheckoutRecovery::shouldKeepExistingOrderWhenLiveLookupFails('REFUNDED'), 'REFUNDED cache is not kept when live GET fails');
 checkout_recovery_assert(
     str_contains($paypalac, 'keeping the existing PayPal order instead of creating a replacement'),
     'paypalac keeps the existing PayPal order when live GET fails'

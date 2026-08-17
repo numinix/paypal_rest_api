@@ -2044,12 +2044,16 @@ class paypalac extends base
                 $this->ppr->setPayPalRequestId('');
                 $live = $this->ppr->getOrderStatus($existing_id);
                 if ($live === false) {
+                    if (CheckoutRecovery::shouldKeepExistingOrderWhenLiveLookupFails($cached_status)) {
+                        $this->log->write(
+                            "\ncreatePayPalOrder($ppac_type), GET failed for $existing_id; keeping the existing PayPal order instead of creating a replacement.\n"
+                        );
+                        return true;
+                    }
                     $this->log->write(
-                        "\ncreatePayPalOrder($ppac_type), GET failed for $existing_id; keeping the existing PayPal order instead of creating a replacement.\n"
+                        "\ncreatePayPalOrder($ppac_type), GET failed for $existing_id and cached status ($cached_status) is terminal; creating a replacement PayPal order.\n"
                     );
-                    return true;
-                }
-                if (CheckoutRecovery::paypalOrderIsReusable($live)) {
+                } elseif (CheckoutRecovery::paypalOrderIsReusable($live)) {
                     $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = (string)($live['status'] ?? $cached_status);
                     $this->log->write(
                         "\ncreatePayPalOrder($ppac_type), order GUID matches ($order_guid) but cached status ($cached_status); " .

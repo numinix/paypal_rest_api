@@ -1540,12 +1540,16 @@ class PayPalCommon {
                 $paymentModule->ppr->setPayPalRequestId('');
                 $live = $paymentModule->ppr->getOrderStatus($existing_id);
                 if ($live === false) {
+                    if (CheckoutRecovery::shouldKeepExistingOrderWhenLiveLookupFails($cached_status)) {
+                        $log->write(
+                            "createPayPalOrder($ppac_type): GET failed for $existing_id; keeping the existing PayPal order instead of creating a replacement."
+                        );
+                        return true;
+                    }
                     $log->write(
-                        "createPayPalOrder($ppac_type): GET failed for $existing_id; keeping the existing PayPal order instead of creating a replacement."
+                        "createPayPalOrder($ppac_type): GET failed for $existing_id and cached status ($cached_status) is terminal; creating a replacement PayPal order."
                     );
-                    return true;
-                }
-                if (CheckoutRecovery::paypalOrderIsReusable($live)) {
+                } elseif (CheckoutRecovery::paypalOrderIsReusable($live)) {
                     $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = (string)($live['status'] ?? $cached_status);
                     $log->write(
                         "createPayPalOrder($ppac_type): Live PayPal order $existing_id status " .

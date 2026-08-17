@@ -122,6 +122,18 @@ class CheckoutRecovery
         return $order_status === 'COMPLETED';
     }
 
+    public static function shouldKeepExistingOrderWhenLiveLookupFails(string $cached_status): bool
+    {
+        return in_array(strtoupper(trim($cached_status)), [
+            'CREATED',
+            'APPROVED',
+            'PAYER_ACTION_REQUIRED',
+            'SAVED',
+            'COMPLETED',
+            'CAPTURED',
+            'PENDING',
+        ], true);
+    }
     public static function paypalOrderIsReusable(array $paypal_order): bool
     {
         $status = strtoupper((string)($paypal_order['status'] ?? ''));
