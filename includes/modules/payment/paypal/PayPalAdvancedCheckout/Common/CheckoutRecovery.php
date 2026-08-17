@@ -141,15 +141,7 @@ class CheckoutRecovery
             }
         }
 
-        $order_status = strtoupper((string)($paypal_order['status'] ?? ''));
-        if (in_array($order_status, ['REFUNDED', 'PARTIALLY_REFUNDED', 'VOIDED', 'FAILED', 'DENIED'], true)) {
-            return false;
-        }
-        if ($should_capture) {
-            return in_array($order_status, ['COMPLETED', 'CAPTURED'], true);
-        }
-
-        return $order_status === 'COMPLETED';
+        return false;
     }
 
     public static function shouldKeepExistingOrderWhenLiveLookupFails(string $cached_status): bool
