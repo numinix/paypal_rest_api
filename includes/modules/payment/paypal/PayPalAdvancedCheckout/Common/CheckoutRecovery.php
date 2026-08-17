@@ -118,18 +118,33 @@ class CheckoutRecovery
             : ['CREATED', 'PENDING', 'CAPTURED', 'PARTIALLY_CAPTURED'];
 
         if (is_array($rows)) {
+            $found_successful = false;
+            $found_unusable = false;
             foreach ($rows as $row) {
                 if (!is_array($row) || ($row['id'] ?? '') === '') {
                     continue;
                 }
                 $status = strtoupper((string)($row['status'] ?? ''));
                 if (in_array($status, $ok_statuses, true)) {
-                    return true;
+                    $found_successful = true;
+                    continue;
                 }
+                if (in_array($status, ['REFUNDED', 'PARTIALLY_REFUNDED', 'VOIDED', 'DENIED', 'FAILED', 'DECLINED'], true)) {
+                    $found_unusable = true;
+                }
+            }
+            if ($found_successful) {
+                return true;
+            }
+            if ($found_unusable) {
+                return false;
             }
         }
 
         $order_status = strtoupper((string)($paypal_order['status'] ?? ''));
+        if (in_array($order_status, ['REFUNDED', 'PARTIALLY_REFUNDED', 'VOIDED', 'FAILED', 'DENIED'], true)) {
+            return false;
+        }
         if ($should_capture) {
             return in_array($order_status, ['COMPLETED', 'CAPTURED'], true);
         }
@@ -152,9 +167,12 @@ class CheckoutRecovery
     public static function paypalOrderIsReusable(array $paypal_order): bool
     {
         $status = strtoupper((string)($paypal_order['status'] ?? ''));
-        return in_array($status, ['CREATED', 'APPROVED', 'PAYER_ACTION_REQUIRED', 'SAVED'], true)
-            || self::paypalOrderHasSuccessfulPaymentAction($paypal_order, true)
-            || self::paypalOrderHasSuccessfulPaymentAction($paypal_order, false);
+        if (in_array($status, ['CREATED', 'APPROVED', 'PAYER_ACTION_REQUIRED', 'SAVED'], true)) {
+            return true;
+        }
+
+        $intent = strtoupper((string)($paypal_order['intent'] ?? 'CAPTURE'));
+        return self::paypalOrderHasSuccessfulPaymentAction($paypal_order, $intent !== 'AUTHORIZE');
     }
 
     public static function shouldPreservePayPalOrderOnError(): bool

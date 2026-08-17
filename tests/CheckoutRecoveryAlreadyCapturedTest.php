@@ -129,7 +129,24 @@ checkout_recovery_assert(!CheckoutRecovery::paypalOrderHasSuccessfulPaymentActio
 checkout_recovery_assert(CheckoutRecovery::paypalOrderHasSuccessfulPaymentAction($completed_order, true), 'COMPLETED capture is successful');
 checkout_recovery_assert(CheckoutRecovery::paypalOrderHasSuccessfulPaymentAction($authorized_order, false), 'CREATED authorization is successful');
 checkout_recovery_assert(CheckoutRecovery::paypalOrderIsReusable($approved_order), 'APPROVED leftover is reusable');
-checkout_recovery_assert(CheckoutRecovery::paypalOrderIsReusable($completed_order), 'COMPLETED captured order is reusable for checkout resume');
+$refunded_order = [
+    'id' => 'REFUNDORDER',
+    'status' => 'COMPLETED',
+    'purchase_units' => [
+        [
+            'payments' => [
+                'captures' => [
+                    [
+                        'id' => 'CAPREFUND',
+                        'status' => 'REFUNDED',
+                    ],
+                ],
+            ],
+        ],
+    ],
+];
+checkout_recovery_assert(!CheckoutRecovery::paypalOrderHasSuccessfulPaymentAction($refunded_order, true), 'REFUNDED capture is not a successful payment');
+checkout_recovery_assert(!CheckoutRecovery::paypalOrderIsReusable($refunded_order), 'REFUNDED completed order is not reusable');
 
 echo "\nTest 5: Preserve APPROVED session state on error\n";
 $_SESSION['PayPalAdvancedCheckout'] = [
