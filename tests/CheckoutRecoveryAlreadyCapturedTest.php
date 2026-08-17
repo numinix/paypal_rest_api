@@ -188,6 +188,14 @@ checkout_recovery_assert(
     'common capture helper sets a capture/authorize Request-Id suffix'
 );
 checkout_recovery_assert(
+    str_contains($common, 'keeping the existing PayPal order instead of creating a replacement'),
+    'createOrder keeps the existing PayPal order when live GET fails'
+);
+checkout_recovery_assert(
+    str_contains($paypalac, 'keeping the existing PayPal order instead of creating a replacement'),
+    'paypalac keeps the existing PayPal order when live GET fails'
+);
+checkout_recovery_assert(
     str_contains($common, 'recoverExistingPayPalOrderAfterDuplicateCreate'),
     'createOrder recovers ORDER_ALREADY_CAPTURED leftovers'
 );

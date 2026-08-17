@@ -2043,7 +2043,13 @@ class paypalac extends base
             if ($existing_id !== '') {
                 $this->ppr->setPayPalRequestId('');
                 $live = $this->ppr->getOrderStatus($existing_id);
-                if ($live !== false && CheckoutRecovery::paypalOrderIsReusable($live)) {
+                if ($live === false) {
+                    $this->log->write(
+                        "\ncreatePayPalOrder($ppac_type), GET failed for $existing_id; keeping the existing PayPal order instead of creating a replacement.\n"
+                    );
+                    return true;
+                }
+                if (CheckoutRecovery::paypalOrderIsReusable($live)) {
                     $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = (string)($live['status'] ?? $cached_status);
                     $this->log->write(
                         "\ncreatePayPalOrder($ppac_type), order GUID matches ($order_guid) but cached status ($cached_status); " .
