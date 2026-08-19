@@ -2106,6 +2106,9 @@ class paypalac extends base
             $recovered = $this->paypalCommon->recoverExistingPayPalOrderAfterDuplicateCreate($this->ppr, $this->log, $error_info);
             if ($recovered === false) {
                 $this->errorInfo->copyErrorInfo($error_info);
+                if (CheckoutRecovery::isDuplicatePaymentActionIssue($error_info)) {
+                    CheckoutRecovery::noteFailedPaymentAttempt();
+                }
                 return false;
             }
             $order_response = $recovered;
