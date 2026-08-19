@@ -168,6 +168,15 @@ if (strpos($cssContent, 'clip-path: inset') === false) {
     echo "✓ Hidden class uses clip-path for modern browsers\n";
 }
 
+if (strpos($cssContent, 'paypalac-wallet-radio-hidden-control') === false
+    || strpos($cssContent, 'label::before') === false
+) {
+    $testPassed = false;
+    $errors[] = "CSS should hide custom-radio label::before/::after when the wallet radio wrapper is marked hidden";
+} else {
+    echo "✓ CSS hides theme custom-radio decoration for wallet methods\n";
+}
+
 // Summary
 echo "\n";
 if ($testPassed) {

@@ -108,6 +108,20 @@
     border: 0 !important;
 }
 
+/*
+ * Bootstrap/custom-radio themes draw the visible circle on label::before
+ * and already hide the real input with opacity:0. Clipping the input
+ * therefore leaves the fake radio on screen. Hide that decoration too.
+ */
+.paypalac-wallet-radio-hidden-control {
+    padding-left: 0 !important;
+}
+.paypalac-wallet-radio-hidden-control > label::before,
+.paypalac-wallet-radio-hidden-control > label::after {
+    display: none !important;
+    content: none !important;
+}
+
 .paypalac-wallet-label-hidden {
     position: absolute !important;
     width: 1px !important;

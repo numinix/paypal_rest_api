@@ -125,6 +125,15 @@ if (strpos($paylaterJs, 'enable-funding=paylater') === false) {
     fwrite(STDOUT, "  ✓ Pay Later JS still enables Pay Later funding\n");
 }
 
+if (strpos($paylaterJs, 'findReusablePayLaterNamespace') === false
+    || strpos($paylaterJs, "'&intent='") === false
+) {
+    fwrite(STDERR, "FAIL: Pay Later JS should reuse the header SDK when it already has Pay Later, and pass intent when loading its own copy\n");
+    $failures++;
+} else {
+    fwrite(STDOUT, "  ✓ Pay Later JS reuses the header SDK and matches intent\n");
+}
+
 if ($failures > 0) {
     fwrite(STDERR, "\n✗ FAILED: $failures test(s) failed\n");
     exit(1);
