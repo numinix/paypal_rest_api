@@ -863,6 +863,146 @@ class PayPalCommon {
     }
 
     /**
+     * Capture or authorize a PayPal order, skipping duplicate API calls when PayPal has
+     * already settled the payment (e.g. Pay in 3 / Pay Later wallet returns).
+     *
+     * @param PayPalAdvancedCheckoutApi $ppr PayPal Advanced Checkout API instance
+     * @param Logger $log Logger instance
+     * @param string $transaction_mode Transaction mode (Final Sale, Auth Only, etc.)
+     * @param string $ppac_type Payment type (card, paypal, apple_pay, etc.)
+     * @param string $log_prefix Label used in log messages
+     * @param bool $clear_session_on_failure When true, unset checkout session on failure
+     * @return array|false
+     */
+    public function captureOrAuthorizePayPalOrder(
+        PayPalAdvancedCheckoutApi $ppr,
+        Logger $log,
+        string $transaction_mode,
+        string $ppac_type,
+        string $log_prefix,
+        bool $clear_session_on_failure = false
+    ) {
+        $paypal_order_id = $_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '';
+        if ($paypal_order_id === '') {
+            $log->write("$log_prefix: FAILED - No PayPal order ID found in session");
+            return false;
+        }
+
+        $order_status = $_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? '';
+        $existing_order = $this->fetchSettledPayPalOrderIfNeeded($ppr, $log, $paypal_order_id, $order_status, $log_prefix);
+        if ($existing_order !== null) {
+            return $existing_order;
+        }
+
+        $should_capture = ($transaction_mode === self::TRANSACTION_MODE_FINAL_SALE ||
+                          ($ppac_type !== 'card' && $transaction_mode === self::TRANSACTION_MODE_AUTH_CARD_ONLY));
+
+        $log->write("$log_prefix: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
+
+        if ($should_capture) {
+            $response = $ppr->captureOrder($paypal_order_id);
+            if ($response === false) {
+                $recovered = $this->recoverOrderFromAlreadySettledPayPalError($ppr, $log, $ppr->getErrorInfo(), $paypal_order_id, $log_prefix);
+                if ($recovered !== null) {
+                    return $recovered;
+                }
+                $log->write("$log_prefix: CAPTURE FAILED. " . Logger::logJSON($ppr->getErrorInfo()));
+                if ($clear_session_on_failure) {
+                    unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
+                }
+                return false;
+            }
+            $log->write("$log_prefix: CAPTURE successful. Status: " . ($response['status'] ?? 'unknown'));
+            return $response;
+        }
+
+        $response = $ppr->authorizeOrder($paypal_order_id);
+        if ($response === false) {
+            $recovered = $this->recoverOrderFromAlreadySettledPayPalError($ppr, $log, $ppr->getErrorInfo(), $paypal_order_id, $log_prefix);
+            if ($recovered !== null) {
+                return $recovered;
+            }
+            $log->write("$log_prefix: AUTHORIZATION FAILED. " . Logger::logJSON($ppr->getErrorInfo()));
+            if ($clear_session_on_failure) {
+                unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
+            }
+            return false;
+        }
+        $log->write("$log_prefix: AUTHORIZATION successful. Status: " . ($response['status'] ?? 'unknown'));
+
+        return $response;
+    }
+
+    /**
+     * Return settled PayPal order details when payment was already captured or authorized.
+     */
+    protected function fetchSettledPayPalOrderIfNeeded(
+        PayPalAdvancedCheckoutApi $ppr,
+        Logger $log,
+        string $paypal_order_id,
+        string $order_status,
+        string $log_prefix
+    ): ?array {
+        $session_snapshot = $_SESSION['PayPalAdvancedCheckout']['Order']['current'] ?? [];
+        if (is_array($session_snapshot) && $this->extractFirstSuccessfulPaymentResourceId($session_snapshot) !== '') {
+            $response = $ppr->getOrderStatus($paypal_order_id);
+            if ($response !== false && $this->extractFirstSuccessfulPaymentResourceId($response) !== '') {
+                $log->write("$log_prefix: Capture/authorize skipped; order was already settled in session.");
+                return $response;
+            }
+        }
+
+        if (!in_array($order_status, [PayPalAdvancedCheckoutApi::STATUS_COMPLETED, PayPalAdvancedCheckoutApi::STATUS_CAPTURED], true)) {
+            return null;
+        }
+
+        $response = $ppr->getOrderStatus($paypal_order_id);
+        if ($response === false || $this->extractFirstSuccessfulPaymentResourceId($response) === '') {
+            return null;
+        }
+
+        $log->write("$log_prefix: Capture/authorize skipped; PayPal order status is $order_status with an existing payment.");
+        return $response;
+    }
+
+    /**
+     * Treat ORDER_ALREADY_CAPTURED / ORDER_ALREADY_AUTHORIZED as success and return order details.
+     */
+    protected function recoverOrderFromAlreadySettledPayPalError(
+        PayPalAdvancedCheckoutApi $ppr,
+        Logger $log,
+        array $error_info,
+        string $paypal_order_id,
+        string $log_prefix
+    ): ?array {
+        $issues = ['ORDER_ALREADY_CAPTURED', 'ORDER_ALREADY_AUTHORIZED'];
+        $details = $error_info['details'] ?? [];
+        if (!is_array($details)) {
+            $details = ($details === '' || $details === 'n/a') ? [] : [$details];
+        }
+        if ($details !== [] && !isset($details[0])) {
+            $details = [$details];
+        }
+
+        foreach ($details as $detail) {
+            if (!is_array($detail)) {
+                continue;
+            }
+            if (!in_array((string)($detail['issue'] ?? ''), $issues, true)) {
+                continue;
+            }
+
+            $response = $ppr->getOrderStatus($paypal_order_id);
+            if ($response !== false && $this->extractFirstSuccessfulPaymentResourceId($response) !== '') {
+                $log->write("$log_prefix: Recovered from {$detail['issue']}; using existing PayPal order details.");
+                return $response;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Common captureOrAuthorizePayment method for wallet modules
      * Determines whether to capture or authorize based on transaction mode
      *
@@ -875,34 +1015,14 @@ class PayPalCommon {
      */
     public function captureWalletPayment(PayPalAdvancedCheckoutApi $ppr, Logger $log, string $payment_source, string $transaction_mode, string $ppac_type)
     {
-        $paypal_order_id = $_SESSION['PayPalAdvancedCheckout']['Order']['id'];
-        
-        // Determine if we should capture or authorize based on transaction mode
-        // For wallets, "Auth Only (Card-Only)" should still use capture since wallet != card
-        $should_capture = ($transaction_mode === self::TRANSACTION_MODE_FINAL_SALE ||
-                          ($ppac_type !== 'card' && $transaction_mode === self::TRANSACTION_MODE_AUTH_CARD_ONLY));
-        
-        $log->write("$payment_source: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
-
-        if ($should_capture) {
-            $response = $ppr->captureOrder($paypal_order_id);
-            if ($response === false) {
-                $log->write($payment_source . ': capture failed. ' . Logger::logJSON($ppr->getErrorInfo()));
-                unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
-                return false;
-            }
-            $log->write("$payment_source: CAPTURE successful. Status: " . ($response['status'] ?? 'unknown'));
-        } else {
-            $response = $ppr->authorizeOrder($paypal_order_id);
-            if ($response === false) {
-                $log->write($payment_source . ': authorization failed. ' . Logger::logJSON($ppr->getErrorInfo()));
-                unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
-                return false;
-            }
-            $log->write("$payment_source: AUTHORIZATION successful. Status: " . ($response['status'] ?? 'unknown'));
-        }
-
-        return $response;
+        return $this->captureOrAuthorizePayPalOrder(
+            $ppr,
+            $log,
+            $transaction_mode,
+            $ppac_type,
+            $payment_source,
+            true
+        );
     }
 
     /**
@@ -1315,47 +1435,14 @@ class PayPalCommon {
             return false;
         }
 
-        // If the order was already completed (captured or authorized) during createOrder,
-        // skip the duplicate capture/authorize call and fetch the order details instead.
-        // This can happen with vault-enabled credit cards where PayPal completes the
-        // authorization during createOrder.
-        if ($order_status === PayPalAdvancedCheckoutApi::STATUS_COMPLETED && ($captures !== [] || $authorizations !== [])) {
-            $skip_reason = ($captures !== []) ? 'already captured' : 'already authorized';
-            $log->write("processCreditCardPayment: Capture/authorize skipped; order was $skip_reason during createOrder.");
-            // Fetch the full order details from PayPal since we need the complete response structure
-            // with all fields that the calling code expects
-            $response = $ppr->getOrderStatus($paypal_order_id);
-            if ($response === false) {
-                $log->write('processCreditCardPayment: FAILED to fetch completed order details. ' . Logger::logJSON($ppr->getErrorInfo()));
-                return false;
-            }
-            $log->write("processCreditCardPayment: Successfully fetched existing order details. Status: " . ($response['status'] ?? 'unknown'));
-            return $response;
-        }
-
-        // Determine if we should capture or authorize based on transaction mode
-        $should_capture = ($transaction_mode === self::TRANSACTION_MODE_FINAL_SALE ||
-                          ($ppac_type !== 'card' && $transaction_mode === self::TRANSACTION_MODE_AUTH_CARD_ONLY));
-
-        $log->write("processCreditCardPayment: Will " . ($should_capture ? 'CAPTURE' : 'AUTHORIZE') . " the order.");
-
-        if ($should_capture) {
-            $response = $ppr->captureOrder($paypal_order_id);
-            if ($response === false) {
-                $log->write('processCreditCardPayment: CAPTURE FAILED. ' . Logger::logJSON($ppr->getErrorInfo()));
-                return false;
-            }
-            $log->write("processCreditCardPayment: CAPTURE successful. Status: " . ($response['status'] ?? 'unknown'));
-        } else {
-            $response = $ppr->authorizeOrder($paypal_order_id);
-            if ($response === false) {
-                $log->write('processCreditCardPayment: AUTHORIZATION FAILED. ' . Logger::logJSON($ppr->getErrorInfo()));
-                return false;
-            }
-            $log->write("processCreditCardPayment: AUTHORIZATION successful. Status: " . ($response['status'] ?? 'unknown'));
-        }
-
-        return $response;
+        return $this->captureOrAuthorizePayPalOrder(
+            $ppr,
+            $log,
+            $transaction_mode,
+            $ppac_type,
+            "processCreditCardPayment($ppac_type)",
+            false
+        );
     }
 
     /**

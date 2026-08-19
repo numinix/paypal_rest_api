@@ -184,6 +184,16 @@ if ($op === '3ds_return') {
 $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $order_status['status'];
 if ($op === 'return') {
     $_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed'] = true;
+    $listener_order = $order_status;
+    unset(
+        $listener_order['id'],
+        $listener_order['status'],
+        $listener_order['create_time'],
+        $listener_order['links'],
+        $listener_order['purchase_units'][0]['reference_id'],
+        $listener_order['purchase_units'][0]['payee']
+    );
+    $_SESSION['PayPalAdvancedCheckout']['Order']['current'] = $listener_order;
 } else {
     $_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response'] = $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']['ccInfo'];
     $_SESSION['PayPalAdvancedCheckout']['Order']['authentication_result'] = $auth_result;

@@ -64,7 +64,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.21';
+    protected const CURRENT_VERSION = '1.3.22';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -843,6 +843,10 @@ class paypalac extends base
                 case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.21', '<'): //- Fall through from above
                     // Saved Card Subscriptions admin lists only paypalac* origin
                     // (or vault-migrated) rows so non-PayPal billing methods stay out.
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.22', '<'): //- Fall through from above
+                    // Skip duplicate capture/authorize when PayPal wallet flows (e.g. Pay in 3)
+                    // already settled the order before checkout_process runs.
 
                 default:    //- Fall through from above
                     break;
@@ -2546,13 +2550,15 @@ class paypalac extends base
     }
     protected function captureOrAuthorizePayment(string $payment_source): array
     {
-        $paypal_id = $_SESSION['PayPalAdvancedCheckout']['Order']['id'];
         $this->ppr->setPayPalRequestId($_SESSION['PayPalAdvancedCheckout']['Order']['guid']);
-        if (MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Final Sale' || ($payment_source !== 'card' && MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Auth Only (Card-Only)')) {
-            $response = $this->ppr->captureOrder($paypal_id);
-        } else {
-            $response = $this->ppr->authorizeOrder($paypal_id);
-        }
+        $response = $this->paypalCommon->captureOrAuthorizePayPalOrder(
+            $this->ppr,
+            $this->log,
+            MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE,
+            $payment_source === 'card' ? 'card' : 'paypal',
+            'paypalac::captureOrAuthorizePayment(' . $payment_source . ')',
+            false
+        );
 
         if ($response === false) {
             $this->errorInfo->copyErrorInfo($this->ppr->getErrorInfo());

@@ -130,9 +130,8 @@ class WalletCaptureOrAuthorizeIntentTest
         
         $content = file_get_contents($this->phpFile);
         
-        // Look for the captureOrder call within the captureWalletPayment function
-        // Should be: if ($should_capture) { ... $ppr->captureOrder(...) }
-        $pattern = '/if\s*\(\s*\$should_capture\s*\)\s*\{[^}]*\$ppr\s*->\s*captureOrder\s*\(/s';
+        // Look for the captureOrder call within captureOrAuthorizePayPalOrder
+        $pattern = '/function\s+captureOrAuthorizePayPalOrder[\s\S]*?if\s*\(\s*\$should_capture\s*\)\s*\{[\s\S]*?\$ppr\s*->\s*captureOrder\s*\(/';
         $hasCaptureOrderCall = preg_match($pattern, $content);
         
         if ($hasCaptureOrderCall) {
@@ -161,9 +160,8 @@ class WalletCaptureOrAuthorizeIntentTest
         
         $content = file_get_contents($this->phpFile);
         
-        // Look for the authorizeOrder call in the else block
-        // Should be: } else { ... $ppr->authorizeOrder(...) }
-        $pattern = '/\}\s*else\s*\{[^}]*\$ppr\s*->\s*authorizeOrder\s*\(/s';
+        // Look for the authorizeOrder call within captureOrAuthorizePayPalOrder
+        $pattern = '/function\s+captureOrAuthorizePayPalOrder[\s\S]*?\$response\s*=\s*\$ppr\s*->\s*authorizeOrder\s*\(/';
         $hasAuthorizeOrderCall = preg_match($pattern, $content);
         
         if ($hasAuthorizeOrderCall) {
