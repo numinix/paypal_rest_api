@@ -18,11 +18,11 @@ $langPhp = file_get_contents(__DIR__ . '/../includes/languages/english/modules/p
 fwrite(STDOUT, "Testing Pay Later amount limits\n");
 fwrite(STDOUT, "================================\n\n");
 
-if (strpos($paylaterPhp, "protected const CURRENT_VERSION = '1.1.0'") === false) {
-    fwrite(STDERR, "FAIL: paypalac_paylater version should be 1.1.0 so tableCheckup inserts the new amount keys\n");
+if (strpos($paylaterPhp, "protected const CURRENT_VERSION = '1.1.1'") === false) {
+    fwrite(STDERR, "FAIL: paypalac_paylater version should be 1.1.1 so tableCheckup still runs after the Pay Later UI/parity update\n");
     $failures++;
 } else {
-    fwrite(STDOUT, "  ✓ Pay Later module version is 1.1.0\n");
+    fwrite(STDOUT, "  ✓ Pay Later module version is 1.1.1\n");
 }
 
 foreach ([
