@@ -257,6 +257,95 @@
         }
     }
 
+    function isPaylaterSelected() {
+        var moduleRadio = document.getElementById('pmt-paypalac_paylater');
+        return !!(moduleRadio && moduleRadio.checked);
+    }
+
+    function isPaylaterApproved() {
+        var statusField = document.getElementById('paypalac-paylater-status');
+        return !!(statusField && statusField.value === 'approved');
+    }
+
+    function shouldStartPayLaterApproval() {
+        return isPaylaterSelected() && !isPaylaterApproved() && !checkoutSubmitting;
+    }
+
+    function getPaylaterButtonElement() {
+        var container = document.getElementById('paypalac-paylater-button');
+        if (!container) {
+            return null;
+        }
+
+        return container.querySelector('.paypal-button')
+            || container.querySelector('[data-funding-source="paylater"]')
+            || container.querySelector('[role="link"]')
+            || container.querySelector('iframe');
+    }
+
+    function triggerPaylaterButtonClick() {
+        selectPaylaterRadio();
+        var button = getPaylaterButtonElement();
+        if (!button) {
+            return false;
+        }
+
+        try {
+            button.click();
+            return true;
+        } catch (error) {
+            console.warn('Unable to start Pay Later from Confirm Order', error);
+            return false;
+        }
+    }
+
+    function wrapSubmitCheckout() {
+        if (typeof window.submitCheckout !== 'function' || window.submitCheckout.__paypalacPaylaterWrapped) {
+            return;
+        }
+
+        var originalSubmitCheckout = window.submitCheckout;
+        function wrappedSubmitCheckout() {
+            if (shouldStartPayLaterApproval()) {
+                releaseCheckoutOverlay();
+                if (!triggerPaylaterButtonClick()) {
+                    renderPaylaterButton();
+                }
+                return false;
+            }
+
+            return originalSubmitCheckout.apply(this, arguments);
+        }
+        wrappedSubmitCheckout.__paypalacPaylaterWrapped = true;
+        window.submitCheckout = wrappedSubmitCheckout;
+    }
+
+    function releaseCheckoutOverlay() {
+        if (typeof jQuery !== 'undefined' && typeof jQuery.unblockUI === 'function') {
+            jQuery.unblockUI();
+        }
+    }
+
+    function interceptPaylaterCheckoutSubmit(event) {
+        if (!shouldStartPayLaterApproval()) {
+            return;
+        }
+
+        if (typeof event.preventDefault === 'function') {
+            event.preventDefault();
+        }
+        if (typeof event.stopImmediatePropagation === 'function') {
+            event.stopImmediatePropagation();
+        } else if (typeof event.stopPropagation === 'function') {
+            event.stopPropagation();
+        }
+
+        releaseCheckoutOverlay();
+        if (!triggerPaylaterButtonClick()) {
+            renderPaylaterButton();
+        }
+    }
+
     function hideModuleRadio() {
         var moduleRadio = document.getElementById('pmt-paypalac_paylater');
         if (moduleRadio) {
@@ -587,7 +676,6 @@
                 return null;
             }
 
-            hideModuleRadio();
             sdkState.config = config;
             return loadPayPalSdk(config).then(function (paypal) {
                 if (currentRenderRequestId !== renderRequestId) {
@@ -598,8 +686,8 @@
                 var buttonInstance = paypal.Buttons({
                     fundingSource: paypal.FUNDING.PAYLATER,
                     style: {
-                        shape: 'rect',
-                        height: 40,
+                        shape: 'pill',
+                        height: 44,
                         color: 'gold'
                     },
                     // createOrder is called when user clicks the button - this is when we create the PayPal order
@@ -711,13 +799,22 @@
         setPaylaterPayload(event.detail || {});
     });
 
-    // The native radio has no effect on its own -- Pay Later can only be
-    // authorized by clicking the PayPal-rendered button, since selecting the
-    // radio alone does not open the approval popup. Hide the radio (screen
-    // readers can still reach it) so shoppers aren't tempted to click a
-    // control that appears to do nothing; the "PayPal Pay Later" label and
-    // button remain the single visible, actionable control.
-    hideModuleRadio();
+    // Match PayPal: keep the native radio visible and place the branded
+    // Pay Later button to its right (no text label). Confirm Order starts
+    // the same hosted approval that clicking the button does.
+    wrapSubmitCheckout();
+    document.addEventListener('click', wrapSubmitCheckout, true);
+
+    if (!window.__paypalacPaylaterSubmitInterceptInstalled) {
+        window.__paypalacPaylaterSubmitInterceptInstalled = true;
+        document.addEventListener('submit', function (event) {
+            var form = event.target;
+            if (!form || form.getAttribute('name') !== 'checkout_payment') {
+                return;
+            }
+            interceptPaylaterCheckoutSubmit(event);
+        }, true);
+    }
 
     var container = document.getElementById('paypalac-paylater-button');
     if (container) {

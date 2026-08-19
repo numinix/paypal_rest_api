@@ -1,64 +1,86 @@
 <?php
 /**
- * Test: Pay Later server-side confirmation fix and dead radio-button UI fix.
+ * Test: Pay Later Confirm Order parity with PayPal, plus server confirmation.
  *
  * Background (ticket 615108 / redlinestands.com):
- * - The customer reported that selecting the "PayPal Pay Later" radio button
- *   did nothing -- only clicking the yellow PayPal-rendered button worked,
- *   which was confusing. The native radio was never actually hidden during
- *   normal rendering even though hideModuleRadio()/CSS support already
- *   existed (same latent gap Google Pay/Apple Pay had before their fix).
- * - Separately, the customer still saw "We were unable to confirm your Pay
- *   Later payment with PayPal" even on an eligible cart amount. Pay Later is
- *   approved through PayPal's own hosted popup (paypal.Buttons()), so by the
- *   time onApprove fires the order is already APPROVED; the shared
- *   processWalletConfirmation() was nonetheless calling confirm-payment-source
- *   (a call meant only for orders confirmed without a payment_source, e.g.
- *   card-only multi-step flows), which PayPal was rejecting.
- *
- * This matches the exact class of bug already fixed for Google Pay via
- * client-side confirmation (see GooglePayClientSideConfirmationTest.php);
- * Pay Later instead skips confirm-payment-source server-side and just
- * re-checks the live order status, since no client "confirmed" flag exists
- * for the plain Buttons() flow.
+ * - Pay Later should look and act like the PayPal row: visible native radio,
+ *   branded button to the right, no "PayPal Pay Later" text label. Confirm
+ *   Order (or the button) starts hosted approval, then checkout continues.
+ * - Pay Later is approved through PayPal's hosted popup (paypal.Buttons()),
+ *   so processWalletConfirmation() must skip confirm-payment-source and
+ *   re-check live order status.
  */
 
 $jsFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.paylater.js';
 $phpFile = __DIR__ . '/../includes/modules/payment/paypal/paypal_common.php';
+$moduleFile = __DIR__ . '/../includes/modules/payment/paypalac_paylater.php';
 
 $testPassed = true;
 $errors = [];
 
 $jsContent = file_get_contents($jsFile);
 $phpContent = file_get_contents($phpFile);
+$moduleContent = file_get_contents($moduleFile);
 
-// Test 1: hideModuleRadio() is actually invoked during normal rendering,
-// not just defined. (Definition + at least one real call site.)
+// Test 1: hideModuleRadio() is only used when the method is ineligible.
 $hideModuleRadioCallCount = preg_match_all('/\bhideModuleRadio\s*\(\s*\)\s*;/', $jsContent);
-if ($hideModuleRadioCallCount < 2) {
+if ($hideModuleRadioCallCount !== 1) {
     $testPassed = false;
-    $errors[] = "hideModuleRadio() should be invoked outside of hidePaymentMethodContainer() so the dead radio is hidden during normal rendering, not just when the button is unavailable.";
+    $errors[] = "hideModuleRadio() should be invoked once, from hidePaymentMethodContainer(), so the radio stays visible like PayPal during normal rendering (found {$hideModuleRadioCallCount} call sites).";
 } else {
-    echo "✓ Pay Later JS invokes hideModuleRadio() during normal rendering (found {$hideModuleRadioCallCount} call sites)\n";
+    echo "✓ Pay Later JS keeps the radio visible during normal rendering (hideModuleRadio only when ineligible)\n";
+}
+
+if (!preg_match('/function hidePaymentMethodContainer\s*\([^)]*\)\s*\{[\s\S]*?\bhideModuleRadio\s*\(\s*\)\s*;/', $jsContent)) {
+    $testPassed = false;
+    $errors[] = "hideModuleRadio() must still run from hidePaymentMethodContainer() when Pay Later is unavailable.";
+} else {
+    echo "✓ hideModuleRadio() still hides the radio when Pay Later is ineligible\n";
 }
 
 if (strpos($jsContent, 'paypalac-wallet-radio-hidden-control') === false) {
     $testPassed = false;
-    $errors[] = "hideModuleRadio() must mark the theme custom-radio wrapper so label::before (the visible circle) is hidden, not just the already-invisible input.";
+    $errors[] = "hideModuleRadio() must mark the theme custom-radio wrapper so label::before is hidden when the method is ineligible.";
 } else {
-    echo "✓ Pay Later JS marks the custom-radio wrapper so the visible fake radio is hidden\n";
+    echo "✓ Pay Later JS marks the custom-radio wrapper when hiding an ineligible method\n";
 }
 
-// Test 2: The label text is NOT hidden by default (only the radio), so the
-// shopper still sees "PayPal Pay Later" for context next to the button.
+// Test 2: Confirm Order intercept matches the PayPal checkout process.
+if (strpos($jsContent, 'function wrapSubmitCheckout') === false
+    || strpos($jsContent, 'function triggerPaylaterButtonClick') === false
+    || strpos($jsContent, 'function interceptPaylaterCheckoutSubmit') === false
+) {
+    $testPassed = false;
+    $errors[] = "Pay Later JS should intercept Confirm Order / submitCheckout and start the Pay Later button, matching the PayPal Confirm Order process.";
+} else {
+    echo "✓ Pay Later JS intercepts Confirm Order and starts Pay Later approval\n";
+}
+
+if (strpos($jsContent, "shape: 'pill'") === false) {
+    $testPassed = false;
+    $errors[] = "Pay Later button should use pill shape to match the PayPal branded button.";
+} else {
+    echo "✓ Pay Later button uses pill shape\n";
+}
+
 if (strpos($jsContent, 'Keep the mock radio button visible') !== false) {
     $testPassed = false;
     $errors[] = "Stale comment claiming the radio is intentionally kept visible should be removed/updated.";
 } else {
-    echo "✓ Stale 'keep radio visible' comment has been updated\n";
+    echo "✓ Stale 'keep radio visible' comment is not present\n";
 }
 
-// Test 3: paypal_common.php has a dedicated 'paylater' branch in
+// Test 3: selection() is radio + button only (no text label), like paypalac.
+if (preg_match('/\$selectionLabel\s*\.\s*[\'"]\s*[\'"]?\s*\.\s*\$buttonContainer/', $moduleContent)
+    || preg_match("/'module'\s*=>\s*\$selectionLabel/", $moduleContent)
+) {
+    $testPassed = false;
+    $errors[] = "selection() should render only the Pay Later button (no text label), matching paypalac::selection().";
+} else {
+    echo "✓ Pay Later selection() does not prepend label text next to the button\n";
+}
+
+// Test 4: paypal_common.php has a dedicated 'paylater' branch in
 // processWalletConfirmation().
 if (!preg_match('/if\s*\(\$walletType\s*===\s*[\'"]paylater[\'"]\)\s*\{/', $phpContent, $matches, PREG_OFFSET_CAPTURE)) {
     $testPassed = false;
@@ -66,15 +88,11 @@ if (!preg_match('/if\s*\(\$walletType\s*===\s*[\'"]paylater[\'"]\)\s*\{/', $phpC
 } else {
     $branchStart = $matches[0][1];
 
-    // Isolate roughly the paylater branch body up to its "return;" so we can
-    // check it doesn't call confirmPaymentSource but does call getOrderStatus.
     $branchEnd = strpos($phpContent, 'return;', $branchStart);
     $branchBody = $branchEnd !== false
         ? substr($phpContent, $branchStart, $branchEnd - $branchStart)
         : substr($phpContent, $branchStart, 2000);
 
-    // Test 4: Pay Later branch must NOT call confirmPaymentSource (look for
-    // the actual method call, not just the word appearing in a log message).
     if (strpos($branchBody, '->confirmPaymentSource(') !== false) {
         $testPassed = false;
         $errors[] = "The paylater branch should not call confirmPaymentSource(); Pay Later orders are already approved via the hosted popup by the time onApprove fires.";
@@ -82,7 +100,6 @@ if (!preg_match('/if\s*\(\$walletType\s*===\s*[\'"]paylater[\'"]\)\s*\{/', $phpC
         echo "✓ Pay Later branch does not call confirmPaymentSource()\n";
     }
 
-    // Test 5: Pay Later branch must call getOrderStatus to re-verify the order.
     if (strpos($branchBody, 'getOrderStatus') === false) {
         $testPassed = false;
         $errors[] = "The paylater branch should call getOrderStatus() to verify the order before proceeding.";
@@ -90,8 +107,6 @@ if (!preg_match('/if\s*\(\$walletType\s*===\s*[\'"]paylater[\'"]\)\s*\{/', $phpC
         echo "✓ Pay Later branch calls getOrderStatus() to verify the order\n";
     }
 
-    // Test 6: Pay Later branch must still surface confirm_failed on a hard
-    // failure, and mark wallet_payment_confirmed on success.
     if (strpos($branchBody, "errorMessages['confirm_failed']") === false) {
         $testPassed = false;
         $errors[] = "The paylater branch should still redirect with confirm_failed if getOrderStatus() fails outright.";
@@ -107,8 +122,6 @@ if (!preg_match('/if\s*\(\$walletType\s*===\s*[\'"]paylater[\'"]\)\s*\{/', $phpC
     }
 }
 
-// Test 7: The new paylater branch must run before the generic
-// confirmPaymentSource fallthrough (order matters -- PHP returns early).
 $paylaterBranchPos = strpos($phpContent, "if (\$walletType === 'paylater')");
 $genericConfirmPos = strpos($phpContent, '$confirm_response = $this->paymentModule->ppr->confirmPaymentSource(');
 if ($paylaterBranchPos === false || $genericConfirmPos === false || $paylaterBranchPos >= $genericConfirmPos) {

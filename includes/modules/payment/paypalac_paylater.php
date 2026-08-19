@@ -52,7 +52,7 @@ class paypalac_paylater extends base
         return defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.1.0';
+    protected const CURRENT_VERSION = '1.1.1';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -670,11 +670,11 @@ class paypalac_paylater extends base
 
         $script = $this->getWalletAssets('jquery.paypalac.paylater.js');
 
-        $selectionLabel = MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_SELECTION ?? 'Pay Later';
-
+        // Match paypalac::selection(): radio + branded button only, no text label.
+        // Confirm Order (or the Pay Later button) starts payment, same as PayPal.
         return [
             'id' => $this->code,
-            'module' => $selectionLabel . ' ' . $buttonContainer . $hiddenFields . $script,
+            'module' => $buttonContainer . $hiddenFields . $script,
         ];
     }
 
