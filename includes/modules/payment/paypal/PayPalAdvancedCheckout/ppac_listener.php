@@ -30,6 +30,7 @@ if (!defined('MODULE_PAYMENT_PAYPALAC_STATUS') || MODULE_PAYMENT_PAYPALAC_STATUS
 require DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 
 use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Common\CheckoutRecovery;
 use PayPalAdvancedCheckout\Common\Logger;
 use PayPalAdvancedCheckout\Compatibility\Language as LanguageCompatibility;
 
@@ -181,8 +182,16 @@ if ($op === '3ds_return') {
 // the base payment module "knows" that the payment-confirmation (or creation) at PayPal
 // has been completed.
 //
-$_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $order_status['status'];
 if ($op === 'return') {
+    $_SESSION['PayPalAdvancedCheckout']['Order'] = array_replace(
+        $_SESSION['PayPalAdvancedCheckout']['Order'],
+        CheckoutRecovery::sessionOrderFromPayPalResponse(
+            $order_status,
+            (string)($_SESSION['PayPalAdvancedCheckout']['Order']['guid'] ?? ''),
+            (string)($_SESSION['PayPalAdvancedCheckout']['Order']['payment_source'] ?? 'paypal'),
+            (array)($_SESSION['PayPalAdvancedCheckout']['Order']['amount_mismatch'] ?? [])
+        )
+    );
     $_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed'] = true;
 } else {
     $_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response'] = $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']['ccInfo'];
