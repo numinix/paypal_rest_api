@@ -947,6 +947,9 @@ class PayPalCommon {
         );
         if ($response === false) {
             $error_info = $ppr->getErrorInfo();
+            if (CheckoutRecovery::isHardPaymentFailure($error_info)) {
+                CheckoutRecovery::noteFailedPaymentAttempt();
+            }
             $keep_order = CheckoutRecovery::shouldPreservePayPalOrderOnError()
                 && !CheckoutRecovery::isHardPaymentFailure($error_info);
             if ($keep_order === false) {
