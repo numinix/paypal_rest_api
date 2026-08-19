@@ -13,3 +13,5 @@ define('MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_CONFIRM_FAILED', 'We were unable 
 define('MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_PAYER_ACTION', 'An additional action is required to complete your Pay Later payment. Please choose another payment method or contact us for assistance.');
 define('MODULE_PAYMENT_PAYPALAC_PAYING_WITH_PAYLATER', 'Paying with PayPal Pay Later');
 define('MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE', 'Pay Later is temporarily unavailable. Please try again or choose a different payment method.');
+define('MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_BELOW_MINIMUM', 'Pay Later is available for orders of %s %s or more.');
+define('MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_ABOVE_MAXIMUM', 'Pay Later is available for orders up to %s %s.');
