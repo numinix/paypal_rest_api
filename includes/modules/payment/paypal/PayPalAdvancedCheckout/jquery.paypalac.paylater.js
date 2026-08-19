@@ -532,6 +532,7 @@
                 return null;
             }
 
+            hideModuleRadio();
             sdkState.config = config;
             return loadPayPalSdk(config).then(function (paypal) {
                 if (currentRenderRequestId !== renderRequestId) {
@@ -655,8 +656,13 @@
         setPaylaterPayload(event.detail || {});
     });
 
-    // Keep the mock radio button visible so the user can click it
-    // to select this payment method.
+    // The native radio has no effect on its own -- Pay Later can only be
+    // authorized by clicking the PayPal-rendered button, since selecting the
+    // radio alone does not open the approval popup. Hide the radio (screen
+    // readers can still reach it) so shoppers aren't tempted to click a
+    // control that appears to do nothing; the "PayPal Pay Later" label and
+    // button remain the single visible, actionable control.
+    hideModuleRadio();
 
     var container = document.getElementById('paypalac-paylater-button');
     if (container) {

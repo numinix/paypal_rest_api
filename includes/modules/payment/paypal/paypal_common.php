@@ -167,8 +167,54 @@ class PayPalCommon {
         //   Skip both createOrder and confirmPaymentSource on server
         // - Google Pay: Confirmation is handled client-side via paypal.Googlepay().confirmOrder()
         //   Skip server-side confirmPaymentSource, just retrieve order status
+        // - Pay Later: Approved via PayPal's own hosted popup (paypal.Buttons()).
+        //   Skip confirmPaymentSource -- it is only for orders confirmed
+        //   without a payment_source (e.g. card-only multi-step flows) and
+        //   was failing here even for eligible carts; just verify the order.
         // - Venmo: Create order here, then confirm server-side
         // -----------------------------------------------------------------
+        if ($walletType === 'paylater') {
+            $orderIdToVerify = $_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? $payloadOrderId;
+
+            if ($orderIdToVerify === null) {
+                $this->paymentModule->setMessageAndRedirect($errorMessages['payload_missing'], FILENAME_CHECKOUT_PAYMENT);
+            }
+
+            if (!isset($_SESSION['PayPalAdvancedCheckout']['Order'])) {
+                $_SESSION['PayPalAdvancedCheckout']['Order'] = [];
+            }
+            $_SESSION['PayPalAdvancedCheckout']['Order']['id'] = $orderIdToVerify;
+
+            $order_status = $this->paymentModule->ppr->getOrderStatus($orderIdToVerify);
+            if ($order_status === false) {
+                $this->paymentModule->getErrorInfo()->copyErrorInfo($this->paymentModule->ppr->getErrorInfo());
+                $this->paymentModule->setMessageAndRedirect($errorMessages['confirm_failed'], FILENAME_CHECKOUT_PAYMENT);
+            }
+
+            $status = $order_status['status'] ?? '';
+            if ($status !== '') {
+                $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $status;
+                $_SESSION['PayPalAdvancedCheckout']['Order']['current'] = $order_status;
+
+                $this->paymentModule->log->write(
+                    "Pay Later: Retrieved order status after hosted-popup approval: $status",
+                    true,
+                    'after'
+                );
+            }
+
+            $_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed'] = true;
+            $_SESSION['PayPalAdvancedCheckout']['Order']['payment_source'] = $walletType;
+
+            $this->paymentModule->log->write(
+                'pre_confirmation_check (paylater) skipped the confirm-payment-source API call; order already approved via hosted popup.',
+                true,
+                'after'
+            );
+
+            return;
+        }
+
         if ($walletType === 'apple_pay' || $walletType === 'google_pay') {
             // Check if this is a client-side confirmed payload
             // After client-side confirmOrder(), the payload contains: {orderID, confirmed: true, wallet}
