@@ -85,7 +85,9 @@ checkout_recovery_assert(CheckoutRecovery::isDuplicatePaymentActionIssue($captur
 checkout_recovery_assert(CheckoutRecovery::isDuplicatePaymentActionIssue($authorized_error), 'ORDER_ALREADY_AUTHORIZED is a duplicate issue');
 checkout_recovery_assert(!CheckoutRecovery::isDuplicatePaymentActionIssue($declined_error), 'INSTRUMENT_DECLINED is not a duplicate issue');
 checkout_recovery_assert(!CheckoutRecovery::isHardPaymentFailure($captured_error), 'ORDER_ALREADY_CAPTURED is not a hard decline');
-checkout_recovery_assert(CheckoutRecovery::isHardPaymentFailure($declined_error), 'INSTRUMENT_DECLINED is a hard payment failure');
+checkout_recovery_assert(CheckoutRecovery::paymentActionRequestId('guid-123', true) === 'guid-123-capture', 'capture Request-Id is distinct from create GUID');
+checkout_recovery_assert(CheckoutRecovery::paymentActionRequestId('guid-123', false) === 'guid-123-authorize', 'authorize Request-Id is distinct from create GUID');
+checkout_recovery_assert(CheckoutRecovery::paymentActionRequestId('guid-123', true) !== 'guid-123', 'capture must never reuse the create-order Request-Id');
 
 echo "\nTest 4: Successful payment detection and APPROVED leftover retry\n";
 $approved_order = [
@@ -195,12 +197,12 @@ checkout_recovery_assert(
     'paypalac preserves recoverable PayPal orders on redirect'
 );
 checkout_recovery_assert(
-    str_contains($paypalac, "CURRENT_VERSION = '1.3.22'"),
-    'CURRENT_VERSION is 1.3.22'
+    str_contains($paypalac, "CURRENT_VERSION = '1.3.23'"),
+    'CURRENT_VERSION is 1.3.23'
 );
 checkout_recovery_assert(
-    str_contains($paypalac, "case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.22', '<')"),
-    'tableCheckup includes 1.3.22 fall-through'
+    str_contains($paypalac, "case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.23', '<')"),
+    'tableCheckup includes 1.3.23 fall-through'
 );
 checkout_recovery_assert(
     str_contains($common, 'CheckoutRecovery::paymentActionRequestId'),

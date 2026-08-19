@@ -65,7 +65,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.3.22';
+    protected const CURRENT_VERSION = '1.3.23';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -848,6 +848,10 @@ class paypalac extends base
                 case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.22', '<'): //- Fall through from above
                     // Recover APPROVED leftover PayPal orders after ORDER_ALREADY_CAPTURED
                     // instead of alerting and wiping the checkout session.
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.23', '<'): //- Fall through from above
+                    // Hard payment declines bump FailedPaymentAttempts so createOrderGuid
+                    // mints a new PayPal order instead of reusing a declined APPROVED leftover.
 
                 default:    //- Fall through from above
                     break;
@@ -2102,6 +2106,9 @@ class paypalac extends base
             $recovered = $this->paypalCommon->recoverExistingPayPalOrderAfterDuplicateCreate($this->ppr, $this->log, $error_info);
             if ($recovered === false) {
                 $this->errorInfo->copyErrorInfo($error_info);
+                if (CheckoutRecovery::isDuplicatePaymentActionIssue($error_info)) {
+                    CheckoutRecovery::noteFailedPaymentAttempt();
+                }
                 return false;
             }
             $order_response = $recovered;
@@ -2174,6 +2181,7 @@ class paypalac extends base
     protected function createOrderGuid(\order $order, string $ppac_type, array $order_info = [], array $order_total_changes = []): string
     {
         $_SESSION['PayPalAdvancedCheckout']['CompletedOrders'] = $_SESSION['PayPalAdvancedCheckout']['CompletedOrders'] ?? 0;
+        $_SESSION['PayPalAdvancedCheckout']['FailedPaymentAttempts'] = $_SESSION['PayPalAdvancedCheckout']['FailedPaymentAttempts'] ?? 0;
         unset($order->info['ip_address']);
 
         $effective_total = isset($order_info['total']) && is_numeric($order_info['total'])
@@ -2209,6 +2217,7 @@ class paypalac extends base
             . json_encode($order)
             . ($_SESSION['securityToken'] ?? '')
             . $_SESSION['PayPalAdvancedCheckout']['CompletedOrders']
+            . $_SESSION['PayPalAdvancedCheckout']['FailedPaymentAttempts']
             . json_encode($financial_signature);
         if ($ppac_type !== 'paypal') {
             $hash_data .= json_encode($this->ccInfo);
@@ -2921,6 +2930,9 @@ class paypalac extends base
         if ($this->errorInfo->hasErrorInfo()) {
             $error_info_for_preserve = $this->errorInfo->getErrorInfo();
             $log_message .= "\n" . Logger::logJSON($error_info_for_preserve);
+            if (CheckoutRecovery::isHardPaymentFailure($error_info_for_preserve)) {
+                CheckoutRecovery::noteFailedPaymentAttempt();
+            }
             $this->errorInfo->reset();
         }
         $this->log->write($log_message);

@@ -178,6 +178,11 @@ class CheckoutRecovery
         return in_array($status, self::PRESERVE_ORDER_STATUSES, true);
     }
 
+    public static function noteFailedPaymentAttempt(): void
+    {
+        $_SESSION['PayPalAdvancedCheckout']['FailedPaymentAttempts'] = (int)($_SESSION['PayPalAdvancedCheckout']['FailedPaymentAttempts'] ?? 0) + 1;
+    }
+
     public static function sessionOrderFromPayPalResponse(
         array $paypal_order,
         string $order_guid,
