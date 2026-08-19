@@ -42,6 +42,13 @@ if ($hideModuleRadioCallCount < 2) {
     echo "✓ Pay Later JS invokes hideModuleRadio() during normal rendering (found {$hideModuleRadioCallCount} call sites)\n";
 }
 
+if (strpos($jsContent, 'paypalac-wallet-radio-hidden-control') === false) {
+    $testPassed = false;
+    $errors[] = "hideModuleRadio() must mark the theme custom-radio wrapper so label::before (the visible circle) is hidden, not just the already-invisible input.";
+} else {
+    echo "✓ Pay Later JS marks the custom-radio wrapper so the visible fake radio is hidden\n";
+}
+
 // Test 2: The label text is NOT hidden by default (only the radio), so the
 // shopper still sees "PayPal Pay Later" for context next to the button.
 if (strpos($jsContent, 'Keep the mock radio button visible') !== false) {

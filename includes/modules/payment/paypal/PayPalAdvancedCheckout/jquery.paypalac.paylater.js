@@ -261,6 +261,10 @@
         var moduleRadio = document.getElementById('pmt-paypalac_paylater');
         if (moduleRadio) {
             moduleRadio.classList.add('paypalac-wallet-radio-hidden');
+            var control = moduleRadio.closest('.custom-radio, .custom-control, .nmx-radio');
+            if (control) {
+                control.classList.add('paypalac-wallet-radio-hidden-control');
+            }
             return true;
         }
 
@@ -395,11 +399,53 @@
         var currency = config.currency || 'USD';
         var merchantId = config.merchantId || '';
         var environment = config.environment || 'sandbox';
-        return [config.clientId, currency, merchantId, environment, 'paylater'].join('|');
+        var intent = normalizeSdkIntent(config.intent);
+        return [config.clientId, currency, merchantId, environment, intent, 'paylater'].join('|');
+    }
+
+    function normalizeSdkIntent(intent) {
+        var value = String(intent || 'capture').toLowerCase();
+        return (value === 'authorize') ? 'authorize' : 'capture';
+    }
+
+    function getScriptSdkIntent(script) {
+        if (!script || !script.src) {
+            return 'capture';
+        }
+
+        var match = script.src.match(/[?&]intent=([^&]*)/i);
+        if (!match || match[1] === '') {
+            return 'capture';
+        }
+
+        return normalizeSdkIntent(decodeURIComponent(match[1]));
+    }
+
+    function findHeaderPayPalScript() {
+        return document.getElementById('PayPalJSSDK')
+            || document.querySelector('script[data-namespace="PayPalSDK"]')
+            || document.querySelector('script[src*="paypal.com/sdk/js"]');
     }
 
     function namespaceHasPayLaterButtons(ns) {
         return !!(ns && typeof ns.Buttons === 'function' && ns.FUNDING && ns.FUNDING.PAYLATER);
+    }
+
+    function findReusablePayLaterNamespace(config) {
+        var desiredIntent = normalizeSdkIntent(config && config.intent);
+        var headerScript = findHeaderPayPalScript();
+        var headerIntentMatches = getScriptSdkIntent(headerScript) === desiredIntent;
+        var headerNs = window.PayPalSDK || window.paypal;
+
+        if (headerIntentMatches && namespaceHasPayLaterButtons(headerNs)) {
+            return headerNs;
+        }
+
+        if (namespaceHasPayLaterButtons(window.paypalacPaylater)) {
+            return window.paypalacPaylater;
+        }
+
+        return null;
     }
 
     function loadPayPalSdk(config) {
@@ -410,6 +456,13 @@
         var desiredKey = buildSdkKey(config);
         var existingPaylaterScript = document.querySelector('script[data-paypal-sdk="paylater"]');
         var isSandbox = (config.environment || '') === 'sandbox';
+        var reusableNs = findReusablePayLaterNamespace(config);
+
+        if (reusableNs) {
+            sharedSdkLoader.key = desiredKey;
+            sharedSdkLoader.promise = Promise.resolve(reusableNs);
+            return sharedSdkLoader.promise;
+        }
 
         var paypalNs = window.paypalacPaylater;
         if (sharedSdkLoader.promise && sharedSdkLoader.key === desiredKey && namespaceHasPayLaterButtons(paypalNs)) {
@@ -430,8 +483,9 @@
             var matchesButtons = existingPaylaterScript.src.indexOf('components=buttons') !== -1
                 || existingPaylaterScript.src.indexOf('components=') === -1
                 || /components=[^&]*buttons/.test(existingPaylaterScript.src);
+            var matchesIntent = getScriptSdkIntent(existingPaylaterScript) === normalizeSdkIntent(config.intent);
 
-            if (matchesClient && matchesCurrency && matchesMerchant && matchesPaylater && matchesButtons) {
+            if (matchesClient && matchesCurrency && matchesMerchant && matchesPaylater && matchesButtons && matchesIntent) {
                 if (namespaceHasPayLaterButtons(window.paypalacPaylater)) {
                     sharedSdkLoader.key = desiredKey;
                     sharedSdkLoader.promise = Promise.resolve(window.paypalacPaylater);
@@ -459,6 +513,7 @@
         var query = '?client-id=' + encodeURIComponent(config.clientId)
             + '&components=buttons'
             + '&enable-funding=paylater'
+            + '&intent=' + encodeURIComponent(normalizeSdkIntent(config.intent))
             + '&currency=' + encodeURIComponent(config.currency || 'USD');
 
         if (isSandbox) {
