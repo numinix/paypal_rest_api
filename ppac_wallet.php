@@ -83,7 +83,8 @@ if (!$hasValidCart && !$configOnly) {
 // The observer's getLastOrderValues() fallback will still retrieve basic totals
 // from $order->info even if the full order_total processing encounters issues.
 //
-// Skip order initialization for config_only requests since they don't need it.
+// Skip order initialization for config_only requests, except Pay Later which
+// needs the current order total to enforce min/max amount limits.
 //
 global $order, $order_total_modules;
 
@@ -97,7 +98,7 @@ if (!function_exists('ppac_wallet_sanitize_error_message')) {
     }
 }
 
-if (!$configOnly && $hasValidCart) {
+if ($hasValidCart && (!$configOnly || $wallet === 'paylater')) {
     $ppacWalletDebugEnabled = defined('MODULE_PAYMENT_PAYPALAC_DEBUGGING')
         && strpos((string)MODULE_PAYMENT_PAYPALAC_DEBUGGING, 'Log') !== false;
 
@@ -123,7 +124,7 @@ try {
     }
     // Do not exit - allow the request to continue with the fallback mechanism
 }
-} // end if (!$configOnly && $hasValidCart)
+}
 
 $moduleMap = [
     'google_pay' => 'paypalac_googlepay',

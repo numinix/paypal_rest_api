@@ -52,7 +52,7 @@ class paypalac_paylater extends base
         return defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.0.0';
+    protected const CURRENT_VERSION = '1.1.0';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -61,6 +61,10 @@ class paypalac_paylater extends base
 
     // Pay Later is available in these currencies only
     protected const SUPPORTED_CURRENCIES = ['USD', 'GBP', 'EUR', 'AUD'];
+
+    // PayPal Pay in 4 published range for USD merchants; admin may override per account.
+    protected const DEFAULT_MIN_AMOUNT = 30.0;
+    protected const DEFAULT_MAX_AMOUNT = 2000.0;
 
     public string $code;
     public string $title;
@@ -270,6 +274,40 @@ class paypalac_paylater extends base
                     ('PayLater Messaging', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MESSAGING', 'Checkout, Shopping Cart, Product Pages', 'On which pages should PayPal PayLater messaging be displayed? (It will automatically not be displayed in regions where it is not available. Only available in USD, GBP, EUR, AUD.) When enabled, it will show the lower installment-based pricing for the presented product or cart amount. This may accelerate buying decisions.<br><b>Default: All</b>', 6, 0, 'zen_cfg_select_multioption([''Checkout'', ''Shopping Cart'', ''Product Pages'', ''Product Listings and Search Results''], ', NULL, now())"
             );
         }
+
+        $amount_limit_keys = [
+            [
+                'title' => 'PayLater Minimum Order Amount',
+                'key' => 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MIN_AMOUNT',
+                'value' => (string)self::DEFAULT_MIN_AMOUNT,
+                'description' => 'Hide Pay Later when the order total is below this amount (in the customer\'s checkout currency). PayPal\'s Pay in 4 product is typically $30–$2,000 USD, but limits can vary by merchant account and buyer eligibility.<br><b>Default: 30</b>',
+                'sort_order' => 1,
+            ],
+            [
+                'title' => 'PayLater Maximum Order Amount',
+                'key' => 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MAX_AMOUNT',
+                'value' => (string)self::DEFAULT_MAX_AMOUNT,
+                'description' => 'Hide Pay Later when the order total exceeds this amount (in the customer\'s checkout currency). PayPal may enforce a lower account-specific maximum; set this to match guidance from PayPal support if needed.<br><b>Default: 2000</b>',
+                'sort_order' => 2,
+            ],
+        ];
+
+        foreach ($amount_limit_keys as $amount_limit) {
+            $amount_limit_check = $db->Execute(
+                "SELECT configuration_id
+                   FROM " . TABLE_CONFIGURATION . "
+                  WHERE configuration_key = '" . zen_db_input($amount_limit['key']) . "'
+                  LIMIT 1"
+            );
+            if ($amount_limit_check->EOF) {
+                $db->Execute(
+                    "INSERT INTO " . TABLE_CONFIGURATION . "
+                        (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                     VALUES
+                        ('" . zen_db_input($amount_limit['title']) . "', '" . zen_db_input($amount_limit['key']) . "', '" . zen_db_input($amount_limit['value']) . "', '" . zen_db_input($amount_limit['description']) . "', 6, " . (int)$amount_limit['sort_order'] . ", NULL, NULL, now())"
+                );
+            }
+        }
         
         // Record the current version of the payment module into its database configuration setting
         $db->Execute(
@@ -367,6 +405,158 @@ class paypalac_paylater extends base
                 $this->enabled = false;
             }
         }
+
+        if ($this->enabled === true && !$this->isOrderTotalWithinPayLaterLimits()) {
+            $this->enabled = false;
+        }
+    }
+
+    protected function getConfiguredMinAmount(): float
+    {
+        if (!defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_MIN_AMOUNT')) {
+            return self::DEFAULT_MIN_AMOUNT;
+        }
+
+        $min_amount = (float)MODULE_PAYMENT_PAYPALAC_PAYLATER_MIN_AMOUNT;
+        return ($min_amount >= 0) ? $min_amount : self::DEFAULT_MIN_AMOUNT;
+    }
+
+    protected function getConfiguredMaxAmount(): float
+    {
+        if (!defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_MAX_AMOUNT')) {
+            return self::DEFAULT_MAX_AMOUNT;
+        }
+
+        $max_amount = (float)MODULE_PAYMENT_PAYPALAC_PAYLATER_MAX_AMOUNT;
+        return ($max_amount > 0) ? $max_amount : self::DEFAULT_MAX_AMOUNT;
+    }
+
+    protected function getOrderTotalForLimitCheck(): ?float
+    {
+        global $order;
+
+        if (isset($order) && is_object($order) && isset($order->info['total']) && is_numeric($order->info['total'])) {
+            return (float)$order->info['total'];
+        }
+
+        return null;
+    }
+
+    protected function orderTotalWithinConfiguredLimits(float $order_total): bool
+    {
+        $min_amount = $this->getConfiguredMinAmount();
+        $max_amount = $this->getConfiguredMaxAmount();
+
+        if ($max_amount > 0 && $max_amount < $min_amount) {
+            $max_amount = $min_amount;
+        }
+
+        if ($order_total < $min_amount) {
+            return false;
+        }
+
+        if ($max_amount > 0 && $order_total > $max_amount) {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function isOrderTotalWithinPayLaterLimits(?float $order_total = null): bool
+    {
+        if ($order_total === null) {
+            $order_total = $this->getOrderTotalForLimitCheck();
+        }
+
+        if ($order_total === null) {
+            return true;
+        }
+
+        $within_limits = $this->orderTotalWithinConfiguredLimits($order_total);
+        if ($within_limits === false) {
+            $min_amount = $this->getConfiguredMinAmount();
+            $max_amount = $this->getConfiguredMaxAmount();
+            if ($order_total < $min_amount) {
+                $this->log->write(
+                    'Pay Later: Module disabled because order total ' . number_format($order_total, 2, '.', '') .
+                    ' is below configured minimum ' . number_format($min_amount, 2, '.', '') . '.'
+                );
+            } elseif ($max_amount > 0 && $order_total > $max_amount) {
+                $this->log->write(
+                    'Pay Later: Module disabled because order total ' . number_format($order_total, 2, '.', '') .
+                    ' exceeds configured maximum ' . number_format($max_amount, 2, '.', '') . '.'
+                );
+            }
+        }
+
+        return $within_limits;
+    }
+
+    protected function getPayLaterLimitContext(?float $order_total = null): array
+    {
+        if ($order_total === null) {
+            $order_total = $this->getOrderTotalForLimitCheck();
+        }
+
+        return [
+            'minAmount' => $this->getConfiguredMinAmount(),
+            'maxAmount' => $this->getConfiguredMaxAmount(),
+            'orderTotal' => $order_total,
+            'withinLimits' => ($order_total === null) ? true : $this->orderTotalWithinConfiguredLimits($order_total),
+            'currency' => $_SESSION['currency'] ?? DEFAULT_CURRENCY,
+        ];
+    }
+
+    protected function getPayLaterAmountLimitMessage(string $reason): string
+    {
+        $limits = $this->getPayLaterLimitContext();
+        $currency = $limits['currency'];
+        $order_total = $limits['orderTotal'];
+
+        if ($reason === 'below_minimum') {
+            return sprintf(
+                MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_BELOW_MINIMUM ?? 'Pay Later is available for orders of %s %s or more.',
+                number_format($limits['minAmount'], 2, '.', ''),
+                $currency
+            );
+        }
+
+        if ($reason === 'above_maximum') {
+            return sprintf(
+                MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_ABOVE_MAXIMUM ?? 'Pay Later is available for orders up to %s %s.',
+                number_format($limits['maxAmount'], 2, '.', ''),
+                $currency
+            );
+        }
+
+        if ($reason === 'amount_out_of_range' && $order_total !== null) {
+            if ((float)$order_total < (float)$limits['minAmount']) {
+                return $this->getPayLaterAmountLimitMessage('below_minimum');
+            }
+            if ((float)$limits['maxAmount'] > 0 && (float)$order_total > (float)$limits['maxAmount']) {
+                return $this->getPayLaterAmountLimitMessage('above_maximum');
+            }
+        }
+
+        return MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.';
+    }
+
+    protected function getPayLaterLimitFailureReason(array $limit_context): string
+    {
+        if ((float)($limit_context['orderTotal'] ?? 0) < (float)$limit_context['minAmount']) {
+            return 'below_minimum';
+        }
+
+        return 'above_maximum';
+    }
+
+    protected function buildPayLaterAmountLimitFailure(string $reason): array
+    {
+        return [
+            'success' => false,
+            'message' => $this->getPayLaterAmountLimitMessage($reason),
+            'reason' => $reason,
+        ] + $this->getPayLaterLimitContext();
     }
 
     /**
@@ -526,13 +716,34 @@ class paypalac_paylater extends base
             return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.'];
         }
 
+        $limit_context = $this->getPayLaterLimitContext();
+        $this->log->write(
+            "Pay Later ajaxGetWalletConfig limits:\n" .
+            "  - Min: " . number_format($limit_context['minAmount'], 2, '.', '') . "\n" .
+            "  - Max: " . number_format($limit_context['maxAmount'], 2, '.', '') . "\n" .
+            "  - Order Total: " . ($limit_context['orderTotal'] === null ? '(unknown)' : number_format((float)$limit_context['orderTotal'], 2, '.', '')) . "\n" .
+            "  - Within Limits: " . ($limit_context['withinLimits'] ? 'Yes' : 'No'),
+            true,
+            'after'
+        );
+
+        if ($limit_context['withinLimits'] === false) {
+            $reason = $this->getPayLaterLimitFailureReason($limit_context);
+
+            return $this->buildPayLaterAmountLimitFailure($reason) + [
+                'clientId' => $client_id,
+                'intent' => $intent,
+                'environment' => MODULE_PAYMENT_PAYPALAC_SERVER,
+            ];
+        }
+
         return [
             'success' => true,
             'clientId' => $client_id,
             'currency' => $_SESSION['currency'] ?? 'USD',
             'intent' => $intent,
             'environment' => MODULE_PAYMENT_PAYPALAC_SERVER,
-        ];
+        ] + $limit_context;
     }
 
     public function ajaxCreateWalletOrder(): array
@@ -630,8 +841,29 @@ class paypalac_paylater extends base
             return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.'];
         }
 
+        $limit_context = $this->getPayLaterLimitContext();
+        if ($limit_context['withinLimits'] === false) {
+            return $this->buildPayLaterAmountLimitFailure($this->getPayLaterLimitFailureReason($limit_context));
+        }
+
         if ($this->createPayPalOrder($ppac_type, false) === false) {
-            return ['success' => false];
+            $message = MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.';
+            $error_info = $this->getErrorInfo()->getErrorInfo();
+            $error_message = trim((string)($error_info['message'] ?? ''));
+            $debug_id = trim((string)($error_info['debug_id'] ?? ''));
+            if ($error_message !== '' || $debug_id !== '') {
+                $this->log->write(
+                    'Pay Later buildWalletAjaxResponse order creation failed: ' .
+                    ($error_message !== '' ? $error_message : 'n/a') .
+                    ($debug_id !== '' ? ' (debug_id: ' . $debug_id . ')' : '')
+                );
+            }
+
+            return [
+                'success' => false,
+                'message' => $message,
+                'reason' => 'order_creation_failed',
+            ] + $limit_context;
         }
 
         $orderData = $_SESSION['PayPalAdvancedCheckout']['Order'] ?? [];
@@ -644,7 +876,7 @@ class paypalac_paylater extends base
             'currency' => $current['currency_code'] ?? ($_SESSION['currency'] ?? ''),
             'intent' => $orderData['current']['intent'] ?? $intent,
             'clientId' => $client_id,
-        ];
+        ] + $limit_context;
     }
 
     public function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
@@ -910,6 +1142,8 @@ class paypalac_paylater extends base
              VALUES
                 ('Module Version', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
                 ('Enable PayPal Pay Later?', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS', 'False', 'Do you want to enable PayPal Pay Later payments? Pay Later allows customers to pay in installments (Pay in 4) or with monthly financing. Available in USD, GBP, EUR, and AUD only.', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
+                ('PayLater Minimum Order Amount', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MIN_AMOUNT', '30', 'Hide Pay Later when the order total is below this amount (in the customer''s checkout currency). PayPal''s Pay in 4 product is typically $30–$2,000 USD, but limits can vary by merchant account and buyer eligibility.<br><b>Default: 30</b>', 6, 1, NULL, NULL, now()),
+                ('PayLater Maximum Order Amount', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MAX_AMOUNT', '2000', 'Hide Pay Later when the order total exceeds this amount (in the customer''s checkout currency). PayPal may enforce a lower account-specific maximum; set this to match guidance from PayPal support if needed.<br><b>Default: 2000</b>', 6, 2, NULL, NULL, now()),
                 ('PayLater Messaging', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MESSAGING', 'Checkout, Shopping Cart, Product Pages', 'On which pages should PayPal PayLater messaging be displayed? (It will automatically not be displayed in regions where it is not available. Only available in USD, GBP, EUR, AUD.) When enabled, it will show the lower installment-based pricing for the presented product or cart amount. This may accelerate buying decisions.<br><b>Default: All</b>', 6, 0, 'zen_cfg_select_multioption([''Checkout'', ''Shopping Cart'', ''Product Pages'', ''Product Listings and Search Results''], ', NULL, now()),
                 ('Sort order of display.', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
                 ('Payment Zone', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())" 
@@ -948,6 +1182,8 @@ class paypalac_paylater extends base
         return [
             'MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION',
             'MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS',
+            'MODULE_PAYMENT_PAYPALAC_PAYLATER_MIN_AMOUNT',
+            'MODULE_PAYMENT_PAYPALAC_PAYLATER_MAX_AMOUNT',
             'MODULE_PAYMENT_PAYPALAC_PAYLATER_MESSAGING',
             'MODULE_PAYMENT_PAYPALAC_PAYLATER_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE',

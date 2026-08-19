@@ -225,6 +225,7 @@
             <li>Confirm the primary <code>paypalac</code> module is installed with valid API credentials.</li>
             <li>Go to <strong>Modules &rarr; Payment</strong>, select <strong>PayPal Pay Later</strong>, and click <strong>Install</strong>.</li>
             <li>Enable the module and set its sort order. The module reads the parent API settings automatically.</li>
+            <li>Set <strong>PayLater Minimum Order Amount</strong> and <strong>PayLater Maximum Order Amount</strong> to hide Pay Later outside the range PayPal will accept. Defaults are 30 and 2000. PayPal&rsquo;s published Pay in 4 range is typically $30&ndash;$2,000 USD, but a merchant account can have a lower maximum; use the values PayPal support gives you if they differ.</li>
             <li>Configure the <strong>PayLater Messaging</strong> setting to control where promotional messaging appears on your storefront.</li>
           </ol>
           <h5>How it works</h5>
@@ -276,7 +277,7 @@ class zcObserverMyPaylaterCustomizer extends base
 }</code></pre>
           <h5>Troubleshooting</h5>
           <ul class="bodyList">
-            <li><strong>Pay Later button not appearing:</strong> Verify the store currency is USD, GBP, EUR, or AUD. Ensure the main PayPal Advanced Checkout module is installed and has valid credentials. Check that the Pay Later module is enabled.</li>
+            <li><strong>Pay Later button not appearing:</strong> Verify the store currency is USD, GBP, EUR, or AUD. Ensure the main PayPal Advanced Checkout module is installed and has valid credentials. Check that the Pay Later module is enabled. Confirm the order total is between the configured minimum and maximum amounts.</li>
             <li><strong>Messaging not appearing:</strong> Verify the store currency is USD, GBP, EUR, or AUD. Check that the <strong>PayLater Messaging</strong> setting includes the current page type.</li>
             <li><strong>Messaging in wrong location:</strong> Add a <code>&lt;div id="paypal-message-container"&gt;&lt;/div&gt;</code> element where you want the messaging to appear, or use the observer hook for custom selectors.</li>
             <li><strong>Customer not eligible:</strong> PayPal determines eligibility based on factors like location, order amount, and customer&rsquo;s PayPal account history. The button will automatically hide for ineligible customers.</li>

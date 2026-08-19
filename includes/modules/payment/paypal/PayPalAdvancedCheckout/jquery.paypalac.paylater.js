@@ -19,20 +19,18 @@
     var WALLET_BUTTON_MIN_WIDTH = '200px';
     var WALLET_BUTTON_MAX_WIDTH = '320px';
 
-    var sharedSdkLoader = window.paypalacSdkLoaderState || { key: null, promise: null };
-    window.paypalacSdkLoaderState = sharedSdkLoader;
+    var sharedSdkLoader = window.paypalacPaylaterSdkLoaderState || { key: null, promise: null };
+    window.paypalacPaylaterSdkLoaderState = sharedSdkLoader;
 
-    /**
-     * Get CSP nonce from existing script tags if available.
-     * This helps comply with Content Security Policy when loading external scripts.
-     */
-    /**
-     * Get the PayPal SDK namespace.
-     * The header observer may load the SDK with data-namespace="PayPalSDK",
-     * placing it at window.PayPalSDK instead of window.paypal.
-     */
     function getPayPalNamespace() {
-        return window.paypal || window.PayPalSDK;
+        var candidates = [window.paypalacPaylater, window.paypal, window.PayPalSDK];
+        for (var i = 0; i < candidates.length; i++) {
+            if (candidates[i] && typeof candidates[i].Buttons === 'function') {
+                return candidates[i];
+            }
+        }
+
+        return window.paypalacPaylater || window.paypal || window.PayPalSDK;
     }
 
     function normalizeWalletContainer(element) {
@@ -59,6 +57,103 @@
         element.style.maxWidth = WALLET_BUTTON_MAX_WIDTH;
         element.style.minWidth = WALLET_BUTTON_MIN_WIDTH;
         element.style.boxSizing = 'border-box';
+    }
+
+    function parseAmountValue(value) {
+        if (value === null || typeof value === 'undefined') {
+            return null;
+        }
+
+        if (typeof value === 'number' && isFinite(value)) {
+            return value;
+        }
+
+        var normalized = String(value).replace(/[^0-9.,-]/g, '').replace(/,/g, '');
+        if (normalized === '' || normalized === '-' || normalized === '.') {
+            return null;
+        }
+
+        var parsed = parseFloat(normalized);
+        return isFinite(parsed) ? parsed : null;
+    }
+
+    function getOrderTotalFromPage() {
+        var totalElement = document.getElementById('ottotal');
+        if (!totalElement) {
+            return null;
+        }
+
+        return parseAmountValue(totalElement.textContent || totalElement.innerText || '');
+    }
+
+    function configHasKnownOrderTotal(config) {
+        return config && config.orderTotal !== null && typeof config.orderTotal !== 'undefined' && config.orderTotal !== '';
+    }
+
+    function getEffectiveOrderTotal(config) {
+        if (configHasKnownOrderTotal(config)) {
+            return parseAmountValue(config.orderTotal);
+        }
+
+        return getOrderTotalFromPage();
+    }
+
+    function isWithinPayLaterLimits(total, config) {
+        if (total === null || !config) {
+            return true;
+        }
+
+        var minAmount = parseAmountValue(config.minAmount);
+        var maxAmount = parseAmountValue(config.maxAmount);
+
+        if (minAmount !== null && total < minAmount) {
+            return false;
+        }
+
+        if (maxAmount !== null && maxAmount > 0 && total > maxAmount) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function shouldHidePayLaterForConfig(config) {
+        if (!config) {
+            return true;
+        }
+
+        if (config.success === false) {
+            return true;
+        }
+
+        if (config.withinLimits === false) {
+            return true;
+        }
+
+        var orderTotal = getEffectiveOrderTotal(config);
+        if (orderTotal !== null && !isWithinPayLaterLimits(orderTotal, config)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function logPayLaterLimitState(config, source) {
+        if (!config) {
+            return;
+        }
+
+        var orderTotal = getEffectiveOrderTotal(config);
+        console.log(
+            'Pay Later limit check (' + (source || 'unknown') + '):',
+            {
+                minAmount: config.minAmount,
+                maxAmount: config.maxAmount,
+                orderTotal: orderTotal,
+                withinLimits: config.withinLimits,
+                shouldHide: shouldHidePayLaterForConfig(config)
+            }
+        );
     }
 
     function getCspNonce() {
@@ -226,6 +321,12 @@
     }
 
     function rerenderPaylaterButton() {
+        if (sdkState.config && shouldHidePayLaterForConfig(sdkState.config)) {
+            logPayLaterLimitState(sdkState.config, 'rerender');
+            hidePaymentMethodContainer();
+            return;
+        }
+
         if (typeof window.paypalacPaylaterRender === 'function') {
             window.paypalacPaylaterRender();
         }
@@ -297,61 +398,61 @@
         return [config.clientId, currency, merchantId, environment, 'paylater'].join('|');
     }
 
+    function namespaceHasPayLaterButtons(ns) {
+        return !!(ns && typeof ns.Buttons === 'function' && ns.FUNDING && ns.FUNDING.PAYLATER);
+    }
+
     function loadPayPalSdk(config) {
         if (!config || !config.clientId) {
             return Promise.reject(new Error('Missing clientId for PayPal SDK load'));
         }
 
         var desiredKey = buildSdkKey(config);
-        // Also detect the header-loaded SDK script (id="PayPalJSSDK") which does
-        // not carry the data-paypal-sdk attribute but uses data-namespace="PayPalSDK".
-        var existingScript = document.querySelector('script[data-paypal-sdk="true"]') || document.getElementById('PayPalJSSDK');
+        var existingPaylaterScript = document.querySelector('script[data-paypal-sdk="paylater"]');
+        var isSandbox = (config.environment || '') === 'sandbox';
 
-        // Check if the SDK is already available under either namespace
-        var paypalNs = getPayPalNamespace();
-        if (sharedSdkLoader.promise && sharedSdkLoader.key === desiredKey && paypalNs && typeof paypalNs.Buttons === 'function') {
-            return sharedSdkLoader.promise.then(function () { return getPayPalNamespace(); });
+        var paypalNs = window.paypalacPaylater;
+        if (sharedSdkLoader.promise && sharedSdkLoader.key === desiredKey && namespaceHasPayLaterButtons(paypalNs)) {
+            return sharedSdkLoader.promise.then(function () { return window.paypalacPaylater || getPayPalNamespace(); });
         }
 
-        // SDK already fully loaded (e.g. by the header observer) but sharedSdkLoader
-        // was never set (different script context).  Reuse it immediately.
-        if (paypalNs && typeof paypalNs.Buttons === 'function') {
+        if (namespaceHasPayLaterButtons(window.paypalacPaylater)) {
             sharedSdkLoader.key = desiredKey;
-            sharedSdkLoader.promise = Promise.resolve(paypalNs);
+            sharedSdkLoader.promise = Promise.resolve(window.paypalacPaylater);
             return sharedSdkLoader.promise;
         }
 
-        if (existingScript) {
-            var matchesClient = existingScript.src.indexOf(encodeURIComponent(config.clientId)) !== -1;
-            var matchesCurrency = existingScript.src.indexOf('currency=' + encodeURIComponent(config.currency || 'USD')) !== -1;
-            var matchesMerchant = !config.merchantId || existingScript.src.indexOf('merchant-id=' + encodeURIComponent(config.merchantId)) !== -1;
-            var matchesPaylater = existingScript.src.indexOf('enable-funding=paylater') !== -1;
+        if (existingPaylaterScript) {
+            var matchesClient = existingPaylaterScript.src.indexOf(encodeURIComponent(config.clientId)) !== -1;
+            var matchesCurrency = existingPaylaterScript.src.indexOf('currency=' + encodeURIComponent(config.currency || 'USD')) !== -1;
+            var matchesMerchant = !config.merchantId || existingPaylaterScript.src.indexOf('merchant-id=' + encodeURIComponent(config.merchantId)) !== -1;
+            var matchesPaylater = existingPaylaterScript.src.indexOf('enable-funding=paylater') !== -1;
+            var matchesButtons = existingPaylaterScript.src.indexOf('components=buttons') !== -1
+                || existingPaylaterScript.src.indexOf('components=') === -1
+                || /components=[^&]*buttons/.test(existingPaylaterScript.src);
 
-            if (matchesClient && matchesCurrency && matchesMerchant && matchesPaylater) {
-                var loadedNs = getPayPalNamespace();
-                if (loadedNs && typeof loadedNs.Buttons === 'function') {
+            if (matchesClient && matchesCurrency && matchesMerchant && matchesPaylater && matchesButtons) {
+                if (namespaceHasPayLaterButtons(window.paypalacPaylater)) {
                     sharedSdkLoader.key = desiredKey;
-                    sharedSdkLoader.promise = Promise.resolve(loadedNs);
+                    sharedSdkLoader.promise = Promise.resolve(window.paypalacPaylater);
                     return sharedSdkLoader.promise;
                 }
 
                 return new Promise(function (resolve, reject) {
-                    existingScript.addEventListener('load', function () {
-                        existingScript.dataset.loaded = 'true';
+                    existingPaylaterScript.addEventListener('load', function () {
+                        existingPaylaterScript.dataset.loaded = 'true';
                         sharedSdkLoader.key = desiredKey;
-                        resolve(getPayPalNamespace());
+                        resolve(window.paypalacPaylater || getPayPalNamespace());
                     });
-                    existingScript.addEventListener('error', function (event) {
+                    existingPaylaterScript.addEventListener('error', function (event) {
                         sharedSdkLoader.promise = null;
                         reject(event);
                     });
                 });
             }
 
-            // Only remove the script if it was one we created (has data-paypal-sdk),
-            // never remove the header-loaded SDK.
-            if (existingScript.dataset && existingScript.dataset.paypalSdk === 'true') {
-                existingScript.parentNode.removeChild(existingScript);
+            if (existingPaylaterScript.parentNode) {
+                existingPaylaterScript.parentNode.removeChild(existingPaylaterScript);
             }
         }
 
@@ -360,7 +461,10 @@
             + '&enable-funding=paylater'
             + '&currency=' + encodeURIComponent(config.currency || 'USD');
 
-        // Only include merchant-id if it's a valid PayPal merchant ID (alphanumeric, typically 13 chars).
+        if (isSandbox) {
+            query += '&buyer-country=US';
+        }
+
         if (config.merchantId && /^[A-Z0-9]{5,20}$/i.test(config.merchantId)) {
             query += '&merchant-id=' + encodeURIComponent(config.merchantId);
         }
@@ -368,15 +472,15 @@
         sharedSdkLoader.promise = new Promise(function(resolve, reject) {
             var script = document.createElement('script');
             script.src = 'https://www.paypal.com/sdk/js' + query;
-            script.dataset.paypalSdk = 'true';
+            script.dataset.paypalSdk = 'paylater';
             script.dataset.loaded = 'false';
-            
-            // Add CSP nonce if available
+            script.setAttribute('data-namespace', 'paypalacPaylater');
+
             var nonce = getCspNonce();
             if (nonce) {
                 script.setAttribute('nonce', nonce);
             }
-            
+
             script.onload = function () {
                 script.dataset.loaded = 'true';
                 sharedSdkLoader.key = desiredKey;
@@ -386,7 +490,7 @@
                     merchantId: config.merchantId,
                     environment: config.environment
                 };
-                resolve(getPayPalNamespace());
+                resolve(window.paypalacPaylater || getPayPalNamespace());
             };
             script.onerror = function (event) {
                 sharedSdkLoader.promise = null;
@@ -422,6 +526,12 @@
                 return null;
             }
 
+            if (shouldHidePayLaterForConfig(config)) {
+                logPayLaterLimitState(config, 'config');
+                hidePaymentMethodContainer();
+                return null;
+            }
+
             sdkState.config = config;
             return loadPayPalSdk(config).then(function (paypal) {
                 if (currentRenderRequestId !== renderRequestId) {
@@ -443,7 +553,12 @@
                                 sdkState.config = orderConfig;
                                 return orderConfig.orderID;
                             }
-                            throw new Error('Unable to create Pay Later order');
+
+                            var failureMessage = (orderConfig && orderConfig.message)
+                                ? orderConfig.message
+                                : 'Unable to create Pay Later order';
+                            console.error('Pay Later order creation failed', orderConfig || {});
+                            throw new Error(failureMessage);
                         });
                     },
                     onClick: function () {
@@ -521,7 +636,13 @@
             }
 
             clearTimeout(rerenderTimeout);
-            rerenderTimeout = setTimeout(rerenderPaylaterButton, 50);
+            rerenderTimeout = setTimeout(function() {
+                var pageTotal = getOrderTotalFromPage();
+                if (sdkState.config) {
+                    sdkState.config.orderTotal = pageTotal;
+                }
+                rerenderPaylaterButton();
+            }, 50);
         });
 
         observer.observe(totalElement, { childList: true, subtree: true, characterData: true });
