@@ -685,18 +685,40 @@
         return !!(ns && typeof ns.Buttons === 'function' && ns.FUNDING && ns.FUNDING.PAYLATER);
     }
 
+    function headerScriptAllowsSandboxPayLater(script) {
+        if (!script || !script.src) {
+            return true;
+        }
+
+        // Sandbox Pay Later Buttons eligibility follows buyer-country. Reusing a
+        // header SDK loaded with CA (or any non-US country) makes isEligible()
+        // false even though Confirm Order redirect still works.
+        var match = script.src.match(/[?&]buyer-country=([^&]*)/i);
+        if (!match) {
+            return true;
+        }
+
+        return String(decodeURIComponent(match[1] || '')).toUpperCase() === 'US';
+    }
+
     function findReusablePayLaterNamespace(config) {
         var desiredIntent = normalizeSdkIntent(config && config.intent);
+        var isSandbox = ((config && config.environment) || '') === 'sandbox';
+
+        // Prefer the dedicated Pay Later namespace when present.
+        if (namespaceHasPayLaterButtons(window.paypalacPaylater)) {
+            return window.paypalacPaylater;
+        }
+
         var headerScript = findHeaderPayPalScript();
         var headerIntentMatches = getScriptSdkIntent(headerScript) === desiredIntent;
         var headerNs = window.PayPalSDK || window.paypal;
 
         if (headerIntentMatches && namespaceHasPayLaterButtons(headerNs)) {
+            if (isSandbox && !headerScriptAllowsSandboxPayLater(headerScript)) {
+                return null;
+            }
             return headerNs;
-        }
-
-        if (namespaceHasPayLaterButtons(window.paypalacPaylater)) {
-            return window.paypalacPaylater;
         }
 
         return null;
