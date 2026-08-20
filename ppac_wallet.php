@@ -19,6 +19,7 @@ $requestData = json_decode($requestBody, true) ?: [];
 
 $wallet = $requestData['wallet'] ?? '';
 $configOnly = !empty($requestData['config_only']);
+$confirmRedirect = !empty($requestData['confirm_redirect']);
 $payloadData = $requestData['payload'] ?? null;
 
 // -----
@@ -188,6 +189,13 @@ if ($configOnly) {
     // whether the viewed product is virtual (not based on the cart).
     $productsId = isset($requestData['products_id']) ? (int)$requestData['products_id'] : 0;
     $response = $moduleInstance->ajaxGetWalletConfig($productsId);
+} elseif ($confirmRedirect && $wallet === 'paylater') {
+    if (!method_exists($moduleInstance, 'ajaxCreatePayLaterConfirmRedirect')) {
+        echo json_encode(['success' => false, 'message' => 'Wallet module missing Confirm Order redirect handler']);
+        require DIR_WS_INCLUDES . 'application_bottom.php';
+        return;
+    }
+    $response = $moduleInstance->ajaxCreatePayLaterConfirmRedirect();
 } else {
     if (!method_exists($moduleInstance, 'ajaxCreateWalletOrder')) {
         echo json_encode(['success' => false, 'message' => 'Wallet module missing AJAX handler']);

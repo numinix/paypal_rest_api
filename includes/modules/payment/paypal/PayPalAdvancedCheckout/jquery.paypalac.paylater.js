@@ -283,20 +283,44 @@
             || container.querySelector('iframe');
     }
 
-    function triggerPaylaterButtonClick() {
+    function fetchPayLaterConfirmRedirect() {
+        return fetch('ppac_wallet.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: 'paylater', confirm_redirect: true })
+        }).then(parseWalletResponse).catch(function (error) {
+            console.error('Unable to start Pay Later Confirm Order redirect', error);
+            return {
+                success: false,
+                message: error && error.message ? error.message : 'Unable to start Pay Later'
+            };
+        });
+    }
+
+    function startPayLaterConfirmOrderRedirect() {
         selectPaylaterRadio();
-        var button = getPaylaterButtonElement();
-        if (!button) {
-            return false;
+        releaseCheckoutOverlay();
+
+        if (typeof window.oprcShowProcessingOverlay === 'function') {
+            window.oprcShowProcessingOverlay();
+        } else if (typeof jQuery !== 'undefined' && typeof jQuery.blockUI === 'function') {
+            jQuery.blockUI();
         }
 
-        try {
-            button.click();
-            return true;
-        } catch (error) {
-            console.warn('Unable to start Pay Later from Confirm Order', error);
+        return fetchPayLaterConfirmRedirect().then(function (result) {
+            if (result && result.success && result.approveUrl) {
+                window.location.href = result.approveUrl;
+                return true;
+            }
+
+            console.error('Pay Later Confirm Order redirect failed', result);
+            releaseCheckoutOverlay();
+            var message = (result && result.message)
+                ? result.message
+                : 'Unable to start Pay Later. Please click the Pay Later button, or try again.';
+            window.alert(message);
             return false;
-        }
+        });
     }
 
     function wrapSubmitCheckout() {
@@ -307,10 +331,7 @@
         var originalSubmitCheckout = window.submitCheckout;
         function wrappedSubmitCheckout() {
             if (shouldStartPayLaterApproval()) {
-                releaseCheckoutOverlay();
-                if (!triggerPaylaterButtonClick()) {
-                    renderPaylaterButton();
-                }
+                startPayLaterConfirmOrderRedirect();
                 return false;
             }
 
@@ -340,10 +361,31 @@
             event.stopPropagation();
         }
 
-        releaseCheckoutOverlay();
-        if (!triggerPaylaterButtonClick()) {
-            renderPaylaterButton();
+        startPayLaterConfirmOrderRedirect();
+    }
+
+    function interceptConfirmOrderClick(event) {
+        wrapSubmitCheckout();
+
+        var submitRoot = document.getElementById('js-submit');
+        if (!submitRoot || !event.target || !submitRoot.contains(event.target)) {
+            return;
         }
+
+        if (!shouldStartPayLaterApproval()) {
+            return;
+        }
+
+        if (typeof event.preventDefault === 'function') {
+            event.preventDefault();
+        }
+        if (typeof event.stopImmediatePropagation === 'function') {
+            event.stopImmediatePropagation();
+        } else if (typeof event.stopPropagation === 'function') {
+            event.stopPropagation();
+        }
+
+        startPayLaterConfirmOrderRedirect();
     }
 
     function hideModuleRadio() {
@@ -801,9 +843,10 @@
 
     // Match PayPal: keep the native radio visible and place the branded
     // Pay Later button to its right (no text label). Confirm Order starts
-    // the same hosted approval that clicking the button does.
+    // a full-page Pay Later approval redirect (browsers block synthetic
+    // clicks on the hosted Buttons iframe).
     wrapSubmitCheckout();
-    document.addEventListener('click', wrapSubmitCheckout, true);
+    document.addEventListener('click', interceptConfirmOrderClick, true);
 
     if (!window.__paypalacPaylaterSubmitInterceptInstalled) {
         window.__paypalacPaylaterSubmitInterceptInstalled = true;
