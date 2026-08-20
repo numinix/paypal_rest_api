@@ -52,7 +52,7 @@ class paypalac_paylater extends base
         return defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.1.3';
+    protected const CURRENT_VERSION = '1.1.4';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -757,8 +757,9 @@ class paypalac_paylater extends base
     }
 
     /**
-     * Confirm Order path: create a Pay Later order with experience_context and
-     * return the PayPal approve / payer-action URL for a full-page redirect.
+     * Confirm Order path: create an order with payment_source.paypal +
+     * experience_context (Orders v2 rejects payment_source.paylater) and return
+     * the approve / payer-action URL (with fundingSource=paylater) for redirect.
      * Synthetic clicks on the hosted Buttons iframe are blocked by browsers.
      */
     public function ajaxCreatePayLaterConfirmRedirect(): array

@@ -132,6 +132,26 @@ if ($paylaterBranchPos === false || $genericConfirmPos === false || $paylaterBra
     echo "✓ Pay Later branch is checked before the generic confirmPaymentSource fallthrough\n";
 }
 
+// Test 5: Confirm Order create uses payment_source.paypal (Orders v2 rejects paylater).
+$createRequestFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/CreatePayPalOrderRequest.php';
+$createRequestContent = file_get_contents($createRequestFile);
+if ($createRequestContent === false
+    || strpos($createRequestContent, "['payment_source']['paypal'] = \$this->buildPayLaterRedirectPaymentSource") === false
+    || strpos($createRequestContent, "['payment_source']['paylater']") !== false
+) {
+    $testPassed = false;
+    $errors[] = "Confirm Order create must use payment_source.paypal via buildPayLaterRedirectPaymentSource (not payment_source.paylater).";
+} else {
+    echo "✓ Confirm Order create uses payment_source.paypal (Orders v2 compatible)\n";
+}
+
+if (strpos($phpContent, 'fundingSource=paylater') === false) {
+    $testPassed = false;
+    $errors[] = "Approve URL for Pay Later Confirm Order redirect should append fundingSource=paylater.";
+} else {
+    echo "✓ Pay Later Confirm Order approve URL appends fundingSource=paylater\n";
+}
+
 echo "\n";
 if ($testPassed) {
     echo "All tests passed! ✓\n";

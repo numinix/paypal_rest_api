@@ -214,10 +214,12 @@ class CreatePayPalOrderRequest extends ErrorInfo
         } elseif ($ppac_type === 'google_pay') {
             $this->request['payment_source']['google_pay'] = new \stdClass();
         } elseif ($ppac_type === 'paylater' && !empty($_SESSION['PayPalAdvancedCheckout']['PayLaterRedirectApproval'])) {
-            // Confirm Order path: create with payment_source.paylater + experience_context
-            // so PayPal returns a payer-action / approve URL. The Buttons() popup path
-            // omits payment_source and lets the JS SDK attach Pay Later instead.
-            $this->request['payment_source']['paylater'] = $this->buildPayLaterPaymentSource($order);
+            // Confirm Order path: Orders v2 does not accept payment_source.paylater
+            // (returns NO_PAYMENT_SOURCE_PROVIDED). Use payment_source.paypal with
+            // experience_context so PayPal returns a payer-action / approve URL; the
+            // approve URL is then opened with fundingSource=paylater. The Buttons()
+            // popup path omits payment_source and lets the JS SDK attach Pay Later.
+            $this->request['payment_source']['paypal'] = $this->buildPayLaterRedirectPaymentSource($order);
         }
 
         $payment_source_types = isset($this->request['payment_source']) ? implode(', ', array_keys($this->request['payment_source'])) : 'none';
@@ -1032,9 +1034,10 @@ class CreatePayPalOrderRequest extends ErrorInfo
     }
 
     /**
-     * Pay Later redirect (Confirm Order) payment source with return/cancel URLs.
+     * Pay Later Confirm Order redirect: Orders v2 payment_source.paypal shape
+     * (paylater is not a valid create-order payment_source key) plus return/cancel URLs.
      */
-    protected function buildPayLaterPaymentSource(\order $order): array
+    protected function buildPayLaterRedirectPaymentSource(\order $order): array
     {
         $shipping_preference = ($order->content_type === 'virtual') ? 'NO_SHIPPING' : 'SET_PROVIDED_ADDRESS';
         $brand_name = (defined('MODULE_PAYMENT_PAYPALAC_BRANDNAME') && MODULE_PAYMENT_PAYPALAC_BRANDNAME !== '')
