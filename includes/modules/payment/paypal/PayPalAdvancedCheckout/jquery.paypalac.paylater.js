@@ -181,10 +181,7 @@
         }
 
         checkoutSubmitting = true;
-
-        if (typeof window.oprcShowProcessingOverlay === 'function') {
-            window.oprcShowProcessingOverlay();
-        }
+        showCheckoutProcessingOverlay();
 
         var previousAllowState = typeof window.oprcAllowNativeCheckoutSubmit !== 'undefined'
             ? window.oprcAllowNativeCheckoutSubmit
@@ -326,16 +323,56 @@
         });
     }
 
+    function showCheckoutProcessingOverlay() {
+        // Prefer OPRC's overlay helper when present (newer plugin builds).
+        if (typeof window.oprcShowProcessingOverlay === 'function') {
+            window.oprcShowProcessingOverlay();
+            return;
+        }
+
+        // Redline / older OPRC themes expose blockPage() with the branded message.
+        if (typeof window.blockPage === 'function') {
+            window.blockPage(false, false);
+            return;
+        }
+
+        if (typeof jQuery === 'undefined' || typeof jQuery.blockUI !== 'function') {
+            return;
+        }
+
+        var message = (typeof oprcProcessingText !== 'undefined' && oprcProcessingText)
+            ? oprcProcessingText
+            : 'Please wait…';
+        var blockOptions = { message: message };
+
+        if (typeof oprcMessageBackground !== 'undefined') {
+            blockOptions.css = {
+                border: 'none',
+                padding: '15px',
+                backgroundColor: oprcMessageBackground,
+                '-webkit-border-radius': '10px',
+                '-moz-border-radius': '10px',
+                opacity: (typeof oprcMessageOpacity !== 'undefined') ? oprcMessageOpacity : 0.8,
+                color: (typeof oprcMessageTextColor !== 'undefined') ? oprcMessageTextColor : '#fff'
+            };
+        }
+
+        if (typeof oprcMessageOverlayColor !== 'undefined') {
+            blockOptions.overlayCSS = {
+                backgroundColor: oprcMessageOverlayColor,
+                color: (typeof oprcMessageOverlayTextColor !== 'undefined') ? oprcMessageOverlayTextColor : '#000',
+                opacity: (typeof oprcMessageOverlayOpacity !== 'undefined') ? oprcMessageOverlayOpacity : 0.6
+            };
+        }
+
+        jQuery.blockUI(blockOptions);
+    }
+
     function startPayLaterConfirmOrderRedirect() {
         selectPaylaterRadio();
         clearPaylaterApprovedStatus();
         releaseCheckoutOverlay();
-
-        if (typeof window.oprcShowProcessingOverlay === 'function') {
-            window.oprcShowProcessingOverlay();
-        } else if (typeof jQuery !== 'undefined' && typeof jQuery.blockUI === 'function') {
-            jQuery.blockUI();
-        }
+        showCheckoutProcessingOverlay();
 
         return fetchPayLaterConfirmRedirect().then(function (result) {
             if (result && result.success && result.approveUrl) {
@@ -372,6 +409,9 @@
     }
 
     function releaseCheckoutOverlay() {
+        if (typeof window.oprcHideProcessingOverlay === 'function') {
+            window.oprcHideProcessingOverlay();
+        }
         if (typeof jQuery !== 'undefined' && typeof jQuery.unblockUI === 'function') {
             jQuery.unblockUI();
         }
@@ -506,9 +546,8 @@
     }
 
     /**
-     * Hide the entire payment method container when payment is not eligible.
-     * This hides the parent element (e.g., paypalac_paylater-custom-control-container)
-     * so the user doesn't see an unavailable payment option.
+     * Hide the entire payment method when it cannot be used at all (config
+     * failure or amount outside Pay Later limits).
      */
     function hidePaymentMethodContainer() {
         hideModuleRadio();
@@ -522,6 +561,19 @@
 
         var container = document.getElementById('paypalac-paylater-button');
         if (container) {
+            container.style.display = 'none';
+        }
+    }
+
+    /**
+     * Buttons SDK can report Pay Later ineligible after a cancel/return even
+     * though Confirm Order redirect still works. Keep the radio row visible and
+     * only clear the yellow button so shoppers can still use Confirm Order.
+     */
+    function hidePayLaterButtonOnly() {
+        var container = document.getElementById('paypalac-paylater-button');
+        if (container) {
+            container.innerHTML = '';
             container.style.display = 'none';
         }
     }
@@ -790,6 +842,7 @@
             }
 
             sdkState.config = config;
+            container.style.display = '';
             return loadPayPalSdk(config).then(function (paypal) {
                 if (currentRenderRequestId !== renderRequestId) {
                     return null;
@@ -846,16 +899,18 @@
                     }
                 });
 
-                // Check if Pay Later is eligible for this user/device
+                // Buttons eligibility is for the yellow widget only. Confirm Order
+                // uses a server redirect and must remain available when the SDK
+                // reports ineligible (common after cancel/return from PayPal).
                 try {
                     if (typeof buttonInstance.isEligible === 'function' && !buttonInstance.isEligible()) {
-                        console.log('Pay Later is not eligible for this user/device');
-                        hidePaymentMethodContainer();
+                        console.log('Pay Later Buttons widget is not eligible; keeping radio for Confirm Order');
+                        hidePayLaterButtonOnly();
                         return null;
                     }
                 } catch (eligibilityError) {
-                    console.warn('Error checking Pay Later eligibility:', eligibilityError);
-                    hidePaymentMethodContainer();
+                    console.warn('Error checking Pay Later Buttons eligibility:', eligibilityError);
+                    hidePayLaterButtonOnly();
                     return null;
                 }
 
@@ -871,7 +926,7 @@
             }
 
             console.error('Failed to render Pay Later button', error);
-            hidePaymentMethodContainer();
+            hidePayLaterButtonOnly();
         });
     }
 

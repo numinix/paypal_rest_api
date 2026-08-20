@@ -18,11 +18,11 @@ $langPhp = file_get_contents(__DIR__ . '/../includes/languages/english/modules/p
 fwrite(STDOUT, "Testing Pay Later amount limits\n");
 fwrite(STDOUT, "================================\n\n");
 
-if (strpos($paylaterPhp, "protected const CURRENT_VERSION = '1.1.4'") === false) {
-    fwrite(STDERR, "FAIL: paypalac_paylater version should be 1.1.4 after the Confirm Order payment_source.paypal fix\n");
+if (strpos($paylaterPhp, "protected const CURRENT_VERSION = '1.1.5'") === false) {
+    fwrite(STDERR, "FAIL: paypalac_paylater version should be 1.1.5 after cancel-hide/overlay fix\n");
     $failures++;
 } else {
-    fwrite(STDOUT, "  ✓ Pay Later module version is 1.1.4\n");
+    fwrite(STDOUT, "  ✓ Pay Later module version is 1.1.5\n");
 }
 
 foreach ([
