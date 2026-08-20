@@ -45,15 +45,16 @@ if (strpos($jsContent, 'paypalac-wallet-radio-hidden-control') === false) {
     echo "✓ Pay Later JS marks the custom-radio wrapper when hiding an ineligible method\n";
 }
 
-// Test 2: Confirm Order intercept matches the PayPal checkout process.
+// Test 2: Confirm Order intercept matches the PayPal checkout process via redirect.
 if (strpos($jsContent, 'function wrapSubmitCheckout') === false
-    || strpos($jsContent, 'function triggerPaylaterButtonClick') === false
+    || strpos($jsContent, 'function startPayLaterConfirmOrderRedirect') === false
     || strpos($jsContent, 'function interceptPaylaterCheckoutSubmit') === false
+    || strpos($jsContent, 'confirm_redirect') === false
 ) {
     $testPassed = false;
-    $errors[] = "Pay Later JS should intercept Confirm Order / submitCheckout and start the Pay Later button, matching the PayPal Confirm Order process.";
+    $errors[] = "Pay Later JS should intercept Confirm Order and redirect to PayPal Pay Later approval (confirm_redirect), matching the PayPal Confirm Order process.";
 } else {
-    echo "✓ Pay Later JS intercepts Confirm Order and starts Pay Later approval\n";
+    echo "✓ Pay Later JS intercepts Confirm Order and starts a Pay Later approval redirect\n";
 }
 
 if (strpos($jsContent, "shape: 'pill'") === false) {

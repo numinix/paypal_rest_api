@@ -213,12 +213,18 @@ class CreatePayPalOrderRequest extends ErrorInfo
             }
         } elseif ($ppac_type === 'google_pay') {
             $this->request['payment_source']['google_pay'] = new \stdClass();
+        } elseif ($ppac_type === 'paylater' && !empty($_SESSION['PayPalAdvancedCheckout']['PayLaterRedirectApproval'])) {
+            // Confirm Order path: create with payment_source.paylater + experience_context
+            // so PayPal returns a payer-action / approve URL. The Buttons() popup path
+            // omits payment_source and lets the JS SDK attach Pay Later instead.
+            $this->request['payment_source']['paylater'] = $this->buildPayLaterPaymentSource($order);
         }
 
         $payment_source_types = isset($this->request['payment_source']) ? implode(', ', array_keys($this->request['payment_source'])) : 'none';
         $this->log->write("Payment source type: {$payment_source_types}");
 
         // For venmo - do NOT include payment_source; the PayPal SDK handles the payment source during the wallet authorization flow
+        // For paylater Buttons() popup - same (omit payment_source unless PayLaterRedirectApproval is set)
 
         $this->log->write("\nCreatePayPalOrderRequest::__construct($ppac_type, ...) finished, request:\n" . Logger::logJSON($this->request, true, true));
     }
@@ -1023,6 +1029,33 @@ class CreatePayPalOrderRequest extends ErrorInfo
         }
 
         return $payment_source;
+    }
+
+    /**
+     * Pay Later redirect (Confirm Order) payment source with return/cancel URLs.
+     */
+    protected function buildPayLaterPaymentSource(\order $order): array
+    {
+        $shipping_preference = ($order->content_type === 'virtual') ? 'NO_SHIPPING' : 'SET_PROVIDED_ADDRESS';
+        $brand_name = (defined('MODULE_PAYMENT_PAYPALAC_BRANDNAME') && MODULE_PAYMENT_PAYPALAC_BRANDNAME !== '')
+            ? MODULE_PAYMENT_PAYPALAC_BRANDNAME
+            : STORE_NAME;
+        $listener_endpoint = $this->resolveListenerEndpoint(null);
+
+        return [
+            'name' => [
+                'given_name' => $order->billing['firstname'],
+                'surname' => $order->billing['lastname'],
+            ],
+            'email_address' => $order->customer['email_address'],
+            'experience_context' => [
+                'brand_name' => $brand_name,
+                'shipping_preference' => $shipping_preference,
+                'user_action' => 'PAY_NOW',
+                'return_url' => $listener_endpoint . '?op=return',
+                'cancel_url' => $listener_endpoint . '?op=cancel',
+            ],
+        ];
     }
 
     protected function resolveListenerEndpoint(?string $listener_endpoint): string

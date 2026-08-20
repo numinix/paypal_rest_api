@@ -52,7 +52,7 @@ class paypalac_paylater extends base
         return defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.1.1';
+    protected const CURRENT_VERSION = '1.1.2';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -756,8 +756,103 @@ class paypalac_paylater extends base
         return $response;
     }
 
+    /**
+     * Confirm Order path: create a Pay Later order with experience_context and
+     * return the PayPal approve / payer-action URL for a full-page redirect.
+     * Synthetic clicks on the hosted Buttons iframe are blocked by browsers.
+     */
+    public function ajaxCreatePayLaterConfirmRedirect(): array
+    {
+        $limit_context = $this->getPayLaterLimitContext();
+        if ($limit_context['withinLimits'] === false) {
+            return $this->buildPayLaterAmountLimitFailure($this->getPayLaterLimitFailureReason($limit_context));
+        }
+
+        // Force a fresh PayPal order with payment_source.paylater (do not reuse a
+        // Buttons()-style CREATED order that omitted payment_source).
+        unset($_SESSION['PayPalAdvancedCheckout']['Order']);
+        $_SESSION['PayPalAdvancedCheckout']['PayLaterRedirectApproval'] = true;
+        $_SESSION['PayPalAdvancedCheckout']['ppac_type'] = 'paylater';
+
+        try {
+            if ($this->createPayPalOrder('paylater', false) === false) {
+                return [
+                    'success' => false,
+                    'message' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.',
+                    'reason' => 'order_creation_failed',
+                ] + $limit_context;
+            }
+        } finally {
+            unset($_SESSION['PayPalAdvancedCheckout']['PayLaterRedirectApproval']);
+        }
+
+        $orderData = $_SESSION['PayPalAdvancedCheckout']['Order'] ?? [];
+        $approveUrl = trim((string)($orderData['approve_url'] ?? ''));
+        $orderId = trim((string)($orderData['id'] ?? ''));
+
+        if ($approveUrl === '' || $orderId === '') {
+            $this->log->write('Pay Later Confirm Order redirect missing approve URL or order id after create.', true, 'after');
+            return [
+                'success' => false,
+                'message' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.',
+                'reason' => 'approve_url_missing',
+            ] + $limit_context;
+        }
+
+        $this->storePayLaterPayerAction($approveUrl);
+
+        return [
+            'success' => true,
+            'orderID' => $orderId,
+            'approveUrl' => $approveUrl,
+        ] + $limit_context;
+    }
+
+    protected function storePayLaterPayerAction(string $approveUrl): void
+    {
+        global $current_page_base;
+
+        $savedPosts = $_POST;
+        unset($savedPosts['request']);
+        if (!isset($savedPosts['payment'])) {
+            $savedPosts['payment'] = $this->code;
+        }
+        if (!isset($savedPosts['ppac_type'])) {
+            $savedPosts['ppac_type'] = 'paylater';
+        }
+
+        $redirectPage = 'one_page_checkout';
+        if (defined('FILENAME_ONE_PAGE_CHECKOUT')) {
+            $redirectPage = FILENAME_ONE_PAGE_CHECKOUT;
+        } elseif (defined('FILENAME_CHECKOUT_CONFIRMATION')) {
+            $redirectPage = FILENAME_CHECKOUT_CONFIRMATION;
+        }
+
+        if (!isset($_SESSION['PayPalAdvancedCheckout']['Order']) || !is_array($_SESSION['PayPalAdvancedCheckout']['Order'])) {
+            $_SESSION['PayPalAdvancedCheckout']['Order'] = [];
+        }
+
+        $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'] = [
+            'current_page_base' => $current_page_base ?? $redirectPage,
+            'redirect_page' => $redirectPage,
+            'savedPosts' => $savedPosts,
+            'payer_action_link' => $approveUrl,
+        ];
+        $_SESSION['PayPalAdvancedCheckout']['Order']['payment_source'] = 'paylater';
+    }
+
     public function pre_confirmation_check()
     {
+        // Returning from PayPal after Confirm Order redirect: payload may be empty
+        // but wallet_payment_confirmed was set by ppac_listener.
+        if (!empty($_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed'])
+            && (($_SESSION['PayPalAdvancedCheckout']['Order']['payment_source'] ?? '') === 'paylater'
+                || ($_SESSION['PayPalAdvancedCheckout']['ppac_type'] ?? '') === 'paylater')
+        ) {
+            $this->log->write('pre_confirmation_check (paylater): wallet already confirmed via redirect return.', true, 'after');
+            return;
+        }
+
         $this->paypalCommon->processWalletConfirmation(
             'paylater',
             'paypalac_paylater_payload',

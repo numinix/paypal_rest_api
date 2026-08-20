@@ -1757,6 +1757,17 @@ class PayPalCommon {
             "  Status: $status"
         );
 
+        $approve_url = '';
+        foreach ($paypal_order['links'] ?? [] as $next_link) {
+            $rel = $next_link['rel'] ?? '';
+            if (in_array($rel, ['payer-action', 'approve'], true) && !empty($next_link['href'])) {
+                $approve_url = (string)$next_link['href'];
+                if ($rel === 'payer-action') {
+                    break;
+                }
+            }
+        }
+
         unset(
             $paypal_order['id'],
             $paypal_order['status'],
@@ -1774,6 +1785,10 @@ class PayPalCommon {
             'payment_source' => $ppac_type,
             'amount_mismatch' => $order_amount_mismatch,
         ];
+
+        if ($approve_url !== '' && !empty($_SESSION['PayPalAdvancedCheckout']['PayLaterRedirectApproval'])) {
+            $_SESSION['PayPalAdvancedCheckout']['Order']['approve_url'] = $approve_url;
+        }
 
         // Card checkout: PayPal may capture/authorize during createOrder (vault / fast path). Claim the
         // payment resource id immediately so a concurrent finalize cannot insert a second Zen order
