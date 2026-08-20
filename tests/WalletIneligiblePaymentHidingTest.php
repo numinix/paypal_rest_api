@@ -136,12 +136,14 @@ if (strpos($payLaterJs, 'function hidePaymentMethodContainer()') === false) {
     echo "✓ Pay Later JS has hidePaymentMethodContainer function\n";
 }
 
-// Test 14: Pay Later checks button eligibility and hides when ineligible
-if (strpos($payLaterJs, 'buttonInstance.isEligible') === false || strpos($payLaterJs, "hidePaymentMethodContainer()") === false) {
+// Test 14: Pay Later checks button eligibility; Buttons-only hide keeps Confirm Order radio
+if (strpos($payLaterJs, 'buttonInstance.isEligible') === false
+    || strpos($payLaterJs, 'hidePayLaterButtonOnly') === false
+) {
     $testPassed = false;
-    $errors[] = "Pay Later JS should check eligibility and hide when ineligible";
+    $errors[] = "Pay Later JS should check Buttons eligibility and hide only the button (keep radio for Confirm Order)";
 } else {
-    echo "✓ Pay Later JS checks eligibility and hides when ineligible\n";
+    echo "✓ Pay Later JS checks Buttons eligibility without hiding the radio row\n";
 }
 
 // Test 13: All JS files no longer show "unavailable" text when config fails

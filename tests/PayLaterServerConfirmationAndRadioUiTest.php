@@ -152,6 +152,26 @@ if (strpos($phpContent, 'fundingSource=paylater') === false) {
     echo "✓ Pay Later Confirm Order approve URL appends fundingSource=paylater\n";
 }
 
+// Test 6: Buttons ineligibility must not hide Confirm Order radio; overlay uses OPRC/mower message.
+if (strpos($jsContent, 'function hidePayLaterButtonOnly') === false
+    || strpos($jsContent, 'keeping radio for Confirm Order') === false
+) {
+    $testPassed = false;
+    $errors[] = "Pay Later JS should hide only the Buttons widget when ineligible so Confirm Order remains available.";
+} else {
+    echo "✓ Buttons ineligibility keeps the Pay Later radio for Confirm Order\n";
+}
+
+if (strpos($jsContent, 'function showCheckoutProcessingOverlay') === false
+    || strpos($jsContent, 'blockPage') === false
+    || strpos($jsContent, 'oprcProcessingText') === false
+) {
+    $testPassed = false;
+    $errors[] = "Pay Later Confirm Order should show the OPRC/mower processing message (blockPage/oprcProcessingText), not an empty blockUI.";
+} else {
+    echo "✓ Confirm Order uses OPRC/mower processing overlay messaging\n";
+}
+
 echo "\n";
 if ($testPassed) {
     echo "All tests passed! ✓\n";

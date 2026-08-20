@@ -52,7 +52,7 @@ class paypalac_paylater extends base
         return defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.1.4';
+    protected const CURRENT_VERSION = '1.1.5';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
