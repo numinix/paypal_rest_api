@@ -18,11 +18,11 @@ $langPhp = file_get_contents(__DIR__ . '/../includes/languages/english/modules/p
 fwrite(STDOUT, "Testing Pay Later amount limits\n");
 fwrite(STDOUT, "================================\n\n");
 
-if (strpos($paylaterPhp, "protected const CURRENT_VERSION = '1.1.5'") === false) {
-    fwrite(STDERR, "FAIL: paypalac_paylater version should be 1.1.5 after cancel-hide/overlay fix\n");
+if (strpos($paylaterPhp, "protected const CURRENT_VERSION = '1.1.6'") === false) {
+    fwrite(STDERR, "FAIL: paypalac_paylater version should be 1.1.6 after Pay Later Buttons buyer-country fix\n");
     $failures++;
 } else {
-    fwrite(STDOUT, "  ✓ Pay Later module version is 1.1.5\n");
+    fwrite(STDOUT, "  ✓ Pay Later module version is 1.1.6\n");
 }
 
 foreach ([
@@ -132,6 +132,15 @@ if (strpos($paylaterJs, 'findReusablePayLaterNamespace') === false
     $failures++;
 } else {
     fwrite(STDOUT, "  ✓ Pay Later JS reuses the header SDK and matches intent\n");
+}
+
+if (strpos($paylaterJs, 'headerScriptAllowsSandboxPayLater') === false
+    || strpos($paylaterJs, 'buyer-country=US') === false
+) {
+    fwrite(STDERR, "FAIL: Pay Later JS must not reuse a non-US sandbox header SDK (Buttons would be ineligible)\n");
+    $failures++;
+} else {
+    fwrite(STDOUT, "  ✓ Pay Later JS skips non-US sandbox header SDK reuse for Buttons eligibility\n");
 }
 
 if ($failures > 0) {
