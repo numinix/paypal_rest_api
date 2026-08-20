@@ -196,6 +196,16 @@ if ($configOnly) {
         return;
     }
     $response = $moduleInstance->ajaxCreatePayLaterConfirmRedirect();
+    if (isset($moduleInstance->log) && is_object($moduleInstance->log) && method_exists($moduleInstance->log, 'write')) {
+        $moduleInstance->log->write(
+            'Pay Later Confirm Order redirect response: success=' .
+            (!empty($response['success']) ? 'yes' : 'no') .
+            ' reason=' . ($response['reason'] ?? '') .
+            ' hasApproveUrl=' . (!empty($response['approveUrl']) ? 'yes' : 'no'),
+            true,
+            'after'
+        );
+    }
 } else {
     if (!method_exists($moduleInstance, 'ajaxCreateWalletOrder')) {
         echo json_encode(['success' => false, 'message' => 'Wallet module missing AJAX handler']);

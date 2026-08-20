@@ -247,8 +247,10 @@
 
     function selectPaylaterRadio() {
         var moduleRadio = document.getElementById('pmt-paypalac_paylater');
-        if (moduleRadio && moduleRadio.type === 'radio' && !moduleRadio.checked) {
-            moduleRadio.checked = true;
+        if (moduleRadio && moduleRadio.type === 'radio') {
+            if (!moduleRadio.checked) {
+                moduleRadio.checked = true;
+            }
             if (typeof jQuery !== 'undefined') {
                 jQuery(moduleRadio).trigger('change');
             } else {
@@ -267,7 +269,34 @@
         return !!(statusField && statusField.value === 'approved');
     }
 
+    function clearPaylaterApprovedStatus() {
+        var statusField = document.getElementById('paypalac-paylater-status');
+        if (statusField) {
+            statusField.value = '';
+        }
+    }
+
+    function findPaylaterPaymentRow() {
+        var moduleRadio = document.getElementById('pmt-paypalac_paylater');
+        var container = document.getElementById('paypalac-paylater-button');
+        var fromRadio = moduleRadio
+            ? (moduleRadio.closest('.moduleRow')
+                || moduleRadio.closest('[id*="paypalac_paylater"]')
+                || moduleRadio.closest('.custom-control')
+                || moduleRadio.parentElement)
+            : null;
+        var fromButton = container
+            ? (container.closest('.moduleRow')
+                || container.closest('[id*="paypalac_paylater"]')
+                || container.closest('.custom-control')
+                || container.parentElement)
+            : null;
+        return fromRadio || fromButton;
+    }
+
     function shouldStartPayLaterApproval() {
+        // Confirm Order must start Pay Later approval whenever the Pay Later
+        // radio is selected and the Buttons popup has not already approved.
         return isPaylaterSelected() && !isPaylaterApproved() && !checkoutSubmitting;
     }
 
@@ -299,6 +328,7 @@
 
     function startPayLaterConfirmOrderRedirect() {
         selectPaylaterRadio();
+        clearPaylaterApprovedStatus();
         releaseCheckoutOverlay();
 
         if (typeof window.oprcShowProcessingOverlay === 'function') {
@@ -372,6 +402,14 @@
             return;
         }
 
+        // Selecting the Pay Later radio can lag behind a theme custom-radio
+        // paint; if the click is Confirm Order and Pay Later is the intended
+        // method (radio checked OR its row was the last payment interaction),
+        // force-select and redirect.
+        if (!isPaylaterSelected() && window.__paypalacPaylaterRowInteracted) {
+            selectPaylaterRadio();
+        }
+
         if (!shouldStartPayLaterApproval()) {
             return;
         }
@@ -386,6 +424,39 @@
         }
 
         startPayLaterConfirmOrderRedirect();
+    }
+
+    function bindPaylaterRowSelection() {
+        if (window.__paypalacPaylaterRowSelectionBound) {
+            return;
+        }
+        window.__paypalacPaylaterRowSelectionBound = true;
+        window.__paypalacPaylaterRowInteracted = false;
+
+        document.addEventListener('click', function (event) {
+            var row = findPaylaterPaymentRow();
+            if (!row || !event.target || !row.contains(event.target)) {
+                return;
+            }
+            // Do not steal clicks aimed at the hosted Buttons iframe/button —
+            // those start the yellow-button popup flow.
+            var buttonEl = getPaylaterButtonElement();
+            if (buttonEl && (event.target === buttonEl || buttonEl.contains(event.target))) {
+                window.__paypalacPaylaterRowInteracted = true;
+                selectPaylaterRadio();
+                return;
+            }
+            window.__paypalacPaylaterRowInteracted = true;
+            selectPaylaterRadio();
+        }, true);
+
+        document.addEventListener('change', function (event) {
+            if (event.target && event.target.id === 'pmt-paypalac_paylater') {
+                window.__paypalacPaylaterRowInteracted = !!event.target.checked;
+            } else if (event.target && event.target.name === 'payment' && event.target.id !== 'pmt-paypalac_paylater') {
+                window.__paypalacPaylaterRowInteracted = false;
+            }
+        }, true);
     }
 
     function hideModuleRadio() {
@@ -845,6 +916,7 @@
     // Pay Later button to its right (no text label). Confirm Order starts
     // a full-page Pay Later approval redirect (browsers block synthetic
     // clicks on the hosted Buttons iframe).
+    bindPaylaterRowSelection();
     wrapSubmitCheckout();
     document.addEventListener('click', interceptConfirmOrderClick, true);
 
