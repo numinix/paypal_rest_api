@@ -1787,6 +1787,11 @@ class PayPalCommon {
         ];
 
         if ($approve_url !== '' && !empty($_SESSION['PayPalAdvancedCheckout']['PayLaterRedirectApproval'])) {
+            // Prefer the Pay Later funding UI on the hosted checkout page (Orders
+            // create uses payment_source.paypal; fundingSource selects Pay Later).
+            if (stripos($approve_url, 'fundingSource=') === false) {
+                $approve_url .= (strpos($approve_url, '?') === false ? '?' : '&') . 'fundingSource=paylater';
+            }
             $_SESSION['PayPalAdvancedCheckout']['Order']['approve_url'] = $approve_url;
         }
 
