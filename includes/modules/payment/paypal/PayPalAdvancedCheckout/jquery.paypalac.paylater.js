@@ -309,11 +309,35 @@
             || container.querySelector('iframe');
     }
 
+    function serializeCheckoutPostsForPayLater() {
+        var form = document.querySelector('form[name="checkout_payment"]');
+        if (!form || typeof FormData === 'undefined' || typeof URLSearchParams === 'undefined') {
+            return 'payment=paypalac_paylater&ppac_type=paylater';
+        }
+
+        var params = new URLSearchParams();
+        var formData = new FormData(form);
+        formData.forEach(function (value, key) {
+            if (key === 'request') {
+                return;
+            }
+            params.append(key, value == null ? '' : String(value));
+        });
+        params.set('payment', 'paypalac_paylater');
+        params.set('ppac_type', 'paylater');
+        return params.toString();
+    }
+
     function fetchPayLaterConfirmRedirect() {
         return fetch('ppac_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ wallet: 'paylater', confirm_redirect: true })
+            body: JSON.stringify({
+                wallet: 'paylater',
+                confirm_redirect: true,
+                // Resume OPC after PayPal return; JSON requests leave $_POST empty.
+                checkout_posts: serializeCheckoutPostsForPayLater()
+            })
         }).then(parseWalletResponse).catch(function (error) {
             console.error('Unable to start Pay Later Confirm Order redirect', error);
             return {

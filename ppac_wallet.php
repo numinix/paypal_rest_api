@@ -195,13 +195,27 @@ if ($configOnly) {
         require DIR_WS_INCLUDES . 'application_bottom.php';
         return;
     }
-    $response = $moduleInstance->ajaxCreatePayLaterConfirmRedirect();
+    // JSON body does not populate $_POST; accept checkout form fields from the browser
+    // so ppac_listener can resume One Page Checkout after PayPal returns.
+    $checkoutPosts = [];
+    if (!empty($requestData['checkout_posts'])) {
+        if (is_string($requestData['checkout_posts'])) {
+            parse_str($requestData['checkout_posts'], $checkoutPosts);
+        } elseif (is_array($requestData['checkout_posts'])) {
+            $checkoutPosts = $requestData['checkout_posts'];
+        }
+    }
+    if (!is_array($checkoutPosts)) {
+        $checkoutPosts = [];
+    }
+    $response = $moduleInstance->ajaxCreatePayLaterConfirmRedirect($checkoutPosts);
     if (isset($moduleInstance->log) && is_object($moduleInstance->log) && method_exists($moduleInstance->log, 'write')) {
         $moduleInstance->log->write(
             'Pay Later Confirm Order redirect response: success=' .
             (!empty($response['success']) ? 'yes' : 'no') .
             ' reason=' . ($response['reason'] ?? '') .
-            ' hasApproveUrl=' . (!empty($response['approveUrl']) ? 'yes' : 'no'),
+            ' hasApproveUrl=' . (!empty($response['approveUrl']) ? 'yes' : 'no') .
+            ' checkoutPostKeys=' . count($checkoutPosts),
             true,
             'after'
         );

@@ -57,6 +57,15 @@ if (strpos($jsContent, 'function wrapSubmitCheckout') === false
     echo "✓ Pay Later JS intercepts Confirm Order and starts a Pay Later approval redirect\n";
 }
 
+if (strpos($jsContent, 'function serializeCheckoutPostsForPayLater') === false
+    || strpos($jsContent, 'checkout_posts') === false
+) {
+    $testPassed = false;
+    $errors[] = "Pay Later Confirm Order must serialize checkout form fields as checkout_posts so ppac_listener can resume OPC after PayPal return.";
+} else {
+    echo "✓ Pay Later Confirm Order sends checkout_posts with the redirect request\n";
+}
+
 if (strpos($jsContent, "shape: 'pill'") === false) {
     $testPassed = false;
     $errors[] = "Pay Later button should use pill shape to match the PayPal branded button.";
@@ -150,6 +159,36 @@ if (strpos($phpContent, 'fundingSource=paylater') === false) {
     $errors[] = "Approve URL for Pay Later Confirm Order redirect should append fundingSource=paylater.";
 } else {
     echo "✓ Pay Later Confirm Order approve URL appends fundingSource=paylater\n";
+}
+
+// Test 5b: Confirm Order must persist browser checkout form fields (not empty $_POST).
+$walletEndpoint = file_get_contents(__DIR__ . '/../ppac_wallet.php');
+if ($walletEndpoint === false
+    || strpos($walletEndpoint, 'checkout_posts') === false
+    || strpos($walletEndpoint, 'ajaxCreatePayLaterConfirmRedirect($checkoutPosts)') === false
+) {
+    $testPassed = false;
+    $errors[] = "ppac_wallet.php must parse checkout_posts and pass them into ajaxCreatePayLaterConfirmRedirect().";
+} else {
+    echo "✓ ppac_wallet.php forwards checkout_posts into Confirm Order redirect\n";
+}
+
+if (strpos($moduleContent, 'function storePayLaterPayerAction(string $approveUrl, array $checkoutPosts') === false
+    || strpos($moduleContent, "\$savedPosts['paypalac_paylater_status'] = 'approved'") === false
+) {
+    $testPassed = false;
+    $errors[] = "storePayLaterPayerAction must accept checkout_posts and mark paylater status approved for the return form.";
+} else {
+    echo "✓ storePayLaterPayerAction persists checkout_posts and approved paylater status\n";
+}
+
+if (strpos($moduleContent, '$keepConfirmed') === false
+    || strpos($moduleContent, "(\$sessionOrder['payment_source'] ?? '') === 'paylater'") === false
+) {
+    $testPassed = false;
+    $errors[] = "selection() must preserve wallet_payment_confirmed after a successful Pay Later return.";
+} else {
+    echo "✓ selection() preserves wallet_payment_confirmed after Pay Later return\n";
 }
 
 // Test 6: Buttons ineligibility must not hide Confirm Order radio; overlay uses OPRC/mower message.
