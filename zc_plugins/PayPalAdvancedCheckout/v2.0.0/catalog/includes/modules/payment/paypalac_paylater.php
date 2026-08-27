@@ -1,0 +1,1350 @@
+<?php
+/**
+ * paypalac_paylater.php payment module class for handling Pay Later via PayPal Advanced Checkout.
+ *
+ * @copyright Copyright 2025 Zen Cart Development Team
+ * @license   https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
+ *
+ * Last updated: v1.0.0
+ */
+/**
+ * Load the support class' auto-loader and common class.
+ */
+require_once __DIR__ . '/paypal/ppacAutoload.php';
+require_once __DIR__ . '/paypal/paypal_common.php';
+
+use PayPalAdvancedCheckout\Admin\AdminMain;
+use PayPalAdvancedCheckout\Admin\DoAuthorization;
+use PayPalAdvancedCheckout\Admin\DoCapture;
+use PayPalAdvancedCheckout\Admin\DoRefund;
+use PayPalAdvancedCheckout\Admin\DoVoid;
+use PayPalAdvancedCheckout\Admin\GetPayPalOrderTransactions;
+use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
+use PayPalAdvancedCheckout\Api\Data\CountryCodes;
+use PayPalAdvancedCheckout\Common\ErrorInfo;
+use PayPalAdvancedCheckout\Common\Helpers;
+use PayPalAdvancedCheckout\Common\Logger;
+use PayPalAdvancedCheckout\Common\VaultManager;
+use PayPalAdvancedCheckout\Compatibility\Language as LanguageCompatibility;
+use PayPalAdvancedCheckout\Zc2Pp\Amount;
+use PayPalAdvancedCheckout\Zc2Pp\ConfirmPayPalPaymentChoiceRequest;
+use PayPalAdvancedCheckout\Zc2Pp\CreatePayPalOrderRequest;
+
+LanguageCompatibility::load('paypalac_paylater');
+
+/**
+ * The PayPal Pay Later payment module using PayPal's REST APIs (v2)
+ */
+class paypalac_paylater extends base
+{
+    protected function getModuleStatusSetting(): string
+    {
+        return defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS') ? MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS : 'False';
+    }
+
+    protected function getModuleSortOrder(): ?int
+    {
+        return defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_SORT_ORDER') ? (int)MODULE_PAYMENT_PAYPALAC_PAYLATER_SORT_ORDER : null;
+    }
+
+    protected function getModuleZoneSetting(): int
+    {
+        return defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE : 0;
+    }
+
+    protected const CURRENT_VERSION = '2.0.0';
+    protected const WALLET_SUCCESS_STATUSES = [
+        PayPalAdvancedCheckoutApi::STATUS_APPROVED,
+        PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
+        PayPalAdvancedCheckoutApi::STATUS_CAPTURED,
+    ];
+
+    // Pay Later is available in these currencies only
+    protected const SUPPORTED_CURRENCIES = ['USD', 'GBP', 'EUR', 'AUD'];
+
+    // PayPal Pay in 4 published range for USD merchants; admin may override per account.
+    protected const DEFAULT_MIN_AMOUNT = 30.0;
+    protected const DEFAULT_MAX_AMOUNT = 2000.0;
+
+    public string $code;
+    public string $title;
+    public string $description = '';
+    public bool $enabled;
+    public ?int $sort_order = null;
+    public int $zone = 0;
+    public int $order_status = 0;
+    
+    // Pay Later never uses on-site card entry
+    public bool $cardsAccepted = false;
+    public bool $collectsCardDataOnsite = false;
+
+    public PayPalAdvancedCheckoutApi $ppr;
+    protected ErrorInfo $errorInfo;
+    public Logger $log;
+    public bool $emailAlerts = false;
+    protected PayPalCommon $paypalCommon;
+    protected array $orderInfo = [];
+    protected bool $paymentIsPending = false;
+    public array $orderCustomerCache = [];
+    protected bool $onOpcConfirmationPage = false;
+    protected array $paypalAdvCheckoutSessionOnEntry = [];
+
+    public function getErrorInfo(): ErrorInfo
+    {
+        return $this->errorInfo;
+    }
+
+    /**
+     * class constructor
+     */
+    public function __construct()
+    {
+        global $order, $messageStack, $loaderPrefix, $current_page;
+
+        $this->code = 'paypalac_paylater';
+
+        $curl_installed = (function_exists('curl_init'));
+
+        if (IS_ADMIN_FLAG === false) {
+            $this->title = MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE ?? 'PayPal Pay Later';
+        } else {
+            $this->title = (MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE_ADMIN ?? 'PayPal Pay Later') . (($curl_installed === true) ? '' : $this->alertMsg(MODULE_PAYMENT_PAYPALAC_ERROR_NO_CURL ?? 'cURL not installed'));
+            $this->description = sprintf(MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_DESCRIPTION ?? 'Pay Later via PayPal Advanced Checkout (v%s)', self::CURRENT_VERSION);
+            
+            // Add upgrade button if current version is less than latest version
+            $installed_version = defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION') ? MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION : '0.0.0';
+            if ($installed_version !== '0.0.0' && version_compare($installed_version, self::CURRENT_VERSION, '<')) {
+                $this->description .= sprintf(
+                    MODULE_PAYMENT_PAYPALAC_TEXT_ADMIN_UPGRADE_AVAILABLE ??
+                    '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="paypalac-upgrade-button" href="%3$s">Upgrade to %2$s</a></p>',
+                    $installed_version,
+                    self::CURRENT_VERSION,
+                    zen_href_link('paypalac_upgrade.php', 'module=paypalac_paylater&action=upgrade', 'SSL')
+                );
+            }
+        }
+
+        $this->sort_order = $this->getModuleSortOrder();
+        if (null === $this->sort_order) {
+            return;
+        }
+
+        $module_status_setting = $this->getModuleStatusSetting();
+        $this->enabled = ($module_status_setting === 'True' || (IS_ADMIN_FLAG === true && $module_status_setting === 'Retired'));
+
+        $this->errorInfo = new ErrorInfo();
+
+        $this->log = new Logger();
+        $debug = (strpos(MODULE_PAYMENT_PAYPALAC_DEBUGGING, 'Log') !== false);
+        if ($debug === true) {
+            $this->log->enableDebug();
+        }
+        $this->emailAlerts = (MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Alerts Only' || MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Log and Email');
+
+        // Initialize the shared PayPal common class
+        $this->paypalCommon = new PayPalCommon($this);
+
+        // -----
+        // An order's *initial* order-status depends on the mode in which the PayPal transaction
+        // is to be performed. Pay Later is a wallet payment (ppac_type !== 'card').
+        //
+        if (MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Final Sale' || MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Auth Only (Card-Only)') {
+            $order_status = (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID;
+        } else {
+            $order_status = (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID;
+        }
+        $this->order_status = ($order_status > 0) ? $order_status : (int)DEFAULT_ORDERS_STATUS_ID;
+
+        $this->zone = $this->getModuleZoneSetting();
+
+        if (IS_ADMIN_FLAG === true) {
+            if ($module_status_setting === 'Retired') {
+                $this->title .= ' <strong>(Retired)</strong>';
+            }
+            if (MODULE_PAYMENT_PAYPALAC_SERVER === 'sandbox') {
+                $this->title .= $this->alertMsg(' (sandbox active)');
+            }
+            if ($debug === true) {
+                $this->title .= ' <strong>(Debug)</strong>';
+            }
+            $this->tableCheckup();
+        } elseif ($this->enabled === true) {
+            global $zcObserverPaypaladvcheckout;
+            if (!isset($zcObserverPaypaladvcheckout)) {
+                $this->enabled = false;
+
+                if (in_array($loaderPrefix ?? '', ['paypal_ipn', 'webhook'], true)) {
+                    return;
+                }
+                $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER ?? 'Observer missing');
+                return;
+            }
+        }
+
+        // Validate the configuration
+        if (IS_ADMIN_FLAG === true && isset($current_page) && $current_page === FILENAME_MODULES) {
+            // Don't validate when simply listing modules
+        } else {
+            $this->enabled = ($this->enabled === true && $this->validateConfiguration($curl_installed));
+        }
+        if ($this->enabled === false || IS_ADMIN_FLAG === true || $loaderPrefix === 'webhook') {
+            return;
+        }
+
+        if (is_object($order)) {
+            $this->update_status();
+            if ($this->enabled === false) {
+                return;
+            }
+
+            // Check currency eligibility - Pay Later is only available for specific currencies
+            $currency = $_SESSION['currency'] ?? DEFAULT_CURRENCY;
+            if (!in_array($currency, self::SUPPORTED_CURRENCIES, true)) {
+                $this->enabled = false;
+                return;
+            }
+        }
+
+        global $current_page_base;
+        if (defined('FILENAME_CHECKOUT_ONE_CONFIRMATION') && $current_page_base === FILENAME_CHECKOUT_ONE_CONFIRMATION) {
+            $this->onOpcConfirmationPage = true;
+            $this->paypalAdvCheckoutSessionOnEntry = $_SESSION['PayPalAdvancedCheckout'] ?? [];
+            $this->attach($this, ['NOTIFY_OPC_OBSERVER_SESSION_FIXUPS']);
+        }
+
+        // Load wallet-specific language file
+        $this->paypalCommon->loadWalletLanguageFile($this->code);
+
+        // Check for required main PayPal module
+        if (!defined('MODULE_PAYMENT_PAYPALAC_VERSION')) {
+            $this->enabled = false;
+            if (IS_ADMIN_FLAG === true) {
+                $this->title .= $this->alertMsg(MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_PAYPAL_REQUIRED ?? 'Main PayPal module required');
+            }
+            return;
+        }
+    }
+
+    public function updateNotifyOpcObserverSessionFixups(&$class, $eventID, $empty_string, &$session_data)
+    {
+        if ($this->onOpcConfirmationPage === false || empty($this->paypalAdvCheckoutSessionOnEntry)) {
+            return;
+        }
+        $session_data['PayPalAdvancedCheckout'] = $this->paypalAdvCheckoutSessionOnEntry;
+    }
+
+    protected function alertMsg(string $msg): string
+    {
+        return '<span class="alert">' . $msg . '</span>';
+    }
+
+    protected function tableCheckup()
+    {
+        global $db;
+
+        // First, let the paypalCommon handle its tableCheckup
+        if (!isset($this->paypalCommon)) {
+            $this->paypalCommon = new PayPalCommon($this);
+        }
+        $this->paypalCommon->tableCheckup();
+        
+        // If the payment module is installed and at the current version, nothing to be done.
+        $current_version = self::CURRENT_VERSION;
+        if (defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION') && MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION === $current_version) {
+            return;
+        }
+
+        // -----
+        // Check if the messaging configuration needs to be migrated from the old paypalac module.
+        // This happens when the paylater module is newly installed but the messaging setting
+        // already exists from the main paypalac module.
+        //
+        $messaging_check = $db->Execute(
+            "SELECT configuration_id 
+               FROM " . TABLE_CONFIGURATION . " 
+              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MESSAGING'
+              LIMIT 1"
+        );
+        if ($messaging_check->EOF) {
+            // The messaging configuration doesn't exist yet - insert it
+            $db->Execute(
+                "INSERT INTO " . TABLE_CONFIGURATION . "
+                    (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                 VALUES
+                    ('PayLater Messaging', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MESSAGING', 'Checkout, Shopping Cart, Product Pages', 'On which pages should PayPal PayLater messaging be displayed? (It will automatically not be displayed in regions where it is not available. Only available in USD, GBP, EUR, AUD.) When enabled, it will show the lower installment-based pricing for the presented product or cart amount. This may accelerate buying decisions.<br><b>Default: All</b>', 6, 0, 'zen_cfg_select_multioption([''Checkout'', ''Shopping Cart'', ''Product Pages'', ''Product Listings and Search Results''], ', NULL, now())"
+            );
+        }
+
+        $amount_limit_keys = [
+            [
+                'title' => 'PayLater Minimum Order Amount',
+                'key' => 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MIN_AMOUNT',
+                'value' => (string)self::DEFAULT_MIN_AMOUNT,
+                'description' => 'Hide Pay Later when the order total is below this amount (in the customer\'s checkout currency). PayPal\'s Pay in 4 product is typically $30–$2,000 USD, but limits can vary by merchant account and buyer eligibility.<br><b>Default: 30</b>',
+                'sort_order' => 1,
+            ],
+            [
+                'title' => 'PayLater Maximum Order Amount',
+                'key' => 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MAX_AMOUNT',
+                'value' => (string)self::DEFAULT_MAX_AMOUNT,
+                'description' => 'Hide Pay Later when the order total exceeds this amount (in the customer\'s checkout currency). PayPal may enforce a lower account-specific maximum; set this to match guidance from PayPal support if needed.<br><b>Default: 2000</b>',
+                'sort_order' => 2,
+            ],
+        ];
+
+        foreach ($amount_limit_keys as $amount_limit) {
+            $amount_limit_check = $db->Execute(
+                "SELECT configuration_id
+                   FROM " . TABLE_CONFIGURATION . "
+                  WHERE configuration_key = '" . zen_db_input($amount_limit['key']) . "'
+                  LIMIT 1"
+            );
+            if ($amount_limit_check->EOF) {
+                $db->Execute(
+                    "INSERT INTO " . TABLE_CONFIGURATION . "
+                        (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                     VALUES
+                        ('" . zen_db_input($amount_limit['title']) . "', '" . zen_db_input($amount_limit['key']) . "', '" . zen_db_input($amount_limit['value']) . "', '" . zen_db_input($amount_limit['description']) . "', 6, " . (int)$amount_limit['sort_order'] . ", NULL, NULL, now())"
+                );
+            }
+        }
+        
+        // Record the current version of the payment module into its database configuration setting
+        $db->Execute(
+            "UPDATE " . TABLE_CONFIGURATION . "
+                SET configuration_value = '$current_version',
+                    last_modified = now()
+              WHERE configuration_key = 'MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION'
+              LIMIT 1"
+        );
+    }
+
+    protected function validateConfiguration(bool $curl_installed): bool
+    {
+        if ($curl_installed === false) {
+            $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALAC_ERROR_NO_CURL ?? 'cURL not installed');
+            return false;
+        }
+
+        $this->ppr = $this->getPayPalAdvancedCheckoutApi();
+        if ($this->ppr === null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function getPayPalAdvancedCheckoutApi(): ?PayPalAdvancedCheckoutApi
+    {
+        $client_id = (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : MODULE_PAYMENT_PAYPALAC_CLIENTID_S;
+        $secret = (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') ? MODULE_PAYMENT_PAYPALAC_SECRET_L : MODULE_PAYMENT_PAYPALAC_SECRET_S;
+
+        // Trim credentials to match PayPalAdvancedCheckoutApi::getConfiguredCredentials behavior
+        $client_id = trim($client_id);
+        $secret = trim($secret);
+
+        if (empty($client_id) || empty($secret)) {
+            $this->setConfigurationDisabled(MODULE_PAYMENT_PAYPALAC_ALERT_INVALID_CONFIGURATION ?? 'Invalid configuration');
+            return null;
+        }
+
+        try {
+            $ppr = new PayPalAdvancedCheckoutApi(
+                MODULE_PAYMENT_PAYPALAC_SERVER,
+                $client_id,
+                $secret
+            );
+            return $ppr;
+        } catch (\Exception $e) {
+            $this->log->write('Pay Later: Error creating PayPalAdvancedCheckoutApi: ' . $e->getMessage());
+            $this->setConfigurationDisabled($e->getMessage());
+            return null;
+        }
+    }
+
+    protected function setConfigurationDisabled(string $error_message, bool $force_disable = false)
+    {
+        $this->enabled = false;
+        if (IS_ADMIN_FLAG === true || $force_disable === true) {
+            $this->title .= $this->alertMsg($error_message);
+        }
+    }
+
+    public function update_status()
+    {
+        global $order, $db;
+
+        if ($this->enabled === false || !is_object($order)) {
+            return;
+        }
+
+        // Disable Pay Later for subscription products - Pay Later does not support vaulting for recurring payments
+        if ($this->cartContainsSubscriptionProduct()) {
+            $this->enabled = false;
+            return;
+        }
+
+        if ((int)$this->zone > 0 && isset($order->billing['country']['id'])) {
+            $check_flag = false;
+            $check = $db->Execute(
+                "SELECT zone_id
+                   FROM " . TABLE_ZONES_TO_GEO_ZONES . "
+                  WHERE geo_zone_id = '" . (int)$this->zone . "'
+                    AND zone_country_id = '" . (int)$order->billing['country']['id'] . "'
+               ORDER BY zone_id"
+            );
+            while (!$check->EOF) {
+                if ($check->fields['zone_id'] < 1 || $check->fields['zone_id'] == $order->billing['zone_id']) {
+                    $check_flag = true;
+                    break;
+                }
+                $check->MoveNext();
+            }
+
+            if ($check_flag === false) {
+                $this->enabled = false;
+            }
+        }
+
+        if ($this->enabled === true && !$this->isOrderTotalWithinPayLaterLimits()) {
+            $this->enabled = false;
+        }
+    }
+
+    protected function getConfiguredMinAmount(): float
+    {
+        if (!defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_MIN_AMOUNT')) {
+            return self::DEFAULT_MIN_AMOUNT;
+        }
+
+        $min_amount = (float)MODULE_PAYMENT_PAYPALAC_PAYLATER_MIN_AMOUNT;
+        return ($min_amount >= 0) ? $min_amount : self::DEFAULT_MIN_AMOUNT;
+    }
+
+    protected function getConfiguredMaxAmount(): float
+    {
+        if (!defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_MAX_AMOUNT')) {
+            return self::DEFAULT_MAX_AMOUNT;
+        }
+
+        $max_amount = (float)MODULE_PAYMENT_PAYPALAC_PAYLATER_MAX_AMOUNT;
+        return ($max_amount > 0) ? $max_amount : self::DEFAULT_MAX_AMOUNT;
+    }
+
+    protected function getOrderTotalForLimitCheck(): ?float
+    {
+        global $order;
+
+        if (isset($order) && is_object($order) && isset($order->info['total']) && is_numeric($order->info['total'])) {
+            return (float)$order->info['total'];
+        }
+
+        return null;
+    }
+
+    protected function orderTotalWithinConfiguredLimits(float $order_total): bool
+    {
+        $min_amount = $this->getConfiguredMinAmount();
+        $max_amount = $this->getConfiguredMaxAmount();
+
+        if ($max_amount > 0 && $max_amount < $min_amount) {
+            $max_amount = $min_amount;
+        }
+
+        if ($order_total < $min_amount) {
+            return false;
+        }
+
+        if ($max_amount > 0 && $order_total > $max_amount) {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function isOrderTotalWithinPayLaterLimits(?float $order_total = null): bool
+    {
+        if ($order_total === null) {
+            $order_total = $this->getOrderTotalForLimitCheck();
+        }
+
+        if ($order_total === null) {
+            return true;
+        }
+
+        $within_limits = $this->orderTotalWithinConfiguredLimits($order_total);
+        if ($within_limits === false) {
+            $min_amount = $this->getConfiguredMinAmount();
+            $max_amount = $this->getConfiguredMaxAmount();
+            if ($order_total < $min_amount) {
+                $this->log->write(
+                    'Pay Later: Module disabled because order total ' . number_format($order_total, 2, '.', '') .
+                    ' is below configured minimum ' . number_format($min_amount, 2, '.', '') . '.'
+                );
+            } elseif ($max_amount > 0 && $order_total > $max_amount) {
+                $this->log->write(
+                    'Pay Later: Module disabled because order total ' . number_format($order_total, 2, '.', '') .
+                    ' exceeds configured maximum ' . number_format($max_amount, 2, '.', '') . '.'
+                );
+            }
+        }
+
+        return $within_limits;
+    }
+
+    protected function getPayLaterLimitContext(?float $order_total = null): array
+    {
+        if ($order_total === null) {
+            $order_total = $this->getOrderTotalForLimitCheck();
+        }
+
+        return [
+            'minAmount' => $this->getConfiguredMinAmount(),
+            'maxAmount' => $this->getConfiguredMaxAmount(),
+            'orderTotal' => $order_total,
+            'withinLimits' => ($order_total === null) ? true : $this->orderTotalWithinConfiguredLimits($order_total),
+            'currency' => $_SESSION['currency'] ?? DEFAULT_CURRENCY,
+        ];
+    }
+
+    protected function getPayLaterAmountLimitMessage(string $reason): string
+    {
+        $limits = $this->getPayLaterLimitContext();
+        $currency = $limits['currency'];
+        $order_total = $limits['orderTotal'];
+
+        if ($reason === 'below_minimum') {
+            return sprintf(
+                MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_BELOW_MINIMUM ?? 'Pay Later is available for orders of %s %s or more.',
+                number_format($limits['minAmount'], 2, '.', ''),
+                $currency
+            );
+        }
+
+        if ($reason === 'above_maximum') {
+            return sprintf(
+                MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_ABOVE_MAXIMUM ?? 'Pay Later is available for orders up to %s %s.',
+                number_format($limits['maxAmount'], 2, '.', ''),
+                $currency
+            );
+        }
+
+        if ($reason === 'amount_out_of_range' && $order_total !== null) {
+            if ((float)$order_total < (float)$limits['minAmount']) {
+                return $this->getPayLaterAmountLimitMessage('below_minimum');
+            }
+            if ((float)$limits['maxAmount'] > 0 && (float)$order_total > (float)$limits['maxAmount']) {
+                return $this->getPayLaterAmountLimitMessage('above_maximum');
+            }
+        }
+
+        return MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.';
+    }
+
+    protected function getPayLaterLimitFailureReason(array $limit_context): string
+    {
+        if ((float)($limit_context['orderTotal'] ?? 0) < (float)$limit_context['minAmount']) {
+            return 'below_minimum';
+        }
+
+        return 'above_maximum';
+    }
+
+    protected function buildPayLaterAmountLimitFailure(string $reason): array
+    {
+        return [
+            'success' => false,
+            'message' => $this->getPayLaterAmountLimitMessage($reason),
+            'reason' => $reason,
+        ] + $this->getPayLaterLimitContext();
+    }
+
+    /**
+     * Check if the cart contains any subscription products that require vaulting.
+     * 
+     * Pay Later does not support vaulting for recurring payments, so this module
+     * should be disabled when the cart contains subscription products.
+     * 
+     * @return bool True if the cart contains subscription products
+     */
+    protected function cartContainsSubscriptionProduct(): bool
+    {
+        if (!isset($_SESSION['cart']) || !is_object($_SESSION['cart'])) {
+            return false;
+        }
+
+        $products = $_SESSION['cart']->get_products();
+        if (!is_array($products) || empty($products)) {
+            return false;
+        }
+
+        // Check using paypalSavedCardRecurring class if available
+        if (!class_exists('paypalacSavedCardRecurring')) {
+            $savedCardRecurringPath = dirname(__DIR__, 2) . '/classes/paypalacSavedCardRecurring.php';
+            if (file_exists($savedCardRecurringPath)) {
+                require_once $savedCardRecurringPath;
+            }
+        }
+
+        if (class_exists('paypalacSavedCardRecurring')) {
+            $recurring = new \paypalacSavedCardRecurring();
+            $subscriptions = $recurring->find_subscription_products_in_order($products);
+            if (!empty($subscriptions)) {
+                return true;
+            }
+        }
+
+        // Also check for plan_id attribute-based subscriptions
+        return $this->cartHasPlanIdSubscription($products);
+    }
+
+    /**
+     * Check if any products in the cart have a PayPal subscription plan_id attribute.
+     * 
+     * @param array $products Products from the cart
+     * @return bool True if any product has a plan_id attribute
+     */
+    protected function cartHasPlanIdSubscription(array $products): bool
+    {
+        global $db;
+
+        foreach ($products as $product) {
+            if (!is_array($product['attributes'] ?? null)) {
+                continue;
+            }
+            foreach ($product['attributes'] as $options_id => $options_values_id) {
+                $options = $db->Execute(
+                    "SELECT products_options_name FROM " . TABLE_PRODUCTS_OPTIONS . " WHERE products_options_id = " . (int)$options_id . " LIMIT 1;"
+                );
+                if ($options->RecordCount() === 0) {
+                    continue;
+                }
+                $normalized = $this->normalizeAttributeKey((string)$options->fields['products_options_name']);
+                if ($normalized === 'paypal_subscription_plan_id' || $normalized === 'plan_id') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Normalize an attribute key for comparison.
+     * 
+     * @param string $label The attribute label to normalize
+     * @return string The normalized key
+     */
+    protected function normalizeAttributeKey(string $label): string
+    {
+        $label = strtolower($label);
+        $label = preg_replace('/[^a-z0-9]+/', '_', $label) ?? $label;
+        return trim($label, '_');
+    }
+
+    public function javascript_validation(): string
+    {
+        return '';
+    }
+
+    protected function getWalletAssets(string $scriptFilename): string
+    {
+        $css = '';
+        if (!defined('MODULE_PAYMENT_PAYPALAC_WALLET_ASSETS_LOADED')) {
+            define('MODULE_PAYMENT_PAYPALAC_WALLET_ASSETS_LOADED', true);
+            $css = '<style>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('paypalac.css') . '</style>';
+        }
+
+        return $css . '<script>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile($scriptFilename) . '</script>';
+    }
+
+    public function selection(): array
+    {
+        // Keep a just-returned Pay Later approval across OPC payment-list rebuilds
+        // in the same finalize request. Clearing it here forced Confirm Order to
+        // treat the shopper as unpaid after PayPal Pay Later completed.
+        $sessionOrder = $_SESSION['PayPalAdvancedCheckout']['Order'] ?? [];
+        $keepConfirmed = !empty($sessionOrder['wallet_payment_confirmed'])
+            && (($sessionOrder['payment_source'] ?? '') === 'paylater')
+            && in_array((string)($sessionOrder['status'] ?? ''), self::WALLET_SUCCESS_STATUSES, true);
+        if (!$keepConfirmed) {
+            unset($_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed']);
+        }
+
+        $buttonContainer = '<div id="paypalac-paylater-button" class="paypalac-paylater-button"></div>';
+        $hiddenFields =
+            zen_draw_hidden_field('ppac_type', 'paylater') .
+            zen_draw_hidden_field('paypalac_paylater_payload', '', 'id="paypalac-paylater-payload"') .
+            zen_draw_hidden_field('paypalac_paylater_status', '', 'id="paypalac-paylater-status"');
+
+        $script = $this->getWalletAssets('jquery.paypalac.paylater.js');
+
+        // Match paypalac::selection(): radio + branded button only, no text label.
+        // Confirm Order (or the Pay Later button) starts payment, same as PayPal.
+        return [
+            'id' => $this->code,
+            'module' => $buttonContainer . $hiddenFields . $script,
+        ];
+    }
+
+    /**
+     * Get wallet SDK configuration without creating a PayPal order.
+     * Used during initial button rendering - the actual order creation
+     * happens when user clicks the button (in createOrder callback).
+     *
+     * @return array
+     */
+    public function ajaxGetWalletConfig(): array
+    {
+        $client_id = (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : MODULE_PAYMENT_PAYPALAC_CLIENTID_S;
+        $client_id = trim($client_id);
+
+        $intent = (MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Final Sale' || MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Auth Only (Card-Only)')
+            ? 'capture'
+            : 'authorize';
+
+        // -----
+        // Log wallet configuration request for debugging SDK 400 errors
+        //
+        $loggedClientId = (strlen($client_id) > 10)
+            ? substr($client_id, 0, 6) . '...' . substr($client_id, -4)
+            : ($client_id === '' ? '(empty)' : $client_id);
+        $this->log->write(
+            "Pay Later ajaxGetWalletConfig:\n" .
+            "  - Environment: " . MODULE_PAYMENT_PAYPALAC_SERVER . "\n" .
+            "  - Client ID: " . $loggedClientId . "\n" .
+            "  - Currency: " . ($_SESSION['currency'] ?? 'USD') . "\n" .
+            "  - Intent: " . $intent . "\n" .
+            "  - Module Enabled: " . ($this->enabled ? 'Yes' : 'No'),
+            true,
+            'before'
+        );
+
+        if ($client_id === '') {
+            $this->log->write("Pay Later ajaxGetWalletConfig FAILED: Client ID is empty", true, 'after');
+            return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.'];
+        }
+
+        $limit_context = $this->getPayLaterLimitContext();
+        $this->log->write(
+            "Pay Later ajaxGetWalletConfig limits:\n" .
+            "  - Min: " . number_format($limit_context['minAmount'], 2, '.', '') . "\n" .
+            "  - Max: " . number_format($limit_context['maxAmount'], 2, '.', '') . "\n" .
+            "  - Order Total: " . ($limit_context['orderTotal'] === null ? '(unknown)' : number_format((float)$limit_context['orderTotal'], 2, '.', '')) . "\n" .
+            "  - Within Limits: " . ($limit_context['withinLimits'] ? 'Yes' : 'No'),
+            true,
+            'after'
+        );
+
+        if ($limit_context['withinLimits'] === false) {
+            $reason = $this->getPayLaterLimitFailureReason($limit_context);
+
+            return $this->buildPayLaterAmountLimitFailure($reason) + [
+                'clientId' => $client_id,
+                'intent' => $intent,
+                'environment' => MODULE_PAYMENT_PAYPALAC_SERVER,
+            ];
+        }
+
+        return [
+            'success' => true,
+            'clientId' => $client_id,
+            'currency' => $_SESSION['currency'] ?? 'USD',
+            'intent' => $intent,
+            'environment' => MODULE_PAYMENT_PAYPALAC_SERVER,
+        ] + $limit_context;
+    }
+
+    public function ajaxCreateWalletOrder(): array
+    {
+        $response = $this->buildWalletAjaxResponse('paylater');
+        if ($response['success'] === false && empty($response['message'])) {
+            $response['message'] = MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.';
+        }
+
+        return $response;
+    }
+
+    /**
+     * Confirm Order path: create an order with payment_source.paypal +
+     * experience_context (Orders v2 rejects payment_source.paylater) and return
+     * the approve / payer-action URL (with fundingSource=paylater) for redirect.
+     * Synthetic clicks on the hosted Buttons iframe are blocked by browsers.
+     *
+     * @param array $checkoutPosts Checkout form fields from the browser (JSON wallet
+     *                             requests do not populate $_POST). Required so
+     *                             ppac_listener can resume OPC after PayPal return.
+     */
+    public function ajaxCreatePayLaterConfirmRedirect(array $checkoutPosts = []): array
+    {
+        $limit_context = $this->getPayLaterLimitContext();
+        if ($limit_context['withinLimits'] === false) {
+            return $this->buildPayLaterAmountLimitFailure($this->getPayLaterLimitFailureReason($limit_context));
+        }
+
+        // Force a fresh PayPal order with payment_source.paylater (do not reuse a
+        // Buttons()-style CREATED order that omitted payment_source).
+        unset($_SESSION['PayPalAdvancedCheckout']['Order']);
+        $_SESSION['PayPalAdvancedCheckout']['PayLaterRedirectApproval'] = true;
+        $_SESSION['PayPalAdvancedCheckout']['ppac_type'] = 'paylater';
+
+        try {
+            if ($this->createPayPalOrder('paylater', false) === false) {
+                return [
+                    'success' => false,
+                    'message' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.',
+                    'reason' => 'order_creation_failed',
+                ] + $limit_context;
+            }
+        } finally {
+            unset($_SESSION['PayPalAdvancedCheckout']['PayLaterRedirectApproval']);
+        }
+
+        $orderData = $_SESSION['PayPalAdvancedCheckout']['Order'] ?? [];
+        $approveUrl = trim((string)($orderData['approve_url'] ?? ''));
+        $orderId = trim((string)($orderData['id'] ?? ''));
+
+        if ($approveUrl === '' || $orderId === '') {
+            $this->log->write('Pay Later Confirm Order redirect missing approve URL or order id after create.', true, 'after');
+            return [
+                'success' => false,
+                'message' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.',
+                'reason' => 'approve_url_missing',
+            ] + $limit_context;
+        }
+
+        $this->storePayLaterPayerAction($approveUrl, $checkoutPosts, $orderId);
+
+        return [
+            'success' => true,
+            'orderID' => $orderId,
+            'approveUrl' => $approveUrl,
+        ] + $limit_context;
+    }
+
+    /**
+     * Stash the checkout POST bag for ppac_listener's return form.
+     * Prefer browser-supplied checkout_posts (JSON confirm_redirect has empty $_POST).
+     */
+    protected function storePayLaterPayerAction(string $approveUrl, array $checkoutPosts = [], string $orderId = ''): void
+    {
+        global $current_page_base;
+
+        $savedPosts = [];
+        if ($checkoutPosts !== []) {
+            $savedPosts = $checkoutPosts;
+        } elseif (!empty($_POST) && is_array($_POST)) {
+            $savedPosts = $_POST;
+        }
+        unset($savedPosts['request']);
+
+        $savedPosts['payment'] = $this->code;
+        $savedPosts['ppac_type'] = 'paylater';
+
+        // Mark approved so a redisplayed checkout does not immediately re-redirect,
+        // and so processWalletConfirmation has an orderID if needed.
+        if ($orderId === '') {
+            $orderId = trim((string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''));
+        }
+        if ($orderId !== '') {
+            $savedPosts['paypalac_paylater_status'] = 'approved';
+            $savedPosts['paypalac_paylater_payload'] = json_encode([
+                'orderID' => $orderId,
+                'wallet' => 'paylater',
+            ]);
+        }
+
+        $redirectPage = 'one_page_checkout';
+        if (defined('FILENAME_ONE_PAGE_CHECKOUT')) {
+            $redirectPage = FILENAME_ONE_PAGE_CHECKOUT;
+        } elseif (defined('FILENAME_CHECKOUT_CONFIRMATION')) {
+            $redirectPage = FILENAME_CHECKOUT_CONFIRMATION;
+        }
+
+        // Prefer the page the shopper was on (e.g. one_page_checkout) over ppac_wallet.
+        if (!empty($checkoutPosts['main_page']) && is_string($checkoutPosts['main_page'])) {
+            $postedMain = preg_replace('/[^a-zA-Z0-9_]/', '', preg_replace('/\.php$/i', '', trim($checkoutPosts['main_page'])));
+            if ($postedMain !== '') {
+                $redirectPage = $postedMain;
+            }
+        }
+
+        if (!isset($_SESSION['PayPalAdvancedCheckout']['Order']) || !is_array($_SESSION['PayPalAdvancedCheckout']['Order'])) {
+            $_SESSION['PayPalAdvancedCheckout']['Order'] = [];
+        }
+
+        $this->log->write(
+            'Pay Later Confirm Order PayerAction savedPosts keys: ' . implode(',', array_keys($savedPosts)),
+            true,
+            'after'
+        );
+
+        $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'] = [
+            'current_page_base' => $current_page_base ?? $redirectPage,
+            'redirect_page' => $redirectPage,
+            'savedPosts' => $savedPosts,
+            'payer_action_link' => $approveUrl,
+        ];
+        $_SESSION['PayPalAdvancedCheckout']['Order']['payment_source'] = 'paylater';
+    }
+
+    public function pre_confirmation_check()
+    {
+        // Returning from PayPal after Confirm Order redirect: payload may be empty
+        // but wallet_payment_confirmed was set by ppac_listener.
+        if (!empty($_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed'])
+            && (($_SESSION['PayPalAdvancedCheckout']['Order']['payment_source'] ?? '') === 'paylater'
+                || ($_SESSION['PayPalAdvancedCheckout']['ppac_type'] ?? '') === 'paylater')
+        ) {
+            $this->log->write('pre_confirmation_check (paylater): wallet already confirmed via redirect return.', true, 'after');
+            return;
+        }
+
+        $this->paypalCommon->processWalletConfirmation(
+            'paylater',
+            'paypalac_paylater_payload',
+            [
+                'title' => MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE ?? 'Pay Later',
+                'payload_missing' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_PAYLOAD_MISSING ?? 'Payload missing',
+                'payload_invalid' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_PAYLOAD_INVALID ?? 'Invalid payload',
+                'confirm_failed' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_CONFIRM_FAILED ?? 'Confirmation failed',
+                'payer_action' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_PAYER_ACTION ?? 'Payer action required',
+            ]
+        );
+    }
+
+    protected function isOpcAjaxRequest(): bool
+    {
+        return (defined('IS_AJAX_REQUEST') && IS_AJAX_REQUEST === true);
+    }
+
+    public function createPayPalOrder(string $ppac_type, bool $redirectOnError = true): bool
+    {
+        global $order, $currencies;
+
+        $order_info = $this->getOrderTotalsInfo($redirectOnError);
+
+        if (count($order_info) === 0) {
+            return false;
+        }
+
+        return $this->paypalCommon->createPayPalOrder($this, $order, $order_info, $ppac_type, $currencies);
+    }
+
+    protected function getOrderTotalsInfo(bool $redirectOnError = true): array
+    {
+        global $zcObserverPaypaladvcheckout;
+
+        if (!isset($zcObserverPaypaladvcheckout) || !is_object($zcObserverPaypaladvcheckout)) {
+            $message = MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER ?? 'Observer missing';
+
+            if ($redirectOnError) {
+                $this->setMessageAndRedirect($message, FILENAME_CHECKOUT_PAYMENT);
+            } else {
+                $this->log->write('Pay Later: ' . $message . '; wallet request will not redirect.');
+            }
+
+            return [];
+        }
+
+        $order_info = $zcObserverPaypaladvcheckout->getLastOrderValues();
+
+        if (count($order_info) === 0) {
+            $message = 'Missing order_total modifications; getLastOrderValues returned empty array.';
+            $this->log->write('Pay Later: ' . $message);
+
+            if ($redirectOnError) {
+                $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER ?? 'Observer missing', FILENAME_CHECKOUT_PAYMENT);
+            }
+
+            return [];
+        }
+
+        $order_info['free_shipping_coupon'] = $zcObserverPaypaladvcheckout->orderHasFreeShippingCoupon();
+
+        return $order_info;
+    }
+
+    protected function createOrderGuid(\order $order, string $ppac_type): string
+    {
+        return $this->paypalCommon->createOrderGuid($order, $ppac_type);
+    }
+
+    protected function buildWalletAjaxResponse(string $ppac_type): array
+    {
+        $client_id = (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') ? MODULE_PAYMENT_PAYPALAC_CLIENTID_L : MODULE_PAYMENT_PAYPALAC_CLIENTID_S;
+        $client_id = trim($client_id);
+
+        $intent = (MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Final Sale' || ($ppac_type !== 'card' && MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE === 'Auth Only (Card-Only)'))
+            ? 'CAPTURE'
+            : 'AUTHORIZE';
+
+        if ($client_id === '') {
+            return ['success' => false, 'message' => MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.'];
+        }
+
+        $limit_context = $this->getPayLaterLimitContext();
+        if ($limit_context['withinLimits'] === false) {
+            return $this->buildPayLaterAmountLimitFailure($this->getPayLaterLimitFailureReason($limit_context));
+        }
+
+        if ($this->createPayPalOrder($ppac_type, false) === false) {
+            $message = MODULE_PAYMENT_PAYPALAC_PAYLATER_ERROR_INITIALIZE ?? 'Unable to start Pay Later. Please try again.';
+            $error_info = $this->getErrorInfo()->getErrorInfo();
+            $error_message = trim((string)($error_info['message'] ?? ''));
+            $debug_id = trim((string)($error_info['debug_id'] ?? ''));
+            if ($error_message !== '' || $debug_id !== '') {
+                $this->log->write(
+                    'Pay Later buildWalletAjaxResponse order creation failed: ' .
+                    ($error_message !== '' ? $error_message : 'n/a') .
+                    ($debug_id !== '' ? ' (debug_id: ' . $debug_id . ')' : '')
+                );
+            }
+
+            return [
+                'success' => false,
+                'message' => $message,
+                'reason' => 'order_creation_failed',
+            ] + $limit_context;
+        }
+
+        $orderData = $_SESSION['PayPalAdvancedCheckout']['Order'] ?? [];
+        $current = $orderData['current']['purchase_units'][0]['amount'] ?? [];
+
+        return [
+            'success' => true,
+            'orderID' => $orderData['id'] ?? '',
+            'amount' => $current['value'] ?? '',
+            'currency' => $current['currency_code'] ?? ($_SESSION['currency'] ?? ''),
+            'intent' => $orderData['current']['intent'] ?? $intent,
+            'clientId' => $client_id,
+        ] + $limit_context;
+    }
+
+    public function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
+    {
+        $this->log->write('Pay Later redirect: ' . $error_message);
+
+        $this->paypalCommon->setMessageAndRedirect($error_message, $redirect_page, $log_only);
+    }
+
+    public function confirmation()
+    {
+        return false;
+    }
+
+    public function process_button()
+    {
+        return false;
+    }
+
+    public function process_button_ajax()
+    {
+        return [];
+    }
+
+    public function alterShippingEditButton()
+    {
+        return '';
+    }
+
+    public function clear_payments()
+    {
+        unset($_SESSION['PayPalAdvancedCheckout']);
+    }
+
+    public function before_process()
+    {
+        global $order;
+
+        $order_info = $this->getOrderTotalsInfo(false);
+
+        if (count($order_info) === 0) {
+            return [
+                'success' => false,
+                'message' => MODULE_PAYMENT_PAYPALAC_ALERT_MISSING_OBSERVER ?? 'Observer missing',
+            ];
+        }
+
+        $this->paymentIsPending = false;
+
+        $wallet_status = $_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? '';
+        $wallet_user_action = $_SESSION['PayPalAdvancedCheckout']['Order']['user_action'] ?? '';
+        $payer_action_fast_path = ($wallet_status === PayPalAdvancedCheckoutApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
+        
+        if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false) {
+            $this->log->write('Pay Later::before_process, cannot capture/authorize; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalAdvancedCheckout']['Order'] ?? []));
+            unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
+        }
+
+        $this->paypalCommon->acquireAdvancedCheckoutMysqlOrderLock();
+
+        $response = $this->captureOrAuthorizePayment('paylater');
+
+        $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $response['status'];
+        unset($response['links']);
+        $this->orderInfo = $response;
+
+        if ($this->paymentIsPending === true) {
+            $pending_status = (int)MODULE_PAYMENT_PAYPALAC_HELD_STATUS_ID;
+            if ($pending_status > 0) {
+                $this->order_status = $pending_status;
+                $order->info['order_status'] = $pending_status;
+            }
+        }
+
+        $txn_type = $this->orderInfo['intent'];
+        $payment = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0];
+        $payment_status = $this->paypalCommon->deriveZenPaymentStatusForPpacOrder($this->orderInfo, $payment);
+
+        // -----
+        // If the capture/authorization was declined, denied, or failed, do NOT create the
+        // order. Redirect the customer back to checkout with an error message so they can
+        // choose a different payment method.
+        //
+        if (in_array($payment['status'], ['DECLINED', 'DENIED', 'FAILED'], true)) {
+            $this->log->write("==> Pay Later::before_process: Payment {$payment['status']}; redirecting to checkout.");
+            unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_CAPTURE_FAILED, FILENAME_CHECKOUT_PAYMENT);
+        }
+
+        $this->orderInfo['payment_status'] = $payment_status;
+        $this->orderInfo['paypal_payment_status'] = $payment['status'];
+        $this->orderInfo['txn_type'] = $txn_type;
+
+        $this->orderInfo['expiration_time'] = $payment['expiration_time'] ?? null;
+
+        // -----
+        // If the order's PayPal status doesn't indicate successful capture, ensure that
+        // the overall order's status is set to this payment-module's PENDING status and set
+        // a processing flag so that the after_process method will alert the store admin if
+        // configured. Authorized payments (STATUS_CREATED) should use pending status since
+        // they have not been captured yet.
+        //
+        $this->orderInfo['admin_alert_needed'] = false;
+        if ($payment_status !== PayPalAdvancedCheckoutApi::STATUS_CAPTURED) {
+            $this->order_status = (int)MODULE_PAYMENT_PAYPALAC_ORDER_PENDING_STATUS_ID;
+            $order->info['order_status'] = $this->order_status;
+            $this->orderInfo['admin_alert_needed'] = true;
+
+            $this->log->write("==> Pay Later::before_process: Payment status {$payment['status']} received from PayPal; order's status forced to pending.");
+        } else {
+            $order->info['order_status'] = $this->order_status;
+        }
+
+        $this->paypalCommon->reservePayPalOrderIdOrFinishExistingCheckout();
+    }
+
+    protected function captureOrAuthorizePayment(string $payment_source): array
+    {
+        $response = $this->paypalCommon->captureWalletPayment(
+            $this->ppr, 
+            $this->log, 
+            'Pay Later',
+            MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE,
+            'paylater'
+        );
+        
+        if ($response === false) {
+            $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_CAPTURE_FAILED ?? 'Capture failed', FILENAME_CHECKOUT_PAYMENT);
+        }
+
+        return $response;
+    }
+
+    public function after_order_create($orders_id)
+    {
+        $this->paypalCommon->markCheckoutReservationOrderCreated((int)$orders_id);
+    }
+
+    public function after_process()
+    {
+        $this->paypalCommon->processAfterOrder($this->orderInfo);
+        $this->paypalCommon->updateOrderHistory($this->orderInfo, 'paylater');
+        $this->paypalCommon->releaseAdvancedCheckoutMysqlOrderLock();
+        $this->paypalCommon->resetOrder();
+    }
+
+    protected function recordPayPalOrderDetails(int $orders_id): void
+    {
+        // Delegate to common class - but for paylater we have specific handling
+        if ($orders_id <= 0) {
+            return;
+        }
+
+        $this->orderInfo['orders_id'] = $orders_id;
+
+        if ($this->paypalCommon->paypalOrderRecordsExist($orders_id) === true) {
+            return;
+        }
+
+        // Record order details in PayPal table
+        global $db;
+        
+        $purchase_unit = $this->orderInfo['purchase_units'][0];
+        $payment = $purchase_unit['payments']['captures'][0] ?? $purchase_unit['payments']['authorizations'][0];
+        
+        $payment_type = 'paylater';
+        $payment_source = $this->orderInfo['payment_source']['paypal'] ?? [];
+        
+        $name = $payment_source['name'] ?? [];
+        
+        $first_name = is_array($name) ? ($name['given_name'] ?? '') : '';
+        $last_name = is_array($name) ? ($name['surname'] ?? '') : '';
+        $email_address = $payment_source['email_address'] ?? '';
+        
+        $memo = [
+            'source' => 'paylater',
+        ];
+        $memo['paypal_order_id'] = $this->orderInfo['id'];
+        $memo['paypal_payment_id'] = $payment['id'];
+        if (isset($this->orderInfo['txn_type'])) {
+            $memo['paypal_txn_type'] = $this->orderInfo['txn_type'];
+        }
+
+        $sql_data_array = [
+            'order_id' => $orders_id,
+            'txn_type' => 'CREATE',
+            'module_name' => $this->code,
+            'module_mode' => $this->orderInfo['txn_type'],
+            'payment_type' => $payment_type,
+            'payment_status' => $this->orderInfo['payment_status'],
+            'mc_currency' => $payment['amount']['currency_code'],
+            'first_name' => substr($first_name, 0, 32),
+            'last_name' => substr($last_name, 0, 32),
+            'payer_email' => $email_address,
+            'txn_id' => $this->orderInfo['id'],
+            'mc_gross' => $payment['amount']['value'],
+            'date_added' => Helpers::convertPayPalDatePay2Db($this->orderInfo['create_time']),
+            'notify_version' => self::CURRENT_VERSION,
+            'memo' => json_encode($memo),
+        ];
+
+        zen_db_perform(TABLE_PAYPAL, $sql_data_array);
+    }
+
+    public function admin_notification($zf_order_id)
+    {
+        $zf_order_id = (int)$zf_order_id;
+        $ppr = $this->getPayPalAdvancedCheckoutApi();
+        if ($ppr === null) {
+            return '';
+        }
+
+        $admin_main = new AdminMain($this->code, self::CURRENT_VERSION, $zf_order_id, $ppr);
+
+        return $admin_main->get();
+    }
+
+    public function help()
+    {
+        return '';
+    }
+
+    public function _doRefund($oID)
+    {
+        return $this->paypalCommon->processRefund($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION);
+    }
+
+    public function _doAuth($oID, $order_amt, $currency = 'USD')
+    {
+        return $this->paypalCommon->processAuthorization($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION, $order_amt, $currency, false);
+    }
+
+    public function _doCapt($oID, $captureType = 'Complete', $order_amt = 0, $order_currency = 'USD')
+    {
+        return $this->paypalCommon->processCapture($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION, $captureType, $order_amt, $order_currency);
+    }
+
+    public function _doVoid($oID)
+    {
+        return $this->paypalCommon->processVoid($oID, $this->getPayPalAdvancedCheckoutApi(), $this->code, self::CURRENT_VERSION);
+    }
+
+    public function check(): bool
+    {
+        global $db;
+        if (!isset($this->_check)) {
+            $check_query = $db->Execute("SELECT configuration_value FROM " . TABLE_CONFIGURATION . " WHERE configuration_key = 'MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS'");
+            $this->_check = !$check_query->EOF;
+        }
+        return $this->_check;
+    }
+
+    public function install()
+    {
+        global $db;
+        
+        $current_version = self::CURRENT_VERSION;
+        $db->Execute("DELETE FROM " . TABLE_CONFIGURATION . " WHERE configuration_key LIKE 'MODULE_PAYMENT_PAYPALAC_PAYLATER_%'");
+        $db->Execute(
+            "INSERT INTO " . TABLE_CONFIGURATION . "
+                (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+             VALUES
+                ('Module Version', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION', '$current_version', 'Currently-installed module version.', 6, 0, 'zen_cfg_read_only(', NULL, now()),
+                ('Enable PayPal Pay Later?', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS', 'False', 'Do you want to enable PayPal Pay Later payments? Pay Later allows customers to pay in installments (Pay in 4) or with monthly financing. Available in USD, GBP, EUR, and AUD only.', 6, 0, 'zen_cfg_select_option([''True'', ''False'', ''Retired''], ', NULL, now()),
+                ('PayLater Minimum Order Amount', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MIN_AMOUNT', '30', 'Hide Pay Later when the order total is below this amount (in the customer''s checkout currency). PayPal''s Pay in 4 product is typically $30–$2,000 USD, but limits can vary by merchant account and buyer eligibility.<br><b>Default: 30</b>', 6, 1, NULL, NULL, now()),
+                ('PayLater Maximum Order Amount', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MAX_AMOUNT', '2000', 'Hide Pay Later when the order total exceeds this amount (in the customer''s checkout currency). PayPal may enforce a lower account-specific maximum; set this to match guidance from PayPal support if needed.<br><b>Default: 2000</b>', 6, 2, NULL, NULL, now()),
+                ('PayLater Messaging', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_MESSAGING', 'Checkout, Shopping Cart, Product Pages', 'On which pages should PayPal PayLater messaging be displayed? (It will automatically not be displayed in regions where it is not available. Only available in USD, GBP, EUR, AUD.) When enabled, it will show the lower installment-based pricing for the presented product or cart amount. This may accelerate buying decisions.<br><b>Default: All</b>', 6, 0, 'zen_cfg_select_multioption([''Checkout'', ''Shopping Cart'', ''Product Pages'', ''Product Listings and Search Results''], ', NULL, now()),
+                ('Sort order of display.', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_SORT_ORDER', '0', 'Sort order of display. Lowest is displayed first.', 6, 0, NULL, NULL, now()),
+                ('Payment Zone', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE', '0', 'If a zone is selected, only enable this payment method for that zone.', 6, 0, 'zen_cfg_pull_down_zone_classes(', 'zen_get_zone_class_title', now())" 
+        );
+        
+        // -----
+        // Migrate configuration values from the old paypalr_paylater module if it was previously installed.
+        // This allows stores upgrading from paypalr to paypalac to keep their existing settings
+        // without having to reconfigure.
+        //
+        $old_config = $db->Execute(
+            "SELECT configuration_key, configuration_value
+               FROM " . TABLE_CONFIGURATION . "
+              WHERE configuration_key LIKE 'MODULE\_PAYMENT\_PAYPALR\_PAYLATER\_%'"
+        );
+        while (!$old_config->EOF) {
+            $old_key = $old_config->fields['configuration_key'];
+            $new_key = str_replace('MODULE_PAYMENT_PAYPALR_PAYLATER_', 'MODULE_PAYMENT_PAYPALAC_PAYLATER_', $old_key);
+            $old_value = $old_config->fields['configuration_value'];
+            $db->Execute(
+                "UPDATE " . TABLE_CONFIGURATION . "
+                    SET configuration_value = '" . zen_db_input($old_value) . "'
+                  WHERE configuration_key = '" . zen_db_input($new_key) . "'
+                  LIMIT 1"
+            );
+            $old_config->MoveNext();
+        }
+
+        // Define the module's current version so that the tableCheckup method will apply all changes
+        define('MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION', '0.0.0');
+        $this->tableCheckup();
+    }
+
+    public function keys(): array
+    {
+        return [
+            'MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION',
+            'MODULE_PAYMENT_PAYPALAC_PAYLATER_STATUS',
+            'MODULE_PAYMENT_PAYPALAC_PAYLATER_MIN_AMOUNT',
+            'MODULE_PAYMENT_PAYPALAC_PAYLATER_MAX_AMOUNT',
+            'MODULE_PAYMENT_PAYPALAC_PAYLATER_MESSAGING',
+            'MODULE_PAYMENT_PAYPALAC_PAYLATER_SORT_ORDER',
+            'MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE',
+        ];
+    }
+
+    public function remove()
+    {
+        global $db;
+        $db->Execute("DELETE FROM " . TABLE_CONFIGURATION . " WHERE configuration_key LIKE 'MODULE_PAYMENT_PAYPALAC_PAYLATER_%'");
+    }
+
+    public function sendAlertEmail(string $subject_detail, string $message, bool $force_send = false)
+    {
+        $this->paypalCommon->sendAlertEmail($subject_detail, $message, $force_send);
+    }
+
+    public function getCurrentVersion(): string
+    {
+        return self::CURRENT_VERSION;
+    }
+}

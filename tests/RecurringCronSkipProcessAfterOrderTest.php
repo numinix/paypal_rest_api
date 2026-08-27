@@ -24,7 +24,7 @@ declare(strict_types=1);
 fwrite(STDOUT, "Running Recurring Cron Skip processAfterOrder Test...\n\n");
 
 $basePath = dirname(__DIR__);
-$paypalCommonFile = $basePath . '/includes/modules/payment/paypal/paypal_common.php';
+$paypalCommonFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/paypal_common.php';
 
 if (!file_exists($paypalCommonFile)) {
     fwrite(STDERR, "✗ paypal_common.php not found\n\n");

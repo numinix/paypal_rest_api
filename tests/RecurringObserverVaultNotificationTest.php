@@ -54,7 +54,7 @@ namespace {
         $GLOBALS['psr4Autoloader'] = new mockPsr4Autoloader();
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 }
 
 // Mock ObserverManager trait in separate namespace
@@ -67,7 +67,7 @@ namespace Zencart\Traits {
 }
 
 namespace {
-    require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout_recurring.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/observers/auto.paypaladvcheckout_recurring.php';
 
     // Mock database
     class queryFactoryResult

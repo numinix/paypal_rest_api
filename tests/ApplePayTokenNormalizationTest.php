@@ -8,7 +8,7 @@
  * NOT be included as they cause MALFORMED_REQUEST_JSON errors.
  */
 
-require_once __DIR__ . '/../includes/modules/payment/paypal/paypal_common.php';
+require_once __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/paypal_common.php';
 
 define('FILENAME_CHECKOUT_PAYMENT', 'checkout_payment');
 

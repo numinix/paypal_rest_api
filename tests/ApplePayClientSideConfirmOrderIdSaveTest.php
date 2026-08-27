@@ -28,7 +28,7 @@ class ApplePayClientSideConfirmOrderIdSaveTest
     
     public function __construct()
     {
-        $this->phpFile = dirname(__DIR__) . '/includes/modules/payment/paypal/paypal_common.php';
+        $this->phpFile = dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/paypal_common.php';
         
         if (!file_exists($this->phpFile)) {
             throw new RuntimeException("PHP file not found: {$this->phpFile}");

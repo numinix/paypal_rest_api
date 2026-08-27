@@ -16,10 +16,10 @@ $testPassed = true;
 $errors = [];
 
 // Get the JS files content
-$googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.googlepay.js');
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
-$venmoJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.venmo.js');
-$payLaterJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.paylater.js');
+$googlePayJs = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.googlepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
+$venmoJs = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.venmo.js');
+$payLaterJs = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.paylater.js');
 
 // Helper regex pattern for detecting 'unavailable' text that shouldn't appear
 $unavailableTextPattern = '/innerHTML\s*=\s*[\'"]<span[^>]*unavailable/i';

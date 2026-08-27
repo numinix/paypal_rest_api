@@ -261,9 +261,9 @@ namespace PayPalAdvancedCheckout\Tests\Webhooks {
         {
             // Create a minimal mock to instantiate the handler
             $baseDir = dirname(__DIR__, 2);
-            require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookObject.php';
-            require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookHandlerContract.php';
-            require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/Events/PaymentCaptureCompleted.php';
+            require_once $baseDir . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookObject.php';
+            require_once $baseDir . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookHandlerContract.php';
+            require_once $baseDir . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/Events/PaymentCaptureCompleted.php';
 
             $webhookData = [
                 'id' => 'WH-TEST',

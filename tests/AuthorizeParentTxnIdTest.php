@@ -27,7 +27,7 @@ $testsPassed = true;
 // Test 1: Verify updateAuthorizations receives primary_txn_id parameter
 fwrite(STDOUT, "Test 1: Verify updateAuthorizations() receives primary_txn_id parameter...\n");
 
-$filePath = $basePath . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Admin/GetPayPalOrderTransactions.php';
+$filePath = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Admin/GetPayPalOrderTransactions.php';
 if (!file_exists($filePath)) {
     fwrite(STDERR, "✗ GetPayPalOrderTransactions.php not found\n");
     exit(1);
@@ -72,7 +72,7 @@ fwrite(STDOUT, "\n");
 // Test 4: Verify extract_rest_payment_id does NOT fall back to order ID
 fwrite(STDOUT, "Test 4: Verify extract_rest_payment_id() does NOT fall back to order ID...\n");
 
-$recurringPath = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
+$recurringPath = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 if (!file_exists($recurringPath)) {
     fwrite(STDERR, "✗ paypalacSavedCardRecurring.php not found\n");
     exit(1);

@@ -120,7 +120,7 @@ namespace {
     $db = new MockDb();
 
     // Load the SavedCreditCardsManager
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SavedCreditCardsManager.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SavedCreditCardsManager.php';
 
     $failures = 0;
 

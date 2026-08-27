@@ -26,7 +26,7 @@ if (class_exists('language', false)) {
     echo "  ⚠ Warning: 'language' class already exists, skipping this test\n";
 } else {
     // Load the Language class
-    require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/Language.php';
+    require_once __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/Language.php';
     
     // Check if it created a global 'language' alias
     if (class_exists('language', false)) {
@@ -45,7 +45,7 @@ if (class_exists('language', false)) {
     echo "  ⚠ Warning: 'language' class already exists, cannot test LanguageShim alias creation\n";
 } else {
     // Load LanguageStub.php which contains the LanguageShim class
-    require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageStub.php';
+    require_once __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageStub.php';
     
     // Check if it created the alias
     if (class_exists('language', false)) {

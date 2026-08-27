@@ -227,7 +227,7 @@ namespace {
     $failures = 0;
 
     // Load the class
-    require_once DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 
     // Test: Verify schedule_payment() uses 'next_payment_date' instead of 'date'
     fwrite(STDOUT, "Test: Verifying schedule_payment() uses 'next_payment_date' instead of 'date'...\n");

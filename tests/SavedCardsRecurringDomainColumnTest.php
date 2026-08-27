@@ -207,7 +207,7 @@ namespace {
 
     // Test 1: Verify saved_cards_recurring_has_column() method exists
     fwrite(STDOUT, "Test 1: Checking if saved_cards_recurring_has_column() method exists...\n");
-    require_once DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
     
     if (!method_exists('paypalacSavedCardRecurring', 'saved_cards_recurring_has_column')) {
         fwrite(STDERR, "✗ CRITICAL: saved_cards_recurring_has_column() method does not exist\n");

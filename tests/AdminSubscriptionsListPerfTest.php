@@ -6,9 +6,9 @@
  */
 
 $root = dirname(__DIR__);
-$admin = file_get_contents($root . '/admin/paypalac_subscriptions.php');
-$manager = file_get_contents($root . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php');
-$sccr = file_get_contents($root . '/includes/classes/paypalacSavedCardRecurring.php');
+$admin = file_get_contents($root . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/paypalac_subscriptions.php');
+$manager = file_get_contents($root . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php');
+$sccr = file_get_contents($root . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php');
 
 function assert_true($cond, $msg)
 {

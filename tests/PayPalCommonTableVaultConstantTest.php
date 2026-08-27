@@ -30,10 +30,10 @@ namespace {
     }
 
     // Load the extra_datafiles that defines table constants (simulating Zen Cart's auto-load behavior)
-    require_once DIR_FS_CATALOG . 'includes/extra_datafiles/ppac_database_tables.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/extra_datafiles/ppac_database_tables.php';
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
 
     class MockDbRecord
     {
@@ -110,7 +110,7 @@ namespace PayPalAdvancedCheckout\Api {
 
 namespace {
     // Now load the PayPalCommon class for testing
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/paypal_common.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/paypal_common.php';
 
     $failures = 0;
 

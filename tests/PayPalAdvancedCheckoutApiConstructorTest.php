@@ -42,25 +42,25 @@ namespace {
 
 namespace PayPalAdvancedCheckout\Common {
     if (!class_exists(Helpers::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
     }
     if (!class_exists(Logger::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
     }
     if (!class_exists(ErrorInfo::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
     }
 }
 
 namespace PayPalAdvancedCheckout\Token {
     if (!class_exists(TokenCache::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Token/TokenCache.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Token/TokenCache.php';
     }
 }
 
 namespace PayPalAdvancedCheckout\Api {
     if (!class_exists(PayPalAdvancedCheckoutApi::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php';
     }
 }
 

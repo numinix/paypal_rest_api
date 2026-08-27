@@ -34,8 +34,8 @@ class ApplePayAuthorizeModeOrderStatusTest
     
     public function __construct()
     {
-        $this->applePayFile = dirname(__DIR__) . '/includes/modules/payment/paypalac_applepay.php';
-        $this->paypalacFile = dirname(__DIR__) . '/includes/modules/payment/paypalac.php';
+        $this->applePayFile = dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_applepay.php';
+        $this->paypalacFile = dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac.php';
         
         if (!file_exists($this->applePayFile)) {
             throw new RuntimeException("Apple Pay file not found: {$this->applePayFile}");

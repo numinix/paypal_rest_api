@@ -29,7 +29,7 @@ echo "Test 1: Checking FILENAME_PAYPALAC_WEBHOOK_LOGS in extra_datafiles...\n";
 if (!defined('DB_PREFIX')) {
     define('DB_PREFIX', '');
 }
-require_once $basePath . '/admin/includes/extra_datafiles/paypalac_filenames.php';
+require_once $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/includes/extra_datafiles/paypalac_filenames.php';
 if (defined('FILENAME_PAYPALAC_WEBHOOK_LOGS') && constant('FILENAME_PAYPALAC_WEBHOOK_LOGS') === 'paypalac_webhook_logs') {
     echo "✓ FILENAME_PAYPALAC_WEBHOOK_LOGS is defined with correct value\n\n";
 } else {
@@ -39,7 +39,7 @@ if (defined('FILENAME_PAYPALAC_WEBHOOK_LOGS') && constant('FILENAME_PAYPALAC_WEB
 
 // ---- Test 2: BOX constant in extra_definitions ----
 echo "Test 2: Checking BOX_PAYPALAC_WEBHOOK_LOGS in extra_definitions...\n";
-require_once $basePath . '/admin/includes/languages/english/extra_definitions/paypalac_admin_names.php';
+require_once $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/includes/languages/english/extra_definitions/paypalac_admin_names.php';
 if (defined('BOX_PAYPALAC_WEBHOOK_LOGS') && constant('BOX_PAYPALAC_WEBHOOK_LOGS') === 'PayPal Webhook Logs') {
     echo "✓ BOX_PAYPALAC_WEBHOOK_LOGS is defined with correct value\n\n";
 } else {
@@ -49,7 +49,7 @@ if (defined('BOX_PAYPALAC_WEBHOOK_LOGS') && constant('BOX_PAYPALAC_WEBHOOK_LOGS'
 
 // ---- Test 3: TABLE_PAYPAL_WEBHOOKS constant ----
 echo "Test 3: Checking TABLE_PAYPAL_WEBHOOKS in ppac_database_tables.php...\n";
-require_once $basePath . '/admin/includes/extra_datafiles/ppac_database_tables.php';
+require_once $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/includes/extra_datafiles/ppac_database_tables.php';
 if (defined('TABLE_PAYPAL_WEBHOOKS') && constant('TABLE_PAYPAL_WEBHOOKS') === 'paypal_webhooks') {
     echo "✓ TABLE_PAYPAL_WEBHOOKS is defined with correct value\n\n";
 } else {
@@ -59,7 +59,7 @@ if (defined('TABLE_PAYPAL_WEBHOOKS') && constant('TABLE_PAYPAL_WEBHOOKS') === 'p
 
 // ---- Test 4: Admin report page file exists ----
 echo "Test 4: Checking admin report page file exists...\n";
-$adminPage = $basePath . '/admin/paypalac_webhook_logs.php';
+$adminPage = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/paypalac_webhook_logs.php';
 if (file_exists($adminPage)) {
     echo "✓ admin/paypalac_webhook_logs.php exists\n\n";
 } else {
@@ -69,7 +69,7 @@ if (file_exists($adminPage)) {
 
 // ---- Test 5: Version constant updated to 1.3.11 ----
 echo "Test 5: Checking CURRENT_VERSION is 1.3.11...\n";
-$paypalacFile = $basePath . '/includes/modules/payment/paypalac.php';
+$paypalacFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac.php';
 $paypalacContent = file_get_contents($paypalacFile);
 if (strpos($paypalacContent, "protected const CURRENT_VERSION = '1.3.11'") !== false) {
     echo "✓ CURRENT_VERSION is set to 1.3.11\n\n";
@@ -142,8 +142,8 @@ if ($hasSearch && $hasPagination && $hasClear && $hasNuminixStyle && $hasTable) 
 
 // ---- Test 11: Correct file separation (FILENAME in datafiles, BOX in definitions) ----
 echo "Test 11: Checking correct constant separation for webhook logs...\n";
-$datafilesContent = file_get_contents($basePath . '/admin/includes/extra_datafiles/paypalac_filenames.php');
-$definitionsContent = file_get_contents($basePath . '/admin/includes/languages/english/extra_definitions/paypalac_admin_names.php');
+$datafilesContent = file_get_contents($basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/includes/extra_datafiles/paypalac_filenames.php');
+$definitionsContent = file_get_contents($basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/includes/languages/english/extra_definitions/paypalac_admin_names.php');
 
 $filenameInDatafiles = strpos($datafilesContent, 'FILENAME_PAYPALAC_WEBHOOK_LOGS') !== false;
 $boxInDefinitions = strpos($definitionsContent, 'BOX_PAYPALAC_WEBHOOK_LOGS') !== false;
@@ -159,7 +159,7 @@ if ($filenameInDatafiles && $boxInDefinitions && $filenameNotInDefinitions && $b
 
 // ---- Test 12: WebhookController saveToDatabase includes verification_status ----
 echo "Test 12: Checking WebhookController saves verification_status...\n";
-$controllerFile = $basePath . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookController.php';
+$controllerFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookController.php';
 $controllerContent = file_get_contents($controllerFile);
 $hasSaveParam = strpos($controllerContent, "verification_status") !== false;
 $hasSaveAllPaths = strpos($controllerContent, "'ignored'") !== false

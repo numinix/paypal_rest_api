@@ -17,7 +17,7 @@ define('DIR_WS_MODULES', 'includes/modules/');
 define('TABLE_PAYPAL_SUBSCRIPTIONS', 'paypal_subscriptions');
 define('TABLE_PAYPAL_VAULT', 'paypal_vault');
 
-require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
+require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 
 use PayPalAdvancedCheckout\Common\SubscriptionManager;
 

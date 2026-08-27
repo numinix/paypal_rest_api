@@ -24,8 +24,8 @@ declare(strict_types=1);
 fwrite(STDOUT, "Running Recurring Cron Payment Source Null Handling Test...\n\n");
 
 $basePath = dirname(__DIR__);
-$paypalCommonFile = $basePath . '/includes/modules/payment/paypal/paypal_common.php';
-$loggerFile = $basePath . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
+$paypalCommonFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/paypal_common.php';
+$loggerFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
 
 if (!file_exists($paypalCommonFile)) {
     fwrite(STDERR, "✗ paypal_common.php not found\n\n");

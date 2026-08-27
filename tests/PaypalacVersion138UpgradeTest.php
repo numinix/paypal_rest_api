@@ -20,7 +20,7 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify version constant is updated to 1.3.8
 echo "Test 1: Checking version constant...\n";
-$paypalacFile = $basePath . '/includes/modules/payment/paypalac.php';
+$paypalacFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac.php';
 if (file_exists($paypalacFile)) {
     $content = file_get_contents($paypalacFile);
     if (strpos($content, "protected const CURRENT_VERSION = '1.3.8'") !== false) {

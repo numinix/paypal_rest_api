@@ -18,7 +18,7 @@ if (!defined('DIR_WS_MODULES')) {
 // Create a minimal PSR-4 autoloader for PayPalAdvancedCheckout namespace
 spl_autoload_register(function ($class) {
     $prefix = 'PayPalAdvancedCheckout\\';
-    $base_dir = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/';
+    $base_dir = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/';
     
     $len = strlen($prefix);
     if (strncmp($prefix, $class, $len) !== 0) {

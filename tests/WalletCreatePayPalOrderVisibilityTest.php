@@ -24,9 +24,9 @@
 class WalletCreatePayPalOrderVisibilityTest
 {
     private array $walletModules = [
-        'paypalac_applepay' => 'includes/modules/payment/paypalac_applepay.php',
-        'paypalac_googlepay' => 'includes/modules/payment/paypalac_googlepay.php',
-        'paypalac_venmo' => 'includes/modules/payment/paypalac_venmo.php',
+        'paypalac_applepay' => 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_applepay.php',
+        'paypalac_googlepay' => 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_googlepay.php',
+        'paypalac_venmo' => 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_venmo.php',
     ];
     private string $commonFile;
     private array $testResults = [];
@@ -34,7 +34,7 @@ class WalletCreatePayPalOrderVisibilityTest
     public function __construct()
     {
         $baseDir = dirname(__DIR__);
-        $this->commonFile = $baseDir . '/includes/modules/payment/paypal/paypal_common.php';
+        $this->commonFile = $baseDir . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/paypal_common.php';
         
         // Verify common file exists
         if (!file_exists($this->commonFile)) {

@@ -82,7 +82,7 @@ namespace {
      */
     function testPaypalacGetEnvironmentInfoTrims(): bool
     {
-        $filePath = DIR_FS_CATALOG . 'includes/modules/payment/paypalac.php';
+        $filePath = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac.php';
         
         if (!file_exists($filePath)) {
             fwrite(STDERR, "FAIL: paypalac.php not found\n");

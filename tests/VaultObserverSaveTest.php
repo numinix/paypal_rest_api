@@ -42,8 +42,8 @@ namespace {
         $GLOBALS['psr4Autoloader'] = new mockPsr4Autoloader();
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
 
     // Mock database class
     class queryFactoryResult
@@ -165,7 +165,7 @@ namespace Zencart\Traits {
 }
 
 namespace {
-    require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout_vault.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/observers/auto.paypaladvcheckout_vault.php';
 
     use PHPUnit\Framework\TestCase;
 

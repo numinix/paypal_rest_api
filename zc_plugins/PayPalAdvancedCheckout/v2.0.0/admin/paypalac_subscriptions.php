@@ -1,0 +1,3195 @@
+<?php
+/**
+ * Admin report for managing vaulted subscriptions created via PayPal Advanced Checkout.
+ *
+ * Lists the normalized subscription records captured by the recurring observer and
+ * lets administrators adjust billing metadata, update vault assignments, and manage
+ * statuses for any saved payment instrument (cards, wallets, etc.).
+ * 
+ * Compatible with:
+ * - paypalwpp.php (Website Payments Pro)
+ * - paypal.php (PayPal Standard)
+ * - paypaldp.php (Direct Payments)
+ * - paypalac.php (REST API)
+ * - payflow.php (Payflow)
+ */
+
+require 'includes/application_top.php';
+
+$autoloaderPath = dirname(__DIR__) . '/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageAutoloader.php';
+if (is_file($autoloaderPath)) {
+    require_once $autoloaderPath;
+    \PayPalAdvancedCheckout\Compatibility\LanguageAutoloader::register();
+}
+
+require_once dirname(__DIR__) . '/catalog/includes/modules/payment/paypal/ppacAutoload.php';
+
+// Load PayPalProfileManager for legacy profile operations
+if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.php')) {
+    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.php';
+}
+
+// Load saved card recurring class
+if (file_exists(dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php')) {
+    require_once dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php';
+}
+
+use PayPalAdvancedCheckout\Common\SubscriptionManager;
+use PayPalAdvancedCheckout\Common\SavedCreditCardsManager;
+use PayPalAdvancedCheckout\Common\VaultManager;
+
+SubscriptionManager::ensureSchema();
+SavedCreditCardsManager::ensureSchema();
+VaultManager::ensureSchema();
+
+// One-time-ish backfill of saved-card expiration_date for active schedules.
+// Cheap probe first: do not scan/update the whole table on every page view.
+if (class_exists('paypalacSavedCardRecurring')) {
+    $paypalacExpiryBackfill = new paypalacSavedCardRecurring();
+    if (method_exists($paypalacExpiryBackfill, 'saved_card_expiration_backfill_needed')
+        ? $paypalacExpiryBackfill->saved_card_expiration_backfill_needed()
+        : true
+    ) {
+        $paypalacExpiryBackfill->backfill_saved_card_expiration_dates();
+    }
+}
+
+define('FILENAME_PAYPALAC_SUBSCRIPTIONS', basename(__FILE__));
+
+if (!defined('HEADING_TITLE')) {
+    define('HEADING_TITLE', 'PayPal Vaulted Subscriptions');
+}
+
+/**
+ * @return array<string,string>
+ */
+function paypalac_known_status_labels()
+{
+    return [
+        'pending' => 'Pending',
+        'awaiting_vault' => 'Awaiting Vault',
+        'scheduled' => 'Scheduled',
+        'active' => 'Active',
+        'paused' => 'Paused',
+        'suspended' => 'Suspended',
+        'cancelled' => 'Cancelled',
+        'complete' => 'Complete',
+        'failed' => 'Failed',
+    ];
+}
+
+/**
+ * True when a DB date/datetime value is usable for expiry math.
+ */
+function paypalac_subscription_date_is_usable(?string $raw): bool
+{
+    $raw = trim((string) $raw);
+    return $raw !== '' && !str_starts_with($raw, '0000-00-00');
+}
+
+/**
+ * True when next_payment_date represents a future charge the system will attempt.
+ *
+ * @param array<string,mixed> $row
+ */
+function paypalac_subscription_next_payment_is_chargeable(array $row): bool
+{
+    if (!paypalac_subscription_date_is_usable(isset($row['next_payment_date']) ? (string) $row['next_payment_date'] : null)) {
+        return false;
+    }
+
+    $status = strtolower(trim((string) ($row['status'] ?? '')));
+    if (($row['subscription_type'] ?? '') === 'savedcard') {
+        if ($status !== 'scheduled') {
+            return false;
+        }
+        $cycles = (int) ($row['total_billing_cycles'] ?? 0);
+        if ($cycles <= 0) {
+            return true;
+        }
+        $completed = (int) ($row['payments_completed'] ?? 0);
+        return $completed < $cycles;
+    }
+
+    return in_array($status, ['active', 'scheduled', 'pending', 'awaiting_vault'], true);
+}
+
+/**
+ * Add N billing-period units to a date (Day/Week/Month/Year/SemiMonth).
+ */
+function paypalac_add_billing_periods(DateTimeImmutable $dt, string $period, int $amount): ?DateTimeImmutable
+{
+    if ($amount === 0) {
+        return $dt;
+    }
+
+    $period = strtolower(trim($period));
+    $sign = $amount >= 0 ? '+' : '-';
+    $abs = abs($amount);
+
+    switch ($period) {
+        case 'day':
+        case 'days':
+            $modified = $dt->modify($sign . $abs . ' days');
+            break;
+        case 'week':
+        case 'weeks':
+            $modified = $dt->modify($sign . $abs . ' weeks');
+            break;
+        case 'semimonth':
+            $modified = $dt->modify($sign . ($abs * 14) . ' days');
+            break;
+        case 'month':
+        case 'months':
+            $modified = $dt->modify($sign . $abs . ' months');
+            break;
+        case 'year':
+        case 'years':
+        case '':
+            $modified = $dt->modify($sign . $abs . ' years');
+            break;
+        default:
+            $modified = $dt->modify($sign . $abs . ' years');
+            break;
+    }
+
+    return $modified instanceof DateTimeImmutable ? $modified : null;
+}
+
+/**
+ * Calculate subscription expiry from start/next date and remaining billing cycles.
+ * total_billing_cycles of 0 means indefinite (returns null).
+ *
+ * @param array<string,mixed> $row
+ */
+function paypalac_calculate_subscription_expiry_date(array $row): ?string
+{
+    // Prefer the persisted creation-time expiration_date when present.
+    $stored = trim((string) ($row['expiration_date'] ?? ''));
+    if (paypalac_subscription_date_is_usable($stored)) {
+        return substr($stored, 0, 10);
+    }
+
+    $cycles = (int) ($row['total_billing_cycles'] ?? 0);
+    if ($cycles <= 0) {
+        return null;
+    }
+
+    $frequency = (int) ($row['billing_frequency'] ?? 0);
+    if ($frequency <= 0) {
+        $frequency = 1;
+    }
+
+    $period = (string) ($row['billing_period'] ?? '');
+    $nextRaw = trim((string) ($row['next_payment_date'] ?? ''));
+    $completed = max(0, (int) ($row['payments_completed'] ?? 0));
+    $remaining = max(0, $cycles - $completed);
+
+    // Upcoming chargeable renewals: expiry is one period after the final remaining charge.
+    if (($row['subscription_type'] ?? '') === 'savedcard'
+        && paypalac_subscription_next_payment_is_chargeable($row)
+        && $remaining > 0
+    ) {
+        try {
+            $dt = new DateTimeImmutable(substr($nextRaw, 0, 10));
+        } catch (Exception $e) {
+            $dt = null;
+        }
+        if ($dt instanceof DateTimeImmutable) {
+            $expiry = paypalac_add_billing_periods($dt, $period, $remaining * $frequency);
+            return $expiry instanceof DateTimeImmutable ? $expiry->format('Y-m-d') : null;
+        }
+    }
+
+    $startCandidates = [
+        $row['date_added'] ?? null,
+        $row['date_purchased'] ?? null,
+        $row['order_date_purchased'] ?? null,
+    ];
+
+    $startRaw = '';
+    foreach ($startCandidates as $candidate) {
+        if (paypalac_subscription_date_is_usable(is_string($candidate) || is_numeric($candidate) ? (string) $candidate : null)) {
+            $startRaw = trim((string) $candidate);
+            break;
+        }
+    }
+
+    if ($startRaw !== '') {
+        try {
+            $dt = new DateTimeImmutable(substr($startRaw, 0, 10));
+        } catch (Exception $e) {
+            $dt = null;
+        }
+        if ($dt instanceof DateTimeImmutable) {
+            $expiry = paypalac_add_billing_periods($dt, $period, $cycles * $frequency);
+            return $expiry instanceof DateTimeImmutable ? $expiry->format('Y-m-d') : null;
+        }
+    }
+
+    // Non-chargeable marker date (common when next_payment was left as membership end).
+    if (!paypalac_subscription_date_is_usable($nextRaw)) {
+        return null;
+    }
+
+    try {
+        $dt = new DateTimeImmutable(substr($nextRaw, 0, 10));
+    } catch (Exception $e) {
+        return null;
+    }
+
+    return $dt->format('Y-m-d');
+}
+
+/**
+ * Human-readable expiry for admin table/export: date, "Indefinite", or em dash.
+ *
+ * @param array<string,mixed> $row
+ */
+function paypalac_format_subscription_expiry_display(array $row): string
+{
+    if ((int) ($row['total_billing_cycles'] ?? 0) <= 0) {
+        return defined('TEXT_PAYPALAC_SUBSCRIPTION_EXPIRY_INDEFINITE')
+            ? TEXT_PAYPALAC_SUBSCRIPTION_EXPIRY_INDEFINITE
+            : 'Indefinite';
+    }
+
+    $expiry = paypalac_calculate_subscription_expiry_date($row);
+    if ($expiry === null) {
+        return '—';
+    }
+
+    return zen_date_short($expiry);
+}
+
+/**
+ * Build a customer label for filter dropdowns; empty when no usable identity exists.
+ */
+function paypalac_subscription_customer_label(array $row): string
+{
+    $first = trim((string) ($row['customers_firstname'] ?? ''));
+    $last = trim((string) ($row['customers_lastname'] ?? ''));
+    $email = trim((string) ($row['customers_email_address'] ?? ''));
+    $memNum = trim((string) ($row['mem_num'] ?? ''));
+
+    $name = trim($last . ($last !== '' && $first !== '' ? ', ' : '') . $first);
+    if ($name !== '') {
+        if ($email !== '') {
+            return $name . ' (' . $email . ')';
+        }
+
+        return $name;
+    }
+    if ($email !== '') {
+        return $email;
+    }
+    if ($memNum !== '') {
+        return 'Member #' . $memNum;
+    }
+
+    return '';
+}
+
+/**
+ * @param array<int,array<string,mixed>> $subscriptions
+ * @return array<int,string>
+ */
+function paypalac_collect_subscription_customer_options(array $subscriptions): array
+{
+    $customers = [];
+    $customerEmailsSeen = [];
+
+    foreach ($subscriptions as $row) {
+        $customersId = (int) ($row['customers_id'] ?? 0);
+        if ($customersId <= 0) {
+            continue;
+        }
+
+        $customerLabel = paypalac_subscription_customer_label($row);
+        if ($customerLabel === '') {
+            continue;
+        }
+
+        $emailKey = strtolower(trim((string) ($row['customers_email_address'] ?? '')));
+        if ($emailKey !== '') {
+            if (!isset($customerEmailsSeen[$emailKey])) {
+                $customerEmailsSeen[$emailKey] = $customersId;
+                $customers[$customersId] = $customerLabel;
+            }
+            continue;
+        }
+
+        if (!isset($customers[$customersId])) {
+            $customers[$customersId] = $customerLabel;
+        }
+    }
+
+    asort($customers);
+
+    return $customers;
+}
+
+/**
+ * Get PayPalProfileManager instance for API operations
+ * @return PayPalProfileManager|null
+ */
+function paypalac_get_profile_manager()
+{
+    static $profileManager = null;
+    static $initialized = false;
+    
+    if ($initialized) {
+        return $profileManager;
+    }
+    $initialized = true;
+    
+    if (!class_exists('PayPalProfileManager')) {
+        return null;
+    }
+    
+    try {
+        $PayPal = null;
+        
+        // Initialize legacy PayPal API if available
+        if (defined('MODULE_PAYMENT_PAYPALWPP_STATUS') && MODULE_PAYMENT_PAYPALWPP_STATUS === 'True') {
+            if (file_exists(DIR_WS_MODULES . 'payment/paypal/class.paypal_wpp_recurring.php')) {
+                require_once DIR_WS_MODULES . 'payment/paypal/class.paypal_wpp_recurring.php';
+                $PayPalConfig = [
+                    'Sandbox' => (MODULE_PAYMENT_PAYPALWPP_SERVER == 'sandbox'),
+                    'APIUsername' => MODULE_PAYMENT_PAYPALWPP_APIUSERNAME,
+                    'APIPassword' => MODULE_PAYMENT_PAYPALWPP_APIPASSWORD,
+                    'APISignature' => MODULE_PAYMENT_PAYPALWPP_APISIGNATURE
+                ];
+                if (class_exists('PayPal')) {
+                    $PayPal = new PayPal($PayPalConfig);
+                }
+            }
+        }
+        
+        $PayPalRestClient = null;
+        if (class_exists('paypalacSavedCardRecurring')) {
+            $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+            $PayPalRestClient = $paypalacSavedCardRecurring->get_paypal_rest_client();
+        }
+        
+        $profileManager = PayPalProfileManager::create($PayPalRestClient, $PayPal);
+    } catch (Exception $e) {
+        error_log('PayPalProfileManager initialization failed: ' . $e->getMessage());
+    }
+    
+    return $profileManager;
+}
+
+/**
+ * Check if a subscription is active based on its type.
+ */
+function paypalac_is_subscription_active($subscriptionType, $subscriptionId)
+{
+    global $db;
+
+    $subscriptionType = strtolower(trim((string) $subscriptionType));
+    if ($subscriptionType === 'savedcard' && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        $statusResult = $db->Execute(
+            "SELECT status FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE saved_credit_card_recurring_id = " . (int) $subscriptionId . " LIMIT 1"
+        );
+        if ($statusResult instanceof queryFactoryResult && $statusResult->RecordCount() > 0) {
+            $s = strtolower((string) ($statusResult->fields['status'] ?? ''));
+            return $s === 'active' || $s === 'scheduled';
+        }
+        return false;
+    }
+
+    $statusResult = $db->Execute(
+        "SELECT status FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId . " LIMIT 1"
+    );
+    if ($statusResult instanceof queryFactoryResult && $statusResult->RecordCount() > 0) {
+        $s = strtolower((string) ($statusResult->fields['status'] ?? ''));
+        return $s === 'active' || $s === 'scheduled';
+    }
+
+    return false;
+}
+
+/**
+ * Normalize a request-provided subscription type to one of the supported values.
+ *
+ * This admin page manages both PayPal REST API subscriptions
+ * (TABLE_PAYPAL_SUBSCRIPTIONS) and Zen Cart-managed saved-card subscriptions
+ * (TABLE_SAVED_CREDIT_CARDS_RECURRING). Action handlers branch on the return
+ * value of this function, so a stubbed-out implementation would silently route
+ * every saved-card cancel/suspend/reactivate request to the REST table.
+ */
+function paypalac_normalize_subscription_type($subscriptionType)
+{
+    $subscriptionType = strtolower(trim((string) $subscriptionType));
+    if ($subscriptionType === 'savedcard' || $subscriptionType === 'saved_card' || $subscriptionType === 'saved-card') {
+        return 'savedcard';
+    }
+    return 'rest';
+}
+
+/**
+ * Load a paypal_subscriptions row by its internal primary key, or return null.
+ * Used by the admin lock to decide whether a subscription is PayPal-managed
+ * (paypal_subscription_remote_id present) and therefore read-only.
+ *
+ * @return array<string,mixed>|null
+ */
+function paypalac_admin_load_rest_subscription(int $subscriptionId): ?array
+{
+    if ($subscriptionId <= 0) {
+        return null;
+    }
+
+    global $db;
+
+    $result = $db->Execute(
+        "SELECT * FROM " . TABLE_PAYPAL_SUBSCRIPTIONS
+        . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+        . " LIMIT 1"
+    );
+
+    if (!is_object($result) || $result->EOF) {
+        return null;
+    }
+
+    return $result->fields;
+}
+
+/**
+ * Return true when a paypal_subscriptions row represents a PayPal-managed
+ * subscription (i.e. PayPal owns the billing schedule and we hold a
+ * paypal_subscription_remote_id token like I-XXXXXX).
+ */
+function paypalac_admin_is_paypal_managed(?array $subscriptionRow): bool
+{
+    if (!is_array($subscriptionRow)) {
+        return false;
+    }
+    return trim((string) ($subscriptionRow['paypal_subscription_remote_id'] ?? '')) !== '';
+}
+
+/**
+ * Push a cancel/suspend/activate change up to PayPal for a PayPal-managed
+ * subscription. Returns true on a successful API call. On failure, the
+ * caller should keep the local state untouched and surface the error to
+ * the admin so they can retry.
+ *
+ * @param string|null $errorMessage Out-param populated with a human-readable
+ *  description of the API failure (PayPal issue id / message) when this
+ *  function returns false. Useful for surfacing exact failure context in the
+ *  admin message stack so the operator doesn't have to dig through logs.
+ */
+function paypalac_admin_push_remote_status(array $subscriptionRow, string $targetStatus, ?string &$errorMessage = null): bool
+{
+    global $messageStack;
+
+    $remoteId = trim((string) ($subscriptionRow['paypal_subscription_remote_id'] ?? ''));
+    if ($remoteId === '') {
+        return false;
+    }
+
+    // The `paypalac` class lives in the catalog tree and is not auto-loaded in
+    // the admin context (the ppacAutoload only registers the namespaced
+    // PayPalAdvancedCheckout\* classes). Calling \paypalac::getEnvironmentInfo()
+    // here without first requiring the module file throws
+    // "Uncaught Error: Class 'paypalac' not found", which surfaces as a 500
+    // when the admin clicks Cancel/Suspend/Activate at PayPal.
+    if (!class_exists('paypalac', false)) {
+        $modulePath = dirname(__DIR__) . '/catalog/includes/modules/payment/paypalac.php';
+        if (!is_file($modulePath)) {
+            if (isset($messageStack)) {
+                $messageStack->add_session('PayPal AC payment module not found; cannot push remote status.', 'error');
+            }
+            return false;
+        }
+        require_once $modulePath;
+    }
+
+    if (!class_exists('paypalac', false) || !method_exists('paypalac', 'getEnvironmentInfo')) {
+        if (isset($messageStack)) {
+            $messageStack->add_session('PayPal AC payment module is missing getEnvironmentInfo(); cannot push remote status.', 'error');
+        }
+        return false;
+    }
+
+    [$clientId, $secret] = \paypalac::getEnvironmentInfo();
+    if ($clientId === '' || $secret === '') {
+        return false;
+    }
+
+    $api = new \PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi(
+        MODULE_PAYMENT_PAYPALAC_SERVER,
+        $clientId,
+        $secret
+    );
+
+    $reason = ['reason' => 'Admin request via paypalac_subscriptions.php'];
+
+    switch ($targetStatus) {
+        case 'cancelled':
+        case 'canceled':
+            $response = $api->cancelSubscription($remoteId, $reason);
+            break;
+        case 'suspended':
+            $response = $api->suspendSubscription($remoteId, $reason);
+            break;
+        case 'active':
+        case 'activated':
+            $response = $api->activateSubscription($remoteId, $reason);
+            break;
+        default:
+            $errorMessage = 'Unsupported target status: ' . $targetStatus;
+            return false;
+    }
+
+    // PayPal returns null / empty body on successful 204; the API wrapper
+    // surfaces that as either null, true, or an empty array depending on
+    // the curl path. Treat anything that isn't an outright false as success.
+    if ($response === false) {
+        $errorInfo = method_exists($api, 'getErrorInfo') ? $api->getErrorInfo() : [];
+        $issue = (string) ($errorInfo['name'] ?? '');
+        $detailIssue = (string) ($errorInfo['details'][0]['issue'] ?? '');
+        $description = (string) ($errorInfo['message'] ?? ($errorInfo['details'][0]['description'] ?? ''));
+        $pieces = array_filter([$issue, $detailIssue, $description], static fn($v) => $v !== '');
+        $errorMessage = $pieces === [] ? 'PayPal API call failed with no details.' : implode(' / ', $pieces);
+        return false;
+    }
+    return true;
+}
+
+$action = strtolower(trim((string) ($_POST['action'] ?? $_GET['action'] ?? '')));
+
+// AJAX: return order info (products + customer saved cards) for the manual create form
+if ($action === 'get_order_info') {
+    header('Content-Type: application/json');
+    $ordersId = (int) ($_GET['orders_id'] ?? 0);
+    if ($ordersId <= 0) {
+        echo json_encode(['error' => 'Invalid order ID']);
+        exit;
+    }
+
+    $orderRow = $db->Execute(
+        "SELECT o.orders_id, o.customers_id, o.currency, o.currency_value,
+                c.customers_firstname, c.customers_lastname
+           FROM " . TABLE_ORDERS . " o
+           LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = o.customers_id
+          WHERE o.orders_id = " . $ordersId . " LIMIT 1"
+    );
+    if (!($orderRow instanceof queryFactoryResult) || $orderRow->EOF) {
+        echo json_encode(['error' => 'Order not found']);
+        exit;
+    }
+
+    $customersId  = (int) $orderRow->fields['customers_id'];
+    $currency     = (string) ($orderRow->fields['currency'] ?? '');
+    $customerName = trim(($orderRow->fields['customers_firstname'] ?? '') . ' ' . ($orderRow->fields['customers_lastname'] ?? ''));
+
+    // Get products for this order
+    $productsResult = $db->Execute(
+        "SELECT op.orders_products_id, op.products_id, op.products_name, op.final_price, op.products_quantity
+           FROM " . TABLE_ORDERS_PRODUCTS . " op
+          WHERE op.orders_id = " . $ordersId
+    );
+    $products = [];
+    if ($productsResult instanceof queryFactoryResult) {
+        while (!$productsResult->EOF) {
+            $products[] = [
+                'orders_products_id' => (int) $productsResult->fields['orders_products_id'],
+                'products_id'        => (int) $productsResult->fields['products_id'],
+                'products_name'      => $productsResult->fields['products_name'],
+                'final_price'        => (float) $productsResult->fields['final_price'],
+                'quantity'           => (float) $productsResult->fields['products_quantity'],
+            ];
+            $productsResult->MoveNext();
+        }
+    }
+
+    // Get saved cards for this customer — only PayPal AC vaulted cards.
+    // Legacy (Payflow / WPP) cards are excluded so that the two systems remain separate.
+    $savedCards = [];
+    if (defined('TABLE_SAVED_CREDIT_CARDS') && defined('TABLE_PAYPAL_VAULT')) {
+        $cardsResult = $db->Execute(
+            "SELECT sc.saved_credit_card_id, sc.type, sc.last_digits, sc.expiry_month, sc.expiry_year, sc.holder_name, sc.vault_id
+               FROM " . TABLE_SAVED_CREDIT_CARDS . " sc
+               INNER JOIN " . TABLE_PAYPAL_VAULT . " pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id
+              WHERE sc.customers_id = " . $customersId . " AND sc.is_deleted = 0 AND sc.vault_id != ''
+              ORDER BY sc.is_default DESC, sc.saved_credit_card_id DESC"
+        );
+        if ($cardsResult instanceof queryFactoryResult) {
+            while (!$cardsResult->EOF) {
+                $savedCards[] = [
+                    'saved_credit_card_id' => (int) $cardsResult->fields['saved_credit_card_id'],
+                    'label'                => trim(
+                        ($cardsResult->fields['type'] ?? '') . ' ending in ' .
+                        ($cardsResult->fields['last_digits'] ?? '') . ' (exp ' .
+                        ($cardsResult->fields['expiry_month'] ?? '') . '/' .
+                        ($cardsResult->fields['expiry_year'] ?? '') . ')'
+                    ),
+                    'vault_id'             => $cardsResult->fields['vault_id'] ?? '',
+                ];
+                $cardsResult->MoveNext();
+            }
+        }
+    }
+
+    // Also check vault records that may not yet be synced to saved_credit_cards
+    $vaultCards = VaultManager::getCustomerVaultedCards($customersId, false);
+    foreach ($vaultCards as $vc) {
+        // Check whether this vault_id already appears in saved_credit_cards
+        $alreadyListed = false;
+        foreach ($savedCards as $sc) {
+            if ($sc['vault_id'] === ($vc['vault_id'] ?? '')) {
+                $alreadyListed = true;
+                break;
+            }
+        }
+        if (!$alreadyListed) {
+            // Look up saved_credit_card_id by vault_id
+            $savedCcId = 0;
+            if (defined('TABLE_SAVED_CREDIT_CARDS') && !empty($vc['vault_id'])) {
+                $vaultLookup = $db->Execute(
+                    "SELECT saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . "
+                      WHERE vault_id = '" . zen_db_input($vc['vault_id']) . "'
+                        AND is_deleted = 0
+                      LIMIT 1"
+                );
+                if ($vaultLookup instanceof queryFactoryResult && !$vaultLookup->EOF) {
+                    $savedCcId = (int) $vaultLookup->fields['saved_credit_card_id'];
+                }
+            }
+            $savedCards[] = [
+                'saved_credit_card_id' => $savedCcId,
+                'label'                => trim(
+                    ($vc['brand'] ?? $vc['card_type'] ?? 'Card') . ' ending in ' .
+                    ($vc['last_digits'] ?? '') . ' (vault: ' . substr($vc['vault_id'] ?? '', 0, 8) . '...)'
+                ),
+                'vault_id'             => $vc['vault_id'] ?? '',
+            ];
+        }
+    }
+
+    echo json_encode([
+        'orders_id'     => $ordersId,
+        'customers_id'  => $customersId,
+        'customer_name' => $customerName,
+        'currency'      => $currency,
+        'products'      => $products,
+        'saved_cards'   => $savedCards,
+    ]);
+    exit;
+}
+
+// Create subscription manually
+if ($action === 'create_subscription') {
+    $redirectQuery = trim((string) ($_POST['redirect_query'] ?? ''));
+    $redirectUrl   = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+
+    // Legacy saved-card subscription creation has been disabled. Only PayPal-managed
+    // (REST) subscriptions are supported going forward; those are created automatically
+    // when an order contains a product that has a paypal_subscription_plan_id attribute.
+    $messageStack->add_session(
+        'Manual saved-card subscription creation is disabled. Add a paypal_subscription_plan_id attribute to the product so the REST subscription system creates it during checkout.',
+        'error'
+    );
+    zen_redirect($redirectUrl);
+
+    $ordersId           = (int) zen_db_prepare_input($_POST['orders_id'] ?? 0);
+    $ordersProductsId   = (int) zen_db_prepare_input($_POST['orders_products_id'] ?? 0);
+    $savedCreditCardId  = (int) zen_db_prepare_input($_POST['saved_credit_card_id'] ?? 0);
+    $nextPaymentDate    = trim((string) zen_db_prepare_input($_POST['next_payment_date'] ?? ''));
+    $billingPeriod      = strtoupper(str_replace([' ', "\t"], '_', (string) zen_db_prepare_input($_POST['billing_period'] ?? '')));
+    $billingFrequency   = (int) zen_db_prepare_input($_POST['billing_frequency'] ?? 1);
+    $totalBillingCycles = (int) zen_db_prepare_input($_POST['total_billing_cycles'] ?? 0);
+    $amount             = (float) zen_db_prepare_input($_POST['amount'] ?? 0);
+    $currencyCode       = substr(strtoupper((string) zen_db_prepare_input($_POST['currency_code'] ?? '')), 0, 3);
+
+    // Basic validation
+    if ($ordersId <= 0 || $ordersProductsId <= 0 || $savedCreditCardId <= 0) {
+        $messageStack->add_session('Create subscription failed: order, product and saved card are required.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    if ($nextPaymentDate === '') {
+        $messageStack->add_session('Create subscription failed: next payment date is required.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    $dateObj = DateTime::createFromFormat('Y-m-d', $nextPaymentDate);
+    if (!$dateObj || $dateObj->format('Y-m-d') !== $nextPaymentDate) {
+        $messageStack->add_session('Create subscription failed: invalid next payment date format (use YYYY-MM-DD).', 'error');
+        zen_redirect($redirectUrl);
+    }
+    if ($billingPeriod === '' || $billingFrequency <= 0) {
+        $messageStack->add_session('Create subscription failed: billing period and frequency are required.', 'error');
+        zen_redirect($redirectUrl);
+    }
+
+    // Look up order to validate it exists and get customer/currency info
+    $orderCheck = $db->Execute(
+        "SELECT o.customers_id, o.currency
+           FROM " . TABLE_ORDERS . " o
+          WHERE o.orders_id = " . $ordersId . " LIMIT 1"
+    );
+    if (!($orderCheck instanceof queryFactoryResult) || $orderCheck->EOF) {
+        $messageStack->add_session('Create subscription failed: order #' . $ordersId . ' not found.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    $customersId = (int) $orderCheck->fields['customers_id'];
+    if (empty($currencyCode)) {
+        $currencyCode = (string) ($orderCheck->fields['currency'] ?? (defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : 'USD'));
+    }
+
+    // Look up product details
+    $productCheck = $db->Execute(
+        "SELECT products_id, products_name, final_price
+           FROM " . TABLE_ORDERS_PRODUCTS . "
+          WHERE orders_products_id = " . $ordersProductsId . "
+            AND orders_id = " . $ordersId . " LIMIT 1"
+    );
+    if (!($productCheck instanceof queryFactoryResult) || $productCheck->EOF) {
+        $messageStack->add_session('Create subscription failed: order product #' . $ordersProductsId . ' not found in order #' . $ordersId . '.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    $productsId   = (int) $productCheck->fields['products_id'];
+    $productsName = (string) $productCheck->fields['products_name'];
+    if ($amount <= 0) {
+        $amount = (float) $productCheck->fields['final_price'];
+    }
+
+    // Validate saved card belongs to this customer AND is a PayPal AC vaulted card.
+    // Legacy (Payflow / WPP) cards must not be used in the new system.
+    if (defined('TABLE_SAVED_CREDIT_CARDS') && defined('TABLE_PAYPAL_VAULT')) {
+        $cardCheck = $db->Execute(
+            "SELECT sc.saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . " sc
+               INNER JOIN " . TABLE_PAYPAL_VAULT . " pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id
+              WHERE sc.saved_credit_card_id = " . $savedCreditCardId . "
+                AND sc.customers_id = " . $customersId . "
+                AND sc.is_deleted = 0 AND sc.vault_id != '' LIMIT 1"
+        );
+        if (!($cardCheck instanceof queryFactoryResult) || $cardCheck->EOF) {
+            $messageStack->add_session('Create subscription failed: saved card #' . $savedCreditCardId . ' not found for this customer or is not a PayPal AC vaulted card.', 'error');
+            zen_redirect($redirectUrl);
+        }
+    }
+
+    if (!class_exists('paypalacSavedCardRecurring')) {
+        $savedCardRecurringPath = dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php';
+        if (file_exists($savedCardRecurringPath)) {
+            require_once $savedCardRecurringPath;
+        }
+    }
+    if (!class_exists('paypalacSavedCardRecurring')) {
+        $messageStack->add_session('Create subscription failed: paypalacSavedCardRecurring class not available.', 'error');
+        zen_redirect($redirectUrl);
+    }
+
+    $savedCardRecurring = new paypalacSavedCardRecurring();
+    $subscriptionId     = $savedCardRecurring->schedule_payment(
+        $amount,
+        $nextPaymentDate,
+        $savedCreditCardId,
+        $ordersProductsId,
+        'Subscription created manually by admin for order #' . $ordersId,
+        [
+            'products_id'          => $productsId,
+            'products_name'        => $productsName,
+            'currency_code'        => $currencyCode,
+            'billing_period'       => $billingPeriod,
+            'billing_frequency'    => $billingFrequency,
+            'total_billing_cycles' => $totalBillingCycles,
+        ]
+    );
+
+    if ($subscriptionId > 0) {
+        $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_CREATED_MANUALLY, $subscriptionId, $ordersId), 'success');
+    } else {
+        $messageStack->add_session('Create subscription failed: schedule_payment returned an error. Check the saved card and order details.', 'error');
+    }
+    zen_redirect($redirectUrl);
+}
+
+if ($action === 'update_subscription') {
+    $subscriptionType = paypalac_normalize_subscription_type($_POST['subscription_type'] ?? 'rest');
+    $subscriptionId = (int) zen_db_prepare_input($_POST['paypal_subscription_id'] ?? 0);
+    $customersId = (int) zen_db_prepare_input($_POST['customers_id'] ?? 0);
+    $redirectQuery = trim((string) ($_POST['redirect_query'] ?? ''));
+    $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session(ERROR_SUBSCRIPTION_MISSING_IDENTIFIER, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Route to saved card handler for saved card subscriptions
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $savedCardMetadata = [];
+        
+        // Handle status change for saved card
+        if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
+            $status = strtolower(trim((string) zen_db_prepare_input($_POST['set_status'])));
+            $paypalacSavedCardRecurring->update_payment_status($subscriptionId, $status, 'Status updated by admin');
+            $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_STATUS_UPDATED, $subscriptionId, $status), 'success');
+            zen_redirect($redirectUrl);
+        }
+        
+        // Handle full update for saved card
+        $updateData = [];
+        if (isset($_POST['amount'])) {
+            $updateData['amount'] = (float) zen_db_prepare_input($_POST['amount']);
+        }
+        if (isset($_POST['next_payment_date']) && $_POST['next_payment_date'] !== '') {
+            $updateData['date'] = zen_db_prepare_input($_POST['next_payment_date']);
+        }
+        if (isset($_POST['products_id'])) {
+            $updateData['product'] = (int) zen_db_prepare_input($_POST['products_id']);
+            $savedCardMetadata['products_id'] = (int) zen_db_prepare_input($_POST['products_id']);
+        }
+        if (isset($_POST['saved_credit_card_id'])) {
+            $newCardId = (int) zen_db_prepare_input($_POST['saved_credit_card_id']);
+            // Validate the card is a PayPal AC vaulted card before allowing update
+            if ($newCardId > 0 && defined('TABLE_SAVED_CREDIT_CARDS') && defined('TABLE_PAYPAL_VAULT')) {
+                $cardValidation = $db->Execute(
+                    "SELECT sc.saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . " sc
+                       INNER JOIN " . TABLE_PAYPAL_VAULT . " pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id
+                      WHERE sc.saved_credit_card_id = " . $newCardId . "
+                        AND sc.customers_id = " . $customersId . "
+                        AND sc.is_deleted = 0 AND sc.vault_id != '' LIMIT 1"
+                );
+                if ($cardValidation instanceof queryFactoryResult && !$cardValidation->EOF) {
+                    $updateData['saved_credit_card_id'] = $newCardId;
+                }
+            } elseif ($newCardId === 0) {
+                $updateData['saved_credit_card_id'] = 0;
+            }
+        }
+
+        if (isset($_POST['billing_period'])) {
+            $savedCardMetadata['billing_period'] = strtoupper(str_replace([' ', "\t"], '_', (string) zen_db_prepare_input($_POST['billing_period'])));
+        }
+        if (isset($_POST['billing_frequency'])) {
+            $savedCardMetadata['billing_frequency'] = (int) zen_db_prepare_input($_POST['billing_frequency']);
+        }
+        if (isset($_POST['total_billing_cycles'])) {
+            $savedCardMetadata['total_billing_cycles'] = (int) zen_db_prepare_input($_POST['total_billing_cycles']);
+        }
+        
+        // Add billing address fields
+        $billingFields = ['billing_name', 'billing_company', 'billing_street_address', 'billing_suburb',
+                         'billing_city', 'billing_state', 'billing_postcode', 'billing_country_code'];
+        foreach ($billingFields as $field) {
+            if (isset($_POST[$field])) {
+                $updateData[$field] = zen_db_prepare_input($_POST[$field]);
+            }
+        }
+        
+        // Handle billing_country_id from billing_country_code
+        if (isset($_POST['billing_country_code']) && $_POST['billing_country_code'] !== '') {
+            $countryCode = strtoupper(zen_db_prepare_input($_POST['billing_country_code']));
+            $countryQuery = $db->Execute(
+                "SELECT countries_id FROM " . TABLE_COUNTRIES . " 
+                 WHERE countries_iso_code_2 = '" . zen_db_input($countryCode) . "' LIMIT 1"
+            );
+            if (!$countryQuery->EOF) {
+                $updateData['billing_country_id'] = (int)$countryQuery->fields['countries_id'];
+            }
+        }
+        
+        // Add shipping fields
+        if (isset($_POST['shipping_method'])) {
+            $updateData['shipping_method'] = zen_db_prepare_input($_POST['shipping_method']);
+        }
+        if (isset($_POST['shipping_cost'])) {
+            $updateData['shipping_cost'] = (float) zen_db_prepare_input($_POST['shipping_cost']);
+        }
+        
+        if (!empty($updateData)) {
+            $updateData['comments'] = 'Updated by admin via unified subscriptions page.';
+            $paypalacSavedCardRecurring->update_payment_info($subscriptionId, $updateData, $savedCardMetadata);
+            $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId), 'success');
+        }
+        
+        zen_redirect($redirectUrl);
+    }
+
+    $planId = substr((string) zen_db_prepare_input($_POST['plan_id'] ?? ''), 0, 64);
+    $productsId = (int) zen_db_prepare_input($_POST['products_id'] ?? 0);
+    $productsName = (string) zen_db_prepare_input($_POST['products_name'] ?? '');
+    $productsQuantity = (float) zen_db_prepare_input($_POST['products_quantity'] ?? 1);
+    $billingPeriod = strtoupper(str_replace([' ', "\t"], '_', (string) zen_db_prepare_input($_POST['billing_period'] ?? '')));
+    $billingFrequency = (int) zen_db_prepare_input($_POST['billing_frequency'] ?? 0);
+    $totalCycles = (int) zen_db_prepare_input($_POST['total_billing_cycles'] ?? 0);
+    
+    // Validate and sanitize next_payment_date
+    $nextPaymentDate = (string) zen_db_prepare_input($_POST['next_payment_date'] ?? '');
+    if ($nextPaymentDate !== '') {
+        // Validate date format (YYYY-MM-DD)
+        $dateValidation = DateTime::createFromFormat('Y-m-d', $nextPaymentDate);
+        if (!$dateValidation || $dateValidation->format('Y-m-d') !== $nextPaymentDate) {
+            $messageStack->add_session(ERROR_SUBSCRIPTION_INVALID_DATE_FORMAT, 'error');
+            zen_redirect($redirectUrl);
+        }
+    }
+    
+    $trialPeriod = strtoupper(str_replace([' ', "\t"], '_', (string) zen_db_prepare_input($_POST['trial_period'] ?? '')));
+    $trialFrequency = (int) zen_db_prepare_input($_POST['trial_frequency'] ?? 0);
+    $trialTotalCycles = (int) zen_db_prepare_input($_POST['trial_total_cycles'] ?? 0);
+    $setupFee = (float) zen_db_prepare_input($_POST['setup_fee'] ?? 0);
+    $amount = (float) zen_db_prepare_input($_POST['amount'] ?? 0);
+    $currencyCode = substr(strtoupper((string) zen_db_prepare_input($_POST['currency_code'] ?? '')), 0, 3);
+    $currencyValue = (float) zen_db_prepare_input($_POST['currency_value'] ?? 1);
+    $status = strtolower(trim((string) zen_db_prepare_input($_POST['status'] ?? '')));
+    $manualVaultId = substr((string) zen_db_prepare_input($_POST['vault_id'] ?? ''), 0, 64);
+    $selectedVaultId = (int) zen_db_prepare_input($_POST['paypal_vault_id'] ?? 0);
+
+    if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
+        $status = strtolower(trim((string) zen_db_prepare_input($_POST['set_status'])));
+
+        // For PayPal-managed subscriptions (paypal_subscription_remote_id set), PayPal
+        // owns the schedule. Push the status change to PayPal first; the matching
+        // BILLING.SUBSCRIPTION.* webhook will mirror the new state back into the
+        // local row. If the API call fails, leave the local state alone so the admin
+        // can retry without ending up out of sync with PayPal.
+        $subscriptionRow = paypalac_admin_load_rest_subscription((int) $subscriptionId);
+        if (paypalac_admin_is_paypal_managed($subscriptionRow)) {
+            $remoteError = null;
+            $remotePushed = paypalac_admin_push_remote_status($subscriptionRow, $status, $remoteError);
+            if (!$remotePushed) {
+                $detail = $remoteError !== null && $remoteError !== '' ? ' Details: ' . $remoteError : '';
+                $messageStack->add_session(
+                    'PayPal rejected the status change for subscription #' . (int) $subscriptionId . '. The local record was not modified; please verify the subscription state at PayPal and try again.' . $detail,
+                    'error'
+                );
+                zen_redirect($redirectUrl);
+            }
+        }
+
+        // For quick status changes, only update the status field without validating other fields
+        zen_db_perform(
+            TABLE_PAYPAL_SUBSCRIPTIONS,
+            ['status' => $status, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'paypal_subscription_id = ' . (int) $subscriptionId
+        );
+        
+        $messageStack->add_session(
+            sprintf(SUCCESS_SUBSCRIPTION_STATUS_UPDATED, $subscriptionId, $status),
+            'success'
+        );
+        
+        zen_redirect($redirectUrl);
+    }
+
+    // For PayPal-managed subscriptions, the only permitted update is a status change
+    // (cancel/suspend/activate). Block any further field edits so admins can't
+    // desync the local row from PayPal's source of truth.
+    $subscriptionRow = isset($subscriptionRow) ? $subscriptionRow : paypalac_admin_load_rest_subscription((int) $subscriptionId);
+    if (paypalac_admin_is_paypal_managed($subscriptionRow)) {
+        $messageStack->add_session(
+            'Subscription #' . (int) $subscriptionId . ' is managed by PayPal and cannot be edited from the store. Use Cancel / Suspend / Activate to change its state.',
+            'error'
+        );
+        zen_redirect($redirectUrl);
+    }
+
+    $attributesEncoded = '';
+    $rawAttributes = trim((string) ($_POST['attributes'] ?? ''));
+    if ($rawAttributes !== '') {
+        $decodedAttributes = json_decode($rawAttributes, true);
+        if ($decodedAttributes === null && json_last_error() !== JSON_ERROR_NONE) {
+            $messageStack->add_session(ERROR_SUBSCRIPTION_INVALID_JSON, 'error');
+            zen_redirect($redirectUrl);
+        }
+
+        $encoded = json_encode($decodedAttributes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($encoded !== false) {
+            $attributesEncoded = $encoded;
+        }
+    }
+
+    $updateData = [
+        'plan_id' => $planId,
+        'products_id' => $productsId,
+        'products_name' => $productsName,
+        'products_quantity' => $productsQuantity,
+        'billing_period' => $billingPeriod,
+        'billing_frequency' => $billingFrequency,
+        'total_billing_cycles' => $totalCycles,
+        'next_payment_date' => $nextPaymentDate !== '' ? $nextPaymentDate : null,
+        'trial_period' => $trialPeriod,
+        'trial_frequency' => $trialFrequency,
+        'trial_total_cycles' => $trialTotalCycles,
+        'setup_fee' => $setupFee,
+        'amount' => $amount,
+        'currency_code' => $currencyCode,
+        'currency_value' => $currencyValue,
+        'status' => $status,
+        'last_modified' => date('Y-m-d H:i:s'),
+    ];
+
+    // Keep stored expiration_date aligned with the configured billing schedule.
+    if (!function_exists('paypalac_compute_subscription_expiration_date')) {
+        $helper = DIR_FS_CATALOG . 'includes/functions/extra_functions/paypalac_subscription_functions.php';
+        if (is_file($helper)) {
+            require_once $helper;
+        }
+    }
+    if (function_exists('paypalac_compute_subscription_expiration_date')) {
+        $startForExpiry = '';
+        foreach (['date_added', 'date_purchased'] as $startKey) {
+            $candidate = trim((string) ($subscriptionRow[$startKey] ?? ''));
+            if (paypalac_subscription_date_is_usable($candidate)) {
+                $startForExpiry = $candidate;
+                break;
+            }
+        }
+        if ($startForExpiry === '') {
+            $startForExpiry = date('Y-m-d H:i:s');
+        }
+        $updateData['expiration_date'] = paypalac_compute_subscription_expiration_date(
+            $startForExpiry,
+            $billingPeriod,
+            $billingFrequency,
+            $totalCycles
+        );
+    }
+
+    if ($attributesEncoded !== '') {
+        $updateData['attributes'] = $attributesEncoded;
+    } else {
+        $updateData['attributes'] = '';
+    }
+
+    if ($selectedVaultId > 0) {
+        $vaultRecord = VaultManager::getCustomerVaultCard($customersId, $selectedVaultId);
+        if ($vaultRecord === null) {
+            $messageStack->add_session(ERROR_SUBSCRIPTION_VAULT_NOT_FOUND, 'error');
+            zen_redirect($redirectUrl);
+        }
+
+        $updateData['paypal_vault_id'] = (int) $vaultRecord['paypal_vault_id'];
+        $updateData['vault_id'] = substr((string) ($vaultRecord['vault_id'] ?? ''), 0, 64);
+    } else {
+        $updateData['paypal_vault_id'] = 0;
+        $updateData['vault_id'] = $manualVaultId;
+    }
+
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        $updateData,
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+
+    // Two distinct cases when this PayPal AC subscription has a legacy_subscription_id
+    // pointing at a TABLE_SAVED_CREDIT_CARDS_RECURRING (SCCR) row:
+    //
+    //   1. plan_id IS set -- a real PayPal-managed Subscription/plan now drives billing
+    //      remotely.  The legacy SCCR row must be CANCELLED so the saved-card cron
+    //      stops attempting to charge the card locally (PayPal will charge it via the
+    //      remote subscription instead).
+    //
+    //   2. plan_id is EMPTY -- this is a Zen-Cart-managed (saved-card) subscription
+    //      that lives in paypal_subscriptions only as a unified-UI mirror of the SCCR
+    //      row.  The recurring cron processes payments out of SCCR (see
+    //      paypalacSavedCardRecurring::get_scheduled_payments), so admin edits made
+    //      via the unified UI MUST be mirrored back to SCCR -- otherwise the new
+    //      next_payment_date / amount / status / billing schedule never reach the
+    //      cron and the customer is silently stranded.  Cancelling SCCR here would
+    //      strand the customer; instead we propagate the edits.
+    if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING') && defined('TABLE_PAYPAL_SUBSCRIPTIONS')) {
+        $legacyIdRow = $db->Execute(
+            "SELECT legacy_subscription_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS
+            . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+            . " AND legacy_subscription_id > 0 LIMIT 1"
+        );
+        if ($legacyIdRow instanceof queryFactoryResult && !$legacyIdRow->EOF) {
+            $legacySubId = (int) $legacyIdRow->fields['legacy_subscription_id'];
+
+            if (!class_exists('paypalacSavedCardRecurring')) {
+                $savedCardRecurringPath = dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php';
+                if (file_exists($savedCardRecurringPath)) {
+                    require_once $savedCardRecurringPath;
+                }
+            }
+
+            if ($planId !== '') {
+                // Case 1: PayPal-managed plan -- cancel the legacy SCCR row so the
+                // saved-card cron stops billing locally (PayPal charges remotely now).
+                $legacyEntry = $db->Execute(
+                    "SELECT saved_credit_card_recurring_id FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                    . " WHERE saved_credit_card_recurring_id = " . $legacySubId
+                    . " AND status = 'scheduled' LIMIT 1"
+                );
+                if ($legacyEntry instanceof queryFactoryResult && !$legacyEntry->EOF) {
+                    if (class_exists('paypalacSavedCardRecurring')) {
+                        $legacyCanceller = new paypalacSavedCardRecurring();
+                        $legacyCanceller->update_payment_status(
+                            $legacySubId,
+                            'cancelled',
+                            'Cancelled by admin - subscription migrated to PayPal-managed plan ' . $planId . ' (subscription #' . $subscriptionId . ')'
+                        );
+                    }
+                }
+            } elseif (class_exists('paypalacSavedCardRecurring')) {
+                // Case 2: Zen-Cart-managed saved-card subscription.  Mirror the edits
+                // (next_payment_date, amount, status, billing schedule) back to SCCR
+                // because the recurring cron reads from SCCR, not paypal_subscriptions.
+                $legacyMirror = new paypalacSavedCardRecurring();
+
+                $mirrorData = array();
+                if ($nextPaymentDate !== '') {
+                    $mirrorData['date'] = $nextPaymentDate;
+                }
+                if ($amount > 0) {
+                    $mirrorData['amount'] = $amount;
+                }
+                if (!empty($mirrorData)) {
+                    $mirrorData['comments'] = ' Updated by admin via unified subscriptions page (mirrored to legacy saved-card record). ';
+                    $legacyMirror->update_payment_info($legacySubId, $mirrorData);
+                }
+
+                // Mirror billing schedule columns directly (update_payment_info doesn't
+                // accept these fields).
+                $scheduleSql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' SET saved_credit_card_recurring_id=saved_credit_card_recurring_id';
+                $hasScheduleUpdate = false;
+                if ($billingPeriod !== '') {
+                    $scheduleSql .= ", billing_period = '" . zen_db_input($billingPeriod) . "'";
+                    $hasScheduleUpdate = true;
+                }
+                if ($billingFrequency > 0) {
+                    $scheduleSql .= ', billing_frequency = ' . (int) $billingFrequency;
+                    $hasScheduleUpdate = true;
+                }
+                if ($totalCycles >= 0) {
+                    $scheduleSql .= ', total_billing_cycles = ' . (int) $totalCycles;
+                    $hasScheduleUpdate = true;
+                }
+                if (array_key_exists('expiration_date', $updateData)
+                    && $legacyMirror->ensure_saved_cards_recurring_expiration_date_column()
+                ) {
+                    if ($updateData['expiration_date'] === null || $updateData['expiration_date'] === '') {
+                        $scheduleSql .= ', expiration_date = NULL';
+                    } else {
+                        $scheduleSql .= ", expiration_date = '" . zen_db_input((string) $updateData['expiration_date']) . "'";
+                    }
+                    $hasScheduleUpdate = true;
+                }
+                if ($hasScheduleUpdate) {
+                    $scheduleSql .= ' WHERE saved_credit_card_recurring_id = ' . (int) $legacySubId;
+                    $db->Execute($scheduleSql);
+                }
+
+                // Mirror status changes too (e.g. admin re-activated a previously
+                // cancelled subscription).  update_payment_status is preferred so its
+                // re-activation safety checks fire (validates saved card, etc.).
+                if ($status !== '') {
+                    $currentStatusRow = $db->Execute(
+                        'SELECT status FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                        . ' WHERE saved_credit_card_recurring_id = ' . (int) $legacySubId
+                        . ' LIMIT 1'
+                    );
+                    $currentStatus = ($currentStatusRow instanceof queryFactoryResult && !$currentStatusRow->EOF)
+                        ? strtolower(trim((string) $currentStatusRow->fields['status']))
+                        : '';
+                    if ($currentStatus !== $status) {
+                        $legacyMirror->update_payment_status(
+                            $legacySubId,
+                            $status,
+                            ' Status mirrored from unified subscriptions page (subscription #' . $subscriptionId . '). '
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // Try to update via PayPal API if plan_id exists
+    if (!empty($planId)) {
+        $profileManager = paypalac_get_profile_manager();
+        if ($profileManager !== null) {
+            try {
+                $apiUpdateData = [];
+                
+                // Update billing amount if changed
+                if ($amount > 0) {
+                    $apiUpdateData['amount'] = $amount;
+                    if (!empty($currencyCode)) {
+                        $apiUpdateData['currency_code'] = $currencyCode;
+                    }
+                }
+                
+                // Update next billing date if provided
+                if (!empty($nextPaymentDate)) {
+                    $dateObj = DateTime::createFromFormat('Y-m-d', $nextPaymentDate);
+                    if ($dateObj) {
+                        $apiUpdateData['next_billing_date'] = $dateObj->format('Y-m-d\TH:i:s\Z');
+                    }
+                }
+                
+                if (!empty($apiUpdateData)) {
+                    $apiUpdateData['profile_id'] = $planId;
+                    $profileManager->updateProfile($apiUpdateData);
+                }
+            } catch (Exception $e) {
+                // Log but don't fail - local status is already updated
+                error_log('Failed to update PayPal subscription: ' . $e->getMessage());
+            }
+        }
+    }
+
+    $messageStack->add_session(
+        sprintf(SUCCESS_SUBSCRIPTION_UPDATED, $subscriptionId),
+        'success'
+    );
+
+    zen_redirect($redirectUrl);
+}
+
+// Cancel subscription action
+if ($action === 'cancel_subscription') {
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id', 'subscription_type']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session(ERROR_SUBSCRIPTION_CANCEL_MISSING_ID, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Route to saved card handler
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'cancelled', 'Cancelled by admin');
+
+        $subscription = $paypalacSavedCardRecurring->get_payment_details($subscriptionId);
+        if ($subscription && method_exists($paypalacSavedCardRecurring, 'remove_group_pricing')) {
+            $paypalacSavedCardRecurring->remove_group_pricing($subscription['customers_id'], $subscription['products_id']);
+        }
+
+        // If this saved-card row is also linked to a PayPal-managed plan/profile
+        // (rare but possible when a subscription was migrated to PayPal), cancel
+        // the remote subscription too so PayPal stops billing the customer.
+        $savedCardProfileId = '';
+        if (is_array($subscription) && isset($subscription['profile_id'])) {
+            $savedCardProfileId = trim((string) $subscription['profile_id']);
+        }
+        if ($savedCardProfileId !== '') {
+            $profileManager = paypalac_get_profile_manager();
+            if ($profileManager !== null) {
+                try {
+                    $profileManager->cancelProfile(['profile_id' => $savedCardProfileId]);
+                } catch (Exception $e) {
+                    error_log('Failed to cancel linked PayPal profile for saved-card subscription #' . $subscriptionId . ': ' . $e->getMessage());
+                }
+            }
+        }
+
+        $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
+        zen_redirect($redirectUrl);
+    }
+
+    // Update local status for REST subscriptions
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        ['status' => 'cancelled', 'last_modified' => date('Y-m-d H:i:s')],
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+
+    // Try to cancel via PayPal API if plan_id exists
+    $subscription = $db->Execute(
+        "SELECT plan_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+    );
+
+    if ($subscription->RecordCount() > 0 && !empty($subscription->fields['plan_id'])) {
+        $profileManager = paypalac_get_profile_manager();
+        if ($profileManager !== null) {
+            try {
+                $profileManager->cancelProfile(['profile_id' => $subscription->fields['plan_id']]);
+            } catch (Exception $e) {
+                // Log but don't fail - local status is already updated
+                error_log('Failed to cancel PayPal profile: ' . $e->getMessage());
+            }
+        }
+    }
+
+    $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_CANCELLED, $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// Suspend subscription action
+if ($action === 'suspend_subscription') {
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id', 'subscription_type']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session(ERROR_SUBSCRIPTION_SUSPEND_MISSING_ID, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Route to saved card handler
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'suspended', 'Suspended by admin');
+        
+        $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_SUSPENDED, $subscriptionId), 'success');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update local status for REST subscriptions
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        ['status' => 'suspended', 'last_modified' => date('Y-m-d H:i:s')],
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+    
+    // Try to suspend via PayPal API if profile_id exists
+    $subscription = $db->Execute(
+        "SELECT plan_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+    );
+    
+    if ($subscription->RecordCount() > 0 && !empty($subscription->fields['plan_id'])) {
+        $profileManager = paypalac_get_profile_manager();
+        if ($profileManager !== null) {
+            try {
+                $profileManager->suspendProfile(['profile_id' => $subscription->fields['plan_id']]);
+            } catch (Exception $e) {
+                error_log('Failed to suspend PayPal profile: ' . $e->getMessage());
+            }
+        }
+    }
+    
+    $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_SUSPENDED, $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// Reactivate subscription action
+if ($action === 'reactivate_subscription') {
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id', 'subscription_type']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session(ERROR_SUBSCRIPTION_REACTIVATE_MISSING_ID, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Route to saved card handler
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'scheduled', 'Re-activated by admin');
+        
+        $subscription = $paypalacSavedCardRecurring->get_payment_details($subscriptionId);
+        if ($subscription && method_exists($paypalacSavedCardRecurring, 'create_group_pricing')) {
+            $paypalacSavedCardRecurring->create_group_pricing($subscription['products_id'], $subscription['customers_id']);
+        }
+        
+        $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_REACTIVATED, $subscriptionId), 'success');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update local status for REST subscriptions
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        ['status' => 'active', 'last_modified' => date('Y-m-d H:i:s')],
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+    
+    // Try to reactivate via PayPal API if profile_id exists
+    $subscription = $db->Execute(
+        "SELECT plan_id FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id = " . (int) $subscriptionId
+    );
+    
+    if ($subscription->RecordCount() > 0 && !empty($subscription->fields['plan_id'])) {
+        $profileManager = paypalac_get_profile_manager();
+        if ($profileManager !== null) {
+            try {
+                $profileManager->reactivateProfile(['profile_id' => $subscription->fields['plan_id']]);
+            } catch (Exception $e) {
+                error_log('Failed to reactivate PayPal profile: ' . $e->getMessage());
+            }
+        }
+    }
+    
+    $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_REACTIVATED, $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// Skip next payment action
+if ($action === 'skip_next_payment') {
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id', 'subscription_type']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session( 'Unable to skip payment. Missing identifier.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Route to saved card handler
+    if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
+        $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
+        $success = $paypalacSavedCardRecurring->skip_next_payment($subscriptionId);
+        if ($success) {
+            $messageStack->add_session('Payment skipped for subscription #' . $subscriptionId . '. The next billing date has been calculated and updated.', 'success');
+        } else {
+            $messageStack->add_session('Failed to skip payment for subscription #' . $subscriptionId . '. Only scheduled subscriptions can be skipped.', 'error');
+        }
+        zen_redirect($redirectUrl);
+    }
+    
+    // Get current subscription details for REST subscriptions
+    $subscription = $db->Execute(
+        "SELECT status, billing_period, billing_frequency, next_payment_date, attributes, plan_id 
+         FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " 
+         WHERE paypal_subscription_id = " . (int) $subscriptionId
+    );
+    
+    if ($subscription->RecordCount() == 0) {
+        $messageStack->add_session( 'Subscription not found.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Only allow skipping active subscriptions
+    if ($subscription->fields['status'] !== 'active') {
+        $messageStack->add_session( 'Only active subscriptions can be skipped.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Extract billing information
+    $billingPeriod = $subscription->fields['billing_period'];
+    $billingFrequency = (int)$subscription->fields['billing_frequency'];
+    
+    // Get attributes if needed
+    if ((!$billingPeriod || $billingFrequency <= 0) && !empty($subscription->fields['attributes'])) {
+        $attributes = json_decode($subscription->fields['attributes'], true);
+        if (is_array($attributes)) {
+            if (!$billingPeriod && isset($attributes['billingperiod'])) {
+                $billingPeriod = $attributes['billingperiod'];
+            }
+            if ($billingFrequency <= 0 && isset($attributes['billingfrequency'])) {
+                $billingFrequency = (int)$attributes['billingfrequency'];
+            }
+        }
+    }
+    
+    // Validate we have billing info
+    if (!$billingPeriod || $billingFrequency <= 0) {
+        $messageStack->add_session( 'Cannot skip payment: missing billing schedule information.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Get current scheduled date
+    $currentDate = $subscription->fields['next_payment_date'];
+    if (!$currentDate) {
+        $currentDate = date('Y-m-d');
+    }
+    
+    $baseDate = DateTime::createFromFormat('Y-m-d', $currentDate);
+    if (!$baseDate) {
+        $baseDate = new DateTime('today');
+    }
+    $baseDate->setTime(0, 0, 0);
+    
+    // Calculate next billing date
+    $period = strtolower(trim((string)$billingPeriod));
+    $frequency = $billingFrequency;
+    
+    $nextDate = clone $baseDate;
+    try {
+        switch ($period) {
+            case 'day':
+            case 'daily':
+                $nextDate->add(new DateInterval('P' . $frequency . 'D'));
+                break;
+            case 'week':
+            case 'weekly':
+                $nextDate->add(new DateInterval('P' . $frequency . 'W'));
+                break;
+            case 'semimonth':
+            case 'semi-month':
+            case 'semi monthly':
+            case 'semi-monthly':
+            case 'bi-weekly':
+            case 'bi weekly':
+                $days = max(1, $frequency * 15);
+                $nextDate->add(new DateInterval('P' . $days . 'D'));
+                break;
+            case 'month':
+            case 'monthly':
+                $nextDate->add(new DateInterval('P' . $frequency . 'M'));
+                break;
+            case 'year':
+            case 'yearly':
+                $nextDate->add(new DateInterval('P' . $frequency . 'Y'));
+                break;
+            default:
+                $nextDate->modify('+' . $frequency . ' ' . $period);
+                break;
+        }
+    } catch (Exception $e) {
+        $messageStack->add_session( 'Failed to calculate next payment date.', 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update the next payment date locally
+    $newDate = $nextDate->format('Y-m-d');
+    zen_db_perform(
+        TABLE_PAYPAL_SUBSCRIPTIONS,
+        ['next_payment_date' => $newDate, 'last_modified' => date('Y-m-d H:i:s')],
+        'update',
+        'paypal_subscription_id = ' . (int) $subscriptionId
+    );
+    
+    // Try to update via PayPal API if plan_id exists
+    if (!empty($subscription->fields['plan_id'])) {
+        $profileManager = paypalac_get_profile_manager();
+        if ($profileManager !== null) {
+            try {
+                // Update the subscription's next billing date via PayPal API
+                $profileManager->updateProfile([
+                    'profile_id' => $subscription->fields['plan_id'],
+                    'next_billing_date' => $nextDate->format('Y-m-d\TH:i:s\Z')
+                ]);
+            } catch (Exception $e) {
+                // Log but don't fail - local status is already updated
+                error_log('Failed to update PayPal subscription billing date: ' . $e->getMessage());
+            }
+        }
+    }
+    
+    $messageStack->add_session( sprintf('Payment skipped for subscription #%d. Next payment date updated to %s.', $subscriptionId, $newDate), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// Archive subscription action
+if ($action === 'archive_subscription') {
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session(ERROR_SUBSCRIPTION_ARCHIVE_MISSING_ID, 'error');
+        zen_redirect($redirectUrl);
+    }
+
+    if (paypalac_is_subscription_active($subscriptionType, $subscriptionId)) {
+        $messageStack->add_session(ERROR_SUBSCRIPTION_ARCHIVE_ACTIVE, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update local record to mark as archived
+    if ($subscriptionType === 'savedcard' && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        zen_db_perform(
+            TABLE_SAVED_CREDIT_CARDS_RECURRING,
+            ['is_archived' => 1, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'saved_credit_card_recurring_id = ' . (int) $subscriptionId
+        );
+    } else {
+        zen_db_perform(
+            TABLE_PAYPAL_SUBSCRIPTIONS,
+            ['is_archived' => 1, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'paypal_subscription_id = ' . (int) $subscriptionId
+        );
+    }
+    
+    $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_ARCHIVED, $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// Unarchive subscription action
+if ($action === 'unarchive_subscription') {
+    $subscriptionId = (int) zen_db_prepare_input($_GET['subscription_id'] ?? 0);
+    $subscriptionType = paypalac_normalize_subscription_type($_GET['subscription_type'] ?? 'rest');
+    $redirectQuery = zen_get_all_get_params(['action', 'subscription_id']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+    
+    if ($subscriptionId <= 0) {
+        $messageStack->add_session(ERROR_SUBSCRIPTION_UNARCHIVE_MISSING_ID, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Update local record to unarchive
+    if ($subscriptionType === 'savedcard' && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        zen_db_perform(
+            TABLE_SAVED_CREDIT_CARDS_RECURRING,
+            ['is_archived' => 0, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'saved_credit_card_recurring_id = ' . (int) $subscriptionId
+        );
+    } else {
+        zen_db_perform(
+            TABLE_PAYPAL_SUBSCRIPTIONS,
+            ['is_archived' => 0, 'last_modified' => date('Y-m-d H:i:s')],
+            'update',
+            'paypal_subscription_id = ' . (int) $subscriptionId
+        );
+    }
+    
+    $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_UNARCHIVED, $subscriptionId), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// Bulk archive subscriptions action
+if ($action === 'bulk_archive') {
+    $subscriptionIds = $_POST['subscription_ids'] ?? [];
+    $subscriptionTypes = $_POST['subscription_types'] ?? [];
+    $redirectQuery = zen_get_all_get_params(['action']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+    
+    // Validate that subscription_ids is an array
+    if (!is_array($subscriptionIds) || empty($subscriptionIds)) {
+        $messageStack->add_session(ERROR_BULK_ARCHIVE_NO_SELECTION, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Filter and validate subscription IDs
+    $validIds = array_values(array_unique(array_filter(array_map('intval', $subscriptionIds), function($id) {
+        return $id > 0;
+    })));
+
+    $restIds = [];
+    $savedCardIds = [];
+    if (is_array($subscriptionTypes) && !empty($subscriptionTypes)) {
+        foreach ($validIds as $id) {
+            $type = strtolower((string) ($subscriptionTypes[$id] ?? 'rest'));
+            if ($type === 'savedcard') {
+                $savedCardIds[] = $id;
+            } else {
+                $restIds[] = $id;
+            }
+        }
+    } else {
+        $restIds = $validIds;
+    }
+    
+    if (empty($validIds)) {
+        $messageStack->add_session(ERROR_BULK_ARCHIVE_NO_SELECTION, 'error');
+        zen_redirect($redirectUrl);
+    }
+
+    $restActive = 0;
+    if (!empty($restIds)) {
+        $idsList = implode(',', $restIds);
+        $statusResult = $db->Execute(
+            "SELECT paypal_subscription_id, status FROM " . TABLE_PAYPAL_SUBSCRIPTIONS . " WHERE paypal_subscription_id IN (" . $idsList . ")"
+        );
+        $restIds = [];
+        while ($statusResult instanceof queryFactoryResult && !$statusResult->EOF) {
+            $status = strtolower((string) ($statusResult->fields['status'] ?? ''));
+            if ($status === 'active') {
+                $restActive++;
+            } else {
+                $restIds[] = (int) $statusResult->fields['paypal_subscription_id'];
+            }
+            $statusResult->MoveNext();
+        }
+    }
+
+    $savedActive = 0;
+    if (!empty($savedCardIds) && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        $idsList = implode(',', $savedCardIds);
+        $statusResult = $db->Execute(
+            "SELECT saved_credit_card_recurring_id, status FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE saved_credit_card_recurring_id IN (" . $idsList . ")"
+        );
+        $savedCardIds = [];
+        while ($statusResult instanceof queryFactoryResult && !$statusResult->EOF) {
+            $status = strtolower((string) ($statusResult->fields['status'] ?? ''));
+            if ($status === 'active') {
+                $savedActive++;
+            } else {
+                $savedCardIds[] = (int) $statusResult->fields['saved_credit_card_recurring_id'];
+            }
+            $statusResult->MoveNext();
+        }
+    }
+
+    $archived = 0;
+    if (!empty($restIds)) {
+        $idsList = implode(',', $restIds);
+        $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+                SET is_archived = 1, last_modified = '" . date('Y-m-d H:i:s') . "'
+                WHERE paypal_subscription_id IN (" . $idsList . ")";
+        $db->Execute($sql);
+        $archived += count($restIds);
+    }
+
+    if (!empty($savedCardIds) && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        $idsList = implode(',', $savedCardIds);
+        $sql = "UPDATE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
+                SET is_archived = 1, last_modified = '" . date('Y-m-d H:i:s') . "'
+                WHERE saved_credit_card_recurring_id IN (" . $idsList . ")";
+        $db->Execute($sql);
+        $archived += count($savedCardIds);
+    }
+
+    if ($archived === 0) {
+        $messageStack->add_session(ERROR_BULK_ARCHIVE_NO_ELIGIBLE, 'error');
+        zen_redirect($redirectUrl);
+    }
+
+    $messageStack->add_session(sprintf(SUCCESS_BULK_ARCHIVED, $archived), 'success');
+    $activeSkipped = $restActive + $savedActive;
+    if ($activeSkipped > 0) {
+        $messageStack->add_session(sprintf(WARNING_BULK_ARCHIVE_SKIPPED_ACTIVE, $activeSkipped), 'warning');
+    }
+    zen_redirect($redirectUrl);
+}
+
+// Bulk unarchive subscriptions action
+if ($action === 'bulk_unarchive') {
+    $subscriptionIds = $_POST['subscription_ids'] ?? [];
+    $subscriptionTypes = $_POST['subscription_types'] ?? [];
+    $redirectQuery = zen_get_all_get_params(['action']);
+    $redirectUrl = zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $redirectQuery);
+    
+    // Validate that subscription_ids is an array
+    if (!is_array($subscriptionIds) || empty($subscriptionIds)) {
+        $messageStack->add_session(ERROR_BULK_UNARCHIVE_NO_SELECTION, 'error');
+        zen_redirect($redirectUrl);
+    }
+    
+    // Filter and validate subscription IDs
+    $validIds = array_values(array_unique(array_filter(array_map('intval', $subscriptionIds), function($id) {
+        return $id > 0;
+    })));
+
+    $restIds = [];
+    $savedCardIds = [];
+    if (is_array($subscriptionTypes) && !empty($subscriptionTypes)) {
+        foreach ($validIds as $id) {
+            $type = strtolower((string) ($subscriptionTypes[$id] ?? 'rest'));
+            if ($type === 'savedcard') {
+                $savedCardIds[] = $id;
+            } else {
+                $restIds[] = $id;
+            }
+        }
+    } else {
+        $restIds = $validIds;
+    }
+    
+    if (empty($validIds)) {
+        $messageStack->add_session(ERROR_BULK_UNARCHIVE_NO_SELECTION, 'error');
+        zen_redirect($redirectUrl);
+    }
+
+    $unarchived = 0;
+    if (!empty($restIds)) {
+        $idsList = implode(',', $restIds);
+        $sql = "UPDATE " . TABLE_PAYPAL_SUBSCRIPTIONS . "
+                SET is_archived = 0, last_modified = '" . date('Y-m-d H:i:s') . "'
+                WHERE paypal_subscription_id IN (" . $idsList . ")";
+        $db->Execute($sql);
+        $unarchived += count($restIds);
+    }
+
+    if (!empty($savedCardIds) && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+        $idsList = implode(',', $savedCardIds);
+        $sql = "UPDATE " . TABLE_SAVED_CREDIT_CARDS_RECURRING . "
+                SET is_archived = 0, last_modified = '" . date('Y-m-d H:i:s') . "'
+                WHERE saved_credit_card_recurring_id IN (" . $idsList . ")";
+        $db->Execute($sql);
+        $unarchived += count($savedCardIds);
+    }
+
+    if ($unarchived === 0) {
+        $messageStack->add_session(ERROR_BULK_UNARCHIVE_NO_ELIGIBLE, 'error');
+        zen_redirect($redirectUrl);
+    }
+
+    $messageStack->add_session(sprintf(SUCCESS_BULK_UNARCHIVED, $unarchived), 'success');
+    zen_redirect($redirectUrl);
+}
+
+// CSV Export action
+if ($action === 'export_csv') {
+    $exportFilters = [
+        'customers_id' => (int) ($_GET['customers_id'] ?? 0),
+        'products_id' => (int) ($_GET['products_id'] ?? 0),
+        'status' => trim((string) ($_GET['status'] ?? '')),
+        'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
+        'show_archived' => trim((string) ($_GET['show_archived'] ?? '')),
+    ];
+    
+    $exportWhere = [];
+    if ($exportFilters['customers_id'] > 0) {
+        $exportWhere[] = 'ps.customers_id = ' . (int) $exportFilters['customers_id'];
+    }
+    if ($exportFilters['products_id'] > 0) {
+        $exportWhere[] = 'ps.products_id = ' . (int) $exportFilters['products_id'];
+    }
+    if ($exportFilters['status'] !== '') {
+        $exportWhere[] = "ps.status = '" . zen_db_input($exportFilters['status']) . "'";
+    }
+    if ($exportFilters['payment_module'] !== '') {
+        $exportWhere[] = "o.payment_module_code = '" . zen_db_input($exportFilters['payment_module']) . "'";
+    }
+    
+    // Archive filter - by default, exclude archived subscriptions from export
+    if ($exportFilters['show_archived'] === 'only') {
+        $exportWhere[] = 'ps.is_archived = 1';
+    } elseif ($exportFilters['show_archived'] !== 'all') {
+        $exportWhere[] = 'ps.is_archived = 0';
+    }
+    
+    $exportSql = 'SELECT ps.*, c.customers_firstname, c.customers_lastname, c.customers_email_address,'
+        . ' o.payment_module_code, o.payment_method,'
+        . ' pv.brand AS vault_brand, pv.last_digits AS vault_last_digits, pv.card_type AS vault_card_type'
+        . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
+        . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = ps.customers_id'
+        . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = ps.orders_id'
+        . ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.paypal_vault_id = ps.paypal_vault_id';
+    
+    if (!empty($exportWhere)) {
+        $exportSql .= ' WHERE ' . implode(' AND ', $exportWhere);
+    }
+    
+    $exportSql .= ' ORDER BY ps.date_added DESC';
+    
+    $exportResults = $db->Execute($exportSql);
+    
+    // Generate CSV
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename=subscriptions_export_' . date('Y-m-d_His') . '.csv');
+    
+    $output = fopen('php://output', 'w');
+    
+    // CSV Headers
+    fputcsv($output, [
+        'Subscription ID',
+        'Customer ID',
+        'Customer Name',
+        'Customer Email',
+        'Order ID',
+        'Product ID',
+        'Product Name',
+        'Quantity',
+        'Amount',
+        'Currency',
+        'Billing Period',
+        'Billing Frequency',
+        'Total Cycles',
+        'Expiry Date',
+        'Status',
+        'Payment Method',
+        'Vault Card Type',
+        'Vault Last 4',
+        'Date Added',
+        'Last Modified'
+    ]);
+    
+    if ($exportResults instanceof queryFactoryResult && $exportResults->RecordCount() > 0) {
+        while (!$exportResults->EOF) {
+            $row = $exportResults->fields;
+            $expiryExport = ((int) ($row['total_billing_cycles'] ?? 0) <= 0)
+                ? 'Indefinite'
+                : (paypalac_calculate_subscription_expiry_date($row) ?? '');
+            fputcsv($output, [
+                $row['paypal_subscription_id'],
+                $row['customers_id'],
+                trim(($row['customers_firstname'] ?? '') . ' ' . ($row['customers_lastname'] ?? '')),
+                $row['customers_email_address'] ?? '',
+                $row['orders_id'] ?? '',
+                $row['products_id'] ?? '',
+                $row['products_name'] ?? '',
+                $row['products_quantity'] ?? 1,
+                $row['amount'] ?? 0,
+                $row['currency_code'] ?? '',
+                $row['billing_period'] ?? '',
+                $row['billing_frequency'] ?? '',
+                $row['total_billing_cycles'] ?? '',
+                $expiryExport,
+                $row['status'] ?? '',
+                trim(($row['payment_module_code'] ?? '') . ' ' . ($row['payment_method'] ?? '')),
+                trim(($row['vault_card_type'] ?? '') . ' ' . ($row['vault_brand'] ?? '')),
+                $row['vault_last_digits'] ?? '',
+                $row['date_added'] ?? '',
+                $row['last_modified'] ?? ''
+            ]);
+            $exportResults->MoveNext();
+        }
+    }
+    
+    fclose($output);
+    exit;
+}
+
+// Default to showing every status. The legacy default was 'scheduled', which
+// matched only Zen Cart-managed saved_credit_cards_recurring rows; once we
+// unified the page to also list paypal_subscriptions (status values like
+// 'pending', 'active', 'suspended', 'cancelled', 'expired'), filtering to
+// 'scheduled' by default silently hid every PayPal-managed subscription. An
+// empty default surfaces both systems and lets the user narrow with the
+// dropdown above the table.
+$filters = [
+    'customers_id' => (int) ($_GET['customers_id'] ?? 0),
+    'products_id' => (int) ($_GET['products_id'] ?? 0),
+    'status' => trim((string) ($_GET['status'] ?? '')),
+    'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
+    'show_archived' => trim((string) ($_GET['show_archived'] ?? '')),
+];
+
+$queryString = [];
+foreach ($filters as $key => $value) {
+    if ($value === '' || $value === 0) {
+        continue;
+    }
+    $queryString[] = rawurlencode((string) $key) . '=' . rawurlencode((string) $value);
+}
+$activeQuery = implode('&', $queryString);
+
+// Get statuses from both tables
+$availableStatuses = paypalac_known_status_labels();
+$statusRecords = $db->Execute(
+    'SELECT DISTINCT status FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ORDER BY status'
+);
+if ($statusRecords instanceof queryFactoryResult && $statusRecords->RecordCount() > 0) {
+    while (!$statusRecords->EOF) {
+        $statusValue = (string) $statusRecords->fields['status'];
+        if ($statusValue !== '' && !isset($availableStatuses[$statusValue])) {
+            $availableStatuses[$statusValue] = ucwords(str_replace('_', ' ', $statusValue));
+        }
+        $statusRecords->MoveNext();
+    }
+}
+// Get products from both tables
+$productOptions = [];
+$productRecords = $db->Execute(
+    'SELECT DISTINCT ps.products_id, ps.products_name'
+    . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
+    . ' ORDER BY ps.products_name'
+);
+if ($productRecords instanceof queryFactoryResult) {
+    while (!$productRecords->EOF) {
+        $pid = (int) $productRecords->fields['products_id'];
+        if ($pid > 0) {
+            $productOptions[$pid] = $productRecords->fields['products_name'];
+        }
+        $productRecords->MoveNext();
+    }
+}
+$paymentModuleOptions = [];
+$paymentRecords = $db->Execute(
+    'SELECT DISTINCT o.payment_module_code, o.payment_method'
+    . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
+    . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = ps.orders_id'
+    . ' WHERE o.payment_module_code IS NOT NULL AND o.payment_module_code <> ""'
+    . ' ORDER BY o.payment_module_code'
+);
+if ($paymentRecords instanceof queryFactoryResult) {
+    while (!$paymentRecords->EOF) {
+        $code = (string) $paymentRecords->fields['payment_module_code'];
+        if ($code !== '') {
+            $label = $code;
+            $method = (string) $paymentRecords->fields['payment_method'];
+            if ($method !== '') {
+                $label .= ' - ' . $method;
+            }
+            $paymentModuleOptions[$code] = $label;
+        }
+        $paymentRecords->MoveNext();
+    }
+}
+
+// Pagination setup
+$requestedPage = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+$requestedPerPage = isset($_GET['per_page']) ? max(10, min(100, (int) $_GET['per_page'])) : 20;
+
+$currentPage = filter_var($requestedPage, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
+if ($currentPage === false) {
+    $currentPage = 1;
+}
+
+$currentPerPage = filter_var($requestedPerPage, FILTER_VALIDATE_INT, ['options' => ['default' => 20, 'min_range' => 10, 'max_range' => 100]]);
+if ($currentPerPage === false) {
+    $currentPerPage = 20;
+}
+
+// Fetch subscriptions from both tables
+$allSubscriptions = [];
+
+// Fetch REST API subscriptions only.
+$restWhereClauses = [];
+
+if ($filters['customers_id'] > 0) {
+    $restWhereClauses[] = 'ps.customers_id = ' . (int) $filters['customers_id'];
+}
+if ($filters['products_id'] > 0) {
+    $restWhereClauses[] = 'ps.products_id = ' . (int) $filters['products_id'];
+}
+if ($filters['status'] !== '') {
+    $restWhereClauses[] = "ps.status = '" . zen_db_input($filters['status']) . "'";
+}
+if ($filters['payment_module'] !== '') {
+    $restWhereClauses[] = "o.payment_module_code = '" . zen_db_input($filters['payment_module']) . "'";
+}
+if ($filters['show_archived'] === 'only') {
+    $restWhereClauses[] = 'ps.is_archived = 1';
+} elseif ($filters['show_archived'] !== 'all') {
+    $restWhereClauses[] = 'ps.is_archived = 0';
+}
+
+$restSql = 'SELECT ps.*, c.customers_firstname, c.customers_lastname, c.customers_email_address,'
+    . ' o.payment_module_code, o.payment_method,'
+    . ' pv.brand AS vault_brand, pv.last_digits AS vault_last_digits, pv.card_type AS vault_card_type, pv.status AS vault_status, pv.expiry AS vault_expiry'
+    . ' FROM ' . TABLE_PAYPAL_SUBSCRIPTIONS . ' ps'
+    . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = ps.customers_id'
+    . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = ps.orders_id'
+    . ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.paypal_vault_id = ps.paypal_vault_id';
+
+if (!empty($restWhereClauses)) {
+    $restSql .= ' WHERE ' . implode(' AND ', $restWhereClauses);
+}
+
+$restSubscriptions = $db->Execute($restSql);
+
+if ($restSubscriptions instanceof queryFactoryResult) {
+    while (!$restSubscriptions->EOF) {
+        $row = $restSubscriptions->fields;
+        $row['subscription_type'] = 'rest';
+        $row['sort_date'] = strtotime($row['date_added'] ?? 'now');
+        $allSubscriptions[] = $row;
+        $restSubscriptions->MoveNext();
+    }
+}
+
+// Store-managed (saved_credit_cards_recurring) subscriptions are a first-class
+// PayPal Advanced Checkout subscription type: products that carry the three
+// Zen Cart subscription attributes (billing period, billing frequency, total
+// billing cycles) route here through paypalacSavedCardRecurring + the cron.
+// Pull them with the same filter semantics as the REST query and merge into
+// $allSubscriptions so the unified UI can display + act on both systems.
+if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
+    $savedCardWhereClauses = [];
+
+    if ($filters['customers_id'] > 0) {
+        $savedCardWhereClauses[] = 'scr.customers_id = ' . (int) $filters['customers_id'];
+    }
+    if ($filters['products_id'] > 0) {
+        $savedCardWhereClauses[] = 'scr.products_id = ' . (int) $filters['products_id'];
+    }
+    if ($filters['status'] !== '') {
+        $savedCardWhereClauses[] = "scr.status = '" . zen_db_input($filters['status']) . "'";
+    }
+    if ($filters['payment_module'] !== '') {
+        $savedCardWhereClauses[] = "o.payment_module_code = '" . zen_db_input($filters['payment_module']) . "'";
+    }
+    if ($filters['show_archived'] === 'only') {
+        $savedCardWhereClauses[] = 'scr.is_archived = 1';
+    } elseif ($filters['show_archived'] !== 'all') {
+        $savedCardWhereClauses[] = 'scr.is_archived = 0';
+    }
+
+    $savedCardSql = 'SELECT scr.*,'
+        . ' c.customers_firstname, c.customers_lastname, c.customers_email_address,'
+        . ' o.payment_module_code, o.payment_method, o.date_purchased AS date_purchased,'
+        . ' pv.brand AS vault_brand, pv.last_digits AS vault_last_digits, pv.card_type AS vault_card_type, pv.status AS vault_status, pv.expiry AS vault_expiry,'
+        . ' pv.paypal_vault_id AS scr_paypal_vault_id'
+        . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' scr'
+        . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = scr.customers_id'
+        . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = scr.orders_id'
+        . ' LEFT JOIN ' . TABLE_SAVED_CREDIT_CARDS . ' sc ON sc.saved_credit_card_id = scr.saved_credit_card_id'
+        . ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id';
+
+    if (!empty($savedCardWhereClauses)) {
+        $savedCardSql .= ' WHERE ' . implode(' AND ', $savedCardWhereClauses);
+    }
+
+    $savedCardSubscriptions = $db->Execute($savedCardSql);
+
+    if ($savedCardSubscriptions instanceof queryFactoryResult) {
+        while (!$savedCardSubscriptions->EOF) {
+            $scrFields = $savedCardSubscriptions->fields;
+
+            // Map saved_credit_cards_recurring columns onto the row shape the rest of
+            // this page renders (which is built around the REST paypal_subscriptions
+            // schema). Keep the original saved-card columns available too for the
+            // saved-card-specific rendering blocks already in this file.
+            $row = $scrFields;
+            $row['subscription_type'] = 'savedcard';
+            $row['paypal_subscription_id'] = (int) ($scrFields['saved_credit_card_recurring_id'] ?? 0);
+            $row['paypal_vault_id'] = (int) ($scrFields['scr_paypal_vault_id'] ?? 0);
+            $row['attributes'] = $scrFields['subscription_attributes_json'] ?? '';
+            $row['trial_period'] = '';
+            $row['trial_frequency'] = 0;
+            $row['trial_total_cycles'] = 0;
+            $row['setup_fee'] = 0;
+            $row['plan_id'] = '';
+            $row['vault_id'] = '';
+            if (!paypalac_subscription_date_is_usable($row['date_added'] ?? null)
+                && paypalac_subscription_date_is_usable($scrFields['date_purchased'] ?? null)
+            ) {
+                $row['date_added'] = $scrFields['date_purchased'];
+            }
+            // Defer expensive orders_status_history LIKE counts until after pagination.
+            // Running count_completed_billing_cycles() for every saved-card row on
+            // large stores was the primary cause of 60s+ admin page loads.
+            $row['payments_completed'] = ((int) ($scrFields['orders_id'] ?? 0) > 0 ? 1 : 0);
+            $row['sort_date'] = strtotime($row['date_added'] ?? ($scrFields['next_payment_date'] ?? 'now'));
+            $allSubscriptions[] = $row;
+            $savedCardSubscriptions->MoveNext();
+        }
+    }
+}
+
+$customersOptions = paypalac_collect_subscription_customer_options($allSubscriptions);
+
+// Sort subscriptions by next billing date, oldest first.
+// Records without a next payment date are sorted last.
+// Note: Using in-memory sort for simplicity. For large datasets, consider using database UNION queries
+// with ORDER BY and LIMIT/OFFSET for better performance and memory efficiency.
+usort($allSubscriptions, function ($a, $b) {
+    $leftNextPaymentRaw = trim((string) ($a['next_payment_date'] ?? ''));
+    $rightNextPaymentRaw = trim((string) ($b['next_payment_date'] ?? ''));
+
+    $leftDate = strtotime($leftNextPaymentRaw);
+    $rightDate = strtotime($rightNextPaymentRaw);
+
+    // Put missing/invalid next dates at the end.
+    if ($leftDate === false) {
+        $leftDate = PHP_INT_MAX;
+    }
+    if ($rightDate === false) {
+        $rightDate = PHP_INT_MAX;
+    }
+
+    if ($leftDate !== $rightDate) {
+        return ($leftDate < $rightDate) ? -1 : 1;
+    }
+
+    // If dates are identical, keep the oldest record first by identifier.
+    $leftId = (int) ($a['paypal_subscription_id'] ?? 0);
+    $rightId = (int) ($b['paypal_subscription_id'] ?? 0);
+    return ($leftId < $rightId) ? -1 : 1;
+});
+
+// Apply pagination
+$totalRecords = count($allSubscriptions);
+$totalPages = ($totalRecords > 0) ? ceil($totalRecords / $currentPerPage) : 1;
+
+// Ensure page stays within bounds so navigation can always return to page 1.
+$currentPage = min($currentPage, $totalPages);
+$offset = ($currentPage - 1) * $currentPerPage;
+
+$subscriptionRows = array_slice($allSubscriptions, $offset, $currentPerPage);
+
+// Accurate completed-cycle counts only for the visible page (typically 10–100 rows).
+$savedCardCycleHelper = class_exists('paypalacSavedCardRecurring') ? new paypalacSavedCardRecurring() : null;
+if ($savedCardCycleHelper instanceof paypalacSavedCardRecurring) {
+    foreach ($subscriptionRows as $rowIndex => $visibleRow) {
+        if (($visibleRow['subscription_type'] ?? '') !== 'savedcard') {
+            continue;
+        }
+        $subscriptionRows[$rowIndex]['payments_completed'] = $savedCardCycleHelper->count_completed_billing_cycles(
+            (int) ($visibleRow['paypal_subscription_id'] ?? 0),
+            $visibleRow
+        );
+    }
+}
+
+$vaultCache = [];
+$savedCardOptionsCache = [];
+
+/**
+ * Generate pagination URL with filters preserved
+ */
+function paypalac_pagination_url($page, $perPage, $activeQuery) {
+    $params = [];
+    if ($activeQuery !== '') {
+        parse_str($activeQuery, $params);
+    }
+    $params['page'] = $page;
+    $params['per_page'] = $perPage;
+    $queryStr = http_build_query($params);
+    return zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $queryStr);
+}
+
+function paypalac_render_select_options(array $options, $selectedValue): string
+{
+    $html = '';
+    foreach ($options as $value => $label) {
+        $isSelected = ((string) $value === (string) $selectedValue) ? ' selected="selected"' : '';
+        $html .= '<option value="' . zen_output_string_protected((string) $value) . '"' . $isSelected . '>'
+            . zen_output_string_protected((string) $label) . '</option>';
+    }
+    return $html;
+}
+
+/**
+ * Return available column names for a table.
+ *
+ * @return array<string,bool>
+ */
+function paypalac_get_table_columns($tableName)
+{
+    global $db;
+
+    static $columnCache = [];
+
+    if (isset($columnCache[$tableName])) {
+        return $columnCache[$tableName];
+    }
+
+    $columns = [];
+    $columnResult = $db->Execute('SHOW COLUMNS FROM ' . $tableName);
+    while ($columnResult instanceof queryFactoryResult && !$columnResult->EOF) {
+        $columnName = (string) ($columnResult->fields['Field'] ?? '');
+        if ($columnName !== '') {
+            $columns[$columnName] = true;
+        }
+        $columnResult->MoveNext();
+    }
+
+    $columnCache[$tableName] = $columns;
+
+    return $columns;
+}
+
+?>
+<!doctype html>
+<html <?php echo HTML_PARAMS; ?>>
+<head>
+    <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
+    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
+    <link rel="stylesheet" href="includes/css/paypalac_subscriptions.css">
+    <style>
+        /* PayPal-managed subscriptions are read-only in the local manager: PayPal
+           owns the source of truth. Visually grey out all editable fields under
+           the locked panel so admins don't expect their edits to be saved. The
+           server-side update handler also rejects writes to these rows. */
+        .paypalac-details-panel-paypal-managed input,
+        .paypalac-details-panel-paypal-managed select,
+        .paypalac-details-panel-paypal-managed textarea {
+            background-color: #f5f5f5 !important;
+            color: #666 !important;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .paypalac-details-panel-paypal-managed input,
+        .paypalac-details-panel-paypal-managed select,
+        .paypalac-details-panel-paypal-managed textarea {
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+<?php require DIR_WS_INCLUDES . 'header.php'; ?>
+<div class="nmx-module">
+    <div class="nmx-container">
+        <div class="nmx-container-header">
+            <h1><?php echo HEADING_TITLE; ?></h1>
+        </div>
+    
+        <div class="nmx-message-stack">
+        <?php
+        if (isset($messageStack) && is_object($messageStack) && $messageStack->size > 0) {
+            echo $messageStack->output();
+        }
+        ?>
+        </div>
+        
+        <div class="nmx-panel">
+            <div class="nmx-panel-heading" style="cursor:pointer;" onclick="paypalacToggleCreatePanel();">
+                <div class="nmx-panel-title">&#43; Create Subscription Manually</div>
+            </div>
+            <div class="nmx-panel-body" id="create-sub-body" style="display:none;">
+                <p style="margin:0 0 12px;color:#666;">Use this form to manually create a saved-card subscription for an order where automatic subscription creation was missed (e.g. payment captured but no subscription record was created).</p>
+                <?php echo zen_draw_form('create_subscription_form', FILENAME_PAYPALAC_SUBSCRIPTIONS, '', 'post', 'id="create-subscription-form"'); ?>
+                    <?php echo zen_draw_hidden_field('action', 'create_subscription'); ?>
+                    <?php echo zen_draw_hidden_field('redirect_query', $activeQuery); ?>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;">
+                        <div class="nmx-form-group">
+                            <label for="cs-orders-id"><strong>Order ID</strong></label>
+                            <div style="display:flex;gap:6px;">
+                                <input type="number" id="cs-orders-id" name="orders_id" class="nmx-form-control" placeholder="e.g. 12345" min="1" style="flex:1;" />
+                                <button type="button" class="nmx-btn nmx-btn-info nmx-btn-sm" onclick="paypalacLoadOrderInfo()">Load</button>
+                            </div>
+                            <small id="cs-customer-name" style="color:#555;"></small>
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-product"><strong>Order Product</strong></label>
+                            <select id="cs-product" name="orders_products_id" class="nmx-form-control">
+                                <option value="">-- Enter Order ID first --</option>
+                            </select>
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-saved-card"><strong>Saved Card</strong></label>
+                            <select id="cs-saved-card" name="saved_credit_card_id" class="nmx-form-control">
+                                <option value="">-- Enter Order ID first --</option>
+                            </select>
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-next-payment"><strong>Next Payment Date</strong></label>
+                            <input type="date" id="cs-next-payment" name="next_payment_date" class="nmx-form-control" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" />
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-amount"><strong>Amount</strong></label>
+                            <input type="number" id="cs-amount" name="amount" class="nmx-form-control" placeholder="Auto from product" min="0" step="0.01" />
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-currency"><strong>Currency</strong></label>
+                            <input type="text" id="cs-currency" name="currency_code" class="nmx-form-control" placeholder="e.g. CAD" maxlength="3" style="text-transform:uppercase;" />
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-period"><strong>Billing Period</strong></label>
+                            <select id="cs-period" name="billing_period" class="nmx-form-control">
+                                <option value="MONTH">Monthly</option>
+                                <option value="YEAR">Yearly</option>
+                                <option value="WEEK">Weekly</option>
+                                <option value="DAY">Daily</option>
+                                <option value="SEMI_MONTH">Semi-Monthly</option>
+                            </select>
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-frequency"><strong>Billing Frequency</strong></label>
+                            <input type="number" id="cs-frequency" name="billing_frequency" class="nmx-form-control" value="1" min="1" />
+                        </div>
+                        <div class="nmx-form-group">
+                            <label for="cs-cycles"><strong>Total Billing Cycles</strong> <small>(0 = unlimited)</small></label>
+                            <input type="number" id="cs-cycles" name="total_billing_cycles" class="nmx-form-control" value="0" min="0" />
+                        </div>
+                    </div>
+                    <div style="margin-top:12px;">
+                        <button type="submit" class="nmx-btn nmx-btn-primary" onclick="return paypalacConfirmCreateSubscription();">Create Subscription</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="nmx-panel">
+            <div class="nmx-panel-heading">
+                <div class="nmx-panel-title">Filter Subscriptions</div>
+            </div>
+            <div class="nmx-panel-body">
+                <?php echo zen_draw_form('paypalac_filter', FILENAME_PAYPALAC_SUBSCRIPTIONS, '', 'get', 'class="nmx-form-inline"'); ?>
+                    <div class="nmx-form-group">
+                        <label for="filter-customers">Customer</label>
+                        <select name="customers_id" id="filter-customers" class="nmx-form-control">
+                            <option value="0">All Customers</option>
+                            <?php echo paypalac_render_select_options($customersOptions, $filters['customers_id']); ?>
+                        </select>
+                    </div>
+                    <div class="nmx-form-group">
+                        <label for="filter-products">Product</label>
+                        <select name="products_id" id="filter-products" class="nmx-form-control">
+                            <option value="0">All Products</option>
+                            <?php echo paypalac_render_select_options($productOptions, $filters['products_id']); ?>
+                        </select>
+                    </div>
+                    <div class="nmx-form-group">
+                        <label for="filter-status">Status</label>
+                        <select name="status" id="filter-status" class="nmx-form-control">
+                            <option value="">All Statuses</option>
+                            <?php echo paypalac_render_select_options($availableStatuses, $filters['status']); ?>
+                        </select>
+                    </div>
+                    <div class="nmx-form-group">
+                        <label for="filter-payment">Payment Method</label>
+                        <select name="payment_module" id="filter-payment" class="nmx-form-control">
+                            <option value="">All Methods</option>
+                            <?php echo paypalac_render_select_options($paymentModuleOptions, $filters['payment_module']); ?>
+                        </select>
+                    </div>
+                    <div class="nmx-form-group">
+                        <label for="filter-archived">Archived</label>
+                        <select name="show_archived" id="filter-archived" class="nmx-form-control">
+                            <option value="">Active Only</option>
+                            <option value="all"<?php echo ($filters['show_archived'] === 'all' ? ' selected' : ''); ?>>Show All</option>
+                            <option value="only"<?php echo ($filters['show_archived'] === 'only' ? ' selected' : ''); ?>>Archived Only</option>
+                        </select>
+                    </div>
+                    <div class="nmx-form-actions">
+                        <button type="submit" class="nmx-btn nmx-btn-primary">Apply Filters</button>
+                        <a href="<?php echo zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, 'action=export_csv' . ($activeQuery !== '' ? '&' . $activeQuery : '')); ?>" class="nmx-btn nmx-btn-info">Export CSV</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <?php
+        // Guard against framework-level variable extraction (e.g. extract($_GET))
+        // clobbering pagination variables after initial normalization.
+        $page = filter_var($page, FILTER_VALIDATE_INT, ['options' => ['default' => 1, 'min_range' => 1]]);
+        if ($page === false) {
+            $page = 1;
+        }
+        $perPage = filter_var($perPage, FILTER_VALIDATE_INT, ['options' => ['default' => 20, 'min_range' => 10, 'max_range' => 100]]);
+        if ($perPage === false) {
+            $perPage = 20;
+        }
+        ?>
+
+        <!-- Pagination controls -->
+        <div class="pagination-controls">
+            <div class="pagination-info">
+                Showing <?php echo $totalRecords > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + $currentPerPage, $totalRecords); ?> of <?php echo $totalRecords; ?> subscriptions
+            </div>
+            <div class="per-page-selector">
+                <label for="per-page-select">Per page:</label>
+                <select id="per-page-select" onchange="changePerPage(this.value)">
+                    <option value="10"<?php echo $currentPerPage === 10 ? ' selected' : ''; ?>>10</option>
+                    <option value="20"<?php echo $currentPerPage === 20 ? ' selected' : ''; ?>>20</option>
+                    <option value="50"<?php echo $currentPerPage === 50 ? ' selected' : ''; ?>>50</option>
+                    <option value="100"<?php echo $currentPerPage === 100 ? ' selected' : ''; ?>>100</option>
+                </select>
+            </div>
+            <div class="pagination-links">
+                <?php if ($currentPage > 1): ?>
+                    <a href="<?php echo paypalac_pagination_url(1, $currentPerPage, $activeQuery); ?>">&laquo; First</a>
+                    <a href="<?php echo paypalac_pagination_url($currentPage - 1, $currentPerPage, $activeQuery); ?>">&lsaquo; Prev</a>
+                <?php else: ?>
+                    <span class="disabled">&laquo; First</span>
+                    <span class="disabled">&lsaquo; Prev</span>
+                <?php endif; ?>
+                
+                <?php
+                // Show page numbers
+                $startPage = max(1, $currentPage - 2);
+                $endPage = min($totalPages, $currentPage + 2);
+                
+                for ($i = $startPage; $i <= $endPage; $i++):
+                    if ($i === $currentPage):
+                ?>
+                    <span class="current"><?php echo $i; ?></span>
+                <?php else: ?>
+                    <a href="<?php echo paypalac_pagination_url($i, $currentPerPage, $activeQuery); ?>"><?php echo $i; ?></a>
+                <?php
+                    endif;
+                endfor;
+                ?>
+                
+                <?php if ($currentPage < $totalPages): ?>
+                    <a href="<?php echo paypalac_pagination_url($currentPage + 1, $currentPerPage, $activeQuery); ?>">Next &rsaquo;</a>
+                    <a href="<?php echo paypalac_pagination_url($totalPages, $currentPerPage, $activeQuery); ?>">Last &raquo;</a>
+                <?php else: ?>
+                    <span class="disabled">Next &rsaquo;</span>
+                    <span class="disabled">Last &raquo;</span>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="nmx-panel">
+            <div class="nmx-panel-heading">
+                <div class="nmx-panel-title">PayPal Vaulted Subscriptions</div>
+            </div>
+            <div class="nmx-panel-body">
+                <!-- Bulk Actions Form -->
+                <?php echo zen_draw_form('bulk_actions_form', FILENAME_PAYPALAC_SUBSCRIPTIONS, '', 'post', 'id="bulk-actions-form"'); ?>
+                    <?php echo zen_draw_hidden_field('action', ''); ?>
+                    <div class="bulk-actions-controls" style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                        <label for="bulk-action-select" style="margin: 0;">Bulk Actions:</label>
+                        <select name="bulk_action" id="bulk-action-select" class="nmx-form-control" style="width: auto;">
+                            <option value="">-- Select Action --</option>
+                            <option value="bulk_archive">Archive Selected</option>
+                            <option value="bulk_unarchive">Unarchive Selected</option>
+                        </select>
+                        <button type="button" id="apply-bulk-action" class="nmx-btn nmx-btn-primary">Apply</button>
+                        <span id="selected-count" style="margin-left: 10px; color: #666;"></span>
+                    </div>
+                </form>
+
+                <div class="nmx-table-responsive">
+                    <table class="nmx-table nmx-table-striped paypalac-subscriptions-table">
+
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;"><input type="checkbox" id="select-all-subscriptions" title="Select/Unselect All"></th>
+                                <th>Subscription</th>
+                                <th>Type</th>
+                                <th>Customer</th>
+                                <th>Product</th>
+                                <th>Billing Details</th>
+                                <th>Financials</th>
+                                <th>Vault Instrument</th>
+                                <th>Status &amp; Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($subscriptionRows)) { ?>
+                                <tr>
+                                    <td colspan="9">No subscriptions found for the selected filters.</td>
+                                </tr>
+                            <?php }
+                foreach ($subscriptionRows as $row) {
+                    $subscriptionId = (int) ($row['paypal_subscription_id'] ?? 0);
+                    // REST paypal_subscription_id and saved-card saved_credit_card_recurring_id
+                    // share an integer space, so HTML element ids must include the type to
+                    // stay unique within the page (form ids, toggle target keys, etc.).
+                    $rowSubscriptionType = $row['subscription_type'] ?? 'rest';
+                    $rowKey = $rowSubscriptionType . '-' . $subscriptionId;
+                    $formId = 'subscription-form-' . $rowKey;
+                    $currentStatus = strtolower($row['status'] ?? '');
+                    $customerName = trim(($row['customers_firstname'] ?? '') . ' ' . ($row['customers_lastname'] ?? ''));
+                    $paymentSummary = trim(($row['payment_module_code'] ?? '') . ' ' . ($row['payment_method'] ?? ''));
+                    $attributes = [];
+                    if (!empty($row['attributes'])) {
+                        $decoded = json_decode((string) $row['attributes'], true);
+                        if (is_array($decoded)) {
+                            $attributes = $decoded;
+                        }
+                    }
+                    $attributesPretty = $attributes ? json_encode($attributes, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '';
+
+                    $customersId = (int) ($row['customers_id'] ?? 0);
+                    if ($customersId > 0 && !array_key_exists($customersId, $vaultCache)) {
+                        $vaultCache[$customersId] = VaultManager::getCustomerVaultedCards($customersId, false);
+                    }
+
+                    $vaultOptions = ['0' => 'None'];
+                    if (!empty($vaultCache[$customersId])) {
+                        foreach ($vaultCache[$customersId] as $vaultCard) {
+                            $label = '#'.$vaultCard['paypal_vault_id'] . ' ' . ($vaultCard['card_type'] ?? $vaultCard['brand'] ?? '');
+                            if (!empty($vaultCard['last_digits'])) {
+                                $label .= ' ••••' . $vaultCard['last_digits'];
+                            }
+                            if (!empty($vaultCard['status'])) {
+                                $label .= ' (' . $vaultCard['status'] . ')';
+                            }
+                            $vaultOptions[(string) $vaultCard['paypal_vault_id']] = $label;
+                        }
+                    }
+                    
+                    // Prepare saved credit card options for savedcard subscriptions — PayPal AC cards only.
+                    // Legacy (Payflow / WPP) cards are excluded to prevent cross-contamination.
+                    $subscriptionType = $row['subscription_type'] ?? 'rest';
+                    $savedCardOptions = ['0' => 'None'];
+                    if ($subscriptionType === 'savedcard' && $customersId > 0 && defined('TABLE_SAVED_CREDIT_CARDS') && defined('TABLE_PAYPAL_VAULT')) {
+                        if (!array_key_exists($customersId, $savedCardOptionsCache)) {
+                            $savedCardOptionsCache[$customersId] = ['0' => 'None'];
+                            $savedCardColumns = paypalac_get_table_columns(TABLE_SAVED_CREDIT_CARDS);
+
+                            if (!empty($savedCardColumns)) {
+                                $selectColumns = ['sc.saved_credit_card_id'];
+                                if (isset($savedCardColumns['type'])) {
+                                    $selectColumns[] = 'sc.type';
+                                }
+                                if (isset($savedCardColumns['last_digits'])) {
+                                    $selectColumns[] = 'sc.last_digits';
+                                }
+                                if (isset($savedCardColumns['holder_name'])) {
+                                    $selectColumns[] = 'sc.holder_name';
+                                }
+                                if (isset($savedCardColumns['is_default'])) {
+                                    $selectColumns[] = 'sc.is_default';
+                                }
+
+                                $whereConditions = ['sc.customers_id = ' . (int) $customersId, "sc.vault_id != ''"];
+                                if (isset($savedCardColumns['is_deleted'])) {
+                                    $whereConditions[] = 'sc.is_deleted = 0';
+                                }
+
+                                $orderBy = 'sc.saved_credit_card_id DESC';
+                                if (isset($savedCardColumns['is_default'])) {
+                                    $orderBy = 'sc.is_default DESC, ' . $orderBy;
+                                }
+
+                                $savedCardsQuery = $db->Execute(
+                                    'SELECT ' . implode(', ', $selectColumns)
+                                    . ' FROM ' . TABLE_SAVED_CREDIT_CARDS . ' sc'
+                                    . ' INNER JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id'
+                                    . ' WHERE ' . implode(' AND ', $whereConditions)
+                                    . ' ORDER BY ' . $orderBy
+                                );
+                            } else {
+                                $savedCardsQuery = false;
+                            }
+
+                            if ($savedCardsQuery instanceof queryFactoryResult) {
+                                while (!$savedCardsQuery->EOF) {
+                                    $cardId = (int)$savedCardsQuery->fields['saved_credit_card_id'];
+                                    $label = '#' . $cardId . ' ' . ($savedCardsQuery->fields['type'] ?? 'Card');
+                                    if (!empty($savedCardsQuery->fields['last_digits'])) {
+                                        $label .= ' ••••' . $savedCardsQuery->fields['last_digits'];
+                                    }
+                                    if (!empty($savedCardsQuery->fields['holder_name'])) {
+                                        $label .= ' - ' . $savedCardsQuery->fields['holder_name'];
+                                    }
+                                    if ((int)$savedCardsQuery->fields['is_default'] === 1) {
+                                        $label .= ' (Default)';
+                                    }
+                                    $savedCardOptionsCache[$customersId][(string)$cardId] = $label;
+                                    $savedCardsQuery->MoveNext();
+                                }
+                            }
+                        }
+                        $savedCardOptions = $savedCardOptionsCache[$customersId];
+                    }
+
+                    $orderLogEntries = [];
+                    if ($subscriptionId > 0 && defined('TABLE_ORDERS_STATUS_HISTORY')) {
+                        if ($subscriptionType === 'savedcard') {
+                            $commentMatch = '%Subscription #' . (int) $subscriptionId . '%';
+                            $historySql = "SELECT DISTINCT orders_id, date_added
+                                FROM " . TABLE_ORDERS_STATUS_HISTORY . "
+                                WHERE comments LIKE '" . zen_db_input($commentMatch) . "'
+                                ORDER BY date_added DESC";
+                            $historyResult = $db->Execute($historySql);
+                            while ($historyResult instanceof queryFactoryResult && !$historyResult->EOF) {
+                                $orderLogEntries[] = [
+                                    'orders_id' => (int) $historyResult->fields['orders_id'],
+                                    'date_added' => $historyResult->fields['date_added'] ?? ''
+                                ];
+                                $historyResult->MoveNext();
+                            }
+                        }
+                    }
+                    if (empty($orderLogEntries) && !empty($row['orders_id'])) {
+                        $orderDate = '';
+                        if (defined('TABLE_ORDERS')) {
+                            $orderResult = $db->Execute('SELECT date_purchased FROM ' . TABLE_ORDERS . ' WHERE orders_id = ' . (int) $row['orders_id'] . ' LIMIT 1');
+                            if ($orderResult instanceof queryFactoryResult && $orderResult->RecordCount() > 0) {
+                                $orderDate = $orderResult->fields['date_purchased'] ?? '';
+                            }
+                        }
+                        $orderLogEntries[] = [
+                            'orders_id' => (int) $row['orders_id'],
+                            'date_added' => $orderDate
+                        ];
+                    }
+
+                    // Subscriptions backed by a PayPal-side remote id (I-XXXXXX) are
+                    // managed by PayPal: PayPal owns the billing schedule, payment
+                    // method, and lifecycle. Local field edits would silently desync
+                    // from PayPal's source of truth, so the form is presented read-only
+                    // with only Cancel / Suspend / Activate buttons enabled. The
+                    // matching BILLING.SUBSCRIPTION.* webhook handler mirrors any state
+                    // change back into the local row.
+                    $isPaypalManaged = (($row['subscription_type'] ?? 'rest') === 'rest')
+                        && trim((string) ($row['paypal_subscription_remote_id'] ?? '')) !== '';
+                    $readonlyAttr = $isPaypalManaged ? ' readonly' : '';
+                    $disabledAttr = $isPaypalManaged ? ' disabled' : '';
+                    ?>
+                    <?php echo zen_draw_form($formId, FILENAME_PAYPALAC_SUBSCRIPTIONS, '', 'post', 'id="' . $formId . '"'); ?>
+                        <?php echo zen_draw_hidden_field('action', 'update_subscription'); ?>
+                        <?php echo zen_draw_hidden_field('paypal_subscription_id', $subscriptionId); ?>
+                        <?php echo zen_draw_hidden_field('customers_id', $customersId); ?>
+                        <?php echo zen_draw_hidden_field('subscription_type', $row['subscription_type'] ?? 'rest'); ?>
+                        <?php echo zen_draw_hidden_field('redirect_query', $activeQuery); ?>
+                    </form>
+                    
+                    <!-- Summary row (always visible, clickable to expand/collapse) -->
+                    <tr class="subscription-summary subscription-row-collapsed" onclick="toggleSubscription('<?php echo zen_output_string_protected($rowKey); ?>', event)" data-subscription-id="<?php echo zen_output_string_protected($rowKey); ?>">
+                        <td onclick="event.stopPropagation();">
+                            <input type="checkbox" name="subscription_ids[]" value="<?php echo $subscriptionId; ?>" class="subscription-checkbox" data-subscription-type="<?php echo zen_output_string_protected($subscriptionType); ?>">
+                        </td>
+                        <td>
+                            <span class="toggle-icon"></span>
+                            <strong>#<?php echo (int) $row['paypal_subscription_id']; ?></strong>
+                        </td>
+                        <td>
+                            <span style="padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; display: inline-flex; align-items: center; white-space: nowrap; background: <?php
+                                echo ($row['subscription_type'] ?? 'rest') === 'rest' ? '#007bff' : '#28a745';
+                            ?>; color: white;">
+                                <?php echo ($row['subscription_type'] ?? 'rest') === 'rest' ? 'REST API' : 'Saved Card'; ?>
+                            </span>
+                        </td>
+                        <td><?php echo $customerName !== '' ? zen_output_string_protected($customerName) : 'Unknown Customer'; ?></td>
+                        <td><?php echo zen_output_string_protected((string) ($row['products_name'] ?? 'N/A')); ?></td>
+                        <td>
+                            Every <?php echo (int) ($row['billing_frequency'] ?? 0); ?> <?php echo zen_output_string_protected((string) ($row['billing_period'] ?? '')); ?>(s)
+                            <?php if (paypalac_subscription_next_payment_is_chargeable($row)) { ?>
+                                <br><small>Next: <?php echo zen_date_short($row['next_payment_date']); ?></small>
+                            <?php } ?>
+                            <br><small>Expiry: <?php echo zen_output_string_protected(paypalac_format_subscription_expiry_display($row)); ?></small>
+                        </td>
+                        <td>
+                            <?php echo zen_output_string_protected((string) ($row['currency_code'] ?? '')); ?> <?php echo number_format((float) ($row['amount'] ?? 0), 2); ?>
+                        </td>
+                        <td>
+                            <?php if (!empty($row['vault_brand']) || !empty($row['vault_card_type'])) { ?>
+                                <?php echo zen_output_string_protected(trim(($row['vault_card_type'] ?? '') . ' ' . ($row['vault_brand'] ?? ''))); ?>
+                                <?php if (!empty($row['vault_last_digits'])) { ?>
+                                    ••••<?php echo zen_output_string_protected($row['vault_last_digits']); ?>
+                                <?php } ?>
+                            <?php } else { ?>
+                                N/A
+                            <?php } ?>
+                        </td>
+                        <td style="text-align: right; white-space: nowrap;">
+                            <span style="padding: 4px 8px; border-radius: 3px; background: <?php
+                                if ($currentStatus === 'active') echo '#28a745';
+                                elseif ($currentStatus === 'cancelled') echo '#dc3545';
+                                elseif ($currentStatus === 'suspended' || $currentStatus === 'paused') echo '#ffc107';
+                                else echo '#6c757d';
+                            ?>; color: white; font-size: 0.85em;">
+                                <?php echo zen_output_string_protected(ucfirst($currentStatus)); ?>
+                            </span>
+                        </td>
+                    </tr>
+                    
+                    <!-- Details rows (hidden by default) -->
+                    <tr class="details-row" data-subscription-id="<?php echo zen_output_string_protected($rowKey); ?>">
+                        <td colspan="10">
+                            <div class="paypalac-details-panel<?php echo $isPaypalManaged ? ' paypalac-details-panel-paypal-managed' : ''; ?>" style="padding: 16px; background: #f9f9f9; border-radius: 4px;">
+                                <?php if ($isPaypalManaged) { ?>
+                                <div style="background: #e7f3ff; border: 1px solid #b3d8ff; color: #00538a; padding: 10px 14px; border-radius: 4px; margin-bottom: 16px;">
+                                    <strong>Managed by PayPal.</strong>
+                                    This subscription is owned by PayPal (remote id
+                                    <code><?php echo zen_output_string_protected((string) $row['paypal_subscription_remote_id']); ?></code>).
+                                    Field edits are disabled to prevent the local record from drifting away from PayPal's source of truth.
+                                    Use <em>Cancel</em>, <em>Suspend</em>, or <em>Activate</em> below; PayPal's webhook will mirror the new state back into this row.
+                                </div>
+                                <?php } ?>
+                                <div class="paypalac-details-top-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                                    <!-- Subscription Details Column -->
+                                    <div>
+                                        <h4 style="margin-top: 0; color: #00618d;">Subscription Details</h4>
+                                        <div class="paypalac-subscription-meta">
+                                            <?php if (!empty($row['orders_id'])) { ?>
+                                                Order: <a href="<?php echo zen_href_link(FILENAME_ORDERS, 'oID=' . (int) $row['orders_id'] . '&action=edit'); ?>">#<?php echo (int) $row['orders_id']; ?></a><br />
+                                            <?php } ?>
+                                            <?php if (!empty($row['orders_products_id'])) { ?>
+                                                Order Item ID: <?php echo (int) $row['orders_products_id']; ?><br />
+                                            <?php } ?>
+                                            <?php if (!empty($row['plan_id'])) { ?>
+                                                Plan: <?php echo zen_output_string_protected($row['plan_id']); ?><br />
+                                            <?php } ?>
+                                            Added: <?php echo zen_date_short($row['date_added'] ?? ''); ?><br />
+                                            Updated: <?php echo zen_date_short($row['last_modified'] ?? ''); ?><br />
+                                            <?php if ($paymentSummary !== '') { ?>
+                                                Paid with: <?php echo zen_output_string_protected($paymentSummary); ?><br />
+                                            <?php } ?>
+                                            Customer Email: <?php echo zen_output_string_protected($row['customers_email_address'] ?? ''); ?>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Product Details Column -->
+                                    <div>
+                                        <h4 style="margin-top: 0; color: #00618d;">Product Information</h4>
+                                        <label>Product Name</label>
+                                        <input type="text" name="products_name" value="<?php echo zen_output_string_protected((string) ($row['products_name'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        <label>Product ID</label>
+                                        <input type="number" name="products_id" value="<?php echo (int) ($row['products_id'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        <label>Quantity</label>
+                                        <input type="number" step="0.01" name="products_quantity" value="<?php echo (float) ($row['products_quantity'] ?? 1); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                    </div>
+                                    
+                                    <!-- Vault & Status Column -->
+                                    <div>
+                                        <h4 style="margin-top: 0; color: #00618d;">Status & <?php echo $subscriptionType === 'savedcard' ? 'Payment Method' : 'Vault'; ?></h4>
+                                        <label>Current Status</label>
+                                        <select name="status" form="<?php echo $formId; ?>" class="nmx-form-control">
+                                            <?php echo paypalac_render_select_options($availableStatuses, $row['status'] ?? ''); ?>
+                                        </select>
+                                        <?php if ($subscriptionType === 'savedcard') { ?>
+                                        <label>Payment Method (Saved Card)</label>
+                                        <select name="saved_credit_card_id" form="<?php echo $formId; ?>" class="nmx-form-control">
+                                            <?php echo paypalac_render_select_options($savedCardOptions, $row['saved_credit_card_id'] ?? '0'); ?>
+                                        </select>
+                                        <p style="margin: 4px 0 0 0; font-size: 0.85em; color: #666;">
+                                            <em>Change the payment method used for this subscription.</em>
+                                        </p>
+                                        <?php } else { ?>
+                                        <label>Vault Assignment</label>
+                                        <select name="paypal_vault_id" form="<?php echo $formId; ?>" class="nmx-form-control">
+                                            <?php echo paypalac_render_select_options($vaultOptions, $row['paypal_vault_id'] ?? '0'); ?>
+                                        </select>
+                                        <label>Vault ID (manual override)</label>
+                                        <input type="text" name="vault_id" value="<?php echo zen_output_string_protected((string) ($row['vault_id'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        <?php } ?>
+                                    </div>
+                                </div>
+                                
+                                <!-- Billing Details (Full Width) -->
+                                <details class="paypalac-form-section" open>
+                                    <summary>Billing Configuration</summary>
+                                    <div class="paypalac-form-section-content" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                                        <div>
+                                            <label>Billing Period</label>
+                                            <input type="text" name="billing_period" value="<?php echo zen_output_string_protected((string) ($row['billing_period'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Billing Frequency</label>
+                                            <input type="number" name="billing_frequency" value="<?php echo (int) ($row['billing_frequency'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Total Billing Cycles</label>
+                                            <input type="number" name="total_billing_cycles" value="<?php echo (int) ($row['total_billing_cycles'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Next Billing Date</label>
+                                            <input type="date" name="next_payment_date" value="<?php echo zen_output_string_protected((string) ($row['next_payment_date'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label><?php echo defined('TEXT_PAYPALAC_SUBSCRIPTION_EXPIRY_DATE') ? TEXT_PAYPALAC_SUBSCRIPTION_EXPIRY_DATE : 'Expiry Date'; ?></label>
+                                            <input type="text" value="<?php echo zen_output_string_protected(paypalac_format_subscription_expiry_display($row)); ?>" class="nmx-form-control" readonly />
+                                            <p style="margin: 4px 0 0 0; font-size: 0.85em; color: #666;">
+                                                <em>Calculated from start/next charge date and remaining billing cycles.</em>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </details>
+                                
+                                <!-- Trial Configuration -->
+                                <details class="paypalac-form-section">
+                                    <summary>Trial Configuration</summary>
+                                    <div class="paypalac-form-section-content" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                                        <div>
+                                            <label>Trial Period</label>
+                                            <input type="text" name="trial_period" value="<?php echo zen_output_string_protected((string) ($row['trial_period'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Trial Frequency</label>
+                                            <input type="number" name="trial_frequency" value="<?php echo (int) ($row['trial_frequency'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Trial Cycles</label>
+                                            <input type="number" name="trial_total_cycles" value="<?php echo (int) ($row['trial_total_cycles'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                    </div>
+                                </details>
+                                
+                                <!-- Financial Details -->
+                                <details class="paypalac-form-section">
+                                    <summary>Financial Details</summary>
+                                    <div class="paypalac-form-section-content" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                                        <div>
+                                            <label>Setup Fee</label>
+                                            <input type="number" step="0.01" name="setup_fee" value="<?php echo (float) ($row['setup_fee'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Amount</label>
+                                            <input type="number" step="0.01" name="amount" value="<?php echo (float) ($row['amount'] ?? 0); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Currency Code</label>
+                                            <input type="text" maxlength="3" name="currency_code" value="<?php echo zen_output_string_protected((string) ($row['currency_code'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Currency Value</label>
+                                            <input type="number" step="0.000001" name="currency_value" value="<?php echo (float) ($row['currency_value'] ?? 1); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                    </div>
+                                </details>
+                                
+                                <!-- Billing Address -->
+                                <?php if ($subscriptionType === 'savedcard') { ?>
+                                <details class="paypalac-form-section">
+                                    <summary>Billing Address</summary>
+                                    <div class="paypalac-form-section-content" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                        <div>
+                                            <label>Billing Name</label>
+                                            <input type="text" name="billing_name" value="<?php echo zen_output_string_protected((string) ($row['billing_name'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Billing Company</label>
+                                            <input type="text" name="billing_company" value="<?php echo zen_output_string_protected((string) ($row['billing_company'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Street Address</label>
+                                            <input type="text" name="billing_street_address" value="<?php echo zen_output_string_protected((string) ($row['billing_street_address'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Address Line 2 (Suburb)</label>
+                                            <input type="text" name="billing_suburb" value="<?php echo zen_output_string_protected((string) ($row['billing_suburb'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>City</label>
+                                            <input type="text" name="billing_city" value="<?php echo zen_output_string_protected((string) ($row['billing_city'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>State/Province</label>
+                                            <input type="text" name="billing_state" value="<?php echo zen_output_string_protected((string) ($row['billing_state'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Postal Code</label>
+                                            <input type="text" name="billing_postcode" value="<?php echo zen_output_string_protected((string) ($row['billing_postcode'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Country Code (2-letter, e.g., CA, US)</label>
+                                            <input type="text" maxlength="2" pattern="[A-Z]{2}" name="billing_country_code" value="<?php echo zen_output_string_protected((string) ($row['billing_country_code'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" style="text-transform: uppercase;" placeholder="CA" />
+                                        </div>
+                                    </div>
+                                </details>
+                                
+                                <!-- Shipping Information -->
+                                <details class="paypalac-form-section">
+                                    <summary>Shipping Information</summary>
+                                    <div class="paypalac-form-section-content" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                        <div>
+                                            <label>Shipping Method</label>
+                                            <input type="text" name="shipping_method" value="<?php echo zen_output_string_protected((string) ($row['shipping_method'] ?? '')); ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                        <div>
+                                            <label>Shipping Cost</label>
+                                            <input type="number" step="0.01" name="shipping_cost" value="<?php echo ($row['shipping_cost'] !== null) ? (float) $row['shipping_cost'] : ''; ?>" form="<?php echo $formId; ?>" class="nmx-form-control" />
+                                        </div>
+                                    </div>
+                                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: #666;">
+                                        <em>Note: Shipping rate was locked at subscription creation and will be reused for recurring orders.</em>
+                                    </p>
+                                </details>
+                                <?php } ?>
+                                
+                                <!-- Order Log -->
+                                <details class="paypalac-form-section">
+                                    <summary><?php echo TEXT_PAYPALAC_SUBSCRIPTION_ORDER_LOG; ?></summary>
+                                    <div class="paypalac-form-section-content">
+                                    <?php if (!empty($orderLogEntries)) { ?>
+                                        <ul style="margin: 0; padding-left: 18px;">
+                                            <?php foreach ($orderLogEntries as $entry) { ?>
+                                                <li>
+                                                    <a href="<?php echo zen_href_link(FILENAME_ORDERS, 'oID=' . (int) $entry['orders_id'] . '&action=edit'); ?>">
+                                                        #<?php echo (int) $entry['orders_id']; ?>
+                                                    </a>
+                                                    <?php if (!empty($entry['date_added'])) { ?>
+                                                        <span style="color: #666;">&mdash; <?php echo zen_date_short($entry['date_added']); ?></span>
+                                                    <?php } ?>
+                                                </li>
+                                            <?php } ?>
+                                        </ul>
+                                    <?php } else { ?>
+                                        <em><?php echo TEXT_PAYPALAC_SUBSCRIPTION_ORDER_LOG_EMPTY; ?></em>
+                                    <?php } ?>
+                                    </div>
+                                </details>
+
+                                <!-- Attributes -->
+                                <details class="paypalac-form-section">
+                                    <summary>Attributes (JSON)</summary>
+                                    <div class="paypalac-form-section-content">
+                                        <textarea id="attributes-<?php echo zen_output_string_protected($rowKey); ?>" name="attributes" form="<?php echo $formId; ?>" placeholder="{ }" class="nmx-form-control" style="min-height: 100px; font-family: monospace;"><?php echo zen_output_string_protected($attributesPretty); ?></textarea>
+                                    </div>
+                                </details>
+                                
+                                <!-- Actions -->
+                                <div class="paypalac-details-actions" style="margin-top: 20px; padding-top: 16px; border-top: 2px solid #ddd;">
+                                    <h4 style="margin-top: 0; color: #00618d;">Actions</h4>
+                                    <div class="paypalac-subscription-actions">
+                                        <?php if (!$isPaypalManaged) { ?>
+                                            <button type="submit" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-primary">Save Changes</button>
+                                        <?php } ?>
+                                        <?php if ($currentStatus !== 'cancelled') { ?>
+                                            <button type="submit" name="set_status" value="cancelled" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-warning">
+                                                <?php echo $isPaypalManaged ? 'Cancel at PayPal' : 'Mark Cancelled'; ?>
+                                            </button>
+                                        <?php } ?>
+                                        <?php if ($currentStatus !== 'active') { ?>
+                                            <button type="submit" name="set_status" value="active" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-success">
+                                                <?php echo $isPaypalManaged ? 'Activate at PayPal' : 'Mark Active'; ?>
+                                            </button>
+                                        <?php } ?>
+                                        <?php if ($isPaypalManaged && $currentStatus !== 'suspended') { ?>
+                                            <button type="submit" name="set_status" value="suspended" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-secondary">
+                                                Suspend at PayPal
+                                            </button>
+                                        <?php } ?>
+                                        <?php if (!$isPaypalManaged && $currentStatus !== 'pending') { ?>
+                                            <button type="submit" name="set_status" value="pending" form="<?php echo $formId; ?>" class="nmx-btn nmx-btn-sm nmx-btn-secondary">Mark Pending</button>
+                                        <?php } ?>
+                                    </div>
+                                    <div class="paypalac-subscription-actions paypalac-subscription-actions-secondary" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd;">
+                                        <?php
+                                        $actionParams = $activeQuery !== '' ? $activeQuery . '&' : '';
+                                        $subscriptionType = $row['subscription_type'] ?? 'rest';
+                                        $actionParams .= 'subscription_type=' . urlencode($subscriptionType) . '&';
+                                        $isArchived = !empty($row['is_archived']);
+                                        ?>
+                                        <?php if ($currentStatus === 'active' || $currentStatus === 'scheduled') { ?>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $actionParams . 'action=skip_next_payment&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Skip this payment? The next billing date will be automatically calculated and updated based on the subscription schedule.');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-info">Skip Next</a>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $actionParams . 'action=suspend_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Are you sure you want to suspend this subscription?');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-warning">Suspend</a>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $actionParams . 'action=cancel_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Are you sure you want to cancel this subscription? This action cannot be undone.');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-danger">Cancel</a>
+                                        <?php } elseif ($currentStatus === 'suspended' || $currentStatus === 'paused') { ?>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $actionParams . 'action=reactivate_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Are you sure you want to reactivate this subscription?');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-success">Reactivate</a>
+                                            <a href="<?php echo zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $actionParams . 'action=cancel_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                               onclick="return confirm('Are you sure you want to cancel this subscription? This action cannot be undone.');"
+                                               class="nmx-btn nmx-btn-sm nmx-btn-danger">Cancel</a>
+                                        <?php } ?>
+                                        <?php if ($currentStatus !== 'active') { ?>
+                                            <?php if ($isArchived) { ?>
+                                                <a href="<?php echo zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $actionParams . 'action=unarchive_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                                   onclick="return confirm('Are you sure you want to unarchive this subscription?');"
+                                                   class="nmx-btn nmx-btn-sm nmx-btn-info">Unarchive</a>
+                                            <?php } else { ?>
+                                                <a href="<?php echo zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, $actionParams . 'action=archive_subscription&subscription_id=' . $subscriptionId); ?>" 
+                                                   onclick="return confirm('Are you sure you want to archive this subscription? Archived subscriptions are hidden by default.');"
+                                                   class="nmx-btn nmx-btn-sm nmx-btn-secondary">Archive</a>
+                                            <?php } ?>
+                                        <?php } ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                <?php } ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bottom Pagination controls -->
+        <div class="pagination-controls">
+            <div class="pagination-info">
+                Showing <?php echo $totalRecords > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + $currentPerPage, $totalRecords); ?> of <?php echo $totalRecords; ?> subscriptions
+            </div>
+            <div class="per-page-selector">
+                <label for="per-page-select-bottom">Per page:</label>
+                <select id="per-page-select-bottom" onchange="changePerPage(this.value)">
+                    <option value="10"<?php echo $currentPerPage === 10 ? ' selected' : ''; ?>>10</option>
+                    <option value="20"<?php echo $currentPerPage === 20 ? ' selected' : ''; ?>>20</option>
+                    <option value="50"<?php echo $currentPerPage === 50 ? ' selected' : ''; ?>>50</option>
+                    <option value="100"<?php echo $currentPerPage === 100 ? ' selected' : ''; ?>>100</option>
+                </select>
+            </div>
+            <div class="pagination-links">
+                <?php if ($currentPage > 1): ?>
+                    <a href="<?php echo paypalac_pagination_url(1, $currentPerPage, $activeQuery); ?>">&laquo; First</a>
+                    <a href="<?php echo paypalac_pagination_url($currentPage - 1, $currentPerPage, $activeQuery); ?>">&lsaquo; Prev</a>
+                <?php else: ?>
+                    <span class="disabled">&laquo; First</span>
+                    <span class="disabled">&lsaquo; Prev</span>
+                <?php endif; ?>
+                
+                <?php
+                // Show page numbers
+                $startPage = max(1, $currentPage - 2);
+                $endPage = min($totalPages, $currentPage + 2);
+                
+                for ($i = $startPage; $i <= $endPage; $i++):
+                    if ($i === $currentPage):
+                ?>
+                    <span class="current"><?php echo $i; ?></span>
+                <?php else: ?>
+                    <a href="<?php echo paypalac_pagination_url($i, $currentPerPage, $activeQuery); ?>"><?php echo $i; ?></a>
+                <?php
+                    endif;
+                endfor;
+                ?>
+                
+                <?php if ($currentPage < $totalPages): ?>
+                    <a href="<?php echo paypalac_pagination_url($currentPage + 1, $currentPerPage, $activeQuery); ?>">Next &rsaquo;</a>
+                    <a href="<?php echo paypalac_pagination_url($totalPages, $currentPerPage, $activeQuery); ?>">Last &raquo;</a>
+                <?php else: ?>
+                    <span class="disabled">Next &rsaquo;</span>
+                    <span class="disabled">Last &raquo;</span>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="nmx-footer">
+            <a href="https://www.numinix.com" target="_blank" rel="noopener noreferrer" class="nmx-footer-logo">
+                <img src="images/numinix_logo.png" alt="Numinix">
+            </a>
+        </div>
+    </div>
+</div>
+
+<?php require DIR_WS_INCLUDES . 'footer.php'; ?>
+
+<script>
+var paypalacSubscriptionsBaseUrl = <?php echo json_encode(zen_href_link(FILENAME_PAYPALAC_SUBSCRIPTIONS, '')); ?>;
+
+function paypalacToggleCreatePanel() {
+    var panel = document.getElementById('create-sub-body');
+    if (panel) {
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function paypalacConfirmCreateSubscription() {
+    var ordersId = parseInt(document.getElementById('cs-orders-id').value, 10) || 0;
+    return confirm('Create subscription manually for order #' + ordersId + '?');
+}
+
+function paypalacLoadOrderInfo() {
+    var ordersId = parseInt(document.getElementById('cs-orders-id').value, 10);
+    if (!ordersId || ordersId <= 0) {
+        alert('Please enter a valid Order ID.');
+        return;
+    }
+    var separator = paypalacSubscriptionsBaseUrl.indexOf('?') >= 0 ? '&' : '?';
+    var url = paypalacSubscriptionsBaseUrl + separator + 'action=get_order_info&orders_id=' + encodeURIComponent(ordersId);
+    fetch(url)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            // Show customer name
+            var nameEl = document.getElementById('cs-customer-name');
+            if (nameEl) {
+                nameEl.textContent = 'Customer: ' + data.customer_name + ' (#' + data.customers_id + ')';
+            }
+            // Populate currency
+            var currEl = document.getElementById('cs-currency');
+            if (currEl && data.currency) {
+                currEl.value = data.currency;
+            }
+            // Populate products
+            var productSel = document.getElementById('cs-product');
+            productSel.innerHTML = '';
+            if (data.products && data.products.length > 0) {
+                data.products.forEach(function(p) {
+                    var opt = document.createElement('option');
+                    opt.value = p.orders_products_id;
+                    opt.textContent = p.products_name + ' ($' + parseFloat(p.final_price).toFixed(2) + ')';
+                    opt.dataset.price = p.final_price;
+                    productSel.appendChild(opt);
+                });
+                // Auto-fill amount from first product
+                var amtEl = document.getElementById('cs-amount');
+                if (amtEl && data.products[0]) {
+                    amtEl.value = parseFloat(data.products[0].final_price).toFixed(2);
+                }
+            } else {
+                productSel.innerHTML = '<option value="">No products found</option>';
+            }
+            // Populate saved cards
+            var cardSel = document.getElementById('cs-saved-card');
+            cardSel.innerHTML = '';
+            if (data.saved_cards && data.saved_cards.length > 0) {
+                data.saved_cards.forEach(function(c) {
+                    var opt = document.createElement('option');
+                    opt.value = c.saved_credit_card_id;
+                    opt.textContent = c.label;
+                    cardSel.appendChild(opt);
+                });
+            } else {
+                cardSel.innerHTML = '<option value="">No saved cards found for this customer</option>';
+            }
+        })
+        .catch(function(err) {
+            alert('Failed to load order info: ' + err);
+        });
+}
+
+// Update amount when a different product is selected
+document.addEventListener('DOMContentLoaded', function() {
+    var productSel = document.getElementById('cs-product');
+    if (productSel) {
+        productSel.addEventListener('change', function() {
+            var selected = productSel.options[productSel.selectedIndex];
+            var amtEl = document.getElementById('cs-amount');
+            if (amtEl && selected && selected.dataset.price) {
+                amtEl.value = parseFloat(selected.dataset.price).toFixed(2);
+            }
+        });
+    }
+});
+</script>
+<script src="includes/javascript/paypalac_subscriptions.js"></script>
+
+</body>
+</html>
+<?php require DIR_WS_INCLUDES . 'application_bottom.php';

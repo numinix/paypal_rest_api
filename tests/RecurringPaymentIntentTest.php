@@ -21,7 +21,7 @@ declare(strict_types=1);
 fwrite(STDOUT, "Running Recurring Payment Intent Test...\n\n");
 
 $basePath = dirname(__DIR__);
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 
 if (!file_exists($savedCardRecurringFile)) {
     fwrite(STDERR, "✗ paypalacSavedCardRecurring.php not found\n\n");

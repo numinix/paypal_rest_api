@@ -104,7 +104,7 @@ namespace PayPalAdvancedCheckout\Zc2Pp {
 }
 
 namespace {
-    require_once dirname(__DIR__) . '/includes/modules/payment/paypalac.php';
+    require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac.php';
 
     class PaypalacTestDouble extends \paypalac
     {

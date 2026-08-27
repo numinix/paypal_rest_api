@@ -18,7 +18,7 @@ namespace {
         define('IS_ADMIN_FLAG', false);
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/paypal_common.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/paypal_common.php';
 }
 
 namespace Tests {

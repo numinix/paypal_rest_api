@@ -33,7 +33,7 @@ $walletModules = [
     'paypalac_savedcard.php' => 'STATUS_CAPTURED',
 ];
 
-$basePath = dirname(__DIR__) . '/includes/modules/payment/';
+$basePath = dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/';
 
 echo "Testing that all payment modules explicitly set \$order->info['order_status'] for captured payments...\n\n";
 

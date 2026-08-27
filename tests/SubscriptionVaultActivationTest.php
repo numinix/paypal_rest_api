@@ -44,7 +44,7 @@ namespace {
         $GLOBALS['psr4Autoloader'] = new mockPsr4Autoloader();
     }
 
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 
     // Mock database class
     class queryFactoryResult

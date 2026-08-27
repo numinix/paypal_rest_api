@@ -21,7 +21,7 @@ namespace {
     fwrite(STDOUT, "Testing bulk archive/unarchive functionality in admin/paypalac_subscriptions.php...\n\n");
 
     // Read the admin file
-    $adminFile = dirname(__DIR__) . '/admin/paypalac_subscriptions.php';
+    $adminFile = dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/paypalac_subscriptions.php';
     if (!file_exists($adminFile)) {
         fwrite(STDERR, "✗ Admin file not found: $adminFile\n");
         exit(1);

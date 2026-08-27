@@ -12,8 +12,8 @@ $testPassed = true;
 $errors = [];
 
 // Path to the saved card module
-$savedCardModulePath = __DIR__ . '/../includes/modules/payment/paypalac_savedcard.php';
-$paypalacModulePath = __DIR__ . '/../includes/modules/payment/paypalac.php';
+$savedCardModulePath = __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_savedcard.php';
+$paypalacModulePath = __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac.php';
 
 if (!file_exists($savedCardModulePath)) {
     echo "Error: paypalac_savedcard.php not found at $savedCardModulePath\n";
