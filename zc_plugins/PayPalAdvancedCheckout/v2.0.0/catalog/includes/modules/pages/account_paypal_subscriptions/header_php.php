@@ -420,7 +420,7 @@ $paypal_subscriptions_allow_api = false;
 $remoteCache = [];
 
 if ($hideSubscriptionsPage === false) {
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/ppacAutoload.php';
+    require_once dirname(__DIR__, 3) . '/payment/paypal/ppacAutoload.php';
     require_once dirname(__DIR__, 3) . '/payment/paypalac.php';
 
     SubscriptionManager::ensureSchema();

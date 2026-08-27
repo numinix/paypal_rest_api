@@ -18,7 +18,12 @@ require_once(DIR_WS_CLASSES . 'currencies.php');
 require_once(DIR_WS_CLASSES . 'order.php');
 require_once(DIR_WS_CLASSES . 'shipping.php');
 require_once(DIR_WS_CLASSES . 'order_total.php');
-require_once(DIR_WS_FUNCTIONS . 'paypalac_functions.php');
+if (is_file(DIR_FS_CATALOG . 'ppac_paths.php')) {
+    require_once DIR_FS_CATALOG . 'ppac_paths.php';
+    ppac_require_catalog_includes_file('functions/paypalac_functions.php');
+} else {
+    require_once DIR_WS_FUNCTIONS . 'paypalac_functions.php';
+}
 
 define('LOG_FILE_PATH', DIR_FS_LOGS . '/paypalac_wallet_handler.log');
 

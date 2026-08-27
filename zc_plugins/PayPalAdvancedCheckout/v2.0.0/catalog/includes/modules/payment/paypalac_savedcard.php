@@ -921,7 +921,7 @@ class paypalac_savedcard extends base
     protected function orderContainsFutureStartDate(): bool
     {
         if (!class_exists('paypalacSavedCardRecurring')) {
-            $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+            $savedCardRecurringPath = dirname(__DIR__, 2) . '/classes/paypalacSavedCardRecurring.php';
             if (file_exists($savedCardRecurringPath)) {
                 require_once $savedCardRecurringPath;
             }

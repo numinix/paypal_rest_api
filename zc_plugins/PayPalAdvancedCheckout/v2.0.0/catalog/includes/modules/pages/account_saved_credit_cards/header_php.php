@@ -637,7 +637,7 @@ if (!function_exists('paypalac_delete_payflow_card')) {
                 $replacementId = paypalac_replacement_card_id($customers_id, $card_id);
                 if ($replacementId > 0) {
                     if (!class_exists('paypalacSavedCardRecurring')) {
-                        require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+                        require_once dirname(__DIR__, 3) . '/classes/paypalacSavedCardRecurring.php';
                     }
                     $acRecurring = new paypalacSavedCardRecurring();
                     $rebindSql = "SELECT saved_credit_card_recurring_id"
@@ -1212,7 +1212,7 @@ for ($offset = 0; $offset <= 15; $offset++) {
 }
 
 if ($hide_saved_cards_page === false) {
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/ppacAutoload.php';
+    require_once dirname(__DIR__, 3) . '/payment/paypal/ppacAutoload.php';
     require_once dirname(__DIR__, 3) . '/payment/paypalac.php';
 
     $statusMap = paypalac_get_vault_status_map();

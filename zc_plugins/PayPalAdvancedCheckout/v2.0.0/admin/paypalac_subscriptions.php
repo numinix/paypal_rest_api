@@ -30,8 +30,8 @@ if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.p
 }
 
 // Load saved card recurring class
-if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php')) {
-    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+if (file_exists(dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php')) {
+    require_once dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php';
 }
 
 use PayPalAdvancedCheckout\Common\SubscriptionManager;
@@ -772,7 +772,7 @@ if ($action === 'create_subscription') {
     }
 
     if (!class_exists('paypalacSavedCardRecurring')) {
-        $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+        $savedCardRecurringPath = dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php';
         if (file_exists($savedCardRecurringPath)) {
             require_once $savedCardRecurringPath;
         }
@@ -1106,7 +1106,7 @@ if ($action === 'update_subscription') {
             $legacySubId = (int) $legacyIdRow->fields['legacy_subscription_id'];
 
             if (!class_exists('paypalacSavedCardRecurring')) {
-                $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+                $savedCardRecurringPath = dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php';
                 if (file_exists($savedCardRecurringPath)) {
                     require_once $savedCardRecurringPath;
                 }

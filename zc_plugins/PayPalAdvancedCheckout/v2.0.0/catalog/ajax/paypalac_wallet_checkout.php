@@ -32,7 +32,12 @@ require('includes/application_top.php');
 // Discard any output from application_top.php
 ob_end_clean();
 
-require_once(DIR_WS_FUNCTIONS . 'paypalac_functions.php');
+if (is_file(DIR_FS_CATALOG . 'ppac_paths.php')) {
+    require_once DIR_FS_CATALOG . 'ppac_paths.php';
+    ppac_require_catalog_includes_file('functions/paypalac_functions.php');
+} else {
+    require_once DIR_WS_FUNCTIONS . 'paypalac_functions.php';
+}
 // Note: Customer.php does not exist in Zen Cart 1.5.6c+ and is not needed
 // The following classes are loaded via Zen Cart's autoloader or must be explicitly required
 if (!class_exists('payment')) {

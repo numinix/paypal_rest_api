@@ -5,7 +5,11 @@ chdir(DIR_FS_CATALOG);
 require_once 'includes/application_top.php';
 if (is_file(DIR_FS_CATALOG . 'ppac_paths.php')) { require_once DIR_FS_CATALOG . 'ppac_paths.php'; ppac_require_catalog_includes_file('modules/payment/paypal/ppacAutoload.php'); } else { require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php'; }
 \PayPalAdvancedCheckout\Common\LegacySubscriptionMigrator::syncLegacySubscriptions();
-require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+if (function_exists('ppac_require_catalog_includes_file')) {
+    ppac_require_catalog_includes_file('classes/paypalacSavedCardRecurring.php');
+} else {
+    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+}
 
 // Load checkout-process language definitions using the active language
 $language = basename($_SESSION['language'] ?? (defined('DEFAULT_LANGUAGE') ? DEFAULT_LANGUAGE : 'english'));

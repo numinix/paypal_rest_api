@@ -50,7 +50,7 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 $action = $requestData['action'] ?? '';
 
 if ($action === 'create_setup_token') {
-    require_once DIR_FS_CATALOG . 'includes/modules/payment/paypal/ppacAutoload.php';
+    ppac_require_catalog_includes_file('modules/payment/paypal/ppacAutoload.php');
     ppac_require_catalog_includes_file('modules/payment/paypalac.php');
 
     // Support either a direct billing_address object or an address_book_id reference

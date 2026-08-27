@@ -580,7 +580,7 @@ class paypalac_paylater extends base
 
         // Check using paypalSavedCardRecurring class if available
         if (!class_exists('paypalacSavedCardRecurring')) {
-            $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+            $savedCardRecurringPath = dirname(__DIR__, 2) . '/classes/paypalacSavedCardRecurring.php';
             if (file_exists($savedCardRecurringPath)) {
                 require_once $savedCardRecurringPath;
             }

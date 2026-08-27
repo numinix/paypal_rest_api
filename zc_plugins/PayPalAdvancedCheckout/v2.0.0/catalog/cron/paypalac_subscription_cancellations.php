@@ -16,8 +16,14 @@ chdir(DIR_FS_CATALOG);
 require_once 'includes/application_top.php';
 
 // Load saved card recurring class for group pricing methods
-if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php')) {
-    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+if (is_file(DIR_FS_CATALOG . 'ppac_paths.php')) {
+    require_once DIR_FS_CATALOG . 'ppac_paths.php';
+}
+$_scc = function_exists('ppac_find_catalog_includes_file')
+    ? ppac_find_catalog_includes_file('classes/paypalacSavedCardRecurring.php')
+    : (DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php');
+if ($_scc && is_file($_scc)) {
+    require_once $_scc;
 }
 
 $customersProcessed = 0;

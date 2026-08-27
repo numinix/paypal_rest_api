@@ -857,7 +857,7 @@ class zcObserverPaypaladvcheckoutRecurring
         $nextBillingDate = $this->calculateNextBillingDate($subscriptionAttributes);
 
         if (!class_exists('paypalacSavedCardRecurring')) {
-            $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+            $savedCardRecurringPath = dirname(__DIR__) . '/paypalacSavedCardRecurring.php';
             if (file_exists($savedCardRecurringPath)) {
                 require_once $savedCardRecurringPath;
             }

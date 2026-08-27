@@ -27,7 +27,7 @@ if (class_exists('PayPalAdvancedCheckout\\Common\\SavedCreditCardsManager')) {
 }
 
 // Load saved card recurring class
-require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+require_once dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php';
 
 // Load extra datafiles if available
 if (file_exists(DIR_FS_CATALOG . DIR_WS_INCLUDES . 'extra_datafiles/saved_credit_cards.php')) {
