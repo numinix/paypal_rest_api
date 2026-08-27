@@ -52,7 +52,7 @@ class paypalac_paylater extends base
         return defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_PAYLATER_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '1.1.6';
+    protected const CURRENT_VERSION = '1.1.7';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -660,7 +660,16 @@ class paypalac_paylater extends base
 
     public function selection(): array
     {
-        unset($_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed']);
+        // Keep a just-returned Pay Later approval across OPC payment-list rebuilds
+        // in the same finalize request. Clearing it here forced Confirm Order to
+        // treat the shopper as unpaid after PayPal Pay Later completed.
+        $sessionOrder = $_SESSION['PayPalAdvancedCheckout']['Order'] ?? [];
+        $keepConfirmed = !empty($sessionOrder['wallet_payment_confirmed'])
+            && (($sessionOrder['payment_source'] ?? '') === 'paylater')
+            && in_array((string)($sessionOrder['status'] ?? ''), self::WALLET_SUCCESS_STATUSES, true);
+        if (!$keepConfirmed) {
+            unset($_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed']);
+        }
 
         $buttonContainer = '<div id="paypalac-paylater-button" class="paypalac-paylater-button"></div>';
         $hiddenFields =
@@ -761,8 +770,12 @@ class paypalac_paylater extends base
      * experience_context (Orders v2 rejects payment_source.paylater) and return
      * the approve / payer-action URL (with fundingSource=paylater) for redirect.
      * Synthetic clicks on the hosted Buttons iframe are blocked by browsers.
+     *
+     * @param array $checkoutPosts Checkout form fields from the browser (JSON wallet
+     *                             requests do not populate $_POST). Required so
+     *                             ppac_listener can resume OPC after PayPal return.
      */
-    public function ajaxCreatePayLaterConfirmRedirect(): array
+    public function ajaxCreatePayLaterConfirmRedirect(array $checkoutPosts = []): array
     {
         $limit_context = $this->getPayLaterLimitContext();
         if ($limit_context['withinLimits'] === false) {
@@ -800,7 +813,7 @@ class paypalac_paylater extends base
             ] + $limit_context;
         }
 
-        $this->storePayLaterPayerAction($approveUrl);
+        $this->storePayLaterPayerAction($approveUrl, $checkoutPosts, $orderId);
 
         return [
             'success' => true,
@@ -809,17 +822,36 @@ class paypalac_paylater extends base
         ] + $limit_context;
     }
 
-    protected function storePayLaterPayerAction(string $approveUrl): void
+    /**
+     * Stash the checkout POST bag for ppac_listener's return form.
+     * Prefer browser-supplied checkout_posts (JSON confirm_redirect has empty $_POST).
+     */
+    protected function storePayLaterPayerAction(string $approveUrl, array $checkoutPosts = [], string $orderId = ''): void
     {
         global $current_page_base;
 
-        $savedPosts = $_POST;
-        unset($savedPosts['request']);
-        if (!isset($savedPosts['payment'])) {
-            $savedPosts['payment'] = $this->code;
+        $savedPosts = [];
+        if ($checkoutPosts !== []) {
+            $savedPosts = $checkoutPosts;
+        } elseif (!empty($_POST) && is_array($_POST)) {
+            $savedPosts = $_POST;
         }
-        if (!isset($savedPosts['ppac_type'])) {
-            $savedPosts['ppac_type'] = 'paylater';
+        unset($savedPosts['request']);
+
+        $savedPosts['payment'] = $this->code;
+        $savedPosts['ppac_type'] = 'paylater';
+
+        // Mark approved so a redisplayed checkout does not immediately re-redirect,
+        // and so processWalletConfirmation has an orderID if needed.
+        if ($orderId === '') {
+            $orderId = trim((string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''));
+        }
+        if ($orderId !== '') {
+            $savedPosts['paypalac_paylater_status'] = 'approved';
+            $savedPosts['paypalac_paylater_payload'] = json_encode([
+                'orderID' => $orderId,
+                'wallet' => 'paylater',
+            ]);
         }
 
         $redirectPage = 'one_page_checkout';
@@ -829,9 +861,23 @@ class paypalac_paylater extends base
             $redirectPage = FILENAME_CHECKOUT_CONFIRMATION;
         }
 
+        // Prefer the page the shopper was on (e.g. one_page_checkout) over ppac_wallet.
+        if (!empty($checkoutPosts['main_page']) && is_string($checkoutPosts['main_page'])) {
+            $postedMain = preg_replace('/[^a-zA-Z0-9_]/', '', preg_replace('/\.php$/i', '', trim($checkoutPosts['main_page'])));
+            if ($postedMain !== '') {
+                $redirectPage = $postedMain;
+            }
+        }
+
         if (!isset($_SESSION['PayPalAdvancedCheckout']['Order']) || !is_array($_SESSION['PayPalAdvancedCheckout']['Order'])) {
             $_SESSION['PayPalAdvancedCheckout']['Order'] = [];
         }
+
+        $this->log->write(
+            'Pay Later Confirm Order PayerAction savedPosts keys: ' . implode(',', array_keys($savedPosts)),
+            true,
+            'after'
+        );
 
         $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'] = [
             'current_page_base' => $current_page_base ?? $redirectPage,
