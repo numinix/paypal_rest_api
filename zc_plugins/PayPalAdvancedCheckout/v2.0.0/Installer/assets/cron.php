@@ -54,4 +54,6 @@ if ($bestRunner === null) {
     exit(1);
 }
 
+$runnerDir = dirname($bestRunner);
+chdir($runnerDir);
 require $bestRunner;

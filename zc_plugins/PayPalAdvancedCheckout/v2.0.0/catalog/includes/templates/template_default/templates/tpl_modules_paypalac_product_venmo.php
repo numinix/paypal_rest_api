@@ -6,7 +6,14 @@
  * Venmo uses PayPal Buttons SDK with VENMO funding source.
  * This is different from Google Pay/Apple Pay which use separate SDKs.
  */
-    require_once(DIR_WS_LANGUAGES . $_SESSION['language'] . '/modules/payment/paypalac_venmo.php');
+    $langBase = dirname(__DIR__, 3) . '/languages/' . $_SESSION['language'] . '/modules/payment/';
+    $langFile = $langBase . 'lang.paypalac_venmo.php';
+    if (!is_file($langFile)) {
+        $langFile = $langBase . 'paypalac_venmo.php';
+    }
+    if (is_file($langFile)) {
+        require_once $langFile;
+    }
     require_once dirname(__DIR__, 3) . '/modules/payment/paypalac_venmo.php';
 
     $venmoModule = new paypalac_venmo();

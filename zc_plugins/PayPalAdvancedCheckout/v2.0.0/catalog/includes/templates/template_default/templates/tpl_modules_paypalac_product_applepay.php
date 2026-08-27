@@ -7,7 +7,14 @@
  * then processes payment through the PayPal Advanced Checkout module.
  * Based on Braintree implementation pattern.
  */
-    require_once(DIR_WS_LANGUAGES . $_SESSION['language'] . '/modules/payment/paypalac_applepay.php');
+    $langBase = dirname(__DIR__, 3) . '/languages/' . $_SESSION['language'] . '/modules/payment/';
+    $langFile = $langBase . 'lang.paypalac_applepay.php';
+    if (!is_file($langFile)) {
+        $langFile = $langBase . 'paypalac_applepay.php';
+    }
+    if (is_file($langFile)) {
+        require_once $langFile;
+    }
     require_once dirname(__DIR__, 3) . '/modules/payment/paypalac_applepay.php';
 
     $applePayModule = new paypalac_applepay();

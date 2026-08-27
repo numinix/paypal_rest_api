@@ -7,7 +7,14 @@
  * The SDK provides the correct tokenization specification and handles
  * Google Pay integration through PayPal's REST API.
  */
-    require_once(DIR_WS_LANGUAGES . $_SESSION['language'] . '/modules/payment/paypalac_googlepay.php');
+    $langBase = dirname(__DIR__, 3) . '/languages/' . $_SESSION['language'] . '/modules/payment/';
+    $langFile = $langBase . 'lang.paypalac_googlepay.php';
+    if (!is_file($langFile)) {
+        $langFile = $langBase . 'paypalac_googlepay.php';
+    }
+    if (is_file($langFile)) {
+        require_once $langFile;
+    }
     require_once dirname(__DIR__, 3) . '/modules/payment/paypalac_googlepay.php';
 
     $googlePayModule = new paypalac_googlepay();
