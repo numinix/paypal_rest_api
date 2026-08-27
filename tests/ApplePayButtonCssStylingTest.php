@@ -18,7 +18,7 @@ $testPassed = true;
 $errors = [];
 
 // Get the CSS file content
-$cssFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/paypalac.css';
+$cssFile = __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/paypalac.css';
 if (!file_exists($cssFile)) {
     echo "❌ CSS file not found: {$cssFile}\n";
     exit(1);

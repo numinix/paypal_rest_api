@@ -208,7 +208,7 @@ namespace {
     $failures = 0;
 
     // Load the class
-    require_once DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 
     // Test 1: Verify get_scheduled_payments() uses 'next_payment_date'
     fwrite(STDOUT, "Test 1: Verifying get_scheduled_payments() uses 'next_payment_date' in WHERE clause...\n");
@@ -293,7 +293,7 @@ namespace {
     fwrite(STDOUT, "\nTest 3: Verifying customer_has_subscription() uses 'next_payment_date' from subscription array...\n");
     
     // Read the source code to verify the array access
-    $sourceFile = DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
+    $sourceFile = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
     $content = file_get_contents($sourceFile);
     
     if (preg_match('/customer_has_subscription.*?{.*?}.*?}/s', $content, $matches)) {

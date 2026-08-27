@@ -41,7 +41,7 @@ function testCcInfoGetter() {
     echo "Test 1: Checking paypalac_savedcard has getCcInfo method...\n";
     
     // Read the file and check for the method
-    $savedcard_content = file_get_contents(DIR_FS_CATALOG . 'includes/modules/payment/paypalac_savedcard.php');
+    $savedcard_content = file_get_contents(DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_savedcard.php');
     
     if (strpos($savedcard_content, 'public function getCcInfo(): array') !== false) {
         echo "✓ paypalac_savedcard has getCcInfo method\n";
@@ -53,7 +53,7 @@ function testCcInfoGetter() {
     // Test 2: Verify paypalac_creditcard has getCcInfo method
     echo "\nTest 2: Checking paypalac_creditcard has getCcInfo method...\n";
     
-    $creditcard_content = file_get_contents(DIR_FS_CATALOG . 'includes/modules/payment/paypalac_creditcard.php');
+    $creditcard_content = file_get_contents(DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_creditcard.php');
     
     if (strpos($creditcard_content, 'public function getCcInfo(): array') !== false) {
         echo "✓ paypalac_creditcard has getCcInfo method\n";
@@ -65,7 +65,7 @@ function testCcInfoGetter() {
     // Test 3: Verify PayPalCommon::createPayPalOrder uses method_exists check
     echo "\nTest 3: Checking PayPalCommon::createPayPalOrder uses getCcInfo getter...\n";
     
-    $common_content = file_get_contents(DIR_FS_CATALOG . 'includes/modules/payment/paypal/paypal_common.php');
+    $common_content = file_get_contents(DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/paypal_common.php');
     
     if (strpos($common_content, "method_exists(\$paymentModule, 'getCcInfo')") !== false) {
         echo "✓ PayPalCommon::createPayPalOrder checks for getCcInfo method\n";

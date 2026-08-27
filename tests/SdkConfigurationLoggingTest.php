@@ -22,7 +22,7 @@ namespace {
     function testObserverHasSdkConfigLogging(): bool
     {
         $passed = true;
-        $observerPath = DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout.php';
+        $observerPath = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/observers/auto.paypaladvcheckout.php';
         
         if (!file_exists($observerPath)) {
             fwrite(STDERR, "FAIL: Observer file not found at $observerPath\n");
@@ -95,7 +95,7 @@ namespace {
         ];
 
         foreach ($walletModules as $filename => $walletName) {
-            $modulePath = DIR_FS_CATALOG . 'includes/modules/payment/' . $filename;
+            $modulePath = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/' . $filename;
             
             if (!file_exists($modulePath)) {
                 fwrite(STDERR, "FAIL: $filename not found at $modulePath\n");

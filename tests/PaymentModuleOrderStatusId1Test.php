@@ -33,7 +33,7 @@ $paymentModules = [
 $testsPassed = true;
 
 foreach ($paymentModules as $module) {
-    $modulePath = $basePath . '/includes/modules/payment/' . $module;
+    $modulePath = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/' . $module;
     
     if (!file_exists($modulePath)) {
         fwrite(STDOUT, "SKIP: $module not found\n");

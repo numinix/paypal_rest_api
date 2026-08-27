@@ -20,7 +20,7 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify country_code logic in build_billing_address_from_card
 fwrite(STDOUT, "Test 1: Checking billing_address includes country_code handling...\n");
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     

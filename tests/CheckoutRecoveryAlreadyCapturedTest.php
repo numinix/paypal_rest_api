@@ -18,7 +18,7 @@ if (!defined('DIR_WS_MODULES')) {
 
 spl_autoload_register(function ($class) {
     $prefix = 'PayPalAdvancedCheckout\\';
-    $base_dir = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/';
+    $base_dir = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/';
 
     $len = strlen($prefix);
     if (strncmp($prefix, $class, $len) !== 0) {
@@ -182,8 +182,8 @@ checkout_recovery_assert(str_contains($context, 'kmk_y2003@example.com'), 'alert
 checkout_recovery_assert(str_contains($context, '6XH02186HH922551G'), 'alert context includes PayPal order id');
 
 echo "\nTest 7: paypalac capture path uses recovery instead of the create GUID\n";
-$paypalac = file_get_contents(DIR_FS_CATALOG . 'includes/modules/payment/paypalac.php');
-$common = file_get_contents(DIR_FS_CATALOG . 'includes/modules/payment/paypal/paypal_common.php');
+$paypalac = file_get_contents(DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac.php');
+$common = file_get_contents(DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/paypal_common.php');
 checkout_recovery_assert(
     strpos($paypalac, "setPayPalRequestId(\$_SESSION['PayPalAdvancedCheckout']['Order']['guid'])") === false,
     'paypalac capture no longer sets Request-Id to the create GUID'

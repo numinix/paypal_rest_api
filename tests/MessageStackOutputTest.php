@@ -28,7 +28,7 @@ class MessageStackOutputTest extends TestCase
         }
         
         // Load the MessageStack compatibility class
-        $messageStackPath = __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/MessageStack.php';
+        $messageStackPath = __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/MessageStack.php';
         if (file_exists($messageStackPath)) {
             // Only load if not already loaded (the class file returns early if already defined)
             require_once $messageStackPath;

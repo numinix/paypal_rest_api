@@ -40,7 +40,7 @@ namespace Tests {
         public static function setUpBeforeClass(): void
         {
             // Load the language file to ensure constants are defined
-            require_once DIR_FS_CATALOG . 'includes/languages/english/account_saved_credit_cards.php';
+            require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/languages/english/account_saved_credit_cards.php';
         }
 
         public function testLanguageFileDefinesConstants(): void
@@ -59,7 +59,7 @@ namespace Tests {
         {
             // Verify that the language file doesn't have an early return
             // that would prevent constants from being defined
-            $languageFile = DIR_FS_CATALOG . 'includes/languages/english/account_saved_credit_cards.php';
+            $languageFile = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/languages/english/account_saved_credit_cards.php';
             $content = file_get_contents($languageFile);
             
             $this->assertStringNotContainsString(

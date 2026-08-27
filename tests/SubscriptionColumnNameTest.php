@@ -180,7 +180,7 @@ namespace {
     $failures = 0;
 
     // Load the class
-    require_once DIR_FS_CATALOG . 'includes/classes/paypalacSavedCardRecurring.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 
     // Test 1: Verify get_attributes() uses correct column name
     fwrite(STDOUT, "Test 1: Verifying get_attributes() uses 'orders_products_id' instead of 'original_orders_products_id'...\n");

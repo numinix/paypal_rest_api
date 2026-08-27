@@ -10,10 +10,10 @@ declare(strict_types=1);
 
 $failures = 0;
 
-$paylaterPhp = file_get_contents(__DIR__ . '/../includes/modules/payment/paypalac_paylater.php');
-$paylaterJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.paylater.js');
-$walletPhp = file_get_contents(__DIR__ . '/../ppac_wallet.php');
-$langPhp = file_get_contents(__DIR__ . '/../includes/languages/english/modules/payment/lang.paypalac_paylater.php');
+$paylaterPhp = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_paylater.php');
+$paylaterJs = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.paylater.js');
+$walletPhp = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/Installer/assets/root/ppac_wallet.php');
+$langPhp = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/languages/english/modules/payment/lang.paypalac_paylater.php');
 
 fwrite(STDOUT, "Testing Pay Later amount limits\n");
 fwrite(STDOUT, "================================\n\n");

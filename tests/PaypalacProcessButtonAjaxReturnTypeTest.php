@@ -33,7 +33,7 @@ class PaypalacProcessButtonAjaxReturnTypeTest
     
     public function __construct()
     {
-        $this->paypalacFile = dirname(__DIR__) . '/includes/modules/payment/paypalac.php';
+        $this->paypalacFile = dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac.php';
         
         if (!file_exists($this->paypalacFile)) {
             throw new RuntimeException("PayPalac file not found: {$this->paypalacFile}");
@@ -88,8 +88,8 @@ class PaypalacProcessButtonAjaxReturnTypeTest
     
     private function testConsistencyWithOtherModules(): void
     {
-        $venmoFile = dirname(__DIR__) . '/includes/modules/payment/paypalac_venmo.php';
-        $paylaterFile = dirname(__DIR__) . '/includes/modules/payment/paypalac_paylater.php';
+        $venmoFile = dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_venmo.php';
+        $paylaterFile = dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_paylater.php';
         
         $venmoContent = file_get_contents($venmoFile);
         $paylaterContent = file_get_contents($paylaterFile);

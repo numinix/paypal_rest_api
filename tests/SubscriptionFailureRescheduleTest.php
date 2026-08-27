@@ -52,7 +52,7 @@ if (file_exists($cronFile)) {
 
 // Test 2: Verify REST API subscription detection fallback
 echo "Test 2: Checking REST API subscription detection with vault card fallback...\n";
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     

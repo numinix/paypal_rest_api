@@ -43,25 +43,25 @@ namespace {
 
 namespace PayPalAdvancedCheckout\Common {
     if (!class_exists(Helpers::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
     }
     if (!class_exists(Logger::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
     }
     if (!class_exists(ErrorInfo::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
     }
 }
 
 namespace PayPalAdvancedCheckout\Token {
     if (!class_exists(TokenCache::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Token/TokenCache.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Token/TokenCache.php';
     }
 }
 
 namespace PayPalAdvancedCheckout\Api {
     if (!class_exists(PayPalAdvancedCheckoutApi::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php';
     }
 }
 
@@ -91,10 +91,10 @@ namespace {
         // Test each wallet module's getPayPalAdvancedCheckoutApi method indirectly
         // by checking the pattern used in the source files
         $modules = [
-            'paypalac_creditcard' => 'includes/modules/payment/paypalac_creditcard.php',
-            'paypalac_applepay' => 'includes/modules/payment/paypalac_applepay.php',
-            'paypalac_googlepay' => 'includes/modules/payment/paypalac_googlepay.php',
-            'paypalac_venmo' => 'includes/modules/payment/paypalac_venmo.php',
+            'paypalac_creditcard' => 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_creditcard.php',
+            'paypalac_applepay' => 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_applepay.php',
+            'paypalac_googlepay' => 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_googlepay.php',
+            'paypalac_venmo' => 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_venmo.php',
         ];
 
         foreach ($modules as $moduleName => $filePath) {

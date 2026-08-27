@@ -185,7 +185,7 @@ if (!isset($GLOBALS['psr4Autoloader'])) {
 }
 
 // Include required files
-require_once DIR_FS_CATALOG . 'includes/modules/payment/paypalac_creditcard.php';
+require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_creditcard.php';
 
 // Run tests
 $all_passed = true;

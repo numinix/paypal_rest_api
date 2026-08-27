@@ -22,7 +22,7 @@ declare(strict_types=1);
 fwrite(STDOUT, "Running Recurring Order Status Test...\n\n");
 
 $basePath = dirname(__DIR__);
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 $cronFile = $basePath . '/cron/paypalac_saved_card_recurring.php';
 
 if (!file_exists($savedCardRecurringFile)) {

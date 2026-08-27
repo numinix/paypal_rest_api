@@ -209,11 +209,11 @@ namespace {
     }
 
     $baseDir = dirname(__DIR__, 2);
-    require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
-    require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
-    require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookObject.php';
-    require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookHandlerContract.php';
-    require_once $baseDir . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/Events/VaultPaymentTokenUpdated.php';
+    require_once $baseDir . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+    require_once $baseDir . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/VaultManager.php';
+    require_once $baseDir . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookObject.php';
+    require_once $baseDir . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookHandlerContract.php';
+    require_once $baseDir . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/Events/VaultPaymentTokenUpdated.php';
 }
 
 namespace PayPalAdvancedCheckout\Common {

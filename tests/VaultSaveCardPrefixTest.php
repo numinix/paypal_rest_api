@@ -49,7 +49,7 @@ namespace {
     }
 
     if (!defined('DIR_WS_CLASSES')) {
-        define('DIR_WS_CLASSES', DIR_FS_CATALOG . 'includes/classes/');
+        define('DIR_WS_CLASSES', DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/');
     }
 
     $GLOBALS['messageStack'] = new messageStack();

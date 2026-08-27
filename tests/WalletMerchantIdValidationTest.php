@@ -35,7 +35,7 @@ namespace {
     function testApplePayDoesNotUseMerchantIdLanguageLabel(): bool
     {
         $passed = true;
-        $applePayFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalac_applepay.php';
+        $applePayFile = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_applepay.php';
         $content = file_get_contents($applePayFile);
 
         // Check that MODULE_PAYMENT_PAYPALAC_MERCHANT_ID is NOT used
@@ -56,7 +56,7 @@ namespace {
     function testGooglePayValidatesOptionalMerchantIdConstant(): bool
     {
         $passed = true;
-        $googlePayFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalac_googlepay.php';
+        $googlePayFile = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_googlepay.php';
         $content = file_get_contents($googlePayFile);
 
         // Find the ajaxGetWalletConfig method
@@ -118,7 +118,7 @@ namespace {
         ];
 
         foreach ($jsFiles as $jsFile) {
-            $jsPath = DIR_FS_CATALOG . 'includes/modules/payment/paypal/PayPalAdvancedCheckout/' . $jsFile;
+            $jsPath = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/' . $jsFile;
             $content = file_get_contents($jsPath);
 
             // Check for the merchant ID validation regex
@@ -149,7 +149,7 @@ namespace {
     function testApplePayReturnsEmptyMerchantId(): bool
     {
         $passed = true;
-        $applePayFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalac_applepay.php';
+        $applePayFile = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_applepay.php';
         $content = file_get_contents($applePayFile);
 
         // Find the ajaxGetWalletConfig method
@@ -187,7 +187,7 @@ namespace {
     function testVenmoUsesOptionalMerchantId(): bool
     {
         $passed = true;
-        $venmoFile = DIR_FS_CATALOG . 'includes/modules/payment/paypalac_venmo.php';
+        $venmoFile = DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_venmo.php';
         $content = file_get_contents($venmoFile);
 
         // Find the ajaxGetWalletConfig method

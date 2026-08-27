@@ -26,7 +26,7 @@ $testPassed = true;
 $errors = [];
 
 // Get the Google Pay JS file content
-$googlePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.googlepay.js');
+$googlePayJs = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.googlepay.js');
 
 echo "Testing Native Google Pay Implementation\n";
 echo "========================================\n\n";

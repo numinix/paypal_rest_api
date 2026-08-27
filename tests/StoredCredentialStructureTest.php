@@ -18,7 +18,7 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify stored_credential is not nested in attributes
 fwrite(STDOUT, "Test 1: Checking stored_credential structure in build_vault_payment_source...\n");
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     

@@ -31,7 +31,7 @@ class OrderGuidReuseStatusCheckTest
     public function __construct()
     {
         $baseDir = dirname(__DIR__);
-        $this->paypalacFile = $baseDir . '/includes/modules/payment/paypalac.php';
+        $this->paypalacFile = $baseDir . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac.php';
         
         if (!file_exists($this->paypalacFile)) {
             throw new RuntimeException("PayPal payment module file not found: {$this->paypalacFile}");

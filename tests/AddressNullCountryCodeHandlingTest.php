@@ -15,8 +15,8 @@ $errors = [];
 echo "Testing Address Null Country Code Handling\n";
 echo "===========================================\n\n";
 
-require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/Data/CountryCodes.php';
-require_once __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/Address.php';
+require_once __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/Data/CountryCodes.php';
+require_once __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/Address.php';
 
 use PayPalAdvancedCheckout\Api\Data\CountryCodes;
 use PayPalAdvancedCheckout\Zc2Pp\Address;

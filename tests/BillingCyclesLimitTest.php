@@ -11,9 +11,9 @@ $basePath = dirname(__DIR__);
 $failures = 0;
 
 $cronFile = $basePath . '/cron/paypalac_saved_card_recurring.php';
-$classFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
-$adminFile = $basePath . '/admin/paypalac_subscriptions.php';
-$moduleFile = $basePath . '/includes/modules/payment/paypalac.php';
+$classFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
+$adminFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/paypalac_subscriptions.php';
+$moduleFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac.php';
 
 echo "Test 1: Cron skips subscriptions with no remaining billing cycles...\n";
 $cron = file_get_contents($cronFile);

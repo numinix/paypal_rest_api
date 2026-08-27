@@ -54,25 +54,25 @@ namespace {
 
 namespace PayPalAdvancedCheckout\Common {
     if (!class_exists(Helpers::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Helpers.php';
     }
     if (!class_exists(Logger::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/Logger.php';
     }
     if (!class_exists(ErrorInfo::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/ErrorInfo.php';
     }
 }
 
 namespace PayPalAdvancedCheckout\Token {
     if (!class_exists(TokenCache::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Token/TokenCache.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Token/TokenCache.php';
     }
 }
 
 namespace PayPalAdvancedCheckout\Api {
     if (!class_exists(PayPalAdvancedCheckoutApi::class)) {
-        require_once dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php';
+        require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Api/PayPalAdvancedCheckoutApi.php';
     }
 }
 
@@ -173,9 +173,9 @@ namespace {
      */
     echo "\nTest 4: Checking wallet modules extend paypalac...\n";
     $walletModules = [
-        'paypalac_applepay' => dirname(__DIR__) . '/includes/modules/payment/paypalac_applepay.php',
-        'paypalac_googlepay' => dirname(__DIR__) . '/includes/modules/payment/paypalac_googlepay.php',
-        'paypalac_venmo' => dirname(__DIR__) . '/includes/modules/payment/paypalac_venmo.php',
+        'paypalac_applepay' => dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_applepay.php',
+        'paypalac_googlepay' => dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_googlepay.php',
+        'paypalac_venmo' => dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_venmo.php',
     ];
     
     foreach ($walletModules as $moduleName => $modulePath) {
@@ -198,12 +198,12 @@ namespace {
      */
     echo "\nTest 5: Checking other code locations instantiate PayPalAdvancedCheckoutApi...\n";
     $otherLocations = [
-        'Admin Observer' => dirname(__DIR__) . '/admin/includes/classes/observers/auto.PaypalacAdmin.php',
+        'Admin Observer' => dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/includes/classes/observers/auto.PaypalacAdmin.php',
         'Payment Listener' => dirname(__DIR__) . '/ppac_listener.php',
-        'Vault Management' => dirname(__DIR__) . '/includes/modules/pages/account_saved_credit_cards/header_php.php',
-        'Subscription Management' => dirname(__DIR__) . '/includes/modules/pages/account_paypal_subscriptions/header_php.php',
-        'Webhook Handler' => dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookHandlerContract.php',
-        'Webhook Responder' => dirname(__DIR__) . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookResponder.php',
+        'Vault Management' => dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/pages/account_saved_credit_cards/header_php.php',
+        'Subscription Management' => dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/pages/account_paypal_subscriptions/header_php.php',
+        'Webhook Handler' => dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookHandlerContract.php',
+        'Webhook Responder' => dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Webhooks/WebhookResponder.php',
     ];
     
     foreach ($otherLocations as $locationName => $locationPath) {

@@ -19,7 +19,7 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify PayPal-Request-Id is set before createOrder
 fwrite(STDOUT, "Test 1: Checking PayPal-Request-Id is set in process_rest_payment...\n");
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     

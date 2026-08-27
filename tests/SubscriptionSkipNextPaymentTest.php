@@ -19,7 +19,7 @@ $basePath = dirname(__DIR__);
 
 // Test 1: Verify skip_next_payment method exists and calculates dates
 echo "Test 1: Checking for skip_next_payment method with date calculation...\n";
-$savedCardRecurringFile = $basePath . '/includes/classes/paypalacSavedCardRecurring.php';
+$savedCardRecurringFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
 if (file_exists($savedCardRecurringFile)) {
     $content = file_get_contents($savedCardRecurringFile);
     if (strpos($content, 'function skip_next_payment') !== false &&
@@ -37,8 +37,8 @@ if (file_exists($savedCardRecurringFile)) {
 
 // Test 2: Verify no skip flag logic in schema managers
 echo "Test 2: Verifying skip flag removed from schema managers...\n";
-$savedCardManagerFile = $basePath . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SavedCreditCardsManager.php';
-$subscriptionManagerFile = $basePath . '/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
+$savedCardManagerFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SavedCreditCardsManager.php';
+$subscriptionManagerFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Common/SubscriptionManager.php';
 
 if (file_exists($savedCardManagerFile) && file_exists($subscriptionManagerFile)) {
     $savedCardContent = file_get_contents($savedCardManagerFile);
@@ -74,8 +74,8 @@ if (file_exists($cronFile)) {
 
 // Test 4: Verify admin files have skip action with immediate date update
 echo "Test 4: Checking admin files for skip action with date calculation...\n";
-$savedCardAdminFile = $basePath . '/admin/paypalac_saved_card_recurring.php';
-$subscriptionsAdminFile = $basePath . '/admin/paypalac_subscriptions.php';
+$savedCardAdminFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/paypalac_saved_card_recurring.php';
+$subscriptionsAdminFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/admin/paypalac_subscriptions.php';
 
 if (file_exists($savedCardAdminFile) && file_exists($subscriptionsAdminFile)) {
     $savedCardContent = file_get_contents($savedCardAdminFile);

@@ -105,7 +105,7 @@ namespace {
         };
     }
 
-    require_once dirname(__DIR__) . '/includes/classes/observers/auto.paypaladvcheckout.php';
+    require_once dirname(__DIR__) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/observers/auto.paypaladvcheckout.php';
 
     /**
      * Test class for observer coupon calculations

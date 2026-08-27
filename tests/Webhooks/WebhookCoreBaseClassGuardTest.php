@@ -22,7 +22,7 @@ namespace {
 
     $failures = 0;
 
-    $webhookCoreFile = dirname(__DIR__, 2) . '/includes/auto_loaders/webhook.core.php';
+    $webhookCoreFile = dirname(__DIR__, 2) . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/auto_loaders/webhook.core.php';
     if (!file_exists($webhookCoreFile)) {
         fwrite(STDERR, "✗ webhook.core.php not found at: $webhookCoreFile\n");
         exit(1);

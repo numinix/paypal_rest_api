@@ -35,7 +35,7 @@ echo "Testing Apple Pay No Cancel Order Creation\n";
 echo "==========================================\n\n";
 
 // Get the Apple Pay JS file content
-$applePayJs = file_get_contents(__DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
+$applePayJs = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.applepay.js');
 
 // Extract the onApplePayButtonClicked function
 $pattern = '/function onApplePayButtonClicked\s*\([^)]*\)\s*\{([\s\S]*?)^\s{4}\}/m';

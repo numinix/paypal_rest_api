@@ -24,7 +24,7 @@ namespace {
     }
 
     // Load the extra_datafiles that defines table constants (simulating Zen Cart's auto-load behavior)
-    require_once DIR_FS_CATALOG . 'includes/extra_datafiles/ppac_database_tables.php';
+    require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/extra_datafiles/ppac_database_tables.php';
 
     $failures = 0;
 

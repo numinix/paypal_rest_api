@@ -11,9 +11,9 @@
  *   re-check live order status.
  */
 
-$jsFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.paylater.js';
-$phpFile = __DIR__ . '/../includes/modules/payment/paypal/paypal_common.php';
-$moduleFile = __DIR__ . '/../includes/modules/payment/paypalac_paylater.php';
+$jsFile = __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/jquery.paypalac.paylater.js';
+$phpFile = __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/paypal_common.php';
+$moduleFile = __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypalac_paylater.php';
 
 $testPassed = true;
 $errors = [];
@@ -142,7 +142,7 @@ if ($paylaterBranchPos === false || $genericConfirmPos === false || $paylaterBra
 }
 
 // Test 5: Confirm Order create uses payment_source.paypal (Orders v2 rejects paylater).
-$createRequestFile = __DIR__ . '/../includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/CreatePayPalOrderRequest.php';
+$createRequestFile = __DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Zc2Pp/CreatePayPalOrderRequest.php';
 $createRequestContent = file_get_contents($createRequestFile);
 if ($createRequestContent === false
     || strpos($createRequestContent, "['payment_source']['paypal'] = \$this->buildPayLaterRedirectPaymentSource") === false
@@ -162,7 +162,7 @@ if (strpos($phpContent, 'fundingSource=paylater') === false) {
 }
 
 // Test 5b: Confirm Order must persist browser checkout form fields (not empty $_POST).
-$walletEndpoint = file_get_contents(__DIR__ . '/../ppac_wallet.php');
+$walletEndpoint = file_get_contents(__DIR__ . '/../zc_plugins/PayPalAdvancedCheckout/v2.0.0/Installer/assets/root/ppac_wallet.php');
 if ($walletEndpoint === false
     || strpos($walletEndpoint, 'checkout_posts') === false
     || strpos($walletEndpoint, 'ajaxCreatePayLaterConfirmRedirect($checkoutPosts)') === false

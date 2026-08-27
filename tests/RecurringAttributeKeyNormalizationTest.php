@@ -19,7 +19,7 @@ if (!isset($psr4Autoloader)) {
     };
 }
 
-require_once DIR_FS_CATALOG . 'includes/classes/observers/auto.paypaladvcheckout_recurring.php';
+require_once DIR_FS_CATALOG . 'zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/observers/auto.paypaladvcheckout_recurring.php';
 
 class RecurringObserverTestHarness extends zcObserverPaypaladvcheckoutRecurring
 {
