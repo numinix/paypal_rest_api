@@ -78,7 +78,7 @@ if (!function_exists('paypalac_cancel_customer_subscription')) {
         $legacyId = (int) ($subscriptionRecord['legacy_subscription_id'] ?? 0);
         if ($legacyId > 0 && defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
             if (!class_exists('paypalacSavedCardRecurring')) {
-                $recurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
+                $recurringPath = dirname(__DIR__, 2) . '/classes/paypalacSavedCardRecurring.php';
                 if (file_exists($recurringPath)) {
                     require_once $recurringPath;
                 }
