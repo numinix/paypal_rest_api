@@ -368,6 +368,7 @@
         if (wrapper) {
             wrapper.style.display = '';
             wrapper.removeAttribute('hidden');
+            wrapper.classList.remove('paypalac-checkout-row-hidden');
         }
 
         showNativeCheckoutWalletRow('paypalac_applepay');
@@ -376,6 +377,7 @@
         if (container) {
             container.style.display = '';
             container.removeAttribute('hidden');
+            container.classList.remove('paypalac-checkout-row-hidden');
         }
 
         var moduleRadio = document.getElementById('pmt-paypalac_applepay');
@@ -402,6 +404,7 @@
         if (wrapper) {
             wrapper.style.display = 'none';
             wrapper.setAttribute('hidden', 'hidden');
+            wrapper.classList.add('paypalac-checkout-row-hidden');
             return;
         }
 
@@ -416,6 +419,8 @@
         var container = document.getElementById('paypalac-applepay-button');
         if (container) {
             container.style.display = 'none';
+            container.setAttribute('hidden', 'hidden');
+            container.classList.add('paypalac-checkout-row-hidden');
         }
     }
 

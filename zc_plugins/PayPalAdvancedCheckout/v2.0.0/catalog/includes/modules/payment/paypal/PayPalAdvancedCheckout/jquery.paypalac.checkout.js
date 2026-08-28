@@ -28,6 +28,8 @@ jQuery(document).ready(function() {
 
     // PayPal JS SDK may still probe #ppr-choice-paypal .ppr-choice-label on
     // document clicks. Wallet-only markup omits the legacy choice UI.
+    // Attach the sentinel inside the real PayPal payment-method label so the
+    // word "PayPal" is not orphaned at the bottom of the checkout form/body.
     function ensurePayPalChoiceSentinel() {
         var label = document.querySelector('#ppr-choice-paypal .ppr-choice-label');
         if (label) {
@@ -36,17 +38,44 @@ jQuery(document).ready(function() {
             }
             return;
         }
+
+        var radio = document.getElementById('pmt-paypalac');
+        var paymentLabel = document.querySelector('label[for="pmt-paypalac"]')
+            || (radio && radio.closest('label'))
+            || document.querySelector('.payment-method.paypalac label')
+            || document.querySelector('label.payment-method-item-label[for="pmt-paypalac"]');
+
+        // No PayPal radio on this page (e.g. cart wallets only) — do not create
+        // an orphan sentinel under document.body / the checkout form.
+        if (!paymentLabel && !radio) {
+            return;
+        }
+
         var wrap = document.getElementById('ppr-choice-paypal');
         if (!wrap) {
-            wrap = document.createElement('div');
+            wrap = document.createElement('span');
             wrap.id = 'ppr-choice-paypal';
             wrap.className = 'paypalac-ppr-choice-sentinel';
-            wrap.setAttribute('aria-hidden', 'true');
-            var host = document.getElementById('paymentModules')
-                || document.getElementById('paymentMethodContainer')
-                || document.querySelector('form[name="checkout_payment"]')
-                || document.body;
-            host.appendChild(wrap);
+            if (paymentLabel) {
+                // Preserve existing label text in-place for the SDK probe.
+                label = document.createElement('span');
+                label.className = 'ppr-choice-label';
+                while (paymentLabel.firstChild) {
+                    label.appendChild(paymentLabel.firstChild);
+                }
+                if (!String(label.textContent || '').trim()) {
+                    label.textContent = 'PayPal';
+                }
+                wrap.appendChild(label);
+                paymentLabel.appendChild(wrap);
+                return;
+            }
+            // Radio exists without a label — keep sentinel next to the radio.
+            if (radio.parentNode) {
+                radio.parentNode.insertBefore(wrap, radio.nextSibling);
+            } else {
+                return;
+            }
         }
         label = document.createElement('span');
         label.className = 'ppr-choice-label';

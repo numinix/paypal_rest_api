@@ -415,9 +415,9 @@ class MainDisplay
                 $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALAC_PAYER_STATUS, $create_fields['payer_status']);
         } elseif (count($card_info) !== 0) {
             $modal_body .=
-                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALAC_CC_TYPE, $card_info['brand']) .
-                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALAC_CC_NUMBER, $card_info['last_digits']) .
-                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALAC_CC_EXPIRES, $card_info['expiry']);
+                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALAC_CC_TYPE, $card_info['brand'] ?? '') .
+                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALAC_CC_NUMBER, $card_info['last_digits'] ?? '') .
+                $this->createStaticFormGroup(3, MODULE_PAYMENT_PAYPALAC_CC_EXPIRES, $card_info['expiry'] ?? '');
         }
 
         if (!empty($create_fields['address_name'])) {
@@ -775,14 +775,14 @@ class MainDisplay
         return $this->createModal("refund-$capture_index", MODULE_PAYMENT_PAYPALAC_REFUND_TITLE, $modal_body);
     }
 
-    protected function createStaticFormGroup(int $label_width, string $label_text, string $value_text): string
+    protected function createStaticFormGroup(int $label_width, string $label_text, ?string $value_text): string
     {
         $value_width = 12 - $label_width;
         return
             '<div class="form-group">
                 <label class="control-label col-sm-' . $label_width . '  ppr-pr-0">' . $label_text . '</label>
                 <div class="col-sm-' . $value_width . '">
-                    <p class="form-control-static">' . zen_output_string_protected($value_text) . '</p>
+                    <p class="form-control-static">' . zen_output_string_protected((string)($value_text ?? '')) . '</p>
                 </div>
             </div>';
     }

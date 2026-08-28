@@ -102,17 +102,21 @@ if (document.readyState === 'loading') {
 <div id="paypalac-applepay-error" style="display:none; color:red; margin-top:10px;"></div>
 
 <style>
+/* Keep Apple Pay at the shared wallet width even when paypalac.css is not
+   already on the page (cart / product embeds). Matches --paypalac-wallet-button-width. */
 #paypalac-applepay-button {
     min-height: 50px;
     margin-top: 15px;
     margin-left: auto !important;
-    width: 228px;
+    width: 240px !important;
+    min-width: 200px !important;
+    max-width: 320px !important;
 }
 
 #paypalac-applepay-button apple-pay-button {
     --apple-pay-button-width: 100%;
     --apple-pay-button-height: 50px;
-    --apple-pay-button-border-radius: 3px;
+    --apple-pay-button-border-radius: 4px;
     display: block;
     width: 100%;
     height: 50px;

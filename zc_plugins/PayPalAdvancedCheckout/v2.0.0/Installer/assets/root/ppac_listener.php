@@ -17,7 +17,7 @@ if ($autoloaderPath !== null && is_file($autoloaderPath)) {
     \PayPalAdvancedCheckout\Compatibility\LanguageAutoloader::register();
 }
 
-require 'includes/application_top.php';
+require __DIR__ . '/includes/application_top.php';
 
 // -----
 // If the paypalac payment module is not installed or is totally disabled, nothing further to be

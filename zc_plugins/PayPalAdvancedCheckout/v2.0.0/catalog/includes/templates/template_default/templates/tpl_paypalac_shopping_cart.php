@@ -1,5 +1,21 @@
 <?php
 // tpl_paypalac_shopping_cart.php
+// Shared wallet button CSS (equal Apple/Google widths, etc.). Checkout modules
+// inject this via getWalletAssets(); cart/product templates do not, so load it
+// here once before the wallet button includes.
+if (!class_exists(\PayPalAdvancedCheckout\Common\PluginPaths::class, false)) {
+    $ppacAutoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
+    if (is_file($ppacAutoload)) {
+        require_once $ppacAutoload;
+    }
+}
+if (class_exists(\PayPalAdvancedCheckout\Common\PluginPaths::class, false)) {
+    $paypalacSharedCss = \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('paypalac.css');
+    if ($paypalacSharedCss !== '') {
+        echo '<style id="paypalac-wallet-shared-css">' . $paypalacSharedCss . '</style>' . "\n";
+    }
+}
+
 // Dynamically fetch store's ISO country code
 $country_query = "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES . " WHERE countries_id = " . (int)STORE_COUNTRY;
 $country_result = $db->Execute($country_query);
@@ -38,18 +54,27 @@ if (defined('MODULE_PAYMENT_PAYPALAC_VENMO_STATUS') && MODULE_PAYMENT_PAYPALAC_V
 
 <style>
 /* PayPal wallet buttons updates */
-/* New PayPal Advanced Checkout wallet button containers */
+/* New PayPal Advanced Checkout wallet button containers.
+   Width is intentionally NOT set here - it is controlled by the shared
+   --paypalac-wallet-button-width rule in paypalac.css (see the
+   #paypalac-applepay-button / #paypalac-googlepay-button !important block)
+   so Apple Pay and Google Pay always render at the exact same width.
+   This block previously hardcoded width:228px, which competed with
+   paypalac.css and the Google Pay wallet JS's own inline width, causing
+   Apple Pay and Google Pay to render at different widths. */
 #paypalac-googlepay-button,
 #paypalac-applepay-button {
     margin-top: 15px;
-    width: 228px;
     margin-left: auto;
+    width: 240px !important;
+    min-width: 200px !important;
+    max-width: 320px !important;
 }
 #paypalac-googlepay-button apple-pay-button,
 #paypalac-applepay-button apple-pay-button {
     --apple-pay-button-width: 100%;
     --apple-pay-button-height: 50px;
-    --apple-pay-button-border-radius: 3px;
+    --apple-pay-button-border-radius: 4px;
     display: block;
     width: 100%;
     height: 50px;

@@ -1,6 +1,12 @@
 :root {
     --paypalac-wallet-button-min-width: 200px;
     --paypalac-wallet-button-max-width: 320px;
+    /* Fixed target width shared by Apple Pay, Google Pay, Venmo and Pay Later
+       buttons. A single shared value (rather than each button resolving its
+       own width from its own content/box model) is what actually guarantees
+       Apple Pay and Google Pay render the SAME width - percentage/auto based
+       widths let the two SDKs' native button implementations disagree. */
+    --paypalac-wallet-button-width: 240px;
 }
 
 #ppr-subtitle {
@@ -136,6 +142,9 @@
 }
 
 /* Wallet button containers */
+/* Block divs inside an inline-flex radio label still participate as flex
+   items; keep them from stretching to 100% of the payment column (which
+   would force the label onto its own row under the radio). */
 .paypalac-googlepay-button,
 .paypalac-applepay-button,
 .paypalac-venmo-button,
@@ -143,12 +152,14 @@
     min-height: 40px;
     min-width: var(--paypalac-wallet-button-min-width);
     max-width: var(--paypalac-wallet-button-max-width);
-    width: 100%;
-    display: flex;
+    width: var(--paypalac-wallet-button-width);
+    flex: 0 0 var(--paypalac-wallet-button-width);
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     box-sizing: border-box;
+    vertical-align: middle;
 }
 
 .paypalac-googlepay-button > *,
@@ -160,7 +171,46 @@
     box-sizing: border-box;
 }
 
-/* Placeholder text for wallet buttons */
+/*
+ * Belt-and-suspenders width enforcement.
+ *
+ * Apple Pay, Google Pay, Venmo and Pay Later each ship their own template
+ * (shopping cart / product page) that historically hardcoded its own
+ * container width (e.g. 228px) in an inline <style> block, and the Google
+ * Pay/Venmo/Pay Later wallet JS additionally sets an inline width via
+ * normalizeWalletContainer()/normalizeWalletButton() (100%, capped by
+ * min/max-width). Apple Pay's JS never sets an inline width at all, relying
+ * only on CSS. Those different mechanisms could each resolve to a different
+ * pixel value, which is why Apple Pay was rendering wider than Google Pay.
+ *
+ * Targeting the container IDs (which are identical on every checkout,
+ * shopping cart and product page instance of these buttons - see
+ * paypalac_applepay.php / paypalac_googlepay.php / paypalac_venmo.php /
+ * paypalac_paylater.php) with !important guarantees this rule wins over
+ * every one of those competing sources regardless of specificity or load
+ * order, so all four wallet buttons always render at the same width.
+ */
+#paypalac-applepay-button,
+#paypalac-googlepay-button,
+#paypalac-venmo-button,
+#paypalac-paylater-button {
+    width: var(--paypalac-wallet-button-width) !important;
+    min-width: var(--paypalac-wallet-button-min-width) !important;
+    max-width: var(--paypalac-wallet-button-max-width) !important;
+}
+
+@media (max-width: 768px) {
+    #paypalac-applepay-button,
+    #paypalac-googlepay-button,
+    #paypalac-venmo-button,
+    #paypalac-paylater-button {
+        width: 100% !important;
+    }
+}
+
+/* Placeholder text for wallet buttons.
+   Rectangle with rounded corners (~4px) — NOT a pill/fully-rounded shape.
+   !important guards against theme button styles that default to pill (999px / 50%). */
 .paypalac-googlepay-placeholder {
     display: inline-flex;
     align-items: center;
@@ -168,7 +218,7 @@
     padding: 0.6rem 1.4rem;
     background-color: #000;
     border: 1px solid #000;
-    border-radius: 4px;
+    border-radius: 4px !important;
     font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -182,18 +232,20 @@
     padding: 0.5rem 1rem;
     background-color: #f5f5f5;
     border: 1px solid #ddd;
-    border-radius: 4px;
+    border-radius: 4px !important;
     font-size: 0.9rem;
     color: #666;
 }
 
-/* Native Apple Pay button element (WebKit custom element) */
+/* Native Apple Pay button element (WebKit custom element).
+   Rectangle radius (~4px), matching the other wallet buttons — not a pill. */
 apple-pay-button {
     display: block;
     -webkit-appearance: -apple-pay-button;
     --apple-pay-button-width: 100%;
     --apple-pay-button-height: 40px;
     --apple-pay-button-border-radius: 4px;
+    border-radius: 4px !important;
     min-width: var(--paypalac-wallet-button-min-width);
     max-width: var(--paypalac-wallet-button-max-width);
     width: 100%;
@@ -205,41 +257,176 @@ apple-pay-button {
  * - Zen Cart default checkout (fieldset.payment, label.radioButtonLabel)
  * - OPRC / One Page Responsive Checkout (#paymentMethodContainer, label.payment-method-item-label)
  * - Other integrations using #paymentMethodContainer (e.g. some One Page Checkout builds)
+ *
+ * Goal: keep the wallet button (Google Pay / Apple Pay / Venmo / Pay Later)
+ * INLINE next to its radio + label, never stacked below it. Themes often
+ * apply their own block/column layout to payment rows, so these rules use
+ * !important and cover both the "button nested inside the label" markup
+ * (default Zen Cart) and the "button is a sibling after the label" markup
+ * some OPRC/theme forks use.
  */
-.paypalac-checkout-row-hidden {
+/* Must beat the moduleRow display:flex rule below so ineligible wallet rows
+   (Pay Later amount limits, Venmo/Apple/Google device checks) stay hidden when
+   JS sets display:none and/or adds this class / [hidden]. */
+.paypalac-checkout-row-hidden,
+fieldset.payment .moduleRow.paypalac-checkout-row-hidden,
+fieldset.payment .moduleRow[hidden],
+#paymentMethodContainer .moduleRow.paypalac-checkout-row-hidden,
+#paymentMethodContainer .moduleRow[hidden],
+#paymentMethodContainer .payment-method-item.paypalac-checkout-row-hidden,
+#paymentMethodContainer .payment-method-item[hidden],
+#paymentMethodContainer .custom-radio.paypalac-checkout-row-hidden,
+#paymentMethodContainer .custom-radio[hidden] {
     display: none !important;
 }
 
-fieldset.payment input[id^="pmt-paypalac_"],
-#paymentMethodContainer input[id^="pmt-paypalac_"] {
-    display: inline-block;
-    vertical-align: middle;
+/*
+ * Classic Zen Cart checkout (template_default / many custom themes including
+ * sts_next_level) renders:
+ *   <input type="radio" id="pmt-paypalac_…">
+ *   <label class="radioButtonLabel" for="pmt-paypalac_…">…wallet button…</label>
+ *   <br class="clearBoth">
+ * with NO .moduleRow wrapper. Themes often set .radioButtonLabel { display:block },
+ * which puts the wallet button on the line BELOW the radio. Force the radio and
+ * its adjacent label onto one horizontal line.
+ *
+ * Wallet-only IDs (not creditcard/savedcard/main paypalac) — those modules can
+ * contain multi-field forms that must stay in a normal block layout.
+ */
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_applepay"],
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_googlepay"],
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_venmo"],
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_paylater"],
+fieldset.payment input[id="pmt-paypalac_applepay"],
+fieldset.payment input[id="pmt-paypalac_googlepay"],
+fieldset.payment input[id="pmt-paypalac_venmo"],
+fieldset.payment input[id="pmt-paypalac_paylater"],
+#paymentMethodContainer input[id="pmt-paypalac_applepay"],
+#paymentMethodContainer input[id="pmt-paypalac_googlepay"],
+#paymentMethodContainer input[id="pmt-paypalac_venmo"],
+#paymentMethodContainer input[id="pmt-paypalac_paylater"] {
+    display: inline-block !important;
+    vertical-align: middle !important;
     float: none !important;
-    margin-right: 0.5rem;
-    margin-top: 0;
+    clear: none !important;
+    margin: 0 0.5rem 0 0 !important;
+    position: static !important;
 }
 
-fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"],
-#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] {
-    display: inline-flex;
-    align-items: center;
+#checkoutPayment .paypalac-wallet-payment-row,
+fieldset.payment .paypalac-wallet-payment-row,
+#paymentMethodContainer .paypalac-wallet-payment-row {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.5rem;
+    width: auto !important;
+    max-width: 100%;
     vertical-align: middle;
-    flex-wrap: nowrap;
+}
+
+#checkoutPayment .paypalac-wallet-payment-row > input[type="radio"],
+#checkoutPayment .paypalac-wallet-payment-row > label.radioButtonLabel,
+fieldset.payment .paypalac-wallet-payment-row > input[type="radio"],
+fieldset.payment .paypalac-wallet-payment-row > label.radioButtonLabel,
+#paymentMethodContainer .paypalac-wallet-payment-row > input[type="radio"],
+#paymentMethodContainer .paypalac-wallet-payment-row > label.radioButtonLabel,
+#paymentMethodContainer .paypalac-wallet-payment-row > label.payment-method-item-label {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    vertical-align: middle !important;
+    float: none !important;
+    clear: none !important;
+    margin: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+}
+
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_applepay"] + label.radioButtonLabel,
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_googlepay"] + label.radioButtonLabel,
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_venmo"] + label.radioButtonLabel,
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_paylater"] + label.radioButtonLabel,
+#checkoutPayment fieldset.payment label.radioButtonLabel[for="pmt-paypalac_applepay"],
+#checkoutPayment fieldset.payment label.radioButtonLabel[for="pmt-paypalac_googlepay"],
+#checkoutPayment fieldset.payment label.radioButtonLabel[for="pmt-paypalac_venmo"],
+#checkoutPayment fieldset.payment label.radioButtonLabel[for="pmt-paypalac_paylater"],
+fieldset.payment input[id="pmt-paypalac_applepay"] + label.radioButtonLabel,
+fieldset.payment input[id="pmt-paypalac_googlepay"] + label.radioButtonLabel,
+fieldset.payment input[id="pmt-paypalac_venmo"] + label.radioButtonLabel,
+fieldset.payment input[id="pmt-paypalac_paylater"] + label.radioButtonLabel,
+fieldset.payment label.radioButtonLabel[for="pmt-paypalac_applepay"],
+fieldset.payment label.radioButtonLabel[for="pmt-paypalac_googlepay"],
+fieldset.payment label.radioButtonLabel[for="pmt-paypalac_venmo"],
+fieldset.payment label.radioButtonLabel[for="pmt-paypalac_paylater"],
+#paymentMethodContainer input[id="pmt-paypalac_applepay"] + label.radioButtonLabel,
+#paymentMethodContainer input[id="pmt-paypalac_googlepay"] + label.radioButtonLabel,
+#paymentMethodContainer input[id="pmt-paypalac_venmo"] + label.radioButtonLabel,
+#paymentMethodContainer input[id="pmt-paypalac_paylater"] + label.radioButtonLabel,
+#paymentMethodContainer label.radioButtonLabel[for="pmt-paypalac_applepay"],
+#paymentMethodContainer label.radioButtonLabel[for="pmt-paypalac_googlepay"],
+#paymentMethodContainer label.radioButtonLabel[for="pmt-paypalac_venmo"],
+#paymentMethodContainer label.radioButtonLabel[for="pmt-paypalac_paylater"] {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    vertical-align: middle !important;
+    float: none !important;
+    clear: none !important;
+    flex-wrap: nowrap !important;
     gap: 0.35rem;
-    max-width: calc(100% - 2rem);
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+}
+
+/* Row wrapper (when present): force flex-row so radio + label + wallet button
+   never wrap onto separate lines, even if the theme's default is block/column. */
+/* No display:!important — ineligible rows hide via inline display:none / [hidden]
+   / .paypalac-checkout-row-hidden and must win over this layout helper. */
+fieldset.payment .moduleRow:has(input[id="pmt-paypalac_applepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+fieldset.payment .moduleRow:has(input[id="pmt-paypalac_googlepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+fieldset.payment .moduleRow:has(input[id="pmt-paypalac_venmo"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+fieldset.payment .moduleRow:has(input[id="pmt-paypalac_paylater"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .moduleRow:has(input[id="pmt-paypalac_applepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .moduleRow:has(input[id="pmt-paypalac_googlepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .moduleRow:has(input[id="pmt-paypalac_venmo"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .moduleRow:has(input[id="pmt-paypalac_paylater"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .payment-method-item:has(input[id="pmt-paypalac_applepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .payment-method-item:has(input[id="pmt-paypalac_googlepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .payment-method-item:has(input[id="pmt-paypalac_venmo"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .payment-method-item:has(input[id="pmt-paypalac_paylater"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .custom-radio:has(input[id="pmt-paypalac_applepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .custom-radio:has(input[id="pmt-paypalac_googlepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .custom-radio:has(input[id="pmt-paypalac_venmo"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .custom-radio:has(input[id="pmt-paypalac_paylater"]):not(.paypalac-checkout-row-hidden):not([hidden]) {
+    display: flex;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.5rem;
 }
 
 /* OPRC uses payment-method-item-label instead of radioButtonLabel */
-#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"],
-#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] {
-    display: inline-flex;
-    align-items: center;
+#paymentMethodContainer label.payment-method-item-label[for="pmt-paypalac_applepay"],
+#paymentMethodContainer label.payment-method-item-label[for="pmt-paypalac_googlepay"],
+#paymentMethodContainer label.payment-method-item-label[for="pmt-paypalac_venmo"],
+#paymentMethodContainer label.payment-method-item-label[for="pmt-paypalac_paylater"],
+#paymentMethodContainer .custom-radio > label[for="pmt-paypalac_applepay"],
+#paymentMethodContainer .custom-radio > label[for="pmt-paypalac_googlepay"],
+#paymentMethodContainer .custom-radio > label[for="pmt-paypalac_venmo"],
+#paymentMethodContainer .custom-radio > label[for="pmt-paypalac_paylater"] {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
     vertical-align: middle;
     flex-wrap: nowrap;
     gap: 0.35rem;
     max-width: calc(100% - 2rem);
 }
 
+/* Case 1: wallet button markup nested inside the radio's label (default Zen Cart). */
 fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-googlepay-button,
 fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-applepay-button,
 fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-venmo-button,
@@ -255,8 +442,38 @@ fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-paylater
 #paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] .paypalac-googlepay-button,
 #paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] .paypalac-applepay-button,
 #paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] .paypalac-venmo-button,
-#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] .paypalac-paylater-button {
-    flex: 0 1 auto;
-    width: auto;
-    min-width: min(320px, 100%);
+#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] .paypalac-paylater-button,
+/* Case 2: wallet button markup is a sibling that follows the radio's label
+   (some OPRC/theme forks render "module" extra content outside the label). */
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-googlepay-button,
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-applepay-button,
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-venmo-button,
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-paylater-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-googlepay-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-applepay-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-venmo-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-paylater-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] ~ .paypalac-googlepay-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] ~ .paypalac-applepay-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] ~ .paypalac-venmo-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] ~ .paypalac-paylater-button,
+#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] ~ .paypalac-googlepay-button,
+#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] ~ .paypalac-applepay-button,
+#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] ~ .paypalac-venmo-button,
+#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] ~ .paypalac-paylater-button {
+    display: flex !important;
+    /* Fixed flex-basis (no grow, no shrink) so Apple Pay/Google Pay/Venmo/
+       Pay Later all claim the exact same box width on the payment row
+       instead of shrink-wrapping to each SDK's own intrinsic content size
+       (which is what previously made Apple Pay render wider than Google
+       Pay). The #paypalac-*-button ID rules above already force this same
+       width/min-width/max-width; repeating it here keeps this selector
+       correct even if a theme fork changes the container's id. */
+    flex: 0 0 auto !important;
+    width: var(--paypalac-wallet-button-width) !important;
+    min-width: var(--paypalac-wallet-button-min-width) !important;
+    max-width: min(var(--paypalac-wallet-button-max-width), 100%) !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    vertical-align: middle;
 }
