@@ -299,9 +299,15 @@ fieldset.payment .moduleRow[hidden],
  * That stacks: radio indent + label indent + nested Google Pay wrapper divs,
  * so wallet radios/buttons drift relative to Credit Card and each other.
  * Normalize one shared radio column and zero nested wallet-button margins.
+ *
+ * --paypalac-payment-indent is set by jquery.paypalac.wallet_layout.js from a
+ * non-wallet payment radio (Credit Card, etc.) so we match the theme without
+ * hardcoding 20px. Fallbacks keep OPRC / default themes at 0 + 0.5rem gap.
  */
-#checkoutPayment fieldset.payment {
-    --paypalac-payment-indent: 20px;
+#checkoutPayment fieldset.payment,
+fieldset.payment,
+#paymentMethodContainer {
+    --paypalac-payment-indent: 0px;
     --paypalac-payment-radio-gap: 0.5rem;
 }
 
@@ -324,7 +330,7 @@ fieldset.payment input[id="pmt-paypalac"],
     vertical-align: middle !important;
     float: none !important;
     clear: none !important;
-    margin: 0 var(--paypalac-payment-radio-gap) 0 var(--paypalac-payment-indent) !important;
+    margin: 0 var(--paypalac-payment-radio-gap, 0.5rem) 0 var(--paypalac-payment-indent, 0px) !important;
     position: static !important;
 }
 
@@ -335,7 +341,7 @@ fieldset.payment .paypalac-wallet-payment-row,
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
-    gap: var(--paypalac-payment-radio-gap);
+    gap: var(--paypalac-payment-radio-gap, 0.5rem);
     width: auto !important;
     max-width: 100%;
     vertical-align: middle;
@@ -348,7 +354,7 @@ fieldset.payment .paypalac-wallet-payment-row > input[type="radio"],
 #paymentMethodContainer .paypalac-wallet-payment-row > input[type="radio"] {
     display: inline-block !important;
     flex: 0 0 auto !important;
-    margin: 0 0 0 var(--paypalac-payment-indent) !important;
+    margin: 0 0 0 var(--paypalac-payment-indent, 0px) !important;
     vertical-align: middle !important;
 }
 
