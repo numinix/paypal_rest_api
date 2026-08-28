@@ -265,7 +265,18 @@ apple-pay-button {
  * (default Zen Cart) and the "button is a sibling after the label" markup
  * some OPRC/theme forks use.
  */
-.paypalac-checkout-row-hidden {
+/* Must beat the moduleRow display:flex rule below so ineligible wallet rows
+   (Pay Later amount limits, Venmo/Apple/Google device checks) stay hidden when
+   JS sets display:none and/or adds this class / [hidden]. */
+.paypalac-checkout-row-hidden,
+fieldset.payment .moduleRow.paypalac-checkout-row-hidden,
+fieldset.payment .moduleRow[hidden],
+#paymentMethodContainer .moduleRow.paypalac-checkout-row-hidden,
+#paymentMethodContainer .moduleRow[hidden],
+#paymentMethodContainer .payment-method-item.paypalac-checkout-row-hidden,
+#paymentMethodContainer .payment-method-item[hidden],
+#paymentMethodContainer .custom-radio.paypalac-checkout-row-hidden,
+#paymentMethodContainer .custom-radio[hidden] {
     display: none !important;
 }
 
@@ -308,11 +319,13 @@ fieldset.payment label.radioButtonLabel[for^="pmt-paypalac"],
 
 /* Row wrapper (when present): force flex-row so radio + label + wallet button
    never wrap onto separate lines, even if the theme's default is block/column. */
-fieldset.payment .moduleRow:has(input[id^="pmt-paypalac"]),
-#paymentMethodContainer .moduleRow:has(input[id^="pmt-paypalac"]),
-#paymentMethodContainer .payment-method-item:has(input[id^="pmt-paypalac"]),
-#paymentMethodContainer .custom-radio:has(input[id^="pmt-paypalac"]) {
-    display: flex !important;
+/* No display:!important — ineligible rows hide via inline display:none / [hidden]
+   / .paypalac-checkout-row-hidden and must win over this layout helper. */
+fieldset.payment .moduleRow:has(input[id^="pmt-paypalac"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .moduleRow:has(input[id^="pmt-paypalac"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .payment-method-item:has(input[id^="pmt-paypalac"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .custom-radio:has(input[id^="pmt-paypalac"]):not(.paypalac-checkout-row-hidden):not([hidden]) {
+    display: flex;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;

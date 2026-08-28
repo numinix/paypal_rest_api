@@ -183,6 +183,8 @@
         // If we found a specific parent container, hide it
         if (parentContainer) {
             parentContainer.style.display = 'none';
+            parentContainer.setAttribute('hidden', 'hidden');
+            parentContainer.classList.add('paypalac-checkout-row-hidden');
             return;
         }
 

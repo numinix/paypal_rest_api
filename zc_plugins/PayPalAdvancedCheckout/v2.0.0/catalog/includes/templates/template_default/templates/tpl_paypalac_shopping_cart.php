@@ -1,5 +1,21 @@
 <?php
 // tpl_paypalac_shopping_cart.php
+// Shared wallet button CSS (equal Apple/Google widths, etc.). Checkout modules
+// inject this via getWalletAssets(); cart/product templates do not, so load it
+// here once before the wallet button includes.
+if (!class_exists(\PayPalAdvancedCheckout\Common\PluginPaths::class, false)) {
+    $ppacAutoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
+    if (is_file($ppacAutoload)) {
+        require_once $ppacAutoload;
+    }
+}
+if (class_exists(\PayPalAdvancedCheckout\Common\PluginPaths::class, false)) {
+    $paypalacSharedCss = \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('paypalac.css');
+    if ($paypalacSharedCss !== '') {
+        echo '<style id="paypalac-wallet-shared-css">' . $paypalacSharedCss . '</style>' . "\n";
+    }
+}
+
 // Dynamically fetch store's ISO country code
 $country_query = "SELECT countries_iso_code_2 FROM " . TABLE_COUNTRIES . " WHERE countries_id = " . (int)STORE_COUNTRY;
 $country_result = $db->Execute($country_query);
@@ -50,6 +66,9 @@ if (defined('MODULE_PAYMENT_PAYPALAC_VENMO_STATUS') && MODULE_PAYMENT_PAYPALAC_V
 #paypalac-applepay-button {
     margin-top: 15px;
     margin-left: auto;
+    width: 240px !important;
+    min-width: 200px !important;
+    max-width: 320px !important;
 }
 #paypalac-googlepay-button apple-pay-button,
 #paypalac-applepay-button apple-pay-button {

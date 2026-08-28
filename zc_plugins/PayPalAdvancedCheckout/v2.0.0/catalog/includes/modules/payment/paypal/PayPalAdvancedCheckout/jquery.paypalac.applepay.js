@@ -402,6 +402,7 @@
         if (wrapper) {
             wrapper.style.display = 'none';
             wrapper.setAttribute('hidden', 'hidden');
+            wrapper.classList.add('paypalac-checkout-row-hidden');
             return;
         }
 
@@ -416,6 +417,8 @@
         var container = document.getElementById('paypalac-applepay-button');
         if (container) {
             container.style.display = 'none';
+            container.setAttribute('hidden', 'hidden');
+            container.classList.add('paypalac-checkout-row-hidden');
         }
     }
 
