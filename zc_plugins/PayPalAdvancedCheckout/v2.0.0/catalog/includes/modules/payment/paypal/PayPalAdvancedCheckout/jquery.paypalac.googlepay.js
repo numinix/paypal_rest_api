@@ -76,6 +76,8 @@
         element.style.maxWidth = WALLET_BUTTON_MAX_WIDTH;
         element.style.minWidth = WALLET_BUTTON_MIN_WIDTH;
         element.style.margin = '0';
+        element.style.marginLeft = '0';
+        element.style.padding = '0';
         element.style.boxSizing = 'border-box';
     }
 
@@ -87,6 +89,8 @@
         element.style.width = '100%';
         element.style.maxWidth = WALLET_BUTTON_MAX_WIDTH;
         element.style.minWidth = WALLET_BUTTON_MIN_WIDTH;
+        element.style.margin = '0';
+        element.style.marginLeft = '0';
         element.style.boxSizing = 'border-box';
     }
 

@@ -12,6 +12,7 @@
     'use strict';
 
     var WALLET_IDS = [
+        'paypalac',
         'paypalac_applepay',
         'paypalac_googlepay',
         'paypalac_venmo',
