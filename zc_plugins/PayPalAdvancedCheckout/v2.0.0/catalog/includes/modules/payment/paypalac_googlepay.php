@@ -532,7 +532,8 @@ class paypalac_googlepay extends base
         $css = '';
         if (!defined('MODULE_PAYMENT_PAYPALAC_WALLET_ASSETS_LOADED')) {
             define('MODULE_PAYMENT_PAYPALAC_WALLET_ASSETS_LOADED', true);
-            $css = '<style>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('paypalac.css') . '</style>';
+            $css = '<style>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('paypalac.css') . '</style>'
+                . '<script>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('jquery.paypalac.wallet_layout.js') . '</script>';
         }
 
         return $css . '<script>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile($scriptFilename) . '</script>';

@@ -379,6 +379,7 @@
         if (wrapper) {
             wrapper.style.display = '';
             wrapper.removeAttribute('hidden');
+            wrapper.classList.remove('paypalac-checkout-row-hidden');
         }
 
         showNativeCheckoutWalletRow('paypalac_googlepay');
@@ -387,6 +388,7 @@
         if (container) {
             container.style.display = '';
             container.removeAttribute('hidden');
+            container.classList.remove('paypalac-checkout-row-hidden');
         }
     }
 

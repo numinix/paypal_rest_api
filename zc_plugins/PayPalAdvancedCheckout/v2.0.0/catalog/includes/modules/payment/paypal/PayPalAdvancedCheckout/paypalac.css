@@ -289,9 +289,22 @@ fieldset.payment .moduleRow[hidden],
  * with NO .moduleRow wrapper. Themes often set .radioButtonLabel { display:block },
  * which puts the wallet button on the line BELOW the radio. Force the radio and
  * its adjacent label onto one horizontal line.
+ *
+ * Wallet-only IDs (not creditcard/savedcard/main paypalac) — those modules can
+ * contain multi-field forms that must stay in a normal block layout.
  */
-fieldset.payment input[id^="pmt-paypalac"],
-#paymentMethodContainer input[id^="pmt-paypalac"] {
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_applepay"],
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_googlepay"],
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_venmo"],
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_paylater"],
+fieldset.payment input[id="pmt-paypalac_applepay"],
+fieldset.payment input[id="pmt-paypalac_googlepay"],
+fieldset.payment input[id="pmt-paypalac_venmo"],
+fieldset.payment input[id="pmt-paypalac_paylater"],
+#paymentMethodContainer input[id="pmt-paypalac_applepay"],
+#paymentMethodContainer input[id="pmt-paypalac_googlepay"],
+#paymentMethodContainer input[id="pmt-paypalac_venmo"],
+#paymentMethodContainer input[id="pmt-paypalac_paylater"] {
     display: inline-block !important;
     vertical-align: middle !important;
     float: none !important;
@@ -300,10 +313,61 @@ fieldset.payment input[id^="pmt-paypalac"],
     position: static !important;
 }
 
-fieldset.payment input[id^="pmt-paypalac"] + label.radioButtonLabel,
-fieldset.payment label.radioButtonLabel[for^="pmt-paypalac"],
-#paymentMethodContainer input[id^="pmt-paypalac"] + label.radioButtonLabel,
-#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac"] {
+#checkoutPayment .paypalac-wallet-payment-row,
+fieldset.payment .paypalac-wallet-payment-row,
+#paymentMethodContainer .paypalac-wallet-payment-row {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.5rem;
+    width: auto !important;
+    max-width: 100%;
+    vertical-align: middle;
+}
+
+#checkoutPayment .paypalac-wallet-payment-row > input[type="radio"],
+#checkoutPayment .paypalac-wallet-payment-row > label.radioButtonLabel,
+fieldset.payment .paypalac-wallet-payment-row > input[type="radio"],
+fieldset.payment .paypalac-wallet-payment-row > label.radioButtonLabel,
+#paymentMethodContainer .paypalac-wallet-payment-row > input[type="radio"],
+#paymentMethodContainer .paypalac-wallet-payment-row > label.radioButtonLabel,
+#paymentMethodContainer .paypalac-wallet-payment-row > label.payment-method-item-label {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    vertical-align: middle !important;
+    float: none !important;
+    clear: none !important;
+    margin: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+}
+
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_applepay"] + label.radioButtonLabel,
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_googlepay"] + label.radioButtonLabel,
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_venmo"] + label.radioButtonLabel,
+#checkoutPayment fieldset.payment input[id="pmt-paypalac_paylater"] + label.radioButtonLabel,
+#checkoutPayment fieldset.payment label.radioButtonLabel[for="pmt-paypalac_applepay"],
+#checkoutPayment fieldset.payment label.radioButtonLabel[for="pmt-paypalac_googlepay"],
+#checkoutPayment fieldset.payment label.radioButtonLabel[for="pmt-paypalac_venmo"],
+#checkoutPayment fieldset.payment label.radioButtonLabel[for="pmt-paypalac_paylater"],
+fieldset.payment input[id="pmt-paypalac_applepay"] + label.radioButtonLabel,
+fieldset.payment input[id="pmt-paypalac_googlepay"] + label.radioButtonLabel,
+fieldset.payment input[id="pmt-paypalac_venmo"] + label.radioButtonLabel,
+fieldset.payment input[id="pmt-paypalac_paylater"] + label.radioButtonLabel,
+fieldset.payment label.radioButtonLabel[for="pmt-paypalac_applepay"],
+fieldset.payment label.radioButtonLabel[for="pmt-paypalac_googlepay"],
+fieldset.payment label.radioButtonLabel[for="pmt-paypalac_venmo"],
+fieldset.payment label.radioButtonLabel[for="pmt-paypalac_paylater"],
+#paymentMethodContainer input[id="pmt-paypalac_applepay"] + label.radioButtonLabel,
+#paymentMethodContainer input[id="pmt-paypalac_googlepay"] + label.radioButtonLabel,
+#paymentMethodContainer input[id="pmt-paypalac_venmo"] + label.radioButtonLabel,
+#paymentMethodContainer input[id="pmt-paypalac_paylater"] + label.radioButtonLabel,
+#paymentMethodContainer label.radioButtonLabel[for="pmt-paypalac_applepay"],
+#paymentMethodContainer label.radioButtonLabel[for="pmt-paypalac_googlepay"],
+#paymentMethodContainer label.radioButtonLabel[for="pmt-paypalac_venmo"],
+#paymentMethodContainer label.radioButtonLabel[for="pmt-paypalac_paylater"] {
     display: inline-flex !important;
     flex-direction: row !important;
     align-items: center !important;
@@ -321,10 +385,22 @@ fieldset.payment label.radioButtonLabel[for^="pmt-paypalac"],
    never wrap onto separate lines, even if the theme's default is block/column. */
 /* No display:!important — ineligible rows hide via inline display:none / [hidden]
    / .paypalac-checkout-row-hidden and must win over this layout helper. */
-fieldset.payment .moduleRow:has(input[id^="pmt-paypalac"]):not(.paypalac-checkout-row-hidden):not([hidden]),
-#paymentMethodContainer .moduleRow:has(input[id^="pmt-paypalac"]):not(.paypalac-checkout-row-hidden):not([hidden]),
-#paymentMethodContainer .payment-method-item:has(input[id^="pmt-paypalac"]):not(.paypalac-checkout-row-hidden):not([hidden]),
-#paymentMethodContainer .custom-radio:has(input[id^="pmt-paypalac"]):not(.paypalac-checkout-row-hidden):not([hidden]) {
+fieldset.payment .moduleRow:has(input[id="pmt-paypalac_applepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+fieldset.payment .moduleRow:has(input[id="pmt-paypalac_googlepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+fieldset.payment .moduleRow:has(input[id="pmt-paypalac_venmo"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+fieldset.payment .moduleRow:has(input[id="pmt-paypalac_paylater"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .moduleRow:has(input[id="pmt-paypalac_applepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .moduleRow:has(input[id="pmt-paypalac_googlepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .moduleRow:has(input[id="pmt-paypalac_venmo"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .moduleRow:has(input[id="pmt-paypalac_paylater"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .payment-method-item:has(input[id="pmt-paypalac_applepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .payment-method-item:has(input[id="pmt-paypalac_googlepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .payment-method-item:has(input[id="pmt-paypalac_venmo"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .payment-method-item:has(input[id="pmt-paypalac_paylater"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .custom-radio:has(input[id="pmt-paypalac_applepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .custom-radio:has(input[id="pmt-paypalac_googlepay"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .custom-radio:has(input[id="pmt-paypalac_venmo"]):not(.paypalac-checkout-row-hidden):not([hidden]),
+#paymentMethodContainer .custom-radio:has(input[id="pmt-paypalac_paylater"]):not(.paypalac-checkout-row-hidden):not([hidden]) {
     display: flex;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
@@ -333,8 +409,14 @@ fieldset.payment .moduleRow:has(input[id^="pmt-paypalac"]):not(.paypalac-checkou
 }
 
 /* OPRC uses payment-method-item-label instead of radioButtonLabel */
-#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"],
-#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] {
+#paymentMethodContainer label.payment-method-item-label[for="pmt-paypalac_applepay"],
+#paymentMethodContainer label.payment-method-item-label[for="pmt-paypalac_googlepay"],
+#paymentMethodContainer label.payment-method-item-label[for="pmt-paypalac_venmo"],
+#paymentMethodContainer label.payment-method-item-label[for="pmt-paypalac_paylater"],
+#paymentMethodContainer .custom-radio > label[for="pmt-paypalac_applepay"],
+#paymentMethodContainer .custom-radio > label[for="pmt-paypalac_googlepay"],
+#paymentMethodContainer .custom-radio > label[for="pmt-paypalac_venmo"],
+#paymentMethodContainer .custom-radio > label[for="pmt-paypalac_paylater"] {
     display: inline-flex !important;
     flex-direction: row !important;
     align-items: center !important;

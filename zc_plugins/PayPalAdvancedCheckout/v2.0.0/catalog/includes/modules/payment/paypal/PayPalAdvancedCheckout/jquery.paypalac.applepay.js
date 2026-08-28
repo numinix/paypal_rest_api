@@ -368,6 +368,7 @@
         if (wrapper) {
             wrapper.style.display = '';
             wrapper.removeAttribute('hidden');
+            wrapper.classList.remove('paypalac-checkout-row-hidden');
         }
 
         showNativeCheckoutWalletRow('paypalac_applepay');
@@ -376,6 +377,7 @@
         if (container) {
             container.style.display = '';
             container.removeAttribute('hidden');
+            container.classList.remove('paypalac-checkout-row-hidden');
         }
 
         var moduleRadio = document.getElementById('pmt-paypalac_applepay');
