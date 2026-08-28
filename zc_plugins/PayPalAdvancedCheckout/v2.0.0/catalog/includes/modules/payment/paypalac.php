@@ -3742,7 +3742,11 @@ class paypalac extends base
                 continue;
             }
             file_put_contents($targetFile, $fileContents);
-            if (!file_exists($targetFile) || filesize($sourceFile) !== filesize($targetFile)) {
+            clearstatcache(true, $targetFile);
+            $targetSize = is_file($targetFile) ? filesize($targetFile) : false;
+            // Host AV can truncate PHP uploads to 0 bytes; treat that as failure
+            // so install/enable surfaces the problem instead of a white-screen cancel URL.
+            if ($targetSize === false || $targetSize === 0 || $targetSize !== strlen($fileContents)) {
                 $filesOk = false;
                 $problemFiles[] = $nextFile;
             }

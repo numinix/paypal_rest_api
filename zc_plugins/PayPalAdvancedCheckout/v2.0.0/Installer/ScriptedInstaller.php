@@ -300,7 +300,14 @@ class ScriptedInstaller extends ScriptedInstallerBase
             return false;
         }
 
-        return filesize($source) === filesize($dest);
+        clearstatcache(true, $dest);
+        $destSize = filesize($dest);
+        // Reject empty/truncated writes (host AV sometimes leaves a 0-byte PHP file).
+        if ($destSize === false || $destSize === 0 || $destSize !== strlen($contents)) {
+            return false;
+        }
+
+        return true;
     }
 
     protected function purgeOldFiles(): bool

@@ -65,7 +65,7 @@ if (!in_array($op, $valid_operations, true)) {
 //
 if ($op === 'cancel' || $op === '3ds_cancel') {
     unset($_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']);
-    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
+    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
 }
 
 // -----
@@ -79,7 +79,7 @@ if ($op === 'cancel' || $op === '3ds_cancel') {
 if ($op === 'sub_cancel') {
     unset($_SESSION['PayPalAdvancedCheckout']['Subscription']);
     $logger->write('ppac_listener: subscription cancelled by customer at PayPal; redirecting to checkout_payment.', true, 'after');
-    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
+    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
 }
 
 if ($op === 'sub_return') {
@@ -112,7 +112,7 @@ if ($op === 'sub_return') {
     if (!in_array($remoteStatus, ['APPROVAL_PENDING', 'APPROVED', 'ACTIVE'], true)) {
         $logger->write("ppac_listener: subscription $incomingSubscriptionId returned with unexpected status $remoteStatus; redirecting to checkout_payment.", true, 'after');
         unset($_SESSION['PayPalAdvancedCheckout']['Subscription']);
-        zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
+        zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
     }
 
     $_SESSION['PayPalAdvancedCheckout']['Subscription']['status'] = $remoteStatus;
@@ -213,7 +213,7 @@ if ($op === 'return' && (!isset($_GET['token'], $_SESSION['PayPalAdvancedCheckou
 //
 if (!isset($_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'])) {
     $logger->write('ppac_listener, redirecting to checkout_payment; no PayerAction variables.', true, 'after');
-    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
+    zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
 }
 
 // -----
@@ -246,7 +246,7 @@ if ($op === '3ds_return') {
     if ($liability_shift === 'UNKNOWN' || ($enrollment_status === 'Y' && $liability_shift === 'NO')) {
         $messageStack->add_session('checkout_payment', MODULE_PAYMENT_PAYPALAC_REDIRECT_LISTENER_TRY_AGAIN, 'error');
         unset($_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'], $_SESSION['PayPalAdvancedCheckout']['Order']['authentication_result']);
-        zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT), '', 'SSL');
+        zen_redirect(zen_href_link(FILENAME_CHECKOUT_PAYMENT, '', 'SSL'));
     }
 }
 
