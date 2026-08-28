@@ -142,6 +142,9 @@
 }
 
 /* Wallet button containers */
+/* Block divs inside an inline-flex radio label still participate as flex
+   items; keep them from stretching to 100% of the payment column (which
+   would force the label onto its own row under the radio). */
 .paypalac-googlepay-button,
 .paypalac-applepay-button,
 .paypalac-venmo-button,
@@ -150,11 +153,13 @@
     min-width: var(--paypalac-wallet-button-min-width);
     max-width: var(--paypalac-wallet-button-max-width);
     width: var(--paypalac-wallet-button-width);
-    display: flex;
+    flex: 0 0 var(--paypalac-wallet-button-width);
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     box-sizing: border-box;
+    vertical-align: middle;
 }
 
 .paypalac-googlepay-button > *,
@@ -264,37 +269,54 @@ apple-pay-button {
     display: none !important;
 }
 
-fieldset.payment input[id^="pmt-paypalac_"],
-#paymentMethodContainer input[id^="pmt-paypalac_"] {
+/*
+ * Classic Zen Cart checkout (template_default / many custom themes including
+ * sts_next_level) renders:
+ *   <input type="radio" id="pmt-paypalac_…">
+ *   <label class="radioButtonLabel" for="pmt-paypalac_…">…wallet button…</label>
+ *   <br class="clearBoth">
+ * with NO .moduleRow wrapper. Themes often set .radioButtonLabel { display:block },
+ * which puts the wallet button on the line BELOW the radio. Force the radio and
+ * its adjacent label onto one horizontal line.
+ */
+fieldset.payment input[id^="pmt-paypalac"],
+#paymentMethodContainer input[id^="pmt-paypalac"] {
     display: inline-block !important;
-    vertical-align: middle;
+    vertical-align: middle !important;
     float: none !important;
-    margin-right: 0.5rem;
-    margin-top: 0;
+    clear: none !important;
+    margin: 0 0.5rem 0 0 !important;
+    position: static !important;
 }
 
-/* Row wrapper: force flex-row so radio + label + wallet button never wrap onto
-   separate lines, even if the theme's default is block/column. */
-fieldset.payment .moduleRow:has(input[id^="pmt-paypalac_"]),
-#paymentMethodContainer .moduleRow:has(input[id^="pmt-paypalac_"]),
-#paymentMethodContainer .payment-method-item:has(input[id^="pmt-paypalac_"]),
-#paymentMethodContainer .custom-radio:has(input[id^="pmt-paypalac_"]) {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: wrap !important;
-    align-items: center !important;
-    gap: 0.5rem;
-}
-
-fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"],
-#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] {
+fieldset.payment input[id^="pmt-paypalac"] + label.radioButtonLabel,
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac"],
+#paymentMethodContainer input[id^="pmt-paypalac"] + label.radioButtonLabel,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac"] {
     display: inline-flex !important;
     flex-direction: row !important;
     align-items: center !important;
-    vertical-align: middle;
-    flex-wrap: nowrap;
+    vertical-align: middle !important;
+    float: none !important;
+    clear: none !important;
+    flex-wrap: nowrap !important;
     gap: 0.35rem;
-    max-width: calc(100% - 2rem);
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+}
+
+/* Row wrapper (when present): force flex-row so radio + label + wallet button
+   never wrap onto separate lines, even if the theme's default is block/column. */
+fieldset.payment .moduleRow:has(input[id^="pmt-paypalac"]),
+#paymentMethodContainer .moduleRow:has(input[id^="pmt-paypalac"]),
+#paymentMethodContainer .payment-method-item:has(input[id^="pmt-paypalac"]),
+#paymentMethodContainer .custom-radio:has(input[id^="pmt-paypalac"]) {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.5rem;
 }
 
 /* OPRC uses payment-method-item-label instead of radioButtonLabel */
