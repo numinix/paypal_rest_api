@@ -898,8 +898,8 @@
                 var buttonInstance = paypal.Buttons({
                     fundingSource: paypal.FUNDING.PAYLATER,
                     style: {
-                        shape: 'pill',
-                        height: 44,
+                        shape: 'rect',
+                        height: 40,
                         color: 'gold'
                     },
                     // createOrder is called when user clicks the button - this is when we create the PayPal order

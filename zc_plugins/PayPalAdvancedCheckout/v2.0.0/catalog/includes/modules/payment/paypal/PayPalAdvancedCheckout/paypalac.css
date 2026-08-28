@@ -160,7 +160,9 @@
     box-sizing: border-box;
 }
 
-/* Placeholder text for wallet buttons */
+/* Placeholder text for wallet buttons.
+   Rectangle with rounded corners (~4px) — NOT a pill/fully-rounded shape.
+   !important guards against theme button styles that default to pill (999px / 50%). */
 .paypalac-googlepay-placeholder {
     display: inline-flex;
     align-items: center;
@@ -168,7 +170,7 @@
     padding: 0.6rem 1.4rem;
     background-color: #000;
     border: 1px solid #000;
-    border-radius: 4px;
+    border-radius: 4px !important;
     font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -182,18 +184,20 @@
     padding: 0.5rem 1rem;
     background-color: #f5f5f5;
     border: 1px solid #ddd;
-    border-radius: 4px;
+    border-radius: 4px !important;
     font-size: 0.9rem;
     color: #666;
 }
 
-/* Native Apple Pay button element (WebKit custom element) */
+/* Native Apple Pay button element (WebKit custom element).
+   Rectangle radius (~4px), matching the other wallet buttons — not a pill. */
 apple-pay-button {
     display: block;
     -webkit-appearance: -apple-pay-button;
     --apple-pay-button-width: 100%;
     --apple-pay-button-height: 40px;
     --apple-pay-button-border-radius: 4px;
+    border-radius: 4px !important;
     min-width: var(--paypalac-wallet-button-min-width);
     max-width: var(--paypalac-wallet-button-max-width);
     width: 100%;
@@ -205,6 +209,13 @@ apple-pay-button {
  * - Zen Cart default checkout (fieldset.payment, label.radioButtonLabel)
  * - OPRC / One Page Responsive Checkout (#paymentMethodContainer, label.payment-method-item-label)
  * - Other integrations using #paymentMethodContainer (e.g. some One Page Checkout builds)
+ *
+ * Goal: keep the wallet button (Google Pay / Apple Pay / Venmo / Pay Later)
+ * INLINE next to its radio + label, never stacked below it. Themes often
+ * apply their own block/column layout to payment rows, so these rules use
+ * !important and cover both the "button nested inside the label" markup
+ * (default Zen Cart) and the "button is a sibling after the label" markup
+ * some OPRC/theme forks use.
  */
 .paypalac-checkout-row-hidden {
     display: none !important;
@@ -212,17 +223,31 @@ apple-pay-button {
 
 fieldset.payment input[id^="pmt-paypalac_"],
 #paymentMethodContainer input[id^="pmt-paypalac_"] {
-    display: inline-block;
+    display: inline-block !important;
     vertical-align: middle;
     float: none !important;
     margin-right: 0.5rem;
     margin-top: 0;
 }
 
+/* Row wrapper: force flex-row so radio + label + wallet button never wrap onto
+   separate lines, even if the theme's default is block/column. */
+fieldset.payment .moduleRow:has(input[id^="pmt-paypalac_"]),
+#paymentMethodContainer .moduleRow:has(input[id^="pmt-paypalac_"]),
+#paymentMethodContainer .payment-method-item:has(input[id^="pmt-paypalac_"]),
+#paymentMethodContainer .custom-radio:has(input[id^="pmt-paypalac_"]) {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 0.5rem;
+}
+
 fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"],
 #paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] {
-    display: inline-flex;
-    align-items: center;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
     vertical-align: middle;
     flex-wrap: nowrap;
     gap: 0.35rem;
@@ -232,14 +257,16 @@ fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"],
 /* OPRC uses payment-method-item-label instead of radioButtonLabel */
 #paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"],
 #paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] {
-    display: inline-flex;
-    align-items: center;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
     vertical-align: middle;
     flex-wrap: nowrap;
     gap: 0.35rem;
     max-width: calc(100% - 2rem);
 }
 
+/* Case 1: wallet button markup nested inside the radio's label (default Zen Cart). */
 fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-googlepay-button,
 fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-applepay-button,
 fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-venmo-button,
@@ -255,8 +282,30 @@ fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] .paypalac-paylater
 #paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] .paypalac-googlepay-button,
 #paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] .paypalac-applepay-button,
 #paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] .paypalac-venmo-button,
-#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] .paypalac-paylater-button {
-    flex: 0 1 auto;
-    width: auto;
+#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] .paypalac-paylater-button,
+/* Case 2: wallet button markup is a sibling that follows the radio's label
+   (some OPRC/theme forks render "module" extra content outside the label). */
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-googlepay-button,
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-applepay-button,
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-venmo-button,
+fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-paylater-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-googlepay-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-applepay-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-venmo-button,
+#paymentMethodContainer label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-paylater-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] ~ .paypalac-googlepay-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] ~ .paypalac-applepay-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] ~ .paypalac-venmo-button,
+#paymentMethodContainer label.payment-method-item-label[for^="pmt-paypalac_"] ~ .paypalac-paylater-button,
+#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] ~ .paypalac-googlepay-button,
+#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] ~ .paypalac-applepay-button,
+#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] ~ .paypalac-venmo-button,
+#paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] ~ .paypalac-paylater-button {
+    display: flex !important;
+    flex: 0 1 auto !important;
+    width: auto !important;
     min-width: min(320px, 100%);
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    vertical-align: middle;
 }
