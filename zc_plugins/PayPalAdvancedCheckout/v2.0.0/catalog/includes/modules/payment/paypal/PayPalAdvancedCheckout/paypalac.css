@@ -298,11 +298,10 @@ fieldset.payment .moduleRow[hidden],
  *   fieldset input[type=radio], fieldset label, fieldset div { margin-left: 20px; }
  * That stacks: radio indent + label indent + nested Google Pay wrapper divs,
  * so wallet radios/buttons drift relative to Credit Card and each other.
- * Normalize one shared radio column and zero nested wallet-button margins.
  *
  * --paypalac-payment-indent is set by jquery.paypalac.wallet_layout.js from a
- * non-wallet payment radio (Credit Card, etc.) so we match the theme without
- * hardcoding 20px. Fallbacks keep OPRC / default themes at 0 + 0.5rem gap.
+ * non-wallet payment radio (Credit Card, etc.). Fallbacks keep OPRC / default
+ * themes at 0 + 0.5rem gap.
  */
 #checkoutPayment fieldset.payment,
 fieldset.payment,
@@ -312,54 +311,56 @@ fieldset.payment,
 }
 
 /*
- * Layout helpers for wallet radios. Do NOT force margin-left here — that would
- * zero the theme indent when wallet_layout.js is not loaded (e.g. only main
- * PayPal + credit card). Indent is applied only inside .paypalac-wallet-payment-row.
+ * Classic checkout wallet row: block-level flex so every radio sits in one
+ * vertical column and every branded button shares one left edge. Indent is
+ * padding on the row (not stacked margin on radio + label + nested divs).
  */
-#checkoutPayment fieldset.payment input[id="pmt-paypalac_applepay"],
-#checkoutPayment fieldset.payment input[id="pmt-paypalac_googlepay"],
-#checkoutPayment fieldset.payment input[id="pmt-paypalac_venmo"],
-#checkoutPayment fieldset.payment input[id="pmt-paypalac_paylater"],
-#checkoutPayment fieldset.payment input[id="pmt-paypalac"],
-fieldset.payment input[id="pmt-paypalac_applepay"],
-fieldset.payment input[id="pmt-paypalac_googlepay"],
-fieldset.payment input[id="pmt-paypalac_venmo"],
-fieldset.payment input[id="pmt-paypalac_paylater"],
-fieldset.payment input[id="pmt-paypalac"],
-#paymentMethodContainer input[id="pmt-paypalac_applepay"],
-#paymentMethodContainer input[id="pmt-paypalac_googlepay"],
-#paymentMethodContainer input[id="pmt-paypalac_venmo"],
-#paymentMethodContainer input[id="pmt-paypalac_paylater"],
-#paymentMethodContainer input[id="pmt-paypalac"] {
-    display: inline-block !important;
-    vertical-align: middle !important;
-    float: none !important;
-    clear: none !important;
-    position: static !important;
-}
-
 #checkoutPayment .paypalac-wallet-payment-row,
 fieldset.payment .paypalac-wallet-payment-row,
 #paymentMethodContainer .paypalac-wallet-payment-row {
-    display: inline-flex !important;
+    display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
     gap: var(--paypalac-payment-radio-gap, 0.5rem);
-    width: auto !important;
+    width: 100% !important;
     max-width: 100%;
-    vertical-align: middle;
-    margin: 0 !important;
-    padding: 0 !important;
+    box-sizing: border-box;
+    margin: 0.35em 0 !important;
+    padding: 0 0 0 var(--paypalac-payment-indent, 0px) !important;
 }
 
+/*
+ * Keep classic-checkout wallet radios visible. Some wallet scripts still mark
+ * inputs with .paypalac-wallet-radio-hidden (sr-only clip) from older hide
+ * paths; undo that when the radio is in our payment row.
+ */
 #checkoutPayment .paypalac-wallet-payment-row > input[type="radio"],
 fieldset.payment .paypalac-wallet-payment-row > input[type="radio"],
-#paymentMethodContainer .paypalac-wallet-payment-row > input[type="radio"] {
+#paymentMethodContainer .paypalac-wallet-payment-row > input[type="radio"],
+#checkoutPayment .paypalac-wallet-payment-row > input[type="radio"].paypalac-wallet-radio-hidden,
+fieldset.payment .paypalac-wallet-payment-row > input[type="radio"].paypalac-wallet-radio-hidden,
+#paymentMethodContainer .paypalac-wallet-payment-row > input[type="radio"].paypalac-wallet-radio-hidden {
     display: inline-block !important;
+    position: static !important;
+    float: none !important;
+    clear: none !important;
     flex: 0 0 auto !important;
-    margin: 0 0 0 var(--paypalac-payment-indent, 0px) !important;
+    width: 1rem !important;
+    height: 1rem !important;
+    min-width: 1rem !important;
+    min-height: 1rem !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    clip: auto !important;
+    clip-path: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    appearance: auto !important;
+    -webkit-appearance: radio !important;
     vertical-align: middle !important;
+    pointer-events: auto !important;
 }
 
 #checkoutPayment .paypalac-wallet-payment-row > label.radioButtonLabel,
@@ -369,26 +370,29 @@ fieldset.payment .paypalac-wallet-payment-row > label.radioButtonLabel,
     display: inline-flex !important;
     flex-direction: row !important;
     align-items: center !important;
+    justify-content: flex-start !important;
     vertical-align: middle !important;
     float: none !important;
     clear: none !important;
-    /* Label must NOT re-apply the theme's fieldset label margin-left or the
-       branded button drifts right of Credit Card / other wallets. */
+    /* Label must NOT re-apply theme fieldset/#checkoutPayment label margins. */
     margin: 0 !important;
     padding: 0 !important;
     width: auto !important;
     max-width: none !important;
     gap: 0 !important;
+    flex: 0 1 auto !important;
 }
 
 /* Theme "fieldset div { margin-left:20px }" compounds on Google Pay's nested
    wrappers (container + SDK div) and shifts that button right of Apple Pay /
-   Pay Later. Zero all margins inside wallet button hosts. */
+   Pay Later. Zero margin AND padding on wallet button hosts and descendants. */
+#checkoutPayment fieldset.payment .paypalac-wallet-payment-row label div,
 #checkoutPayment fieldset.payment .paypalac-googlepay-button,
 #checkoutPayment fieldset.payment .paypalac-applepay-button,
 #checkoutPayment fieldset.payment .paypalac-paylater-button,
 #checkoutPayment fieldset.payment .paypalac-venmo-button,
 #checkoutPayment fieldset.payment label[for="pmt-paypalac"] > div,
+fieldset.payment .paypalac-wallet-payment-row label div,
 fieldset.payment .paypalac-googlepay-button,
 fieldset.payment .paypalac-applepay-button,
 fieldset.payment .paypalac-paylater-button,
@@ -400,13 +404,17 @@ fieldset.payment label[for="pmt-paypalac"] > div,
 #paymentMethodContainer .paypalac-venmo-button {
     margin-left: 0 !important;
     margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
 }
 
+#checkoutPayment fieldset.payment .paypalac-wallet-payment-row label div *,
 #checkoutPayment fieldset.payment .paypalac-googlepay-button *,
 #checkoutPayment fieldset.payment .paypalac-applepay-button *,
 #checkoutPayment fieldset.payment .paypalac-paylater-button *,
 #checkoutPayment fieldset.payment .paypalac-venmo-button *,
 #checkoutPayment fieldset.payment label[for="pmt-paypalac"] > div *,
+fieldset.payment .paypalac-wallet-payment-row label div *,
 fieldset.payment .paypalac-googlepay-button *,
 fieldset.payment .paypalac-applepay-button *,
 fieldset.payment .paypalac-paylater-button *,
@@ -417,6 +425,8 @@ fieldset.payment label[for="pmt-paypalac"] > div *,
 #paymentMethodContainer .paypalac-paylater-button *,
 #paymentMethodContainer .paypalac-venmo-button * {
     margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
 }
 
 #checkoutPayment fieldset.payment input[id="pmt-paypalac_applepay"] + label.radioButtonLabel,

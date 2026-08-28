@@ -4,13 +4,13 @@
  *   <input type="radio" id="pmt-paypalac_…">
  *   <label class="radioButtonLabel" for="…">…button…</label>
  *   <br class="clearBoth">
- * Themes often style labels as block / with large left margins so the button
- * drops under the radio. Wrapping the adjacent pair is more reliable than CSS
- * alone across custom checkouts (e.g. sts_next_level).
  *
- * Also copies the theme's left indent from a non-wallet payment radio onto
- * --paypalac-payment-indent so PayPal-family radios line up with Credit Card
- * without hardcoding 20px (sts_next_level fieldset margin-left).
+ * Also:
+ * - Copies the theme's left indent from Credit Card (etc.) onto
+ *   --paypalac-payment-indent (row padding), without hardcoding 20px.
+ * - Forces wallet radios visible (undoes .paypalac-wallet-radio-hidden /
+ *   display:none left by older hide paths).
+ * - Clears stacked theme margins on nested wallet button wrappers.
  */
 (function () {
     'use strict';
@@ -22,6 +22,8 @@
         'paypalac_venmo',
         'paypalac_paylater'
     ];
+
+    var MAX_INDENT_PX = 40;
 
     /** Branded wallet-button modules only (not creditcard / savedcard). */
     function isBrandedWalletRadio(el) {
@@ -37,9 +39,8 @@
     }
 
     function setPaymentIndent(valuePx) {
-        var value = Math.max(0, Math.round(valuePx)) + 'px';
-        // Prefer innermost container first; set on every known host so nested
-        // OPRC (#paymentMethodContainer inside fieldset.payment) stays in sync.
+        var capped = Math.max(0, Math.min(MAX_INDENT_PX, Math.round(valuePx)));
+        var value = capped + 'px';
         var hosts = [
             document.querySelector('#paymentMethodContainer'),
             document.querySelector('#checkoutPayment fieldset.payment'),
@@ -57,10 +58,7 @@
     }
 
     /**
-     * Match wallet radios to the theme's Credit Card / other payment column by
-     * copying that radio's computed margin-left (e.g. sts_next_level's 20px).
-     * Prefer paypalac_creditcard / savedcard / third-party methods — not the
-     * branded wallet button radios themselves.
+     * Match wallet rows to the theme's Credit Card / other payment column.
      */
     function syncPaymentIndentFromTheme() {
         var scope = document.querySelector('#paymentMethodContainer')
@@ -93,13 +91,69 @@
         setPaymentIndent(marginLeft);
     }
 
-    function wrapRadioAndLabel(radio) {
-        if (!radio || radio.closest('.paypalac-wallet-payment-row')) {
+    /** Undo sr-only / display:none hide used by older wallet hide paths. */
+    function ensureWalletRadioVisible(radio) {
+        if (!radio) {
             return;
+        }
+        radio.classList.remove('paypalac-wallet-radio-hidden');
+        radio.style.display = '';
+        radio.style.position = '';
+        radio.style.width = '';
+        radio.style.height = '';
+        radio.style.margin = '';
+        radio.style.padding = '';
+        radio.style.opacity = '';
+        radio.style.visibility = '';
+        radio.style.clip = '';
+        radio.style.clipPath = '';
+        radio.removeAttribute('aria-hidden');
+        if (radio.tabIndex < 0) {
+            radio.tabIndex = 0;
         }
 
         var label = document.querySelector('label[for="' + radio.id + '"]');
+        if (label) {
+            label.classList.remove('paypalac-wallet-label-hidden');
+            if (label.style.display === 'none') {
+                label.style.display = '';
+            }
+            label.removeAttribute('aria-hidden');
+        }
+
+        var control = radio.closest('.paypalac-wallet-radio-hidden-control');
+        if (control) {
+            control.classList.remove('paypalac-wallet-radio-hidden-control');
+        }
+    }
+
+    function zeroNestedWalletMargins(label) {
         if (!label) {
+            return;
+        }
+        var nodes = label.querySelectorAll('div, span, button, apple-pay-button');
+        for (var i = 0; i < nodes.length; i++) {
+            nodes[i].style.marginLeft = '0';
+            nodes[i].style.marginRight = '0';
+            nodes[i].style.paddingLeft = '0';
+        }
+    }
+
+    function wrapRadioAndLabel(radio) {
+        if (!radio) {
+            return;
+        }
+
+        ensureWalletRadioVisible(radio);
+
+        var label = document.querySelector('label[for="' + radio.id + '"]');
+        if (!label) {
+            return;
+        }
+
+        zeroNestedWalletMargins(label);
+
+        if (radio.closest('.paypalac-wallet-payment-row')) {
             return;
         }
 
@@ -130,8 +184,9 @@
         alignWalletRadioRows();
     }
 
-    // Wallet SDKs may reflow the button containers after init.
+    // Wallet SDKs may reflow / re-hide after init.
     setTimeout(alignWalletRadioRows, 0);
     setTimeout(alignWalletRadioRows, 250);
     setTimeout(alignWalletRadioRows, 1000);
+    setTimeout(alignWalletRadioRows, 2500);
 }());
