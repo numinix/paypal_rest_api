@@ -1,6 +1,12 @@
 :root {
     --paypalac-wallet-button-min-width: 200px;
     --paypalac-wallet-button-max-width: 320px;
+    /* Fixed target width shared by Apple Pay, Google Pay, Venmo and Pay Later
+       buttons. A single shared value (rather than each button resolving its
+       own width from its own content/box model) is what actually guarantees
+       Apple Pay and Google Pay render the SAME width - percentage/auto based
+       widths let the two SDKs' native button implementations disagree. */
+    --paypalac-wallet-button-width: 240px;
 }
 
 #ppr-subtitle {
@@ -143,7 +149,7 @@
     min-height: 40px;
     min-width: var(--paypalac-wallet-button-min-width);
     max-width: var(--paypalac-wallet-button-max-width);
-    width: 100%;
+    width: var(--paypalac-wallet-button-width);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -158,6 +164,43 @@
     width: 100%;
     max-width: var(--paypalac-wallet-button-max-width);
     box-sizing: border-box;
+}
+
+/*
+ * Belt-and-suspenders width enforcement.
+ *
+ * Apple Pay, Google Pay, Venmo and Pay Later each ship their own template
+ * (shopping cart / product page) that historically hardcoded its own
+ * container width (e.g. 228px) in an inline <style> block, and the Google
+ * Pay/Venmo/Pay Later wallet JS additionally sets an inline width via
+ * normalizeWalletContainer()/normalizeWalletButton() (100%, capped by
+ * min/max-width). Apple Pay's JS never sets an inline width at all, relying
+ * only on CSS. Those different mechanisms could each resolve to a different
+ * pixel value, which is why Apple Pay was rendering wider than Google Pay.
+ *
+ * Targeting the container IDs (which are identical on every checkout,
+ * shopping cart and product page instance of these buttons - see
+ * paypalac_applepay.php / paypalac_googlepay.php / paypalac_venmo.php /
+ * paypalac_paylater.php) with !important guarantees this rule wins over
+ * every one of those competing sources regardless of specificity or load
+ * order, so all four wallet buttons always render at the same width.
+ */
+#paypalac-applepay-button,
+#paypalac-googlepay-button,
+#paypalac-venmo-button,
+#paypalac-paylater-button {
+    width: var(--paypalac-wallet-button-width) !important;
+    min-width: var(--paypalac-wallet-button-min-width) !important;
+    max-width: var(--paypalac-wallet-button-max-width) !important;
+}
+
+@media (max-width: 768px) {
+    #paypalac-applepay-button,
+    #paypalac-googlepay-button,
+    #paypalac-venmo-button,
+    #paypalac-paylater-button {
+        width: 100% !important;
+    }
 }
 
 /* Placeholder text for wallet buttons.
@@ -302,9 +345,17 @@ fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-paylat
 #paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] ~ .paypalac-venmo-button,
 #paymentMethodContainer .custom-radio > label[for^="pmt-paypalac_"] ~ .paypalac-paylater-button {
     display: flex !important;
-    flex: 0 1 auto !important;
-    width: auto !important;
-    min-width: min(320px, 100%);
+    /* Fixed flex-basis (no grow, no shrink) so Apple Pay/Google Pay/Venmo/
+       Pay Later all claim the exact same box width on the payment row
+       instead of shrink-wrapping to each SDK's own intrinsic content size
+       (which is what previously made Apple Pay render wider than Google
+       Pay). The #paypalac-*-button ID rules above already force this same
+       width/min-width/max-width; repeating it here keeps this selector
+       correct even if a theme fork changes the container's id. */
+    flex: 0 0 auto !important;
+    width: var(--paypalac-wallet-button-width) !important;
+    min-width: var(--paypalac-wallet-button-min-width) !important;
+    max-width: min(var(--paypalac-wallet-button-max-width), 100%) !important;
     margin-top: 0 !important;
     margin-bottom: 0 !important;
     vertical-align: middle;

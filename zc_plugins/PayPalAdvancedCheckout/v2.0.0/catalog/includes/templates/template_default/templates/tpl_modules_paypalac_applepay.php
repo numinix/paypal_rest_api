@@ -102,17 +102,18 @@ if (document.readyState === 'loading') {
 <div id="paypalac-applepay-error" style="display:none; color:red; margin-top:10px;"></div>
 
 <style>
+/* Width is controlled by the shared --paypalac-wallet-button-width rule in
+   paypalac.css so this button always matches Google Pay's width exactly. */
 #paypalac-applepay-button {
     min-height: 50px;
     margin-top: 15px;
     margin-left: auto !important;
-    width: 228px;
 }
 
 #paypalac-applepay-button apple-pay-button {
     --apple-pay-button-width: 100%;
     --apple-pay-button-height: 50px;
-    --apple-pay-button-border-radius: 3px;
+    --apple-pay-button-border-radius: 4px;
     display: block;
     width: 100%;
     height: 50px;

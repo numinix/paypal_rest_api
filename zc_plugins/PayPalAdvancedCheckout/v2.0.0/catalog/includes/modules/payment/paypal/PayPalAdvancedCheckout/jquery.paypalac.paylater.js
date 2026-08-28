@@ -18,6 +18,11 @@
 
     var WALLET_BUTTON_MIN_WIDTH = '200px';
     var WALLET_BUTTON_MAX_WIDTH = '320px';
+    // Fixed target width matching --paypalac-wallet-button-width in paypalac.css.
+    // Setting an explicit inline width (rather than 100%) keeps this button the
+    // same size as Apple Pay/Google Pay/Venmo even before/without the CSS file
+    // loading, since Apple Pay never sets an inline width at all.
+    var WALLET_BUTTON_WIDTH = '240px';
 
     var sharedSdkLoader = window.paypalacPaylaterSdkLoaderState || { key: null, promise: null };
     window.paypalacPaylaterSdkLoaderState = sharedSdkLoader;
@@ -41,7 +46,7 @@
         element.style.display = 'flex';
         element.style.alignItems = 'center';
         element.style.justifyContent = 'center';
-        element.style.width = '100%';
+        element.style.width = WALLET_BUTTON_WIDTH;
         element.style.maxWidth = WALLET_BUTTON_MAX_WIDTH;
         element.style.minWidth = WALLET_BUTTON_MIN_WIDTH;
         element.style.margin = '0';

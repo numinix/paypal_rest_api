@@ -45,6 +45,14 @@
 
     var WALLET_BUTTON_MIN_WIDTH = '200px';
     var WALLET_BUTTON_MAX_WIDTH = '320px';
+    // Fixed target width matching --paypalac-wallet-button-width in paypalac.css.
+    // Setting an explicit inline width (rather than 100%) keeps this button the
+    // same size as Apple Pay on the shopping cart/product page even
+    // before/without the CSS file loading - Apple Pay never sets an inline
+    // width at all, and the per-template <style> blocks used to hardcode a
+    // different fixed width (228px) than this script's old 100% fill, which
+    // is what made Apple Pay and Google Pay render at different widths.
+    var WALLET_BUTTON_WIDTH = '240px';
 
     var sharedSdkLoader = window.paypalacSdkLoaderState || { key: null, promise: null };
     window.paypalacSdkLoaderState = sharedSdkLoader;
@@ -101,7 +109,7 @@
         element.style.display = 'flex';
         element.style.alignItems = 'center';
         element.style.justifyContent = 'center';
-        element.style.width = '100%';
+        element.style.width = WALLET_BUTTON_WIDTH;
         element.style.maxWidth = WALLET_BUTTON_MAX_WIDTH;
         element.style.minWidth = WALLET_BUTTON_MIN_WIDTH;
         element.style.margin = '0';
