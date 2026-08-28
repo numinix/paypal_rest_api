@@ -213,7 +213,8 @@ class PayPalAdvancedCheckoutApi extends ErrorInfo
     public function close()
     {
         if ($this->ch !== false) {
-            curl_close($this->ch);
+            // curl_close() is a no-op since PHP 8.0 and deprecated in 8.5.
+            // Dropping the handle reference is enough to release the resource.
             $this->ch = false;
         }
     }

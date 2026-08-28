@@ -1613,17 +1613,32 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
 		$defaultStartDate = date('Y-m-d');
                 $todayTimestamp = strtotime('today');
                 foreach ($products as $product) {
-                        $subscriptions[$product['id']]['product_info'] = $this->get_product_info($product['id']);
+                        // Capture product_info first — get_subscription_attributes() returns a
+                        // fresh array and must not overwrite it (PHP 8+ undefined-key warnings).
+                        $productInfo = $this->get_product_info($product['id']);
                         $subscriptions[$product['id']] = $this->get_subscription_attributes($product);
+                        if (!is_array($subscriptions[$product['id']])) {
+                                $subscriptions[$product['id']] = array();
+                        }
+                        $subscriptions[$product['id']]['product_info'] = $productInfo;
+                        if (!array_key_exists('billingperiod', $subscriptions[$product['id']])) {
+                                $subscriptions[$product['id']]['billingperiod'] = null;
+                        }
+                        if (!array_key_exists('billingfrequency', $subscriptions[$product['id']])) {
+                                $subscriptions[$product['id']]['billingfrequency'] = null;
+                        }
                         $startdateAttribute = isset($subscriptions[$product['id']]['startdate']) ? $subscriptions[$product['id']]['startdate'] : null;
                         $startdateTimestamp = (!empty($startdateAttribute)) ? strtotime($startdateAttribute) : false;
                         $subscriptions[$product['id']]['startdate'] = ($startdateTimestamp !== false && $startdateTimestamp > $todayTimestamp) ? $startdateAttribute : $defaultStartDate;
                         $subscriptions[$product['id']]['quantity'] = $product['quantity'];
-			if ($subscriptions[$product['id']]['billingperiod'] && !($subscriptions[$product['id']]['billingfrequency'] > 0) && strpos($subscriptions[$product['id']]['billingfrequency'], 'Lifetime') === false) {
+                        $billingPeriod = $subscriptions[$product['id']]['billingperiod'];
+                        $billingFrequency = $subscriptions[$product['id']]['billingfrequency'];
+			if (!empty($billingPeriod) && !((is_numeric($billingFrequency) ? (float)$billingFrequency : 0) > 0) && strpos((string)$billingFrequency, 'Lifetime') === false) {
 				$subscriptions[$product['id']]['billingfrequency'] = '1'; //default in case it was missed
+                                $billingFrequency = '1';
 			}
 // check if subscription exists and then populate all other fields
-			if ($subscriptions[$product['id']]['billingperiod'] && strpos($subscriptions[$product['id']]['billingfrequency'], 'Lifetime') === false) {
+			if (!empty($billingPeriod) && strpos((string)$billingFrequency, 'Lifetime') === false) {
 // this needs to be set to the base price plus price of attributes but not including one-time charges then multiple by quantity
 				$subscriptions[$product['id']]['amt'] = ($product['final_price'] - $product['one_time_charges']) * $product['quantity'];
 				$subscriptions[$product['id']]['currencycode'] = $_SESSION['currency'];
@@ -1635,7 +1650,7 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
 				}
 			}
 			else {
-				if ($subscriptions[$product['id']]['product_info']['products_license']) {
+				if (!empty($subscriptions[$product['id']]['product_info']['products_license'])) {
 					$this->notify_error('possible configuration error', 'While looking for subscription products in this order, we found a product that is licensed but does not have a billing period so it is not recognized as a subscription product.  No subscription or licence will be created.  Subscription info: ' . json_encode($subscriptions[$product['id']]), 'warning');
 				}
 				unset($subscriptions[$product['id']]); //this is not a subscription product
