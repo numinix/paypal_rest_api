@@ -23,46 +23,74 @@
         'paypalac_paylater'
     ];
 
-    function isWalletPaymentRadio(el) {
+    /** Branded wallet-button modules only (not creditcard / savedcard). */
+    function isBrandedWalletRadio(el) {
         if (!el || !el.id) {
             return false;
         }
-        return el.id.indexOf('pmt-paypalac') === 0;
+        for (var i = 0; i < WALLET_IDS.length; i++) {
+            if (el.id === 'pmt-' + WALLET_IDS[i]) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    function findIndentHost() {
-        return document.querySelector('#checkoutPayment fieldset.payment')
-            || document.querySelector('fieldset.payment')
-            || document.querySelector('#paymentMethodContainer');
+    function setPaymentIndent(valuePx) {
+        var value = Math.max(0, Math.round(valuePx)) + 'px';
+        // Prefer innermost container first; set on every known host so nested
+        // OPRC (#paymentMethodContainer inside fieldset.payment) stays in sync.
+        var hosts = [
+            document.querySelector('#paymentMethodContainer'),
+            document.querySelector('#checkoutPayment fieldset.payment'),
+            document.querySelector('fieldset.payment')
+        ];
+        var seen = [];
+        for (var i = 0; i < hosts.length; i++) {
+            var host = hosts[i];
+            if (!host || seen.indexOf(host) !== -1) {
+                continue;
+            }
+            seen.push(host);
+            host.style.setProperty('--paypalac-payment-indent', value);
+        }
     }
 
     /**
      * Match wallet radios to the theme's Credit Card / other payment column by
      * copying that radio's computed margin-left (e.g. sts_next_level's 20px).
-     * Do not use getBoundingClientRect offsets — shared container padding would
-     * double-count once we also apply margin-left on the wallet radios.
+     * Prefer paypalac_creditcard / savedcard / third-party methods — not the
+     * branded wallet button radios themselves.
      */
     function syncPaymentIndentFromTheme() {
-        var host = findIndentHost();
-        if (!host) {
-            return;
-        }
+        var scope = document.querySelector('#paymentMethodContainer')
+            || document.querySelector('#checkoutPayment fieldset.payment')
+            || document.querySelector('fieldset.payment')
+            || document;
 
-        var radios = host.querySelectorAll('input[type="radio"][name="payment"]');
+        var radios = scope.querySelectorAll('input[type="radio"][name="payment"]');
         var sample = null;
-        for (var i = 0; i < radios.length; i++) {
-            if (!isWalletPaymentRadio(radios[i])) {
-                sample = radios[i];
-                break;
+        var preferred = ['pmt-paypalac_creditcard', 'pmt-paypalac_savedcard'];
+        for (var p = 0; p < preferred.length && !sample; p++) {
+            for (var i = 0; i < radios.length; i++) {
+                if (radios[i].id === preferred[p]) {
+                    sample = radios[i];
+                    break;
+                }
+            }
+        }
+        for (var j = 0; j < radios.length && !sample; j++) {
+            if (!isBrandedWalletRadio(radios[j])) {
+                sample = radios[j];
             }
         }
         if (!sample) {
-            host.style.setProperty('--paypalac-payment-indent', '0px');
+            setPaymentIndent(0);
             return;
         }
 
         var marginLeft = parseFloat(window.getComputedStyle(sample).marginLeft) || 0;
-        host.style.setProperty('--paypalac-payment-indent', Math.max(0, Math.round(marginLeft)) + 'px');
+        setPaymentIndent(marginLeft);
     }
 
     function wrapRadioAndLabel(radio) {

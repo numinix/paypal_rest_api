@@ -311,6 +311,11 @@ fieldset.payment,
     --paypalac-payment-radio-gap: 0.5rem;
 }
 
+/*
+ * Layout helpers for wallet radios. Do NOT force margin-left here — that would
+ * zero the theme indent when wallet_layout.js is not loaded (e.g. only main
+ * PayPal + credit card). Indent is applied only inside .paypalac-wallet-payment-row.
+ */
 #checkoutPayment fieldset.payment input[id="pmt-paypalac_applepay"],
 #checkoutPayment fieldset.payment input[id="pmt-paypalac_googlepay"],
 #checkoutPayment fieldset.payment input[id="pmt-paypalac_venmo"],
@@ -330,7 +335,6 @@ fieldset.payment input[id="pmt-paypalac"],
     vertical-align: middle !important;
     float: none !important;
     clear: none !important;
-    margin: 0 var(--paypalac-payment-radio-gap, 0.5rem) 0 var(--paypalac-payment-indent, 0px) !important;
     position: static !important;
 }
 
