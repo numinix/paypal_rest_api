@@ -3753,10 +3753,6 @@ class paypalac extends base
                 if ($existing !== false && $existing === $fileContents) {
                     continue;
                 }
-                // Do not replace a larger/valid root file with a shorter source of the same name.
-                if ($existing !== false && strlen($existing) > strlen($fileContents) && strlen($existing) > 0) {
-                    continue;
-                }
             }
 
             if (!$this->writeRootEntrypointAtomically($targetFile, $fileContents)) {
