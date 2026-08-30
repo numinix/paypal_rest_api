@@ -41,8 +41,17 @@ $paypalac = file_get_contents($plugin . '/catalog/includes/modules/payment/paypa
 if (strpos($paypalac, 'function manageRootDirectoryFiles') === false) {
     $errors[] = 'paypalac missing manageRootDirectoryFiles';
 }
+if (strpos($paypalac, 'function readNonEmptyRootEntrypointSource') === false) {
+    $errors[] = 'paypalac missing readNonEmptyRootEntrypointSource empty-source guard';
+}
+if (strpos($paypalac, 'function writeRootEntrypointAtomically') === false) {
+    $errors[] = 'paypalac missing writeRootEntrypointAtomically';
+}
 if (strpos($paypalac, "CURRENT_VERSION = '2.0.0'") === false) {
     $errors[] = 'paypalac CURRENT_VERSION should be 2.0.0';
+}
+if (strpos($installer, 'function readNonEmptyAssetContents') === false) {
+    $errors[] = 'Installer missing readNonEmptyAssetContents empty-source guard';
 }
 
 if ($errors) {
