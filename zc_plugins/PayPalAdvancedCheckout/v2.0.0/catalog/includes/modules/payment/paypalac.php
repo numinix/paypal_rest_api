@@ -3699,8 +3699,12 @@ class paypalac extends base
     }
 
     /**
-     * Copy catalog-root entrypoints from the encapsulated support directory.
+     * Copy catalog-root entrypoints from the encapsulated package.
      * Returns false (and disables the module) when required files cannot be written.
+     *
+     * Prefer a non-empty Installer asset, then the support-dir copy. Never overwrite a
+     * good root file with an empty/truncated source (hosts sometimes zero specific PHP
+     * files under Installer/assets/root while leaving the catalog support copy intact).
      */
     protected function manageRootDirectoryFiles(): bool
     {
@@ -3725,28 +3729,33 @@ class paypalac extends base
         $problemFiles = [];
 
         foreach ($rootFiles as $nextFile) {
-            $sourceFile = $assetRoot . $nextFile;
-            if (!is_file($sourceFile)) {
-                $sourceFile = $supportDir . $nextFile;
-            }
             $targetFile = DIR_FS_CATALOG . $nextFile;
-            if (!is_file($sourceFile)) {
+            $fileContents = $this->readNonEmptyRootEntrypointSource([
+                $assetRoot . $nextFile,
+                $supportDir . $nextFile,
+            ]);
+
+            if ($fileContents === null) {
+                // Keep an already-good destination rather than failing closed on a wiped source.
+                clearstatcache(true, $targetFile);
+                $existingSize = is_file($targetFile) ? (int) filesize($targetFile) : 0;
+                if ($existingSize > 0) {
+                    continue;
+                }
                 $filesOk = false;
                 $problemFiles[] = $nextFile;
                 continue;
             }
-            $fileContents = file_get_contents($sourceFile);
-            if ($fileContents === false) {
-                $filesOk = false;
-                $problemFiles[] = $nextFile;
-                continue;
-            }
-            file_put_contents($targetFile, $fileContents);
+
             clearstatcache(true, $targetFile);
-            $targetSize = is_file($targetFile) ? filesize($targetFile) : false;
-            // Host AV can truncate PHP uploads to 0 bytes; treat that as failure
-            // so install/enable surfaces the problem instead of a white-screen cancel URL.
-            if ($targetSize === false || $targetSize === 0 || $targetSize !== strlen($fileContents)) {
+            if (is_file($targetFile)) {
+                $existing = file_get_contents($targetFile);
+                if ($existing !== false && $existing === $fileContents) {
+                    continue;
+                }
+            }
+
+            if (!$this->writeRootEntrypointAtomically($targetFile, $fileContents)) {
                 $filesOk = false;
                 $problemFiles[] = $nextFile;
             }
@@ -3764,6 +3773,60 @@ class paypalac extends base
         }
 
         return $filesOk;
+    }
+
+    /**
+     * @param array<int, string> $candidates Absolute paths, preferred first.
+     */
+    protected function readNonEmptyRootEntrypointSource(array $candidates): ?string
+    {
+        foreach ($candidates as $sourceFile) {
+            if (!is_file($sourceFile) || !is_readable($sourceFile)) {
+                continue;
+            }
+            clearstatcache(true, $sourceFile);
+            if ((int) filesize($sourceFile) <= 0) {
+                continue;
+            }
+            $contents = file_get_contents($sourceFile);
+            if ($contents !== false && $contents !== '') {
+                return $contents;
+            }
+        }
+
+        return null;
+    }
+
+    protected function writeRootEntrypointAtomically(string $targetFile, string $fileContents): bool
+    {
+        $dir = dirname($targetFile);
+        if (!is_dir($dir)) {
+            return false;
+        }
+
+        $tempFile = $targetFile . '.ppac_tmp_' . bin2hex(random_bytes(4));
+        $written = @file_put_contents($tempFile, $fileContents);
+        clearstatcache(true, $tempFile);
+        $tempSize = is_file($tempFile) ? filesize($tempFile) : false;
+        if ($written === false || $tempSize === false || $tempSize === 0 || $tempSize !== strlen($fileContents)) {
+            if (is_file($tempFile)) {
+                @unlink($tempFile);
+            }
+            return false;
+        }
+
+        // Prefer rename so a failed host filter cannot leave a 0-byte final path behind.
+        if (@rename($tempFile, $targetFile)) {
+            clearstatcache(true, $targetFile);
+            $targetSize = is_file($targetFile) ? filesize($targetFile) : false;
+            return $targetSize !== false && $targetSize === strlen($fileContents);
+        }
+
+        $copied = @copy($tempFile, $targetFile);
+        @unlink($tempFile);
+        clearstatcache(true, $targetFile);
+        $targetSize = is_file($targetFile) ? filesize($targetFile) : false;
+        return $copied && $targetSize !== false && $targetSize === strlen($fileContents);
     }
 
     /**

@@ -227,8 +227,11 @@ class ScriptedInstaller extends ScriptedInstallerBase
             'ppac_add_card.php' => 'assets/root/ppac_add_card.php',
         ];
 
+        $supportFallbackDir = dirname(__DIR__) . '/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/';
         foreach ($rootMap as $destName => $relativeSource) {
-            if (!$this->copyAsset(__DIR__ . '/' . $relativeSource, $catalog . $destName)) {
+            $installerSource = __DIR__ . '/' . $relativeSource;
+            $fallbackSource = $supportFallbackDir . $destName;
+            if (!$this->copyAsset($installerSource, $catalog . $destName, $fallbackSource)) {
                 $ok = false;
             }
         }
@@ -284,30 +287,68 @@ class ScriptedInstaller extends ScriptedInstallerBase
         }
     }
 
-    protected function copyAsset(string $source, string $dest): bool
+    /**
+     * @param string|null $fallbackSource Optional non-empty alternate source when $source is missing/empty.
+     */
+    protected function copyAsset(string $source, string $dest, ?string $fallbackSource = null): bool
     {
-        if (!is_readable($source)) {
-            return false;
+        $contents = $this->readNonEmptyAssetContents($source);
+        if ($contents === null && $fallbackSource !== null) {
+            $contents = $this->readNonEmptyAssetContents($fallbackSource);
         }
-
-        $contents = file_get_contents($source);
-        if ($contents === false) {
-            return false;
-        }
-
-        $written = @file_put_contents($dest, $contents);
-        if ($written === false || !is_file($dest)) {
-            return false;
+        if ($contents === null) {
+            // Preserve an already-deployed good destination if sources were wiped on disk.
+            clearstatcache(true, $dest);
+            return is_file($dest) && (int) filesize($dest) > 0;
         }
 
         clearstatcache(true, $dest);
-        $destSize = filesize($dest);
-        // Reject empty/truncated writes (host AV sometimes leaves a 0-byte PHP file).
-        if ($destSize === false || $destSize === 0 || $destSize !== strlen($contents)) {
+        if (is_file($dest)) {
+            $existing = file_get_contents($dest);
+            if ($existing !== false && $existing === $contents) {
+                return true;
+            }
+        }
+
+        $temp = $dest . '.ppac_tmp_' . bin2hex(random_bytes(4));
+        $written = @file_put_contents($temp, $contents);
+        clearstatcache(true, $temp);
+        $tempSize = is_file($temp) ? filesize($temp) : false;
+        if ($written === false || $tempSize === false || $tempSize === 0 || $tempSize !== strlen($contents)) {
+            if (is_file($temp)) {
+                @unlink($temp);
+            }
             return false;
         }
 
-        return true;
+        if (@rename($temp, $dest)) {
+            clearstatcache(true, $dest);
+            $destSize = is_file($dest) ? filesize($dest) : false;
+            return $destSize !== false && $destSize === strlen($contents);
+        }
+
+        $copied = @copy($temp, $dest);
+        @unlink($temp);
+        clearstatcache(true, $dest);
+        $destSize = is_file($dest) ? filesize($dest) : false;
+        // Reject empty/truncated writes (host filters sometimes leave a 0-byte PHP file).
+        return $copied && $destSize !== false && $destSize === strlen($contents);
+    }
+
+    protected function readNonEmptyAssetContents(string $source): ?string
+    {
+        if (!is_readable($source) || !is_file($source)) {
+            return null;
+        }
+        clearstatcache(true, $source);
+        if ((int) filesize($source) <= 0) {
+            return null;
+        }
+        $contents = file_get_contents($source);
+        if ($contents === false || $contents === '') {
+            return null;
+        }
+        return $contents;
     }
 
     protected function purgeOldFiles(): bool
