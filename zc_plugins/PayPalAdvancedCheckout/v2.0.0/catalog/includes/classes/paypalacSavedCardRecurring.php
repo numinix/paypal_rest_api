@@ -1024,8 +1024,25 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                 }
 
                 // Persist customers_id so admin subscription pages can filter by customer.
-                if (isset($metadata['customers_id']) && (int) $metadata['customers_id'] > 0) {
-                        $sql_data_array[] = array('fieldName' => 'customers_id', 'value' => (int) $metadata['customers_id'], 'type' => 'integer');
+                // Fall back to the saved-card owner when order-line metadata was incomplete
+                // (legacy migration rows often had orders_products_id but customers_id = 0).
+                $customersId = isset($metadata['customers_id']) ? (int) $metadata['customers_id'] : 0;
+                if ($customersId <= 0 && $saved_credit_card_id > 0) {
+                        $cardOwner = $db->Execute(
+                                'SELECT customers_id FROM ' . TABLE_SAVED_CREDIT_CARDS
+                                . ' WHERE saved_credit_card_id = ' . (int) $saved_credit_card_id
+                                . ' LIMIT 1'
+                        );
+                        if ($cardOwner instanceof queryFactoryResult && !$cardOwner->EOF) {
+                                $customersId = (int) ($cardOwner->fields['customers_id'] ?? 0);
+                        }
+                }
+                if ($customersId > 0) {
+                        $sql_data_array[] = array('fieldName' => 'customers_id', 'value' => $customersId, 'type' => 'integer');
+                }
+
+                if ($original_orders_products_id > 0 && $this->saved_cards_recurring_has_column('original_orders_products_id')) {
+                        $sql_data_array[] = array('fieldName' => 'original_orders_products_id', 'value' => $original_orders_products_id, 'type' => 'integer');
                 }
 
                 // Planned end date from creation (null when total_billing_cycles is 0 / indefinite).
