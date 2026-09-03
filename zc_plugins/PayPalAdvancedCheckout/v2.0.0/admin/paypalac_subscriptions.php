@@ -2190,7 +2190,9 @@ $subscriptionRows = array_slice($allSubscriptions, $offset, $currentPerPage);
 
 // Accurate completed-cycle counts only for the visible page (typically 10–100 rows).
 $savedCardCycleHelper = class_exists('paypalacSavedCardRecurring') ? new paypalacSavedCardRecurring() : null;
-if ($savedCardCycleHelper instanceof paypalacSavedCardRecurring) {
+if ($savedCardCycleHelper instanceof paypalacSavedCardRecurring
+    && method_exists($savedCardCycleHelper, 'count_completed_billing_cycles')
+) {
     foreach ($subscriptionRows as $rowIndex => $visibleRow) {
         if (($visibleRow['subscription_type'] ?? '') !== 'savedcard') {
             continue;
