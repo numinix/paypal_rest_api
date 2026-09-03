@@ -28,6 +28,10 @@ assert_true(
     'count_completed_billing_cycles runs only on the visible page'
 );
 assert_true(
+    strpos($admin, "method_exists(\$savedCardCycleHelper, 'count_completed_billing_cycles')") !== false,
+    'admin guards count_completed_billing_cycles with method_exists'
+);
+assert_true(
     strpos($admin, "payments_completed'] = ((int) (\$scrFields['orders_id']") !== false,
     'full list uses cheap orders_id placeholder for payments_completed'
 );
