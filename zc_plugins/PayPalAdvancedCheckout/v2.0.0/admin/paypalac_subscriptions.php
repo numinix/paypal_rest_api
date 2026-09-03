@@ -44,13 +44,17 @@ VaultManager::ensureSchema();
 
 // One-time-ish backfill of saved-card expiration_date for active schedules.
 // Cheap probe first: do not scan/update the whole table on every page view.
+// Guard both helpers — stores may ship a customized paypalacSavedCardRecurring
+// without these methods (calling them caused a 500 on numinix.ca).
 if (class_exists('paypalacSavedCardRecurring')) {
     $paypalacExpiryBackfill = new paypalacSavedCardRecurring();
-    if (method_exists($paypalacExpiryBackfill, 'saved_card_expiration_backfill_needed')
-        ? $paypalacExpiryBackfill->saved_card_expiration_backfill_needed()
-        : true
-    ) {
-        $paypalacExpiryBackfill->backfill_saved_card_expiration_dates();
+    if (method_exists($paypalacExpiryBackfill, 'backfill_saved_card_expiration_dates')) {
+        if (method_exists($paypalacExpiryBackfill, 'saved_card_expiration_backfill_needed')
+            ? $paypalacExpiryBackfill->saved_card_expiration_backfill_needed()
+            : true
+        ) {
+            $paypalacExpiryBackfill->backfill_saved_card_expiration_dates();
+        }
     }
 }
 

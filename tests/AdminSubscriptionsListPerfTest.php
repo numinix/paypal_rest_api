@@ -47,5 +47,9 @@ assert_true(
     strpos($admin, 'saved_card_expiration_backfill_needed') !== false,
     'admin page uses saved-card backfill probe'
 );
+assert_true(
+    strpos($admin, "method_exists(\$paypalacExpiryBackfill, 'backfill_saved_card_expiration_dates')") !== false,
+    'admin guards backfill method for customized SCCR classes'
+);
 
 fwrite(STDOUT, "\nAll AdminSubscriptionsListPerfTest checks passed.\n");
