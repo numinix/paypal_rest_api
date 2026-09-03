@@ -304,20 +304,33 @@ class zcObserverMyPaylaterCustomizer extends base
           </ol>
 
           <h4>Recurring subscriptions: cron setup</h4>
-          <p class="bodyText">If you use saved-card recurring billing, schedule the recurring cron script so subscription renewals process automatically.</p>
+          <p class="bodyText">If you use PayPal Advanced Checkout saved-card recurring billing (vaulted cards / <code>paypalac*</code> checkout modules), schedule the recurring cron so renewals process automatically. Prefer the version-stable plugin dispatcher; catalog-root <code>cron/paypalac_*.php</code> shims are redeployed on install/upgrade for existing crontab entries.</p>
           <ol>
-            <li>Confirm this file exists in your store: <code>cron/paypalac_saved_card_recurring.php</code>.</li>
-            <li>Add a server cron entry (example: run every 15 minutes):</li>
+            <li>Confirm either path exists: <code>zc_plugins/PayPalAdvancedCheckout/cron.php</code> (preferred) or <code>cron/paypalac_saved_card_recurring.php</code> (shim).</li>
+            <li>Add a server cron entry (example: once daily early morning, or every 15 minutes if you need same-day retries):</li>
           </ol>
-          <pre class="sh_bash" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>*/15 * * * * /usr/bin/php /path/to/your/store/cron/paypalac_saved_card_recurring.php &gt;&gt; /path/to/your/store/logs/paypalac/recurring-cron.log 2&gt;&amp;1</code></pre>
+          <pre class="sh_bash" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code># preferred (survives plugin version folder changes)
+0 4 * * * /usr/bin/php /path/to/your/store/zc_plugins/PayPalAdvancedCheckout/cron.php paypalac_saved_card_recurring &gt;&gt; /path/to/your/store/logs/paypalac/recurring-cron.log 2&gt;&amp;1
+
+# legacy shim (still supported)
+*/15 * * * * /usr/bin/php /path/to/your/store/cron/paypalac_saved_card_recurring.php &gt;&gt; /path/to/your/store/logs/paypalac/recurring-cron.log 2&gt;&amp;1</code></pre>
           <ol start="3">
             <li>Test manually from your store root:</li>
           </ol>
-          <pre class="sh_bash" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>php cron/paypalac_saved_card_recurring.php</code></pre>
+          <pre class="sh_bash" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>php zc_plugins/PayPalAdvancedCheckout/cron.php paypalac_saved_card_recurring
+# or
+php cron/paypalac_saved_card_recurring.php</code></pre>
           <ol start="4">
-            <li>Verify output and logs show processed records. The recurring job processes subscriptions that are due with status <code>scheduled</code> and failed retries configured for automatic retry.</li>
-            <li>If nothing processes, check subscription status, <code>next_payment_date</code>, and schema health in your database.</li>
+            <li>Verify output and logs show processed records. The AC recurring job only bills subscriptions that are due with status <code>scheduled</code> when the source order used a <code>paypalac%</code> payment module <em>or</em> the saved card is linked to <code>TABLE_PAYPAL_VAULT</code>. Failed gateway attempts stay retryable (status remains <code>scheduled</code>) until max failures is exceeded.</li>
+            <li>Legacy Payflow / offline-invoice schedules are <strong>not</strong> billed by this cron — keep those on the store's legacy saved-card recurring tools.</li>
+            <li>If nothing processes, check subscription status, <code>next_payment_date</code>, vault linkage, and schema health in your database.</li>
           </ol>
+
+          <h4>Admin: which subscriptions appear where</h4>
+          <ul class="bodyList">
+            <li><code>admin/paypalac_subscriptions.php</code> (Customers → PayPal Advanced Checkout Subscriptions) lists PayPal-managed REST subscriptions plus store-managed SCCR rows that PayPal AC bills (vaulted / <code>paypalac*</code>). It does <strong>not</strong> list legacy Payflow or offline-invoice plans, and it hides unified-UI mirror rows in <code>paypal_subscriptions</code> that only sync SCCR dates for editing.</li>
+            <li>Legacy Payflow saved-card schedules belong on the store's legacy recurring admin page (for example Numinix <code>numinix_saved_card_recurring</code>), not the Advanced Checkout list.</li>
+          </ul>
 
           <h4>Additional maintenance cron jobs</h4>
           <p class="bodyText">If you use subscription lifecycle features and saved cards, schedule these companion cron jobs as well.</p>
@@ -359,9 +372,10 @@ php cron/paypalac_recurring_reminders.php</code></pre>
           <p class="bodyText">This section consolidates implementation details, extension points, and maintenance notes for developers.</p>
           <h4>Key files and extension points</h4>
           <ul class="bodyList">
-            <li><code>cron/paypalac_saved_card_recurring.php</code> &mdash; recurring billing processor.</li>
-            <li><code>includes/classes/paypalacSavedCardRecurring.php</code> &mdash; scheduled payment queries and recurring data helpers.</li>
-            <li><code>admin/paypalac_saved_card_recurring.php</code> &mdash; admin recurring subscription management UI.</li>
+            <li><code>zc_plugins/PayPalAdvancedCheckout/cron.php paypalac_saved_card_recurring</code> (preferred) or <code>cron/paypalac_saved_card_recurring.php</code> shim &mdash; recurring billing processor for vaulted / <code>paypalac*</code> schedules.</li>
+            <li><code>catalog/includes/classes/paypalacSavedCardRecurring.php</code> (encapsulated) &mdash; scheduled payment queries, overdue/retry helpers, and recurring data helpers.</li>
+            <li><code>admin/paypalac_subscriptions.php</code> &mdash; unified Advanced Checkout subscriptions list (REST + AC saved-card only).</li>
+            <li><code>admin/paypalac_saved_card_recurring.php</code> &mdash; plugin saved-card recurring helpers UI (not a replacement for a store's legacy Payflow recurring page).</li>
             <li><code>NOTIFY_RECURRING_ORDER_LOGGED</code> and <code>NOTIFY_PAYPALAC_VAULT_CARD_SAVED</code> observer events are available for integrations.</li>
           </ul>
           <h4>Advanced customization topics</h4>

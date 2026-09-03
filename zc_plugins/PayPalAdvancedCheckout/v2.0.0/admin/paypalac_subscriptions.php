@@ -2100,6 +2100,17 @@ $restSubscriptions = $db->Execute($restSql);
 if ($restSubscriptions instanceof queryFactoryResult) {
     while (!$restSubscriptions->EOF) {
         $row = $restSubscriptions->fields;
+        // LegacySubscriptionMigrator copies SCCR into paypal_subscriptions as a
+        // unified-UI mirror (legacy_subscription_id set, no PayPal remote id).
+        // Listing those alongside the real saved-card row shows the same plan twice
+        // ("REST API" + "Saved Card") with matching next-billing dates. Skip mirrors;
+        // keep true PayPal-managed subscriptions (paypal_subscription_remote_id set).
+        if ((int) ($row['legacy_subscription_id'] ?? 0) > 0
+            && !paypalac_admin_is_paypal_managed($row)
+        ) {
+            $restSubscriptions->MoveNext();
+            continue;
+        }
         $row['subscription_type'] = 'rest';
         $row['sort_date'] = strtotime($row['date_added'] ?? 'now');
         $allSubscriptions[] = $row;
@@ -2107,12 +2118,12 @@ if ($restSubscriptions instanceof queryFactoryResult) {
     }
 }
 
-// Store-managed (saved_credit_cards_recurring) subscriptions are a first-class
-// PayPal Advanced Checkout subscription type: products that carry the three
-// Zen Cart subscription attributes (billing period, billing frequency, total
-// billing cycles) route here through paypalacSavedCardRecurring + the cron.
-// Pull them with the same filter semantics as the REST query and merge into
-// $allSubscriptions so the unified UI can display + act on both systems.
+// Store-managed (saved_credit_cards_recurring) subscriptions that PayPal AC
+// bills: vaulted cards / paypalac* checkouts. Legacy Payflow and offline-
+// invoice SCCR rows belong on the store's legacy saved-card recurring admin
+// page (and the offline-invoice tools) — not this page. Match
+// paypalacSavedCardRecurring::get_scheduled_payments() so the admin list and
+// AC cron stay aligned.
 if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
     $savedCardWhereClauses = [];
     // Prefer the persisted customers_id, but fall back to the parent order line /
@@ -2122,6 +2133,14 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
         . 'NULLIF(o.customers_id, 0),'
         . 'NULLIF(o_op.customers_id, 0),'
         . 'NULLIF(sc.customers_id, 0)'
+        . ')';
+    $savedCardPaymentModuleExpr = 'COALESCE(o.payment_module_code, o_op.payment_module_code)';
+
+    // PayPal AC only: exclude Payflow/WPP/offline SCCR (those stay on the
+    // legacy saved-card recurring admin page).
+    $savedCardWhereClauses[] = '('
+        . $savedCardPaymentModuleExpr . " LIKE 'paypalac%'"
+        . " OR (sc.vault_id IS NOT NULL AND sc.vault_id <> '' AND pv.vault_id IS NOT NULL)"
         . ')';
 
     if ($filters['customers_id'] > 0) {
@@ -2135,7 +2154,7 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
         $savedCardWhereClauses[] = $savedStatusSql;
     }
     if ($filters['payment_module'] !== '') {
-        $savedCardWhereClauses[] = "COALESCE(o.payment_module_code, o_op.payment_module_code) = '" . zen_db_input($filters['payment_module']) . "'";
+        $savedCardWhereClauses[] = $savedCardPaymentModuleExpr . " = '" . zen_db_input($filters['payment_module']) . "'";
     }
     if ($filters['show_archived'] === 'only') {
         $savedCardWhereClauses[] = 'scr.is_archived = 1';

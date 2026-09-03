@@ -15,7 +15,7 @@ require_once ($legacyModulePath);
 $this->paypalsavedcard = new paypalsavedcard($this);
 }
 else {
-$restCardModule = dirname(__DIR__) . '/modules/payment/paypalac_creditcard.php';
+$restCardModule = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalac_creditcard.php';
 $this->paymentModuleCode = file_exists($restCardModule) ? 'paypalac_creditcard' : 'paypalac';
 $this->paypalsavedcard = null;
 }
@@ -49,7 +49,7 @@ $this->PayPalAdvancedCheckout = isset($this->paypalsavedcard->PayPalAdvancedChec
 return $this->PayPalAdvancedCheckout;
 }
 }
-               $autoload = dirname(__DIR__) . '/modules/payment/paypal/ppacAutoload.php';
+               $autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
                if (!class_exists('PayPalAdvancedCheckout\\Api\\PayPalAdvancedCheckoutApi') && file_exists($autoload)) {
                        require_once ($autoload);
                }
@@ -350,7 +350,7 @@ return $this->PayPalAdvancedCheckout;
       }
 protected function ensure_vault_manager_loaded() {
 if (!class_exists('PayPalAdvancedCheckout\\Common\\VaultManager')) {
-$autoload = dirname(__DIR__) . '/modules/payment/paypal/ppacAutoload.php';
+$autoload = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 if (file_exists($autoload)) {
 require_once ($autoload);
 }
@@ -358,11 +358,15 @@ require_once ($autoload);
 return class_exists('PayPalAdvancedCheckout\\Common\\VaultManager');
 }
 public function get_saved_card_details($saved_card_id, $customer_id = null) {
+$saved_card_id = (int) $saved_card_id;
+if ($saved_card_id <= 0) {
+return array();
+}
 if (is_object($this->paypalsavedcard) && method_exists($this->paypalsavedcard, 'get_card_details')) {
 return $this->paypalsavedcard->get_card_details($saved_card_id, $customer_id);
 }
 global $db;
-$sql = "SELECT * FROM " . TABLE_SAVED_CREDIT_CARDS . " WHERE saved_credit_card_id = " . (int) $saved_card_id;
+$sql = "SELECT * FROM " . TABLE_SAVED_CREDIT_CARDS . " WHERE saved_credit_card_id = " . $saved_card_id;
 if ($customer_id) {
 $sql .= ' AND customers_id = ' . (int) $customer_id;
 }
@@ -622,9 +626,7 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                if (!(strlen($credential_id) > 0)) {
                        return array('success' => false, 'error' => 'Missing stored credential identifier');
                }
-               // Determine intent from MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE.
-               // When not Final Sale, recurring uses AUTHORIZE: PayPal places a hold / authorization only;
-               // funds are not settled until staff capture (same as checkout in authorize mode).
+               // Determine intent based on transaction mode setting - recurring card payments should respect the authorize/capture mode
                $transaction_mode = defined('MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE') ? MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE : 'Final Sale';
                // For card payments, 'Auth Only (All Txns)' and 'Auth Only (Card-Only)' both mean AUTHORIZE
                // 'Final Sale' means CAPTURE
@@ -965,11 +967,11 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
 */
         function schedule_payment($amount, $date, $saved_credit_card_id, $original_orders_products_id = '', $comments = '', array $metadata = array()) {
                 global $db;
+                $amount = preg_replace("/[^0-9\.]/", "", $amount); //remove any illegal chars from the amount so it stores properly.
                 if (!$this->validate_saved_card($saved_credit_card_id, $original_orders_products_id)) {
                         $this->notify_error('Invalid saved card id', 'saved card id: ' . $saved_credit_card_id . ' orders_products_id ' . $original_orders_products_id);
                         return 0;
                 }
-                $amount = preg_replace("/[^0-9\.]/", "", $amount); //remove any illegal chars from the amount so it stores properly.
                 $metadata = $this->prepare_schedule_payment_metadata($metadata, $original_orders_products_id, $amount);
                 $sql_data_array = array(
                         array('fieldName' => 'next_payment_date', 'value' => $date, 'type' => 'string'),
@@ -1044,39 +1046,187 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                 if ($original_orders_products_id > 0 && $this->saved_cards_recurring_has_column('original_orders_products_id')) {
                         $sql_data_array[] = array('fieldName' => 'original_orders_products_id', 'value' => $original_orders_products_id, 'type' => 'integer');
                 }
-
-                // Planned end date from creation (null when total_billing_cycles is 0 / indefinite).
-                $this->ensure_saved_cards_recurring_expiration_date_column();
-                if ($this->saved_cards_recurring_has_column('expiration_date')) {
-                        if (!function_exists('paypalac_compute_subscription_expiration_date')) {
-                                $helper = DIR_FS_CATALOG . 'includes/functions/extra_functions/paypalac_subscription_functions.php';
-                                if (is_file($helper)) {
-                                        require_once $helper;
-                                }
-                        }
-                        $expiry = null;
-                        if (function_exists('paypalac_compute_subscription_expiration_date')) {
-                                $startForExpiry = !empty($metadata['date_added'])
-                                        ? (string) $metadata['date_added']
-                                        : date('Y-m-d H:i:s');
-                                $expiry = paypalac_compute_subscription_expiration_date(
-                                        $startForExpiry,
-                                        (string) ($metadata['billing_period'] ?? ''),
-                                        (int) ($metadata['billing_frequency'] ?? 0),
-                                        (int) ($metadata['total_billing_cycles'] ?? 0)
-                                );
-                        }
-                        if ($expiry !== null) {
-                                $sql_data_array[] = array('fieldName' => 'expiration_date', 'value' => $expiry, 'type' => 'string');
-                        }
-                }
                 
                 $db->perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, $sql_data_array);
                 $paypal_saved_card_recurring_id = $db->insert_ID();
                 return $paypal_saved_card_recurring_id;
         }
 
-        protected function prepare_schedule_payment_metadata(array $metadata, $original_orders_products_id, $amount)
+        /**
+         * If the current session has a coupon that is enabled for subscriptions,
+         * record it in the subscription_coupons table so recurring billing can
+         * apply the discount automatically.
+         *
+         * This must be called right after schedule_payment() when creating a new
+         * subscription (not during automatic renewal).
+         *
+         * @param int $subscription_id  The saved_credit_card_recurring_id just created.
+         * @param int $initial_order_id The order_id of the originating order.
+         */
+        public function record_subscription_coupon_if_applicable($subscription_id, $initial_order_id)
+        {
+                global $db;
+
+                $subscription_id = (int) $subscription_id;
+                $initial_order_id = (int) $initial_order_id;
+
+                if ($subscription_id <= 0) {
+                        return;
+                }
+
+                // Check session for an active coupon
+                if (empty($_SESSION['cc_id'])) {
+                        return;
+                }
+
+                $coupon_id = (int) $_SESSION['cc_id'];
+                if ($coupon_id <= 0) {
+                        return;
+                }
+
+                $tableName = defined('TABLE_SUBSCRIPTION_COUPONS')
+                        ? TABLE_SUBSCRIPTION_COUPONS
+                        : ((defined('DB_PREFIX') ? DB_PREFIX : '') . 'subscription_coupons');
+
+                // Look up the coupon and check if it's subscription-enabled
+                $coupon = $db->Execute(
+                        "SELECT coupon_id, coupon_subscription_enabled, coupon_subscription_cycles
+                         FROM " . TABLE_COUPONS . "
+                         WHERE coupon_id = " . $coupon_id . "
+                         AND coupon_active = 'Y'
+                         LIMIT 1"
+                );
+
+                if ($coupon->EOF) {
+                        return;
+                }
+
+                if (!isset($coupon->fields['coupon_subscription_enabled']) || (int) $coupon->fields['coupon_subscription_enabled'] !== 1) {
+                        return;
+                }
+
+                // Check if a record already exists for this subscription (avoid duplicates)
+                $existing = $db->Execute(
+                        "SELECT id FROM `{$tableName}`
+                         WHERE saved_credit_card_recurring_id = " . $subscription_id . "
+                         LIMIT 1"
+                );
+
+                if (!$existing->EOF) {
+                        return;
+                }
+
+                $db->Execute(
+                        "INSERT INTO `{$tableName}`
+                         (saved_credit_card_recurring_id, coupon_id, billing_cycles_applied, initial_order_id)
+                         VALUES (" . $subscription_id . ", " . $coupon_id . ", 0, " . $initial_order_id . ")"
+                );
+        }
+
+        /**
+         * Retrieve the active subscription coupon record for a subscription, if any.
+         * Returns an associative array with coupon and tracking data, or null if none.
+         *
+         * @param int $subscription_id
+         * @return array|null
+         */
+        public function get_subscription_coupon($subscription_id)
+        {
+                global $db;
+
+                $subscription_id = (int) $subscription_id;
+                if ($subscription_id <= 0) {
+                        return null;
+                }
+
+                $tableName = defined('TABLE_SUBSCRIPTION_COUPONS')
+                        ? TABLE_SUBSCRIPTION_COUPONS
+                        : ((defined('DB_PREFIX') ? DB_PREFIX : '') . 'subscription_coupons');
+
+                $result = $db->Execute(
+                        "SELECT sc.id, sc.coupon_id, sc.billing_cycles_applied, sc.initial_order_id,
+                                c.coupon_amount, c.coupon_type, c.coupon_subscription_cycles, c.coupon_subscription_enabled
+                         FROM `{$tableName}` sc
+                         INNER JOIN " . TABLE_COUPONS . " c ON c.coupon_id = sc.coupon_id
+                         WHERE sc.saved_credit_card_recurring_id = " . $subscription_id . "
+                         AND c.coupon_active = 'Y'
+                         AND c.coupon_subscription_enabled = 1
+                         LIMIT 1"
+                );
+
+                if ($result->EOF) {
+                        return null;
+                }
+
+                $data = $result->fields;
+
+                // Check if the coupon has a cycle limit and if it has been reached
+                $max_cycles = (int) $data['coupon_subscription_cycles'];
+                $cycles_applied = (int) $data['billing_cycles_applied'];
+
+                if ($max_cycles > 0 && $cycles_applied >= $max_cycles) {
+                        // Cycle limit reached â€“ coupon no longer applies
+                        return null;
+                }
+
+                return $data;
+        }
+
+        /**
+         * Calculate the subscription coupon discount amount for a given order total.
+         *
+         * @param array  $coupon_data  Row from get_subscription_coupon()
+         * @param float  $subtotal     The order subtotal (pre-discount)
+         * @return float Discount amount (positive number to subtract from total)
+         */
+        public function calculate_subscription_coupon_discount(array $coupon_data, $subtotal)
+        {
+                $coupon_type = $coupon_data['coupon_type'];
+                $coupon_amount = (float) $coupon_data['coupon_amount'];
+                $subtotal = (float) $subtotal;
+
+                switch ($coupon_type) {
+                        case 'P': // percentage off
+                        case 'E': // percentage off + free shipping
+                                $discount = round($subtotal * ($coupon_amount / 100), 2);
+                                break;
+                        case 'F': // fixed amount off
+                        case 'O': // fixed amount off + free shipping
+                        default:
+                                $discount = min($coupon_amount, $subtotal);
+                                break;
+                }
+
+                return max(0, $discount);
+        }
+
+        /**
+         * Increment the billing_cycles_applied counter for a subscription coupon.
+         *
+         * @param int $subscription_id
+         */
+        public function increment_subscription_coupon_cycles($subscription_id)
+        {
+                global $db;
+
+                $subscription_id = (int) $subscription_id;
+                if ($subscription_id <= 0) {
+                        return;
+                }
+
+                $tableName = defined('TABLE_SUBSCRIPTION_COUPONS')
+                        ? TABLE_SUBSCRIPTION_COUPONS
+                        : ((defined('DB_PREFIX') ? DB_PREFIX : '') . 'subscription_coupons');
+
+                $db->Execute(
+                        "UPDATE `{$tableName}`
+                         SET billing_cycles_applied = billing_cycles_applied + 1
+                         WHERE saved_credit_card_recurring_id = " . $subscription_id
+                );
+        }
+
+
+        function prepare_schedule_payment_metadata($metadata, $original_orders_products_id, $amount)
         {
                 $normalized = $this->normalize_schedule_payment_metadata($metadata);
                 $original_orders_products_id = (int) $original_orders_products_id;
@@ -1586,7 +1736,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         return array('success' => false, 'error' => 'Validation failed');
                 }
                 $api_type = isset($payment_details['api_type']) ? $payment_details['api_type'] : '';
-                // Prefer REST whenever a PayPal vault token is available — even if the
+                // Prefer REST whenever a PayPal vault token is available â€” even if the
                 // saved_credit_cards.api_type still says paypalwpp/payflow from a
                 // legacy migration. Routing those to Payflow without a PNREF causes
                 // Payflow 81253 "ReferenceID : Mandatory parameter missing".
@@ -1607,7 +1757,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                                 $this->add_payment_comment($paypal_saved_card_recurring_id, 'Transaction id: ' . $transaction_id);
                                 return $result;
                         }
-                        // Do not flip status to 'failed' here — the cron decides whether
+                        // Do not flip status to 'failed' here â€” the cron decides whether
                         // retries remain (keep 'scheduled') or max attempts were exceeded.
                         $this->add_payment_comment($paypal_saved_card_recurring_id, 'Paypal error: ' . $result['error']);
                         return $result;
@@ -1646,32 +1796,17 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
 		$defaultStartDate = date('Y-m-d');
                 $todayTimestamp = strtotime('today');
                 foreach ($products as $product) {
-                        // Capture product_info first — get_subscription_attributes() returns a
-                        // fresh array and must not overwrite it (PHP 8+ undefined-key warnings).
-                        $productInfo = $this->get_product_info($product['id']);
+                        $subscriptions[$product['id']]['product_info'] = $this->get_product_info($product['id']);
                         $subscriptions[$product['id']] = $this->get_subscription_attributes($product);
-                        if (!is_array($subscriptions[$product['id']])) {
-                                $subscriptions[$product['id']] = array();
-                        }
-                        $subscriptions[$product['id']]['product_info'] = $productInfo;
-                        if (!array_key_exists('billingperiod', $subscriptions[$product['id']])) {
-                                $subscriptions[$product['id']]['billingperiod'] = null;
-                        }
-                        if (!array_key_exists('billingfrequency', $subscriptions[$product['id']])) {
-                                $subscriptions[$product['id']]['billingfrequency'] = null;
-                        }
                         $startdateAttribute = isset($subscriptions[$product['id']]['startdate']) ? $subscriptions[$product['id']]['startdate'] : null;
                         $startdateTimestamp = (!empty($startdateAttribute)) ? strtotime($startdateAttribute) : false;
                         $subscriptions[$product['id']]['startdate'] = ($startdateTimestamp !== false && $startdateTimestamp > $todayTimestamp) ? $startdateAttribute : $defaultStartDate;
                         $subscriptions[$product['id']]['quantity'] = $product['quantity'];
-                        $billingPeriod = $subscriptions[$product['id']]['billingperiod'];
-                        $billingFrequency = $subscriptions[$product['id']]['billingfrequency'];
-			if (!empty($billingPeriod) && !((is_numeric($billingFrequency) ? (float)$billingFrequency : 0) > 0) && strpos((string)$billingFrequency, 'Lifetime') === false) {
+			if ($subscriptions[$product['id']]['billingperiod'] && !($subscriptions[$product['id']]['billingfrequency'] > 0) && strpos($subscriptions[$product['id']]['billingfrequency'], 'Lifetime') === false) {
 				$subscriptions[$product['id']]['billingfrequency'] = '1'; //default in case it was missed
-                                $billingFrequency = '1';
 			}
 // check if subscription exists and then populate all other fields
-			if (!empty($billingPeriod) && strpos((string)$billingFrequency, 'Lifetime') === false) {
+			if ($subscriptions[$product['id']]['billingperiod'] && strpos($subscriptions[$product['id']]['billingfrequency'], 'Lifetime') === false) {
 // this needs to be set to the base price plus price of attributes but not including one-time charges then multiple by quantity
 				$subscriptions[$product['id']]['amt'] = ($product['final_price'] - $product['one_time_charges']) * $product['quantity'];
 				$subscriptions[$product['id']]['currencycode'] = $_SESSION['currency'];
@@ -1683,7 +1818,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
 				}
 			}
 			else {
-				if (!empty($subscriptions[$product['id']]['product_info']['products_license'])) {
+				if ($subscriptions[$product['id']]['product_info']['products_license']) {
 					$this->notify_error('possible configuration error', 'While looking for subscription products in this order, we found a product that is licensed but does not have a billing period so it is not recognized as a subscription product.  No subscription or licence will be created.  Subscription info: ' . json_encode($subscriptions[$product['id']]), 'warning');
 				}
 				unset($subscriptions[$product['id']]); //this is not a subscription product
@@ -1766,20 +1901,9 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         $scopeSql = 'orders_products_id = ' . $original_orders_products_id;
                 }
 
-                if ($completed_cycles === null) {
-                        $subscriptionId = 0;
-                        if (isset($subscription_context['saved_credit_card_recurring_id'])) {
-                                $subscriptionId = (int) $subscription_context['saved_credit_card_recurring_id'];
-                        } elseif (isset($subscription_context['paypal_saved_card_recurring_id'])) {
-                                $subscriptionId = (int) $subscription_context['paypal_saved_card_recurring_id'];
-                        }
-                        if ($subscriptionId > 0) {
-                                $completed_cycles = $this->count_completed_billing_cycles($subscriptionId, $subscription_context);
-                        } elseif ($scopeSql !== '') {
-                                // Legacy multi-row fallback when we cannot resolve a subscription id.
-                                $result = $db->Execute('SELECT COUNT(*) AS num_cycles FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE ' . $scopeSql);
-                                $completed_cycles = (int) $result->fields['num_cycles'];
-                        }
+                if ($completed_cycles === null && $scopeSql !== '') {
+                        $result = $db->Execute('SELECT COUNT(*) AS num_cycles FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE ' . $scopeSql);
+                        $completed_cycles = (int) $result->fields['num_cycles'];
                 }
                 if ($completed_cycles === null) {
                         $completed_cycles = 0;
@@ -1794,7 +1918,14 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         return false;
                 }
 
-                $next_date = strtotime('+' . (int) $attributes['billingfrequency'] . " " . $attributes['billingperiod']);
+                // Prefer the unit captured from the frequency option's value name
+                // (stored as billingfrequency_unit, e.g., "30 Days" -> "Day") so
+                // misconfigured products (period="Monthly" + frequency="30 Days")
+                // still produce a sensible "+30 Days" instead of "+30 Months".
+                $billing_unit = (!empty($attributes['billingfrequency_unit']))
+                        ? $attributes['billingfrequency_unit']
+                        : $attributes['billingperiod'];
+                $next_date = strtotime('+' . (int) $attributes['billingfrequency'] . " " . $billing_unit);
                 return date("Y-m-d", strtotime('-' . $days_to_minus . " Day", $next_date));
         }
 
@@ -1975,7 +2106,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
 		}
 		if (strtolower($subscription->fields['status']) === 'cancelled') {
 			if (strpos($subscription->fields['comments'], $commentToken) === false) {
-				$db->Execute('UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . " SET comments = CONCAT(comments, '" . $comment . "') WHERE saved_credit_card_recurring_id = " . $recurring_id . ' LIMIT 1;');
+				$db->Execute('UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . " SET comments = '" . $comment . "' WHERE saved_credit_card_recurring_id = " . $recurring_id . ' LIMIT 1;');
 			}
 			return false;
 		}
@@ -2152,16 +2283,12 @@ $payment_modules = new payment($_SESSION['payment']);
 // set the cart variables
 		$order->cart();
 // initiate order totals
+		// Force store credit to 0 before instantiating order_total so the ot_sc
+		// constructor cannot auto-populate it (e.g. via STORE_CREDIT_AUTOMATICALLY_ADD).
+		// Recurring/cron payments must never consume a customer's store credit balance.
+		$_SESSION['storecredit'] = 0;
 		$order_total_modules = new order_total();
 		$zco_notifier->notify('NOTIFY_CHECKOUT_PROCESS_BEFORE_ORDER_TOTALS_PROCESS');
-		
-		// Initialize store credit to 0 by default
-		// Site-specific customizations (e.g., category-based restrictions, store credit modules)
-		// should be implemented via observers listening to NOTIFY_CHECKOUT_PROCESS_BEFORE_ORDER_TOTALS_PROCESS
-		// See docs/OBSERVER_CUSTOMIZATIONS.md for examples
-		if (!isset($_SESSION['storecredit'])) {
-			$_SESSION['storecredit'] = 0;
-		}
 		
 // process order totals
 		$order_totals = $order_total_modules->process();
@@ -2223,6 +2350,9 @@ $GLOBALS[$_SESSION['payment']]->after_process();
                 }
                 elseif (isset($fields['subscription_customer_id']) && (int) $fields['subscription_customer_id'] > 0) {
                         $subscription_customer_id = (int) $fields['subscription_customer_id'];
+                }
+                elseif (isset($fields['sccr_customers_id']) && (int) $fields['sccr_customers_id'] > 0) {
+                        $subscription_customer_id = (int) $fields['sccr_customers_id'];
                 }
                 elseif (isset($fields['customers_id']) && (int) $fields['customers_id'] > 0) {
                         $subscription_customer_id = (int) $fields['customers_id'];
@@ -2315,8 +2445,12 @@ $GLOBALS[$_SESSION['payment']]->after_process();
                 if (!is_array($preloaded_fields)) {
                         $hasDomainColumn = $this->saved_cards_recurring_has_column('domain');
                         $domainSelect = $hasDomainColumn ? "\n          sccr.domain AS sccr_domain," : '';
+                        // Offline / invoice plans store customers_id on sccr and may have
+                        // saved_credit_card_id = 0. Join customers via card OR sccr so cardless
+                        // rows still load (INNER JOIN on scc.customers_id alone drops them).
                         $sql = "SELECT
           sccr.*,
+          sccr.customers_id AS sccr_customers_id,
           sccr.products_id AS sccr_products_id,
           sccr.products_name AS sccr_products_name,
           sccr.products_model AS sccr_products_model,
@@ -2325,13 +2459,13 @@ $GLOBALS[$_SESSION['payment']]->after_process();
           sccr.billing_frequency AS sccr_billing_frequency,
           sccr.total_billing_cycles AS sccr_total_billing_cycles," . $domainSelect . "
           sccr.subscription_attributes_json AS sccr_subscription_attributes_json,
-          COALESCE(scc.customers_id, c.customers_id) AS subscription_customer_id,
+          COALESCE(NULLIF(scc.customers_id, 0), NULLIF(sccr.customers_id, 0), c.customers_id) AS subscription_customer_id,
           scc.*,
           c.*,
           scc.customers_id AS saved_card_customer_id
         FROM " . TABLE_SAVED_CREDIT_CARDS_RECURRING . " sccr
         LEFT JOIN " . TABLE_SAVED_CREDIT_CARDS . " scc ON scc.saved_credit_card_id = sccr.saved_credit_card_id
-        INNER JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = scc.customers_id
+        INNER JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = COALESCE(NULLIF(scc.customers_id, 0), NULLIF(sccr.customers_id, 0))
         WHERE sccr.saved_credit_card_recurring_id = " . (int) $paypal_saved_card_recurring_id;
 			$result = $db->Execute($sql);
 			$fields = $result->fields;
@@ -2420,17 +2554,118 @@ $GLOBALS[$_SESSION['payment']]->after_process();
 */
 	function cancel_other_subscriptions_in_category($customer_id, $subscription_to_keep, $categories) {
 		global $db;
-// disable this for now
-		return false;
 		$customer_subscriptions = array();
 		foreach ($categories as $category_id) {
 			$customer_subscriptions = array_merge($customer_subscriptions, $this->get_customer_subscriptions($customer_id, $category_id));
 		}
 		foreach ($customer_subscriptions as $subscription) {
 			if ($subscription['saved_credit_card_recurring_id'] != $subscription_to_keep && $subscription['status'] == 'scheduled') {
-				$this->update_payment_status($subscription['saved_credit_card_recurring_id'], 'cancelled', 'Subscription was cancelled because the customer can only have one subscription in this category.  ', $customers_id);
+				$this->update_payment_status($subscription['saved_credit_card_recurring_id'], 'cancelled', 'Subscription was cancelled because the customer can only have one subscription in this category.  ', $customer_id);
 			}
 		}
+	}
+/*
+* Returns display brand for a saved card row (legacy type, vault brand, etc.).
+*/
+	function get_saved_card_display_brand(array $cardDetails, array $vaultRecord = array()) {
+		if (!empty($cardDetails['card_type'])) {
+			return (string) $cardDetails['card_type'];
+		}
+		if (!empty($cardDetails['type'])) {
+			return (string) $cardDetails['type'];
+		}
+		if (!empty($vaultRecord['brand'])) {
+			return (string) $vaultRecord['brand'];
+		}
+		if (!empty($vaultRecord['card_type'])) {
+			return (string) $vaultRecord['card_type'];
+		}
+		return 'N/A';
+	}
+/*
+* True when a saved card (legacy mmyy or PayPal AC vault YYYY-MM) is past expiry.
+*/
+	function is_saved_card_expired_for_billing(array $cardDetails, array $vaultRecord = array()) {
+		$vaultId = trim((string) ($cardDetails['vault_id'] ?? ''));
+		if ($vaultId !== '' && !empty($vaultRecord)) {
+			$vaultExpiry = trim((string) ($vaultRecord['expiry'] ?? ''));
+			if ($vaultExpiry === '') {
+				return false;
+			}
+			if (preg_match('/^\d{4}-\d{2}$/', $vaultExpiry)) {
+				$expiryDate = DateTime::createFromFormat('Y-m-d', $vaultExpiry . '-01');
+				if ($expiryDate instanceof DateTime) {
+					$expiryDate->modify('last day of this month');
+					return $expiryDate < new DateTime('today');
+				}
+			}
+			return false;
+		}
+		$expiry = trim((string) ($cardDetails['expiry'] ?? ''));
+		if (strlen($expiry) === 4) {
+			$expiryDate = DateTime::createFromFormat('my', $expiry);
+			if ($expiryDate instanceof DateTime) {
+				$expiryDate->modify('last day of this month');
+				return $expiryDate < new DateTime('today');
+			}
+		}
+		return false;
+	}
+/*
+* Load the PayPal vault row linked to a saved card, if any.
+*/
+	function get_vault_record_for_saved_card(array $cardDetails) {
+		global $db;
+		$vaultId = trim((string) ($cardDetails['vault_id'] ?? ''));
+		$customersId = (int) ($cardDetails['customers_id'] ?? 0);
+		if ($vaultId === '' || $customersId <= 0 || !defined('TABLE_PAYPAL_VAULT')) {
+			return array();
+		}
+		$result = $db->Execute(
+			'SELECT * FROM ' . TABLE_PAYPAL_VAULT
+			. " WHERE vault_id = '" . zen_db_input($vaultId) . "'"
+			. ' AND customers_id = ' . $customersId
+			. ' LIMIT 1'
+		);
+		return ($result && !$result->EOF) ? $result->fields : array();
+	}
+/*
+* Evaluate whether the subscription's saved card can be billed today.
+*/
+	function get_saved_card_billing_status($saved_credit_card_id, $customers_id = null) {
+		$cardDetails = $this->get_saved_card_details($saved_credit_card_id, $customers_id);
+		if (empty($cardDetails) || empty($cardDetails['saved_credit_card_id'])) {
+			return array(
+				'billable' => false,
+				'deleted' => true,
+				'expired' => false,
+				'skip_reason' => 'no card on file',
+				'card_brand' => 'N/A',
+				'card_last4' => 'N/A',
+			);
+		}
+		$vaultRecord = $this->get_vault_record_for_saved_card($cardDetails);
+		$deleted = isset($cardDetails['is_deleted']) && $cardDetails['is_deleted'] == '1';
+		$expired = $this->is_saved_card_expired_for_billing($cardDetails, $vaultRecord);
+		$skipParts = array();
+		if ($deleted) {
+			$skipParts[] = 'card removed';
+		}
+		if ($expired) {
+			$skipParts[] = 'card expired';
+		}
+		$skipReason = '';
+		if ($deleted || $expired) {
+			$skipReason = implode(' and ', $skipParts) . '; no usable replacement on file';
+		}
+		return array(
+			'billable' => !$deleted && !$expired,
+			'deleted' => $deleted,
+			'expired' => $expired,
+			'skip_reason' => $skipReason,
+			'card_brand' => $this->get_saved_card_display_brand($cardDetails, $vaultRecord),
+			'card_last4' => (string) ($cardDetails['last_digits'] ?? ($vaultRecord['last_digits'] ?? 'N/A')),
+		);
 	}
 /*
 * Returns the saved credit card id for the customer, if one exists
@@ -2445,10 +2680,7 @@ $GLOBALS[$_SESSION['payment']]->after_process();
 		//      the real expiry lives in TABLE_PAYPAL_VAULT.expiry as 'YYYY-MM'.
 		// Without this join the cron's automatic-replacement step would silently
 		// skip vault cards and report "no valid card" while a perfectly good
-		// vault card sits on file.  TABLE_PAYPAL_VAULT is defined by this plugin
-		// (see includes/extra_datafiles/ppac_database_tables.php), but we still
-		// fall back gracefully if the constant has not been loaded yet (test
-		// harnesses, very early bootstrap).
+		// vault card sits on file.
 		$customers_id = (int) $customers_id;
 		if (defined('TABLE_PAYPAL_VAULT')) {
 			$sql = 'SELECT scc.saved_credit_card_id'
@@ -2482,10 +2714,12 @@ $GLOBALS[$_SESSION['payment']]->after_process();
 * When a card is deleted, we need to check if it had any subscriptions.  If it did, we need to find another card to use for the subscription
 * Returns a message to show to the customer
 */
-	function card_was_deleted($card_id, $customers_id) {
+	function card_was_deleted($card_id, $customers_id, $replacement_card_id = null) {
 		global $db;
 //find another card
-		$new_card = $this->get_customers_saved_card($customers_id);
+		$new_card = ($replacement_card_id !== null && (int) $replacement_card_id > 0)
+			? (int) $replacement_card_id
+			: $this->get_customers_saved_card($customers_id);
 if ($new_card) {
 $new_card_details = $this->get_saved_card_details($new_card);
 }
@@ -2520,8 +2754,7 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		// Include subscriptions that either:
 		// 1. Were originally placed via a PayPal AC payment module (payment_module_code LIKE 'paypalac%'), OR
 		// 2. Have a saved card with a vault_id linked to TABLE_PAYPAL_VAULT (migrated from legacy PayFlow).
-		//    These subscriptions were updated to use a PayPal AC vault card and should be
-		//    processed by the PayPal AC cron instead of the legacy cron.
+		// Offline invoice renewals are handled by cron/offline_invoice_recurring.php.
 		$sql = 'SELECT DISTINCT sccr.saved_credit_card_recurring_id FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' sccr'
 			. ' INNER JOIN ' . TABLE_ORDERS_PRODUCTS . ' op ON op.orders_products_id = sccr.orders_products_id'
 			. ' INNER JOIN ' . TABLE_ORDERS . " o ON o.orders_id = op.orders_id"
@@ -2531,7 +2764,8 @@ $new_card_details = $this->get_saved_card_details($new_card);
 			. " AND sccr.next_payment_date IS NOT NULL"
 			. " AND sccr.next_payment_date <> '0000-00-00'"
 			. " AND DATE(sccr.next_payment_date) <= '" . $today . "'"
-			. " AND (o.payment_module_code LIKE 'paypalac%' OR (scc.vault_id IS NOT NULL AND scc.vault_id <> '' AND pv.vault_id IS NOT NULL))";
+			. " AND (o.payment_module_code LIKE 'paypalac%'"
+			. " OR (scc.vault_id IS NOT NULL AND scc.vault_id <> '' AND pv.vault_id IS NOT NULL))";
 		
 		// Debug logging for cron
 		if (!empty($_SESSION['in_cron'])) {
@@ -2553,6 +2787,7 @@ $new_card_details = $this->get_saved_card_details($new_card);
 		
 		return $payments;
 	}
+
 /*
 * Update status of payment to 'complete', 'failed', 'scheduled', or 'cancelled'
 * Customer id is optional, pass it in for a security check that the customer owns the subscription he is trying to update.
@@ -2583,7 +2818,16 @@ $new_card_details = $this->get_saved_card_details($new_card);
                 }
 //If the subscription is being re-activated (new status scheduled), verify that the card associated with the subscription is still valid.  If not, find another one
 		if ($status == 'scheduled') {
-$saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
+			$cardId = is_array($details) && isset($details['saved_credit_card_id'])
+				? (int) $details['saved_credit_card_id']
+				: 0;
+			// Rows with no vaulted card (check/invoice plans) must not be treated as
+			// a deleted card and cancelled on reactivate.
+			if ($cardId <= 0) {
+				$saved_card = array('is_deleted' => '0');
+			} else {
+				$saved_card = $this->get_saved_card_details($cardId);
+			}
 			if ($saved_card['is_deleted'] == '1') {
 				$new_card = $this->get_customers_saved_card($details['customers_id']);
 				if ($new_card > 0) {
@@ -2596,7 +2840,7 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 				}
 			}
 		}
-		$sql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' SET status = \'' . $status . '\', comments = CONCAT(comments, \'' . $comments . '\') WHERE saved_credit_card_recurring_id = ' . $paypal_saved_card_recurring_id;
+		$sql = 'UPDATE ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' SET status = \'' . $status . '\', comments = \'' . $comments . '\' WHERE saved_credit_card_recurring_id = ' . $paypal_saved_card_recurring_id;
                 $db->Execute($sql);
                 //notify admin of cancellation
                 if ($status == 'cancelled' || $status == 'failed') {
@@ -2635,8 +2879,7 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 		// Use zen_db_perform for safer database operations
 		$current = $db->Execute('SELECT comments FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' WHERE saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id);
 		if (!$current->EOF) {
-			$new_comments = $current->fields['comments'] . ' ' . $comment . ' ';
-			zen_db_perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, array('comments' => $new_comments), 'update', 'saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id);
+			zen_db_perform(TABLE_SAVED_CREDIT_CARDS_RECURRING, array('comments' => $comment), 'update', 'saved_credit_card_recurring_id = ' . (int)$paypal_saved_card_recurring_id);
 		}
 	}
 	
@@ -2823,8 +3066,16 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                         $sql .= ", amount = '" . $this->escape_db_value($data['amount']) . "'";
                 }
 
+                if (array_key_exists('overdue_balance', $data) && $this->saved_cards_recurring_has_column('overdue_balance')) {
+                        $sql .= ', overdue_balance = ' . max(0.0, (float) $data['overdue_balance']);
+                }
+
+                if (array_key_exists('consecutive_failures', $data) && $this->saved_cards_recurring_has_column('consecutive_failures')) {
+                        $sql .= ', consecutive_failures = ' . max(0, (int) $data['consecutive_failures']);
+                }
+
                 if (isset($data['comments'])) {
-                        $sql .= ", comments = CONCAT(comments, '" . $this->escape_db_value($data['comments']) . "')";
+                        $sql .= ", comments = '" . $this->escape_db_value($data['comments']) . "'";
                 }
 
                 if (isset($data['product'])) {
@@ -2844,12 +3095,15 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 
                 $snapshotUpdates = array();
                 $subscriptionAttributes = array();
+                $hasExplicitSubscriptionAttributes = false;
                 if (isset($metadata['subscription_attributes']) && is_array($metadata['subscription_attributes'])) {
                         $subscriptionAttributes = $metadata['subscription_attributes'];
+                        $hasExplicitSubscriptionAttributes = true;
                         unset($metadata['subscription_attributes']);
                 }
                 elseif (isset($data['subscription_attributes']) && is_array($data['subscription_attributes'])) {
                         $subscriptionAttributes = $data['subscription_attributes'];
+                        $hasExplicitSubscriptionAttributes = true;
                 }
 
                 foreach (array('products_id', 'billing_frequency', 'total_billing_cycles') as $intKey) {
@@ -2897,6 +3151,10 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                         if ($encoded !== '') {
                                 $snapshotUpdates[] = "subscription_attributes_json = '" . $this->escape_db_value($encoded) . "'";
                         }
+                } elseif ($hasExplicitSubscriptionAttributes) {
+                        // Caller explicitly provided an empty attributes array (e.g. after clearing
+                        // overdue_daily_retry_next_cycle), so write '{}' to erase any stale JSON.
+                        $snapshotUpdates[] = "subscription_attributes_json = '{}'";
                 }
 
                 if (count($snapshotUpdates) > 0) {
@@ -3022,6 +3280,14 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                 return $completed < $limit;
         }
 
+        /**
+         * @deprecated since 1.9.0 â€” overdue tracking is now handled by the
+         *   overdue_balance and consecutive_failures columns written directly by
+         *   the cron on each billing cycle.  This method no longer affects cron
+         *   behaviour and will be removed in a future release.  Do NOT call it
+         *   from new code; read the overdue_balance column or call
+         *   get_overdue_balance() / get_consecutive_failures() instead.
+         */
         function count_failed_payments($paypal_saved_card_recurring_id, array $payment_details = null) {
 		global $db;
 		if (!is_array($payment_details)) {
@@ -3047,6 +3313,73 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
 		$result = $db->Execute($sql);
 		return (int) $result->fields['count'];
 	}
+
+        /**
+         * Return the current overdue balance for a subscription row.
+         *
+         * Returns 0.0 on installations that have not yet run the 1_9_0 installer
+         * (column absent) so callers do not need to guard against missing columns.
+         *
+         * @param int $paypal_saved_card_recurring_id
+         * @return float
+         */
+        function get_overdue_balance($paypal_saved_card_recurring_id)
+        {
+                global $db;
+                $id = (int) $paypal_saved_card_recurring_id;
+                if ($id <= 0 || !$this->saved_cards_recurring_has_column('overdue_balance')) {
+                        return 0.0;
+                }
+                $result = $db->Execute(
+                        'SELECT overdue_balance FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                        . ' WHERE saved_credit_card_recurring_id = ' . $id . ' LIMIT 1'
+                );
+                if (!$result || $result->EOF) {
+                        return 0.0;
+                }
+                return (float) $result->fields['overdue_balance'];
+        }
+
+        /**
+         * Return true when the overdue_balance column exists (i.e. the 1_9_0 migration
+         * has been applied), false otherwise.
+         *
+         * Crons use this to distinguish a genuinely-zero overdue balance from the 0
+         * returned by get_overdue_balance() when the column is absent, so that they
+         * do not skip charging the card during the deployment window.
+         *
+         * @return bool
+         */
+        function has_overdue_balance_column()
+        {
+                return $this->saved_cards_recurring_has_column('overdue_balance');
+        }
+
+        /**
+         * Return the current consecutive_failures count for a subscription row.
+         *
+         * Returns 0 on installations that have not yet run the 1_9_0 installer
+         * (column absent) so callers do not need to guard against missing columns.
+         *
+         * @param int $paypal_saved_card_recurring_id
+         * @return int
+         */
+        function get_consecutive_failures($paypal_saved_card_recurring_id)
+        {
+                global $db;
+                $id = (int) $paypal_saved_card_recurring_id;
+                if ($id <= 0 || !$this->saved_cards_recurring_has_column('consecutive_failures')) {
+                        return 0;
+                }
+                $result = $db->Execute(
+                        'SELECT consecutive_failures FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING
+                        . ' WHERE saved_credit_card_recurring_id = ' . $id . ' LIMIT 1'
+                );
+                if (!$result || $result->EOF) {
+                        return 0;
+                }
+                return (int) $result->fields['consecutive_failures'];
+        }
 
 /*
 *  This function will return an array of all of the product_ids that the user has an open subscription for (scheduled payment) or that the user has cancelled.
@@ -3172,31 +3505,31 @@ $saved_card = $this->get_saved_card_details($details['saved_credit_card_id']);
                 $completed_payments = null;
                 if (isset($precomputed['completed_payments'])) {
                         $completed_payments = (int) $precomputed['completed_payments'];
-                } else {
-                        $completed_payments = $this->count_completed_billing_cycles(
-                                $paypal_saved_card_recurring_id,
-                                $payment_details
-                        );
+                }
+                elseif ($scopeSql !== '') {
+                        $result = $db->Execute('SELECT COUNT(*) AS num_payments FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . " WHERE " . $scopeSql . " AND status = 'complete'");
+                        $completed_payments = (int) $result->fields['num_payments'];
+                }
+                else {
+                        $completed_payments = 0;
                 }
 
-                $stats['payments_completed'] = $completed_payments;
+                $stats['payments_completed'] = $completed_payments + 1;
 
                 $context = is_array($payment_details) ? $payment_details : array();
-                $context['saved_credit_card_recurring_id'] = (int) $paypal_saved_card_recurring_id;
                 $context['original_orders_products_id'] = $original_orders_products_id;
                 $context['completed_payments'] = $completed_payments;
                 if ($scopeSql !== '') {
                         $context['subscription_scope'] = $scopeSql;
                 }
-                $stats['next_date'] = $this->has_remaining_billing_cycles($paypal_saved_card_recurring_id, $payment_details)
-                        ? $this->next_billing_date($attributes, $context)
-                        : false;
+                $stats['next_date'] = $this->next_billing_date($attributes, $context);
 
-                $totalCycles = $this->get_total_billing_cycles_limit($payment_details);
-                if ($totalCycles <= 0) {
-                        $stats['payments_remaining'] = null;
-                } else {
-                        $stats['payments_remaining'] = max(0, $totalCycles - $stats['payments_completed']);
+                $totalCycles = isset($attributes['totalbillingcycles']) ? $attributes['totalbillingcycles'] : null;
+                if (!is_numeric($totalCycles)) {
+                        $stats['payments_remaining'] = $totalCycles;
+                }
+                else {
+                        $stats['payments_remaining'] = (int) $totalCycles - $stats['payments_completed'];
                 }
 
                 $start_date = '';
