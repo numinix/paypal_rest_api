@@ -40,6 +40,15 @@ php zc_plugins/PayPalAdvancedCheckout/cron.php paypalac_saved_card_recurring
 
 Legacy `cron/paypalac_*.php` shims under the catalog root are redeployed on install/upgrade for existing crontab entries.
 
+The AC recurring cron only bills `saved_credit_cards_recurring` rows whose source order used a `paypalac%` payment module **or** whose saved card is linked to `paypal_vault`. Legacy Payflow / offline-invoice schedules stay on the store’s legacy recurring tools.
+
+## Admin subscriptions list
+
+`paypalac_subscriptions` shows PayPal-managed REST subscriptions and AC-billed saved-card schedules only. It hides:
+
+- Legacy Payflow / offline SCCR rows (use the store’s legacy saved-card recurring admin page)
+- Unified-UI mirror rows in `paypal_subscriptions` that only sync SCCR for editing (`legacy_subscription_id` set, no PayPal remote id)
+
 ## Documentation
 
 📖 **[PayPal Advanced Checkout Documentation](zc_plugins/PayPalAdvancedCheckout/v2.0.0/docs/PayPal%20Advanced%20Checkout/readme.html)**
