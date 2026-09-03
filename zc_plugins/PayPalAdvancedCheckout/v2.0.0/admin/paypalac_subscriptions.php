@@ -16,13 +16,13 @@
 
 require 'includes/application_top.php';
 
-$autoloaderPath = dirname(__DIR__) . '/catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageAutoloader.php';
+$autoloaderPath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/PayPalAdvancedCheckout/Compatibility/LanguageAutoloader.php';
 if (is_file($autoloaderPath)) {
     require_once $autoloaderPath;
     \PayPalAdvancedCheckout\Compatibility\LanguageAutoloader::register();
 }
 
-require_once dirname(__DIR__) . '/catalog/includes/modules/payment/paypal/ppacAutoload.php';
+require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
 
 // Load PayPalProfileManager for legacy profile operations
 if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.php')) {
@@ -30,8 +30,8 @@ if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypal/PayPalProfileManager.p
 }
 
 // Load saved card recurring class
-if (file_exists(dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php')) {
-    require_once dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php';
+if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php')) {
+    require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
 }
 
 use PayPalAdvancedCheckout\Common\SubscriptionManager;
@@ -44,8 +44,7 @@ VaultManager::ensureSchema();
 
 // One-time-ish backfill of saved-card expiration_date for active schedules.
 // Cheap probe first: do not scan/update the whole table on every page view.
-// Guard both helpers — stores may ship a customized paypalacSavedCardRecurring
-// without these methods (calling them caused a 500 on numinix.ca).
+// Guard both helpers — customized paypalacSavedCardRecurring may lack these methods.
 if (class_exists('paypalacSavedCardRecurring')) {
     $paypalacExpiryBackfill = new paypalacSavedCardRecurring();
     if (method_exists($paypalacExpiryBackfill, 'backfill_saved_card_expiration_dates')) {
@@ -80,6 +79,42 @@ function paypalac_known_status_labels()
         'complete' => 'Complete',
         'failed' => 'Failed',
     ];
+}
+
+/**
+ * Status values that mean the subscription is still live / billable.
+ *
+ * Used by the default admin filter so completed/failed/cancelled history
+ * does not flood the list. Saved-card cron rows use "scheduled"; PayPal-
+ * managed plan rows commonly use "active" (and sometimes pending states).
+ *
+ * @return list<string>
+ */
+function paypalac_active_billing_statuses()
+{
+    return ['active', 'scheduled', 'pending', 'awaiting_vault'];
+}
+
+/**
+ * Build a SQL status predicate for a table alias.
+ *
+ * Special filter value "__active__" matches {@see paypalac_active_billing_statuses()}.
+ * Empty string means no status restriction.
+ */
+function paypalac_status_filter_sql(string $columnSql, string $statusFilter): string
+{
+    $statusFilter = trim($statusFilter);
+    if ($statusFilter === '') {
+        return '';
+    }
+    if ($statusFilter === '__active__') {
+        $quoted = [];
+        foreach (paypalac_active_billing_statuses() as $status) {
+            $quoted[] = "'" . zen_db_input($status) . "'";
+        }
+        return $columnSql . ' IN (' . implode(', ', $quoted) . ')';
+    }
+    return $columnSql . " = '" . zen_db_input($statusFilter) . "'";
 }
 
 /**
@@ -500,7 +535,7 @@ function paypalac_admin_push_remote_status(array $subscriptionRow, string $targe
     // "Uncaught Error: Class 'paypalac' not found", which surfaces as a 500
     // when the admin clicks Cancel/Suspend/Activate at PayPal.
     if (!class_exists('paypalac', false)) {
-        $modulePath = dirname(__DIR__) . '/catalog/includes/modules/payment/paypalac.php';
+        $modulePath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalac.php';
         if (!is_file($modulePath)) {
             if (isset($messageStack)) {
                 $messageStack->add_session('PayPal AC payment module not found; cannot push remote status.', 'error');
@@ -776,7 +811,7 @@ if ($action === 'create_subscription') {
     }
 
     if (!class_exists('paypalacSavedCardRecurring')) {
-        $savedCardRecurringPath = dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php';
+        $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
         if (file_exists($savedCardRecurringPath)) {
             require_once $savedCardRecurringPath;
         }
@@ -831,7 +866,7 @@ if ($action === 'update_subscription') {
         // Handle status change for saved card
         if (isset($_POST['set_status']) && $_POST['set_status'] !== '') {
             $status = strtolower(trim((string) zen_db_prepare_input($_POST['set_status'])));
-            $paypalacSavedCardRecurring->update_payment_status($subscriptionId, $status, 'Status updated by admin');
+            nmx_update_saved_card_recurring_status($paypalacSavedCardRecurring, $subscriptionId, $status, 'Status updated by admin');
             $messageStack->add_session(sprintf(SUCCESS_SUBSCRIPTION_STATUS_UPDATED, $subscriptionId, $status), 'success');
             zen_redirect($redirectUrl);
         }
@@ -1110,7 +1145,7 @@ if ($action === 'update_subscription') {
             $legacySubId = (int) $legacyIdRow->fields['legacy_subscription_id'];
 
             if (!class_exists('paypalacSavedCardRecurring')) {
-                $savedCardRecurringPath = dirname(__DIR__) . '/catalog/includes/classes/paypalacSavedCardRecurring.php';
+                $savedCardRecurringPath = DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
                 if (file_exists($savedCardRecurringPath)) {
                     require_once $savedCardRecurringPath;
                 }
@@ -1386,7 +1421,7 @@ if ($action === 'reactivate_subscription') {
     // Route to saved card handler
     if ($subscriptionType === 'savedcard' && class_exists('paypalacSavedCardRecurring')) {
         $paypalacSavedCardRecurring = new paypalacSavedCardRecurring();
-        $paypalacSavedCardRecurring->update_payment_status($subscriptionId, 'scheduled', 'Re-activated by admin');
+        nmx_update_saved_card_recurring_status($paypalacSavedCardRecurring, $subscriptionId, 'scheduled', 'Re-activated by admin');
         
         $subscription = $paypalacSavedCardRecurring->get_payment_details($subscriptionId);
         if ($subscription && method_exists($paypalacSavedCardRecurring, 'create_group_pricing')) {
@@ -1821,7 +1856,10 @@ if ($action === 'export_csv') {
     $exportFilters = [
         'customers_id' => (int) ($_GET['customers_id'] ?? 0),
         'products_id' => (int) ($_GET['products_id'] ?? 0),
-        'status' => trim((string) ($_GET['status'] ?? '')),
+        // Match list-page default: live/billable statuses unless explicitly overridden.
+        'status' => array_key_exists('status', $_GET)
+            ? trim((string) $_GET['status'])
+            : '__active__',
         'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
         'show_archived' => trim((string) ($_GET['show_archived'] ?? '')),
     ];
@@ -1833,8 +1871,9 @@ if ($action === 'export_csv') {
     if ($exportFilters['products_id'] > 0) {
         $exportWhere[] = 'ps.products_id = ' . (int) $exportFilters['products_id'];
     }
-    if ($exportFilters['status'] !== '') {
-        $exportWhere[] = "ps.status = '" . zen_db_input($exportFilters['status']) . "'";
+    $exportStatusSql = paypalac_status_filter_sql('ps.status', $exportFilters['status']);
+    if ($exportStatusSql !== '') {
+        $exportWhere[] = $exportStatusSql;
     }
     if ($exportFilters['payment_module'] !== '') {
         $exportWhere[] = "o.payment_module_code = '" . zen_db_input($exportFilters['payment_module']) . "'";
@@ -1929,17 +1968,16 @@ if ($action === 'export_csv') {
     exit;
 }
 
-// Default to showing every status. The legacy default was 'scheduled', which
-// matched only Zen Cart-managed saved_credit_cards_recurring rows; once we
-// unified the page to also list paypal_subscriptions (status values like
-// 'pending', 'active', 'suspended', 'cancelled', 'expired'), filtering to
-// 'scheduled' by default silently hid every PayPal-managed subscription. An
-// empty default surfaces both systems and lets the user narrow with the
-// dropdown above the table.
+// Default status filter is "__active__" (live/billable statuses across both
+// saved-card "scheduled" and PayPal-managed "active"/pending rows). An empty
+// status value means "All Statuses". The Archived dropdown separately controls
+// is_archived (its blank option is "Hide Archived", not a status filter).
 $filters = [
     'customers_id' => (int) ($_GET['customers_id'] ?? 0),
     'products_id' => (int) ($_GET['products_id'] ?? 0),
-    'status' => trim((string) ($_GET['status'] ?? '')),
+    'status' => array_key_exists('status', $_GET)
+        ? trim((string) $_GET['status'])
+        : '__active__',
     'payment_module' => trim((string) ($_GET['payment_module'] ?? '')),
     'show_archived' => trim((string) ($_GET['show_archived'] ?? '')),
 ];
@@ -2032,8 +2070,9 @@ if ($filters['customers_id'] > 0) {
 if ($filters['products_id'] > 0) {
     $restWhereClauses[] = 'ps.products_id = ' . (int) $filters['products_id'];
 }
-if ($filters['status'] !== '') {
-    $restWhereClauses[] = "ps.status = '" . zen_db_input($filters['status']) . "'";
+$restStatusSql = paypalac_status_filter_sql('ps.status', $filters['status']);
+if ($restStatusSql !== '') {
+    $restWhereClauses[] = $restStatusSql;
 }
 if ($filters['payment_module'] !== '') {
     $restWhereClauses[] = "o.payment_module_code = '" . zen_db_input($filters['payment_module']) . "'";
@@ -2083,8 +2122,9 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
     if ($filters['products_id'] > 0) {
         $savedCardWhereClauses[] = 'scr.products_id = ' . (int) $filters['products_id'];
     }
-    if ($filters['status'] !== '') {
-        $savedCardWhereClauses[] = "scr.status = '" . zen_db_input($filters['status']) . "'";
+    $savedStatusSql = paypalac_status_filter_sql('scr.status', $filters['status']);
+    if ($savedStatusSql !== '') {
+        $savedCardWhereClauses[] = $savedStatusSql;
     }
     if ($filters['payment_module'] !== '') {
         $savedCardWhereClauses[] = "o.payment_module_code = '" . zen_db_input($filters['payment_module']) . "'";
@@ -2396,7 +2436,8 @@ function paypalac_get_table_columns($tableName)
                     <div class="nmx-form-group">
                         <label for="filter-status">Status</label>
                         <select name="status" id="filter-status" class="nmx-form-control">
-                            <option value="">All Statuses</option>
+                            <option value="__active__"<?php echo ($filters['status'] === '__active__' ? ' selected' : ''); ?>>Active</option>
+                            <option value=""<?php echo ($filters['status'] === '' ? ' selected' : ''); ?>>All Statuses</option>
                             <?php echo paypalac_render_select_options($availableStatuses, $filters['status']); ?>
                         </select>
                     </div>
@@ -2410,7 +2451,7 @@ function paypalac_get_table_columns($tableName)
                     <div class="nmx-form-group">
                         <label for="filter-archived">Archived</label>
                         <select name="show_archived" id="filter-archived" class="nmx-form-control">
-                            <option value="">Active Only</option>
+                            <option value="">Hide Archived</option>
                             <option value="all"<?php echo ($filters['show_archived'] === 'all' ? ' selected' : ''); ?>>Show All</option>
                             <option value="only"<?php echo ($filters['show_archived'] === 'only' ? ' selected' : ''); ?>>Archived Only</option>
                         </select>
