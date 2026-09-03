@@ -26,7 +26,10 @@ fwrite(STDOUT, "Running Subscription Status State Machine Test...\n\n");
 
 $basePath = dirname(__DIR__);
 $savedCardRecurringFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/includes/classes/paypalacSavedCardRecurring.php';
-$cronFile = $basePath . '/cron/paypalac_saved_card_recurring.php';
+$cronFile = $basePath . '/zc_plugins/PayPalAdvancedCheckout/v2.0.0/catalog/cron/paypalac_saved_card_recurring.php';
+if (!file_exists($cronFile)) {
+    $cronFile = $basePath . '/cron/paypalac_saved_card_recurring.php';
+}
 
 if (!file_exists($savedCardRecurringFile)) {
     fwrite(STDERR, "✗ paypalacSavedCardRecurring.php not found\n\n");

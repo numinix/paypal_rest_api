@@ -1569,9 +1569,18 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         return array('success' => false, 'error' => 'Validation failed');
                 }
                 $api_type = isset($payment_details['api_type']) ? $payment_details['api_type'] : '';
-                // Fallback: if api_type is not set but there's a vault card, it's a REST API subscription
+                // Prefer REST whenever a PayPal vault token is available — even if the
+                // saved_credit_cards.api_type still says paypalwpp/payflow from a
+                // legacy migration. Routing those to Payflow without a PNREF causes
+                // Payflow 81253 "ReferenceID : Mandatory parameter missing".
                 $has_vault_card = isset($payment_details['paypal_vault_card']) && is_array($payment_details['paypal_vault_card']) && !empty($payment_details['paypal_vault_card']);
-                if (in_array($api_type, array('paypalac', 'rest')) || ($api_type === '' && $has_vault_card)) {
+                $vault_id = method_exists($this, 'extract_vault_id_from_card')
+                        ? trim((string) $this->extract_vault_id_from_card($payment_details))
+                        : trim((string) ($payment_details['vault_id'] ?? ''));
+                $use_rest = in_array($api_type, array('paypalac', 'rest'), true)
+                        || $has_vault_card
+                        || $vault_id !== '';
+                if ($use_rest) {
                         $result = $this->process_rest_payment($payment_details, $total_to_bill);
                         if ($result['success']) {
                                 $transaction_id = $result['transaction_id'];
@@ -1581,14 +1590,21 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                                 $this->add_payment_comment($paypal_saved_card_recurring_id, 'Transaction id: ' . $transaction_id);
                                 return $result;
                         }
-$this->update_payment_status($paypal_saved_card_recurring_id, 'failed', 'Paypal error: ' . $result['error']);
-return $result;
-}
-if (!is_object($this->paypalsavedcard) || !method_exists($this->paypalsavedcard, 'process')) {
-$this->update_payment_status($paypal_saved_card_recurring_id, 'failed', 'Paypal error: Legacy module unavailable');
-return array('success' => false, 'error' => 'Legacy saved card module unavailable');
-}
-$error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transaction_id'], $total_to_bill);
+                        // Do not flip status to 'failed' here — the cron decides whether
+                        // retries remain (keep 'scheduled') or max attempts were exceeded.
+                        $this->add_payment_comment($paypal_saved_card_recurring_id, 'Paypal error: ' . $result['error']);
+                        return $result;
+                }
+                if (!is_object($this->paypalsavedcard) || !method_exists($this->paypalsavedcard, 'process')) {
+                        $this->add_payment_comment($paypal_saved_card_recurring_id, 'Paypal error: Legacy module unavailable');
+                        return array('success' => false, 'error' => 'Legacy saved card module unavailable');
+                }
+                $pnref = trim((string) ($payment_details['paypal_transaction_id'] ?? ''));
+                if ($pnref === '') {
+                        $this->add_payment_comment($paypal_saved_card_recurring_id, 'Paypal error: Missing Payflow ReferenceID (PNREF)');
+                        return array('success' => false, 'error' => '81253 ReferenceID : Mandatory parameter missing (no PNREF or vault_id)');
+                }
+                $error = $this->paypalsavedcard->process('Sale', $pnref, $total_to_bill);
                 if (!$error) {
                         $payment_status = 'Completed';
                         $transaction_id = $this->paypalsavedcard->transaction_id;
@@ -1597,7 +1613,7 @@ $error = $this->paypalsavedcard->process('Sale', $payment_details['paypal_transa
                         $this->add_payment_comment($paypal_saved_card_recurring_id, 'Transaction id: ' . $transaction_id);
                         return array('success' => true, 'transaction_id' => $transaction_id);
                 }
-                $this->update_payment_status($paypal_saved_card_recurring_id, 'failed', 'Paypal error: ' . $error);
+                $this->add_payment_comment($paypal_saved_card_recurring_id, 'Paypal error: ' . $error);
                 return array('success' => false, 'error' => $error);
         }
 /*

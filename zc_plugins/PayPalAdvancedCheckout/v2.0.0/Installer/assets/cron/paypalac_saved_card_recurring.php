@@ -809,10 +809,12 @@ foreach ($todays_payments as $payment_id) {
             }
             $log .= ' Status set to FAILED after ' . $num_failed_payments . ' consecutive failed attempts (max: ' . $max_fails_allowed . '). Customer notified.';
         } else { 
-            // Keep status as 'scheduled' - subscription will be retried by cron on next run
-            // Do NOT update next_payment_date or change status - this prevents subscription drift and keeps the subscription in the retry queue
-            // The next billing date is calculated from the original schedule, not from today
-            $paypalacSavedCardRecurring->add_payment_comment($payment_id, ' Payment attempt failed. Will retry. ');
+            // Keep status as 'scheduled' - subscription will be retried by cron on next run.
+            // process_payment() may have left a failure comment but must not leave status
+            // as 'failed', or get_scheduled_payments() will skip this row forever.
+            // Do NOT update next_payment_date — this prevents subscription drift and keeps
+            // the subscription in the retry queue on the original due date.
+            $paypalacSavedCardRecurring->update_payment_status($payment_id, 'scheduled', ' Payment attempt failed. Will retry. ');
             $message = sprintf(SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL, $payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['products_name'], $payment_details['last_digits'], $payment_details['products_name']);
             zen_mail($payment_details['customers_firstname'] . ' ' . $payment_details['customers_lastname'], $payment_details['customers_email_address'], SAVED_CREDIT_CARDS_RECURRING_FAILURE_WARNING_EMAIL_SUBJECT, $message, STORE_NAME, EMAIL_FROM, array('EMAIL_MESSAGE_HTML' => nl2br($message)), 'recurring_failure');
             if ($max_fails_allowed > 0) {
