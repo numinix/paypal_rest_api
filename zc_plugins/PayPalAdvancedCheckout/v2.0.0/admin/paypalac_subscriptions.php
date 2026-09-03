@@ -2115,9 +2115,17 @@ if ($restSubscriptions instanceof queryFactoryResult) {
 // $allSubscriptions so the unified UI can display + act on both systems.
 if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
     $savedCardWhereClauses = [];
+    // Prefer the persisted customers_id, but fall back to the parent order line /
+    // saved-card owner when older migration rows left customers_id at 0.
+    $savedCardCustomerExpr = 'COALESCE('
+        . 'NULLIF(scr.customers_id, 0),'
+        . 'NULLIF(o.customers_id, 0),'
+        . 'NULLIF(o_op.customers_id, 0),'
+        . 'NULLIF(sc.customers_id, 0)'
+        . ')';
 
     if ($filters['customers_id'] > 0) {
-        $savedCardWhereClauses[] = 'scr.customers_id = ' . (int) $filters['customers_id'];
+        $savedCardWhereClauses[] = $savedCardCustomerExpr . ' = ' . (int) $filters['customers_id'];
     }
     if ($filters['products_id'] > 0) {
         $savedCardWhereClauses[] = 'scr.products_id = ' . (int) $filters['products_id'];
@@ -2127,7 +2135,7 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
         $savedCardWhereClauses[] = $savedStatusSql;
     }
     if ($filters['payment_module'] !== '') {
-        $savedCardWhereClauses[] = "o.payment_module_code = '" . zen_db_input($filters['payment_module']) . "'";
+        $savedCardWhereClauses[] = "COALESCE(o.payment_module_code, o_op.payment_module_code) = '" . zen_db_input($filters['payment_module']) . "'";
     }
     if ($filters['show_archived'] === 'only') {
         $savedCardWhereClauses[] = 'scr.is_archived = 1';
@@ -2136,14 +2144,19 @@ if (defined('TABLE_SAVED_CREDIT_CARDS_RECURRING')) {
     }
 
     $savedCardSql = 'SELECT scr.*,'
+        . ' ' . $savedCardCustomerExpr . ' AS customers_id,'
         . ' c.customers_firstname, c.customers_lastname, c.customers_email_address,'
-        . ' o.payment_module_code, o.payment_method, o.date_purchased AS date_purchased,'
+        . ' COALESCE(o.payment_module_code, o_op.payment_module_code) AS payment_module_code,'
+        . ' COALESCE(o.payment_method, o_op.payment_method) AS payment_method,'
+        . ' COALESCE(o.date_purchased, o_op.date_purchased) AS date_purchased,'
         . ' pv.brand AS vault_brand, pv.last_digits AS vault_last_digits, pv.card_type AS vault_card_type, pv.status AS vault_status, pv.expiry AS vault_expiry,'
         . ' pv.paypal_vault_id AS scr_paypal_vault_id'
         . ' FROM ' . TABLE_SAVED_CREDIT_CARDS_RECURRING . ' scr'
-        . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = scr.customers_id'
-        . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = scr.orders_id'
+        . ' LEFT JOIN ' . TABLE_ORDERS . ' o ON o.orders_id = NULLIF(scr.orders_id, 0)'
+        . ' LEFT JOIN ' . TABLE_ORDERS_PRODUCTS . ' op ON op.orders_products_id = COALESCE(NULLIF(scr.orders_products_id, 0), NULLIF(scr.original_orders_products_id, 0))'
+        . ' LEFT JOIN ' . TABLE_ORDERS . ' o_op ON o_op.orders_id = op.orders_id'
         . ' LEFT JOIN ' . TABLE_SAVED_CREDIT_CARDS . ' sc ON sc.saved_credit_card_id = scr.saved_credit_card_id'
+        . ' LEFT JOIN ' . TABLE_CUSTOMERS . ' c ON c.customers_id = ' . $savedCardCustomerExpr
         . ' LEFT JOIN ' . TABLE_PAYPAL_VAULT . ' pv ON pv.vault_id = sc.vault_id AND pv.customers_id = sc.customers_id';
 
     if (!empty($savedCardWhereClauses)) {
