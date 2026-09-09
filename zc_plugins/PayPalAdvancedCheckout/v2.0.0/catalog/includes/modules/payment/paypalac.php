@@ -272,9 +272,11 @@ class paypalac extends base
             // Add upgrade button if current version is less than latest version
             $installed_version = defined('MODULE_PAYMENT_PAYPALAC_VERSION') ? MODULE_PAYMENT_PAYPALAC_VERSION : '0.0.0';
             if (version_compare($installed_version, self::CURRENT_VERSION, '<')) {
+                $upgrade_template = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ADMIN_UPGRADE_AVAILABLE')
+                    ? MODULE_PAYMENT_PAYPALAC_TEXT_ADMIN_UPGRADE_AVAILABLE
+                    : '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="paypalac-upgrade-button" href="%3$s">Upgrade to %2$s</a></p>';
                 $this->description .= sprintf(
-                    MODULE_PAYMENT_PAYPALAC_TEXT_ADMIN_UPGRADE_AVAILABLE ?? 
-                    '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="paypalac-upgrade-button" href="%3$s">Upgrade to %2$s</a></p>',
+                    $upgrade_template,
                     $installed_version,
                     self::CURRENT_VERSION,
                     zen_href_link('paypalac_upgrade.php', 'module=paypalac&action=upgrade', 'SSL')
@@ -487,13 +489,15 @@ class paypalac extends base
             }
         }
         
+        // PHP 8+ throws on undefined constants; ?? does not protect bare constant reads.
+        // Payment Modules admin instantiates this class before install() creates config keys.
         if ($environment === 'live') {
-            $client_id = trim(MODULE_PAYMENT_PAYPALAC_CLIENTID_L ?? '');
-            $secret = trim(MODULE_PAYMENT_PAYPALAC_SECRET_L ?? '');
+            $client_id = defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L') ? trim((string)MODULE_PAYMENT_PAYPALAC_CLIENTID_L) : '';
+            $secret = defined('MODULE_PAYMENT_PAYPALAC_SECRET_L') ? trim((string)MODULE_PAYMENT_PAYPALAC_SECRET_L) : '';
             $env_label = 'Production';
         } else {
-            $client_id = trim(MODULE_PAYMENT_PAYPALAC_CLIENTID_S ?? '');
-            $secret = trim(MODULE_PAYMENT_PAYPALAC_SECRET_S ?? '');
+            $client_id = defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S') ? trim((string)MODULE_PAYMENT_PAYPALAC_CLIENTID_S) : '';
+            $secret = defined('MODULE_PAYMENT_PAYPALAC_SECRET_S') ? trim((string)MODULE_PAYMENT_PAYPALAC_SECRET_S) : '';
             $env_label = 'Sandbox';
         }
         
@@ -931,12 +935,13 @@ class paypalac extends base
         // Determine and return which (live vs. sandbox) credentials are in use.
         // Trim credentials to match PayPalAdvancedCheckoutApi::getConfiguredCredentials behavior.
         //
-        if (MODULE_PAYMENT_PAYPALAC_SERVER === 'live') {
-            $client_id = MODULE_PAYMENT_PAYPALAC_CLIENTID_L;
-            $secret = MODULE_PAYMENT_PAYPALAC_SECRET_L;
+        $server = defined('MODULE_PAYMENT_PAYPALAC_SERVER') ? (string)MODULE_PAYMENT_PAYPALAC_SERVER : 'live';
+        if ($server === 'live') {
+            $client_id = defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_L') ? (string)MODULE_PAYMENT_PAYPALAC_CLIENTID_L : '';
+            $secret = defined('MODULE_PAYMENT_PAYPALAC_SECRET_L') ? (string)MODULE_PAYMENT_PAYPALAC_SECRET_L : '';
         } else {
-            $client_id = MODULE_PAYMENT_PAYPALAC_CLIENTID_S;
-            $secret = MODULE_PAYMENT_PAYPALAC_SECRET_S;
+            $client_id = defined('MODULE_PAYMENT_PAYPALAC_CLIENTID_S') ? (string)MODULE_PAYMENT_PAYPALAC_CLIENTID_S : '';
+            $secret = defined('MODULE_PAYMENT_PAYPALAC_SECRET_S') ? (string)MODULE_PAYMENT_PAYPALAC_SECRET_S : '';
         }
 
         return [
