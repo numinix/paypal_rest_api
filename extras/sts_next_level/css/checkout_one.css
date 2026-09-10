@@ -1,0 +1,116 @@
+select, fieldset select { margin-left: 0; height: 40px; }
+
+#checkoutConfirmDefault { display: none; }
+#checkoutOneLoading { position: relative; height: 95vh; top: 50%; left: 50%; display: none; }
+#checkoutPaymentNoJs { box-sizing:border-box; text-align: center; border: 1px solid red; width: 95%; margin: 2em auto; }
+
+#messages-bill, #messages-ship { margin-top: 10px; }
+
+#ccProductsHeading { text-align: left; }
+#ccTotalHeading { text-align: right; }
+.floatingBox { width: 49%; }
+.clearRight { clear: right; }
+.clearBoth { clear: both; }
+.inputLabel { width: 110px; }
+#cartContentsDisplay th, #cartContentsDisplay td { padding: 0.5em 1em; }
+#cartOrderTotals { border-top: 1px solid #bbb; border-bottom: 1px solid #bbb; }
+#checkoutOneCartGroup { padding-bottom: 0; }
+fieldset > #cartContentsDisplay div { margin-right: 0; }
+
+#choices-bill, #choices-ship { text-align: right; }
+#select-address-bill, #select-address-ship { width: auto; }
+
+.edit-button { text-align: right; }
+.opc-buttons { display: none; }
+.opc-buttons > div:first-child { float: left; }
+.opc-buttons::after { clear: both; }
+
+.opc-changed { border: 1px solid #0000ff; }
+.opc-error { border: 2px solid red; }
+.opc-right { text-align: right; }
+.opc-cc-submit, #opc-order-confirm, #opc-order-review, #opc-bill-cancel, #opc-bill-save, #opc-ship-cancel, #opc-ship-save, #opc-guest-cancel, #opc-guest-save, #opc-bill-edit, #opc-ship-edit { cursor: pointer; }
+.opc-base, .opc-credit { position: relative; }
+.opc-overlay.active { background: #dcdcdc; height: 100%; width: 100%; opacity: 0.5; top: 0; left: 0; position: absolute; padding: 0; z-index: 1; }
+.opc-disabled { background: #dcdcdc; opacity: 0.5; z-index: 1; cursor: not-allowed; pointer-events: none; }
+.buttonRow.opc-buttons { clear: both; }
+
+.back { float: left; }
+.forward { float: right; }
+.hiddenField { display: none; }
+.visibleField { display: inline; }
+.alert { padding-left: 0.5em; }
+
+#checkoutPayment.centerColumn{padding-left: 1em;}
+#whatCVVAUTH{margin-top: -1em; padding-left: .25em; font-size:85%;}
+#whatCVVAUTH a:hover{text-decoration:underline; color:#f2a00a;}
+#checkoutOneHeading{text-align:center;}
+
+/*
+ * STS desired checkout wallets: no radios, stacked full-width branded buttons
+ * under "#alt_pmnt_methods" ("- or pay using -"). Plugin wallet_layout.js
+ * auto-enables .paypalac-wallet-layout-stacked when #alt_pmnt_methods exists.
+ */
+#alt_pmnt_methods {
+  margin: 0;
+  padding: 1em 0 0.35em;
+  text-align: center;
+  color: #959595;
+}
+
+#checkoutPayment .paypalac-wallet-payment-row > input[type="radio"],
+fieldset.payment .paypalac-wallet-payment-row > input[type="radio"],
+#paymentMethodContainer .paypalac-wallet-payment-row > input[type="radio"],
+#checkoutPayment .paypalac-wallet-payment-row > input[type="radio"].paypalac-wallet-radio-hidden,
+fieldset.payment .paypalac-wallet-payment-row > input[type="radio"].paypalac-wallet-radio-hidden,
+#paymentMethodContainer .paypalac-wallet-payment-row > input[type="radio"].paypalac-wallet-radio-hidden,
+#checkoutPayment input[id^="pmt-paypalac"]:not([id="pmt-paypalac_creditcard"]):not([id="pmt-paypalac_savedcard"]),
+fieldset.payment input[id^="pmt-paypalac"]:not([id="pmt-paypalac_creditcard"]):not([id="pmt-paypalac_savedcard"]) {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+#checkoutPayment .paypalac-wallet-payment-row,
+fieldset.payment .paypalac-wallet-payment-row,
+#paymentMethodContainer .paypalac-wallet-payment-row {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  width: 100% !important;
+  margin: 0.45em 0 !important;
+  padding: 0 !important;
+}
+
+#checkoutPayment .paypalac-wallet-payment-row > label.radioButtonLabel,
+fieldset.payment .paypalac-wallet-payment-row > label.radioButtonLabel,
+#paymentMethodContainer .paypalac-wallet-payment-row > label.radioButtonLabel,
+#paymentMethodContainer .paypalac-wallet-payment-row > label.payment-method-item-label {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  float: none !important;
+  clear: both !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: 420px !important;
+}
+
+#checkoutPayment .paypalac-googlepay-button,
+#checkoutPayment .paypalac-applepay-button,
+#checkoutPayment .paypalac-paylater-button,
+#checkoutPayment .paypalac-venmo-button,
+#checkoutPayment #paypalac-googlepay-button,
+#checkoutPayment #paypalac-applepay-button,
+#checkoutPayment #paypalac-paylater-button,
+fieldset.payment .paypalac-googlepay-button,
+fieldset.payment .paypalac-applepay-button,
+fieldset.payment .paypalac-paylater-button {
+  display: block !important;
+  width: 100% !important;
+  max-width: 420px !important;
+  margin: 0 auto !important;
+}
+
+@media (max-width: 979px) {
+  .floatingBox { width: 95%; float: none; margin: 0 auto; }
+}

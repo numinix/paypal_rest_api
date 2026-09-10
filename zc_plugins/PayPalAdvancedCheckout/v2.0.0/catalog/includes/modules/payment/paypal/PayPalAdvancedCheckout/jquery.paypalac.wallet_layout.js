@@ -1,16 +1,16 @@
 /**
- * Keep wallet radios and branded buttons on one horizontal line for classic
- * Zen Cart checkout templates that render:
+ * Wallet checkout layout helper.
+ *
+ * Default (classic): keep wallet radios and branded buttons on one horizontal
+ * line for templates that render:
  *   <input type="radio" id="pmt-paypalac_…">
  *   <label class="radioButtonLabel" for="…">…button…</label>
  *   <br class="clearBoth">
  *
- * Also:
- * - Copies the theme's left indent from Credit Card (etc.) onto
- *   --paypalac-payment-indent (row padding), without hardcoding 20px.
- * - Forces wallet radios visible (undoes .paypalac-wallet-radio-hidden /
- *   display:none left by older hide paths).
- * - Clears stacked theme margins on nested wallet button wrappers.
+ * Stacked mode (STS / OPC with "#alt_pmnt_methods" or
+ * html/body/checkout marked .paypalac-wallet-layout-stacked): hide radios and
+ * stack full-width branded buttons under an "or pay using" separator — matching
+ * merchant themes that intentionally remove wallet radios.
  */
 (function () {
     'use strict';
@@ -34,6 +34,25 @@
             if (el.id === 'pmt-' + WALLET_IDS[i]) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    /**
+     * Stacked layout when the theme opts in via marker element/class, or when
+     * the legacy STS "#alt_pmnt_methods" separator is present on checkout.
+     */
+    function isStackedWalletLayout() {
+        if (document.documentElement.classList.contains('paypalac-wallet-layout-stacked')
+            || document.body.classList.contains('paypalac-wallet-layout-stacked')) {
+            return true;
+        }
+        var checkout = document.querySelector('#checkoutPayment, #checkoutOneForm, form[name="checkout_payment"]');
+        if (checkout && checkout.classList.contains('paypalac-wallet-layout-stacked')) {
+            return true;
+        }
+        if (document.getElementById('alt_pmnt_methods')) {
+            return true;
         }
         return false;
     }
@@ -127,6 +146,16 @@
         }
     }
 
+    /** Hide wallet radios for stacked branded-button layouts. */
+    function hideWalletRadioForStacked(radio) {
+        if (!radio) {
+            return;
+        }
+        radio.classList.add('paypalac-wallet-radio-hidden');
+        radio.setAttribute('aria-hidden', 'true');
+        radio.tabIndex = -1;
+    }
+
     function zeroNestedWalletMargins(label) {
         if (!label) {
             return;
@@ -139,12 +168,34 @@
         }
     }
 
-    function wrapRadioAndLabel(radio) {
+    function markStackedHosts(enabled) {
+        var hosts = [
+            document.documentElement,
+            document.body,
+            document.querySelector('#checkoutPayment'),
+            document.querySelector('#paymentMethodContainer'),
+            document.querySelector('fieldset.payment')
+        ];
+        for (var i = 0; i < hosts.length; i++) {
+            if (!hosts[i]) {
+                continue;
+            }
+            if (enabled) {
+                hosts[i].classList.add('paypalac-wallet-layout-stacked');
+            }
+        }
+    }
+
+    function wrapRadioAndLabel(radio, stacked) {
         if (!radio) {
             return;
         }
 
-        ensureWalletRadioVisible(radio);
+        if (stacked) {
+            hideWalletRadioForStacked(radio);
+        } else {
+            ensureWalletRadioVisible(radio);
+        }
 
         var label = document.querySelector('label[for="' + radio.id + '"]');
         if (!label) {
@@ -163,16 +214,22 @@
         }
 
         var row = document.createElement('span');
-        row.className = 'paypalac-wallet-payment-row';
+        row.className = 'paypalac-wallet-payment-row' + (stacked ? ' paypalac-wallet-payment-row-stacked' : '');
         parent.insertBefore(row, radio);
         row.appendChild(radio);
         row.appendChild(label);
     }
 
     function alignWalletRadioRows() {
-        syncPaymentIndentFromTheme();
+        var stacked = isStackedWalletLayout();
+        markStackedHosts(stacked);
+        if (!stacked) {
+            syncPaymentIndentFromTheme();
+        } else {
+            setPaymentIndent(0);
+        }
         for (var i = 0; i < WALLET_IDS.length; i++) {
-            wrapRadioAndLabel(document.getElementById('pmt-' + WALLET_IDS[i]));
+            wrapRadioAndLabel(document.getElementById('pmt-' + WALLET_IDS[i]), stacked);
         }
     }
 
