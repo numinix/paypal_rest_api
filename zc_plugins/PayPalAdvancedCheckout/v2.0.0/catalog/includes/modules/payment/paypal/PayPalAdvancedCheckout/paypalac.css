@@ -562,3 +562,102 @@ fieldset.payment label.radioButtonLabel[for^="pmt-paypalac_"] ~ .paypalac-paylat
     margin-bottom: 0 !important;
     vertical-align: middle;
 }
+
+/*
+ * Stacked layout (STS OPC with #alt_pmnt_methods, or .paypalac-wallet-layout-stacked):
+ * hide wallet radios and stack full-width branded buttons under the separator.
+ * Must beat the classic horizontal !important rules above.
+ */
+.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row,
+.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row-stacked,
+#checkoutPayment.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row,
+#checkoutPayment.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row-stacked,
+fieldset.payment.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row,
+#paymentMethodContainer.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.65rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0.45em 0 !important;
+    padding: 0 !important;
+}
+
+.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > input[type="radio"],
+.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > input[type="radio"].paypalac-wallet-radio-hidden,
+#checkoutPayment.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > input[type="radio"],
+#checkoutPayment.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > input[type="radio"].paypalac-wallet-radio-hidden,
+fieldset.payment.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > input[type="radio"],
+#paymentMethodContainer.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > input[type="radio"] {
+    display: none !important;
+    visibility: hidden !important;
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > label.radioButtonLabel,
+.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > label.payment-method-item-label,
+#checkoutPayment.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > label.radioButtonLabel,
+fieldset.payment.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > label.radioButtonLabel,
+#paymentMethodContainer.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > label.radioButtonLabel,
+#paymentMethodContainer.paypalac-wallet-layout-stacked .paypalac-wallet-payment-row > label.payment-method-item-label {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    float: none !important;
+    clear: both !important;
+    width: 100% !important;
+    max-width: 420px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    gap: 0 !important;
+}
+
+.paypalac-wallet-layout-stacked .paypalac-googlepay-button,
+.paypalac-wallet-layout-stacked .paypalac-applepay-button,
+.paypalac-wallet-layout-stacked .paypalac-paylater-button,
+.paypalac-wallet-layout-stacked .paypalac-venmo-button,
+.paypalac-wallet-layout-stacked label[for="pmt-paypalac"] > div,
+.paypalac-wallet-layout-stacked #paypalac-googlepay-button,
+.paypalac-wallet-layout-stacked #paypalac-applepay-button,
+.paypalac-wallet-layout-stacked #paypalac-paylater-button,
+.paypalac-wallet-layout-stacked #paypalac-venmo-button,
+#checkoutPayment.paypalac-wallet-layout-stacked .paypalac-googlepay-button,
+#checkoutPayment.paypalac-wallet-layout-stacked .paypalac-applepay-button,
+#checkoutPayment.paypalac-wallet-layout-stacked .paypalac-paylater-button,
+#checkoutPayment.paypalac-wallet-layout-stacked .paypalac-venmo-button {
+    display: block !important;
+    width: 100% !important;
+    max-width: 420px !important;
+    min-width: 0 !important;
+    margin: 0 auto !important;
+    flex: 0 0 auto !important;
+}
+
+.paypalac-wallet-layout-stacked .paypalac-googlepay-button > *,
+.paypalac-wallet-layout-stacked .paypalac-applepay-button > *,
+.paypalac-wallet-layout-stacked .paypalac-paylater-button > *,
+.paypalac-wallet-layout-stacked .paypalac-venmo-button > *,
+.paypalac-wallet-layout-stacked #paypalac-googlepay-button > *,
+.paypalac-wallet-layout-stacked #paypalac-applepay-button > *,
+.paypalac-wallet-layout-stacked #paypalac-paylater-button > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+#alt_pmnt_methods {
+    margin: 0;
+    padding: 1em 0 0.35em;
+    text-align: center;
+    color: #959595;
+}
