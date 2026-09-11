@@ -105,18 +105,33 @@ class paypalac_paylater extends base
 
         $curl_installed = (function_exists('curl_init'));
 
+        // PHP 8+ throws on undefined constants; ?? does not protect bare constant reads.
+        // ppac_wallet.php (and similar AJAX entrypoints) may construct this before language files load.
         if (IS_ADMIN_FLAG === false) {
-            $this->title = MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE ?? 'PayPal Pay Later';
+            $this->title = defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE')
+                ? MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE
+                : 'PayPal Pay Later';
         } else {
-            $this->title = (MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE_ADMIN ?? 'PayPal Pay Later') . (($curl_installed === true) ? '' : $this->alertMsg(MODULE_PAYMENT_PAYPALAC_ERROR_NO_CURL ?? 'cURL not installed'));
-            $this->description = sprintf(MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_DESCRIPTION ?? 'Pay Later via PayPal Advanced Checkout (v%s)', self::CURRENT_VERSION);
+            $adminTitle = defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE_ADMIN')
+                ? MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_TITLE_ADMIN
+                : 'PayPal Pay Later';
+            $curlMissing = defined('MODULE_PAYMENT_PAYPALAC_ERROR_NO_CURL')
+                ? MODULE_PAYMENT_PAYPALAC_ERROR_NO_CURL
+                : 'cURL not installed';
+            $this->title = $adminTitle . (($curl_installed === true) ? '' : $this->alertMsg($curlMissing));
+            $descriptionTemplate = defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_DESCRIPTION')
+                ? MODULE_PAYMENT_PAYPALAC_PAYLATER_TEXT_DESCRIPTION
+                : 'Pay Later via PayPal Advanced Checkout (v%s)';
+            $this->description = sprintf($descriptionTemplate, self::CURRENT_VERSION);
             
             // Add upgrade button if current version is less than latest version
             $installed_version = defined('MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION') ? MODULE_PAYMENT_PAYPALAC_PAYLATER_VERSION : '0.0.0';
             if ($installed_version !== '0.0.0' && version_compare($installed_version, self::CURRENT_VERSION, '<')) {
+                $upgradeTemplate = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ADMIN_UPGRADE_AVAILABLE')
+                    ? MODULE_PAYMENT_PAYPALAC_TEXT_ADMIN_UPGRADE_AVAILABLE
+                    : '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="paypalac-upgrade-button" href="%3$s">Upgrade to %2$s</a></p>';
                 $this->description .= sprintf(
-                    MODULE_PAYMENT_PAYPALAC_TEXT_ADMIN_UPGRADE_AVAILABLE ??
-                    '<br><br><p><strong>Update Available:</strong> Version %2$s is available. You are currently running version %1$s.</p><p><a class="paypalac-upgrade-button" href="%3$s">Upgrade to %2$s</a></p>',
+                    $upgradeTemplate,
                     $installed_version,
                     self::CURRENT_VERSION,
                     zen_href_link('paypalac_upgrade.php', 'module=paypalac_paylater&action=upgrade', 'SSL')
