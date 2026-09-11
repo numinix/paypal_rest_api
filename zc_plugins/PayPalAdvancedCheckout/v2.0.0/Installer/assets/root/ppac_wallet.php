@@ -119,7 +119,7 @@ try {
     // Run order totals processing to ensure $order->info is populated
     $order_total_modules->collect_posts();
     $order_total_modules->pre_confirmation_check();
-} catch (\Exception $e) {
+} catch (\Throwable $e) {
     // Log the error but continue - the observer fallback will use $order->info
     if ($ppacWalletDebugEnabled) {
         $sanitizedMessage = ppac_wallet_sanitize_error_message($e->getMessage());
@@ -143,6 +143,22 @@ if (!array_key_exists($wallet, $moduleMap)) {
 }
 
 $moduleCode = $moduleMap[$wallet];
+
+// Wallet AJAX bootstraps modules outside Zen Cart's payment-module loader, so
+// language files are not auto-included. Load them before constructing so PHP 8+
+// does not fatal on undefined MODULE_PAYMENT_*_TEXT_TITLE constants.
+$ppacWalletLanguage = !empty($_SESSION['language']) ? (string)$_SESSION['language'] : 'english';
+$ppacWalletLangCandidates = [
+    'languages/' . $ppacWalletLanguage . '/modules/payment/lang.' . $moduleCode . '.php',
+    'languages/' . $ppacWalletLanguage . '/modules/payment/' . $moduleCode . '.php',
+];
+foreach ($ppacWalletLangCandidates as $ppacWalletLangRelative) {
+    $ppacWalletLangPath = ppac_find_catalog_includes_file($ppacWalletLangRelative);
+    if ($ppacWalletLangPath !== null && is_file($ppacWalletLangPath)) {
+        require_once $ppacWalletLangPath;
+        break;
+    }
+}
 
 ppac_require_catalog_includes_file('modules/payment/paypal/ppacAutoload.php');
 ppac_require_catalog_includes_file('modules/payment/' . $moduleCode . '.php');
