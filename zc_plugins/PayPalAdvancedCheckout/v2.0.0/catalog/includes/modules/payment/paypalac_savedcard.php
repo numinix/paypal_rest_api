@@ -491,8 +491,8 @@ class paypalac_savedcard extends base
 
         // Load the checkout script to handle radio button selection
         // Append it to the module output to avoid creating a separate div row
-        $savedCardCss = '<style>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('paypalac.css') . '</style>';
-        $checkoutScript = $savedCardCss . '<script>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('jquery.paypalac.checkout.js') . '</script>';
+        $savedCardCss = \PayPalAdvancedCheckout\Common\PluginPaths::supportStyleTag('paypalac.css');
+        $checkoutScript = $savedCardCss . \PayPalAdvancedCheckout\Common\PluginPaths::supportScriptTag('jquery.paypalac.checkout.js');
         $moduleTitle .= $checkoutScript;
 
         return [

@@ -424,21 +424,22 @@ jQuery(document).ready(function() {
     function attachPayPalButtonClickHandler()
     {
         var $checkoutForm = jQuery('form[name="checkout_payment"]');
-        var $paypalButton = jQuery('#ppr-choice-paypal .ppr-choice-label');
+        // Prefer the visible wallet image. Sentinel #ppr-choice-paypal may be
+        // pointer-events:none or a non-button probe — do not let it win first.
+        var $paypalButton = jQuery('.payment-method.paypalac .creditcard-form img');
         var isWalletOnlyButton = false;
 
         if (!$paypalButton.length) {
-            // Look for wallet-only button image in the payment method container
-            // The image is in the creditcard-form div, not inside the label
-            $paypalButton = jQuery('.payment-method.paypalac .creditcard-form img');
-        }
-
-        if (!$paypalButton.length) {
-            // Fallback: try legacy selector (in case image is inside label in some templates)
+            // Fallback: image inside the payment-method label (some templates)
             $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalac"] img');
         }
 
-        // Do NOT fall back to the label itself - clicking the label should only
+        if (!$paypalButton.length) {
+            // Legacy choice UI only — exclude SDK probe sentinel
+            $paypalButton = jQuery('#ppr-choice-paypal:not(.paypalac-ppr-choice-sentinel) .ppr-choice-label');
+        }
+
+        // Do NOT fall back to the payment radio label itself - clicking the label should only
         // select the radio button, not launch the PayPal wallet modal.
         // Only the button/image click or form submission should launch the modal.
 

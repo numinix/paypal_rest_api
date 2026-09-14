@@ -55,4 +55,54 @@ class PluginPaths
         $contents = file_get_contents($path);
         return $contents === false ? '' : $contents;
     }
+
+    /**
+     * Catalog-relative web URL for a support file under zc_plugins (js/css are
+     * allowed by Zen Cart's zc_plugins/.htaccess). Empty when not web-mappable.
+     */
+    public static function supportWebUrl(string $relative): string
+    {
+        if (!defined('DIR_FS_CATALOG')) {
+            return '';
+        }
+        $path = str_replace('\\', '/', self::supportFile($relative));
+        if (!is_file($path)) {
+            return '';
+        }
+        $root = rtrim(str_replace('\\', '/', DIR_FS_CATALOG), '/');
+        if (strpos($path, $root . '/') !== 0) {
+            return '';
+        }
+        $rel = ltrim(substr($path, strlen($root)), '/');
+        $prefix = defined('DIR_WS_CATALOG') ? DIR_WS_CATALOG : '';
+        return rtrim((string)$prefix, '/') . '/' . $rel;
+    }
+
+    /**
+     * Versioned stylesheet tag; falls back to inline when no public URL.
+     */
+    public static function supportStyleTag(string $relative): string
+    {
+        $path = self::supportFile($relative);
+        $url = self::supportWebUrl($relative);
+        if ($url !== '' && is_file($path)) {
+            return '<link rel="stylesheet" href="' . $url . '?v=' . (int)filemtime($path) . '">';
+        }
+        $css = self::readSupportFile($relative);
+        return $css === '' ? '' : '<style>' . $css . '</style>';
+    }
+
+    /**
+     * Versioned script tag; falls back to inline when no public URL.
+     */
+    public static function supportScriptTag(string $relative, bool $defer = true): string
+    {
+        $path = self::supportFile($relative);
+        $url = self::supportWebUrl($relative);
+        if ($url !== '' && is_file($path)) {
+            return '<script' . ($defer ? ' defer' : '') . ' src="' . $url . '?v=' . (int)filemtime($path) . '"></script>';
+        }
+        $js = self::readSupportFile($relative);
+        return $js === '' ? '' : '<script>' . $js . '</script>';
+    }
 }

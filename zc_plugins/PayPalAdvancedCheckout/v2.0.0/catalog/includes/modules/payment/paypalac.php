@@ -1487,7 +1487,7 @@ class paypalac extends base
         if ($this->cardsAccepted === false || $this->shippingCountryIsSupported === false) {
             // Attach checkout.js to the module markup so tpl_checkout_payment does not wrap an
             // empty-title row in .ccinfo (empty label + clearBoth Brs create large gaps between methods).
-            $checkoutScript = '<script>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('jquery.paypalac.checkout.js') . '</script>';
+            $checkoutScript = \PayPalAdvancedCheckout\Common\PluginPaths::supportScriptTag('jquery.paypalac.checkout.js');
             $selection['module'] .= $checkoutScript;
 
             if ($this->shippingCountryIsSupported === false) {
@@ -1495,7 +1495,7 @@ class paypalac extends base
                     [
                         'title' => '<b>' . MODULE_PAYMENT_PAYPALAC_TEXT_PLEASE_NOTE . '</b>',
                         'field' =>
-                            '<script>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('jquery.paypalac.disable.js') . '</script>' .
+                            \PayPalAdvancedCheckout\Common\PluginPaths::supportScriptTag('jquery.paypalac.disable.js') .
                             '<small>' . MODULE_PAYMENT_PAYPALAC_UNSUPPORTED_SHIPPING_COUNTRY . '</small>',
                     ],
                 ];

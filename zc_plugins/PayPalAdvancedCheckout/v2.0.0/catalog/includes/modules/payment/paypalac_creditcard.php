@@ -449,7 +449,7 @@ class paypalac_creditcard extends base
         
         unset($_SESSION['PayPalAdvancedCheckout']['Order']['wallet_payment_confirmed']);
 
-        $creditCardCss = '<style>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('paypalac.css') . '</style>';
+        $creditCardCss = \PayPalAdvancedCheckout\Common\PluginPaths::supportStyleTag('paypalac.css');
 
         // Create dropdowns for expiry date
         $expires_month = [];
@@ -598,7 +598,7 @@ class paypalac_creditcard extends base
 
         // Load the checkout script to handle radio button selection when focusing on fields
         // Append it to the module output to avoid creating a separate div row
-        $checkoutScript = $creditCardCss . '<script>' . \PayPalAdvancedCheckout\Common\PluginPaths::readSupportFile('jquery.paypalac.checkout.js') . '</script>';
+        $checkoutScript = $creditCardCss . \PayPalAdvancedCheckout\Common\PluginPaths::supportScriptTag('jquery.paypalac.checkout.js');
         $moduleDisplay .= $checkoutScript;
 
         return [
