@@ -11,3 +11,4 @@ includes/classes/shopping_cart.php
 
 # OPRC reference vendor directory
 references/one_page_responsive_checkout/vendor/
+/worktrees/

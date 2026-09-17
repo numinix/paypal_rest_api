@@ -65,7 +65,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '2.0.0';
+    protected const CURRENT_VERSION = '2.0.1';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -858,6 +858,23 @@ class paypalac extends base
                 case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.3.23', '<'): //- Fall through from above
                     // Hard payment declines bump FailedPaymentAttempts so createOrderGuid
                     // mints a new PayPal order instead of reusing a declined APPROVED leftover.
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '2.0.1', '<'): //- Fall through from above
+                    // Admin vault rebill page (merchant-initiated charge of vaulted cards).
+                    $zc150 = (PROJECT_VERSION_MAJOR > 1 || (PROJECT_VERSION_MAJOR == 1 && substr(PROJECT_VERSION_MINOR, 0, 3) >= 5));
+                    if ($zc150 && function_exists('zen_page_key_exists') && function_exists('zen_register_admin_page')) {
+                        if (!zen_page_key_exists('paypalacRebill')) {
+                            zen_register_admin_page(
+                                'paypalacRebill',
+                                'BOX_PAYPALAC_REBILL',
+                                'FILENAME_PAYPALAC_REBILL',
+                                '',
+                                'customers',
+                                'Y',
+                                12
+                            );
+                        }
+                    }
 
                 default:    //- Fall through from above
                     break;

@@ -617,7 +617,320 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                }
                return defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : 'USD';
        }
-       function process_rest_payment($payment_details, $total_to_bill) {
+       /**
+        * Merchant-initiated one-off charge of a vaulted/saved card (admin rebill).
+        *
+        * @param int   $saved_credit_card_id
+        * @param float $total_to_bill
+        * @param array $options Optional: currency, request_id, comments
+        * @return array{success:bool,error?:string,transaction_id?:string,paypal_order_id?:string,...}
+        */
+       function charge_vaulted_card($saved_credit_card_id, $total_to_bill, array $options = array())
+       {
+               global $db;
+
+               $saved_credit_card_id = (int)$saved_credit_card_id;
+               $total_to_bill = (float)$total_to_bill;
+               if ($saved_credit_card_id <= 0) {
+                       return array('success' => false, 'error' => 'Invalid saved card id');
+               }
+               if ($total_to_bill <= 0) {
+                       return array('success' => false, 'error' => 'Amount must be greater than zero');
+               }
+
+               $card = $this->get_saved_card_details($saved_credit_card_id);
+               if (!is_array($card) || empty($card)) {
+                       return array('success' => false, 'error' => 'Saved card not found');
+               }
+               if (isset($card['is_deleted']) && (int)$card['is_deleted'] === 1) {
+                       return array('success' => false, 'error' => 'Saved card is deleted');
+               }
+
+               $vaultId = $this->extract_vault_id_from_card($card);
+               if ($vaultId === '') {
+                       return array('success' => false, 'error' => 'Saved card has no PayPal vault id');
+               }
+
+               $customers_id = (int)($card['customers_id'] ?? 0);
+               $first_name = '';
+               $last_name = '';
+               $email = '';
+               if ($customers_id > 0) {
+                       $cust = $db->Execute(
+                           "SELECT customers_firstname, customers_lastname, customers_email_address
+                              FROM " . TABLE_CUSTOMERS . "
+                             WHERE customers_id = " . $customers_id . "
+                             LIMIT 1"
+                       );
+                       if (!$cust->EOF) {
+                               $first_name = (string)$cust->fields['customers_firstname'];
+                               $last_name = (string)$cust->fields['customers_lastname'];
+                               $email = (string)$cust->fields['customers_email_address'];
+                       }
+               }
+
+               $payment_details = $card;
+               $payment_details['vault_id'] = $vaultId;
+               $payment_details['paypal_vault_card'] = array('vault_id' => $vaultId);
+               $payment_details['customers_id'] = $customers_id;
+               $payment_details['customers_firstname'] = $first_name;
+               $payment_details['customers_lastname'] = $last_name;
+               $payment_details['customers_email_address'] = $email;
+               if (!empty($options['currency'])) {
+                       $payment_details['currencycode'] = (string)$options['currency'];
+               }
+
+               $request_id = !empty($options['request_id'])
+                       ? (string)$options['request_id']
+                       : ('rebill_' . $saved_credit_card_id . '_' . time() . '_' . substr(md5(uniqid((string)$saved_credit_card_id, true)), 0, 8));
+
+               $result = $this->process_rest_payment($payment_details, $total_to_bill, array(
+                       'payment_type' => 'UNSCHEDULED',
+                       'request_id' => $request_id,
+               ));
+               if (is_array($result)) {
+                       $result['saved_credit_card_id'] = $saved_credit_card_id;
+                       $result['customers_id'] = $customers_id;
+                       $result['payment_details'] = $payment_details;
+               }
+               return $result;
+       }
+
+       /**
+        * Create a Zen Cart order for an admin vault rebill (or attach txn to an existing order).
+        *
+        * @param array $payment_result Result from charge_vaulted_card / process_rest_payment
+        * @param array $options customers_id, amount, currency, comments, orders_id (optional existing), product_name
+        * @return array{success:bool,orders_id?:int,error?:string}
+        */
+       function create_rebill_order(array $payment_result, array $options = array())
+       {
+               global $db;
+
+               if (empty($payment_result['success'])) {
+                       return array('success' => false, 'error' => $payment_result['error'] ?? 'Charge failed');
+               }
+
+               $customers_id = (int)($options['customers_id'] ?? $payment_result['customers_id'] ?? 0);
+               $amount = number_format((float)($options['amount'] ?? $payment_result['amount'] ?? 0), 2, '.', '');
+               $currency = (string)($options['currency'] ?? $payment_result['currency'] ?? (defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : 'USD'));
+               $comments = trim((string)($options['comments'] ?? ''));
+               $product_name = trim((string)($options['product_name'] ?? 'Admin rebill'));
+               if ($product_name === '') {
+                       $product_name = 'Admin rebill';
+               }
+               $existing_orders_id = (int)($options['orders_id'] ?? 0);
+               $transaction_id = (string)($payment_result['transaction_id'] ?? '');
+               $paypal_order_id = (string)($payment_result['paypal_order_id'] ?? '');
+
+               $payment_details = isset($payment_result['payment_details']) && is_array($payment_result['payment_details'])
+                       ? $payment_result['payment_details']
+                       : array();
+
+               if ($existing_orders_id > 0) {
+                       $order_check = $db->Execute(
+                           "SELECT orders_id, customers_id FROM " . TABLE_ORDERS . "
+                             WHERE orders_id = " . $existing_orders_id . " LIMIT 1"
+                       );
+                       if ($order_check->EOF) {
+                               return array('success' => false, 'error' => 'Order #' . $existing_orders_id . ' not found');
+                       }
+                       if ($customers_id > 0 && (int)$order_check->fields['customers_id'] !== $customers_id) {
+                               return array('success' => false, 'error' => 'Order #' . $existing_orders_id . ' belongs to a different customer');
+                       }
+                       $customers_id = (int)$order_check->fields['customers_id'];
+                       $orders_id = $existing_orders_id;
+               } else {
+                       if ($customers_id <= 0) {
+                               return array('success' => false, 'error' => 'Missing customer id for new rebill order');
+                       }
+                       if ((float)$amount <= 0) {
+                               return array('success' => false, 'error' => 'Invalid rebill amount');
+                       }
+
+                       $customer = $db->Execute(
+                           "SELECT c.customers_id, c.customers_firstname, c.customers_lastname, c.customers_email_address,
+                                   c.customers_telephone, c.customers_default_address_id,
+                                   ab.entry_firstname, ab.entry_lastname, ab.entry_company,
+                                   ab.entry_street_address, ab.entry_suburb, ab.entry_city, ab.entry_postcode,
+                                   ab.entry_state, ab.entry_country_id, ab.entry_zone_id
+                              FROM " . TABLE_CUSTOMERS . " c
+                         LEFT JOIN " . TABLE_ADDRESS_BOOK . " ab
+                                ON ab.address_book_id = c.customers_default_address_id
+                             WHERE c.customers_id = " . $customers_id . "
+                             LIMIT 1"
+                       );
+                       if ($customer->EOF) {
+                               return array('success' => false, 'error' => 'Customer not found');
+                       }
+
+                       $country_name = '';
+                       $country_iso2 = '';
+                       $country_iso3 = '';
+                       $country_id = (int)$customer->fields['entry_country_id'];
+                       if ($country_id > 0) {
+                               $country = $db->Execute(
+                                   "SELECT countries_name, countries_iso_code_2, countries_iso_code_3
+                                      FROM " . TABLE_COUNTRIES . "
+                                     WHERE countries_id = " . $country_id . "
+                                     LIMIT 1"
+                               );
+                               if (!$country->EOF) {
+                                       $country_name = (string)$country->fields['countries_name'];
+                                       $country_iso2 = (string)$country->fields['countries_iso_code_2'];
+                                       $country_iso3 = (string)$country->fields['countries_iso_code_3'];
+                               }
+                       }
+                       $zone_name = (string)$customer->fields['entry_state'];
+                       $zone_id = (int)$customer->fields['entry_zone_id'];
+                       if ($zone_id > 0 && $zone_name === '') {
+                               $zone = $db->Execute(
+                                   "SELECT zone_name FROM " . TABLE_ZONES . " WHERE zone_id = " . $zone_id . " LIMIT 1"
+                               );
+                               if (!$zone->EOF) {
+                                       $zone_name = (string)$zone->fields['zone_name'];
+                               }
+                       }
+
+                       $order_status = 2;
+                       if (defined('MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID') && (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID > 0) {
+                               $order_status = (int)MODULE_PAYMENT_PAYPALAC_ORDER_STATUS_ID;
+                       }
+
+                       $module_code = !empty($this->paymentModuleCode) ? $this->paymentModuleCode : 'paypalac_creditcard';
+                       $firstname = (string)($customer->fields['entry_firstname'] ?: $customer->fields['customers_firstname']);
+                       $lastname = (string)($customer->fields['entry_lastname'] ?: $customer->fields['customers_lastname']);
+                       $sql_data_array = array(
+                               'customers_id' => $customers_id,
+                               'customers_name' => $firstname . ' ' . $lastname,
+                               'customers_company' => (string)$customer->fields['entry_company'],
+                               'customers_street_address' => (string)$customer->fields['entry_street_address'],
+                               'customers_suburb' => (string)$customer->fields['entry_suburb'],
+                               'customers_city' => (string)$customer->fields['entry_city'],
+                               'customers_postcode' => (string)$customer->fields['entry_postcode'],
+                               'customers_state' => $zone_name,
+                               'customers_country' => $country_name,
+                               'customers_telephone' => (string)$customer->fields['customers_telephone'],
+                               'customers_email_address' => (string)$customer->fields['customers_email_address'],
+                               'customers_address_format_id' => 2,
+                               'delivery_name' => $firstname . ' ' . $lastname,
+                               'delivery_company' => (string)$customer->fields['entry_company'],
+                               'delivery_street_address' => (string)$customer->fields['entry_street_address'],
+                               'delivery_suburb' => (string)$customer->fields['entry_suburb'],
+                               'delivery_city' => (string)$customer->fields['entry_city'],
+                               'delivery_postcode' => (string)$customer->fields['entry_postcode'],
+                               'delivery_state' => $zone_name,
+                               'delivery_country' => $country_name,
+                               'delivery_address_format_id' => 2,
+                               'billing_name' => $firstname . ' ' . $lastname,
+                               'billing_company' => (string)$customer->fields['entry_company'],
+                               'billing_street_address' => (string)$customer->fields['entry_street_address'],
+                               'billing_suburb' => (string)$customer->fields['entry_suburb'],
+                               'billing_city' => (string)$customer->fields['entry_city'],
+                               'billing_postcode' => (string)$customer->fields['entry_postcode'],
+                               'billing_state' => $zone_name,
+                               'billing_country' => $country_name,
+                               'billing_address_format_id' => 2,
+                               'payment_method' => 'PayPal Advanced Checkout (Rebill)',
+                               'payment_module_code' => $module_code,
+                               'shipping_method' => 'None',
+                               'shipping_module_code' => '',
+                               'coupon_code' => '',
+                               'cc_type' => '',
+                               'cc_owner' => '',
+                               'cc_number' => '',
+                               'cc_expires' => '',
+                               'date_purchased' => 'now()',
+                               'orders_status' => $order_status,
+                               'order_total' => $amount,
+                               'order_tax' => '0.0000',
+                               'currency' => $currency,
+                               'currency_value' => 1,
+                       );
+                       zen_db_perform(TABLE_ORDERS, $sql_data_array);
+                       $orders_id = (int)$db->Insert_ID();
+                       if ($orders_id <= 0) {
+                               return array('success' => false, 'error' => 'Failed to create rebill order');
+                       }
+
+                       $db->Execute(
+                           "INSERT INTO " . TABLE_ORDERS_PRODUCTS . "
+                            (orders_id, products_id, products_model, products_name, products_price, final_price, products_tax, products_quantity)
+                            VALUES
+                            (" . $orders_id . ", 0, 'REBILL', '" . zen_db_input($product_name) . "',
+                             " . (float)$amount . ", " . (float)$amount . ", 0, 1)"
+                       );
+
+                       $totals = array(
+                               array('Sub-Total', 'ot_subtotal', $amount, 1),
+                               array('Total', 'ot_total', $amount, 999),
+                       );
+                       foreach ($totals as $total) {
+                               $db->Execute(
+                                   "INSERT INTO " . TABLE_ORDERS_TOTAL . "
+                                    (orders_id, title, text, value, class, sort_order)
+                                    VALUES
+                                    (" . $orders_id . ",
+                                     '" . zen_db_input($total[0]) . "',
+                                     '" . zen_db_input($currency . ' ' . $amount) . "',
+                                     " . (float)$total[2] . ",
+                                     '" . zen_db_input($total[1]) . "',
+                                     " . (int)$total[3] . ")"
+                               );
+                       }
+               }
+
+               $history_comment = 'Admin vault rebill';
+               if ($transaction_id !== '') {
+                       $history_comment .= ' — txn ' . $transaction_id;
+               }
+               if ($paypal_order_id !== '') {
+                       $history_comment .= ' (PayPal order ' . $paypal_order_id . ')';
+               }
+               if ($comments !== '') {
+                       $history_comment .= "\n" . $comments;
+               }
+
+               $status_id = 2;
+               $status_row = $db->Execute(
+                   "SELECT orders_status FROM " . TABLE_ORDERS . " WHERE orders_id = " . (int)$orders_id . " LIMIT 1"
+               );
+               if (!$status_row->EOF) {
+                       $status_id = (int)$status_row->fields['orders_status'];
+               }
+
+               $db->Execute(
+                   "INSERT INTO " . TABLE_ORDERS_STATUS_HISTORY . "
+                    (orders_id, orders_status_id, date_added, customer_notified, comments)
+                    VALUES
+                    (" . (int)$orders_id . ", " . $status_id . ", NOW(), 0, '" . zen_db_input($history_comment) . "')"
+               );
+
+               if (!isset($payment_details['customers_firstname']) && $customers_id > 0) {
+                       $cust = $db->Execute(
+                           "SELECT customers_firstname, customers_lastname, customers_email_address
+                              FROM " . TABLE_CUSTOMERS . "
+                             WHERE customers_id = " . $customers_id . " LIMIT 1"
+                       );
+                       if (!$cust->EOF) {
+                               $payment_details['customers_firstname'] = $cust->fields['customers_firstname'];
+                               $payment_details['customers_lastname'] = $cust->fields['customers_lastname'];
+                               $payment_details['customers_email_address'] = $cust->fields['customers_email_address'];
+                       }
+               }
+               $payment_details['saved_credit_card_recurring_id'] = 0;
+               $payment_details['paypal_txn_source'] = 'admin_rebill';
+               $this->record_paypal_transaction($orders_id, $payment_result, $payment_details);
+
+               return array(
+                       'success' => true,
+                       'orders_id' => $orders_id,
+                       'transaction_id' => $transaction_id,
+                       'paypal_order_id' => $paypal_order_id,
+               );
+       }
+
+       function process_rest_payment($payment_details, $total_to_bill, $options = array()) {
                $client = $this->get_paypal_api_client();
                if (!$client) {
                        return array('success' => false, 'error' => 'PayPal REST client unavailable');
@@ -634,7 +947,8 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                $currency = $this->get_payment_currency($payment_details);
                $amount = number_format((float) $total_to_bill, 2, '.', '');
                $request = array('intent' => $intent, 'purchase_units' => array(array('amount' => array('currency_code' => $currency, 'value' => $amount))));
-$cardPayload = $this->build_vault_payment_source($payment_details, array('stored_credential' => array('payment_type' => 'RECURRING')));
+               $payment_type = !empty($options['payment_type']) ? (string)$options['payment_type'] : 'RECURRING';
+$cardPayload = $this->build_vault_payment_source($payment_details, array('stored_credential' => array('payment_type' => $payment_type)));
                error_log('PayPal REST cardPayload: ' . json_encode($cardPayload));
                if (!empty($cardPayload) && isset($cardPayload['vault_id'])) {
                        $request['payment_source'] = array('card' => $cardPayload);
@@ -648,10 +962,14 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                        $this->notify_error('Missing PayPal REST payment source', 'No payment source was available for saved card recurring payment. Details: ' . json_encode($payment_details), 'error');
                        return array('success' => false, 'error' => 'Missing PayPal REST payment source');
                }
-               // Generate a unique PayPal-Request-Id for idempotency
-               // Use subscription ID and current date to create a deterministic but unique ID
-               $subscription_id = isset($payment_details['saved_credit_card_recurring_id']) ? $payment_details['saved_credit_card_recurring_id'] : 0;
-               $request_id = 'recurring_' . $subscription_id . '_' . date('Ymd');
+               // Generate a unique PayPal-Request-Id for idempotency.
+               // Recurring: subscription + date. Admin rebill: caller-supplied unique id.
+               if (!empty($options['request_id'])) {
+                       $request_id = (string)$options['request_id'];
+               } else {
+                       $subscription_id = isset($payment_details['saved_credit_card_recurring_id']) ? $payment_details['saved_credit_card_recurring_id'] : 0;
+                       $request_id = 'recurring_' . $subscription_id . '_' . date('Ymd');
+               }
                $client->setPayPalRequestId($request_id);
                error_log('PayPal REST Request-Id: ' . $request_id);
                // Log the request being sent for debugging
@@ -771,7 +1089,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                
                // Create memo with source information
                $memo = array(
-                       'source' => 'recurring_cron',
+                       'source' => $payment_details['paypal_txn_source'] ?? 'recurring_cron',
                        'subscription_id' => $payment_details['saved_credit_card_recurring_id'] ?? 0,
                );
                

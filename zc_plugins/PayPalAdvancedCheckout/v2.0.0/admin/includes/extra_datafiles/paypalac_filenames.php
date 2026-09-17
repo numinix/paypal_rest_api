@@ -20,3 +20,6 @@ if (!defined('FILENAME_PAYPALAC_SUBSCRIPTIONS_REPORT')) {
 if (!defined('FILENAME_PAYPALAC_WEBHOOK_LOGS')) {
     define('FILENAME_PAYPALAC_WEBHOOK_LOGS', 'paypalac_webhook_logs');
 }
+if (!defined('FILENAME_PAYPALAC_REBILL')) {
+    define('FILENAME_PAYPALAC_REBILL', 'paypalac_rebill');
+}

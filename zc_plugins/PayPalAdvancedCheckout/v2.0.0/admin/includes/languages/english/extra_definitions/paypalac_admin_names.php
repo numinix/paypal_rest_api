@@ -20,3 +20,6 @@ if (!defined('BOX_PAYPALAC_SUBSCRIPTIONS_REPORT')) {
 if (!defined('BOX_PAYPALAC_WEBHOOK_LOGS')) {
     define('BOX_PAYPALAC_WEBHOOK_LOGS', 'PayPal Webhook Logs');
 }
+if (!defined('BOX_PAYPALAC_REBILL')) {
+    define('BOX_PAYPALAC_REBILL', 'PayPal Vault Rebill');
+}

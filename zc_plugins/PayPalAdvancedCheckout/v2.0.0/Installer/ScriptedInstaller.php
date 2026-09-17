@@ -199,6 +199,7 @@ class ScriptedInstaller extends ScriptedInstallerBase
         $pages = [
             ['paypalacSubscriptions', 'BOX_PAYPALAC_SUBSCRIPTIONS', 'paypalac_subscriptions', '', 'customers', 'Y', 90],
             ['paypalacSavedCardRecurring', 'BOX_PAYPALAC_SAVED_CARD_RECURRING', 'paypalac_saved_card_recurring', '', 'customers', 'Y', 91],
+            ['paypalacRebill', 'BOX_PAYPALAC_REBILL', 'paypalac_rebill', '', 'customers', 'Y', 92],
             ['paypalacSubscriptionsReport', 'BOX_PAYPALAC_SUBSCRIPTIONS_REPORT', 'paypalac_subscriptions_report', '', 'reports', 'Y', 90],
             ['paypalacWebhookLogs', 'BOX_PAYPALAC_WEBHOOK_LOGS', 'paypalac_webhook_logs', '', 'tools', 'Y', 90],
         ];
