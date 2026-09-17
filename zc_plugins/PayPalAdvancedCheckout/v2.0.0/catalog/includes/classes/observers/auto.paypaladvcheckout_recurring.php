@@ -1450,6 +1450,8 @@ class zcObserverPaypaladvcheckoutRecurring
         $legacyColumns = [
             'name_on_card' => "'" . zen_db_input($holderName) . "'",
             'paypal_transaction_id' => "'" . $safeVaultId . "'",
+            // Installer default is paypalwpp; vault rows must renew via REST, not PNREF.
+            'api_type' => "'paypalac'",
             'is_primary' => "0",
         ];
         foreach ($legacyColumns as $col => $val) {
