@@ -1370,11 +1370,18 @@ class zcObserverPaypaladvcheckoutRecurring
         // The is_deleted=0 filter must match getSavedCreditCardId() so that both methods
         // agree on whether a usable record exists. Without this, a soft-deleted record
         // would cause syncVault to skip creation while getSavedCreditCardId returns 0.
+        // This method runs up to three times per checkout (vault-saved notify, the re-notify
+        // from ensureSessionVaultPersistedForOrder, then the vault-found path). queryCache
+        // would hand the later calls the first, pre-insert result, so bypass it here.
         $safeVaultId = zen_db_input($vaultId);
         $existing = $db->Execute(
             "SELECT saved_credit_card_id, is_deleted FROM " . TABLE_SAVED_CREDIT_CARDS . "
              WHERE vault_id = '$safeVaultId'
-             LIMIT 1"
+             LIMIT 1",
+            false,
+            false,
+            0,
+            true
         );
         
         if (!$existing->EOF) {
@@ -1437,10 +1444,12 @@ class zcObserverPaypaladvcheckoutRecurring
         $values = "$safeCustomersId, '$safeType', '$safeLastDigits', '$safeExpiryMonth', '$safeExpiryYear', "
                 . "'$safeHolderName', 0, 0, 0, '$safeVaultId', '$now', '$now'";
         
-        // Include legacy columns if they exist in the table to avoid strict mode errors
+        // Include legacy columns if they exist in the table to avoid strict mode errors.
+        // paypal_transaction_id is UNIQUE on some legacy installs. PayPal AC has no Payflow
+        // PNREF — use vault_id (never '') so a second store-card checkout cannot kill OPRC.
         $legacyColumns = [
             'name_on_card' => "'" . zen_db_input($holderName) . "'",
-            'paypal_transaction_id' => "''",
+            'paypal_transaction_id' => "'" . $safeVaultId . "'",
             'is_primary' => "0",
         ];
         foreach ($legacyColumns as $col => $val) {
@@ -1453,12 +1462,30 @@ class zcObserverPaypaladvcheckoutRecurring
             }
         }
         
+        // A concurrent request or a legacy row may already own this value in the UNIQUE
+        // paypal_transaction_id column. IGNORE keeps that from aborting checkout_process
+        // after PayPal has already captured.
         $db->Execute(
-            "INSERT INTO " . TABLE_SAVED_CREDIT_CARDS . " ($columns) VALUES ($values)"
+            "INSERT IGNORE INTO " . TABLE_SAVED_CREDIT_CARDS . " ($columns) VALUES ($values)"
         );
         
-        $savedCreditCardId = $db->Insert_ID();
-        $this->log->write("    SUCCESS: Created saved_credit_card record #$savedCreditCardId for vault_id: $vaultId");
+        $created = $db->Execute(
+            "SELECT saved_credit_card_id FROM " . TABLE_SAVED_CREDIT_CARDS . "
+             WHERE vault_id = '$safeVaultId'
+             LIMIT 1",
+            false,
+            false,
+            0,
+            true
+        );
+        
+        if ($created->EOF) {
+            $this->log->write("    WARNING: saved_credit_cards row for vault_id $vaultId was not created; paypal_transaction_id '$safeVaultId' is already owned by another row.");
+            return;
+        }
+        
+        $savedCreditCardId = (int)$created->fields['saved_credit_card_id'];
+        $this->log->write("    SUCCESS: saved_credit_card record #$savedCreditCardId active for vault_id: $vaultId");
     }
 
     /**
