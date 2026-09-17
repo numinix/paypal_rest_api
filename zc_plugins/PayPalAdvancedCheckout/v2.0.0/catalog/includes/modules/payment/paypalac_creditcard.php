@@ -1291,13 +1291,9 @@ class paypalac_creditcard extends base
 
     public function after_order_create($orders_id)
     {
-        $this->paypalCommon->markCheckoutReservationOrderCreated((int)$orders_id);
-
-        $paymentRow = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0] ?? [];
-        $captureOrAuthId = (string)($paymentRow['id'] ?? '');
-        $this->paypalCommon->markCaptureCheckoutReservationOrderCreated((int)$orders_id, $captureOrAuthId);
-
-        // Store vaulted card data if present in the response
+        // Store vaulted card data if present in the response.
+        // Reservation rows are marked later (after create_add_products) so a concurrent
+        // finalize cannot redirect to a header-only order.
         $card_source = $this->extractCardSource($this->orderInfo);
 
         if ($card_source !== null) {
@@ -1305,8 +1301,18 @@ class paypalac_creditcard extends base
         }
     }
 
+    /**
+     * Publish checkout reservation rows once the Zen order has products.
+     */
+    public function markCheckoutReservationsComplete(): void
+    {
+        $orders_id = (int)($_SESSION['order_number_created'] ?? ($this->orderInfo['orders_id'] ?? 0));
+        $this->paypalCommon->markReservationsOrderComplete($orders_id, is_array($this->orderInfo) ? $this->orderInfo : []);
+    }
+
     public function after_process()
     {
+        $this->markCheckoutReservationsComplete();
         $this->paypalCommon->processAfterOrder($this->orderInfo);
         $this->paypalCommon->updateOrderHistory($this->orderInfo, 'card');
         $this->paypalCommon->releaseAdvancedCheckoutMysqlOrderLock();

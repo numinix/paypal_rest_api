@@ -2309,9 +2309,12 @@ class PayPalCommon {
             if ($existing_oid <= 0) {
                 $existing_oid = (int)GetPayPalOrderTransactions::getOrderIdFromPayPalTxnId($paypal_order_id);
             }
-            if ($existing_oid > 0) {
+            // Only finish once the Zen order has line items. Marking reservations before
+            // create_add_products() used to redirect peers to header-only orders.
+            if ($existing_oid > 0 && $this->zenOrderHasLineItems($existing_oid)) {
                 break;
             }
+            $existing_oid = 0;
             usleep(125000);
         }
 
@@ -2327,7 +2330,46 @@ class PayPalCommon {
     }
 
     /**
-     * Link the reservation row to the new orders_id after order->create.
+     * True when the Zen Cart order has at least one orders_products row.
+     */
+    public function zenOrderHasLineItems(int $orders_id): bool
+    {
+        global $db;
+
+        if ($orders_id <= 0 || !isset($db) || !is_object($db) || !defined('TABLE_ORDERS_PRODUCTS')) {
+            return false;
+        }
+
+        $chk = $db->Execute(
+            "SELECT orders_products_id FROM " . TABLE_ORDERS_PRODUCTS . " WHERE orders_id = " . (int)$orders_id . " LIMIT 1"
+        );
+
+        return !$chk->EOF;
+    }
+
+    /**
+     * Link reservation rows to orders_id after create_add_products (not after order->create).
+     */
+    public function markReservationsOrderComplete(int $orders_id, array $orderInfo = []): void
+    {
+        if ($orders_id <= 0) {
+            return;
+        }
+
+        $this->markCheckoutReservationOrderCreated($orders_id);
+
+        $paymentRow = $orderInfo['purchase_units'][0]['payments']['captures'][0]
+            ?? $orderInfo['purchase_units'][0]['payments']['authorizations'][0]
+            ?? [];
+        $captureOrAuthId = (string)($paymentRow['id'] ?? '');
+        if ($captureOrAuthId === '') {
+            $captureOrAuthId = $this->extractFirstSuccessfulPaymentResourceId($orderInfo);
+        }
+        $this->markCaptureCheckoutReservationOrderCreated($orders_id, $captureOrAuthId);
+    }
+
+    /**
+     * Link the reservation row to the new orders_id after order products exist.
      */
     public function markCheckoutReservationOrderCreated(int $orders_id): void
     {
@@ -2435,9 +2477,10 @@ class PayPalCommon {
             if ($existing_oid <= 0) {
                 $existing_oid = (int)GetPayPalOrderTransactions::getOrderIdFromPayPalTxnId($capture_resource_id);
             }
-            if ($existing_oid > 0) {
+            if ($existing_oid > 0 && $this->zenOrderHasLineItems($existing_oid)) {
                 break;
             }
+            $existing_oid = 0;
             usleep(125000);
         }
 

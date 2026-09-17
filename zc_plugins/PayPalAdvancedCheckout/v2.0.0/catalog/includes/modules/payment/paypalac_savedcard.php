@@ -826,6 +826,11 @@ class paypalac_savedcard extends base
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
         }
 
+        // Match credit-card finalize serialization so parallel OPRC/saved-card submits
+        // cannot each create a Zen Cart order for the same PayPal capture.
+        $this->paypalCommon->acquireAdvancedCheckoutCreditCardCustomerSessionLock();
+        $this->paypalCommon->acquireAdvancedCheckoutMysqlOrderLock();
+
         $response = $this->captureOrAuthorizePayment('card');
 
         $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = $response['status'];
@@ -882,6 +887,11 @@ class paypalac_savedcard extends base
             $order->info['order_status'] = $this->order_status;
         }
 
+        $paymentRow = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0] ?? [];
+        $captureOrAuthId = (string)($paymentRow['id'] ?? '');
+        $this->paypalCommon->reservePayPalCaptureResourceOrFinishExistingCheckout($captureOrAuthId);
+        $this->paypalCommon->reservePayPalOrderIdOrFinishExistingCheckout();
+
         $this->notify('NOTIFY_PAYPALAC_BEFORE_PROCESS_FINISHED', $this->orderInfo);
     }
 
@@ -937,13 +947,25 @@ class paypalac_savedcard extends base
 
     public function after_order_create($orders_id)
     {
-        // Saved cards don't need to store new vault data
+        // Saved cards don't need to store new vault data. Reservation rows are marked
+        // after products are added (see markCheckoutReservationsComplete / after_process).
+    }
+
+    /**
+     * Publish checkout reservation rows once the Zen order has products.
+     */
+    public function markCheckoutReservationsComplete(): void
+    {
+        $orders_id = (int)($_SESSION['order_number_created'] ?? ($this->orderInfo['orders_id'] ?? 0));
+        $this->paypalCommon->markReservationsOrderComplete($orders_id, is_array($this->orderInfo) ? $this->orderInfo : []);
     }
 
     public function after_process()
     {
+        $this->markCheckoutReservationsComplete();
         $this->paypalCommon->processAfterOrder($this->orderInfo);
         $this->paypalCommon->updateOrderHistory($this->orderInfo, 'card');
+        $this->paypalCommon->releaseAdvancedCheckoutMysqlOrderLock();
         $this->paypalCommon->resetOrder();
     }
 
