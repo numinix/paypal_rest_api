@@ -2367,6 +2367,9 @@ function paypalac_get_table_columns($tableName)
     <div class="nmx-container">
         <div class="nmx-container-header">
             <h1><?php echo HEADING_TITLE; ?></h1>
+            <?php if (defined('FILENAME_PAYPALAC_REBILL')) { ?>
+                <p><a class="nmx-btn nmx-btn-sm nmx-btn-primary" href="<?php echo zen_href_link(FILENAME_PAYPALAC_REBILL); ?>">PayPal Vault Rebill</a></p>
+            <?php } ?>
         </div>
     
         <div class="nmx-message-stack">
