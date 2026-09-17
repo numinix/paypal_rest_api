@@ -63,7 +63,22 @@ class zcObserverPaypaladvcheckoutVault
     public function updateNotifyCheckoutProcessAfterOrderCreateAddProducts(&$class, $eventID, $params): void
     {
         $ordersId = (int)($_SESSION['order_number_created'] ?? 0);
-        if ($ordersId <= 0 || isset($this->processedOrders[$ordersId])) {
+        if ($ordersId <= 0) {
+            return;
+        }
+
+        // Publish reservation orders_id only after line items exist so concurrent
+        // finalize requests never redirect to a header-only order.
+        $paymentCode = (string)($_SESSION['payment'] ?? '');
+        if (in_array($paymentCode, ['paypalac_creditcard', 'paypalac_savedcard'], true)
+            && isset($GLOBALS[$paymentCode])
+            && is_object($GLOBALS[$paymentCode])
+            && method_exists($GLOBALS[$paymentCode], 'markCheckoutReservationsComplete')
+        ) {
+            $GLOBALS[$paymentCode]->markCheckoutReservationsComplete();
+        }
+
+        if (isset($this->processedOrders[$ordersId])) {
             return;
         }
 
