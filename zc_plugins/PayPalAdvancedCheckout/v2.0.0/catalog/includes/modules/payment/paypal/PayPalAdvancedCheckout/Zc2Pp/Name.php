@@ -8,6 +8,8 @@
  */
 namespace PayPalAdvancedCheckout\Zc2Pp;
 
+use PayPalAdvancedCheckout\Common\Helpers;
+
 class Name
 {
     public static function get(array $order_address): array
@@ -22,9 +24,9 @@ class Name
             $surname = $order_address['lastname'];
         }
 */
-        $full_name = $order_address['name'] ?? ($order_address['firstname'] . ' ' . $order_address['lastname']);
+        $full_name = $order_address['name'] ?? (($order_address['firstname'] ?? '') . ' ' . ($order_address['lastname'] ?? ''));
         return [
-            'full_name' => $full_name,
+            'full_name' => Helpers::toUtf8($full_name),
         ];
     }
 }

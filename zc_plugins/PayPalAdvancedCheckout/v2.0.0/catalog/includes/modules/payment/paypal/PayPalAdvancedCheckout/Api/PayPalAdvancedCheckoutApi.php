@@ -17,6 +17,7 @@
 namespace PayPalAdvancedCheckout\Api;
 
 use PayPalAdvancedCheckout\Common\ErrorInfo;
+use PayPalAdvancedCheckout\Common\Helpers;
 use PayPalAdvancedCheckout\Common\Logger;
 use PayPalAdvancedCheckout\Common\PayPalShippingCarriers;
 use PayPalAdvancedCheckout\Token\TokenCache;
@@ -1234,7 +1235,19 @@ class PayPalAdvancedCheckoutApi extends ErrorInfo
                 return false;
             }
             if (count($options_array) !== 0) {
-                $curl_options[CURLOPT_POSTFIELDS] = json_encode($options_array);
+                $payload = Helpers::jsonEncodePayload($options_array);
+                if ($payload === null) {
+                    $this->setErrorInfo(
+                        self::ERR_CURL_ERROR,
+                        'Unable to JSON-encode the PayPal request payload (invalid data).'
+                    );
+                    $this->log->write(
+                        'curlPost aborted: json_encode failed after UTF-8 sanitization for ' . $option,
+                        true
+                    );
+                    return false;
+                }
+                $curl_options[CURLOPT_POSTFIELDS] = $payload;
             }
         }
 
@@ -1316,7 +1329,19 @@ class PayPalAdvancedCheckoutApi extends ErrorInfo
         }
 
         if (count($options_array) !== 0) {
-            $curl_options[CURLOPT_POSTFIELDS] = json_encode($options_array);
+            $payload = Helpers::jsonEncodePayload($options_array);
+            if ($payload === null) {
+                $this->setErrorInfo(
+                    self::ERR_CURL_ERROR,
+                    'Unable to JSON-encode the PayPal request payload (invalid data).'
+                );
+                $this->log->write(
+                    'curlPatch aborted: json_encode failed after UTF-8 sanitization for ' . $option,
+                    true
+                );
+                return false;
+            }
+            $curl_options[CURLOPT_POSTFIELDS] = $payload;
         }
         curl_reset($this->ch);
         curl_setopt_array($this->ch, $curl_options);
@@ -1355,7 +1380,19 @@ class PayPalAdvancedCheckoutApi extends ErrorInfo
         }
 
         if (count($options_array) !== 0) {
-            $curl_options[CURLOPT_POSTFIELDS] = json_encode($options_array);
+            $payload = Helpers::jsonEncodePayload($options_array);
+            if ($payload === null) {
+                $this->setErrorInfo(
+                    self::ERR_CURL_ERROR,
+                    'Unable to JSON-encode the PayPal request payload (invalid data).'
+                );
+                $this->log->write(
+                    'curlDelete aborted: json_encode failed after UTF-8 sanitization for ' . $option,
+                    true
+                );
+                return false;
+            }
+            $curl_options[CURLOPT_POSTFIELDS] = $payload;
         }
         curl_reset($this->ch);
         curl_setopt_array($this->ch, $curl_options);

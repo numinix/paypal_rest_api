@@ -228,6 +228,10 @@ class CreatePayPalOrderRequest extends ErrorInfo
         // For venmo - do NOT include payment_source; the PayPal SDK handles the payment source during the wallet authorization flow
         // For paylater Buttons() popup - same (omit payment_source unless PayLaterRedirectApproval is set)
 
+        // Ensure the outbound create-order payload is JSON-safe (invalid UTF-8 in personalisation
+        // previously caused json_encode to fail and PayPal to see an empty body / MISSING_REQUIRED_PARAMETER).
+        $this->request = Helpers::sanitizeForJson($this->request);
+
         $this->log->write("\nCreatePayPalOrderRequest::__construct($ppac_type, ...) finished, request:\n" . Logger::logJSON($this->request, true, true));
     }
     protected function validateOrderAmounts()
@@ -322,10 +326,11 @@ class CreatePayPalOrderRequest extends ErrorInfo
             if (!empty($next_product['attributes'])) {
                 $attribute_values = [];
                 foreach ($next_product['attributes'] as $next_attribute) {
-                    $attribute_values[] = $next_attribute['value'];
+                    $attribute_values[] = Helpers::toUtf8($next_attribute['value'] ?? '');
                 }
                 $name .= ': ' . implode('|', $attribute_values);
             }
+            $name = Helpers::toUtf8($name);
 
             // -----
             // PayPal supports *only* integer-quantities in the order's item list,
@@ -357,7 +362,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             $products_price = $this->getRateConvertedValue($next_product['final_price']);
             $product_is_physical = $this->isProductPhysical($next_product);
             $item = [
-                'name' => substr($name, 0, 127),
+                'name' => Helpers::truncateUtf8($name, 127),
                 'quantity' => $quantity,
                 'category' => ($product_is_physical === true) ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
                 'unit_amount' => $this->amount->setValue($products_price),
@@ -840,10 +845,10 @@ class CreatePayPalOrderRequest extends ErrorInfo
     {
         $payment_source = [
             'name' => [
-                'given_name' => $order->billing['firstname'],
-                'surname' => $order->billing['lastname'],
+                'given_name' => Helpers::toUtf8($order->billing['firstname'] ?? ''),
+                'surname' => Helpers::toUtf8($order->billing['lastname'] ?? ''),
             ],
-            'email_address' => $order->customer['email_address'],
+            'email_address' => Helpers::toUtf8($order->customer['email_address'] ?? ''),
             'address' => Address::get($order->billing),
         ];
         return $payment_source;

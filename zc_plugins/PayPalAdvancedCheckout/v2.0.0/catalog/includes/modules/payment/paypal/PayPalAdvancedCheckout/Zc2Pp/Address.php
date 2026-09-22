@@ -11,20 +11,23 @@
 namespace PayPalAdvancedCheckout\Zc2Pp;
 
 use PayPalAdvancedCheckout\Api\Data\CountryCodes;
+use PayPalAdvancedCheckout\Common\Helpers;
 
 class Address
 {
     public static function get(array $order_address): array
     {
         $paypal_address = [
-            'address_line_1' => $order_address['street_address'],
-            'admin_area_2' => $order_address['city'],
-            'admin_area_1' => (!empty($order_address['state_code'])) ? $order_address['state_code'] : $order_address['state'],
-            'postal_code' => str_replace(' ', '', $order_address['postcode']),
+            'address_line_1' => Helpers::toUtf8($order_address['street_address'] ?? ''),
+            'admin_area_2' => Helpers::toUtf8($order_address['city'] ?? ''),
+            'admin_area_1' => Helpers::toUtf8(
+                (!empty($order_address['state_code'])) ? $order_address['state_code'] : ($order_address['state'] ?? '')
+            ),
+            'postal_code' => str_replace(' ', '', Helpers::toUtf8($order_address['postcode'] ?? '')),
             'country_code' => CountryCodes::convertCountryCode($order_address['country']['iso_code_2'] ?? null),
         ];
         if (!empty($order_address['suburb'])) {
-            $paypal_address['address_line_2'] = $order_address['suburb'];
+            $paypal_address['address_line_2'] = Helpers::toUtf8($order_address['suburb']);
         }
         return $paypal_address;
     }

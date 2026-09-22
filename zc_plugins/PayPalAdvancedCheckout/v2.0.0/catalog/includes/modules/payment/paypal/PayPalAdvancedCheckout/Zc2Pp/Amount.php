@@ -142,14 +142,21 @@ class Amount
     }
     public function setValue(float $value): array
     {
+        if (!is_finite($value)) {
+            $value = 0.0;
+        }
         $amount_value = number_format($value, 2, '.', '');
-        if (self::$defaultCurrencyCode['no_decimals'] === true && strpos($value, '.00') === false) {
+        if (self::$defaultCurrencyCode['no_decimals'] === true && strpos($amount_value, '.00') === false) {
 //            $default_currency_code = self::$defaultCurrencyCode['code'];
 //            $this->log->write("Amount::setValue, value ($amount_value) has unsupported decimal digits for currency $default_currency_code; value is converted to integer.");
             $amount_value = (string)((int)$value);
         }
         $this->amount['value'] = $amount_value;
 
-        return $this->amount;
+        // Return a fresh array so callers do not share a copy-on-write reference to $this->amount.
+        return [
+            'currency_code' => $this->amount['currency_code'],
+            'value' => $amount_value,
+        ];
     }
 }
