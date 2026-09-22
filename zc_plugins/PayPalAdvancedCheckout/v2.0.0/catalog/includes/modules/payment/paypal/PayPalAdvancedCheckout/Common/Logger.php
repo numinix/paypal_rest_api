@@ -78,10 +78,23 @@ class Logger
     public static function logJSON($data, bool $keep_links = false, bool $use_var_export = false): string
     {
         if (is_array($data)) {
-            // Create a deep copy to avoid modifying the original data
-            // Using json_decode/encode is safe for data that will be JSON-encoded anyway
-            $data = json_decode(json_encode($data), true);
-            
+            // Create a deep copy to avoid modifying the original data.
+            // Sanitize first so invalid UTF-8 in personalisation/cart text cannot collapse the copy to null
+            // (which previously logged "NULL" and mirrored the empty createOrder POST body).
+            $flags = 0;
+            if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+                $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+            }
+            $sanitized = Helpers::sanitizeForJson($data);
+            $encoded = json_encode($sanitized, $flags);
+            if ($encoded === false) {
+                return var_export($sanitized, true);
+            }
+            $data = json_decode($encoded, true);
+            if (!is_array($data)) {
+                return var_export($sanitized, true);
+            }
+
             unset(
                 $data[CURLOPT_HTTPHEADER],
                 $data['access_token'],
@@ -114,7 +127,11 @@ class Logger
                 }
             }
         }
-        return ($use_var_export === true) ? var_export($data, true) : json_encode($data, JSON_PRETTY_PRINT);
+        if ($use_var_export === true) {
+            return var_export($data, true);
+        }
+        $pretty = json_encode($data, JSON_PRETTY_PRINT | (defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0));
+        return ($pretty === false) ? var_export($data, true) : $pretty;
     }
 
     public function write(string $message, bool $include_timestamp = false, string $include_separator = '')

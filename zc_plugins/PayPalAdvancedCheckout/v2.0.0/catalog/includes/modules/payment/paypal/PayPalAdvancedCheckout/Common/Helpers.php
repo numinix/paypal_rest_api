@@ -73,4 +73,130 @@ class Helpers
         }
         return preg_replace('/[^a-zA-Z0-9]/', '_', $log_suffix);
     }
+
+    /**
+     * Coerce a string to valid UTF-8 so json_encode() cannot fail and produce an empty PayPal POST body.
+     * Personalisation text / cart attributes sometimes contain invalid byte sequences that MySQL
+     * later "cleans" on insert, which is why order rows can encode while the live cart request cannot.
+     */
+    public static function toUtf8($value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        if (!is_string($value)) {
+            if (is_scalar($value)) {
+                $value = (string)$value;
+            } else {
+                return '';
+            }
+        }
+        if ($value === '') {
+            return '';
+        }
+
+        if (function_exists('mb_check_encoding') && mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        if (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+            if ($converted !== false && $converted !== '') {
+                return $converted;
+            }
+            foreach (['Windows-1252', 'ISO-8859-1'] as $from) {
+                $converted = @iconv($from, 'UTF-8//IGNORE', $value);
+                if ($converted !== false && $converted !== '') {
+                    return $converted;
+                }
+            }
+        }
+
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $encoded = json_encode($value, JSON_INVALID_UTF8_SUBSTITUTE);
+            if ($encoded !== false) {
+                $decoded = json_decode($encoded, true);
+                if (is_string($decoded)) {
+                    return $decoded;
+                }
+            }
+        }
+
+        // Last resort: drop non-ASCII bytes rather than send an unencodable payload.
+        return preg_replace('/[^\x09\x0A\x0D\x20-\x7E]/', '?', $value) ?? '';
+    }
+
+    /**
+     * Truncate to at most $maxChars Unicode characters without splitting a multibyte sequence.
+     * PayPal item name max length is 127 characters; byte-oriented substr() can create invalid UTF-8.
+     */
+    public static function truncateUtf8(string $value, int $maxChars): string
+    {
+        $value = self::toUtf8($value);
+        if ($maxChars < 1) {
+            return '';
+        }
+        if (function_exists('mb_substr')) {
+            return mb_substr($value, 0, $maxChars, 'UTF-8');
+        }
+        return substr($value, 0, $maxChars);
+    }
+
+    /**
+     * Recursively ensure all strings in a PayPal request payload are valid UTF-8.
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    public static function sanitizeForJson($value)
+    {
+        if (is_string($value)) {
+            return self::toUtf8($value);
+        }
+        if (is_array($value)) {
+            $clean = [];
+            foreach ($value as $key => $child) {
+                $cleanKey = is_string($key) ? self::toUtf8($key) : $key;
+                $clean[$cleanKey] = self::sanitizeForJson($child);
+            }
+            return $clean;
+        }
+        if (is_object($value)) {
+            // Preserve empty stdClass objects used as PayPal placeholders (e.g. google_pay).
+            if ($value instanceof \stdClass) {
+                $vars = get_object_vars($value);
+                if ($vars === []) {
+                    return $value;
+                }
+                $clean = new \stdClass();
+                foreach ($vars as $key => $child) {
+                    $clean->{self::toUtf8((string)$key)} = self::sanitizeForJson($child);
+                }
+                return $clean;
+            }
+            return self::sanitizeForJson((array)$value);
+        }
+        if (is_float($value) && (!is_finite($value))) {
+            return 0.0;
+        }
+        return $value;
+    }
+
+    /**
+     * JSON-encode a PayPal API payload. Never returns false for UTF-8 issues.
+     * Returns null only if encoding still fails after sanitization (caller should abort the request).
+     */
+    public static function jsonEncodePayload($value): ?string
+    {
+        $value = self::sanitizeForJson($value);
+        $flags = 0;
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+        if (defined('JSON_PARTIAL_OUTPUT_ON_ERROR')) {
+            $flags |= JSON_PARTIAL_OUTPUT_ON_ERROR;
+        }
+        $encoded = json_encode($value, $flags);
+        return ($encoded === false) ? null : $encoded;
+    }
 }
