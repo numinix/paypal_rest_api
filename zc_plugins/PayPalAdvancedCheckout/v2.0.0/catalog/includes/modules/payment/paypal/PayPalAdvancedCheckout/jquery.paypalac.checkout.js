@@ -27,14 +27,49 @@ jQuery(document).ready(function() {
     }
 
     // PayPal JS SDK may still probe #ppr-choice-paypal .ppr-choice-label on
-    // document clicks. Wallet-only markup omits the legacy choice UI.
-    // Attach the sentinel inside the real PayPal payment-method label so the
-    // word "PayPal" is not orphaned at the bottom of the checkout form/body.
+    // document clicks. Wallet-only markup omits the legacy choice UI, so we keep
+    // a visually-hidden sentinel for that probe. Never leave visible "PayPal"
+    // text under the branded button (OPRC / OPC / default checkout).
+    function applySentinelVisuallyHidden(wrap) {
+        if (!wrap || wrap.closest('.ppr-button-choice')) {
+            return;
+        }
+        wrap.classList.add('paypalac-ppr-choice-sentinel');
+        wrap.setAttribute('aria-hidden', 'true');
+        // Inline styles so this works even when paypalac.css is not loaded yet
+        // (paypalac selection only injects checkout.js on some checkouts).
+        wrap.style.cssText = [
+            'position:absolute',
+            'width:1px',
+            'height:1px',
+            'padding:0',
+            'margin:-1px',
+            'overflow:hidden',
+            'clip:rect(0,0,0,0)',
+            'clip-path:inset(50%)',
+            'white-space:nowrap',
+            'border:0',
+            'pointer-events:none'
+        ].join(';');
+    }
+
     function ensurePayPalChoiceSentinel() {
+        var wrap = document.getElementById('ppr-choice-paypal');
         var label = document.querySelector('#ppr-choice-paypal .ppr-choice-label');
+
+        // Legacy dual PayPal/Card choice UI — leave it alone.
+        if (wrap && wrap.closest('.ppr-button-choice')) {
+            return;
+        }
+
+        // Existing probe-only sentinel (or leftover orphan text from older JS):
+        // hide it and ensure it has probe text without touching the button img.
         if (label) {
-            if (!String(label.textContent || '').trim()) {
-                label.textContent = 'PayPal';
+            if (!label.querySelector('img, iframe, .paypal-buttons')) {
+                if (!String(label.textContent || '').trim()) {
+                    label.textContent = 'PayPal';
+                }
+                applySentinelVisuallyHidden(wrap || label.parentNode);
             }
             return;
         }
@@ -43,7 +78,8 @@ jQuery(document).ready(function() {
         var paymentLabel = document.querySelector('label[for="pmt-paypalac"]')
             || (radio && radio.closest('label'))
             || document.querySelector('.payment-method.paypalac label')
-            || document.querySelector('label.payment-method-item-label[for="pmt-paypalac"]');
+            || document.querySelector('label.payment-method-item-label[for="pmt-paypalac"]')
+            || document.querySelector('label.radioButtonLabel[for="pmt-paypalac"]');
 
         // No PayPal radio on this page (e.g. cart wallets only) — do not create
         // an orphan sentinel under document.body / the checkout form.
@@ -51,36 +87,23 @@ jQuery(document).ready(function() {
             return;
         }
 
-        var wrap = document.getElementById('ppr-choice-paypal');
         if (!wrap) {
             wrap = document.createElement('span');
             wrap.id = 'ppr-choice-paypal';
-            wrap.className = 'paypalac-ppr-choice-sentinel';
             if (paymentLabel) {
-                // Preserve existing label text in-place for the SDK probe.
-                label = document.createElement('span');
-                label.className = 'ppr-choice-label';
-                while (paymentLabel.firstChild) {
-                    label.appendChild(paymentLabel.firstChild);
-                }
-                if (!String(label.textContent || '').trim()) {
-                    label.textContent = 'PayPal';
-                }
-                wrap.appendChild(label);
                 paymentLabel.appendChild(wrap);
-                return;
-            }
-            // Radio exists without a label — keep sentinel next to the radio.
-            if (radio.parentNode) {
+            } else if (radio.parentNode) {
                 radio.parentNode.insertBefore(wrap, radio.nextSibling);
             } else {
                 return;
             }
         }
+
         label = document.createElement('span');
         label.className = 'ppr-choice-label';
         label.textContent = 'PayPal';
         wrap.appendChild(label);
+        applySentinelVisuallyHidden(wrap);
     }
     ensurePayPalChoiceSentinel();
 
@@ -424,26 +447,25 @@ jQuery(document).ready(function() {
     function attachPayPalButtonClickHandler()
     {
         var $checkoutForm = jQuery('form[name="checkout_payment"]');
-        var $paypalButton = jQuery('#ppr-choice-paypal .ppr-choice-label');
         var isWalletOnlyButton = false;
 
-        if (!$paypalButton.length) {
-            // Look for wallet-only button image in the payment method container
-            // The image is in the creditcard-form div, not inside the label
-            $paypalButton = jQuery('.payment-method.paypalac .creditcard-form img');
-        }
+        // Prefer the branded wallet image (OPRC / OPC / default wallet-only).
+        // Do not bind to the sr-only SDK sentinel (.paypalac-ppr-choice-sentinel).
+        var $paypalButton = jQuery('label[for="pmt-paypalac"] img')
+            .add('.payment-method.paypalac label img')
+            .add('.payment-method.paypalac .creditcard-form img')
+            .add('label.radioButtonLabel[for="pmt-paypalac"] img')
+            .first();
 
         if (!$paypalButton.length) {
-            // Fallback: try legacy selector (in case image is inside label in some templates)
-            $paypalButton = jQuery('label.payment-method-item-label[for="pmt-paypalac"] img');
+            // Legacy dual-choice UI only (visible .ppr-button-choice row).
+            $paypalButton = jQuery('.ppr-button-choice #ppr-choice-paypal .ppr-choice-label');
         }
 
-        // Do NOT fall back to the label itself - clicking the label should only
-        // select the radio button, not launch the PayPal wallet modal.
-        // Only the button/image click or form submission should launch the modal.
+        // Do NOT fall back to the payment-method label itself - clicking the label
+        // should only select the radio, not launch the PayPal wallet modal.
 
-        // If we found an image (not the label), this is a wallet-only button
-        isWalletOnlyButton = $paypalButton.length > 0;
+        isWalletOnlyButton = $paypalButton.length > 0 && $paypalButton.is('img');
 
         if ($checkoutForm.length && $paypalButton.length) {
             debugLog('Attaching click handler to button', {
