@@ -130,7 +130,7 @@ function paypalac_upgrade_render_page(): void
     <html <?php echo defined('HTML_PARAMS') ? HTML_PARAMS : 'lang="en"'; ?>>
     <head>
         <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
-        <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
+        <link rel="stylesheet" href="includes/css/numinix_admin.css">
     </head>
     <body>
     <?php require DIR_WS_INCLUDES . 'header.php'; ?>

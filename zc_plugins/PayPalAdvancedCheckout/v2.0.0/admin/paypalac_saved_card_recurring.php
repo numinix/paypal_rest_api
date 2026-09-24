@@ -479,7 +479,7 @@ function scr_pagination_url($page, $perPage, $queryString) {
 <html <?php echo HTML_PARAMS; ?>>
 <head>
     <?php require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
-    <link rel="stylesheet" href="../includes/modules/payment/paypal/PayPalAdvancedCheckout/numinix_admin.css">
+    <link rel="stylesheet" href="includes/css/numinix_admin.css">
     <link rel="stylesheet" href="includes/css/paypalac_saved_card_recurring.css">
 </head>
 <body>

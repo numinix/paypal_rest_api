@@ -370,6 +370,7 @@ class ScriptedInstaller extends ScriptedInstallerBase
                 'auto.PaypalacAdmin.php',
             ],
             'includes/css/' => [
+                'numinix_admin.css',
                 'paypalac_integrated_signup.css',
                 'paypalac_saved_card_recurring.css',
                 'paypalac_signup.css',
