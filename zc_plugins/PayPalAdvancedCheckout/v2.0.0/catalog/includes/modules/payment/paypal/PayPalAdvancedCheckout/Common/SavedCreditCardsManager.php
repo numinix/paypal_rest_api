@@ -203,6 +203,10 @@ class SavedCreditCardsManager
      * - comments: Used by legacy admin pages to append payment history notes
      * - billing_*: Billing address fields for subscription independence
      * - shipping_*: Shipping method and cost captured at subscription creation
+     * - orders_id, orders_products_id, products_id, billing_period, billing_frequency,
+     *   total_billing_cycles, currency_code, profile_id, subscription_attributes_json:
+     *   present on tables created by this class, missing on the older MyISAM table.
+     *   billing_frequency is added before total_billing_cycles so AFTER can place it.
      */
     private static function ensureLegacyColumns(): void
     {
@@ -226,6 +230,15 @@ class SavedCreditCardsManager
             'billing_country_code' => "CHAR(2) DEFAULT NULL COMMENT 'Billing country ISO code (CA, US, etc.)'",
             'shipping_method' => "VARCHAR(255) DEFAULT NULL COMMENT 'Shipping method name'",
             'shipping_cost' => "DECIMAL(15,4) DEFAULT NULL COMMENT 'Shipping cost at time of order'",
+            'orders_id' => 'INT UNSIGNED NOT NULL DEFAULT 0',
+            'orders_products_id' => 'INT UNSIGNED NOT NULL DEFAULT 0',
+            'products_id' => 'INT UNSIGNED NOT NULL DEFAULT 0',
+            'billing_period' => "VARCHAR(16) NOT NULL DEFAULT ''",
+            'billing_frequency' => "SMALLINT UNSIGNED NOT NULL DEFAULT 0 AFTER billing_period",
+            'total_billing_cycles' => 'SMALLINT UNSIGNED NOT NULL DEFAULT 0 AFTER billing_frequency',
+            'currency_code' => "CHAR(3) NOT NULL DEFAULT ''",
+            'profile_id' => "VARCHAR(64) NOT NULL DEFAULT ''",
+            'subscription_attributes_json' => 'TEXT',
         ];
 
         foreach ($columns as $column => $definition) {
