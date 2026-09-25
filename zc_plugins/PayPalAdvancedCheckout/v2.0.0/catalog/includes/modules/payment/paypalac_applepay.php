@@ -149,7 +149,7 @@ class paypalac_applepay extends base
         if ($debug === true) {
             $this->log->enableDebug();
         }
-        $this->emailAlerts = (MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Alerts Only' || MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Log and Email');
+        $this->emailAlerts = (MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Alerts Only' || MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Log File' || MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Log and Email');
 
         // Initialize the shared PayPal common class
         $this->paypalCommon = new PayPalCommon($this);
