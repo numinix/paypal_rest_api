@@ -92,7 +92,7 @@ namespace FraudAlertEmailTest {
                 public bool $emailAlerts;
                 
                 public function __construct(string $debugMode) {
-                    $this->emailAlerts = ($debugMode === 'Alerts Only' || $debugMode === 'Log and Email');
+                    $this->emailAlerts = ($debugMode === 'Alerts Only' || $debugMode === 'Log File' || $debugMode === 'Log and Email');
                 }
             };
 
@@ -149,7 +149,7 @@ namespace FraudAlertEmailTest {
             $this->assertStringContainsString('Lost/Stolen/Fraudulent Card', $GLOBALS['zen_mail_calls'][0]['subject']);
         }
 
-        public function testFraudAlertNotSentWhenDebugModeLogFile(): void
+        public function testFraudAlertSentWhenDebugModeLogFile(): void
         {
             $paypalCommon = $this->createPayPalCommonMock('Log File');
             
@@ -160,8 +160,9 @@ namespace FraudAlertEmailTest {
                 false  // Not forced
             );
             
-            // Verify no email was sent (Log File mode doesn't send emails)
-            $this->assertEmpty($GLOBALS['zen_mail_calls'], 'No email should be sent when debug mode is Log File');
+            // Log File writes the debug log only. Alerts still send.
+            $this->assertCount(1, $GLOBALS['zen_mail_calls'], 'Email should be sent when debug mode is Log File');
+            $this->assertStringContainsString('Lost/Stolen/Fraudulent Card', $GLOBALS['zen_mail_calls'][0]['subject']);
         }
 
         public function testForceSendOverridesDebugModeSetting(): void

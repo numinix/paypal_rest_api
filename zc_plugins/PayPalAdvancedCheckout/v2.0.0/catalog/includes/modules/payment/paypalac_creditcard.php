@@ -151,7 +151,7 @@ class paypalac_creditcard extends base
         if ($debug === true) {
             $this->log->enableDebug();
         }
-        $this->emailAlerts = (MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Alerts Only' || MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Log and Email');
+        $this->emailAlerts = (MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Alerts Only' || MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Log File' || MODULE_PAYMENT_PAYPALAC_DEBUGGING === 'Log and Email');
 
         // Initialize the shared PayPal common class
         $this->paypalCommon = new PayPalCommon($this);
@@ -955,13 +955,46 @@ class paypalac_creditcard extends base
             return false;
         }
 
+        // Stock Luhn / brand / expiry checks. A transposed number still passes the length
+        // check above, and PayPal then returns issue VALIDATION_ERROR with no processor code.
+        require DIR_WS_CLASSES . 'cc_validation.php';
+        $cc_validation = new cc_validation();
+        $result = $cc_validation->validate($cc_number_raw, $expiry_month, $expiry_year);
+        switch ((int)$result) {
+            case -1:
+                $card_error = MODULE_PAYMENT_PAYPALAC_TEXT_BAD_CARD;
+                if ($cc_number === '') {
+                    $card_error = trim(MODULE_PAYMENT_PAYPALAC_TEXT_JS_CC_NUMBER, '* \\n');
+                }
+                break;
+            case -2:
+            case -3:
+            case -4:
+                $card_error = TEXT_CCVAL_ERROR_INVALID_DATE;
+                break;
+            case 0:
+                $card_error = TEXT_CCVAL_ERROR_INVALID_NUMBER;
+                break;
+            default:
+                $card_error = '';
+                break;
+        }
+        if ($card_error !== '') {
+            $messageStack->add_session('checkout_payment', $card_error, 'error');
+            return false;
+        }
+
+        $cc_number = $cc_validation->cc_number;
+        $expiry_month = $cc_validation->cc_expiry_month;
+        $expiry_year = $cc_validation->cc_expiry_year;
+
         $allowSaveCard = ($_SESSION['customer_id'] ?? 0) > 0;
         $forceSaveCard = $allowSaveCard && $this->orderRequiresVaultedCard();
         $storeCard = $allowSaveCard && ($forceSaveCard || paypalac_customer_checked_save_card_post());
         $this->syncCheckoutSaveCardSession($allowSaveCard, true);
 
         $this->ccInfo = [
-            'type' => MODULE_PAYMENT_PAYPALAC_TEXT_CC_TYPE_GENERIC ?? 'Card',
+            'type' => $cc_validation->cc_type,
             'number' => $cc_number,
             'expiry_month' => $expiry_month,
             'expiry_year' => $expiry_year,
