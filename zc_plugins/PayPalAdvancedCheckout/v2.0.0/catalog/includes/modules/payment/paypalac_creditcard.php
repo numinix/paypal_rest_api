@@ -458,7 +458,7 @@ class paypalac_creditcard extends base
             $expires_month[] = ['id' => sprintf('%02u', $month), 'text' => date('F - (m)', mktime(0, 0, 0, $month, 1))];
         }
         $this_year = date('Y');
-        for ($year = $this_year; $year < (int)$this_year + 15; $year++) {
+        for ($year = $this_year; $year < (int)$this_year + 11; $year++) {
             $expires_year[] = ['id' => $year, 'text' => $year];
         }
 
