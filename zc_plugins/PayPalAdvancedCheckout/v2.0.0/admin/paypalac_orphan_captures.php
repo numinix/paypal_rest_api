@@ -36,6 +36,9 @@ if (!defined('FILENAME_PAYPALAC_ORPHAN_CAPTURES')) {
 /** Match cron/paypalac_orphan_capture_alerts.php in-flight skip. */
 const PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES = 5;
 
+/** Stale admin claims (crashed request) become reclaimable after this many minutes. */
+const PAYPALAC_ORPHAN_ADMIN_CLAIM_TTL_MINUTES = 10;
+
 $reservation_table = (defined('DB_PREFIX') ? DB_PREFIX : '') . 'paypal_ac_capture_reservation';
 
 $paymentStub = new class {
@@ -84,9 +87,9 @@ function paypalac_orphan_captures_aged_sql(int $min_age_minutes): string
 
 /**
  * Atomically claim an aged orphan row for admin action.
- * Returns row fields, or null if missing / in-flight / already linked.
+ * Uses admin_claim_token only — never touches alerted_at (email cooldown).
  *
- * @return array<string,mixed>|null
+ * @return array{token:string,row:array<string,mixed>}|null
  */
 function paypalac_orphan_captures_claim_aged_row(string $capture_resource_id, int $min_age_minutes): ?array
 {
@@ -97,16 +100,24 @@ function paypalac_orphan_captures_claim_aged_row(string $capture_resource_id, in
         return null;
     }
 
+    $token = bin2hex(random_bytes(16));
     $esc = zen_db_input($capture_resource_id);
+    $esc_token = zen_db_input($token);
     $aged = paypalac_orphan_captures_aged_sql($min_age_minutes);
+    $ttl = (int)PAYPALAC_ORPHAN_ADMIN_CLAIM_TTL_MINUTES;
 
-    // Claim touch: only succeeds while still orphan + aged (blocks in-flight / linked rows).
-    // Always bump alerted_at so MySQL reports affected rows even when already alerted.
+    // One winner: free claim, or stale claim past TTL (crashed admin request).
     $db->Execute(
         "UPDATE " . $reservation_table . "
-            SET alerted_at = NOW()
+            SET admin_claim_token = '" . $esc_token . "',
+                admin_claimed_at = NOW()
           WHERE capture_resource_id = '" . $esc . "'
             AND " . $aged . "
+            AND (
+                admin_claim_token = ''
+                OR admin_claimed_at IS NULL
+                OR admin_claimed_at < DATE_SUB(NOW(), INTERVAL " . $ttl . " MINUTE)
+            )
           LIMIT 1"
     );
     if ($db->affectedRows() < 1) {
@@ -114,10 +125,47 @@ function paypalac_orphan_captures_claim_aged_row(string $capture_resource_id, in
     }
 
     $chk = $db->Execute(
+        "SELECT capture_resource_id, resource_type, customers_id, paypal_order_id, created_at, alerted_at,
+                admin_claim_token, admin_claimed_at
+           FROM " . $reservation_table . "
+          WHERE capture_resource_id = '" . $esc . "'
+            AND admin_claim_token = '" . $esc_token . "'
+            AND " . $aged . "
+          LIMIT 1"
+    );
+    if ($chk->EOF) {
+        return null;
+    }
+
+    return ['token' => $token, 'row' => $chk->fields];
+}
+
+/**
+ * Confirm claim still holds and row is still an aged orphan (no second UPDATE).
+ *
+ * @return array<string,mixed>|null
+ */
+function paypalac_orphan_captures_recheck_claim(
+    string $capture_resource_id,
+    string $claim_token,
+    int $min_age_minutes
+): ?array {
+    global $db, $reservation_table;
+
+    $capture_resource_id = trim($capture_resource_id);
+    $claim_token = trim($claim_token);
+    if ($capture_resource_id === '' || $claim_token === '') {
+        return null;
+    }
+
+    $esc = zen_db_input($capture_resource_id);
+    $esc_token = zen_db_input($claim_token);
+    $chk = $db->Execute(
         "SELECT capture_resource_id, resource_type, customers_id, paypal_order_id, created_at, alerted_at
            FROM " . $reservation_table . "
           WHERE capture_resource_id = '" . $esc . "'
-            AND " . $aged . "
+            AND admin_claim_token = '" . $esc_token . "'
+            AND " . paypalac_orphan_captures_aged_sql($min_age_minutes) . "
           LIMIT 1"
     );
     if ($chk->EOF) {
@@ -128,26 +176,97 @@ function paypalac_orphan_captures_claim_aged_row(string $capture_resource_id, in
 }
 
 /**
- * Delete orphan reservation row (must still be aged orphan).
+ * Release admin claim without touching alerted_at (failed refund/void / abort).
  */
-function paypalac_orphan_captures_delete_aged_row(string $capture_resource_id, int $min_age_minutes): bool
+function paypalac_orphan_captures_release_claim(string $capture_resource_id, string $claim_token): void
 {
     global $db, $reservation_table;
 
     $capture_resource_id = trim($capture_resource_id);
-    if ($capture_resource_id === '') {
+    $claim_token = trim($claim_token);
+    if ($capture_resource_id === '' || $claim_token === '') {
+        return;
+    }
+
+    $esc = zen_db_input($capture_resource_id);
+    $esc_token = zen_db_input($claim_token);
+    $db->Execute(
+        "UPDATE " . $reservation_table . "
+            SET admin_claim_token = '',
+                admin_claimed_at = NULL
+          WHERE capture_resource_id = '" . $esc . "'
+            AND admin_claim_token = '" . $esc_token . "'
+          LIMIT 1"
+    );
+}
+
+/**
+ * Delete claimed aged orphan row.
+ */
+function paypalac_orphan_captures_delete_claimed_row(
+    string $capture_resource_id,
+    string $claim_token,
+    int $min_age_minutes
+): bool {
+    global $db, $reservation_table;
+
+    $capture_resource_id = trim($capture_resource_id);
+    $claim_token = trim($claim_token);
+    if ($capture_resource_id === '' || $claim_token === '') {
         return false;
     }
 
     $esc = zen_db_input($capture_resource_id);
+    $esc_token = zen_db_input($claim_token);
     $db->Execute(
         "DELETE FROM " . $reservation_table . "
           WHERE capture_resource_id = '" . $esc . "'
+            AND admin_claim_token = '" . $esc_token . "'
             AND " . paypalac_orphan_captures_aged_sql($min_age_minutes) . "
           LIMIT 1"
     );
 
     return $db->affectedRows() > 0;
+}
+
+/**
+ * Shared checkout lock name (same as PayPalCommon::acquireAdvancedCheckoutMysqlOrderLock).
+ */
+function paypalac_orphan_captures_order_lock_name(string $paypal_order_id): string
+{
+    return 'ppac_' . md5($paypal_order_id);
+}
+
+/**
+ * Acquire checkout GET_LOCK for paypal_order_id when present (serialize vs before_process).
+ */
+function paypalac_orphan_captures_acquire_order_lock(string $paypal_order_id): bool
+{
+    global $db;
+
+    $paypal_order_id = trim($paypal_order_id);
+    if ($paypal_order_id === '') {
+        return true;
+    }
+
+    $escaped = zen_db_input(paypalac_orphan_captures_order_lock_name($paypal_order_id));
+    $result = $db->Execute("SELECT GET_LOCK('" . $escaped . "', 5) AS ppac_orphan_lock");
+    $acquired = isset($result->fields['ppac_orphan_lock']) ? (int)$result->fields['ppac_orphan_lock'] : 0;
+
+    return $acquired === 1;
+}
+
+function paypalac_orphan_captures_release_order_lock(string $paypal_order_id): void
+{
+    global $db;
+
+    $paypal_order_id = trim($paypal_order_id);
+    if ($paypal_order_id === '') {
+        return;
+    }
+
+    $escaped = zen_db_input(paypalac_orphan_captures_order_lock_name($paypal_order_id));
+    $db->Execute("SELECT RELEASE_LOCK('" . $escaped . "')");
 }
 
 $action = isset($_POST['action']) ? trim((string)$_POST['action']) : '';
@@ -176,14 +295,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'refund' || $action ==
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
 
+    $claim_token = $claimed['token'];
+    $paypal_order_id = (string)($claimed['row']['paypal_order_id'] ?? '');
+    $order_lock_held = false;
+
+    if (!paypalac_orphan_captures_acquire_order_lock($paypal_order_id)) {
+        paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
+        $messageStack->add_session(ERROR_CHECKOUT_LOCK, 'error');
+        zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
+    }
+    $order_lock_held = ($paypal_order_id !== '');
+
+    // Checkout may have linked orders_id while we waited for GET_LOCK.
+    $recheck = paypalac_orphan_captures_recheck_claim(
+        $capture_resource_id,
+        $claim_token,
+        PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
+    );
+    if ($recheck === null) {
+        paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
+        if ($order_lock_held) {
+            paypalac_orphan_captures_release_order_lock($paypal_order_id);
+        }
+        $messageStack->add_session(ERROR_ROW_NOT_FOUND, 'error');
+        zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
+    }
+
     if ($action === 'dismiss') {
-        if (paypalac_orphan_captures_delete_aged_row($capture_resource_id, PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES)) {
+        if (paypalac_orphan_captures_delete_claimed_row(
+            $capture_resource_id,
+            $claim_token,
+            PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
+        )) {
             $messageStack->add_session(
                 sprintf(SUCCESS_DISMISS, zen_output_string_protected($capture_resource_id)),
                 'success'
             );
         } else {
+            paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
             $messageStack->add_session(ERROR_ROW_NOT_FOUND, 'error');
+        }
+        if ($order_lock_held) {
+            paypalac_orphan_captures_release_order_lock($paypal_order_id);
         }
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
@@ -191,21 +344,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'refund' || $action ==
     // action === refund (capture refund or authorization void)
     $ppr = paypalac_orphan_captures_api();
     if ($ppr === null) {
+        paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
+        if ($order_lock_held) {
+            paypalac_orphan_captures_release_order_lock($paypal_order_id);
+        }
         if (!class_exists('paypalac', false)) {
             $messageStack->add_session(ERROR_MODULE_MISSING, 'error');
         } else {
             $messageStack->add_session(ERROR_API_CREDENTIALS, 'error');
         }
-        zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
-    }
-
-    // Recheck immediately before PayPal call (checkout may have marked orders_id).
-    $recheck = paypalac_orphan_captures_claim_aged_row(
-        $capture_resource_id,
-        PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
-    );
-    if ($recheck === null) {
-        $messageStack->add_session(ERROR_ROW_NOT_FOUND, 'error');
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
 
@@ -271,7 +418,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'refund' || $action ==
     }
 
     if ($api_ok) {
-        paypalac_orphan_captures_delete_aged_row($capture_resource_id, PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES);
+        paypalac_orphan_captures_delete_claimed_row(
+            $capture_resource_id,
+            $claim_token,
+            PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
+        );
         if ($used_void) {
             $messageStack->add_session(
                 sprintf(SUCCESS_VOID, zen_output_string_protected($capture_resource_id)),
@@ -287,6 +438,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'refund' || $action ==
                 'success'
             );
         }
+    } else {
+        // Failed PayPal call: free claim so cron alerts keep working (alerted_at untouched).
+        paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
+    }
+
+    if ($order_lock_held) {
+        paypalac_orphan_captures_release_order_lock($paypal_order_id);
     }
 
     zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));

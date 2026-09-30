@@ -2431,6 +2431,8 @@ class PayPalCommon {
                 created_at DATETIME NOT NULL,
                 alerted_at DATETIME NULL DEFAULT NULL,
                 resource_type VARCHAR(16) NOT NULL DEFAULT '',
+                admin_claim_token VARCHAR(64) NOT NULL DEFAULT '',
+                admin_claimed_at DATETIME NULL DEFAULT NULL,
                 PRIMARY KEY (capture_resource_id),
                 KEY idx_ppac_cap_orders (orders_id),
                 KEY idx_ppac_cap_created (created_at)
@@ -2448,6 +2450,18 @@ class PayPalCommon {
         if ($col->EOF) {
             $db->Execute(
                 "ALTER TABLE " . $table . " ADD resource_type VARCHAR(16) NOT NULL DEFAULT '' AFTER alerted_at"
+            );
+        }
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'admin_claim_token'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD admin_claim_token VARCHAR(64) NOT NULL DEFAULT '' AFTER resource_type"
+            );
+        }
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'admin_claimed_at'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD admin_claimed_at DATETIME NULL DEFAULT NULL AFTER admin_claim_token"
             );
         }
     }

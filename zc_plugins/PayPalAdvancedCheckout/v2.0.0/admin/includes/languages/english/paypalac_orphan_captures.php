@@ -30,7 +30,8 @@ define('TEXT_CONFIRM_DISMISS', 'Delete this reservation row without refunding/vo
 
 define('ERROR_SECURITY_TOKEN', 'Security token mismatch. Please try again.');
 define('ERROR_MISSING_CAPTURE_ID', 'Missing capture/authorization ID.');
-define('ERROR_ROW_NOT_FOUND', 'Reservation row not found, still in-flight (under 5 minutes), or already linked to an order.');
+define('ERROR_ROW_NOT_FOUND', 'Reservation row not found, still in-flight (under 5 minutes), already linked to an order, or claimed by another admin action.');
+define('ERROR_CHECKOUT_LOCK', 'Could not acquire checkout lock for this PayPal order (checkout may be in progress). Try again shortly.');
 define('ERROR_MODULE_MISSING', 'PayPal Advanced Checkout module is not available.');
 define('ERROR_API_CREDENTIALS', 'PayPal API credentials are not configured.');
 define('ERROR_REFUND_FAILED', 'PayPal refund failed for %s: %s');
