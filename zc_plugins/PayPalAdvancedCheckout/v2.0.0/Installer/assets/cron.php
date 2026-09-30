@@ -20,6 +20,7 @@ $allowed = [
     'paypalac_remove_expired_cards',
     'paypalac_subscription_cancellations',
     'paypalac_recurring_reminders',
+    'paypalac_orphan_capture_alerts',
 ];
 
 if ($job === '' || !in_array($job, $allowed, true)) {

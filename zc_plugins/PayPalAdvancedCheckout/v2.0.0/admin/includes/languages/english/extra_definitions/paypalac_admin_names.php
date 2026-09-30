@@ -23,3 +23,6 @@ if (!defined('BOX_PAYPALAC_WEBHOOK_LOGS')) {
 if (!defined('BOX_PAYPALAC_REBILL')) {
     define('BOX_PAYPALAC_REBILL', 'PayPal Vault Rebill');
 }
+if (!defined('BOX_PAYPALAC_ORPHAN_CAPTURES')) {
+    define('BOX_PAYPALAC_ORPHAN_CAPTURES', 'PayPal Orphan Captures');
+}

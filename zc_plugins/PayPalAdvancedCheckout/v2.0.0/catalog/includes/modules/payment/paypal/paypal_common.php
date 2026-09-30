@@ -2418,11 +2418,20 @@ class PayPalCommon {
                 paypal_order_id VARCHAR(64) NOT NULL DEFAULT '',
                 orders_id INT UNSIGNED NOT NULL DEFAULT 0,
                 created_at DATETIME NOT NULL,
+                alerted_at DATETIME NULL DEFAULT NULL,
                 PRIMARY KEY (capture_resource_id),
                 KEY idx_ppac_cap_orders (orders_id),
                 KEY idx_ppac_cap_created (created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
+
+        // Existing installs: CREATE IF NOT EXISTS does not add new columns.
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'alerted_at'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD alerted_at DATETIME NULL DEFAULT NULL AFTER created_at"
+            );
+        }
     }
 
     /**
@@ -2638,5 +2647,113 @@ class PayPalCommon {
         }
 
         return $refunded;
+    }
+
+    /**
+     * Cron / ops: aged orphan reservations due for alert (any customer). No refund/void/delete.
+     * Digests are emailed by cron/paypalac_orphan_capture_alerts.php.
+     *
+     * @param object|null $paymentModule Payment module stub (for log); optional
+     * @param int $min_age_minutes Skip in-flight checkouts newer than this
+     * @param int $alert_cooldown_hours Skip rows already emailed within this window (0 = no cooldown)
+     * @return array{count:int,lines:string[],capture_ids:string[]}
+     */
+    public function alertAgedOrphanCaptureReservations(
+        $paymentModule = null,
+        int $min_age_minutes = 5,
+        int $alert_cooldown_hours = 24
+    ): array {
+        global $db;
+
+        $empty = ['count' => 0, 'lines' => [], 'capture_ids' => []];
+        if (!isset($db) || !is_object($db)) {
+            return $empty;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+        $min_age_minutes = max(1, $min_age_minutes);
+        $alert_cooldown_hours = max(0, $alert_cooldown_hours);
+
+        $sql = "SELECT capture_resource_id, customers_id, paypal_order_id, created_at, alerted_at
+                  FROM " . $table . "
+                 WHERE orders_id = 0
+                   AND created_at < DATE_SUB(NOW(), INTERVAL " . (int)$min_age_minutes . " MINUTE)";
+        if ($alert_cooldown_hours > 0) {
+            $sql .= " AND (alerted_at IS NULL OR alerted_at < DATE_SUB(NOW(), INTERVAL "
+                . (int)$alert_cooldown_hours . " HOUR))";
+        }
+        $sql .= " ORDER BY created_at ASC";
+
+        $rows = $db->Execute($sql);
+
+        if ($rows->EOF) {
+            return $empty;
+        }
+
+        $lines = [];
+        $capture_ids = [];
+        while (!$rows->EOF) {
+            $capture_resource_id = (string)$rows->fields['capture_resource_id'];
+            $capture_ids[] = $capture_resource_id;
+            $lines[] = sprintf(
+                "- capture/auth=%s customer=%d paypal_order=%s created=%s",
+                $capture_resource_id,
+                (int)$rows->fields['customers_id'],
+                (string)($rows->fields['paypal_order_id'] ?? ''),
+                (string)($rows->fields['created_at'] ?? '')
+            );
+            $rows->MoveNext();
+        }
+
+        $logger = ($paymentModule !== null && isset($paymentModule->log) && is_object($paymentModule->log))
+            ? $paymentModule->log
+            : null;
+        if ($logger !== null) {
+            $logger->write(
+                'PayPalCommon::alertAgedOrphanCaptureReservations: ' . count($capture_ids) . " orphan(s) due for alert\n"
+                . implode("\n", $lines)
+            );
+        }
+
+        return [
+            'count' => count($capture_ids),
+            'lines' => $lines,
+            'capture_ids' => $capture_ids,
+        ];
+    }
+
+    /**
+     * Mark orphan reservation rows as alerted so cron cooldown can suppress repeat mail.
+     *
+     * @param string[] $capture_ids
+     */
+    public function markOrphanCaptureReservationsAlerted(array $capture_ids): void
+    {
+        global $db;
+
+        if (!isset($db) || !is_object($db) || $capture_ids === []) {
+            return;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+        $escaped = [];
+        foreach ($capture_ids as $capture_id) {
+            $capture_id = trim((string)$capture_id);
+            if ($capture_id !== '') {
+                $escaped[] = "'" . $db->prepare_input($capture_id) . "'";
+            }
+        }
+        if ($escaped === []) {
+            return;
+        }
+
+        $db->Execute(
+            "UPDATE " . $table . "
+                SET alerted_at = NOW()
+              WHERE orders_id = 0
+                AND capture_resource_id IN (" . implode(',', $escaped) . ")"
+        );
     }
 }

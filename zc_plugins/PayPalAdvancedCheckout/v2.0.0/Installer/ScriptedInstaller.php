@@ -426,6 +426,7 @@ class ScriptedInstaller extends ScriptedInstallerBase
                 'paypalac_remove_expired_cards.php',
                 'paypalac_subscription_cancellations.php',
                 'paypalac_recurring_reminders.php',
+                'paypalac_orphan_capture_alerts.php',
             ],
             'includes/auto_loaders/' => [
                 'paypalac_vault_observer.core.php',
