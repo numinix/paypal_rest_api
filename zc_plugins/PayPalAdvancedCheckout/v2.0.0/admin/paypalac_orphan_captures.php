@@ -2,7 +2,8 @@
 /**
  * Admin: PayPal Advanced Checkout orphan capture reservations (orders_id = 0).
  *
- * List / refund via PayPal API / dismiss (delete row only). Not tied to Zen order refund UI.
+ * List / refund or void via PayPal API / dismiss (delete row only). Not tied to Zen order refund UI.
+ * Only rows older than MIN_AGE_MINUTES are listed or actionable (same cutoff as alert cron).
  */
 
 require 'includes/application_top.php';
@@ -30,7 +31,10 @@ if (!defined('FILENAME_PAYPALAC_ORPHAN_CAPTURES')) {
     define('FILENAME_PAYPALAC_ORPHAN_CAPTURES', 'paypalac_orphan_captures');
 }
 
-require DIR_WS_LANGUAGES . $_SESSION['language'] . '/' . FILENAME_PAYPALAC_ORPHAN_CAPTURES . '.php';
+// Page language is loaded by application_top / LanguageLoader — do not re-require.
+
+/** Match cron/paypalac_orphan_capture_alerts.php in-flight skip. */
+const PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES = 5;
 
 $reservation_table = (defined('DB_PREFIX') ? DB_PREFIX : '') . 'paypal_ac_capture_reservation';
 
@@ -70,9 +74,63 @@ function paypalac_orphan_captures_api(): ?PayPalAdvancedCheckoutApi
 }
 
 /**
- * Delete orphan reservation row (orders_id must still be 0).
+ * Age + still-orphan SQL fragment (orders_id = 0 and older than min age).
  */
-function paypalac_orphan_captures_delete_row(string $capture_resource_id): bool
+function paypalac_orphan_captures_aged_sql(int $min_age_minutes): string
+{
+    return "orders_id = 0
+            AND created_at < DATE_SUB(NOW(), INTERVAL " . (int)$min_age_minutes . " MINUTE)";
+}
+
+/**
+ * Atomically claim an aged orphan row for admin action.
+ * Returns row fields, or null if missing / in-flight / already linked.
+ *
+ * @return array<string,mixed>|null
+ */
+function paypalac_orphan_captures_claim_aged_row(string $capture_resource_id, int $min_age_minutes): ?array
+{
+    global $db, $reservation_table;
+
+    $capture_resource_id = trim($capture_resource_id);
+    if ($capture_resource_id === '') {
+        return null;
+    }
+
+    $esc = zen_db_input($capture_resource_id);
+    $aged = paypalac_orphan_captures_aged_sql($min_age_minutes);
+
+    // Claim touch: only succeeds while still orphan + aged (blocks in-flight / linked rows).
+    // Always bump alerted_at so MySQL reports affected rows even when already alerted.
+    $db->Execute(
+        "UPDATE " . $reservation_table . "
+            SET alerted_at = NOW()
+          WHERE capture_resource_id = '" . $esc . "'
+            AND " . $aged . "
+          LIMIT 1"
+    );
+    if ($db->affectedRows() < 1) {
+        return null;
+    }
+
+    $chk = $db->Execute(
+        "SELECT capture_resource_id, resource_type, customers_id, paypal_order_id, created_at, alerted_at
+           FROM " . $reservation_table . "
+          WHERE capture_resource_id = '" . $esc . "'
+            AND " . $aged . "
+          LIMIT 1"
+    );
+    if ($chk->EOF) {
+        return null;
+    }
+
+    return $chk->fields;
+}
+
+/**
+ * Delete orphan reservation row (must still be aged orphan).
+ */
+function paypalac_orphan_captures_delete_aged_row(string $capture_resource_id, int $min_age_minutes): bool
 {
     global $db, $reservation_table;
 
@@ -85,7 +143,7 @@ function paypalac_orphan_captures_delete_row(string $capture_resource_id): bool
     $db->Execute(
         "DELETE FROM " . $reservation_table . "
           WHERE capture_resource_id = '" . $esc . "'
-            AND orders_id = 0
+            AND " . paypalac_orphan_captures_aged_sql($min_age_minutes) . "
           LIMIT 1"
     );
 
@@ -109,20 +167,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'refund' || $action ==
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
 
-    $chk = $db->Execute(
-        "SELECT capture_resource_id
-           FROM " . $reservation_table . "
-          WHERE capture_resource_id = '" . zen_db_input($capture_resource_id) . "'
-            AND orders_id = 0
-          LIMIT 1"
+    $claimed = paypalac_orphan_captures_claim_aged_row(
+        $capture_resource_id,
+        PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
     );
-    if ($chk->EOF) {
+    if ($claimed === null) {
         $messageStack->add_session(ERROR_ROW_NOT_FOUND, 'error');
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
 
     if ($action === 'dismiss') {
-        if (paypalac_orphan_captures_delete_row($capture_resource_id)) {
+        if (paypalac_orphan_captures_delete_aged_row($capture_resource_id, PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES)) {
             $messageStack->add_session(
                 sprintf(SUCCESS_DISMISS, zen_output_string_protected($capture_resource_id)),
                 'success'
@@ -133,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'refund' || $action ==
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
 
-    // action === refund
+    // action === refund (capture refund or authorization void)
     $ppr = paypalac_orphan_captures_api();
     if ($ppr === null) {
         if (!class_exists('paypalac', false)) {
@@ -144,43 +199,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'refund' || $action ==
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
 
-    $invoice_id = 'PPAC-ORPHAN-ADMIN-' . substr($capture_resource_id, 0, 32);
-    $payer_note = 'Admin refund of orphan checkout capture (no Zen Cart order).';
-    $refund_response = $ppr->refundCaptureFull($capture_resource_id, $invoice_id, $payer_note);
+    // Recheck immediately before PayPal call (checkout may have marked orders_id).
+    $recheck = paypalac_orphan_captures_claim_aged_row(
+        $capture_resource_id,
+        PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
+    );
+    if ($recheck === null) {
+        $messageStack->add_session(ERROR_ROW_NOT_FOUND, 'error');
+        zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
+    }
 
-    $refund_ok = false;
-    $refund_id = '';
-    if (is_array($refund_response)) {
-        $status = strtoupper((string)($refund_response['status'] ?? ''));
-        if (in_array($status, ['COMPLETED', 'PENDING'], true)) {
-            $refund_ok = true;
-            $refund_id = (string)($refund_response['id'] ?? '');
+    $resource_type = strtolower(trim((string)($recheck['resource_type'] ?? '')));
+    $api_ok = false;
+    $result_id = '';
+    $used_void = ($resource_type === 'authorization');
+
+    if ($used_void) {
+        $void_response = $ppr->voidPayment($capture_resource_id);
+        if ($void_response !== false) {
+            $api_ok = true;
+            $result_id = (string)($void_response['id'] ?? $capture_resource_id);
+        } else {
+            $error_info = method_exists($ppr, 'getErrorInfo') ? $ppr->getErrorInfo() : [];
+            $messageStack->add_session(
+                sprintf(
+                    ERROR_VOID_FAILED,
+                    zen_output_string_protected($capture_resource_id),
+                    zen_output_string_protected(json_encode($error_info))
+                ),
+                'error'
+            );
+        }
+    } else {
+        // capture, or unknown legacy rows — try capture refund; auth-shaped unknowns may fail.
+        $invoice_id = 'PPAC-ORPHAN-ADMIN-' . substr($capture_resource_id, 0, 32);
+        $payer_note = 'Admin refund of orphan checkout capture (no Zen Cart order).';
+        $refund_response = $ppr->refundCaptureFull($capture_resource_id, $invoice_id, $payer_note);
+
+        if (is_array($refund_response)) {
+            $status = strtoupper((string)($refund_response['status'] ?? ''));
+            if (in_array($status, ['COMPLETED', 'PENDING'], true)) {
+                $api_ok = true;
+                $result_id = (string)($refund_response['id'] ?? '');
+            }
+        }
+
+        // Unknown type: if capture-refund failed, try void (authorization id).
+        if ($api_ok === false && $resource_type === '') {
+            $void_response = $ppr->voidPayment($capture_resource_id);
+            if ($void_response !== false) {
+                $api_ok = true;
+                $used_void = true;
+                $result_id = (string)($void_response['id'] ?? $capture_resource_id);
+            }
+        }
+
+        if ($api_ok === false) {
+            $error_info = method_exists($ppr, 'getErrorInfo') ? $ppr->getErrorInfo() : [];
+            $detail = is_array($refund_response)
+                ? json_encode($refund_response)
+                : json_encode($error_info);
+            $messageStack->add_session(
+                sprintf(
+                    ERROR_REFUND_FAILED,
+                    zen_output_string_protected($capture_resource_id),
+                    zen_output_string_protected((string)$detail)
+                ),
+                'error'
+            );
         }
     }
 
-    if ($refund_ok) {
-        paypalac_orphan_captures_delete_row($capture_resource_id);
-        $messageStack->add_session(
-            sprintf(
-                SUCCESS_REFUND,
-                zen_output_string_protected($capture_resource_id),
-                zen_output_string_protected($refund_id !== '' ? $refund_id : 'n/a')
-            ),
-            'success'
-        );
-    } else {
-        $error_info = method_exists($ppr, 'getErrorInfo') ? $ppr->getErrorInfo() : [];
-        $detail = is_array($refund_response)
-            ? json_encode($refund_response)
-            : json_encode($error_info);
-        $messageStack->add_session(
-            sprintf(
-                ERROR_REFUND_FAILED,
-                zen_output_string_protected($capture_resource_id),
-                zen_output_string_protected((string)$detail)
-            ),
-            'error'
-        );
+    if ($api_ok) {
+        paypalac_orphan_captures_delete_aged_row($capture_resource_id, PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES);
+        if ($used_void) {
+            $messageStack->add_session(
+                sprintf(SUCCESS_VOID, zen_output_string_protected($capture_resource_id)),
+                'success'
+            );
+        } else {
+            $messageStack->add_session(
+                sprintf(
+                    SUCCESS_REFUND,
+                    zen_output_string_protected($capture_resource_id),
+                    zen_output_string_protected($result_id !== '' ? $result_id : 'n/a')
+                ),
+                'success'
+            );
+        }
     }
 
     zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
@@ -188,11 +294,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'refund' || $action ==
 
 $rows = [];
 $result = $db->Execute(
-    "SELECT r.capture_resource_id, r.customers_id, r.paypal_order_id, r.created_at, r.alerted_at,
+    "SELECT r.capture_resource_id, r.resource_type, r.customers_id, r.paypal_order_id, r.created_at, r.alerted_at,
             c.customers_firstname, c.customers_lastname, c.customers_email_address
        FROM " . $reservation_table . " r
   LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = r.customers_id
       WHERE r.orders_id = 0
+        AND r.created_at < DATE_SUB(NOW(), INTERVAL " . (int)PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES . " MINUTE)
    ORDER BY r.created_at DESC"
 );
 while (!$result->EOF) {
@@ -229,6 +336,7 @@ while (!$result->EOF) {
             <thead>
             <tr>
                 <th><?php echo TABLE_HEADING_CAPTURE; ?></th>
+                <th><?php echo TABLE_HEADING_TYPE; ?></th>
                 <th><?php echo TABLE_HEADING_CUSTOMER; ?></th>
                 <th><?php echo TABLE_HEADING_PAYPAL_ORDER; ?></th>
                 <th><?php echo TABLE_HEADING_CREATED; ?></th>
@@ -239,6 +347,14 @@ while (!$result->EOF) {
             <tbody>
             <?php foreach ($rows as $row) {
                 $capture_id = (string)$row['capture_resource_id'];
+                $resource_type = strtolower(trim((string)($row['resource_type'] ?? '')));
+                $is_auth = ($resource_type === 'authorization');
+                $type_label = TEXT_TYPE_UNKNOWN;
+                if ($resource_type === 'capture') {
+                    $type_label = TEXT_TYPE_CAPTURE;
+                } elseif ($is_auth) {
+                    $type_label = TEXT_TYPE_AUTHORIZATION;
+                }
                 $cid = (int)$row['customers_id'];
                 $name = trim((string)($row['customers_firstname'] ?? '') . ' ' . (string)($row['customers_lastname'] ?? ''));
                 $email = trim((string)($row['customers_email_address'] ?? ''));
@@ -250,9 +366,12 @@ while (!$result->EOF) {
                     $customer_label = sprintf(TEXT_CUSTOMER_UNKNOWN, $cid);
                 }
                 $alerted = trim((string)($row['alerted_at'] ?? ''));
+                $confirm = $is_auth ? TEXT_CONFIRM_VOID : TEXT_CONFIRM_REFUND;
+                $action_label = $is_auth ? BUTTON_VOID : BUTTON_REFUND;
                 ?>
                 <tr>
                     <td class="ppac-orphan-mono"><?php echo zen_output_string_protected($capture_id); ?></td>
+                    <td><?php echo zen_output_string_protected($type_label); ?></td>
                     <td><?php echo $customer_label; ?></td>
                     <td class="ppac-orphan-mono"><?php echo zen_output_string_protected((string)($row['paypal_order_id'] ?? '')); ?></td>
                     <td><?php echo zen_output_string_protected((string)($row['created_at'] ?? '')); ?></td>
@@ -263,8 +382,8 @@ while (!$result->EOF) {
                             <?php echo zen_draw_hidden_field('action', 'refund'); ?>
                             <?php echo zen_draw_hidden_field('capture_resource_id', $capture_id); ?>
                             <button type="submit" class="btn btn-warning"
-                                    onclick="return confirm(<?php echo json_encode(TEXT_CONFIRM_REFUND, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>);">
-                                <?php echo BUTTON_REFUND; ?>
+                                    onclick="return confirm(<?php echo json_encode($confirm, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>);">
+                                <?php echo $action_label; ?>
                             </button>
                         </form>
                         <?php echo zen_draw_form('orphan_dismiss_' . md5($capture_id), FILENAME_PAYPALAC_ORPHAN_CAPTURES, '', 'post'); ?>

@@ -1800,9 +1800,12 @@ class PayPalCommon {
         // before before_process runs. before_process calls reserve again; reserve detects the same
         // PayPal order id on the row and returns without waiting (see reservePayPalCaptureResourceOrFinishExistingCheckout).
         if ($ppac_type === 'card') {
-            $immediate_payment_id = $this->extractFirstSuccessfulPaymentResourceId($paypal_order);
-            if ($immediate_payment_id !== '') {
-                $this->reservePayPalCaptureResourceOrFinishExistingCheckout($immediate_payment_id);
+            $immediate_payment = $this->extractFirstSuccessfulPaymentResource($paypal_order);
+            if ($immediate_payment['id'] !== '') {
+                $this->reservePayPalCaptureResourceOrFinishExistingCheckout(
+                    $immediate_payment['id'],
+                    $immediate_payment['type']
+                );
             }
         }
 
@@ -1861,10 +1864,18 @@ class PayPalCommon {
      */
     protected function extractFirstSuccessfulPaymentResourceId(array $paypal_order): string
     {
+        return $this->extractFirstSuccessfulPaymentResource($paypal_order)['id'];
+    }
+
+    /**
+     * @return array{id:string,type:string} type is capture|authorization|''
+     */
+    protected function extractFirstSuccessfulPaymentResource(array $paypal_order): array
+    {
         $failed_statuses = ['DECLINED', 'DENIED', 'FAILED'];
         $purchase_units = $paypal_order['purchase_units'] ?? [];
         if (!is_array($purchase_units)) {
-            return '';
+            return ['id' => '', 'type' => ''];
         }
 
         foreach ($purchase_units as $purchase_unit) {
@@ -1875,7 +1886,7 @@ class PayPalCommon {
             if (!is_array($payments)) {
                 continue;
             }
-            foreach (['captures', 'authorizations'] as $payment_key) {
+            foreach (['captures' => 'capture', 'authorizations' => 'authorization'] as $payment_key => $resource_type) {
                 $entries = $payments[$payment_key] ?? [];
                 if (!is_array($entries)) {
                     continue;
@@ -1890,13 +1901,13 @@ class PayPalCommon {
                     }
                     $id = trim((string)($entry['id'] ?? ''));
                     if ($id !== '') {
-                        return $id;
+                        return ['id' => $id, 'type' => $resource_type];
                     }
                 }
             }
         }
 
-        return '';
+        return ['id' => '', 'type' => ''];
     }
 
     /**
@@ -2419,6 +2430,7 @@ class PayPalCommon {
                 orders_id INT UNSIGNED NOT NULL DEFAULT 0,
                 created_at DATETIME NOT NULL,
                 alerted_at DATETIME NULL DEFAULT NULL,
+                resource_type VARCHAR(16) NOT NULL DEFAULT '',
                 PRIMARY KEY (capture_resource_id),
                 KEY idx_ppac_cap_orders (orders_id),
                 KEY idx_ppac_cap_created (created_at)
@@ -2432,14 +2444,22 @@ class PayPalCommon {
                 "ALTER TABLE " . $table . " ADD alerted_at DATETIME NULL DEFAULT NULL AFTER created_at"
             );
         }
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'resource_type'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD resource_type VARCHAR(16) NOT NULL DEFAULT '' AFTER alerted_at"
+            );
+        }
     }
 
     /**
      * Claim this capture/authorization id before Zen creates the order. Duplicate claims
      * wait for orders_id then redirect to checkout success (same as PayPal order reservation).
      */
-    public function reservePayPalCaptureResourceOrFinishExistingCheckout(string $capture_resource_id): void
-    {
+    public function reservePayPalCaptureResourceOrFinishExistingCheckout(
+        string $capture_resource_id,
+        string $resource_type = ''
+    ): void {
         global $db;
 
         $capture_resource_id = trim($capture_resource_id);
@@ -2447,15 +2467,22 @@ class PayPalCommon {
             return;
         }
 
+        $resource_type = strtolower(trim($resource_type));
+        if (!in_array($resource_type, ['capture', 'authorization'], true)) {
+            $resource_type = '';
+        }
+
         $this->ensureCaptureCheckoutReservationTable();
         $esc = $db->prepare_input($capture_resource_id);
+        $esc_type = $db->prepare_input($resource_type);
         $cid = (int)($_SESSION['customer_id'] ?? 0);
         $paypal_order_id = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '');
         $esc_po = $db->prepare_input($paypal_order_id);
         $table = $this->checkoutCaptureReservationTableName();
 
         $db->Execute(
-            "INSERT IGNORE INTO " . $table . " (capture_resource_id, customers_id, paypal_order_id, orders_id, created_at) VALUES ('" . $esc . "', " . $cid . ", '" . $esc_po . "', 0, NOW())"
+            "INSERT IGNORE INTO " . $table . " (capture_resource_id, customers_id, paypal_order_id, orders_id, created_at, resource_type)
+             VALUES ('" . $esc . "', " . $cid . ", '" . $esc_po . "', 0, NOW(), '" . $esc_type . "')"
         );
 
         if ($db->affectedRows() > 0) {
@@ -2465,12 +2492,23 @@ class PayPalCommon {
         // Same checkout pipeline may call reserve twice (createPayPalOrder then before_process). The row
         // already belongs to this PayPal order with orders_id still 0 — do not wait (would deadlock).
         $ownerChk = $db->Execute(
-            "SELECT orders_id, paypal_order_id FROM " . $table . " WHERE capture_resource_id = '" . $esc . "' LIMIT 1"
+            "SELECT orders_id, paypal_order_id, resource_type FROM " . $table . " WHERE capture_resource_id = '" . $esc . "' LIMIT 1"
         );
         if (!$ownerChk->EOF) {
             $row_orders_id = (int)($ownerChk->fields['orders_id'] ?? 0);
             $row_paypal_order_id = (string)($ownerChk->fields['paypal_order_id'] ?? '');
             if ($row_orders_id === 0 && $row_paypal_order_id !== '' && $row_paypal_order_id === $paypal_order_id) {
+                $row_type = trim((string)($ownerChk->fields['resource_type'] ?? ''));
+                if ($resource_type !== '' && $row_type === '') {
+                    $db->Execute(
+                        "UPDATE " . $table . "
+                            SET resource_type = '" . $esc_type . "'
+                          WHERE capture_resource_id = '" . $esc . "'
+                            AND orders_id = 0
+                            AND resource_type = ''
+                          LIMIT 1"
+                    );
+                }
                 return;
             }
         }
