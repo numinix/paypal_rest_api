@@ -878,6 +878,23 @@ class paypalac extends base
                         }
                     }
 
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '2.0.2', '<'): //- Fall through from above
+                    // Admin orphan capture reservations (orders_id = 0) — refund/dismiss outside order UI.
+                    $zc150 = (PROJECT_VERSION_MAJOR > 1 || (PROJECT_VERSION_MAJOR == 1 && substr(PROJECT_VERSION_MINOR, 0, 3) >= 5));
+                    if ($zc150 && function_exists('zen_page_key_exists') && function_exists('zen_register_admin_page')) {
+                        if (!zen_page_key_exists('paypalacOrphanCaptures')) {
+                            zen_register_admin_page(
+                                'paypalacOrphanCaptures',
+                                'BOX_PAYPALAC_ORPHAN_CAPTURES',
+                                'FILENAME_PAYPALAC_ORPHAN_CAPTURES',
+                                '',
+                                'customers',
+                                'Y',
+                                13
+                            );
+                        }
+                    }
+
                 default:    //- Fall through from above
                     break;
             }

@@ -23,3 +23,6 @@ if (!defined('FILENAME_PAYPALAC_WEBHOOK_LOGS')) {
 if (!defined('FILENAME_PAYPALAC_REBILL')) {
     define('FILENAME_PAYPALAC_REBILL', 'paypalac_rebill');
 }
+if (!defined('FILENAME_PAYPALAC_ORPHAN_CAPTURES')) {
+    define('FILENAME_PAYPALAC_ORPHAN_CAPTURES', 'paypalac_orphan_captures');
+}

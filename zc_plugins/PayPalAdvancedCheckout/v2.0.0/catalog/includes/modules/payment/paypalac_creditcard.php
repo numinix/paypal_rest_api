@@ -1216,9 +1216,19 @@ class paypalac_creditcard extends base
         // Store vault card data in session if present
         $this->storeVaultCardDataInSession($this->orderInfo);
 
-        $paymentRow = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0] ?? [];
-        $captureOrAuthId = (string)($paymentRow['id'] ?? '');
-        $this->paypalCommon->reservePayPalCaptureResourceOrFinishExistingCheckout($captureOrAuthId);
+        $captureRow = $this->orderInfo['purchase_units'][0]['payments']['captures'][0] ?? null;
+        $authRow = $this->orderInfo['purchase_units'][0]['payments']['authorizations'][0] ?? null;
+        if (is_array($captureRow) && trim((string)($captureRow['id'] ?? '')) !== '') {
+            $this->paypalCommon->reservePayPalCaptureResourceOrFinishExistingCheckout(
+                (string)$captureRow['id'],
+                'capture'
+            );
+        } elseif (is_array($authRow) && trim((string)($authRow['id'] ?? '')) !== '') {
+            $this->paypalCommon->reservePayPalCaptureResourceOrFinishExistingCheckout(
+                (string)$authRow['id'],
+                'authorization'
+            );
+        }
 
         $this->paypalCommon->reservePayPalOrderIdOrFinishExistingCheckout();
     }

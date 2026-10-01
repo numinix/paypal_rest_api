@@ -200,6 +200,7 @@ class ScriptedInstaller extends ScriptedInstallerBase
             ['paypalacSubscriptions', 'BOX_PAYPALAC_SUBSCRIPTIONS', 'paypalac_subscriptions', '', 'customers', 'Y', 90],
             ['paypalacSavedCardRecurring', 'BOX_PAYPALAC_SAVED_CARD_RECURRING', 'paypalac_saved_card_recurring', '', 'customers', 'Y', 91],
             ['paypalacRebill', 'BOX_PAYPALAC_REBILL', 'paypalac_rebill', '', 'customers', 'Y', 92],
+            ['paypalacOrphanCaptures', 'BOX_PAYPALAC_ORPHAN_CAPTURES', 'paypalac_orphan_captures', '', 'customers', 'Y', 93],
             ['paypalacSubscriptionsReport', 'BOX_PAYPALAC_SUBSCRIPTIONS_REPORT', 'paypalac_subscriptions_report', '', 'reports', 'Y', 90],
             ['paypalacWebhookLogs', 'BOX_PAYPALAC_WEBHOOK_LOGS', 'paypalac_webhook_logs', '', 'tools', 'Y', 90],
         ];
@@ -359,6 +360,7 @@ class ScriptedInstaller extends ScriptedInstallerBase
         $adminFiles = [
             '' => [
                 'paypalac_integrated_signup.php',
+                'paypalac_orphan_captures.php',
                 'paypalac_saved_card_recurring.php',
                 'paypalac_signup.php',
                 'paypalac_subscriptions_report.php',
@@ -390,6 +392,7 @@ class ScriptedInstaller extends ScriptedInstallerBase
                 'paypalac_subscriptions.js',
             ],
             'includes/languages/english/' => [
+                'paypalac_orphan_captures.php',
                 'paypalac_saved_card_recurring.php',
                 'paypalac_subscriptions_report.php',
                 'paypalac_subscriptions.php',
@@ -426,6 +429,7 @@ class ScriptedInstaller extends ScriptedInstallerBase
                 'paypalac_remove_expired_cards.php',
                 'paypalac_subscription_cancellations.php',
                 'paypalac_recurring_reminders.php',
+                'paypalac_orphan_capture_alerts.php',
             ],
             'includes/auto_loaders/' => [
                 'paypalac_vault_observer.core.php',

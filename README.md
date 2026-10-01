@@ -36,9 +36,12 @@ Prefer the stable dispatcher (survives version upgrades):
 
 ```bash
 php zc_plugins/PayPalAdvancedCheckout/cron.php paypalac_saved_card_recurring
+php zc_plugins/PayPalAdvancedCheckout/cron.php paypalac_orphan_capture_alerts
 ```
 
 Legacy `cron/paypalac_*.php` shims under the catalog root are redeployed on install/upgrade for existing crontab entries.
+
+`paypalac_orphan_capture_alerts` emails ops about aged `paypal_ac_capture_reservation` rows with `orders_id = 0` (no auto-refund). Clear via Admin → Customers → PayPal Orphan Captures.
 
 The AC recurring cron only bills `saved_credit_cards_recurring` rows whose source order used a `paypalac%` payment module **or** whose saved card is linked to `paypal_vault`. Legacy Payflow / offline-invoice schedules stay on the store’s legacy recurring tools.
 

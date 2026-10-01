@@ -338,6 +338,7 @@ php cron/paypalac_saved_card_recurring.php</code></pre>
             <li><strong>Expired card cleanup:</strong> <code>cron/paypalac_remove_expired_cards.php</code><br>Marks expired cards as deleted in <code>TABLE_SAVED_CREDIT_CARDS</code> and sets expired PayPal vault records to <code>status=expired</code> in <code>TABLE_PAYPAL_VAULT</code>.</li>
             <li><strong>Scheduled cancellation processing:</strong> <code>cron/paypalac_subscription_cancellations.php</code><br>Applies scheduled subscription cancellations by removing customer group pricing after the cancellation expiration date and deleting processed rows from <code>TABLE_SUBSCRIPTION_CANCELLATIONS</code>.</li>
             <li><strong>Reminder and notice emails:</strong> <code>cron/paypalac_recurring_reminders.php</code><br>Sends renewal reminders, upcoming payment reminders, and expiration notices for recurring subscriptions (including legacy recurring profiles when enabled).</li>
+            <li><strong>Orphan capture alerts:</strong> <code>cron/paypalac_orphan_capture_alerts.php</code> (or <code>zc_plugins/PayPalAdvancedCheckout/cron.php paypalac_orphan_capture_alerts</code>)<br>Emails ops when a PayPal capture/authorization was reserved but never linked to a Zen Cart order (<code>paypal_ac_capture_reservation.orders_id = 0</code>). Alert only — no automatic refund. Clear rows via Customers → PayPal Orphan Captures (Refund or Dismiss).</li>
           </ul>
           <p class="bodyText">Example scheduling cadence:</p>
           <pre class="sh_bash" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code># every 6 hours: flag expired saved/vault cards
@@ -347,11 +348,15 @@ php cron/paypalac_saved_card_recurring.php</code></pre>
 15 2 * * * /usr/bin/php /path/to/your/store/cron/paypalac_subscription_cancellations.php &gt;&gt; /path/to/your/store/logs/paypalac/subscription-cancellations.log 2&gt;&amp;1
 
 # once daily: send reminders/notices
-30 2 * * * /usr/bin/php /path/to/your/store/cron/paypalac_recurring_reminders.php &gt;&gt; /path/to/your/store/logs/paypalac/recurring-reminders.log 2&gt;&amp;1</code></pre>
+30 2 * * * /usr/bin/php /path/to/your/store/cron/paypalac_recurring_reminders.php &gt;&gt; /path/to/your/store/logs/paypalac/recurring-reminders.log 2&gt;&amp;1
+
+# every 15 minutes: orphan capture alert digest (aged orders_id=0 reservations)
+*/15 * * * * /usr/bin/php /path/to/your/store/zc_plugins/PayPalAdvancedCheckout/cron.php paypalac_orphan_capture_alerts &gt;&gt; /path/to/your/store/logs/paypalac/orphan-capture-alerts.log 2&gt;&amp;1</code></pre>
           <p class="bodyText">Manual run checks from your store root:</p>
           <pre class="sh_bash" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>php cron/paypalac_remove_expired_cards.php
 php cron/paypalac_subscription_cancellations.php
-php cron/paypalac_recurring_reminders.php</code></pre>
+php cron/paypalac_recurring_reminders.php
+php zc_plugins/PayPalAdvancedCheckout/cron.php paypalac_orphan_capture_alerts</code></pre>
 
           <h4>Store-owner troubleshooting highlights</h4>
           <ul class="bodyList">

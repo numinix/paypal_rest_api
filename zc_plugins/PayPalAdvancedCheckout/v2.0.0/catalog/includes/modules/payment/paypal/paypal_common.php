@@ -1800,9 +1800,12 @@ class PayPalCommon {
         // before before_process runs. before_process calls reserve again; reserve detects the same
         // PayPal order id on the row and returns without waiting (see reservePayPalCaptureResourceOrFinishExistingCheckout).
         if ($ppac_type === 'card') {
-            $immediate_payment_id = $this->extractFirstSuccessfulPaymentResourceId($paypal_order);
-            if ($immediate_payment_id !== '') {
-                $this->reservePayPalCaptureResourceOrFinishExistingCheckout($immediate_payment_id);
+            $immediate_payment = $this->extractFirstSuccessfulPaymentResource($paypal_order);
+            if ($immediate_payment['id'] !== '') {
+                $this->reservePayPalCaptureResourceOrFinishExistingCheckout(
+                    $immediate_payment['id'],
+                    $immediate_payment['type']
+                );
             }
         }
 
@@ -1861,10 +1864,18 @@ class PayPalCommon {
      */
     protected function extractFirstSuccessfulPaymentResourceId(array $paypal_order): string
     {
+        return $this->extractFirstSuccessfulPaymentResource($paypal_order)['id'];
+    }
+
+    /**
+     * @return array{id:string,type:string} type is capture|authorization|''
+     */
+    protected function extractFirstSuccessfulPaymentResource(array $paypal_order): array
+    {
         $failed_statuses = ['DECLINED', 'DENIED', 'FAILED'];
         $purchase_units = $paypal_order['purchase_units'] ?? [];
         if (!is_array($purchase_units)) {
-            return '';
+            return ['id' => '', 'type' => ''];
         }
 
         foreach ($purchase_units as $purchase_unit) {
@@ -1875,7 +1886,7 @@ class PayPalCommon {
             if (!is_array($payments)) {
                 continue;
             }
-            foreach (['captures', 'authorizations'] as $payment_key) {
+            foreach (['captures' => 'capture', 'authorizations' => 'authorization'] as $payment_key => $resource_type) {
                 $entries = $payments[$payment_key] ?? [];
                 if (!is_array($entries)) {
                     continue;
@@ -1890,13 +1901,13 @@ class PayPalCommon {
                     }
                     $id = trim((string)($entry['id'] ?? ''));
                     if ($id !== '') {
-                        return $id;
+                        return ['id' => $id, 'type' => $resource_type];
                     }
                 }
             }
         }
 
-        return '';
+        return ['id' => '', 'type' => ''];
     }
 
     /**
@@ -2418,19 +2429,51 @@ class PayPalCommon {
                 paypal_order_id VARCHAR(64) NOT NULL DEFAULT '',
                 orders_id INT UNSIGNED NOT NULL DEFAULT 0,
                 created_at DATETIME NOT NULL,
+                alerted_at DATETIME NULL DEFAULT NULL,
+                resource_type VARCHAR(16) NOT NULL DEFAULT '',
+                admin_claim_token VARCHAR(64) NOT NULL DEFAULT '',
+                admin_claimed_at DATETIME NULL DEFAULT NULL,
                 PRIMARY KEY (capture_resource_id),
                 KEY idx_ppac_cap_orders (orders_id),
                 KEY idx_ppac_cap_created (created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
+
+        // Existing installs: CREATE IF NOT EXISTS does not add new columns.
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'alerted_at'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD alerted_at DATETIME NULL DEFAULT NULL AFTER created_at"
+            );
+        }
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'resource_type'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD resource_type VARCHAR(16) NOT NULL DEFAULT '' AFTER alerted_at"
+            );
+        }
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'admin_claim_token'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD admin_claim_token VARCHAR(64) NOT NULL DEFAULT '' AFTER resource_type"
+            );
+        }
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'admin_claimed_at'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD admin_claimed_at DATETIME NULL DEFAULT NULL AFTER admin_claim_token"
+            );
+        }
     }
 
     /**
      * Claim this capture/authorization id before Zen creates the order. Duplicate claims
      * wait for orders_id then redirect to checkout success (same as PayPal order reservation).
      */
-    public function reservePayPalCaptureResourceOrFinishExistingCheckout(string $capture_resource_id): void
-    {
+    public function reservePayPalCaptureResourceOrFinishExistingCheckout(
+        string $capture_resource_id,
+        string $resource_type = ''
+    ): void {
         global $db;
 
         $capture_resource_id = trim($capture_resource_id);
@@ -2438,15 +2481,22 @@ class PayPalCommon {
             return;
         }
 
+        $resource_type = strtolower(trim($resource_type));
+        if (!in_array($resource_type, ['capture', 'authorization'], true)) {
+            $resource_type = '';
+        }
+
         $this->ensureCaptureCheckoutReservationTable();
         $esc = $db->prepare_input($capture_resource_id);
+        $esc_type = $db->prepare_input($resource_type);
         $cid = (int)($_SESSION['customer_id'] ?? 0);
         $paypal_order_id = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '');
         $esc_po = $db->prepare_input($paypal_order_id);
         $table = $this->checkoutCaptureReservationTableName();
 
         $db->Execute(
-            "INSERT IGNORE INTO " . $table . " (capture_resource_id, customers_id, paypal_order_id, orders_id, created_at) VALUES ('" . $esc . "', " . $cid . ", '" . $esc_po . "', 0, NOW())"
+            "INSERT IGNORE INTO " . $table . " (capture_resource_id, customers_id, paypal_order_id, orders_id, created_at, resource_type)
+             VALUES ('" . $esc . "', " . $cid . ", '" . $esc_po . "', 0, NOW(), '" . $esc_type . "')"
         );
 
         if ($db->affectedRows() > 0) {
@@ -2456,12 +2506,23 @@ class PayPalCommon {
         // Same checkout pipeline may call reserve twice (createPayPalOrder then before_process). The row
         // already belongs to this PayPal order with orders_id still 0 — do not wait (would deadlock).
         $ownerChk = $db->Execute(
-            "SELECT orders_id, paypal_order_id FROM " . $table . " WHERE capture_resource_id = '" . $esc . "' LIMIT 1"
+            "SELECT orders_id, paypal_order_id, resource_type FROM " . $table . " WHERE capture_resource_id = '" . $esc . "' LIMIT 1"
         );
         if (!$ownerChk->EOF) {
             $row_orders_id = (int)($ownerChk->fields['orders_id'] ?? 0);
             $row_paypal_order_id = (string)($ownerChk->fields['paypal_order_id'] ?? '');
             if ($row_orders_id === 0 && $row_paypal_order_id !== '' && $row_paypal_order_id === $paypal_order_id) {
+                $row_type = trim((string)($ownerChk->fields['resource_type'] ?? ''));
+                if ($resource_type !== '' && $row_type === '') {
+                    $db->Execute(
+                        "UPDATE " . $table . "
+                            SET resource_type = '" . $esc_type . "'
+                          WHERE capture_resource_id = '" . $esc . "'
+                            AND orders_id = 0
+                            AND resource_type = ''
+                          LIMIT 1"
+                    );
+                }
                 return;
             }
         }
@@ -2638,5 +2699,113 @@ class PayPalCommon {
         }
 
         return $refunded;
+    }
+
+    /**
+     * Cron / ops: aged orphan reservations due for alert (any customer). No refund/void/delete.
+     * Digests are emailed by cron/paypalac_orphan_capture_alerts.php.
+     *
+     * @param object|null $paymentModule Payment module stub (for log); optional
+     * @param int $min_age_minutes Skip in-flight checkouts newer than this
+     * @param int $alert_cooldown_hours Skip rows already emailed within this window (0 = no cooldown)
+     * @return array{count:int,lines:string[],capture_ids:string[]}
+     */
+    public function alertAgedOrphanCaptureReservations(
+        $paymentModule = null,
+        int $min_age_minutes = 5,
+        int $alert_cooldown_hours = 24
+    ): array {
+        global $db;
+
+        $empty = ['count' => 0, 'lines' => [], 'capture_ids' => []];
+        if (!isset($db) || !is_object($db)) {
+            return $empty;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+        $min_age_minutes = max(1, $min_age_minutes);
+        $alert_cooldown_hours = max(0, $alert_cooldown_hours);
+
+        $sql = "SELECT capture_resource_id, customers_id, paypal_order_id, created_at, alerted_at
+                  FROM " . $table . "
+                 WHERE orders_id = 0
+                   AND created_at < DATE_SUB(NOW(), INTERVAL " . (int)$min_age_minutes . " MINUTE)";
+        if ($alert_cooldown_hours > 0) {
+            $sql .= " AND (alerted_at IS NULL OR alerted_at < DATE_SUB(NOW(), INTERVAL "
+                . (int)$alert_cooldown_hours . " HOUR))";
+        }
+        $sql .= " ORDER BY created_at ASC";
+
+        $rows = $db->Execute($sql);
+
+        if ($rows->EOF) {
+            return $empty;
+        }
+
+        $lines = [];
+        $capture_ids = [];
+        while (!$rows->EOF) {
+            $capture_resource_id = (string)$rows->fields['capture_resource_id'];
+            $capture_ids[] = $capture_resource_id;
+            $lines[] = sprintf(
+                "- capture/auth=%s customer=%d paypal_order=%s created=%s",
+                $capture_resource_id,
+                (int)$rows->fields['customers_id'],
+                (string)($rows->fields['paypal_order_id'] ?? ''),
+                (string)($rows->fields['created_at'] ?? '')
+            );
+            $rows->MoveNext();
+        }
+
+        $logger = ($paymentModule !== null && isset($paymentModule->log) && is_object($paymentModule->log))
+            ? $paymentModule->log
+            : null;
+        if ($logger !== null) {
+            $logger->write(
+                'PayPalCommon::alertAgedOrphanCaptureReservations: ' . count($capture_ids) . " orphan(s) due for alert\n"
+                . implode("\n", $lines)
+            );
+        }
+
+        return [
+            'count' => count($capture_ids),
+            'lines' => $lines,
+            'capture_ids' => $capture_ids,
+        ];
+    }
+
+    /**
+     * Mark orphan reservation rows as alerted so cron cooldown can suppress repeat mail.
+     *
+     * @param string[] $capture_ids
+     */
+    public function markOrphanCaptureReservationsAlerted(array $capture_ids): void
+    {
+        global $db;
+
+        if (!isset($db) || !is_object($db) || $capture_ids === []) {
+            return;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+        $escaped = [];
+        foreach ($capture_ids as $capture_id) {
+            $capture_id = trim((string)$capture_id);
+            if ($capture_id !== '') {
+                $escaped[] = "'" . $db->prepare_input($capture_id) . "'";
+            }
+        }
+        if ($escaped === []) {
+            return;
+        }
+
+        $db->Execute(
+            "UPDATE " . $table . "
+                SET alerted_at = NOW()
+              WHERE orders_id = 0
+                AND capture_resource_id IN (" . implode(',', $escaped) . ")"
+        );
     }
 }
