@@ -24,12 +24,19 @@ define('TEXT_TYPE_UNKNOWN', 'Unknown');
 define('BUTTON_REFUND', 'Refund');
 define('BUTTON_VOID', 'Void');
 define('BUTTON_DISMISS', 'Dismiss');
-define('TEXT_CONFIRM_REFUND', 'Refund this PayPal capture via the API and remove the reservation row?');
-define('TEXT_CONFIRM_VOID', 'Void this PayPal authorization via the API and remove the reservation row?');
-define('TEXT_CONFIRM_DISMISS', 'Delete this reservation row without refunding/voiding at PayPal?');
+define('BUTTON_CONFIRM', 'Confirm');
+define('BUTTON_CANCEL', 'Cancel');
+
+define('TEXT_CONFIRM_HEADING_REFUND', 'Confirm refund');
+define('TEXT_CONFIRM_HEADING_VOID', 'Confirm void');
+define('TEXT_CONFIRM_HEADING_DISMISS', 'Confirm dismiss');
+define('TEXT_CONFIRM_REFUND', 'Refund this PayPal capture via the API and remove the reservation row? This cannot be undone from Zen Cart.');
+define('TEXT_CONFIRM_VOID', 'Void this PayPal authorization via the API and remove the reservation row? This cannot be undone from Zen Cart.');
+define('TEXT_CONFIRM_DISMISS', 'Delete this reservation row without refunding or voiding at PayPal? The PayPal payment will remain until handled separately.');
 
 define('ERROR_SECURITY_TOKEN', 'Security token mismatch. Please try again.');
 define('ERROR_MISSING_CAPTURE_ID', 'Missing capture/authorization ID.');
+define('ERROR_CONFIRM_REQUIRED', 'Confirmation required. Choose Confirm on the confirmation panel to proceed.');
 define('ERROR_ROW_NOT_FOUND', 'Reservation row not found, still in-flight (under 5 minutes), already linked to an order, or claimed by another admin action.');
 define('ERROR_CHECKOUT_LOCK', 'Could not acquire checkout lock for this PayPal order (checkout may be in progress). Try again shortly.');
 define('ERROR_MODULE_MISSING', 'PayPal Advanced Checkout module is not available.');

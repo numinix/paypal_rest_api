@@ -269,8 +269,44 @@ function paypalac_orphan_captures_release_order_lock(string $paypal_order_id): v
     $db->Execute("SELECT RELEASE_LOCK('" . $escaped . "')");
 }
 
+/**
+ * Load aged orphan row for confirm panel (read-only; no claim).
+ *
+ * @return array<string,mixed>|null
+ */
+function paypalac_orphan_captures_load_aged_row(string $capture_resource_id, int $min_age_minutes): ?array
+{
+    global $db, $reservation_table;
+
+    $capture_resource_id = trim($capture_resource_id);
+    if ($capture_resource_id === '') {
+        return null;
+    }
+
+    $esc = zen_db_input($capture_resource_id);
+    $chk = $db->Execute(
+        "SELECT r.capture_resource_id, r.resource_type, r.customers_id, r.paypal_order_id, r.created_at, r.alerted_at,
+                c.customers_firstname, c.customers_lastname, c.customers_email_address
+           FROM " . $reservation_table . " r
+      LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = r.customers_id
+          WHERE r.capture_resource_id = '" . $esc . "'
+            AND " . paypalac_orphan_captures_aged_sql($min_age_minutes) . "
+          LIMIT 1"
+    );
+    if ($chk->EOF) {
+        return null;
+    }
+
+    return $chk->fields;
+}
+
+$confirm_panel = null;
 $action = isset($_POST['action']) ? trim((string)$_POST['action']) : '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'refund' || $action === 'dismiss')) {
+$confirmed = isset($_POST['confirmed']) && (string)$_POST['confirmed'] === '1';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && in_array($action, ['refund_confirm', 'dismiss_confirm', 'refund', 'dismiss'], true)
+) {
     $sessionToken = $_SESSION['securityToken'] ?? '';
     $requestToken = $_POST['securityToken'] ?? '';
     if ($sessionToken === '' || $requestToken !== $sessionToken) {
@@ -278,6 +314,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($action === 'refund' || $action ==
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
 
+    $capture_resource_id = isset($_POST['capture_resource_id'])
+        ? trim((string)$_POST['capture_resource_id'])
+        : '';
+    if ($capture_resource_id === '') {
+        $messageStack->add_session(ERROR_MISSING_CAPTURE_ID, 'error');
+        zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
+    }
+
+    // Step 1: show confirm panel only (no claim / PayPal / delete).
+    if ($action === 'refund_confirm' || $action === 'dismiss_confirm') {
+        $row = paypalac_orphan_captures_load_aged_row(
+            $capture_resource_id,
+            PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
+        );
+        if ($row === null) {
+            $messageStack->add_session(ERROR_ROW_NOT_FOUND, 'error');
+            zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
+        }
+        $confirm_panel = [
+            'execute_action' => ($action === 'dismiss_confirm') ? 'dismiss' : 'refund',
+            'row' => $row,
+        ];
+    } elseif (($action === 'refund' || $action === 'dismiss') && !$confirmed) {
+        $messageStack->add_session(ERROR_CONFIRM_REQUIRED, 'error');
+        zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && ($action === 'refund' || $action === 'dismiss')
+    && $confirmed
+) {
     $capture_resource_id = isset($_POST['capture_resource_id'])
         ? trim((string)$_POST['capture_resource_id'])
         : '';
@@ -479,6 +547,18 @@ while (!$result->EOF) {
         .ppac-orphan-actions form { display: inline-block; margin: 0 .25rem .25rem 0; }
         .ppac-orphan-mono { font-family: monospace; font-size: 12px; word-break: break-all; }
         .ppac-orphan-empty { padding: 1rem; color: #666; }
+        .ppac-orphan-confirm {
+            max-width: 720px;
+            margin: 0 0 1.5rem;
+            padding: 1rem 1.25rem;
+            border: 1px solid #c9a227;
+            background: #fff8e6;
+        }
+        .ppac-orphan-confirm h2 { margin: 0 0 .75rem; font-size: 1.25rem; }
+        .ppac-orphan-confirm dl { margin: 0 0 1rem; }
+        .ppac-orphan-confirm dt { font-weight: 600; margin-top: .35rem; }
+        .ppac-orphan-confirm dd { margin: 0 0 .25rem; }
+        .ppac-orphan-confirm-actions form { display: inline-block; margin: 0 .5rem .25rem 0; }
     </style>
 </head>
 <body>
@@ -486,6 +566,77 @@ while (!$result->EOF) {
 <div class="container-fluid">
     <h1><?php echo HEADING_TITLE; ?></h1>
     <p class="ppac-orphan-intro"><?php echo TEXT_ORPHAN_INTRO; ?></p>
+
+    <?php if (is_array($confirm_panel)) {
+        $crow = $confirm_panel['row'];
+        $c_capture = (string)($crow['capture_resource_id'] ?? '');
+        $c_type = strtolower(trim((string)($crow['resource_type'] ?? '')));
+        $c_is_auth = ($c_type === 'authorization');
+        $c_type_label = TEXT_TYPE_UNKNOWN;
+        if ($c_type === 'capture') {
+            $c_type_label = TEXT_TYPE_CAPTURE;
+        } elseif ($c_is_auth) {
+            $c_type_label = TEXT_TYPE_AUTHORIZATION;
+        }
+        $c_cid = (int)($crow['customers_id'] ?? 0);
+        $c_name = trim((string)($crow['customers_firstname'] ?? '') . ' ' . (string)($crow['customers_lastname'] ?? ''));
+        $c_email = trim((string)($crow['customers_email_address'] ?? ''));
+        if ($c_name !== '' || $c_email !== '') {
+            $c_customer = ($c_name !== '' ? zen_output_string_protected($c_name) : '')
+                . ($c_email !== '' ? ' &lt;' . zen_output_string_protected($c_email) . '&gt;' : '')
+                . ' (#' . $c_cid . ')';
+        } else {
+            $c_customer = sprintf(TEXT_CUSTOMER_UNKNOWN, $c_cid);
+        }
+        $execute_action = (string)$confirm_panel['execute_action'];
+        if ($execute_action === 'dismiss') {
+            $confirm_heading = TEXT_CONFIRM_HEADING_DISMISS;
+            $confirm_intro = TEXT_CONFIRM_DISMISS;
+            $confirm_btn_class = 'btn-warning';
+            $confirm_btn_label = BUTTON_DISMISS;
+        } elseif ($c_is_auth) {
+            $confirm_heading = TEXT_CONFIRM_HEADING_VOID;
+            $confirm_intro = TEXT_CONFIRM_VOID;
+            $confirm_btn_class = 'btn-danger';
+            $confirm_btn_label = BUTTON_VOID;
+        } else {
+            $confirm_heading = TEXT_CONFIRM_HEADING_REFUND;
+            $confirm_intro = TEXT_CONFIRM_REFUND;
+            $confirm_btn_class = 'btn-danger';
+            $confirm_btn_label = BUTTON_REFUND;
+        }
+        ?>
+        <div class="ppac-orphan-confirm">
+            <h2><?php echo $confirm_heading; ?></h2>
+            <p><?php echo $confirm_intro; ?></p>
+            <dl>
+                <dt><?php echo TABLE_HEADING_CAPTURE; ?></dt>
+                <dd class="ppac-orphan-mono"><?php echo zen_output_string_protected($c_capture); ?></dd>
+                <dt><?php echo TABLE_HEADING_TYPE; ?></dt>
+                <dd><?php echo zen_output_string_protected($c_type_label); ?></dd>
+                <dt><?php echo TABLE_HEADING_CUSTOMER; ?></dt>
+                <dd><?php echo $c_customer; ?></dd>
+                <dt><?php echo TABLE_HEADING_PAYPAL_ORDER; ?></dt>
+                <dd class="ppac-orphan-mono"><?php echo zen_output_string_protected((string)($crow['paypal_order_id'] ?? '')); ?></dd>
+                <dt><?php echo TABLE_HEADING_CREATED; ?></dt>
+                <dd><?php echo zen_output_string_protected((string)($crow['created_at'] ?? '')); ?></dd>
+            </dl>
+            <div class="ppac-orphan-confirm-actions">
+                <?php echo zen_draw_form('orphan_confirm_execute', FILENAME_PAYPALAC_ORPHAN_CAPTURES, '', 'post'); ?>
+                    <?php echo zen_draw_hidden_field('securityToken', $_SESSION['securityToken'] ?? ''); ?>
+                    <?php echo zen_draw_hidden_field('action', $execute_action); ?>
+                    <?php echo zen_draw_hidden_field('confirmed', '1'); ?>
+                    <?php echo zen_draw_hidden_field('capture_resource_id', $c_capture); ?>
+                    <button type="submit" class="btn <?php echo $confirm_btn_class; ?>">
+                        <?php echo BUTTON_CONFIRM; ?> — <?php echo $confirm_btn_label; ?>
+                    </button>
+                </form>
+                <a class="btn btn-default" href="<?php echo zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES); ?>">
+                    <?php echo BUTTON_CANCEL; ?>
+                </a>
+            </div>
+        </div>
+    <?php } ?>
 
     <?php if ($rows === []) { ?>
         <p class="ppac-orphan-empty"><?php echo TEXT_NO_ORPHANS; ?></p>
@@ -524,7 +675,6 @@ while (!$result->EOF) {
                     $customer_label = sprintf(TEXT_CUSTOMER_UNKNOWN, $cid);
                 }
                 $alerted = trim((string)($row['alerted_at'] ?? ''));
-                $confirm = $is_auth ? TEXT_CONFIRM_VOID : TEXT_CONFIRM_REFUND;
                 $action_label = $is_auth ? BUTTON_VOID : BUTTON_REFUND;
                 ?>
                 <tr>
@@ -537,19 +687,17 @@ while (!$result->EOF) {
                     <td class="ppac-orphan-actions">
                         <?php echo zen_draw_form('orphan_refund_' . md5($capture_id), FILENAME_PAYPALAC_ORPHAN_CAPTURES, '', 'post'); ?>
                             <?php echo zen_draw_hidden_field('securityToken', $_SESSION['securityToken'] ?? ''); ?>
-                            <?php echo zen_draw_hidden_field('action', 'refund'); ?>
+                            <?php echo zen_draw_hidden_field('action', 'refund_confirm'); ?>
                             <?php echo zen_draw_hidden_field('capture_resource_id', $capture_id); ?>
-                            <button type="submit" class="btn btn-warning"
-                                    onclick="return confirm(<?php echo json_encode($confirm, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>);">
+                            <button type="submit" class="btn btn-warning">
                                 <?php echo $action_label; ?>
                             </button>
                         </form>
                         <?php echo zen_draw_form('orphan_dismiss_' . md5($capture_id), FILENAME_PAYPALAC_ORPHAN_CAPTURES, '', 'post'); ?>
                             <?php echo zen_draw_hidden_field('securityToken', $_SESSION['securityToken'] ?? ''); ?>
-                            <?php echo zen_draw_hidden_field('action', 'dismiss'); ?>
+                            <?php echo zen_draw_hidden_field('action', 'dismiss_confirm'); ?>
                             <?php echo zen_draw_hidden_field('capture_resource_id', $capture_id); ?>
-                            <button type="submit" class="btn btn-default"
-                                    onclick="return confirm(<?php echo json_encode(TEXT_CONFIRM_DISMISS, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>);">
+                            <button type="submit" class="btn btn-default">
                                 <?php echo BUTTON_DISMISS; ?>
                             </button>
                         </form>
