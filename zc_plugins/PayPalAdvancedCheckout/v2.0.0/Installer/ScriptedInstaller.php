@@ -360,6 +360,7 @@ class ScriptedInstaller extends ScriptedInstallerBase
         $adminFiles = [
             '' => [
                 'paypalac_integrated_signup.php',
+                'paypalac_orphan_captures.php',
                 'paypalac_saved_card_recurring.php',
                 'paypalac_signup.php',
                 'paypalac_subscriptions_report.php',
@@ -391,6 +392,7 @@ class ScriptedInstaller extends ScriptedInstallerBase
                 'paypalac_subscriptions.js',
             ],
             'includes/languages/english/' => [
+                'paypalac_orphan_captures.php',
                 'paypalac_saved_card_recurring.php',
                 'paypalac_subscriptions_report.php',
                 'paypalac_subscriptions.php',

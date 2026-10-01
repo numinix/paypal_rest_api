@@ -10,15 +10,59 @@
  * checkouts are not reported. Each capture id is emailed at most once per 24 hours
  * until resolved (orders_id set, or cleared via Admin → Customers → PayPal Orphan Captures).
  *
- * Run from any CWD, e.g. php /path/to/cron/paypalac_orphan_capture_alerts.php
+ * Run from any CWD:
+ *   php cron/paypalac_orphan_capture_alerts.php
+ *   php zc_plugins/PayPalAdvancedCheckout/cron.php paypalac_orphan_capture_alerts
  */
 
-require __DIR__ . '/../includes/configure.php';
+// Dual resolve: catalog-root cron/ shim, or encapsulated catalog/cron via stable dispatcher.
+$ppacConfigure = null;
+foreach ([
+    __DIR__ . '/../includes/configure.php',
+    __DIR__ . '/../../../../../includes/configure.php',
+] as $ppacConfigureCandidate) {
+    if (is_file($ppacConfigureCandidate)) {
+        $ppacConfigure = $ppacConfigureCandidate;
+        break;
+    }
+}
+if ($ppacConfigure === null) {
+    $ppacWalk = __DIR__;
+    for ($ppacI = 0; $ppacI < 8; $ppacI++) {
+        $ppacConfigureCandidate = $ppacWalk . '/includes/configure.php';
+        if (is_file($ppacConfigureCandidate)) {
+            $ppacConfigure = $ppacConfigureCandidate;
+            break;
+        }
+        $ppacParent = dirname($ppacWalk);
+        if ($ppacParent === $ppacWalk) {
+            break;
+        }
+        $ppacWalk = $ppacParent;
+    }
+}
+if ($ppacConfigure === null) {
+    fwrite(STDERR, "PayPal orphan alert cron: includes/configure.php not found from " . __DIR__ . "\n");
+    exit(1);
+}
+require $ppacConfigure;
+
 ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'));
 chdir(DIR_FS_CATALOG);
 require_once 'includes/application_top.php';
-require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
-require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_common.php';
+
+// Prefer encapsulated package (overlay modules may be purged); fall back to legacy paths.
+if (is_file(DIR_FS_CATALOG . 'ppac_paths.php')) {
+    require_once DIR_FS_CATALOG . 'ppac_paths.php';
+    ppac_require_catalog_includes_file('modules/payment/paypal/ppacAutoload.php');
+    ppac_require_catalog_includes_file('modules/payment/paypal/paypal_common.php');
+} elseif (is_file(dirname(__DIR__) . '/includes/modules/payment/paypal/ppacAutoload.php')) {
+    require_once dirname(__DIR__) . '/includes/modules/payment/paypal/ppacAutoload.php';
+    require_once dirname(__DIR__) . '/includes/modules/payment/paypal/paypal_common.php';
+} else {
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
+    require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_common.php';
+}
 
 use PayPalAdvancedCheckout\Common\Logger;
 

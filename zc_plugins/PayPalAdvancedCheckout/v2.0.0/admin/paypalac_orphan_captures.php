@@ -21,8 +21,10 @@ if (function_exists('zen_page_key_exists') && function_exists('zen_register_admi
     );
 }
 
-require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/ppacAutoload.php';
-require_once DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypal/paypal_common.php';
+// Encapsulated package paths (overlay copies under DIR_FS_CATALOG are purged on install).
+$ppacPluginCatalog = dirname(__DIR__) . '/catalog';
+require_once $ppacPluginCatalog . '/includes/modules/payment/paypal/ppacAutoload.php';
+require_once $ppacPluginCatalog . '/includes/modules/payment/paypal/paypal_common.php';
 
 use PayPalAdvancedCheckout\Api\PayPalAdvancedCheckoutApi;
 use PayPalAdvancedCheckout\Common\Logger;
@@ -55,7 +57,7 @@ $paypalCommon->ensureCaptureCheckoutReservationTable();
 function paypalac_orphan_captures_api(): ?PayPalAdvancedCheckoutApi
 {
     if (!class_exists('paypalac', false)) {
-        $modulePath = DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/paypalac.php';
+        $modulePath = dirname(__DIR__) . '/catalog/includes/modules/payment/paypalac.php';
         if (!is_file($modulePath)) {
             return null;
         }
