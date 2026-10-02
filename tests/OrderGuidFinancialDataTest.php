@@ -7,8 +7,10 @@
  *    PayPal's PayPal-Request-Id header limit
  * 2. Changes when the order total changes (e.g. store credit applied)
  * 3. Changes when store credit session data changes
- * 4. Changes when wallet payload changes
- * 5. Remains stable when inputs don't change
+ * 4. Changes when gift credit (cot_gv) or coupon (cc_id) session data changes
+ * 5. Keeps store-credit / gift-credit field pairs from colliding in the hash
+ * 6. Changes when wallet payload changes
+ * 7. Remains stable when inputs don't change
  *
  * Background:
  * - The GUID is used as the PayPal-Request-Id header for idempotency
@@ -79,6 +81,9 @@ class OrderGuidFinancialDataTest
         $this->testGuidStability();
         $this->testGuidChangesWithTotal();
         $this->testGuidChangesWithStoreCredit();
+        $this->testGuidChangesWithGiftCredit();
+        $this->testGuidChangesWithCouponId();
+        $this->testGuidDelimitedCreditFieldsDoNotCollide();
         $this->testGuidChangesWithWalletPayload();
         $this->testGuidUuidFormat();
 
@@ -169,9 +174,86 @@ class OrderGuidFinancialDataTest
         echo "\n";
     }
 
+    private function testGuidChangesWithGiftCredit(): void
+    {
+        echo "Test 5: GUID changes when gift credit (cot_gv) session data changes\n";
+        $this->resetSession();
+        $common = new PayPalCommon(new class {});
+        $order = $this->makeOrder();
+
+        $guid_no_credit = $common->createOrderGuid($order, 'card');
+
+        $_SESSION['cot_gv'] = 15.00;
+        $guid_with_credit = $common->createOrderGuid($order, 'card');
+
+        $_SESSION['cot_gv'] = 25.00;
+        $guid_different_credit = $common->createOrderGuid($order, 'card');
+
+        $passed = ($guid_no_credit !== $guid_with_credit) && ($guid_with_credit !== $guid_different_credit);
+
+        echo "  GUID (no cot_gv):     $guid_no_credit\n";
+        echo "  GUID (cot_gv=15):     $guid_with_credit\n";
+        echo "  GUID (cot_gv=25):     $guid_different_credit\n";
+        echo ($passed ? "  ✓ GUID changed with gift credit changes\n" : "  ✗ GUID did NOT change with gift credit changes\n");
+
+        $this->testResults[] = ['name' => 'GUID changes with gift credit', 'passed' => $passed];
+        echo "\n";
+    }
+
+    private function testGuidChangesWithCouponId(): void
+    {
+        echo "Test 6: GUID changes when coupon (cc_id) session data changes\n";
+        $this->resetSession();
+        $common = new PayPalCommon(new class {});
+        $order = $this->makeOrder();
+
+        $guid_no_coupon = $common->createOrderGuid($order, 'card');
+
+        $_SESSION['cc_id'] = [178];
+        $guid_with_coupon = $common->createOrderGuid($order, 'card');
+
+        $_SESSION['cc_id'] = [179];
+        $guid_different_coupon = $common->createOrderGuid($order, 'card');
+
+        $passed = ($guid_no_coupon !== $guid_with_coupon) && ($guid_with_coupon !== $guid_different_coupon);
+
+        echo "  GUID (no cc_id):      $guid_no_coupon\n";
+        echo "  GUID (cc_id=178):     $guid_with_coupon\n";
+        echo "  GUID (cc_id=179):     $guid_different_coupon\n";
+        echo ($passed ? "  ✓ GUID changed with coupon id changes\n" : "  ✗ GUID did NOT change with coupon id changes\n");
+
+        $this->testResults[] = ['name' => 'GUID changes with coupon id', 'passed' => $passed];
+        echo "\n";
+    }
+
+    private function testGuidDelimitedCreditFieldsDoNotCollide(): void
+    {
+        echo "Test 7: Delimited storecredit/cot_gv fields do not collide\n";
+        $this->resetSession();
+        $common = new PayPalCommon(new class {});
+        $order = $this->makeOrder();
+
+        $_SESSION['storecredit'] = 1.0;
+        $_SESSION['cot_gv'] = 23.0;
+        $guid_pair_a = $common->createOrderGuid($order, 'card');
+
+        $_SESSION['storecredit'] = 12.0;
+        $_SESSION['cot_gv'] = 3.0;
+        $guid_pair_b = $common->createOrderGuid($order, 'card');
+
+        $passed = ($guid_pair_a !== $guid_pair_b);
+
+        echo "  GUID (storecredit=1, cot_gv=23):  $guid_pair_a\n";
+        echo "  GUID (storecredit=12, cot_gv=3):  $guid_pair_b\n";
+        echo ($passed ? "  ✓ Delimited credit fields produce different GUIDs\n" : "  ✗ Credit field pairs collided in GUID hash\n");
+
+        $this->testResults[] = ['name' => 'GUID credit fields delimited', 'passed' => $passed];
+        echo "\n";
+    }
+
     private function testGuidChangesWithWalletPayload(): void
     {
-        echo "Test 5: GUID changes when wallet payload changes\n";
+        echo "Test 8: GUID changes when wallet payload changes\n";
         $this->resetSession();
         $common = new PayPalCommon(new class {});
         $order = $this->makeOrder();
@@ -197,7 +279,7 @@ class OrderGuidFinancialDataTest
 
     private function testGuidUuidFormat(): void
     {
-        echo "Test 6: GUID matches UUID-like format (8-4-4-4-12)\n";
+        echo "Test 9: GUID matches UUID-like format (8-4-4-4-12)\n";
         $this->resetSession();
         $common = new PayPalCommon(new class {});
         $order = $this->makeOrder();
