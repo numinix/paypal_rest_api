@@ -503,33 +503,42 @@ class CreatePayPalOrderRequest extends ErrorInfo
         }
 
         // -----
-        // Fallback for one-page checkout flows where ot_sc's deduction isn't reflected in
-        // $order_info/$ot_diffs at PayPal order-creation time (even though it's applied for
-        // non-PayPal methods). If that happens, use the customer's redeemed store-credit
-        // session value as a discount, but only when no other discount is present and the
-        // current order-total equals the non-discounted sum.
+        // One-page checkout creates the PayPal order before ot_sc / ot_gv / ot_coupon
+        // stick on $order. Add any session credit that is not already in $ot_diffs or
+        // $order->totals. Gift credit uses ot_gv's eligible deduction (cannot pay for
+        // GIFT products). Coupons use ot_coupon's priced deduction from $_SESSION['cc_id'].
         //
-        $session_store_credit = $this->getSessionStoreCreditAmount();
-        if (
-            $session_store_credit > 0
-            && !isset($ot_diffs['ot_sc'])
-            && $discount_total < 0.01
-            && $shipping_discount_total < 0.01
-        ) {
-            $non_discount_total = (float)($item_total + $item_tax_total + $shipping_total + $handling_total + $insurance_total);
-            if (abs($effective_order_total - $non_discount_total) < 0.01) {
-                $fallback_discount = min($session_store_credit, $non_discount_total);
-                if ($fallback_discount > 0) {
-                    $discount_total = $fallback_discount;
-                    $effective_order_total = max(0.0, $effective_order_total - $fallback_discount);
-                    $amount = $this->setRateConvertedValue($effective_order_total);
-                    $this->log->write(
-                        sprintf(
-                            'CreatePayPalOrderRequest: applied fallback store-credit discount %.2f from session.',
-                            $fallback_discount
-                        )
-                    );
-                }
+        $ot_gv_already = $this->orderTotalClassAlreadyApplied('ot_gv', $ot_diffs, $order);
+        $ot_sc_already = $this->orderTotalClassAlreadyApplied('ot_sc', $ot_diffs, $order);
+        $ot_coupon_already = $this->orderTotalClassAlreadyApplied('ot_coupon', $ot_diffs, $order);
+        $session_store_credit = 0.0;
+        if (!$ot_sc_already) {
+            $session_store_credit = $this->getSessionStoreCreditAmount();
+        }
+        $session_gift_credit = 0.0;
+        if (!$ot_gv_already) {
+            $session_gift_credit = $this->getEligibleGiftVoucherDeduction($order);
+        }
+        $session_coupon_credit = 0.0;
+        if (!$ot_coupon_already) {
+            $session_coupon_credit = $this->getEligibleCouponDeduction();
+        }
+        $session_fallback_credit = $session_store_credit + $session_gift_credit + $session_coupon_credit;
+        if ($session_fallback_credit > 0.009) {
+            $fallback_discount = min($session_fallback_credit, max(0.0, $effective_order_total));
+            if ($fallback_discount > 0) {
+                $discount_total += $fallback_discount;
+                $effective_order_total = max(0.0, $effective_order_total - $fallback_discount);
+                $amount = $this->setRateConvertedValue($effective_order_total);
+                $this->log->write(
+                    sprintf(
+                        'CreatePayPalOrderRequest: applied fallback session credit discount %.2f (storecredit=%.2f, cot_gv=%.2f, coupon=%.2f) onto existing discount.',
+                        $fallback_discount,
+                        $session_store_credit,
+                        $session_gift_credit,
+                        $session_coupon_credit
+                    )
+                );
             }
         }
 
@@ -612,6 +621,99 @@ class CreatePayPalOrderRequest extends ErrorInfo
         }
 
         return max(0.0, (float)$_SESSION['storecredit']);
+    }
+
+    protected function orderTotalClassAlreadyApplied(string $class_name, array $ot_diffs, \order $order): bool
+    {
+        if (isset($ot_diffs[$class_name]['diff']['total']) && abs((float)$ot_diffs[$class_name]['diff']['total']) > 0.009) {
+            return true;
+        }
+
+        if (empty($order->totals) || !is_array($order->totals)) {
+            return false;
+        }
+
+        foreach ($order->totals as $order_total) {
+            if (!is_array($order_total)) {
+                continue;
+            }
+            $code = (string)($order_total['class'] ?? $order_total['code'] ?? '');
+            if ($code !== $class_name) {
+                continue;
+            }
+            if (isset($order_total['value']) && abs((float)$order_total['value']) > 0.009) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Gift credit PayPal may take: same cap as ot_gv::calculate_credit(get_order_total()),
+     * which excludes products whose model starts with GIFT.
+     */
+    protected function getEligibleGiftVoucherDeduction(\order $order): float
+    {
+        if (!isset($_SESSION['cot_gv']) || !is_numeric($_SESSION['cot_gv']) || (float)$_SESSION['cot_gv'] <= 0) {
+            return 0.0;
+        }
+
+        if (isset($GLOBALS['ot_gv']) && is_object($GLOBALS['ot_gv'])) {
+            $ot_gv = $GLOBALS['ot_gv'];
+            if (method_exists($ot_gv, 'get_order_total') && method_exists($ot_gv, 'calculate_credit')) {
+                return max(0.0, (float)$ot_gv->calculate_credit($ot_gv->get_order_total()));
+            }
+        }
+
+        global $currencies;
+        $requested = (float)$_SESSION['cot_gv'];
+        if (isset($currencies) && is_object($currencies) && defined('DEFAULT_CURRENCY')) {
+            $requested = (float)$currencies->value($currencies->normalizeValue($requested), true, DEFAULT_CURRENCY);
+        }
+
+        $eligible_base = isset($order->info['total']) ? (float)$order->info['total'] : 0.0;
+        if (isset($_SESSION['cart']) && is_object($_SESSION['cart']) && method_exists($_SESSION['cart'], 'get_products')) {
+            foreach ($_SESSION['cart']->get_products() as $product) {
+                if (!is_array($product) || !preg_match('/^GIFT/', (string)($product['model'] ?? ''))) {
+                    continue;
+                }
+                $eligible_base -= (float)($product['price'] ?? 0) * (float)($product['quantity'] ?? 0);
+            }
+        }
+
+        return max(0.0, min($requested, max(0.0, $eligible_base)));
+    }
+
+    /**
+     * Discount coupon PayPal may take. dc_redeem_code is only the posted code;
+     * ot_coupon stores the applied coupon in $_SESSION['cc_id'] and prices it
+     * in calculate_deductions() (amount, percent, or free shipping).
+     */
+    protected function getEligibleCouponDeduction(): float
+    {
+        if (empty($_SESSION['cc_id'])) {
+            return 0.0;
+        }
+        if (!isset($GLOBALS['ot_coupon']) || !is_object($GLOBALS['ot_coupon']) || !method_exists($GLOBALS['ot_coupon'], 'calculate_deductions')) {
+            return 0.0;
+        }
+
+        $deductions = $GLOBALS['ot_coupon']->calculate_deductions();
+        if (!is_array($deductions)) {
+            return 0.0;
+        }
+
+        $rows = isset($deductions['total']) ? [$deductions] : $deductions;
+        $total = 0.0;
+        foreach ($rows as $row) {
+            if (!is_array($row) || !isset($row['total']) || !is_numeric($row['total'])) {
+                continue;
+            }
+            $total += max(0.0, (float)$row['total']);
+        }
+
+        return $total;
     }
 
     protected function getDiscountFromOrderTotals(\order $order): float
