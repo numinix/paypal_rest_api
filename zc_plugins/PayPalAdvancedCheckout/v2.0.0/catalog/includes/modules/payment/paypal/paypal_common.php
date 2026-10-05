@@ -1681,6 +1681,19 @@ class PayPalCommon {
                     $customers_id_for_orphan_sweep,
                     $paymentModule
                 );
+                // Claim, PENDING, lock-busy, or a failed refund leaves the row.
+                // Do not mint another capture while that charge is still open.
+                if ($this->customerHasOpenOrphanCapture($customers_id_for_orphan_sweep)) {
+                    $log->write(
+                        'createPayPalOrder(card): blocked; unresolved orphan capture remains for customer #'
+                        . $customers_id_for_orphan_sweep
+                    );
+                    $block_message = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING')
+                        ? MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING
+                        : 'A previous card payment is still being resolved. Please wait a few minutes and try again, or contact us for assistance.';
+                    $this->setMessageAndRedirect($block_message, FILENAME_CHECKOUT_PAYMENT);
+                    return false;
+                }
             }
         }
 
@@ -2625,6 +2638,32 @@ class PayPalCommon {
         $db->Execute(
             "UPDATE " . $table . " SET orders_id = " . (int)$orders_id . " WHERE capture_resource_id = '" . $esc . "' AND orders_id = 0 LIMIT 1"
         );
+    }
+
+    /**
+     * True when this customer still has an unlinked capture in the auto-refund window.
+     */
+    public function customerHasOpenOrphanCapture(int $customers_id): bool
+    {
+        global $db;
+
+        if ($customers_id <= 0 || !isset($db) || !is_object($db)) {
+            return false;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+        $open = $db->Execute(
+            "SELECT capture_resource_id
+               FROM " . $table . "
+              WHERE customers_id = " . (int)$customers_id . "
+                AND orders_id = 0
+                AND created_at < DATE_SUB(NOW(), INTERVAL 15 SECOND)
+                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+              LIMIT 1"
+        );
+
+        return !$open->EOF;
     }
 
     /**
