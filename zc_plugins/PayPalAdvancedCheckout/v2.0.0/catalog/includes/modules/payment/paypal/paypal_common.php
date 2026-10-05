@@ -2657,8 +2657,8 @@ class PayPalCommon {
     }
 
     /**
-     * True when this customer still has an unlinked capture.
-     * No age cutoff: auto-refund keeps its own 15-second / 24-hour window.
+     * True when this customer still has an unlinked capture from the last 24 hours.
+     * Younger than the sweep's 15-second grace still blocks. Older rows do not.
      */
     public function customerHasOpenOrphanCapture(int $customers_id): bool
     {
@@ -2675,6 +2675,7 @@ class PayPalCommon {
                FROM " . $table . "
               WHERE customers_id = " . (int)$customers_id . "
                 AND orders_id = 0
+                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
               LIMIT 1"
         );
 
@@ -2682,7 +2683,7 @@ class PayPalCommon {
     }
 
     /**
-     * True when this PayPal order still has an unlinked capture.
+     * True when this PayPal order still has an unlinked capture from the last 24 hours.
      * Guest retries use the session order id so customers_id 0 is never scanned.
      */
     public function paypalOrderHasOpenOrphanCapture(string $paypal_order_id): bool
@@ -2702,6 +2703,7 @@ class PayPalCommon {
                FROM " . $table . "
               WHERE paypal_order_id = '" . $esc . "'
                 AND orders_id = 0
+                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
               LIMIT 1"
         );
 
