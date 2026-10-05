@@ -2642,7 +2642,7 @@ class PayPalCommon {
 
     /**
      * True when this customer still has an unlinked capture.
-     * Includes rows younger than the sweep's 15-second grace so an immediate retry cannot charge again.
+     * No age cutoff: auto-refund keeps its own 15-second / 24-hour window.
      */
     public function customerHasOpenOrphanCapture(int $customers_id): bool
     {
@@ -2659,7 +2659,6 @@ class PayPalCommon {
                FROM " . $table . "
               WHERE customers_id = " . (int)$customers_id . "
                 AND orders_id = 0
-                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
               LIMIT 1"
         );
 
