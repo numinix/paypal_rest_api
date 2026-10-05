@@ -1690,11 +1690,14 @@ class PayPalCommon {
                     $block_scope = 'customer #' . $customers_id_for_orphan_sweep;
                 }
             } else {
-                // Guests share customers_id 0. Match only this session's prior PayPal order.
-                $prior_paypal_order_id = trim((string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''));
-                if ($prior_paypal_order_id !== '' && $this->paypalOrderHasOpenOrphanCapture($prior_paypal_order_id)) {
-                    $block_orphan = true;
-                    $block_scope = 'guest paypal order ' . $prior_paypal_order_id;
+                // Guests share customers_id 0. clear_payments() drops PayPalAdvancedCheckout,
+                // so also check the order id kept outside that tree.
+                foreach ($this->guestOrphanPayPalOrderIds() as $prior_paypal_order_id) {
+                    if ($this->paypalOrderHasOpenOrphanCapture($prior_paypal_order_id)) {
+                        $block_orphan = true;
+                        $block_scope = 'guest paypal order ' . $prior_paypal_order_id;
+                        break;
+                    }
                 }
             }
             if ($block_orphan) {
@@ -2564,6 +2567,7 @@ class PayPalCommon {
         $esc_type = $db->prepare_input($resource_type);
         $cid = (int)($_SESSION['customer_id'] ?? 0);
         $paypal_order_id = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '');
+        $this->rememberGuestOrphanPayPalOrderId($cid, $paypal_order_id);
         $esc_po = $db->prepare_input($paypal_order_id);
         $table = $this->checkoutCaptureReservationTableName();
 
@@ -2702,6 +2706,40 @@ class PayPalCommon {
         );
 
         return !$open->EOF;
+    }
+
+    /**
+     * Keep a guest orphan PayPal order id outside PayPalAdvancedCheckout.
+     * clear_payments() unsets that tree on cart or payment changes.
+     */
+    public function rememberGuestOrphanPayPalOrderId(int $customers_id, string $paypal_order_id): void
+    {
+        if ($customers_id > 0) {
+            return;
+        }
+        $paypal_order_id = trim($paypal_order_id);
+        if ($paypal_order_id === '') {
+            return;
+        }
+        $_SESSION['paypalac_guest_orphan_paypal_order_id'] = $paypal_order_id;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function guestOrphanPayPalOrderIds(): array
+    {
+        $ids = [];
+        foreach ([
+            (string)($_SESSION['paypalac_guest_orphan_paypal_order_id'] ?? ''),
+            (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''),
+        ] as $candidate) {
+            $candidate = trim($candidate);
+            if ($candidate !== '' && !in_array($candidate, $ids, true)) {
+                $ids[] = $candidate;
+            }
+        }
+        return $ids;
     }
 
     /**
