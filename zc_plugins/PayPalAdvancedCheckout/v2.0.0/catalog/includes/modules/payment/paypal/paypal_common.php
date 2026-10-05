@@ -1676,11 +1676,39 @@ class PayPalCommon {
         // any prior orphan captures for this customer before minting a new PayPal order.
         if ($ppac_type === 'card') {
             $customers_id_for_orphan_sweep = (int)($_SESSION['customer_id'] ?? 0);
+            $block_orphan = false;
+            $block_scope = '';
             if ($customers_id_for_orphan_sweep > 0) {
                 $this->refundOrphanCaptureReservationsForCustomer(
                     $customers_id_for_orphan_sweep,
                     $paymentModule
                 );
+                // Claim, PENDING, lock-busy, or a failed refund leaves the row.
+                // Do not mint another capture while that charge is still open.
+                if ($this->customerHasOpenOrphanCapture($customers_id_for_orphan_sweep)) {
+                    $block_orphan = true;
+                    $block_scope = 'customer #' . $customers_id_for_orphan_sweep;
+                }
+            } else {
+                // Guests share customers_id 0. clear_payments() drops PayPalAdvancedCheckout,
+                // so also check the order id kept outside that tree.
+                foreach ($this->guestOrphanPayPalOrderIds() as $prior_paypal_order_id) {
+                    if ($this->paypalOrderHasOpenOrphanCapture($prior_paypal_order_id)) {
+                        $block_orphan = true;
+                        $block_scope = 'guest paypal order ' . $prior_paypal_order_id;
+                        break;
+                    }
+                }
+            }
+            if ($block_orphan) {
+                $log->write(
+                    'createPayPalOrder(card): blocked; unresolved orphan capture remains for ' . $block_scope
+                );
+                $block_message = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING')
+                    ? MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING
+                    : 'A previous card payment is still being resolved. Please wait a few minutes and try again, or contact us for assistance.';
+                $this->setMessageAndRedirect($block_message, FILENAME_CHECKOUT_PAYMENT);
+                return false;
             }
         }
 
@@ -2539,6 +2567,7 @@ class PayPalCommon {
         $esc_type = $db->prepare_input($resource_type);
         $cid = (int)($_SESSION['customer_id'] ?? 0);
         $paypal_order_id = (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? '');
+        $this->rememberGuestOrphanPayPalOrderId($cid, $paypal_order_id);
         $esc_po = $db->prepare_input($paypal_order_id);
         $table = $this->checkoutCaptureReservationTableName();
 
@@ -2625,6 +2654,92 @@ class PayPalCommon {
         $db->Execute(
             "UPDATE " . $table . " SET orders_id = " . (int)$orders_id . " WHERE capture_resource_id = '" . $esc . "' AND orders_id = 0 LIMIT 1"
         );
+    }
+
+    /**
+     * True when this customer still has an unlinked capture.
+     * No age cutoff: auto-refund keeps its own 15-second / 24-hour window.
+     */
+    public function customerHasOpenOrphanCapture(int $customers_id): bool
+    {
+        global $db;
+
+        if ($customers_id <= 0 || !isset($db) || !is_object($db)) {
+            return false;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+        $open = $db->Execute(
+            "SELECT capture_resource_id
+               FROM " . $table . "
+              WHERE customers_id = " . (int)$customers_id . "
+                AND orders_id = 0
+              LIMIT 1"
+        );
+
+        return !$open->EOF;
+    }
+
+    /**
+     * True when this PayPal order still has an unlinked capture.
+     * Guest retries use the session order id so customers_id 0 is never scanned.
+     */
+    public function paypalOrderHasOpenOrphanCapture(string $paypal_order_id): bool
+    {
+        global $db;
+
+        $paypal_order_id = trim($paypal_order_id);
+        if ($paypal_order_id === '' || !isset($db) || !is_object($db)) {
+            return false;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+        $esc = $db->prepare_input($paypal_order_id);
+        $open = $db->Execute(
+            "SELECT capture_resource_id
+               FROM " . $table . "
+              WHERE paypal_order_id = '" . $esc . "'
+                AND orders_id = 0
+              LIMIT 1"
+        );
+
+        return !$open->EOF;
+    }
+
+    /**
+     * Keep a guest orphan PayPal order id outside PayPalAdvancedCheckout.
+     * clear_payments() unsets that tree on cart or payment changes.
+     */
+    public function rememberGuestOrphanPayPalOrderId(int $customers_id, string $paypal_order_id): void
+    {
+        if ($customers_id > 0) {
+            return;
+        }
+        $paypal_order_id = trim($paypal_order_id);
+        if ($paypal_order_id === '') {
+            return;
+        }
+        $_SESSION['paypalac_guest_orphan_paypal_order_id'] = $paypal_order_id;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function guestOrphanPayPalOrderIds(): array
+    {
+        $ids = [];
+        foreach ([
+            (string)($_SESSION['paypalac_guest_orphan_paypal_order_id'] ?? ''),
+            (string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''),
+        ] as $candidate) {
+            $candidate = trim($candidate);
+            if ($candidate !== '' && !in_array($candidate, $ids, true)) {
+                $ids[] = $candidate;
+            }
+        }
+        return $ids;
     }
 
     /**
