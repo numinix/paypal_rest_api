@@ -1676,6 +1676,8 @@ class PayPalCommon {
         // any prior orphan captures for this customer before minting a new PayPal order.
         if ($ppac_type === 'card') {
             $customers_id_for_orphan_sweep = (int)($_SESSION['customer_id'] ?? 0);
+            $block_orphan = false;
+            $block_scope = '';
             if ($customers_id_for_orphan_sweep > 0) {
                 $this->refundOrphanCaptureReservationsForCustomer(
                     $customers_id_for_orphan_sweep,
@@ -1684,16 +1686,26 @@ class PayPalCommon {
                 // Claim, PENDING, lock-busy, or a failed refund leaves the row.
                 // Do not mint another capture while that charge is still open.
                 if ($this->customerHasOpenOrphanCapture($customers_id_for_orphan_sweep)) {
-                    $log->write(
-                        'createPayPalOrder(card): blocked; unresolved orphan capture remains for customer #'
-                        . $customers_id_for_orphan_sweep
-                    );
-                    $block_message = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING')
-                        ? MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING
-                        : 'A previous card payment is still being resolved. Please wait a few minutes and try again, or contact us for assistance.';
-                    $this->setMessageAndRedirect($block_message, FILENAME_CHECKOUT_PAYMENT);
-                    return false;
+                    $block_orphan = true;
+                    $block_scope = 'customer #' . $customers_id_for_orphan_sweep;
                 }
+            } else {
+                // Guests share customers_id 0. Match only this session's prior PayPal order.
+                $prior_paypal_order_id = trim((string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''));
+                if ($prior_paypal_order_id !== '' && $this->paypalOrderHasOpenOrphanCapture($prior_paypal_order_id)) {
+                    $block_orphan = true;
+                    $block_scope = 'guest paypal order ' . $prior_paypal_order_id;
+                }
+            }
+            if ($block_orphan) {
+                $log->write(
+                    'createPayPalOrder(card): blocked; unresolved orphan capture remains for ' . $block_scope
+                );
+                $block_message = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING')
+                    ? MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING
+                    : 'A previous card payment is still being resolved. Please wait a few minutes and try again, or contact us for assistance.';
+                $this->setMessageAndRedirect($block_message, FILENAME_CHECKOUT_PAYMENT);
+                return false;
             }
         }
 
@@ -2658,6 +2670,33 @@ class PayPalCommon {
             "SELECT capture_resource_id
                FROM " . $table . "
               WHERE customers_id = " . (int)$customers_id . "
+                AND orders_id = 0
+              LIMIT 1"
+        );
+
+        return !$open->EOF;
+    }
+
+    /**
+     * True when this PayPal order still has an unlinked capture.
+     * Guest retries use the session order id so customers_id 0 is never scanned.
+     */
+    public function paypalOrderHasOpenOrphanCapture(string $paypal_order_id): bool
+    {
+        global $db;
+
+        $paypal_order_id = trim($paypal_order_id);
+        if ($paypal_order_id === '' || !isset($db) || !is_object($db)) {
+            return false;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+        $esc = $db->prepare_input($paypal_order_id);
+        $open = $db->Execute(
+            "SELECT capture_resource_id
+               FROM " . $table . "
+              WHERE paypal_order_id = '" . $esc . "'
                 AND orders_id = 0
               LIMIT 1"
         );
