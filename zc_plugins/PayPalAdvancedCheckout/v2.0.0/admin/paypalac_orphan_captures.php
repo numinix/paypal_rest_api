@@ -163,7 +163,8 @@ function paypalac_orphan_captures_recheck_claim(
     $esc = zen_db_input($capture_resource_id);
     $esc_token = zen_db_input($claim_token);
     $chk = $db->Execute(
-        "SELECT capture_resource_id, resource_type, customers_id, paypal_order_id, created_at, alerted_at
+        "SELECT capture_resource_id, resource_type, customers_id, paypal_order_id, created_at, alerted_at,
+                refund_id, refund_status
            FROM " . $reservation_table . "
           WHERE capture_resource_id = '" . $esc . "'
             AND admin_claim_token = '" . $esc_token . "'
@@ -232,42 +233,45 @@ function paypalac_orphan_captures_delete_claimed_row(
 }
 
 /**
- * Shared checkout lock name (same as PayPalCommon::acquireAdvancedCheckoutMysqlOrderLock).
+ * Same name as checkout orphan auto-refund: PayPal order id, else capture id.
  */
-function paypalac_orphan_captures_order_lock_name(string $paypal_order_id): string
+function paypalac_orphan_captures_order_lock_name(string $paypal_order_id, string $capture_resource_id = ''): string
 {
-    return 'ppac_' . md5($paypal_order_id);
+    $paypal_order_id = trim($paypal_order_id);
+    if ($paypal_order_id !== '') {
+        return 'ppac_' . md5($paypal_order_id);
+    }
+
+    return 'ppac_' . md5('cap:' . trim($capture_resource_id));
 }
 
 /**
- * Acquire checkout GET_LOCK for paypal_order_id when present (serialize vs before_process).
+ * Acquire the shared orphan lock (PayPal order id, or capture-id fallback).
  */
-function paypalac_orphan_captures_acquire_order_lock(string $paypal_order_id): bool
+function paypalac_orphan_captures_acquire_order_lock(string $paypal_order_id, string $capture_resource_id = ''): bool
 {
     global $db;
 
-    $paypal_order_id = trim($paypal_order_id);
-    if ($paypal_order_id === '') {
+    if (trim($paypal_order_id) === '' && trim($capture_resource_id) === '') {
         return true;
     }
 
-    $escaped = zen_db_input(paypalac_orphan_captures_order_lock_name($paypal_order_id));
+    $escaped = zen_db_input(paypalac_orphan_captures_order_lock_name($paypal_order_id, $capture_resource_id));
     $result = $db->Execute("SELECT GET_LOCK('" . $escaped . "', 5) AS ppac_orphan_lock");
     $acquired = isset($result->fields['ppac_orphan_lock']) ? (int)$result->fields['ppac_orphan_lock'] : 0;
 
     return $acquired === 1;
 }
 
-function paypalac_orphan_captures_release_order_lock(string $paypal_order_id): void
+function paypalac_orphan_captures_release_order_lock(string $paypal_order_id, string $capture_resource_id = ''): void
 {
     global $db;
 
-    $paypal_order_id = trim($paypal_order_id);
-    if ($paypal_order_id === '') {
+    if (trim($paypal_order_id) === '' && trim($capture_resource_id) === '') {
         return;
     }
 
-    $escaped = zen_db_input(paypalac_orphan_captures_order_lock_name($paypal_order_id));
+    $escaped = zen_db_input(paypalac_orphan_captures_order_lock_name($paypal_order_id, $capture_resource_id));
     $db->Execute("SELECT RELEASE_LOCK('" . $escaped . "')");
 }
 
@@ -369,12 +373,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     $paypal_order_id = (string)($claimed['row']['paypal_order_id'] ?? '');
     $order_lock_held = false;
 
-    if (!paypalac_orphan_captures_acquire_order_lock($paypal_order_id)) {
+    if (!paypalac_orphan_captures_acquire_order_lock($paypal_order_id, $capture_resource_id)) {
         paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
         $messageStack->add_session(ERROR_CHECKOUT_LOCK, 'error');
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
-    $order_lock_held = ($paypal_order_id !== '');
+    $order_lock_held = true;
 
     // Checkout may have linked orders_id while we waited for GET_LOCK.
     $recheck = paypalac_orphan_captures_recheck_claim(
@@ -385,7 +389,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     if ($recheck === null) {
         paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
         if ($order_lock_held) {
-            paypalac_orphan_captures_release_order_lock($paypal_order_id);
+            paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
         }
         $messageStack->add_session(ERROR_ROW_NOT_FOUND, 'error');
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
@@ -406,7 +410,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
             $messageStack->add_session(ERROR_ROW_NOT_FOUND, 'error');
         }
         if ($order_lock_held) {
-            paypalac_orphan_captures_release_order_lock($paypal_order_id);
+            paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
         }
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
@@ -416,7 +420,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     if ($ppr === null) {
         paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
         if ($order_lock_held) {
-            paypalac_orphan_captures_release_order_lock($paypal_order_id);
+            paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
         }
         if (!class_exists('paypalac', false)) {
             $messageStack->add_session(ERROR_MODULE_MISSING, 'error');
@@ -427,9 +431,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     }
 
     $resource_type = strtolower(trim((string)($recheck['resource_type'] ?? '')));
+    $existing_refund_status = strtoupper(trim((string)($recheck['refund_status'] ?? '')));
     $api_ok = false;
+    $refund_pending = false;
     $result_id = '';
     $used_void = ($resource_type === 'authorization');
+
+    // Already submitted and still PENDING — do not call PayPal again.
+    if (!$used_void && $existing_refund_status === 'PENDING') {
+        paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
+        if ($order_lock_held) {
+            paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
+        }
+        $messageStack->add_session(
+            sprintf(
+                SUCCESS_REFUND_PENDING,
+                zen_output_string_protected($capture_resource_id),
+                zen_output_string_protected((string)($recheck['refund_id'] ?? 'n/a'))
+            ),
+            'success'
+        );
+        zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
+    }
 
     if ($used_void) {
         $void_response = $ppr->voidPayment($capture_resource_id);
@@ -455,8 +478,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 
         if (is_array($refund_response)) {
             $status = strtoupper((string)($refund_response['status'] ?? ''));
-            if (in_array($status, ['COMPLETED', 'PENDING'], true)) {
+            if ($status === 'COMPLETED' || $status === 'PENDING') {
                 $api_ok = true;
+                $refund_pending = ($status === 'PENDING');
                 $result_id = (string)($refund_response['id'] ?? '');
             }
         }
@@ -488,20 +512,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     }
 
     if ($api_ok) {
-        paypalac_orphan_captures_delete_claimed_row(
-            $capture_resource_id,
-            $claim_token,
-            PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
-        );
-        if ($used_void) {
-            $messageStack->add_session(
-                sprintf(SUCCESS_VOID, zen_output_string_protected($capture_resource_id)),
-                'success'
+        if ($used_void || !$refund_pending) {
+            // Void success or COMPLETED refund — safe to drop the reservation row.
+            paypalac_orphan_captures_delete_claimed_row(
+                $capture_resource_id,
+                $claim_token,
+                PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
             );
+            if ($used_void) {
+                $messageStack->add_session(
+                    sprintf(SUCCESS_VOID, zen_output_string_protected($capture_resource_id)),
+                    'success'
+                );
+            } else {
+                $messageStack->add_session(
+                    sprintf(
+                        SUCCESS_REFUND,
+                        zen_output_string_protected($capture_resource_id),
+                        zen_output_string_protected($result_id !== '' ? $result_id : 'n/a')
+                    ),
+                    'success'
+                );
+            }
         } else {
+            // PENDING refund: persist id/status so checkout auto-refund will not retry.
+            $paypalCommon->markOrphanCaptureRefundPending($capture_resource_id, $result_id);
+            paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
             $messageStack->add_session(
                 sprintf(
-                    SUCCESS_REFUND,
+                    SUCCESS_REFUND_PENDING,
                     zen_output_string_protected($capture_resource_id),
                     zen_output_string_protected($result_id !== '' ? $result_id : 'n/a')
                 ),
@@ -514,7 +553,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     }
 
     if ($order_lock_held) {
-        paypalac_orphan_captures_release_order_lock($paypal_order_id);
+        paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
     }
 
     zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
