@@ -428,6 +428,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 
     $resource_type = strtolower(trim((string)($recheck['resource_type'] ?? '')));
     $api_ok = false;
+    $refund_pending = false;
     $result_id = '';
     $used_void = ($resource_type === 'authorization');
 
@@ -455,8 +456,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 
         if (is_array($refund_response)) {
             $status = strtoupper((string)($refund_response['status'] ?? ''));
-            if (in_array($status, ['COMPLETED', 'PENDING'], true)) {
+            if ($status === 'COMPLETED' || $status === 'PENDING') {
                 $api_ok = true;
+                $refund_pending = ($status === 'PENDING');
                 $result_id = (string)($refund_response['id'] ?? '');
             }
         }
@@ -488,20 +490,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     }
 
     if ($api_ok) {
-        paypalac_orphan_captures_delete_claimed_row(
-            $capture_resource_id,
-            $claim_token,
-            PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
-        );
-        if ($used_void) {
-            $messageStack->add_session(
-                sprintf(SUCCESS_VOID, zen_output_string_protected($capture_resource_id)),
-                'success'
+        if ($used_void || !$refund_pending) {
+            // Void success or COMPLETED refund — safe to drop the reservation row.
+            paypalac_orphan_captures_delete_claimed_row(
+                $capture_resource_id,
+                $claim_token,
+                PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES
             );
+            if ($used_void) {
+                $messageStack->add_session(
+                    sprintf(SUCCESS_VOID, zen_output_string_protected($capture_resource_id)),
+                    'success'
+                );
+            } else {
+                $messageStack->add_session(
+                    sprintf(
+                        SUCCESS_REFUND,
+                        zen_output_string_protected($capture_resource_id),
+                        zen_output_string_protected($result_id !== '' ? $result_id : 'n/a')
+                    ),
+                    'success'
+                );
+            }
         } else {
+            // PENDING refund: keep row visible for reconcile; release claim (alerted_at untouched).
+            paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
             $messageStack->add_session(
                 sprintf(
-                    SUCCESS_REFUND,
+                    SUCCESS_REFUND_PENDING,
                     zen_output_string_protected($capture_resource_id),
                     zen_output_string_protected($result_id !== '' ? $result_id : 'n/a')
                 ),

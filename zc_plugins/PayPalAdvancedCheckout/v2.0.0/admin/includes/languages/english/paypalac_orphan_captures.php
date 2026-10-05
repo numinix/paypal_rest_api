@@ -43,6 +43,7 @@ define('ERROR_MODULE_MISSING', 'PayPal Advanced Checkout module is not available
 define('ERROR_API_CREDENTIALS', 'PayPal API credentials are not configured.');
 define('ERROR_REFUND_FAILED', 'PayPal refund failed for %s: %s');
 define('ERROR_VOID_FAILED', 'PayPal void failed for %s: %s');
-define('SUCCESS_REFUND', 'Refund accepted for %s (refund id %s). Reservation row removed.');
+define('SUCCESS_REFUND', 'Refund completed for %s (refund id %s). Reservation row removed.');
+define('SUCCESS_REFUND_PENDING', 'Refund PENDING for %s (refund id %s). Reservation row kept until PayPal confirms completion — verify in PayPal, then Dismiss or retry.');
 define('SUCCESS_VOID', 'Authorization voided for %s. Reservation row removed.');
 define('SUCCESS_DISMISS', 'Reservation row for %s dismissed (removed without PayPal refund/void).');

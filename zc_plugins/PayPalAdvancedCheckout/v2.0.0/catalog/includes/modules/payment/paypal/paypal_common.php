@@ -2607,13 +2607,21 @@ class PayPalCommon {
         $this->ensureCaptureCheckoutReservationTable();
         $table = $this->checkoutCaptureReservationTableName();
 
+        // Skip rows claimed by admin orphan UI (same TTL as PAYPALAC_ORPHAN_ADMIN_CLAIM_TTL_MINUTES).
+        $admin_claim_ttl_minutes = 10;
+
         $candidates = $db->Execute(
             "SELECT capture_resource_id, paypal_order_id, created_at
                FROM " . $table . "
               WHERE customers_id = " . (int)$customers_id . "
                 AND orders_id = 0
                 AND created_at < DATE_SUB(NOW(), INTERVAL 15 SECOND)
-                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                AND (
+                    admin_claim_token = ''
+                    OR admin_claimed_at IS NULL
+                    OR admin_claimed_at < DATE_SUB(NOW(), INTERVAL " . (int)$admin_claim_ttl_minutes . " MINUTE)
+                )"
         );
 
         $refunded = 0;
@@ -2647,15 +2655,13 @@ class PayPalCommon {
                 $payer_note
             );
 
-            $refund_ok = false;
+            $refund_status = '';
             if (is_array($refund_response)) {
-                $status = strtoupper((string)($refund_response['status'] ?? ''));
-                if (in_array($status, ['COMPLETED', 'PENDING'], true)) {
-                    $refund_ok = true;
-                }
+                $refund_status = strtoupper((string)($refund_response['status'] ?? ''));
             }
 
-            if ($refund_ok === true) {
+            // COMPLETED only — PENDING stays in the table for later reconcile (do not race-delete).
+            if ($refund_status === 'COMPLETED') {
                 $refunded++;
                 $esc = $db->prepare_input($capture_resource_id);
                 $db->Execute(
@@ -2667,8 +2673,16 @@ class PayPalCommon {
                 );
                 if ($logger !== null) {
                     $logger->write(
-                        'PayPalCommon::refundOrphanCaptureReservationsForCustomer: refund accepted for '
+                        'PayPalCommon::refundOrphanCaptureReservationsForCustomer: refund completed for '
                         . $capture_resource_id . ' (refund_id=' . (string)($refund_response['id'] ?? '') . ').'
+                    );
+                }
+            } elseif ($refund_status === 'PENDING') {
+                if ($logger !== null) {
+                    $logger->write(
+                        'PayPalCommon::refundOrphanCaptureReservationsForCustomer: refund PENDING for '
+                        . $capture_resource_id . ' (refund_id=' . (string)($refund_response['id'] ?? '')
+                        . '); reservation row kept for reconcile.'
                     );
                 }
             } else {
