@@ -233,42 +233,45 @@ function paypalac_orphan_captures_delete_claimed_row(
 }
 
 /**
- * Shared checkout lock name (same as PayPalCommon::acquireAdvancedCheckoutMysqlOrderLock).
+ * Same name as checkout orphan auto-refund: PayPal order id, else capture id.
  */
-function paypalac_orphan_captures_order_lock_name(string $paypal_order_id): string
+function paypalac_orphan_captures_order_lock_name(string $paypal_order_id, string $capture_resource_id = ''): string
 {
-    return 'ppac_' . md5($paypal_order_id);
+    $paypal_order_id = trim($paypal_order_id);
+    if ($paypal_order_id !== '') {
+        return 'ppac_' . md5($paypal_order_id);
+    }
+
+    return 'ppac_' . md5('cap:' . trim($capture_resource_id));
 }
 
 /**
- * Acquire checkout GET_LOCK for paypal_order_id when present (serialize vs before_process).
+ * Acquire the shared orphan lock (PayPal order id, or capture-id fallback).
  */
-function paypalac_orphan_captures_acquire_order_lock(string $paypal_order_id): bool
+function paypalac_orphan_captures_acquire_order_lock(string $paypal_order_id, string $capture_resource_id = ''): bool
 {
     global $db;
 
-    $paypal_order_id = trim($paypal_order_id);
-    if ($paypal_order_id === '') {
+    if (trim($paypal_order_id) === '' && trim($capture_resource_id) === '') {
         return true;
     }
 
-    $escaped = zen_db_input(paypalac_orphan_captures_order_lock_name($paypal_order_id));
+    $escaped = zen_db_input(paypalac_orphan_captures_order_lock_name($paypal_order_id, $capture_resource_id));
     $result = $db->Execute("SELECT GET_LOCK('" . $escaped . "', 5) AS ppac_orphan_lock");
     $acquired = isset($result->fields['ppac_orphan_lock']) ? (int)$result->fields['ppac_orphan_lock'] : 0;
 
     return $acquired === 1;
 }
 
-function paypalac_orphan_captures_release_order_lock(string $paypal_order_id): void
+function paypalac_orphan_captures_release_order_lock(string $paypal_order_id, string $capture_resource_id = ''): void
 {
     global $db;
 
-    $paypal_order_id = trim($paypal_order_id);
-    if ($paypal_order_id === '') {
+    if (trim($paypal_order_id) === '' && trim($capture_resource_id) === '') {
         return;
     }
 
-    $escaped = zen_db_input(paypalac_orphan_captures_order_lock_name($paypal_order_id));
+    $escaped = zen_db_input(paypalac_orphan_captures_order_lock_name($paypal_order_id, $capture_resource_id));
     $db->Execute("SELECT RELEASE_LOCK('" . $escaped . "')");
 }
 
@@ -370,12 +373,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     $paypal_order_id = (string)($claimed['row']['paypal_order_id'] ?? '');
     $order_lock_held = false;
 
-    if (!paypalac_orphan_captures_acquire_order_lock($paypal_order_id)) {
+    if (!paypalac_orphan_captures_acquire_order_lock($paypal_order_id, $capture_resource_id)) {
         paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
         $messageStack->add_session(ERROR_CHECKOUT_LOCK, 'error');
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
-    $order_lock_held = ($paypal_order_id !== '');
+    $order_lock_held = true;
 
     // Checkout may have linked orders_id while we waited for GET_LOCK.
     $recheck = paypalac_orphan_captures_recheck_claim(
@@ -386,7 +389,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     if ($recheck === null) {
         paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
         if ($order_lock_held) {
-            paypalac_orphan_captures_release_order_lock($paypal_order_id);
+            paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
         }
         $messageStack->add_session(ERROR_ROW_NOT_FOUND, 'error');
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
@@ -407,7 +410,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
             $messageStack->add_session(ERROR_ROW_NOT_FOUND, 'error');
         }
         if ($order_lock_held) {
-            paypalac_orphan_captures_release_order_lock($paypal_order_id);
+            paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
         }
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
     }
@@ -417,7 +420,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     if ($ppr === null) {
         paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
         if ($order_lock_held) {
-            paypalac_orphan_captures_release_order_lock($paypal_order_id);
+            paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
         }
         if (!class_exists('paypalac', false)) {
             $messageStack->add_session(ERROR_MODULE_MISSING, 'error');
@@ -438,7 +441,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     if (!$used_void && $existing_refund_status === 'PENDING') {
         paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
         if ($order_lock_held) {
-            paypalac_orphan_captures_release_order_lock($paypal_order_id);
+            paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
         }
         $messageStack->add_session(
             sprintf(
@@ -550,7 +553,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     }
 
     if ($order_lock_held) {
-        paypalac_orphan_captures_release_order_lock($paypal_order_id);
+        paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
     }
 
     zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
