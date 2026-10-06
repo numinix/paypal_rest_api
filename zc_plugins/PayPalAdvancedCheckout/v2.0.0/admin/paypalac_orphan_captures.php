@@ -641,12 +641,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 $rows = [];
 $result = $db->Execute(
     "SELECT r.capture_resource_id, r.resource_type, r.customers_id, r.paypal_order_id, r.created_at, r.alerted_at,
-            r.refund_status, r.amount, r.currency,
+            r.refund_status, r.amount, r.currency, r.related_orders_id,
             c.customers_firstname, c.customers_lastname, c.customers_email_address
        FROM " . $reservation_table . " r
   LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = r.customers_id
       WHERE r.orders_id = 0
-        AND r.related_orders_id = 0
         AND r.created_at < DATE_SUB(NOW(), INTERVAL " . (int)PAYPALAC_ORPHAN_ADMIN_MIN_AGE_MINUTES . " MINUTE)
    ORDER BY r.created_at DESC"
 );
@@ -808,6 +807,7 @@ while (!$result->EOF) {
                 }
                 $alerted = trim((string)($row['alerted_at'] ?? ''));
                 $refund_status = strtoupper(trim((string)($row['refund_status'] ?? '')));
+                $related_orders_id = (int)($row['related_orders_id'] ?? 0);
                 $action_label = $is_auth ? BUTTON_VOID : BUTTON_REFUND;
                 ?>
                 <tr>
@@ -819,6 +819,9 @@ while (!$result->EOF) {
                     <td><?php echo zen_output_string_protected((string)($row['created_at'] ?? '')); ?></td>
                     <td><?php echo $alerted !== '' ? zen_output_string_protected($alerted) : TEXT_NEVER_ALERTED; ?></td>
                     <td class="ppac-orphan-actions">
+                        <?php if ($related_orders_id > 0) { ?>
+                            <?php echo sprintf(TEXT_LINKED_ORDER, $related_orders_id); ?>
+                        <?php } else { ?>
                         <?php echo zen_draw_form('orphan_refund_' . md5($capture_id), FILENAME_PAYPALAC_ORPHAN_CAPTURES, '', 'post'); ?>
                             <?php echo zen_draw_hidden_field('securityToken', $_SESSION['securityToken'] ?? ''); ?>
                             <?php echo zen_draw_hidden_field('action', 'refund_confirm'); ?>
@@ -838,6 +841,7 @@ while (!$result->EOF) {
                         </form>
                         <?php } else { ?>
                             <span><?php echo sprintf(TEXT_LINK_UNAVAILABLE_REFUND, zen_output_string_protected($refund_status)); ?></span>
+                        <?php } ?>
                         <?php } ?>
                     </td>
                 </tr>
