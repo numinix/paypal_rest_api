@@ -2507,6 +2507,7 @@ class PayPalCommon {
                 refund_id VARCHAR(64) NOT NULL DEFAULT '',
                 refund_status VARCHAR(16) NOT NULL DEFAULT '',
                 cart_fingerprint CHAR(64) NOT NULL DEFAULT '',
+                related_orders_id INT UNSIGNED NOT NULL DEFAULT 0,
                 PRIMARY KEY (capture_resource_id),
                 KEY idx_ppac_cap_orders (orders_id),
                 KEY idx_ppac_cap_created (created_at)
@@ -2554,6 +2555,12 @@ class PayPalCommon {
         if ($col->EOF) {
             $db->Execute(
                 "ALTER TABLE " . $table . " ADD cart_fingerprint CHAR(64) NOT NULL DEFAULT '' AFTER refund_status"
+            );
+        }
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'related_orders_id'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD related_orders_id INT UNSIGNED NOT NULL DEFAULT 0 AFTER cart_fingerprint"
             );
         }
     }
@@ -2728,6 +2735,7 @@ class PayPalCommon {
                FROM " . $table . "
               WHERE customers_id = " . (int)$customers_id . "
                 AND orders_id = 0
+                AND related_orders_id = 0
                 AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
               LIMIT 1"
         );
@@ -2756,6 +2764,7 @@ class PayPalCommon {
                FROM " . $table . "
               WHERE paypal_order_id = '" . $esc . "'
                 AND orders_id = 0
+                AND related_orders_id = 0
                 AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
               LIMIT 1"
         );
@@ -2887,6 +2896,7 @@ class PayPalCommon {
         $this->ensureCaptureCheckoutReservationTable();
         $table = $this->checkoutCaptureReservationTableName();
         $where = "orders_id = 0
+                    AND related_orders_id = 0
                     AND paypal_order_id != ''
                     AND (refund_status = '' OR refund_status IS NULL)
                     AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)";
@@ -2962,6 +2972,7 @@ class PayPalCommon {
               WHERE capture_resource_id = '" . $esc_cap . "'
                 AND paypal_order_id = '" . $esc_po . "'
                 AND orders_id = 0
+                AND related_orders_id = 0
                 AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
                 AND (refund_status = '' OR refund_status IS NULL)
                 AND (
@@ -3245,6 +3256,7 @@ class PayPalCommon {
         $admin_claim_ttl_minutes = 10;
 
         $eligible_sql = "orders_id = 0
+                AND related_orders_id = 0
                 AND (refund_status = '' OR refund_status IS NULL)
                 AND (
                     admin_claim_token = ''
@@ -3434,6 +3446,7 @@ class PayPalCommon {
         $sql = "SELECT capture_resource_id, customers_id, paypal_order_id, created_at, alerted_at
                   FROM " . $table . "
                  WHERE orders_id = 0
+                   AND related_orders_id = 0
                    AND created_at < DATE_SUB(NOW(), INTERVAL " . (int)$min_age_minutes . " MINUTE)";
         if ($alert_cooldown_hours > 0) {
             $sql .= " AND (alerted_at IS NULL OR alerted_at < DATE_SUB(NOW(), INTERVAL "

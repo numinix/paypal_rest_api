@@ -8,7 +8,7 @@
  *
  * Schedule every 5–15 minutes. Rows newer than 5 minutes are skipped so in-flight
  * checkouts are not reported. Each capture id is emailed at most once per 24 hours
- * until resolved (orders_id set, or cleared via Admin → Customers → PayPal Orphan Captures).
+ * until resolved (orders_id set, or a related Zen order id is recorded on the row).
  *
  * Run from any CWD:
  *   php cron/paypalac_orphan_capture_alerts.php
@@ -121,7 +121,7 @@ $summary = "Orphan Capture Alert — {$run_date} ({$timezone})\n"
     . "Orphans reported: {$reported}\n"
     . ($error !== '' ? "Error: {$error}\n" : '')
     . "\nNo automatic refund. Review PayPal and any follow-up money-order orders before acting.\n"
-    . "Clear via Admin → Customers → PayPal Orphan Captures (Refund or Dismiss).\n"
+    . "Clear via Admin → Customers → PayPal Orphan Captures (Refund, Void, or Link order).\n"
     . ($detail_lines !== [] ? "\n" . implode("\n", $detail_lines) . "\n" : '')
     . "\nReport ID: {$report_id}\n"
     . "Generated: {$generated_at}";
@@ -131,7 +131,7 @@ $summary_html = '<h1 style="margin: 0 0 16px; font-size: 22px; color: #0f172a;">
     . '<p><strong>Min age (minutes):</strong> ' . (int)$min_age_minutes . '</p>'
     . '<p><strong>Alert cooldown (hours):</strong> ' . (int)$alert_cooldown_hours . '</p>'
     . '<p><strong>Orphans reported:</strong> ' . (int)$reported . '</p>'
-    . '<p>No automatic refund. Review PayPal and any follow-up money-order orders before acting. Clear via Admin &rarr; Customers &rarr; PayPal Orphan Captures (Refund or Dismiss).</p>'
+    . '<p>No automatic refund. Review PayPal and any follow-up orders before acting. Clear via Admin &rarr; Customers &rarr; PayPal Orphan Captures (Refund, Void, or Link order).</p>'
     . ($error !== '' ? '<p><strong>Error:</strong> ' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</p>' : '')
     . ($detail_lines !== []
         ? '<pre style="font-family: monospace; white-space: pre-wrap;">'
