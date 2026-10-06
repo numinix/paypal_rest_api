@@ -1505,6 +1505,11 @@ class PayPalCommon {
                 $log->write('processCreditCardPayment: FAILED to fetch completed order details. ' . Logger::logJSON($ppr->getErrorInfo()));
                 return false;
             }
+            $blocked_status = $this->settledPaymentBlockStatus($response);
+            if ($blocked_status !== '') {
+                $log->write("processCreditCardPayment: FAILED - existing PayPal payment status is $blocked_status");
+                return false;
+            }
             $log->write("processCreditCardPayment: Successfully fetched existing order details. Status: " . ($response['status'] ?? 'unknown'));
             return $response;
         }
@@ -1676,7 +1681,7 @@ class PayPalCommon {
         if ($ppac_type === 'card') {
             $reused_or_blocked = $this->reuseOrBlockOpenCardCapture(
                 $paymentModule,
-                $order,
+                $create_order_request,
                 $order_guid,
                 $order_amount_mismatch,
                 $log
@@ -1815,6 +1820,10 @@ class PayPalCommon {
                 $this->reservePayPalCaptureResourceOrFinishExistingCheckout(
                     $immediate_payment['id'],
                     $immediate_payment['type']
+                );
+                $this->storeOpenCaptureCartFingerprint(
+                    (string)$paypal_id,
+                    $this->captureCartFingerprint($order_request)
                 );
             }
         }
@@ -2231,6 +2240,57 @@ class PayPalCommon {
         }
     }
 
+    /**
+     * Same ppac_ lock admin orphan refund uses. Does not release the card-scope lock.
+     */
+    protected function acquireOpenCaptureReuseLock(string $paypal_order_id): bool
+    {
+        global $db;
+
+        $paypal_order_id = trim($paypal_order_id);
+        if ($paypal_order_id === '' || !isset($db) || !is_object($db)) {
+            return false;
+        }
+
+        $lock_name = 'ppac_' . md5($paypal_order_id);
+        if (self::$advancedCheckoutMysqlLockName !== null) {
+            return self::$advancedCheckoutMysqlLockName === $lock_name;
+        }
+
+        self::$advancedCheckoutMysqlLockName = $lock_name;
+        if (self::$advancedCheckoutMysqlShutdownRegistered === false) {
+            self::$advancedCheckoutMysqlShutdownRegistered = true;
+            register_shutdown_function([self::class, 'releaseAdvancedCheckoutMysqlOrderLockShutdown']);
+        }
+
+        $escaped = $db->prepare_input($lock_name);
+        $result = $db->Execute("SELECT GET_LOCK('" . $escaped . "', 5) AS ppac_lock_acquired");
+        $acquired = isset($result->fields['ppac_lock_acquired']) ? (int)$result->fields['ppac_lock_acquired'] : 0;
+        if ($acquired !== 1) {
+            self::$advancedCheckoutMysqlLockName = null;
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Release only the PayPal-order lock taken for capture reuse.
+     */
+    protected function releaseOpenCaptureReuseLock(): void
+    {
+        global $db;
+
+        if (self::$advancedCheckoutMysqlLockName === null || !isset($db) || !is_object($db)) {
+            self::$advancedCheckoutMysqlLockName = null;
+            return;
+        }
+
+        $escaped = $db->prepare_input(self::$advancedCheckoutMysqlLockName);
+        $db->Execute("SELECT RELEASE_LOCK('" . $escaped . "')");
+        self::$advancedCheckoutMysqlLockName = null;
+    }
+
     public function releaseAdvancedCheckoutMysqlOrderLock(): void
     {
         self::releaseAdvancedCheckoutMysqlOrderLockShutdown();
@@ -2445,6 +2505,7 @@ class PayPalCommon {
                 admin_claimed_at DATETIME NULL DEFAULT NULL,
                 refund_id VARCHAR(64) NOT NULL DEFAULT '',
                 refund_status VARCHAR(16) NOT NULL DEFAULT '',
+                cart_fingerprint CHAR(64) NOT NULL DEFAULT '',
                 PRIMARY KEY (capture_resource_id),
                 KEY idx_ppac_cap_orders (orders_id),
                 KEY idx_ppac_cap_created (created_at)
@@ -2486,6 +2547,12 @@ class PayPalCommon {
         if ($col->EOF) {
             $db->Execute(
                 "ALTER TABLE " . $table . " ADD refund_status VARCHAR(16) NOT NULL DEFAULT '' AFTER refund_id"
+            );
+        }
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'cart_fingerprint'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD cart_fingerprint CHAR(64) NOT NULL DEFAULT '' AFTER refund_status"
             );
         }
     }
@@ -2557,12 +2624,19 @@ class PayPalCommon {
         // Same checkout pipeline may call reserve twice (createPayPalOrder then before_process). The row
         // already belongs to this PayPal order with orders_id still 0 — do not wait (would deadlock).
         $ownerChk = $db->Execute(
-            "SELECT orders_id, paypal_order_id, resource_type FROM " . $table . " WHERE capture_resource_id = '" . $esc . "' LIMIT 1"
+            "SELECT orders_id, paypal_order_id, resource_type
+               FROM " . $table . " WHERE capture_resource_id = '" . $esc . "' LIMIT 1"
         );
         if (!$ownerChk->EOF) {
             $row_orders_id = (int)($ownerChk->fields['orders_id'] ?? 0);
             $row_paypal_order_id = (string)($ownerChk->fields['paypal_order_id'] ?? '');
             if ($row_orders_id === 0 && $row_paypal_order_id !== '' && $row_paypal_order_id === $paypal_order_id) {
+                if (!$this->captureReservationStillOpenForCheckout($capture_resource_id, $paypal_order_id)) {
+                    $block_message = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING')
+                        ? MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING
+                        : 'A previous card payment is still being resolved. Please wait a few minutes and try again, or contact us for assistance.';
+                    $this->setMessageAndRedirect($block_message, FILENAME_CHECKOUT_PAYMENT);
+                }
                 $row_type = trim((string)($ownerChk->fields['resource_type'] ?? ''));
                 if ($resource_type !== '' && $row_type === '') {
                     $db->Execute(
@@ -2716,15 +2790,14 @@ class PayPalCommon {
     }
 
     /**
-     * Reuse an unlinked capture when the cart amount still matches. Block when one remains
+     * Reuse an unlinked capture when the PayPal request still matches. Block when one remains
      * and cannot be reused. Null means no open capture, so createOrder may continue.
      *
      * @return bool|null
      */
-    protected function reuseOrBlockOpenCardCapture($paymentModule, $order, string $order_guid, array $order_amount_mismatch, $log): ?bool
+    protected function reuseOrBlockOpenCardCapture($paymentModule, $create_order_request, string $order_guid, array $order_amount_mismatch, $log): ?bool
     {
         $customers_id = (int)($_SESSION['customer_id'] ?? 0);
-        $paypal_order_ids = $this->reusableOpenOrphanPayPalOrderIds($customers_id);
         $has_open = $customers_id > 0
             ? $this->customerHasOpenOrphanCapture($customers_id)
             : $this->guestHasOpenOrphanCapture();
@@ -2733,18 +2806,42 @@ class PayPalCommon {
             return null;
         }
 
-        foreach ($paypal_order_ids as $paypal_order_id) {
+        $order_request = (is_object($create_order_request) && method_exists($create_order_request, 'get'))
+            ? $create_order_request->get()
+            : [];
+        if (!is_array($order_request)) {
+            $order_request = [];
+        }
+        $fingerprint = $this->captureCartFingerprint($order_request);
+        $rows = $this->reusableOpenOrphanCaptureRows($customers_id);
+
+        foreach ($rows as $row) {
+            $paypal_order_id = $row['paypal_order_id'];
+            $capture_resource_id = $row['capture_resource_id'];
+            $stored_fingerprint = $row['cart_fingerprint'];
+            if ($fingerprint === '' || $stored_fingerprint === '' || !hash_equals($stored_fingerprint, $fingerprint)) {
+                continue;
+            }
             if (!isset($paymentModule->ppr) || !is_object($paymentModule->ppr) || !method_exists($paymentModule->ppr, 'getOrderStatus')) {
                 break;
             }
+            if (!$this->acquireOpenCaptureReuseLock($paypal_order_id)) {
+                continue;
+            }
+            if (!$this->captureReservationStillOpenForCheckout($capture_resource_id, $paypal_order_id)) {
+                $this->releaseOpenCaptureReuseLock();
+                continue;
+            }
             $paypal_order = $paymentModule->ppr->getOrderStatus($paypal_order_id);
-            if (!is_array($paypal_order) || !$this->paypalOrderCanBeReusedForCart($paypal_order, $order)) {
+            if (!is_array($paypal_order) || !$this->paypalCaptureCanBeReused($paypal_order, $order_request, $capture_resource_id)) {
+                $this->releaseOpenCaptureReuseLock();
                 continue;
             }
             $this->restoreReusedPayPalOrderSession($paypal_order, $order_guid, $order_amount_mismatch);
             if ($log !== null) {
                 $log->write(
-                    'createPayPalOrder(card): reusing open capture for PayPal order ' . $paypal_order_id
+                    'createPayPalOrder(card): reusing open capture ' . $capture_resource_id
+                    . ' for PayPal order ' . $paypal_order_id
                 );
             }
             return true;
@@ -2752,7 +2849,7 @@ class PayPalCommon {
 
         $block_scope = $customers_id > 0
             ? 'customer #' . $customers_id
-            : 'guest paypal order ' . ($paypal_order_ids[0] ?? '');
+            : 'guest';
         if ($log !== null) {
             $log->write(
                 'createPayPalOrder(card): blocked; unresolved orphan capture remains for ' . $block_scope
@@ -2766,12 +2863,12 @@ class PayPalCommon {
     }
 
     /**
-     * PayPal order ids for unlinked captures that checkout may try to reuse.
-     * Rows with a refund already started are omitted. customers_id 0 uses the guest session ids.
+     * Unlinked captures checkout may try to reuse. Refund-started rows are omitted.
+     * customers_id 0 uses the guest session PayPal order ids.
      *
-     * @return list<string>
+     * @return list<array{capture_resource_id:string,paypal_order_id:string,cart_fingerprint:string}>
      */
-    protected function reusableOpenOrphanPayPalOrderIds(int $customers_id): array
+    protected function reusableOpenOrphanCaptureRows(int $customers_id): array
     {
         global $db;
 
@@ -2781,35 +2878,43 @@ class PayPalCommon {
 
         $this->ensureCaptureCheckoutReservationTable();
         $table = $this->checkoutCaptureReservationTableName();
-
-        if ($customers_id > 0) {
-            $rows = $db->Execute(
-                "SELECT paypal_order_id
-                   FROM " . $table . "
-                  WHERE customers_id = " . (int)$customers_id . "
-                    AND orders_id = 0
+        $where = "orders_id = 0
                     AND paypal_order_id != ''
-                    AND (refund_status = '' OR refund_status IS NULL)
-                  ORDER BY created_at DESC"
-            );
-            $ids = [];
-            while (!$rows->EOF) {
-                $paypal_order_id = trim((string)($rows->fields['paypal_order_id'] ?? ''));
-                if ($paypal_order_id !== '' && !in_array($paypal_order_id, $ids, true)) {
-                    $ids[] = $paypal_order_id;
-                }
-                $rows->MoveNext();
+                    AND (refund_status = '' OR refund_status IS NULL)";
+        if ($customers_id > 0) {
+            $where .= " AND customers_id = " . (int)$customers_id;
+        } else {
+            $guest_ids = $this->guestOrphanPayPalOrderIds();
+            if ($guest_ids === []) {
+                return [];
             }
-            return $ids;
+            $escaped_ids = [];
+            foreach ($guest_ids as $guest_id) {
+                $escaped_ids[] = "'" . $db->prepare_input($guest_id) . "'";
+            }
+            $where .= " AND paypal_order_id IN (" . implode(',', $escaped_ids) . ")";
         }
 
-        $ids = [];
-        foreach ($this->guestOrphanPayPalOrderIds() as $paypal_order_id) {
-            if ($this->paypalOrderHasReusableOpenOrphanCapture($paypal_order_id)) {
-                $ids[] = $paypal_order_id;
+        $rows = $db->Execute(
+            "SELECT capture_resource_id, paypal_order_id, cart_fingerprint
+               FROM " . $table . "
+              WHERE " . $where . "
+              ORDER BY created_at DESC"
+        );
+        $out = [];
+        while (!$rows->EOF) {
+            $capture_resource_id = trim((string)($rows->fields['capture_resource_id'] ?? ''));
+            $paypal_order_id = trim((string)($rows->fields['paypal_order_id'] ?? ''));
+            if ($capture_resource_id !== '' && $paypal_order_id !== '') {
+                $out[] = [
+                    'capture_resource_id' => $capture_resource_id,
+                    'paypal_order_id' => $paypal_order_id,
+                    'cart_fingerprint' => trim((string)($rows->fields['cart_fingerprint'] ?? '')),
+                ];
             }
+            $rows->MoveNext();
         }
-        return $ids;
+        return $out;
     }
 
     /**
@@ -2826,26 +2931,34 @@ class PayPalCommon {
     }
 
     /**
-     * True when this PayPal order is unlinked and checkout has not started a refund.
+     * True when this capture is still unlinked, not refunding, and not admin-claimed.
      */
-    protected function paypalOrderHasReusableOpenOrphanCapture(string $paypal_order_id): bool
+    protected function captureReservationStillOpenForCheckout(string $capture_resource_id, string $paypal_order_id): bool
     {
         global $db;
 
+        $capture_resource_id = trim($capture_resource_id);
         $paypal_order_id = trim($paypal_order_id);
-        if ($paypal_order_id === '' || !isset($db) || !is_object($db)) {
+        if ($capture_resource_id === '' || $paypal_order_id === '' || !isset($db) || !is_object($db)) {
             return false;
         }
 
         $this->ensureCaptureCheckoutReservationTable();
         $table = $this->checkoutCaptureReservationTableName();
-        $esc = $db->prepare_input($paypal_order_id);
+        $esc_cap = $db->prepare_input($capture_resource_id);
+        $esc_po = $db->prepare_input($paypal_order_id);
         $open = $db->Execute(
             "SELECT capture_resource_id
                FROM " . $table . "
-              WHERE paypal_order_id = '" . $esc . "'
+              WHERE capture_resource_id = '" . $esc_cap . "'
+                AND paypal_order_id = '" . $esc_po . "'
                 AND orders_id = 0
                 AND (refund_status = '' OR refund_status IS NULL)
+                AND (
+                    admin_claim_token = ''
+                    OR admin_claimed_at IS NULL
+                    OR admin_claimed_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+                )
               LIMIT 1"
         );
 
@@ -2853,48 +2966,211 @@ class PayPalCommon {
     }
 
     /**
-     * True when this PayPal order is still payable for the current cart total.
+     * True when this exact capture is still settled for the PayPal request about to be sent.
+     * Only COMPLETED orders are reused. processCreditCardPayment() captures again for any other status.
      */
-    protected function paypalOrderCanBeReusedForCart(array $paypal_order, $order): bool
+    protected function paypalCaptureCanBeReused(array $paypal_order, array $order_request, string $capture_resource_id): bool
     {
-        $status = strtoupper((string)($paypal_order['status'] ?? ''));
-        if (!in_array($status, [
-            PayPalAdvancedCheckoutApi::STATUS_APPROVED,
-            PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
+        if (strtoupper((string)($paypal_order['status'] ?? '')) !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED) {
+            return false;
+        }
+        if ($this->settledPaymentBlockStatus($paypal_order) !== '') {
+            return false;
+        }
+        $entry = $this->findPaymentResourceById($paypal_order, $capture_resource_id);
+        if ($entry === null) {
+            return false;
+        }
+        $status = strtoupper((string)($entry['status'] ?? ''));
+        if (($entry['kind'] ?? '') === 'capture') {
+            if ($status !== PayPalAdvancedCheckoutApi::STATUS_COMPLETED) {
+                return false;
+            }
+        } elseif (!in_array($status, [
+            PayPalAdvancedCheckoutApi::STATUS_CREATED,
+            PayPalAdvancedCheckoutApi::STATUS_PENDING,
             PayPalAdvancedCheckoutApi::STATUS_CAPTURED,
         ], true)) {
             return false;
         }
-        if ($this->findFailedPaymentStatus($paypal_order) !== '') {
-            return false;
-        }
-        $captures = $paypal_order['purchase_units'][0]['payments']['captures'] ?? [];
-        $authorizations = $paypal_order['purchase_units'][0]['payments']['authorizations'] ?? [];
-        if ($status === PayPalAdvancedCheckoutApi::STATUS_COMPLETED && $captures === [] && $authorizations === []) {
-            return false;
-        }
-        if (!is_object($order) || !isset($order->info) || !is_array($order->info)) {
-            return false;
-        }
 
-        $unit = $paypal_order['purchase_units'][0]['amount'] ?? null;
-        if (!is_array($unit)) {
+        return $this->paypalAmountMatchesRequest($paypal_order, $order_request);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function findPaymentResourceById(array $paypal_order, string $capture_resource_id): ?array
+    {
+        $capture_resource_id = trim($capture_resource_id);
+        if ($capture_resource_id === '') {
+            return null;
+        }
+        $payments = $paypal_order['purchase_units'][0]['payments'] ?? [];
+        if (!is_array($payments)) {
+            return null;
+        }
+        foreach (['captures' => 'capture', 'authorizations' => 'authorization'] as $payment_key => $kind) {
+            $entries = $payments[$payment_key] ?? [];
+            if (!is_array($entries)) {
+                continue;
+            }
+            foreach ($entries as $entry) {
+                if (!is_array($entry)) {
+                    continue;
+                }
+                if (trim((string)($entry['id'] ?? '')) === $capture_resource_id) {
+                    $entry['kind'] = $kind;
+                    return $entry;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Refunded or voided resources must not be treated as a successful payment.
+     */
+    protected function settledPaymentBlockStatus(array $paypal_order): string
+    {
+        $blocked = ['REFUNDED', 'PARTIALLY_REFUNDED', 'VOIDED', 'DECLINED', 'DENIED', 'FAILED', 'EXPIRED'];
+        $payments = $paypal_order['purchase_units'][0]['payments'] ?? [];
+        if (!is_array($payments)) {
+            return '';
+        }
+        foreach (['captures', 'authorizations'] as $payment_key) {
+            $entries = $payments[$payment_key] ?? [];
+            if (!is_array($entries)) {
+                continue;
+            }
+            foreach ($entries as $entry) {
+                if (!is_array($entry)) {
+                    continue;
+                }
+                $status = strtoupper((string)($entry['status'] ?? ''));
+                if (in_array($status, $blocked, true)) {
+                    return $status;
+                }
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Compare the PayPal order amount to the create-order request, not the Zen cart total.
+     */
+    protected function paypalAmountMatchesRequest(array $paypal_order, array $order_request): bool
+    {
+        $paypal = $paypal_order['purchase_units'][0]['amount'] ?? null;
+        $request = $order_request['purchase_units'][0]['amount'] ?? null;
+        if (!is_array($paypal) || !is_array($request)) {
             return false;
         }
-        $paypal_value = (string)($unit['value'] ?? '');
-        $paypal_currency = strtoupper((string)($unit['currency_code'] ?? ''));
-        $cart_currency = strtoupper((string)($order->info['currency'] ?? ''));
-        if ($paypal_value === '' || $paypal_currency === '' || $paypal_currency !== $cart_currency) {
+        $paypal_value = (string)($paypal['value'] ?? '');
+        $request_value = (string)($request['value'] ?? '');
+        $paypal_currency = strtoupper((string)($paypal['currency_code'] ?? ''));
+        $request_currency = strtoupper((string)($request['currency_code'] ?? ''));
+        if ($paypal_value === '' || $request_value === '' || $paypal_currency === '' || $paypal_currency !== $request_currency) {
             return false;
+        }
+        if ($paypal_value === $request_value) {
+            return true;
         }
         $decimals = 2;
-        $dot = strrpos($paypal_value, '.');
+        $dot = strrpos($request_value, '.');
         if ($dot !== false) {
-            $decimals = strlen($paypal_value) - $dot - 1;
+            $decimals = strlen($request_value) - $dot - 1;
         }
-        $cart_value = number_format((float)($order->info['total'] ?? 0), $decimals, '.', '');
 
-        return $paypal_value === $cart_value;
+        return number_format((float)$paypal_value, $decimals, '.', '') === number_format((float)$request_value, $decimals, '.', '');
+    }
+
+    /**
+     * Hash of the PayPal purchase unit that identifies this cart, amount, and ship-to.
+     */
+    protected function captureCartFingerprint(array $order_request): string
+    {
+        $unit = $order_request['purchase_units'][0] ?? null;
+        if (!is_array($unit)) {
+            return '';
+        }
+        $amount = is_array($unit['amount'] ?? null) ? $unit['amount'] : [];
+        $value = (string)($amount['value'] ?? '');
+        if ($value === '') {
+            return '';
+        }
+        $canonical = [
+            'amount' => [
+                'currency_code' => strtoupper((string)($amount['currency_code'] ?? '')),
+                'value' => $value,
+            ],
+            'items' => $this->canonicalFingerprintValue($unit['items'] ?? []),
+            'shipping' => $this->canonicalFingerprintValue($unit['shipping'] ?? []),
+        ];
+        $encoded = json_encode($canonical);
+        if (!is_string($encoded) || $encoded === '') {
+            return '';
+        }
+        return hash('sha256', $encoded);
+    }
+
+    /**
+     * @param mixed $value
+     * @return mixed
+     */
+    protected function canonicalFingerprintValue($value)
+    {
+        if (!is_array($value)) {
+            if (is_bool($value)) {
+                return $value ? '1' : '0';
+            }
+            if ($value === null) {
+                return '';
+            }
+            return is_scalar($value) ? (string)$value : '';
+        }
+        if ($value === []) {
+            return [];
+        }
+        if (function_exists('array_is_list') && array_is_list($value)) {
+            $list = [];
+            foreach ($value as $item) {
+                $list[] = $this->canonicalFingerprintValue($item);
+            }
+            return $list;
+        }
+        ksort($value);
+        $assoc = [];
+        foreach ($value as $key => $item) {
+            $assoc[(string)$key] = $this->canonicalFingerprintValue($item);
+        }
+        return $assoc;
+    }
+
+    /**
+     * Remember the cart that this open capture paid for. Later retries must match it.
+     */
+    protected function storeOpenCaptureCartFingerprint(string $paypal_order_id, string $fingerprint): void
+    {
+        global $db;
+
+        $paypal_order_id = trim($paypal_order_id);
+        $fingerprint = trim($fingerprint);
+        if ($paypal_order_id === '' || $fingerprint === '' || !isset($db) || !is_object($db)) {
+            return;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+        $esc_po = $db->prepare_input($paypal_order_id);
+        $esc_fp = $db->prepare_input($fingerprint);
+        $db->Execute(
+            "UPDATE " . $table . "
+                SET cart_fingerprint = '" . $esc_fp . "'
+              WHERE paypal_order_id = '" . $esc_po . "'
+                AND orders_id = 0
+                AND cart_fingerprint = ''"
+        );
     }
 
     /**
