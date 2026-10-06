@@ -2508,6 +2508,8 @@ class PayPalCommon {
                 refund_status VARCHAR(16) NOT NULL DEFAULT '',
                 cart_fingerprint CHAR(64) NOT NULL DEFAULT '',
                 related_orders_id INT UNSIGNED NOT NULL DEFAULT 0,
+                amount DECIMAL(15,4) NULL DEFAULT NULL,
+                currency CHAR(3) NOT NULL DEFAULT '',
                 PRIMARY KEY (capture_resource_id),
                 KEY idx_ppac_cap_orders (orders_id),
                 KEY idx_ppac_cap_created (created_at)
@@ -2563,6 +2565,18 @@ class PayPalCommon {
                 "ALTER TABLE " . $table . " ADD related_orders_id INT UNSIGNED NOT NULL DEFAULT 0 AFTER cart_fingerprint"
             );
         }
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'amount'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD amount DECIMAL(15,4) NULL DEFAULT NULL AFTER related_orders_id"
+            );
+        }
+        $col = $db->Execute("SHOW COLUMNS FROM " . $table . " LIKE 'currency'");
+        if ($col->EOF) {
+            $db->Execute(
+                "ALTER TABLE " . $table . " ADD currency CHAR(3) NOT NULL DEFAULT '' AFTER amount"
+            );
+        }
     }
 
     /**
@@ -2587,6 +2601,104 @@ class PayPalCommon {
                     refund_status = 'PENDING'
               WHERE capture_resource_id = '" . $esc . "'
                 AND orders_id = 0
+              LIMIT 1"
+        );
+    }
+
+    /**
+     * Amount on this capture/authorization from the PayPal order still in session.
+     *
+     * @return array{amount:?string,currency:string}
+     */
+    protected function openCaptureAmountFromSession(string $capture_resource_id): array
+    {
+        $empty = ['amount' => null, 'currency' => ''];
+        $current = $_SESSION['PayPalAdvancedCheckout']['Order']['current'] ?? null;
+        if (!is_array($current)) {
+            return $empty;
+        }
+
+        $capture_resource_id = trim($capture_resource_id);
+        $matched = null;
+        $fallback = null;
+        $purchase_units = $current['purchase_units'] ?? [];
+        if (!is_array($purchase_units)) {
+            return $empty;
+        }
+
+        foreach ($purchase_units as $purchase_unit) {
+            if (!is_array($purchase_unit)) {
+                continue;
+            }
+            if ($fallback === null && isset($purchase_unit['amount']) && is_array($purchase_unit['amount'])) {
+                $fallback = $purchase_unit['amount'];
+            }
+            $payments = $purchase_unit['payments'] ?? [];
+            if (!is_array($payments)) {
+                continue;
+            }
+            foreach (['captures', 'authorizations'] as $payment_key) {
+                $entries = $payments[$payment_key] ?? [];
+                if (!is_array($entries)) {
+                    continue;
+                }
+                foreach ($entries as $entry) {
+                    if (!is_array($entry)) {
+                        continue;
+                    }
+                    if (trim((string)($entry['id'] ?? '')) !== $capture_resource_id) {
+                        continue;
+                    }
+                    if (isset($entry['amount']) && is_array($entry['amount'])) {
+                        $matched = $entry['amount'];
+                        break 3;
+                    }
+                }
+            }
+        }
+
+        $amount_node = $matched ?? $fallback;
+        if (!is_array($amount_node)) {
+            return $empty;
+        }
+
+        $value = trim((string)($amount_node['value'] ?? ''));
+        $currency = strtoupper(trim((string)($amount_node['currency_code'] ?? '')));
+        if (!preg_match('/^\d+(\.\d{1,4})?$/', $value)) {
+            return $empty;
+        }
+        if (!preg_match('/^[A-Z]{3}$/', $currency)) {
+            $currency = '';
+        }
+
+        return ['amount' => $value, 'currency' => $currency];
+    }
+
+    /**
+     * Fill amount on an existing open reservation when checkout reserved it before the total was stored.
+     *
+     * @param array{amount:?string,currency:string} $captured_amount
+     */
+    protected function storeOpenCaptureAmountIfMissing(string $capture_resource_id, array $captured_amount): void
+    {
+        global $db;
+
+        $capture_resource_id = trim($capture_resource_id);
+        if ($capture_resource_id === '' || ($captured_amount['amount'] ?? null) === null || !isset($db) || !is_object($db)) {
+            return;
+        }
+
+        $table = $this->checkoutCaptureReservationTableName();
+        $esc = $db->prepare_input($capture_resource_id);
+        $esc_amount = $db->prepare_input((string)$captured_amount['amount']);
+        $esc_currency = $db->prepare_input((string)($captured_amount['currency'] ?? ''));
+        $db->Execute(
+            "UPDATE " . $table . "
+                SET amount = '" . $esc_amount . "',
+                    currency = '" . $esc_currency . "'
+              WHERE capture_resource_id = '" . $esc . "'
+                AND orders_id = 0
+                AND amount IS NULL
               LIMIT 1"
         );
     }
@@ -2619,13 +2731,23 @@ class PayPalCommon {
         $this->rememberGuestOrphanPayPalOrderId($cid, $paypal_order_id);
         $esc_po = $db->prepare_input($paypal_order_id);
         $table = $this->checkoutCaptureReservationTableName();
+        $captured_amount = $this->openCaptureAmountFromSession($capture_resource_id);
+        $amount_sql = $captured_amount['amount'] === null
+            ? 'NULL'
+            : "'" . $db->prepare_input($captured_amount['amount']) . "'";
+        $esc_currency = $db->prepare_input($captured_amount['currency']);
 
         $db->Execute(
-            "INSERT IGNORE INTO " . $table . " (capture_resource_id, customers_id, paypal_order_id, orders_id, created_at, resource_type)
-             VALUES ('" . $esc . "', " . $cid . ", '" . $esc_po . "', 0, NOW(), '" . $esc_type . "')"
+            "INSERT IGNORE INTO " . $table . " (capture_resource_id, customers_id, paypal_order_id, orders_id, created_at, resource_type, amount, currency)
+             VALUES ('" . $esc . "', " . $cid . ", '" . $esc_po . "', 0, NOW(), '" . $esc_type . "', " . $amount_sql . ", '" . $esc_currency . "')"
         );
 
         if ($db->affectedRows() > 0) {
+            $this->storeOpenCaptureCartFingerprint(
+                $paypal_order_id,
+                $this->captureCartFingerprint(),
+                $capture_resource_id
+            );
             return;
         }
 
@@ -2661,6 +2783,7 @@ class PayPalCommon {
                     $this->captureCartFingerprint(),
                     $capture_resource_id
                 );
+                $this->storeOpenCaptureAmountIfMissing($capture_resource_id, $captured_amount);
                 return;
             }
         }
@@ -3443,7 +3566,7 @@ class PayPalCommon {
         $min_age_minutes = max(1, $min_age_minutes);
         $alert_cooldown_hours = max(0, $alert_cooldown_hours);
 
-        $sql = "SELECT capture_resource_id, customers_id, paypal_order_id, created_at, alerted_at
+        $sql = "SELECT capture_resource_id, customers_id, paypal_order_id, created_at, alerted_at, amount, currency
                   FROM " . $table . "
                  WHERE orders_id = 0
                    AND related_orders_id = 0
@@ -3465,11 +3588,19 @@ class PayPalCommon {
         while (!$rows->EOF) {
             $capture_resource_id = (string)$rows->fields['capture_resource_id'];
             $capture_ids[] = $capture_resource_id;
+            $amount_value = $rows->fields['amount'] ?? null;
+            $amount_label = ($amount_value === null || $amount_value === '')
+                ? 'unknown'
+                : number_format((float)$amount_value, 2, '.', '')
+                    . (trim((string)($rows->fields['currency'] ?? '')) !== ''
+                        ? ' ' . trim((string)$rows->fields['currency'])
+                        : '');
             $lines[] = sprintf(
-                "- capture/auth=%s customer=%d paypal_order=%s created=%s",
+                "- capture/auth=%s customer=%d paypal_order=%s total=%s created=%s",
                 $capture_resource_id,
                 (int)$rows->fields['customers_id'],
                 (string)($rows->fields['paypal_order_id'] ?? ''),
+                $amount_label,
                 (string)($rows->fields['created_at'] ?? '')
             );
             $rows->MoveNext();

@@ -81,6 +81,20 @@ function paypalac_orphan_captures_api(): ?PayPalAdvancedCheckoutApi
 /**
  * Age + still-orphan SQL fragment (orders_id = 0 and older than min age).
  */
+function paypalac_orphan_captures_amount_label(array $row): string
+{
+    $amount = $row['amount'] ?? null;
+    if ($amount === null || $amount === '') {
+        return TEXT_AMOUNT_UNKNOWN;
+    }
+    $currency = trim((string)($row['currency'] ?? ''));
+    $label = number_format((float)$amount, 2, '.', '');
+    if ($currency !== '') {
+        $label .= ' ' . $currency;
+    }
+    return $label;
+}
+
 function paypalac_orphan_captures_aged_sql(int $min_age_minutes): string
 {
     return "orders_id = 0
@@ -293,6 +307,7 @@ function paypalac_orphan_captures_load_aged_row(string $capture_resource_id, int
     $esc = zen_db_input($capture_resource_id);
     $chk = $db->Execute(
         "SELECT r.capture_resource_id, r.resource_type, r.customers_id, r.paypal_order_id, r.created_at, r.alerted_at,
+                r.amount, r.currency,
                 c.customers_firstname, c.customers_lastname, c.customers_email_address
            FROM " . $reservation_table . " r
       LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = r.customers_id
@@ -626,7 +641,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 $rows = [];
 $result = $db->Execute(
     "SELECT r.capture_resource_id, r.resource_type, r.customers_id, r.paypal_order_id, r.created_at, r.alerted_at,
-            r.refund_status,
+            r.refund_status, r.amount, r.currency,
             c.customers_firstname, c.customers_lastname, c.customers_email_address
        FROM " . $reservation_table . " r
   LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = r.customers_id
@@ -725,6 +740,8 @@ while (!$result->EOF) {
                 <dd><?php echo $c_customer; ?></dd>
                 <dt><?php echo TABLE_HEADING_PAYPAL_ORDER; ?></dt>
                 <dd class="ppac-orphan-mono"><?php echo zen_output_string_protected((string)($crow['paypal_order_id'] ?? '')); ?></dd>
+                <dt><?php echo TABLE_HEADING_AMOUNT; ?></dt>
+                <dd><?php echo zen_output_string_protected(paypalac_orphan_captures_amount_label($crow)); ?></dd>
                 <dt><?php echo TABLE_HEADING_CREATED; ?></dt>
                 <dd><?php echo zen_output_string_protected((string)($crow['created_at'] ?? '')); ?></dd>
             </dl>
@@ -762,6 +779,7 @@ while (!$result->EOF) {
                 <th><?php echo TABLE_HEADING_TYPE; ?></th>
                 <th><?php echo TABLE_HEADING_CUSTOMER; ?></th>
                 <th><?php echo TABLE_HEADING_PAYPAL_ORDER; ?></th>
+                <th><?php echo TABLE_HEADING_AMOUNT; ?></th>
                 <th><?php echo TABLE_HEADING_CREATED; ?></th>
                 <th><?php echo TABLE_HEADING_ALERTED; ?></th>
                 <th><?php echo TABLE_HEADING_ACTIONS; ?></th>
@@ -797,6 +815,7 @@ while (!$result->EOF) {
                     <td><?php echo zen_output_string_protected($type_label); ?></td>
                     <td><?php echo $customer_label; ?></td>
                     <td class="ppac-orphan-mono"><?php echo zen_output_string_protected((string)($row['paypal_order_id'] ?? '')); ?></td>
+                    <td><?php echo zen_output_string_protected(paypalac_orphan_captures_amount_label($row)); ?></td>
                     <td><?php echo zen_output_string_protected((string)($row['created_at'] ?? '')); ?></td>
                     <td><?php echo $alerted !== '' ? zen_output_string_protected($alerted) : TEXT_NEVER_ALERTED; ?></td>
                     <td class="ppac-orphan-actions">
