@@ -4,7 +4,7 @@
  */
 
 define('HEADING_TITLE', 'PayPal Orphan Captures');
-define('TEXT_ORPHAN_INTRO', 'Aged PayPal capture/authorization IDs reserved during checkout but never linked to a Zen Cart order (orders_id = 0). Rows newer than 5 minutes are hidden (in-flight checkout). Refund or void calls PayPal. Link order records an existing Zen order on this row and leaves orders_id at 0. The row is kept, and the daily alert skips it.');
+define('TEXT_ORPHAN_INTRO', 'Aged PayPal capture/authorization IDs reserved during checkout but never linked to a Zen Cart order (orders_id = 0). Rows newer than 5 minutes are hidden (in-flight checkout). Refund or void calls PayPal. Link order records an existing Zen order on this row and leaves orders_id at 0. The row stays on this list with its buttons hidden. The daily alert skips it.');
 
 define('TABLE_HEADING_CAPTURE', 'Capture / Auth ID');
 define('TABLE_HEADING_TYPE', 'Type');
@@ -60,3 +60,4 @@ define('ERROR_REFUND_STATUS_BLOCKS_LINK', 'Refund status %s is still on this res
 define('ERROR_RELATED_ORDER_CUSTOMER', 'Zen order #%d belongs to customer #%d. This stalled payment belongs to customer #%d.');
 define('ERROR_RELATED_ORDER_ALREADY_LINKED', 'Zen order #%d is already tied to capture %s.');
 define('TEXT_LINK_UNAVAILABLE_REFUND', 'Link unavailable (refund %s).');
+define('TEXT_LINKED_ORDER', 'Zen order #%d');
