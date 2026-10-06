@@ -697,6 +697,105 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
        }
 
        /**
+        * Merchant-initiated charge of a paypal_vault row, including cards the customer did not opt to show at checkout.
+        *
+        * @param int   $paypal_vault_id
+        * @param float $total_to_bill
+        * @param array $options Optional: currency, request_id, customers_id
+        * @return array{success:bool,error?:string,transaction_id?:string,paypal_order_id?:string,...}
+        */
+       function charge_paypal_vault($paypal_vault_id, $total_to_bill, array $options = array())
+       {
+               global $db;
+
+               $paypal_vault_id = (int)$paypal_vault_id;
+               $total_to_bill = (float)$total_to_bill;
+               if ($paypal_vault_id <= 0) {
+                       return array('success' => false, 'error' => 'Invalid vault record');
+               }
+               if ($total_to_bill <= 0) {
+                       return array('success' => false, 'error' => 'Amount must be greater than zero');
+               }
+               if (!$this->ensure_vault_manager_loaded() || !defined('TABLE_PAYPAL_VAULT')) {
+                       return array('success' => false, 'error' => 'Vault manager unavailable');
+               }
+
+               $row = $db->Execute(
+                   "SELECT paypal_vault_id, customers_id, vault_id, status, brand, last_digits, expiry, cardholder_name
+                      FROM " . TABLE_PAYPAL_VAULT . "
+                     WHERE paypal_vault_id = " . $paypal_vault_id . "
+                     LIMIT 1"
+               );
+               if (!$row || $row->EOF) {
+                       return array('success' => false, 'error' => 'Vault record not found');
+               }
+
+               $customers_id = (int)($row->fields['customers_id'] ?? 0);
+               $expectedCustomer = (int)($options['customers_id'] ?? 0);
+               if ($expectedCustomer > 0 && $customers_id !== $expectedCustomer) {
+                       return array('success' => false, 'error' => 'Vault record belongs to a different customer');
+               }
+
+               $status = strtoupper(trim((string)($row->fields['status'] ?? '')));
+               if (!in_array($status, array('ACTIVE', 'APPROVED', 'VAULTED'), true)) {
+                       return array('success' => false, 'error' => 'Vault token is not active');
+               }
+
+               $vaultId = trim((string)($row->fields['vault_id'] ?? ''));
+               if ($vaultId === '') {
+                       return array('success' => false, 'error' => 'Vault record has no PayPal vault id');
+               }
+
+               $first_name = '';
+               $last_name = '';
+               $email = '';
+               if ($customers_id > 0) {
+                       $cust = $db->Execute(
+                           "SELECT customers_firstname, customers_lastname, customers_email_address
+                              FROM " . TABLE_CUSTOMERS . "
+                             WHERE customers_id = " . $customers_id . "
+                             LIMIT 1"
+                       );
+                       if ($cust && !$cust->EOF) {
+                               $first_name = (string)$cust->fields['customers_firstname'];
+                               $last_name = (string)$cust->fields['customers_lastname'];
+                               $email = (string)$cust->fields['customers_email_address'];
+                       }
+               }
+
+               $payment_details = array(
+                       'vault_id' => $vaultId,
+                       'paypal_vault_card' => array('vault_id' => $vaultId),
+                       'customers_id' => $customers_id,
+                       'customers_firstname' => $first_name,
+                       'customers_lastname' => $last_name,
+                       'customers_email_address' => $email,
+                       'type' => (string)($row->fields['brand'] ?? ''),
+                       'last_digits' => (string)($row->fields['last_digits'] ?? ''),
+                       'holder_name' => (string)($row->fields['cardholder_name'] ?? ''),
+               );
+               if (!empty($options['currency'])) {
+                       $payment_details['currencycode'] = (string)$options['currency'];
+               }
+
+               $request_id = !empty($options['request_id'])
+                       ? (string)$options['request_id']
+                       : ('rebill_vault_' . $paypal_vault_id . '_' . time() . '_' . substr(md5(uniqid((string)$paypal_vault_id, true)), 0, 8));
+
+               $result = $this->process_rest_payment($payment_details, $total_to_bill, array(
+                       'payment_type' => 'UNSCHEDULED',
+                       'request_id' => $request_id,
+               ));
+               if (is_array($result)) {
+                       $result['paypal_vault_id'] = $paypal_vault_id;
+                       $result['saved_credit_card_id'] = 0;
+                       $result['customers_id'] = $customers_id;
+                       $result['payment_details'] = $payment_details;
+               }
+               return $result;
+       }
+
+       /**
         * Create a Zen Cart order for an admin vault rebill (or attach txn to an existing order).
         *
         * @param array $payment_result Result from charge_vaulted_card / process_rest_payment

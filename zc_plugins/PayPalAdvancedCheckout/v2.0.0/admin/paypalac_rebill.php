@@ -35,6 +35,7 @@ if (file_exists(DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.ph
     require_once DIR_FS_CATALOG . DIR_WS_CLASSES . 'paypalacSavedCardRecurring.php';
 }
 
+use PayPalAdvancedCheckout\Common\AdminRebillCards;
 use PayPalAdvancedCheckout\Common\SavedCreditCardsManager;
 use PayPalAdvancedCheckout\Common\VaultManager;
 
@@ -52,6 +53,7 @@ require DIR_WS_LANGUAGES . $_SESSION['language'] . '/paypalac_rebill.php';
 $action = isset($_REQUEST['action']) ? trim((string)$_REQUEST['action']) : '';
 $customers_id = isset($_REQUEST['customers_id']) ? (int)$_REQUEST['customers_id'] : 0;
 $saved_credit_card_id = isset($_REQUEST['saved_credit_card_id']) ? (int)$_REQUEST['saved_credit_card_id'] : 0;
+$rebill_target = isset($_REQUEST['rebill_target']) ? trim((string)$_REQUEST['rebill_target']) : '';
 $search = isset($_GET['search']) ? trim((string)$_GET['search']) : '';
 
 /**
@@ -82,10 +84,31 @@ function paypalac_rebill_load_customer_cards(int $customers_id): array
         }
         if ($vaultId !== '') {
             $row['effective_vault_id'] = $vaultId;
+            $row['customer_visible'] = 1;
             $cards[] = $row;
         }
         $result->MoveNext();
     }
+
+    $vaultRows = [];
+    if (defined('TABLE_PAYPAL_VAULT')) {
+        $vaultResult = $db->Execute(
+            "SELECT paypal_vault_id, customers_id, orders_id, vault_id, status, brand, last_digits,
+                    card_type, expiry, cardholder_name, visible
+               FROM " . TABLE_PAYPAL_VAULT . "
+              WHERE customers_id = " . $customers_id . "
+           ORDER BY paypal_vault_id DESC"
+        );
+        while (!$vaultResult->EOF) {
+            $vaultRows[] = $vaultResult->fields;
+            $vaultResult->MoveNext();
+        }
+    }
+
+    if (class_exists(AdminRebillCards::class)) {
+        return AdminRebillCards::merge($cards, $vaultRows);
+    }
+
     return $cards;
 }
 
@@ -143,9 +166,26 @@ if ($action === 'charge' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $rebiller = new paypalacSavedCardRecurring();
-    $charge = $rebiller->charge_vaulted_card($saved_credit_card_id, $amount, [
-        'currency' => $currency,
-    ]);
+    $charge = ['success' => false, 'error' => 'Choose a card to charge'];
+    if (preg_match('/^scc:(\d+)$/', $rebill_target, $targetMatch) === 1) {
+        $saved_credit_card_id = (int)$targetMatch[1];
+        $charge = $rebiller->charge_vaulted_card($saved_credit_card_id, $amount, [
+            'currency' => $currency,
+        ]);
+    } elseif (preg_match('/^vault:(\d+)$/', $rebill_target, $targetMatch) === 1) {
+        if (!method_exists($rebiller, 'charge_paypal_vault')) {
+            $charge = ['success' => false, 'error' => 'Admin-only vault rebill is not available'];
+        } else {
+            $charge = $rebiller->charge_paypal_vault((int)$targetMatch[1], $amount, [
+                'currency' => $currency,
+                'customers_id' => $customers_id,
+            ]);
+        }
+    } elseif ($saved_credit_card_id > 0) {
+        $charge = $rebiller->charge_vaulted_card($saved_credit_card_id, $amount, [
+            'currency' => $currency,
+        ]);
+    }
 
     if (empty($charge['success'])) {
         $messageStack->add_session(
@@ -311,22 +351,25 @@ $default_currency = defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : 'USD';
                             <th></th>
                             <th><?php echo TABLE_HEADING_CARD; ?></th>
                             <th><?php echo TABLE_HEADING_EXPIRY; ?></th>
+                            <th><?php echo TABLE_HEADING_AVAILABILITY; ?></th>
                             <th><?php echo TABLE_HEADING_VAULT; ?></th>
                         </tr>
                         </thead>
                         <tbody>
                         <?php foreach ($cards as $index => $card) {
-                            $cardId = (int)$card['saved_credit_card_id'];
-                            $checked = ($saved_credit_card_id > 0 ? $saved_credit_card_id === $cardId : $index === 0);
+                            $target = (string)($card['rebill_target'] ?? ('scc:' . (int)$card['saved_credit_card_id']));
+                            $checked = ($rebill_target !== '' ? $rebill_target === $target : $index === 0);
                             $label = trim((string)($card['type'] ?? 'Card')) . ' •••• ' . trim((string)($card['last_digits'] ?? '????'));
+                            $customerVisible = (int)($card['customer_visible'] ?? 1) === 1;
                             ?>
                             <tr>
                                 <td>
-                                    <input type="radio" name="saved_credit_card_id" value="<?php echo $cardId; ?>"
+                                    <input type="radio" name="rebill_target" value="<?php echo zen_output_string_protected($target); ?>"
                                         <?php echo $checked ? ' checked' : ''; ?> required>
                                 </td>
                                 <td><?php echo zen_output_string_protected($label); ?></td>
                                 <td><?php echo zen_output_string_protected(($card['expiry_month'] ?? '') . '/' . ($card['expiry_year'] ?? '')); ?></td>
+                                <td><?php echo $customerVisible ? TEXT_AVAILABLE_CHECKOUT : TEXT_ADMIN_ONLY; ?></td>
                                 <td><code><?php echo zen_output_string_protected(substr((string)$card['effective_vault_id'], 0, 24)); ?></code></td>
                             </tr>
                         <?php } ?>
