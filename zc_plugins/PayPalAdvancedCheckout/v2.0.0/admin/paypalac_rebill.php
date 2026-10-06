@@ -220,10 +220,11 @@ if ($action === 'charge' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             sprintf(ERROR_REBILL_CHARGE_FAILED, zen_output_string_protected($charge['error'] ?? 'Unknown error')),
             'error'
         );
-        zen_redirect(zen_href_link(
-            FILENAME_PAYPALAC_REBILL,
-            'customers_id=' . $customers_id . '&saved_credit_card_id=' . $saved_credit_card_id
-        ));
+        $failureRedirect = 'customers_id=' . $customers_id;
+        if ($rebill_target !== '') {
+            $failureRedirect .= '&rebill_target=' . rawurlencode($rebill_target);
+        }
+        zen_redirect(zen_href_link(FILENAME_PAYPALAC_REBILL, $failureRedirect));
     }
 
     $orders_id = 0;
