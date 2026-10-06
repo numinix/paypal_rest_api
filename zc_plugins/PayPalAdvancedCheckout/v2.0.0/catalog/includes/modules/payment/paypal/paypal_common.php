@@ -1671,44 +1671,18 @@ class PayPalCommon {
             );
         }
 
-        // For card payments with vault setup (e.g. membership / subscription carts),
-        // PayPal may capture during createOrder before a Zen Cart order exists. Refund
-        // any prior orphan captures for this customer before minting a new PayPal order.
+        // Card checkout may already have captured before a Zen order exists. Reuse that
+        // capture when the cart amount still matches. Otherwise do not take another charge.
         if ($ppac_type === 'card') {
-            $customers_id_for_orphan_sweep = (int)($_SESSION['customer_id'] ?? 0);
-            $block_orphan = false;
-            $block_scope = '';
-            if ($customers_id_for_orphan_sweep > 0) {
-                $this->refundOrphanCaptureReservationsForCustomer(
-                    $customers_id_for_orphan_sweep,
-                    $paymentModule
-                );
-                // Claim, PENDING, lock-busy, or a failed refund leaves the row.
-                // Do not mint another capture while that charge is still open.
-                if ($this->customerHasOpenOrphanCapture($customers_id_for_orphan_sweep)) {
-                    $block_orphan = true;
-                    $block_scope = 'customer #' . $customers_id_for_orphan_sweep;
-                }
-            } else {
-                // Guests share customers_id 0. clear_payments() drops PayPalAdvancedCheckout,
-                // so also check the order id kept outside that tree.
-                foreach ($this->guestOrphanPayPalOrderIds() as $prior_paypal_order_id) {
-                    if ($this->paypalOrderHasOpenOrphanCapture($prior_paypal_order_id)) {
-                        $block_orphan = true;
-                        $block_scope = 'guest paypal order ' . $prior_paypal_order_id;
-                        break;
-                    }
-                }
-            }
-            if ($block_orphan) {
-                $log->write(
-                    'createPayPalOrder(card): blocked; unresolved orphan capture remains for ' . $block_scope
-                );
-                $block_message = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING')
-                    ? MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING
-                    : 'A previous card payment is still being resolved. Please wait a few minutes and try again, or contact us for assistance.';
-                $this->setMessageAndRedirect($block_message, FILENAME_CHECKOUT_PAYMENT);
-                return false;
+            $reused_or_blocked = $this->reuseOrBlockOpenCardCapture(
+                $paymentModule,
+                $order,
+                $order_guid,
+                $order_amount_mismatch,
+                $log
+            );
+            if ($reused_or_blocked !== null) {
+                return $reused_or_blocked;
             }
         }
 
@@ -2657,8 +2631,7 @@ class PayPalCommon {
     }
 
     /**
-     * True when this customer still has an unlinked capture from the last 24 hours.
-     * Younger than the sweep's 15-second grace still blocks. Older rows do not.
+     * True when this customer still has an unlinked capture.
      */
     public function customerHasOpenOrphanCapture(int $customers_id): bool
     {
@@ -2675,7 +2648,6 @@ class PayPalCommon {
                FROM " . $table . "
               WHERE customers_id = " . (int)$customers_id . "
                 AND orders_id = 0
-                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
               LIMIT 1"
         );
 
@@ -2683,7 +2655,7 @@ class PayPalCommon {
     }
 
     /**
-     * True when this PayPal order still has an unlinked capture from the last 24 hours.
+     * True when this PayPal order still has an unlinked capture.
      * Guest retries use the session order id so customers_id 0 is never scanned.
      */
     public function paypalOrderHasOpenOrphanCapture(string $paypal_order_id): bool
@@ -2703,7 +2675,6 @@ class PayPalCommon {
                FROM " . $table . "
               WHERE paypal_order_id = '" . $esc . "'
                 AND orders_id = 0
-                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
               LIMIT 1"
         );
 
@@ -2742,6 +2713,213 @@ class PayPalCommon {
             }
         }
         return $ids;
+    }
+
+    /**
+     * Reuse an unlinked capture when the cart amount still matches. Block when one remains
+     * and cannot be reused. Null means no open capture, so createOrder may continue.
+     *
+     * @return bool|null
+     */
+    protected function reuseOrBlockOpenCardCapture($paymentModule, $order, string $order_guid, array $order_amount_mismatch, $log): ?bool
+    {
+        $customers_id = (int)($_SESSION['customer_id'] ?? 0);
+        $paypal_order_ids = $this->reusableOpenOrphanPayPalOrderIds($customers_id);
+        $has_open = $customers_id > 0
+            ? $this->customerHasOpenOrphanCapture($customers_id)
+            : $this->guestHasOpenOrphanCapture();
+
+        if (!$has_open) {
+            return null;
+        }
+
+        foreach ($paypal_order_ids as $paypal_order_id) {
+            if (!isset($paymentModule->ppr) || !is_object($paymentModule->ppr) || !method_exists($paymentModule->ppr, 'getOrderStatus')) {
+                break;
+            }
+            $paypal_order = $paymentModule->ppr->getOrderStatus($paypal_order_id);
+            if (!is_array($paypal_order) || !$this->paypalOrderCanBeReusedForCart($paypal_order, $order)) {
+                continue;
+            }
+            $this->restoreReusedPayPalOrderSession($paypal_order, $order_guid, $order_amount_mismatch);
+            if ($log !== null) {
+                $log->write(
+                    'createPayPalOrder(card): reusing open capture for PayPal order ' . $paypal_order_id
+                );
+            }
+            return true;
+        }
+
+        $block_scope = $customers_id > 0
+            ? 'customer #' . $customers_id
+            : 'guest paypal order ' . ($paypal_order_ids[0] ?? '');
+        if ($log !== null) {
+            $log->write(
+                'createPayPalOrder(card): blocked; unresolved orphan capture remains for ' . $block_scope
+            );
+        }
+        $block_message = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING')
+            ? MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING
+            : 'A previous card payment is still being resolved. Please wait a few minutes and try again, or contact us for assistance.';
+        $this->setMessageAndRedirect($block_message, FILENAME_CHECKOUT_PAYMENT);
+        return false;
+    }
+
+    /**
+     * PayPal order ids for unlinked captures that checkout may try to reuse.
+     * Rows with a refund already started are omitted. customers_id 0 uses the guest session ids.
+     *
+     * @return list<string>
+     */
+    protected function reusableOpenOrphanPayPalOrderIds(int $customers_id): array
+    {
+        global $db;
+
+        if (!isset($db) || !is_object($db)) {
+            return [];
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+
+        if ($customers_id > 0) {
+            $rows = $db->Execute(
+                "SELECT paypal_order_id
+                   FROM " . $table . "
+                  WHERE customers_id = " . (int)$customers_id . "
+                    AND orders_id = 0
+                    AND paypal_order_id != ''
+                    AND (refund_status = '' OR refund_status IS NULL)
+                  ORDER BY created_at DESC"
+            );
+            $ids = [];
+            while (!$rows->EOF) {
+                $paypal_order_id = trim((string)($rows->fields['paypal_order_id'] ?? ''));
+                if ($paypal_order_id !== '' && !in_array($paypal_order_id, $ids, true)) {
+                    $ids[] = $paypal_order_id;
+                }
+                $rows->MoveNext();
+            }
+            return $ids;
+        }
+
+        $ids = [];
+        foreach ($this->guestOrphanPayPalOrderIds() as $paypal_order_id) {
+            if ($this->paypalOrderHasReusableOpenOrphanCapture($paypal_order_id)) {
+                $ids[] = $paypal_order_id;
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * True when a guest session still points at an unlinked capture.
+     */
+    protected function guestHasOpenOrphanCapture(): bool
+    {
+        foreach ($this->guestOrphanPayPalOrderIds() as $paypal_order_id) {
+            if ($this->paypalOrderHasOpenOrphanCapture($paypal_order_id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True when this PayPal order is unlinked and checkout has not started a refund.
+     */
+    protected function paypalOrderHasReusableOpenOrphanCapture(string $paypal_order_id): bool
+    {
+        global $db;
+
+        $paypal_order_id = trim($paypal_order_id);
+        if ($paypal_order_id === '' || !isset($db) || !is_object($db)) {
+            return false;
+        }
+
+        $this->ensureCaptureCheckoutReservationTable();
+        $table = $this->checkoutCaptureReservationTableName();
+        $esc = $db->prepare_input($paypal_order_id);
+        $open = $db->Execute(
+            "SELECT capture_resource_id
+               FROM " . $table . "
+              WHERE paypal_order_id = '" . $esc . "'
+                AND orders_id = 0
+                AND (refund_status = '' OR refund_status IS NULL)
+              LIMIT 1"
+        );
+
+        return !$open->EOF;
+    }
+
+    /**
+     * True when this PayPal order is still payable for the current cart total.
+     */
+    protected function paypalOrderCanBeReusedForCart(array $paypal_order, $order): bool
+    {
+        $status = strtoupper((string)($paypal_order['status'] ?? ''));
+        if (!in_array($status, [
+            PayPalAdvancedCheckoutApi::STATUS_APPROVED,
+            PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
+            PayPalAdvancedCheckoutApi::STATUS_CAPTURED,
+        ], true)) {
+            return false;
+        }
+        if ($this->findFailedPaymentStatus($paypal_order) !== '') {
+            return false;
+        }
+        $captures = $paypal_order['purchase_units'][0]['payments']['captures'] ?? [];
+        $authorizations = $paypal_order['purchase_units'][0]['payments']['authorizations'] ?? [];
+        if ($status === PayPalAdvancedCheckoutApi::STATUS_COMPLETED && $captures === [] && $authorizations === []) {
+            return false;
+        }
+        if (!is_object($order) || !isset($order->info) || !is_array($order->info)) {
+            return false;
+        }
+
+        $unit = $paypal_order['purchase_units'][0]['amount'] ?? null;
+        if (!is_array($unit)) {
+            return false;
+        }
+        $paypal_value = (string)($unit['value'] ?? '');
+        $paypal_currency = strtoupper((string)($unit['currency_code'] ?? ''));
+        $cart_currency = strtoupper((string)($order->info['currency'] ?? ''));
+        if ($paypal_value === '' || $paypal_currency === '' || $paypal_currency !== $cart_currency) {
+            return false;
+        }
+        $decimals = 2;
+        $dot = strrpos($paypal_value, '.');
+        if ($dot !== false) {
+            $decimals = strlen($paypal_value) - $dot - 1;
+        }
+        $cart_value = number_format((float)($order->info['total'] ?? 0), $decimals, '.', '');
+
+        return $paypal_value === $cart_value;
+    }
+
+    /**
+     * Put a previously created PayPal order back into the checkout session.
+     */
+    protected function restoreReusedPayPalOrderSession(array $paypal_order, string $order_guid, array $order_amount_mismatch): void
+    {
+        $paypal_id = (string)($paypal_order['id'] ?? '');
+        $status = (string)($paypal_order['status'] ?? '');
+        unset(
+            $paypal_order['id'],
+            $paypal_order['status'],
+            $paypal_order['create_time'],
+            $paypal_order['links'],
+            $paypal_order['purchase_units'][0]['reference_id'],
+            $paypal_order['purchase_units'][0]['payee']
+        );
+        $_SESSION['PayPalAdvancedCheckout']['Order'] = [
+            'current' => $paypal_order,
+            'id' => $paypal_id,
+            'status' => $status,
+            'guid' => $order_guid,
+            'payment_source' => 'card',
+            'amount_mismatch' => $order_amount_mismatch,
+        ];
     }
 
     /**
