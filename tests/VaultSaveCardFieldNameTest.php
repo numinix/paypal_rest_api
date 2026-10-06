@@ -37,6 +37,12 @@ namespace {
     if (!defined('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT')) {
         define('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT', '');
     }
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT')) {
+        define('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT', 'True');
+    }
+    if (!defined('MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS')) {
+        define('MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS', 'False');
+    }
     if (!defined('SHIPPING_ORIGIN_ZIP')) {
         define('SHIPPING_ORIGIN_ZIP', '');
     }
@@ -209,8 +215,8 @@ namespace {
         echo "  ✓ Regular checkout flow correctly sets attributes.vault.store_in_vault to ON_SUCCESS\n";
     }
 
-    // Test 3: Verify all cards are vaulted (the visibility is controlled separately)
-    echo "\nTest 3: Checkbox not checked (all cards are vaulted, visibility controlled separately)...\n";
+    // Test 3: Vault-all is off, so an unsaved card is not sent to the vault.
+    echo "\nTest 3: Checkbox not checked (card is not vaulted unless vault-all is on)...\n";
     unset($_POST['paypalac_cc_save_card']);
     unset($_POST['ppac_cc_save_card']);
 
@@ -227,15 +233,14 @@ namespace {
     $payload_nosave = $request_nosave->get();
     $card_source_nosave = $payload_nosave['payment_source']['card'] ?? [];
 
-    if (($card_source_nosave['attributes']['vault']['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
+    if (isset($card_source_nosave['attributes']['vault']['store_in_vault'])) {
         fwrite(STDERR, sprintf(
-            "Test 3 FAILED: Expected attributes.vault.store_in_vault ON_SUCCESS (all cards are vaulted), got %s.\n",
-            json_encode($card_source_nosave['attributes']['vault']['store_in_vault'] ?? null)
+            "Test 3 FAILED: Expected no store_in_vault when the customer did not save the card, got %s.\n",
+            json_encode($card_source_nosave['attributes']['vault']['store_in_vault'])
         ));
         $failures++;
     } else {
-        echo "  ✓ Correctly sets attributes.vault.store_in_vault to ON_SUCCESS (all cards are vaulted)\n";
-        echo "     (visibility is controlled separately in the database)\n";
+        echo "  ✓ Unsaved card is not sent to the vault when vault-all is off\n";
     }
 
     if ($failures > 0) {

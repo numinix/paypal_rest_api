@@ -29,6 +29,12 @@ namespace {
     if (!defined('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT')) {
         define('MODULE_PAYMENT_PAYPALAC_DISCOUNT_OT', '');
     }
+    if (!defined('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT')) {
+        define('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT', 'True');
+    }
+    if (!defined('MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS')) {
+        define('MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS', 'False');
+    }
     if (!defined('SHIPPING_ORIGIN_ZIP')) {
         define('SHIPPING_ORIGIN_ZIP', '');
     }
@@ -165,20 +171,40 @@ namespace {
         $failures++;
     }
 
-    // New card - ALL cards are now vaulted for security and recurring billing support.
-    // The visibility is controlled separately in the database, not by the store_in_vault parameter.
+    // Vault is enabled and vault-all is off, so a card the customer did not save is not vaulted.
     $cc_info_nosave = $cc_info_save;
     unset($cc_info_nosave['store_card']);
     $request_nosave = new CreatePayPalOrderRequest('card', $order, $cc_info_nosave, $order_info, []);
     $payload_nosave = $request_nosave->get();
     $card_source_nosave = $payload_nosave['payment_source']['card'] ?? [];
 
-    if (($card_source_nosave['attributes']['vault']['store_in_vault'] ?? '') !== 'ON_SUCCESS') {
+    if (isset($card_source_nosave['attributes']['vault']['store_in_vault'])) {
         fwrite(STDERR, sprintf(
-            "Expected attributes.vault.store_in_vault ON_SUCCESS (all cards are now vaulted), got %s.\n",
-            json_encode($card_source_nosave['attributes']['vault']['store_in_vault'] ?? null)
+            "Expected no store_in_vault when vault-all is off and the customer did not save the card, got %s.\n",
+            json_encode($card_source_nosave['attributes']['vault']['store_in_vault'])
         ));
         $failures++;
+    }
+
+    $vaultCases = [
+        [false, true, true, false],
+        [true, false, false, false],
+        [true, false, true, true],
+        [true, true, false, true],
+    ];
+    foreach ($vaultCases as [$vaultEnabled, $vaultAll, $customerSaved, $expected]) {
+        $actual = CreatePayPalOrderRequest::cardShouldBeVaulted($vaultEnabled, $vaultAll, $customerSaved);
+        if ($actual !== $expected) {
+            fwrite(STDERR, sprintf(
+                "cardShouldBeVaulted(%s, %s, %s) expected %s, got %s.\n",
+                $vaultEnabled ? 'true' : 'false',
+                $vaultAll ? 'true' : 'false',
+                $customerSaved ? 'true' : 'false',
+                $expected ? 'true' : 'false',
+                $actual ? 'true' : 'false'
+            ));
+            $failures++;
+        }
     }
 
     // Existing vaulted card reuse path.
