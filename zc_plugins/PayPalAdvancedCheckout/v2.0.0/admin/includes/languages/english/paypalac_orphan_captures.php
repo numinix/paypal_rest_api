@@ -54,3 +54,7 @@ define('SUCCESS_DISMISS', 'Reservation row for %s dismissed (removed without Pay
 define('SUCCESS_LINK_ORDER', 'Reservation for %s kept. Related Zen order #%d recorded. orders_id left at 0.');
 define('ERROR_RELATED_ORDER_REQUIRED', 'Enter the Zen order id created for this stalled payment.');
 define('ERROR_RELATED_ORDER_NOT_FOUND', 'Zen order #%d was not found.');
+define('ERROR_REFUND_STATUS_BLOCKS_LINK', 'Refund status %s is still on this reservation. Reconcile it in PayPal before linking a Zen order.');
+define('ERROR_RELATED_ORDER_CUSTOMER', 'Zen order #%d belongs to customer #%d. This stalled payment belongs to customer #%d.');
+define('ERROR_RELATED_ORDER_ALREADY_LINKED', 'Zen order #%d is already tied to capture %s.');
+define('TEXT_LINK_UNAVAILABLE_REFUND', 'Link unavailable (refund %s).');

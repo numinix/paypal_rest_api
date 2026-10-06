@@ -397,28 +397,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     }
 
     if ($action === 'dismiss') {
+        $abort_link = function (string $message) use (
+            $capture_resource_id,
+            $claim_token,
+            $order_lock_held,
+            $paypal_order_id,
+            $messageStack
+        ): void {
+            paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
+            if ($order_lock_held) {
+                paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
+            }
+            $messageStack->add_session($message, 'error');
+            zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
+        };
+
+        $refund_status = strtoupper(trim((string)($recheck['refund_status'] ?? '')));
+        if ($refund_status !== '') {
+            $abort_link(sprintf(ERROR_REFUND_STATUS_BLOCKS_LINK, zen_output_string_protected($refund_status)));
+        }
         $related_orders_id = (int)($_POST['related_orders_id'] ?? 0);
         if ($related_orders_id <= 0) {
-            paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
-            if ($order_lock_held) {
-                paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
-            }
-            $messageStack->add_session(ERROR_RELATED_ORDER_REQUIRED, 'error');
-            zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
+            $abort_link(ERROR_RELATED_ORDER_REQUIRED);
         }
         $order_exists = $db->Execute(
-            "SELECT orders_id FROM " . TABLE_ORDERS . " WHERE orders_id = " . $related_orders_id . " LIMIT 1"
+            "SELECT orders_id, customers_id FROM " . TABLE_ORDERS . " WHERE orders_id = " . $related_orders_id . " LIMIT 1"
         );
         if ($order_exists->EOF) {
-            paypalac_orphan_captures_release_claim($capture_resource_id, $claim_token);
-            if ($order_lock_held) {
-                paypalac_orphan_captures_release_order_lock($paypal_order_id, $capture_resource_id);
-            }
-            $messageStack->add_session(sprintf(ERROR_RELATED_ORDER_NOT_FOUND, $related_orders_id), 'error');
-            zen_redirect(zen_href_link(FILENAME_PAYPALAC_ORPHAN_CAPTURES));
+            $abort_link(sprintf(ERROR_RELATED_ORDER_NOT_FOUND, $related_orders_id));
+        }
+        $order_customer_id = (int)($order_exists->fields['customers_id'] ?? 0);
+        $reservation_customer_id = (int)($recheck['customers_id'] ?? 0);
+        if ($order_customer_id !== $reservation_customer_id) {
+            $abort_link(sprintf(
+                ERROR_RELATED_ORDER_CUSTOMER,
+                $related_orders_id,
+                $order_customer_id,
+                $reservation_customer_id
+            ));
         }
         $esc = zen_db_input($capture_resource_id);
         $esc_token = zen_db_input($claim_token);
+        $taken = $db->Execute(
+            "SELECT capture_resource_id
+               FROM " . $reservation_table . "
+              WHERE capture_resource_id != '" . $esc . "'
+                AND (orders_id = " . $related_orders_id . " OR related_orders_id = " . $related_orders_id . ")
+              LIMIT 1"
+        );
+        if (!$taken->EOF) {
+            $abort_link(sprintf(
+                ERROR_RELATED_ORDER_ALREADY_LINKED,
+                $related_orders_id,
+                zen_output_string_protected((string)$taken->fields['capture_resource_id'])
+            ));
+        }
         $db->Execute(
             "UPDATE " . $reservation_table . "
                 SET related_orders_id = " . $related_orders_id . ",
@@ -428,6 +461,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
                 AND admin_claim_token = '" . $esc_token . "'
                 AND orders_id = 0
                 AND related_orders_id = 0
+                AND (refund_status = '' OR refund_status IS NULL)
               LIMIT 1"
         );
         if ($db->affectedRows() > 0) {
@@ -592,6 +626,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 $rows = [];
 $result = $db->Execute(
     "SELECT r.capture_resource_id, r.resource_type, r.customers_id, r.paypal_order_id, r.created_at, r.alerted_at,
+            r.refund_status,
             c.customers_firstname, c.customers_lastname, c.customers_email_address
        FROM " . $reservation_table . " r
   LEFT JOIN " . TABLE_CUSTOMERS . " c ON c.customers_id = r.customers_id
@@ -754,6 +789,7 @@ while (!$result->EOF) {
                     $customer_label = sprintf(TEXT_CUSTOMER_UNKNOWN, $cid);
                 }
                 $alerted = trim((string)($row['alerted_at'] ?? ''));
+                $refund_status = strtoupper(trim((string)($row['refund_status'] ?? '')));
                 $action_label = $is_auth ? BUTTON_VOID : BUTTON_REFUND;
                 ?>
                 <tr>
@@ -772,6 +808,7 @@ while (!$result->EOF) {
                                 <?php echo $action_label; ?>
                             </button>
                         </form>
+                        <?php if ($refund_status === '') { ?>
                         <?php echo zen_draw_form('orphan_dismiss_' . md5($capture_id), FILENAME_PAYPALAC_ORPHAN_CAPTURES, '', 'post'); ?>
                             <?php echo zen_draw_hidden_field('securityToken', $_SESSION['securityToken'] ?? ''); ?>
                             <?php echo zen_draw_hidden_field('action', 'dismiss_confirm'); ?>
@@ -780,6 +817,9 @@ while (!$result->EOF) {
                                 <?php echo BUTTON_LINK_ORDER; ?>
                             </button>
                         </form>
+                        <?php } else { ?>
+                            <span><?php echo sprintf(TEXT_LINK_UNAVAILABLE_REFUND, zen_output_string_protected($refund_status)); ?></span>
+                        <?php } ?>
                     </td>
                 </tr>
             <?php } ?>
