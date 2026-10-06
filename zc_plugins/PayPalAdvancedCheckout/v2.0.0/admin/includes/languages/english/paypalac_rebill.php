@@ -4,13 +4,13 @@
  */
 
 define('HEADING_TITLE', 'PayPal Vault Rebill');
-define('TEXT_REBILL_INTRO', 'Charge a customer\'s PayPal Advanced Checkout vaulted card (merchant-initiated). This replaces Payflow Manager reference rebills for REST vault tokens.');
+define('TEXT_REBILL_INTRO', 'Charge a customer\'s PayPal Advanced Checkout vaulted card (merchant-initiated). Every credit-card checkout is vaulted. Cards the customer chose to save are also offered at checkout. Cards they did not save are listed here as admin only. This replaces Payflow Manager reference rebills for REST vault tokens.');
 define('TEXT_FIND_CUSTOMER', 'Find customer');
 define('TEXT_SEARCH_LABEL', 'Search');
 define('TEXT_SEARCH_PLACEHOLDER', 'Email, name, or customer ID');
 define('TEXT_NO_CUSTOMERS_FOUND', 'No customers matched that search.');
 define('TEXT_CUSTOMER', 'Customer');
-define('TEXT_NO_VAULT_CARDS', 'This customer has no active vaulted cards available for REST rebill.');
+define('TEXT_NO_VAULT_CARDS', 'This customer has no active vaulted cards available for REST rebill. Cards from checkouts before vaulting was enabled, and Payflow Manager references, are not listed here.');
 define('TEXT_AMOUNT', 'Amount');
 define('TEXT_CURRENCY', 'Currency');
 define('TEXT_COMMENTS', 'Admin comments (order history)');
@@ -26,7 +26,10 @@ define('TABLE_HEADING_NAME', 'Name');
 define('TABLE_HEADING_EMAIL', 'Email');
 define('TABLE_HEADING_CARD', 'Card');
 define('TABLE_HEADING_EXPIRY', 'Expiry');
+define('TABLE_HEADING_AVAILABILITY', 'Available to');
 define('TABLE_HEADING_VAULT', 'Vault ID');
+define('TEXT_AVAILABLE_CHECKOUT', 'Customer checkout');
+define('TEXT_ADMIN_ONLY', 'Admin rebill only');
 
 define('BUTTON_SEARCH', 'Search');
 define('BUTTON_RESET', 'Reset');
