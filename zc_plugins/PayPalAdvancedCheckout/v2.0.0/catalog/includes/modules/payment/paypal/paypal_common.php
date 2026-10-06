@@ -1821,10 +1821,6 @@ class PayPalCommon {
                     $immediate_payment['id'],
                     $immediate_payment['type']
                 );
-                $this->storeOpenCaptureCartFingerprint(
-                    (string)$paypal_id,
-                    $this->captureCartFingerprint($order_request)
-                );
             }
         }
 
@@ -2376,6 +2372,11 @@ class PayPalCommon {
         );
 
         if ($db->affectedRows() > 0) {
+            $this->storeOpenCaptureCartFingerprint(
+                $paypal_order_id,
+                $this->captureCartFingerprint(),
+                $capture_resource_id
+            );
             return;
         }
 
@@ -2648,6 +2649,11 @@ class PayPalCommon {
                           LIMIT 1"
                     );
                 }
+                $this->storeOpenCaptureCartFingerprint(
+                    $paypal_order_id,
+                    $this->captureCartFingerprint(),
+                    $capture_resource_id
+                );
                 return;
             }
         }
@@ -2705,7 +2711,7 @@ class PayPalCommon {
     }
 
     /**
-     * True when this customer still has an unlinked capture.
+     * True when this customer has an unlinked capture from the last 24 hours.
      */
     public function customerHasOpenOrphanCapture(int $customers_id): bool
     {
@@ -2722,6 +2728,7 @@ class PayPalCommon {
                FROM " . $table . "
               WHERE customers_id = " . (int)$customers_id . "
                 AND orders_id = 0
+                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
               LIMIT 1"
         );
 
@@ -2729,7 +2736,7 @@ class PayPalCommon {
     }
 
     /**
-     * True when this PayPal order still has an unlinked capture.
+     * True when this PayPal order has an unlinked capture from the last 24 hours.
      * Guest retries use the session order id so customers_id 0 is never scanned.
      */
     public function paypalOrderHasOpenOrphanCapture(string $paypal_order_id): bool
@@ -2749,6 +2756,7 @@ class PayPalCommon {
                FROM " . $table . "
               WHERE paypal_order_id = '" . $esc . "'
                 AND orders_id = 0
+                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
               LIMIT 1"
         );
 
@@ -2812,7 +2820,7 @@ class PayPalCommon {
         if (!is_array($order_request)) {
             $order_request = [];
         }
-        $fingerprint = $this->captureCartFingerprint($order_request);
+        $fingerprint = $this->captureCartFingerprint();
         $rows = $this->reusableOpenOrphanCaptureRows($customers_id);
 
         foreach ($rows as $row) {
@@ -2880,7 +2888,8 @@ class PayPalCommon {
         $table = $this->checkoutCaptureReservationTableName();
         $where = "orders_id = 0
                     AND paypal_order_id != ''
-                    AND (refund_status = '' OR refund_status IS NULL)";
+                    AND (refund_status = '' OR refund_status IS NULL)
+                    AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)";
         if ($customers_id > 0) {
             $where .= " AND customers_id = " . (int)$customers_id;
         } else {
@@ -2953,6 +2962,7 @@ class PayPalCommon {
               WHERE capture_resource_id = '" . $esc_cap . "'
                 AND paypal_order_id = '" . $esc_po . "'
                 AND orders_id = 0
+                AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
                 AND (refund_status = '' OR refund_status IS NULL)
                 AND (
                     admin_claim_token = ''
@@ -3086,26 +3096,67 @@ class PayPalCommon {
     }
 
     /**
-     * Hash of the PayPal purchase unit that identifies this cart, amount, and ship-to.
+     * Hash of the Zen cart products, attributes, and ship-to.
+     * PayPal drops line items when the amount breakdown does not add up, so this does not read the PayPal request.
      */
-    protected function captureCartFingerprint(array $order_request): string
+    protected function captureCartFingerprint(): string
     {
-        $unit = $order_request['purchase_units'][0] ?? null;
-        if (!is_array($unit)) {
+        global $order;
+
+        if (!is_object($order) || empty($order->products) || !is_array($order->products)) {
             return '';
         }
-        $amount = is_array($unit['amount'] ?? null) ? $unit['amount'] : [];
-        $value = (string)($amount['value'] ?? '');
-        if ($value === '') {
+
+        $items = [];
+        foreach ($order->products as $product) {
+            if (!is_array($product)) {
+                continue;
+            }
+            $attributes = [];
+            foreach ($product['attributes'] ?? [] as $attribute) {
+                if (!is_array($attribute)) {
+                    continue;
+                }
+                $attributes[] = [
+                    'option_id' => (string)(int)($attribute['option_id'] ?? 0),
+                    'value_id' => (string)(int)($attribute['value_id'] ?? 0),
+                    'value' => trim((string)($attribute['value'] ?? '')),
+                ];
+            }
+            usort($attributes, static function (array $left, array $right): int {
+                return [$left['option_id'], $left['value_id'], $left['value']]
+                    <=> [$right['option_id'], $right['value_id'], $right['value']];
+            });
+            $qty = $product['qty'] ?? '';
+            $qty = is_numeric($qty)
+                ? rtrim(rtrim(number_format((float)$qty, 4, '.', ''), '0'), '.')
+                : trim((string)$qty);
+            $items[] = [
+                'id' => (string)(int)($product['id'] ?? 0),
+                'qty' => $qty,
+                'attributes' => $attributes,
+            ];
+        }
+        if ($items === []) {
             return '';
+        }
+
+        $delivery = is_array($order->delivery ?? null) ? $order->delivery : [];
+        $country = $delivery['country'] ?? '';
+        if (is_array($country)) {
+            $country = (string)($country['iso_code_2'] ?? $country['title'] ?? '');
         }
         $canonical = [
-            'amount' => [
-                'currency_code' => strtoupper((string)($amount['currency_code'] ?? '')),
-                'value' => $value,
+            'items' => $items,
+            'ship' => [
+                'name' => trim((string)($delivery['name'] ?? '')),
+                'street' => trim((string)($delivery['street_address'] ?? '')),
+                'suburb' => trim((string)($delivery['suburb'] ?? '')),
+                'city' => trim((string)($delivery['city'] ?? '')),
+                'postcode' => trim((string)($delivery['postcode'] ?? '')),
+                'state' => trim((string)($delivery['state'] ?? '')),
+                'country' => trim((string)$country),
             ],
-            'items' => $this->canonicalFingerprintValue($unit['items'] ?? []),
-            'shipping' => $this->canonicalFingerprintValue($unit['shipping'] ?? []),
         ];
         $encoded = json_encode($canonical);
         if (!is_string($encoded) || $encoded === '') {
@@ -3115,59 +3166,31 @@ class PayPalCommon {
     }
 
     /**
-     * @param mixed $value
-     * @return mixed
-     */
-    protected function canonicalFingerprintValue($value)
-    {
-        if (!is_array($value)) {
-            if (is_bool($value)) {
-                return $value ? '1' : '0';
-            }
-            if ($value === null) {
-                return '';
-            }
-            return is_scalar($value) ? (string)$value : '';
-        }
-        if ($value === []) {
-            return [];
-        }
-        if (function_exists('array_is_list') && array_is_list($value)) {
-            $list = [];
-            foreach ($value as $item) {
-                $list[] = $this->canonicalFingerprintValue($item);
-            }
-            return $list;
-        }
-        ksort($value);
-        $assoc = [];
-        foreach ($value as $key => $item) {
-            $assoc[(string)$key] = $this->canonicalFingerprintValue($item);
-        }
-        return $assoc;
-    }
-
-    /**
      * Remember the cart that this open capture paid for. Later retries must match it.
      */
-    protected function storeOpenCaptureCartFingerprint(string $paypal_order_id, string $fingerprint): void
+    protected function storeOpenCaptureCartFingerprint(string $paypal_order_id, string $fingerprint, string $capture_resource_id = ''): void
     {
         global $db;
 
         $paypal_order_id = trim($paypal_order_id);
+        $capture_resource_id = trim($capture_resource_id);
         $fingerprint = trim($fingerprint);
-        if ($paypal_order_id === '' || $fingerprint === '' || !isset($db) || !is_object($db)) {
+        if ($fingerprint === '' || ($paypal_order_id === '' && $capture_resource_id === '') || !isset($db) || !is_object($db)) {
             return;
         }
 
         $this->ensureCaptureCheckoutReservationTable();
         $table = $this->checkoutCaptureReservationTableName();
-        $esc_po = $db->prepare_input($paypal_order_id);
         $esc_fp = $db->prepare_input($fingerprint);
+        if ($capture_resource_id !== '') {
+            $where = "capture_resource_id = '" . $db->prepare_input($capture_resource_id) . "'";
+        } else {
+            $where = "paypal_order_id = '" . $db->prepare_input($paypal_order_id) . "'";
+        }
         $db->Execute(
             "UPDATE " . $table . "
                 SET cart_fingerprint = '" . $esc_fp . "'
-              WHERE paypal_order_id = '" . $esc_po . "'
+              WHERE " . $where . "
                 AND orders_id = 0
                 AND cart_fingerprint = ''"
         );
