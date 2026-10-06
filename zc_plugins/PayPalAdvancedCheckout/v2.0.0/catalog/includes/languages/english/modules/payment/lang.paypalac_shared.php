@@ -17,6 +17,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALAC_CLIENTID_S' => 'Sandbox Client ID',
     'MODULE_PAYMENT_PAYPALAC_DEBUGGING' => 'Logging / Email Alerts',
     'MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT' => 'Enable Card Vault',
+    'MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS' => 'Vault All Cards',
     'MODULE_PAYMENT_PAYPALAC_ERROR_NO_CURL' => 'CURL not installed, cannot use.',
     'MODULE_PAYMENT_PAYPALAC_HELD_STATUS_ID' => 'Held Orders Status',
     'MODULE_PAYMENT_PAYPALAC_NEW_CARD' => 'Use a new card',

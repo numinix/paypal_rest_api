@@ -50,6 +50,16 @@ define('FILENAME_PAYPALAC_REBILL', basename(__FILE__));
 
 require DIR_WS_LANGUAGES . $_SESSION['language'] . '/paypalac_rebill.php';
 
+function paypalac_rebill_vault_enabled(): bool
+{
+    return defined('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT') && MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT === 'True';
+}
+
+function paypalac_rebill_vault_all_cards(): bool
+{
+    return defined('MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS') && MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS === 'True';
+}
+
 $action = isset($_REQUEST['action']) ? trim((string)$_REQUEST['action']) : '';
 $customers_id = isset($_REQUEST['customers_id']) ? (int)$_REQUEST['customers_id'] : 0;
 $saved_credit_card_id = isset($_REQUEST['saved_credit_card_id']) ? (int)$_REQUEST['saved_credit_card_id'] : 0;
@@ -106,7 +116,13 @@ function paypalac_rebill_load_customer_cards(int $customers_id): array
     }
 
     if (class_exists(AdminRebillCards::class)) {
-        return AdminRebillCards::merge($cards, $vaultRows);
+        $cards = AdminRebillCards::merge($cards, $vaultRows);
+    }
+
+    if (!paypalac_rebill_vault_all_cards()) {
+        $cards = array_values(array_filter($cards, static function (array $card): bool {
+            return (int)($card['customer_visible'] ?? 0) === 1;
+        }));
     }
 
     return $cards;
@@ -162,6 +178,18 @@ if ($action === 'charge' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!class_exists('paypalacSavedCardRecurring')) {
         $messageStack->add_session(ERROR_REBILL_CLASS_MISSING, 'error');
+        zen_redirect(zen_href_link(FILENAME_PAYPALAC_REBILL, 'customers_id=' . $customers_id));
+    }
+
+    $allowedTargets = [];
+    foreach (paypalac_rebill_load_customer_cards($customers_id) as $allowedCard) {
+        $allowedTarget = (string)($allowedCard['rebill_target'] ?? '');
+        if ($allowedTarget !== '') {
+            $allowedTargets[$allowedTarget] = true;
+        }
+    }
+    if ($rebill_target === '' || empty($allowedTargets[$rebill_target])) {
+        $messageStack->add_session(ERROR_REBILL_CARD_NOT_ELIGIBLE, 'error');
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_REBILL, 'customers_id=' . $customers_id));
     }
 
@@ -260,6 +288,9 @@ if ($customers_id > 0) {
 $searchResults = ($search !== '' && $customers_id <= 0) ? paypalac_rebill_search_customers($search) : [];
 $last_orders_id = isset($_GET['last_orders_id']) ? (int)$_GET['last_orders_id'] : 0;
 $default_currency = defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : 'USD';
+if (!paypalac_rebill_vault_enabled() && isset($messageStack) && is_object($messageStack)) {
+    $messageStack->add(TEXT_VAULT_DISABLED_WARNING, 'warning');
+}
 
 ?>
 <!doctype html>
@@ -290,7 +321,6 @@ $default_currency = defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : 'USD';
                 <div class="nmx-panel-title"><?php echo TEXT_FIND_CUSTOMER; ?></div>
             </div>
             <div class="nmx-panel-body">
-                <p><?php echo TEXT_REBILL_INTRO; ?></p>
                 <?php echo zen_draw_form('paypalac_rebill_search', FILENAME_PAYPALAC_REBILL, '', 'get', 'class="nmx-form-inline"'); ?>
                     <div class="nmx-form-group">
                         <label for="search"><?php echo TEXT_SEARCH_LABEL; ?></label>

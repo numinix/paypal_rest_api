@@ -65,7 +65,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '2.0.2';
+    protected const CURRENT_VERSION = '2.0.3';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -894,6 +894,14 @@ class paypalac extends base
                             );
                         }
                     }
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '2.0.3', '<'): //- Fall through from above
+                    $db->Execute(
+                        "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
+                            (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
+                         VALUES
+                            ('Vault all credit cards?', 'MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS', 'False', 'Choose <var>True</var> to save every new credit card to PayPal Vault, including cards the customer did not choose to save. Cards the customer did not save can be rebilled by an administrator and are not offered at checkout. When <var>False</var>, only cards the customer chose to save are stored and can be rebilled. This setting applies only when Enable PayPal Vault is <var>True</var>. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now())"
+                    );
 
                 default:    //- Fall through from above
                     break;
@@ -3574,6 +3582,8 @@ class paypalac extends base
 
                 ('Enable PayPal Vault?', 'MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT', 'False', 'Choose <var>True</var> to allow customers to save payment methods for future checkouts using PayPal Vault. This capability requires your PayPal <em>Advanced Credit and Debit Cards</em> integration to have the <em>Store customer payment methods</em> feature enabled for the associated REST API credentials. When disabled, saved payment method options will not be displayed. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now()),
 
+                ('Vault all credit cards?', 'MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS', 'False', 'Choose <var>True</var> to save every new credit card to PayPal Vault, including cards the customer did not choose to save. Cards the customer did not save can be rebilled by an administrator and are not offered at checkout. When <var>False</var>, only cards the customer chose to save are stored and can be rebilled. This setting applies only when Enable PayPal Vault is <var>True</var>. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now()),
+
                 ('List <var>handling-fee</var> Order-Totals', 'MODULE_PAYMENT_PAYPALAC_HANDLING_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules &mdash; <em>other than</em> <code>ot_loworderfee</code> &mdash; that add a <em>handling-fee</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
 
                 ('List <var>insurance</var> Order-Totals', 'MODULE_PAYMENT_PAYPALAC_INSURANCE_OT', '', 'Identify, using a comma-separated list (intervening spaces are OK), any order-total modules that add an <em>insurance</em> element to an order.  Leave the setting as an empty string if there are none (the default).', 6, 0, NULL, NULL, now()),
@@ -3697,6 +3707,7 @@ class paypalac extends base
             'MODULE_PAYMENT_PAYPALAC_TRANSACTION_MODE',
             'MODULE_PAYMENT_PAYPALAC_SCA_ALWAYS',
             'MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT',
+            'MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS',
             'MODULE_PAYMENT_PAYPALAC_SORT_ORDER',
             'MODULE_PAYMENT_PAYPALAC_ZONE',
             'MODULE_PAYMENT_PAYPALAC_SERVER',

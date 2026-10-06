@@ -956,6 +956,19 @@ class CreatePayPalOrderRequest extends ErrorInfo
         return $payment_source;
     }
 
+    public static function cardShouldBeVaulted(bool $vaultEnabled, bool $vaultAllCards, bool $customerSavedCard): bool
+    {
+        return $vaultEnabled && ($vaultAllCards || $customerSavedCard);
+    }
+
+    protected function shouldStoreCardInVault(array $cc_info): bool
+    {
+        $vaultEnabled = defined('MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT') && MODULE_PAYMENT_PAYPALAC_ENABLE_VAULT === 'True';
+        $vaultAllCards = defined('MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS') && MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS === 'True';
+
+        return self::cardShouldBeVaulted($vaultEnabled, $vaultAllCards, !empty($cc_info['store_card']));
+    }
+
     protected function buildCardPaymentSource(\order $order, array $cc_info): array
     {
         $listener_endpoint = $this->resolveListenerEndpoint($cc_info['redirect'] ?? '');
@@ -1047,16 +1060,16 @@ class CreatePayPalOrderRequest extends ErrorInfo
             'security_code' => $cc_info['security_code'],
             'expiry' => $expiry_year . '-' . $expiry_month,
             'billing_address' => Address::get($order->billing),
-            'attributes' => [
-                'vault' => [
-                    'store_in_vault' => 'ON_SUCCESS',  // Always vault cards for security and recurring billing
-                ],
-            ],
             'experience_context' => [
                 'return_url' => $this->buildScaUrl($listener_endpoint, '3ds_return'),
                 'cancel_url' => $this->buildScaUrl($listener_endpoint, '3ds_cancel'),
             ],
         ];
+        if ($this->shouldStoreCardInVault($cc_info)) {
+            $payment_source['attributes']['vault'] = [
+                'store_in_vault' => 'ON_SUCCESS',
+            ];
+        }
         if (isset($_POST['ppac_cc_sca_always']) || (defined('MODULE_PAYMENT_PAYPALAC_SCA_ALWAYS') && MODULE_PAYMENT_PAYPALAC_SCA_ALWAYS === 'true')) {
             $payment_source['attributes']['verification']['method'] = 'SCA_ALWAYS'; //- Defaults to 'SCA_WHEN_REQUIRED' for live environment
         }
