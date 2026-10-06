@@ -2635,7 +2635,7 @@ class PayPalCommon {
                 if (!$this->captureReservationStillOpenForCheckout($capture_resource_id, $paypal_order_id)) {
                     $block_message = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING')
                         ? MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING
-                        : 'A previous card payment is still being resolved. Please wait a few minutes and try again, or contact us for assistance.';
+                        : 'A previous card payment is still open. It can only be completed with the same cart. Contact us if you need that payment refunded.';
                     $this->setMessageAndRedirect($block_message, FILENAME_CHECKOUT_PAYMENT);
                 }
                 $row_type = trim((string)($ownerChk->fields['resource_type'] ?? ''));
@@ -2865,7 +2865,7 @@ class PayPalCommon {
         }
         $block_message = defined('MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING')
             ? MODULE_PAYMENT_PAYPALAC_TEXT_ORPHAN_CAPTURE_PENDING
-            : 'A previous card payment is still being resolved. Please wait a few minutes and try again, or contact us for assistance.';
+            : 'A previous card payment is still open. It can only be completed with the same cart. Contact us if you need that payment refunded.';
         $this->setMessageAndRedirect($block_message, FILENAME_CHECKOUT_PAYMENT);
         return false;
     }
