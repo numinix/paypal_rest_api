@@ -1153,15 +1153,7 @@ class PayPalCommon {
             . (isset($order->info['tax']) ? (string)(float)$order->info['tax'] : '');
 
         if (isset($_SESSION['storecredit']) && is_numeric($_SESSION['storecredit'])) {
-            $hash_data .= '|storecredit:' . (string)(float)$_SESSION['storecredit'];
-        }
-
-        if (isset($_SESSION['cot_gv']) && is_numeric($_SESSION['cot_gv'])) {
-            $hash_data .= '|cot_gv:' . (string)(float)$_SESSION['cot_gv'];
-        }
-
-        if (!empty($_SESSION['cc_id'])) {
-            $hash_data .= '|cc_id:' . (is_array($_SESSION['cc_id']) ? implode(',', $_SESSION['cc_id']) : (string)$_SESSION['cc_id']);
+            $hash_data .= (string)(float)$_SESSION['storecredit'];
         }
 
         if (in_array($ppac_type, ['apple_pay', 'google_pay', 'venmo'], true)) {

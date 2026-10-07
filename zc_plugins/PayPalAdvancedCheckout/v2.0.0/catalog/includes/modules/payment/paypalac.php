@@ -2069,13 +2069,9 @@ class paypalac extends base
 "
             . '  session.storecredit=' . (isset($_SESSION['storecredit']) ? (string)$_SESSION['storecredit'] : 'unset') . "
 "
-            . '  session.cot_gv=' . (isset($_SESSION['cot_gv']) ? (string)$_SESSION['cot_gv'] : 'unset') . "
-"
             . '  post.opt_credit=' . (isset($_POST['opt_credit']) ? (string)$_POST['opt_credit'] : 'unset') . "
 "
             . '  ot_sc.diff.total=' . ((isset($order_total_changes['ot_sc']['diff']['total']) && is_numeric($order_total_changes['ot_sc']['diff']['total'])) ? (string)$order_total_changes['ot_sc']['diff']['total'] : 'unset') . "
-"
-            . '  ot_gv.diff.total=' . ((isset($order_total_changes['ot_gv']['diff']['total']) && is_numeric($order_total_changes['ot_gv']['diff']['total'])) ? (string)$order_total_changes['ot_gv']['diff']['total'] : 'unset') . "
 "
             . '  guid=' . $order_guid
         );
@@ -2254,20 +2250,13 @@ class paypalac extends base
 
         $storecredit_session = (isset($_SESSION['storecredit']) && is_numeric($_SESSION['storecredit'])) ? (float)$_SESSION['storecredit'] : 0.0;
         $storecredit_posted = (isset($_POST['opt_credit']) && is_numeric($_POST['opt_credit'])) ? (float)$_POST['opt_credit'] : null;
-        $cot_gv_session = (isset($_SESSION['cot_gv']) && is_numeric($_SESSION['cot_gv'])) ? (float)$_SESSION['cot_gv'] : 0.0;
-        $cc_id_session = $_SESSION['cc_id'] ?? null;
         $financial_signature = [
             'effective_total' => $effective_total,
             'order_info_total' => (isset($order_info['total']) && is_numeric($order_info['total'])) ? (float)$order_info['total'] : null,
             'storecredit_session' => $storecredit_session,
             'storecredit_posted' => $storecredit_posted,
-            'cot_gv_session' => $cot_gv_session,
-            'cc_id' => is_array($cc_id_session) ? array_values($cc_id_session) : $cc_id_session,
             'ot_sc_total' => isset($order_total_changes['ot_sc']['diff']['total']) && is_numeric($order_total_changes['ot_sc']['diff']['total'])
                 ? (float)$order_total_changes['ot_sc']['diff']['total']
-                : null,
-            'ot_gv_total' => isset($order_total_changes['ot_gv']['diff']['total']) && is_numeric($order_total_changes['ot_gv']['diff']['total'])
-                ? (float)$order_total_changes['ot_gv']['diff']['total']
                 : null,
         ];
 
