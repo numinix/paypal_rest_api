@@ -106,30 +106,22 @@
           </ol>
 
           <h5>Zen Cart 1.5.7c through 2.0.0 (file overlay)</h5>
-          <p class="bodyText">Copy from <code>zc_plugins/PayPalAdvancedCheckout/v2.0.0/</code>. Merge into the matching store directories. Do not replace the store&rsquo;s <code>includes/</code> tree, and do not copy <code>Installer/</code>, <code>docs/</code>, or <code>manifest.php</code>.</p>
+          <p class="bodyText">Copy from <code>zc_plugins/PayPalAdvancedCheckout/v2.0.0/</code> into the store. Merge; do not replace <code>includes/</code>. Skip <code>Installer/</code> except the entry-point files below, and skip <code>docs/</code> and <code>manifest.php</code>.</p>
           <ol>
-            <li><code>catalog/includes/</code> &rarr; store <code>includes/</code>. This includes <code>includes/modules/payment/</code>, languages, classes, observers, extra functions, and template files. Copy <code>catalog/includes/templates/template_default/</code> and <code>catalog/includes/templates/YOUR_TEMPLATE/</code> into the active template as well as <code>template_default</code>.</li>
-            <li><code>admin/</code> &rarr; the store&rsquo;s real admin directory (the folder is not always named <code>admin</code>).</li>
-            <li><code>Installer/assets/root/ppac_add_card.php</code>, <code>ppac_listener.php</code>, <code>ppac_paths.php</code>, <code>ppac_wallet.php</code>, and <code>ppac_webhook.php</code> &rarr; the store root.</li>
-            <li><code>Installer/assets/ajax/paypalac_wallet*.php</code> &rarr; store <code>ajax/</code>.</li>
-            <li><code>catalog/cron/paypalac_*.php</code> &rarr; store <code>cron/</code>. Schedule those files. There is no <code>zc_plugins/PayPalAdvancedCheckout/cron.php</code> dispatcher on this install.</li>
-            <li>Copy <code>catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/images/</code> to <code>images/paypalac/</code>.</li>
+            <li><code>catalog/includes/</code> &rarr; <code>includes/</code>, including <code>template_default</code> and <code>YOUR_TEMPLATE</code> into the active template.</li>
+            <li><code>admin/</code> &rarr; the real admin directory.</li>
+            <li><code>Installer/assets/root/ppac_*.php</code> &rarr; the store root. <code>Installer/assets/ajax/paypalac_wallet*.php</code> &rarr; <code>ajax/</code>. <code>catalog/cron/paypalac_*.php</code> &rarr; <code>cron/</code>.</li>
+            <li><code>catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/images/</code> &rarr; <code>images/paypalac/</code>.</li>
           </ol>
-          <p class="bodyText">After the copy, fix paths that still assume the version folder layout:</p>
+          <p class="bodyText">Then adjust paths that still point at the version folder:</p>
           <ul class="bodyList">
-            <li><strong>Admin PHP.</strong> From a file in the admin directory, <code>dirname(__DIR__)</code> is the store root. Replace <code>dirname(__DIR__) . '/catalog/includes/</code> with <code>dirname(__DIR__) . '/includes/</code> in <code>paypalac_signup.php</code>, <code>paypalac_integrated_signup.php</code>, <code>paypalac_webhook_logs.php</code>, <code>paypalac_subscriptions_report.php</code>, <code>paypalac_saved_card_recurring.php</code>, <code>paypalac_upgrade.php</code>, and <code>paypalac_orphan_captures.php</code>. In <code>admin/includes/classes/observers/auto.PaypalacAdmin.php</code>, replace <code>dirname(__DIR__, 4) . '/catalog/includes/</code> with <code>dirname(__DIR__, 4) . '/includes/</code>.</li>
-            <li><strong>Account pages.</strong> <code>includes/modules/pages/account_paypal_subscriptions/header_php.php</code> and <code>account_saved_credit_cards/header_php.php</code> must load payment classes with <code>DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/...'</code>. <code>dirname(__DIR__, 3) . '/payment/'</code> points at <code>includes/payment/</code>, which does not exist.</li>
-            <li><strong>Cron.</strong> In <code>cron/paypalac_saved_card_recurring.php</code>, <code>paypalac_recurring_reminders.php</code>, <code>paypalac_remove_expired_cards.php</code>, and <code>paypalac_subscription_cancellations.php</code>, change <code>require '../includes/configure.php';</code> to <code>require __DIR__ . '/../includes/configure.php';</code>. A crontab that starts in another directory otherwise fatals. <code>paypalac_orphan_capture_alerts.php</code> already uses <code>__DIR__</code>.</li>
-            <li><strong>Auto-loaders.</strong> Catalog init on these versions loads <code>includes/auto_loaders/config.*.php</code> only. Rename <code>paypalac_vault_observer.core.php</code> to <code>config.paypalac_vault_observer.php</code> and <code>paypalac_wallet_ajax.core.php</code> to <code>config.paypalac_wallet_ajax.php</code>. Do not copy <code>webhook.core.php</code> over a store file that is already present. Add <code>includes/auto_loaders/config.paypalac_saved_card_recurring.php</code> so the recurring class loads:
-              <pre class="sh_php" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>&lt;?php
-$autoLoadConfig[200][] = [
-    'autoType' =&gt; 'class',
-    'loadFile' =&gt; 'paypalacSavedCardRecurring.php',
-];</code></pre>
-            </li>
+            <li>In the copied admin PHP, change <code>/catalog/includes/</code> to <code>/includes/</code>. That includes <code>auto.PaypalacAdmin.php</code>.</li>
+            <li>On the account subscription and saved-card pages, load payment classes with <code>DIR_FS_CATALOG . DIR_WS_MODULES</code>.</li>
+            <li>In the four cron scripts that use <code>require '../includes/configure.php'</code>, use <code>require __DIR__ . '/../includes/configure.php'</code>.</li>
+            <li>Rename only <code>paypalac_vault_observer.core.php</code> to <code>config.paypalac_vault_observer.php</code>. Leave <code>paypalac_wallet_ajax.core.php</code> under that name: wallet AJAX sets <code>$loaderPrefix</code> to <code>paypalac_wallet_ajax</code>. Do not replace an existing <code>webhook.core.php</code>. Add <code>includes/auto_loaders/config.paypalac_saved_card_recurring.php</code> that loads class <code>paypalacSavedCardRecurring.php</code> at breakpoint 200.</li>
           </ul>
-          <p class="bodyText">Catalog observers under <code>includes/classes/observers/</code> already resolve <code>dirname(__DIR__, 2) . '/modules/payment'</code>. Leave those paths.</p>
-          <p class="bodyText">Then open <strong>Modules &rarr; Payment</strong>, install <strong>PayPal Advanced Checkout</strong>, and add Sandbox credentials under <strong>Configuration &rarr; PayPal Modules</strong>. Installing the payment module creates the configuration keys and admin menu entries. <code>paypal_ac_checkout_reservation</code> and <code>paypal_ac_capture_reservation</code> are created on the first checkout that needs them. There is no installer SQL for those tables.</p>
+          <p class="bodyText"><code>includes/functions/extra_functions/paypalac_php74.php</code> and the same file under the admin <code>extra_functions</code> directory define <code>str_starts_with</code>, <code>str_contains</code>, and <code>str_ends_with</code> when PHP is 7.4. They are part of the copy above.</p>
+          <p class="bodyText">Open <strong>Modules &rarr; Payment</strong>, install <strong>PayPal Advanced Checkout</strong>, and add Sandbox credentials. Reservation tables are created on the first checkout that needs them.</p>
 
           <h4>Optional components commonly installed with this plugin</h4>
           <ul class="bodyList">
@@ -142,7 +134,7 @@ $autoLoadConfig[200][] = [
           <ol>
             <li>Switch the module to Sandbox mode and confirm no live transactions are in flight.</li>
             <li>In <strong>Modules &rarr; Payment</strong>, remove PayPal Advanced Checkout and any companion modules.</li>
-            <li>Delete uploaded module files from <code>includes/modules/payment/</code>, language files, observer files, and admin files you added.</li>
+            <li>Delete uploaded module files from <code>includes/modules/payment/</code>, language files, observer files, and admin files you added. On a file-overlay install, also remove the <code>cron/paypalac_*.php</code> crontab lines and those cron files, plus the store-root <code>ppac_*.php</code> and <code>ajax/paypalac_wallet*.php</code> copies.</li>
             <li>If no other add-on depends on it, roll back the <code>includes/classes/order_total.php</code> notifier patch.</li>
             <li>Revoke or rotate API credentials in your PayPal developer dashboard.</li>
           </ol>
