@@ -2355,6 +2355,7 @@ class PayPalCommon {
         }
 
         $this->ensureCheckoutReservationTable();
+        $this->ensureCaptureCheckoutReservationTable();
         $esc = $db->prepare_input($paypal_order_id);
         $cid = (int)($_SESSION['customer_id'] ?? 0);
         $table = $this->checkoutReservationTableName();
@@ -2366,8 +2367,7 @@ class PayPalCommon {
         if ($db->affectedRows() > 0) {
             $this->storeOpenCaptureCartFingerprint(
                 $paypal_order_id,
-                $this->captureCartFingerprint(),
-                $capture_resource_id
+                $this->captureCartFingerprint()
             );
             return;
         }

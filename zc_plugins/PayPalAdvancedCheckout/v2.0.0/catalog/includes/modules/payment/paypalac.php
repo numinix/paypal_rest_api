@@ -3393,6 +3393,9 @@ class paypalac extends base
             );
         }
 
+        $this->paypalCommon->markCheckoutReservationOrderCreated(
+            (int)($orders_id ?: ($_SESSION['order_number_created'] ?? 0))
+        );
         $this->paypalCommon->releaseAdvancedCheckoutMysqlOrderLock();
         $this->resetOrder();
     }
