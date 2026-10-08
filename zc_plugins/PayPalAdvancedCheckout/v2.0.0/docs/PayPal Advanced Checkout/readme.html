@@ -94,17 +94,42 @@
         </div>
         <div class="bodyWrapper">
           <h4>Install the plugin</h4>
+          <p class="bodyText">Back up the database and store files, then apply the <a href="https://github.com/numinix/paypal_rest_api/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank" rel="noopener">order total notifier patch</a> when the store&rsquo;s <code>includes/classes/order_total.php</code> does not already notify <code>NOTIFY_ORDER_TOTAL_PROCESS_STARTS</code>, <code>NOTIFY_ORDER_TOTAL_PROCESS_NEXT</code>, and <code>NOTIFY_ORDER_TOTAL_PRE_CONFIRMATION_CHECK_*</code>. PHP 7.4–8.4 with cURL, JSON, and OpenSSL is required.</p>
+          <p class="bodyText">Zen Cart <strong>2.0.1 and later</strong> installs through Plugin Manager. Zen Cart <strong>1.5.7c through 2.0.0</strong> has no working Plugin Manager path for this package (<code>ScriptedInstaller</code> refuses versions below 2.0.1). Copy the files onto the store instead. Do not upload <code>zc_plugins/PayPalAdvancedCheckout/</code> on those carts: payment modules load only from <code>includes/modules/payment/</code>.</p>
+
+          <h5>Zen Cart 2.0.1+ (Plugin Manager)</h5>
           <ol>
-            <li>Back up your Zen Cart database and store files.</li>
-            <li>Confirm your store meets requirements from the Overview section (Zen Cart/PHP/extensions).</li>
-            <li>Apply the <a href="https://github.com/numinix/paypal_rest_api/wiki/Required-changes-to-%60-includes-classes-order_total.php%60" target="_blank" rel="noopener">order total notifier patch</a> if your Zen Cart version requires it.</li>
-            <li>Unzip the release package and rename <code>YOUR_ADMIN/</code> to your real admin directory.</li>
-            <li>Confirm Zen Cart <strong>2.0.1+</strong> and PHP <strong>7.4–8.4</strong>.</li>
-            <li>Upload <code>zc_plugins/PayPalAdvancedCheckout/</code> into your store’s <code>zc_plugins/</code> directory (keep the version folder, e.g. <code>v2.0.0</code>).</li>
-            <li>In admin, go to <strong>Modules &rarr; Plugin Manager</strong> and install <strong>PayPal Advanced Checkout</strong>. This removes any prior non-encapsulated overlay copies (if present) while preserving existing Modules → Payment configuration.</li>
-            <li>In admin, go to <strong>Modules &rarr; Payment</strong> and enable/configure <strong>PayPal Advanced Checkout</strong> (and optional wallet/card companion modules you plan to use).</li>
-            <li>In <strong>Configuration &rarr; PayPal Modules</strong>, add Sandbox credentials first, run a test transaction, then add Live credentials.</li>
+            <li>Upload <code>zc_plugins/PayPalAdvancedCheckout/</code> into the store&rsquo;s <code>zc_plugins/</code> directory. Keep the version folder, for example <code>v2.0.0</code>.</li>
+            <li>In admin, open <strong>Modules &rarr; Plugin Manager</strong> and install <strong>PayPal Advanced Checkout</strong>. That step copies the catalog entry points and removes an older overlay if one is present. Existing <strong>Modules &rarr; Payment</strong> settings are kept.</li>
+            <li>In <strong>Modules &rarr; Payment</strong>, install and enable <strong>PayPal Advanced Checkout</strong> and any wallet or card modules you will use.</li>
+            <li>In <strong>Configuration &rarr; PayPal Modules</strong>, add Sandbox credentials, run a test transaction, then add Live credentials.</li>
           </ol>
+
+          <h5>Zen Cart 1.5.7c through 2.0.0 (file overlay)</h5>
+          <p class="bodyText">Copy from <code>zc_plugins/PayPalAdvancedCheckout/v2.0.0/</code>. Merge into the matching store directories. Do not replace the store&rsquo;s <code>includes/</code> tree, and do not copy <code>Installer/</code>, <code>docs/</code>, or <code>manifest.php</code>.</p>
+          <ol>
+            <li><code>catalog/includes/</code> &rarr; store <code>includes/</code>. This includes <code>includes/modules/payment/</code>, languages, classes, observers, extra functions, and template files. Copy <code>catalog/includes/templates/template_default/</code> and <code>catalog/includes/templates/YOUR_TEMPLATE/</code> into the active template as well as <code>template_default</code>.</li>
+            <li><code>admin/</code> &rarr; the store&rsquo;s real admin directory (the folder is not always named <code>admin</code>).</li>
+            <li><code>Installer/assets/root/ppac_add_card.php</code>, <code>ppac_listener.php</code>, <code>ppac_paths.php</code>, <code>ppac_wallet.php</code>, and <code>ppac_webhook.php</code> &rarr; the store root.</li>
+            <li><code>Installer/assets/ajax/paypalac_wallet*.php</code> &rarr; store <code>ajax/</code>.</li>
+            <li><code>catalog/cron/paypalac_*.php</code> &rarr; store <code>cron/</code>. Schedule those files. There is no <code>zc_plugins/PayPalAdvancedCheckout/cron.php</code> dispatcher on this install.</li>
+            <li>Copy <code>catalog/includes/modules/payment/paypal/PayPalAdvancedCheckout/images/</code> to <code>images/paypalac/</code>.</li>
+          </ol>
+          <p class="bodyText">After the copy, fix paths that still assume the version folder layout:</p>
+          <ul class="bodyList">
+            <li><strong>Admin PHP.</strong> From a file in the admin directory, <code>dirname(__DIR__)</code> is the store root. Replace <code>dirname(__DIR__) . '/catalog/includes/</code> with <code>dirname(__DIR__) . '/includes/</code> in <code>paypalac_signup.php</code>, <code>paypalac_integrated_signup.php</code>, <code>paypalac_webhook_logs.php</code>, <code>paypalac_subscriptions_report.php</code>, <code>paypalac_saved_card_recurring.php</code>, <code>paypalac_upgrade.php</code>, and <code>paypalac_orphan_captures.php</code>. In <code>admin/includes/classes/observers/auto.PaypalacAdmin.php</code>, replace <code>dirname(__DIR__, 4) . '/catalog/includes/</code> with <code>dirname(__DIR__, 4) . '/includes/</code>.</li>
+            <li><strong>Account pages.</strong> <code>includes/modules/pages/account_paypal_subscriptions/header_php.php</code> and <code>account_saved_credit_cards/header_php.php</code> must load payment classes with <code>DIR_FS_CATALOG . DIR_WS_MODULES . 'payment/...'</code>. <code>dirname(__DIR__, 3) . '/payment/'</code> points at <code>includes/payment/</code>, which does not exist.</li>
+            <li><strong>Cron.</strong> In <code>cron/paypalac_saved_card_recurring.php</code>, <code>paypalac_recurring_reminders.php</code>, <code>paypalac_remove_expired_cards.php</code>, and <code>paypalac_subscription_cancellations.php</code>, change <code>require '../includes/configure.php';</code> to <code>require __DIR__ . '/../includes/configure.php';</code>. A crontab that starts in another directory otherwise fatals. <code>paypalac_orphan_capture_alerts.php</code> already uses <code>__DIR__</code>.</li>
+            <li><strong>Auto-loaders.</strong> Catalog init on these versions loads <code>includes/auto_loaders/config.*.php</code> only. Rename <code>paypalac_vault_observer.core.php</code> to <code>config.paypalac_vault_observer.php</code> and <code>paypalac_wallet_ajax.core.php</code> to <code>config.paypalac_wallet_ajax.php</code>. Do not copy <code>webhook.core.php</code> over a store file that is already present. Add <code>includes/auto_loaders/config.paypalac_saved_card_recurring.php</code> so the recurring class loads:
+              <pre class="sh_php" style="background: #f5f5f5; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>&lt;?php
+$autoLoadConfig[200][] = [
+    'autoType' =&gt; 'class',
+    'loadFile' =&gt; 'paypalacSavedCardRecurring.php',
+];</code></pre>
+            </li>
+          </ul>
+          <p class="bodyText">Catalog observers under <code>includes/classes/observers/</code> already resolve <code>dirname(__DIR__, 2) . '/modules/payment'</code>. Leave those paths.</p>
+          <p class="bodyText">Then open <strong>Modules &rarr; Payment</strong>, install <strong>PayPal Advanced Checkout</strong>, and add Sandbox credentials under <strong>Configuration &rarr; PayPal Modules</strong>. Installing the payment module creates the configuration keys and admin menu entries. <code>paypal_ac_checkout_reservation</code> and <code>paypal_ac_capture_reservation</code> are created on the first checkout that needs them. There is no installer SQL for those tables.</p>
 
           <h4>Optional components commonly installed with this plugin</h4>
           <ul class="bodyList">
