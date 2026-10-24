@@ -26,3 +26,6 @@ if (!defined('BOX_PAYPALAC_REBILL')) {
 if (!defined('BOX_PAYPALAC_ORPHAN_CAPTURES')) {
     define('BOX_PAYPALAC_ORPHAN_CAPTURES', 'PayPal Orphan Captures');
 }
+if (!defined('BOX_PAYPALAC_SIGNUP')) {
+    define('BOX_PAYPALAC_SIGNUP', 'PayPal Onboarding');
+}

@@ -339,14 +339,17 @@ function callNuminixApi(array $payload): array
  */
 function getSignupPageUrl(array $params = []): string
 {
-    $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') 
-        . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['SCRIPT_NAME'];
-    
-    if (!empty($params)) {
-        $baseUrl .= '?' . http_build_query($params);
-    }
-    
-    return $baseUrl;
+    // Zen Cart 2.x serves this page through index.php?cmd=paypalac_signup.
+    // SCRIPT_NAME is rewritten to paypalac_signup.php, which is not a real file.
+    $link = zen_href_link('paypalac_signup.php', http_build_query($params), 'SSL');
+    return html_entity_decode($link, ENT_QUOTES, 'UTF-8');
+}
+
+function paypalac_signup_asset(string $relative): string
+{
+    $version = basename(dirname(__DIR__));
+    $base = rtrim(DIR_WS_CATALOG, '/') . '/zc_plugins/PayPalAdvancedCheckout/' . $version . '/admin/';
+    return $base . ltrim($relative, '/');
 }
 
 /**
@@ -371,15 +374,15 @@ function renderSignupPage(): void
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PayPal Signup</title>
-    <link rel="stylesheet" href="includes/css/numinix_admin.css">
-    <link rel="stylesheet" href="includes/css/paypalac_signup.css">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(paypalac_signup_asset('includes/css/numinix_admin.css'), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(paypalac_signup_asset('includes/css/paypalac_signup.css'), ENT_QUOTES, 'UTF-8'); ?>">
 </head>
 <body>
 <div class="nmx-module">
     <div class="nmx-container">
         <?php 
         // Use zen_draw_form to create a form with automatic securityToken hidden input
-        echo zen_draw_form('paypal_signup', basename($_SERVER['SCRIPT_NAME']), '', 'post', 'id="paypal-signup-form"');
+        echo zen_draw_form('paypal_signup', 'paypalac_signup.php', '', 'post', 'id="paypal-signup-form"');
         ?>
         <div id="main-content">
             <div class="nmx-container-header">
@@ -480,13 +483,13 @@ function renderSignupPage(): void
         
         <div class="nmx-footer">
             <a href="https://www.numinix.com" target="_blank" rel="noopener noreferrer" class="nmx-footer-logo">
-                <img src="images/numinix_logo.png" alt="Numinix">
+                <img src="<?php echo htmlspecialchars(paypalac_signup_asset('images/numinix_logo.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="Numinix">
             </a>
         </div>
     </div>
 </div>
     
-    <script src="includes/javascript/paypalac_signup.js"></script>
+    <script src="<?php echo htmlspecialchars(paypalac_signup_asset('includes/javascript/paypalac_signup.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 </body>
 </html>
     <?php

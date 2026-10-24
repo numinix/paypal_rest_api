@@ -203,6 +203,7 @@ class ScriptedInstaller extends ScriptedInstallerBase
             ['paypalacOrphanCaptures', 'BOX_PAYPALAC_ORPHAN_CAPTURES', 'paypalac_orphan_captures', '', 'customers', 'Y', 93],
             ['paypalacSubscriptionsReport', 'BOX_PAYPALAC_SUBSCRIPTIONS_REPORT', 'paypalac_subscriptions_report', '', 'reports', 'Y', 90],
             ['paypalacWebhookLogs', 'BOX_PAYPALAC_WEBHOOK_LOGS', 'paypalac_webhook_logs', '', 'tools', 'Y', 90],
+            ['paypalacSignup', 'BOX_PAYPALAC_SIGNUP', 'paypalac_signup', '', 'tools', 'N', 99],
         ];
 
         foreach ($pages as $page) {
