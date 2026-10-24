@@ -107,6 +107,17 @@ class ScriptedInstaller extends ScriptedInstallerBase
             }
         }
 
+        if (function_exists('zen_deregister_admin_pages')) {
+            zen_deregister_admin_pages([
+                'paypalacSubscriptions',
+                'paypalacSavedCardRecurring',
+                'paypalacRebill',
+                'paypalacOrphanCaptures',
+                'paypalacSubscriptionsReport',
+                'paypalacWebhookLogs',
+            ]);
+        }
+
         $this->removeCatalogEntrypoints();
 
         return true;

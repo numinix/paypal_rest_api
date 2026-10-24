@@ -1,5 +1,12 @@
 <?php
-require '../includes/configure.php';
+if (PHP_SAPI !== 'cli') {
+    if (!headers_sent()) {
+        http_response_code(404);
+    }
+    exit;
+}
+
+require dirname(__DIR__) . '/includes/configure.php';
 ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'));
 chdir(DIR_FS_CATALOG);
 require_once 'includes/application_top.php';

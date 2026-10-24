@@ -9,6 +9,13 @@ $current_page_base = 'paypalac_wallet_ajax'; // or similar unique name
 $loaderPrefix = 'paypalac_wallet_ajax';
 require('includes/application_top.php');
 
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    http_response_code(405);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'POST required.']);
+    exit;
+}
+
 // Set header to return JSON
 header('Content-Type: application/json');
 

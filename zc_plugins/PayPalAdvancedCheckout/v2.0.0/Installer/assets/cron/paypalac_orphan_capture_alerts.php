@@ -1,4 +1,11 @@
 <?php
+if (PHP_SAPI !== 'cli') {
+    if (!headers_sent()) {
+        http_response_code(404);
+    }
+    exit;
+}
+
 /**
  * PayPal Advanced Checkout — orphan capture/authorization alert cron.
  *
