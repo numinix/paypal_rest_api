@@ -330,11 +330,13 @@ $customer_query = $db->Execute("SELECT customers_id, customers_firstname, custom
 
 if (empty($_SESSION['customer_id'])) {
     if ($customer_query->RecordCount() > 0) {
-        // If customer exists, use existing customer ID and set session variables
-        $customer_id = $customer_query->fields['customers_id'];
-        $existing_first = $customer_query->fields['customers_firstname'];
-        $existing_last = $customer_query->fields['customers_lastname'];
-        log_paypalac_wallet_message("Using existing customer ID: $customer_id");
+        // An email from the wallet is not proof of account ownership.
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'An account already uses this email. Please log in to continue.',
+            'redirect_url' => zen_href_link(FILENAME_LOGIN, '', 'SSL'),
+        ]);
+        exit;
     } else {
         // Create the new customer record
         $db->Execute("INSERT INTO " . TABLE_CUSTOMERS . " (customers_email_address, customers_firstname, customers_lastname)

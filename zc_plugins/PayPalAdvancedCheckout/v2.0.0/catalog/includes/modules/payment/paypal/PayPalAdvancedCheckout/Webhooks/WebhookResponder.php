@@ -86,7 +86,18 @@ class WebhookResponder
         $transmissionSignature = $headers['PAYPAL-TRANSMISSION-SIG'];
         $decodedSignature = base64_decode($transmissionSignature);
 
-        $publicKeyUrl = $headers['PAYPAL-CERT-URL'];
+        $publicKeyUrl = $headers['PAYPAL-CERT-URL'] ?? '';
+        $certParts = parse_url($publicKeyUrl);
+        $certHost = strtolower((string)($certParts['host'] ?? ''));
+        $allowedCertHosts = [
+            'api.paypal.com',
+            'api-m.paypal.com',
+            'api.sandbox.paypal.com',
+            'api-m.sandbox.paypal.com',
+        ];
+        if (($certParts['scheme'] ?? '') !== 'https' || !in_array($certHost, $allowedCertHosts, true)) {
+            return false;
+        }
 
         // @TODO - download and cache the public key, from the URL, instead of retrieving fresh in real time
         $pem_cert = \file_get_contents($publicKeyUrl); // @TODO add curl fallback option in case server blocks this way of reading
