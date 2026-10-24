@@ -17,7 +17,25 @@ if (PHP_SAPI !== 'cli') {
  * lose their group pricing discounts after the cancellation grace period.
  */
 
-require dirname(__DIR__) . '/includes/configure.php';
+$ppacConfigure = null;
+$ppacWalk = __DIR__;
+for ($ppacI = 0; $ppacI < 8 && $ppacConfigure === null; $ppacI++) {
+    $ppacCandidate = $ppacWalk . '/includes/configure.php';
+    if (is_file($ppacCandidate)) {
+        $ppacConfigure = $ppacCandidate;
+        break;
+    }
+    $ppacParent = dirname($ppacWalk);
+    if ($ppacParent === $ppacWalk) {
+        break;
+    }
+    $ppacWalk = $ppacParent;
+}
+if ($ppacConfigure === null) {
+    fwrite(STDERR, "PayPal cron: includes/configure.php not found from " . __DIR__ . "\n");
+    exit(1);
+}
+require $ppacConfigure;
 ini_set('include_path', DIR_FS_CATALOG . PATH_SEPARATOR . ini_get('include_path'));
 chdir(DIR_FS_CATALOG);
 require_once 'includes/application_top.php';
