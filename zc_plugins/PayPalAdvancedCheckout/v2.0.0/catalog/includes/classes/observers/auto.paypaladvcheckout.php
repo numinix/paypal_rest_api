@@ -96,13 +96,18 @@ class zcObserverPaypaladvcheckout
                 'NOTIFY_ORDER_TOTAL_PRE_CONFIRMATION_CHECK_NEXT',
                 'NOTIFY_OT_COUPON_CALCS_FINISHED',
             ]);
-        // -----
-        // If currently on the checkout_process page, need to monitor calls to the
-        // order-totals' process method.  That method's run on that page prior to
-        // paypalac's before_process method.
-        //
         }
-        if ($current_page_base === FILENAME_CHECKOUT_PROCESS || ($oprcProcessKey !== null && $current_page_base === $oprcProcessKey)) {
+        // -----
+        // Watch order-total process() on checkout_process and on the same pages that
+        // watch pre_confirmation_check. Wallet AJAX boots as the default page, runs
+        // both methods, and must keep lastOrderValues in sync through process() or
+        // coupons never reach the PayPal amount.
+        //
+        $watchProcess =
+            in_array($current_page_base, $pages_to_watch, true)
+            || $current_page_base === FILENAME_CHECKOUT_PROCESS
+            || ($oprcProcessKey !== null && $current_page_base === $oprcProcessKey);
+        if ($watchProcess) {
             $this->attach($this, [
                 'NOTIFY_ORDER_TOTAL_PROCESS_STARTS',
                 'NOTIFY_ORDER_TOTAL_PROCESS_NEXT',

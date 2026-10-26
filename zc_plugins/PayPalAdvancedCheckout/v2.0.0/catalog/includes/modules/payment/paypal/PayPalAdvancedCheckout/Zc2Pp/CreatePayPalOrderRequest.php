@@ -711,7 +711,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
             if (!is_array($order_total)) {
                 continue;
             }
-            $class_name = (string)($order_total['class'] ?? '');
+            // process() returns 'code'; some callers populate 'class' instead.
+            $class_name = (string)($order_total['class'] ?? $order_total['code'] ?? '');
             if ($class_name !== 'ot_total') {
                 continue;
             }
