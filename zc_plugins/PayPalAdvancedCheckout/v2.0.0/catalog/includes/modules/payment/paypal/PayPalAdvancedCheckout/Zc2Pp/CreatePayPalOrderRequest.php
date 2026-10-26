@@ -630,7 +630,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
                 continue;
             }
 
-            $class_name = (string)($order_total['class'] ?? '');
+            // process() returns 'code'; some callers populate 'class' instead.
+            $class_name = (string)($order_total['class'] ?? $order_total['code'] ?? '');
             if ($class_name === '' || !in_array($class_name, $eligible_modules, true)) {
                 continue;
             }
@@ -671,7 +672,7 @@ class CreatePayPalOrderRequest extends ErrorInfo
             if (!is_array($order_total)) {
                 continue;
             }
-            if (($order_total['class'] ?? '') !== 'ot_local_sales_taxes') {
+            if (($order_total['class'] ?? $order_total['code'] ?? '') !== 'ot_local_sales_taxes') {
                 continue;
             }
             if (!isset($order_total['value']) || !is_numeric($order_total['value'])) {
@@ -711,7 +712,8 @@ class CreatePayPalOrderRequest extends ErrorInfo
             if (!is_array($order_total)) {
                 continue;
             }
-            $class_name = (string)($order_total['class'] ?? '');
+            // process() returns 'code'; some callers populate 'class' instead.
+            $class_name = (string)($order_total['class'] ?? $order_total['code'] ?? '');
             if ($class_name !== 'ot_total') {
                 continue;
             }
