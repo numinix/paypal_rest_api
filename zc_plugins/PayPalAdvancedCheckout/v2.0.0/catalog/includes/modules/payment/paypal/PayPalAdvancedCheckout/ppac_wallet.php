@@ -116,9 +116,12 @@ try {
         $order_total_modules = new order_total();
     }
 
-    // Run order totals processing to ensure $order->info is populated
+    // Run order totals so coupons, tax, and shipping are applied before the
+    // PayPal order amount is built. collect_posts alone leaves $order->info['total']
+    // at the pre-discount amount, which is what Google/Apple Pay would charge.
     $order_total_modules->collect_posts();
     $order_total_modules->pre_confirmation_check();
+    $order->totals = $order_total_modules->process();
 } catch (\Throwable $e) {
     // Log the error but continue - the observer fallback will use $order->info
     if ($ppacWalletDebugEnabled) {
