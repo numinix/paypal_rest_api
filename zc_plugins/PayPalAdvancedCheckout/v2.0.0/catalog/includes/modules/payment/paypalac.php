@@ -3048,7 +3048,7 @@ class paypalac extends base
             $payment_info = [
                 'payment_date' => Helpers::convertPayPalDatePay2Db($payment['create_time']),
                 'payment_gross' => $seller_receivable['gross_amount']['value'],
-                'payment_fee' => $seller_receivable['paypal_fee']['value'],
+                'payment_fee' => $seller_receivable['paypal_fee']['value'] ?? '0.00',
                 'settle_amount' => $seller_receivable['receivable_amount']['value'] ?? $seller_receivable['net_amount']['value'],
                 'settle_currency' => $seller_receivable['receivable_amount']['currency_code'] ?? $seller_receivable['net_amount']['currency_code'],
                 'exchange_rate' => $seller_receivable['exchange_rate']['value'] ?? 'null',
