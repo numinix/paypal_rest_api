@@ -102,9 +102,6 @@ if (!function_exists('ppac_wallet_sanitize_error_message')) {
 }
 
 if ($hasValidCart && (!$configOnly || $wallet === 'paylater')) {
-    $ppacWalletDebugEnabled = defined('MODULE_PAYMENT_PAYPALAC_DEBUGGING')
-        && strpos((string)MODULE_PAYMENT_PAYPALAC_DEBUGGING, 'Log') !== false;
-
 try {
     if (!isset($order) || !is_object($order)) {
         require_once DIR_WS_CLASSES . 'order.php';
@@ -122,11 +119,51 @@ try {
     $order_total_modules->collect_posts();
     $order_total_modules->pre_confirmation_check();
     $order->totals = $order_total_modules->process();
+
+    // Keep $order->info['total'] aligned with processed ot_total. Some coupon
+    // paths update the observer while leaving info['total'] stale until later
+    // in checkout; GUID reuse then recharges the pre-coupon PayPal order.
+    if (!empty($order->totals) && is_array($order->totals)) {
+        foreach ($order->totals as $ppacWalletOt) {
+            if (!is_array($ppacWalletOt)) {
+                continue;
+            }
+            $ppacWalletOtCode = (string)($ppacWalletOt['class'] ?? $ppacWalletOt['code'] ?? '');
+            if ($ppacWalletOtCode === 'ot_total' && isset($ppacWalletOt['value']) && is_numeric($ppacWalletOt['value'])) {
+                $order->info['total'] = (float)$ppacWalletOt['value'];
+                break;
+            }
+        }
+    }
+
+    if (defined('DIR_FS_LOGS')) {
+        $ppacWalletAmountLine = date('Y-m-d H:i:s')
+            . ' wallet=' . $wallet
+            . ' info_total=' . (isset($order->info['total']) ? (string)(float)$order->info['total'] : 'n/a')
+            . ' cc_id=' . (isset($_SESSION['cc_id']) ? (is_array($_SESSION['cc_id']) ? implode(',', $_SESSION['cc_id']) : (string)$_SESSION['cc_id']) : '')
+            . ' totals=' . json_encode(array_map(static function ($row) {
+                if (!is_array($row)) {
+                    return $row;
+                }
+                return [
+                    'code' => $row['code'] ?? null,
+                    'class' => $row['class'] ?? null,
+                    'value' => $row['value'] ?? null,
+                ];
+            }, is_array($order->totals ?? null) ? $order->totals : []))
+            . "\n";
+        error_log($ppacWalletAmountLine, 3, DIR_FS_LOGS . '/paypalac-wallet-amount-' . date('Ymd') . '.log');
+    }
 } catch (\Throwable $e) {
-    // Log the error but continue - the observer fallback will use $order->info
-    if ($ppacWalletDebugEnabled) {
-        $sanitizedMessage = ppac_wallet_sanitize_error_message($e->getMessage());
-        error_log('PayPal Wallet: Order totals initialization exception: ' . $sanitizedMessage);
+    // Always log wallet total failures — silent catch was hiding coupon/amount bugs.
+    $sanitizedMessage = ppac_wallet_sanitize_error_message($e->getMessage());
+    error_log('PayPal Wallet: Order totals initialization exception: ' . $sanitizedMessage);
+    if (defined('DIR_FS_LOGS')) {
+        error_log(
+            date('Y-m-d H:i:s') . ' wallet=' . $wallet . ' process_exception=' . $sanitizedMessage . "\n",
+            3,
+            DIR_FS_LOGS . '/paypalac-wallet-amount-' . date('Ymd') . '.log'
+        );
     }
     // Do not exit - allow the request to continue with the fallback mechanism
 }

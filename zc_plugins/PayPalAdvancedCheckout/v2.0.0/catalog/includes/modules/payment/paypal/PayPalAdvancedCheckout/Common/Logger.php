@@ -136,22 +136,51 @@ class Logger
 
     public function write(string $message, bool $include_timestamp = false, string $include_separator = '')
     {
+        if (self::$debug === true) {
+            $this->writeToDebugLog($message, $include_timestamp, $include_separator);
+        }
+    }
+
+    /**
+     * Always write wallet/amount diagnostics, even when MODULE_PAYMENT_PAYPALAC_DEBUGGING is Off.
+     * Keeps coupon/total mismatches diagnosable without requiring a config change first.
+     */
+    public function writeAlways(string $message, bool $include_timestamp = true, string $include_separator = ''): void
+    {
+        if (!isset(self::$debugLogFile)) {
+            // Constructor early-returned or was never called with a usable path.
+            new self('amount');
+        }
+        $this->writeToDebugLog($message, $include_timestamp, $include_separator);
+
+        if (!defined('DIR_FS_LOGS')) {
+            return;
+        }
+        $auditFile = DIR_FS_LOGS . '/paypalac-wallet-amount-' . date('Ymd') . '.log';
+        $line = date('Y-m-d H:i:s') . ' ' . str_replace(["\r", "\n"], ['', ' | '], $message) . "\n";
+        error_log($line, 3, $auditFile);
+    }
+
+    protected function writeToDebugLog(string $message, bool $include_timestamp = false, string $include_separator = ''): void
+    {
         global $current_page_base;
 
-        if (self::$debug === true) {
-            $timestamp = ($include_timestamp === false) ? '' : ("\n" . date('Y-m-d H:i:s: ') . "($current_page_base) ");
-            $separator = '';
-            $separator_before = '';
-            $separator_after = '';
-            if ($include_separator !== '') {
-                $separator = "************************************************";
-                if ($include_separator === 'before') {
-                    $separator_before = (strpos($message, "\n") === 0) ? "\n$separator" : "\n$separator\n";
-                } else {
-                    $separator_after = (substr($message, -1) === "\n") ? "$separator\n" : "\n$separator\n";
-                }
-            }
-            error_log($separator_before . $timestamp . $message . $separator_after, 3, self::$debugLogFile);
+        if (!isset(self::$debugLogFile)) {
+            return;
         }
+
+        $timestamp = ($include_timestamp === false) ? '' : ("\n" . date('Y-m-d H:i:s: ') . "($current_page_base) ");
+        $separator = '';
+        $separator_before = '';
+        $separator_after = '';
+        if ($include_separator !== '') {
+            $separator = "************************************************";
+            if ($include_separator === 'before') {
+                $separator_before = (strpos($message, "\n") === 0) ? "\n$separator" : "\n$separator\n";
+            } else {
+                $separator_after = (substr($message, -1) === "\n") ? "$separator\n" : "\n$separator\n";
+            }
+        }
+        error_log($separator_before . $timestamp . $message . $separator_after, 3, self::$debugLogFile);
     }
 }

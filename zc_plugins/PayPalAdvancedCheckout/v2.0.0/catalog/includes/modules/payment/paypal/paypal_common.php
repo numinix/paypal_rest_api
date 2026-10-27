@@ -1133,6 +1133,34 @@ class PayPalCommon {
      * @param array $cc_info Credit card info array (optional, used for card payments)
      * @return string
      */
+    /**
+     * Prefer the processed ot_total when present. Wallet AJAX can leave
+     * $order->info['total'] at the pre-coupon amount after pre_confirmation_check().
+     */
+    public function getProcessedOrderTotal($order): float
+    {
+        if (is_object($order) && !empty($order->totals) && is_array($order->totals)) {
+            foreach ($order->totals as $order_total) {
+                if (!is_array($order_total)) {
+                    continue;
+                }
+                $code = (string)($order_total['class'] ?? $order_total['code'] ?? '');
+                if ($code !== 'ot_total') {
+                    continue;
+                }
+                if (isset($order_total['value']) && is_numeric($order_total['value'])) {
+                    return (float)$order_total['value'];
+                }
+            }
+        }
+
+        if (is_object($order) && isset($order->info['total']) && is_numeric($order->info['total'])) {
+            return (float)$order->info['total'];
+        }
+
+        return 0.0;
+    }
+
     public function createOrderGuid($order, string $ppac_type, array $cc_info = []): string
     {
         $orders_completed = $_SESSION['PayPalAdvancedCheckout']['CompletedOrders'] ?? 0;
@@ -1142,18 +1170,28 @@ class PayPalCommon {
             $cart_data .= $product['id'] . $product['qty'];
         }
 
+        $total_for_guid = $this->getProcessedOrderTotal($order);
+
         $hash_data =
             $_SESSION['customer_id']
             . $_SESSION['cartID']
             . $orders_completed
             . $ppac_type
             . $cart_data
-            . (isset($order->info['total']) ? (string)(float)$order->info['total'] : '')
+            . (string)$total_for_guid
             . (isset($order->info['shipping_cost']) ? (string)(float)$order->info['shipping_cost'] : '')
             . (isset($order->info['tax']) ? (string)(float)$order->info['tax'] : '');
 
         if (isset($_SESSION['storecredit']) && is_numeric($_SESSION['storecredit'])) {
-            $hash_data .= (string)(float)$_SESSION['storecredit'];
+            $hash_data .= '|storecredit:' . (string)(float)$_SESSION['storecredit'];
+        }
+
+        if (isset($_SESSION['cot_gv']) && is_numeric($_SESSION['cot_gv'])) {
+            $hash_data .= '|cot_gv:' . (string)(float)$_SESSION['cot_gv'];
+        }
+
+        if (!empty($_SESSION['cc_id'])) {
+            $hash_data .= '|cc_id:' . (is_array($_SESSION['cc_id']) ? implode(',', $_SESSION['cc_id']) : (string)$_SESSION['cc_id']);
         }
 
         if (in_array($ppac_type, ['apple_pay', 'google_pay', 'venmo'], true)) {
@@ -1589,43 +1627,75 @@ class PayPalCommon {
         // session GUID reuse is still safe because the payment source is
         // managed by PayPal's SDK, not by session-stored card data.
         $create_request_id = $order_guid;
+        $current_amount = $this->getProcessedOrderTotal($order);
+        $cached_amount = (float)($_SESSION['PayPalAdvancedCheckout']['Order']['current']['purchase_units'][0]['amount']['value']
+            ?? $_SESSION['PayPalAdvancedCheckout']['Order']['amount']
+            ?? 0);
+
+        $log->writeAlways(
+            "createPayPalOrder($ppac_type): amount_audit current={$current_amount}"
+            . " cached={$cached_amount}"
+            . " info_total=" . (isset($order->info['total']) ? (string)(float)$order->info['total'] : 'n/a')
+            . " cc_id=" . (isset($_SESSION['cc_id']) ? (is_array($_SESSION['cc_id']) ? implode(',', $_SESSION['cc_id']) : (string)$_SESSION['cc_id']) : '')
+            . " guid={$order_guid}"
+            . " session_guid=" . (string)($_SESSION['PayPalAdvancedCheckout']['Order']['guid'] ?? '')
+            . " totals=" . json_encode(array_map(static function ($row) {
+                if (!is_array($row)) {
+                    return $row;
+                }
+                return [
+                    'code' => $row['code'] ?? null,
+                    'class' => $row['class'] ?? null,
+                    'value' => $row['value'] ?? null,
+                ];
+            }, is_array($order->totals ?? null) ? $order->totals : []))
+        );
 
         if ($ppac_type !== 'card' && isset($_SESSION['PayPalAdvancedCheckout']['Order']['guid']) && $_SESSION['PayPalAdvancedCheckout']['Order']['guid'] === $order_guid) {
-            $cached_status = strtoupper((string)($_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? ''));
-            if ($cached_status === '' || in_array($cached_status, ['CREATED', 'APPROVED', 'PAYER_ACTION_REQUIRED', 'SAVED'], true)) {
-                $log->write("createPayPalOrder($ppac_type): Reusing existing PayPal order with GUID: $order_guid (status $cached_status)");
-                return true;
-            }
+            // Never reuse a PayPal order whose captured amount no longer matches the
+            // current cart/coupon total (e.g. coupon applied after the first create).
+            if ($cached_amount > 0 && abs($cached_amount - $current_amount) >= 0.01) {
+                $create_request_id = CheckoutRecovery::newCreateRequestId($order_guid);
+                $log->writeAlways(
+                    "createPayPalOrder($ppac_type): refusing session reuse; cached amount {$cached_amount} != current {$current_amount}. New Request-Id {$create_request_id}."
+                );
+            } else {
+                $cached_status = strtoupper((string)($_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? ''));
+                if ($cached_status === '' || in_array($cached_status, ['CREATED', 'APPROVED', 'PAYER_ACTION_REQUIRED', 'SAVED'], true)) {
+                    $log->write("createPayPalOrder($ppac_type): Reusing existing PayPal order with GUID: $order_guid (status $cached_status)");
+                    return true;
+                }
 
-            $existing_id = trim((string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''));
-            if ($existing_id !== '') {
-                $paymentModule->ppr->setPayPalRequestId('');
-                $live = $paymentModule->ppr->getOrderStatus($existing_id);
-                if ($live === false) {
-                    if (CheckoutRecovery::shouldKeepExistingOrderWhenLiveLookupFails($cached_status)) {
+                $existing_id = trim((string)($_SESSION['PayPalAdvancedCheckout']['Order']['id'] ?? ''));
+                if ($existing_id !== '') {
+                    $paymentModule->ppr->setPayPalRequestId('');
+                    $live = $paymentModule->ppr->getOrderStatus($existing_id);
+                    if ($live === false) {
+                        if (CheckoutRecovery::shouldKeepExistingOrderWhenLiveLookupFails($cached_status)) {
+                            $log->write(
+                                "createPayPalOrder($ppac_type): GET failed for $existing_id; keeping the existing PayPal order instead of creating a replacement."
+                            );
+                            return true;
+                        }
                         $log->write(
-                            "createPayPalOrder($ppac_type): GET failed for $existing_id; keeping the existing PayPal order instead of creating a replacement."
+                            "createPayPalOrder($ppac_type): GET failed for $existing_id and cached status ($cached_status) is terminal; creating a replacement PayPal order."
+                        );
+                    } elseif (CheckoutRecovery::paypalOrderIsReusable($live)) {
+                        $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = (string)($live['status'] ?? $cached_status);
+                        $log->write(
+                            "createPayPalOrder($ppac_type): Live PayPal order $existing_id status " .
+                            ($live['status'] ?? '') .
+                            '; reusing instead of creating.'
                         );
                         return true;
                     }
-                    $log->write(
-                        "createPayPalOrder($ppac_type): GET failed for $existing_id and cached status ($cached_status) is terminal; creating a replacement PayPal order."
-                    );
-                } elseif (CheckoutRecovery::paypalOrderIsReusable($live)) {
-                    $_SESSION['PayPalAdvancedCheckout']['Order']['status'] = (string)($live['status'] ?? $cached_status);
-                    $log->write(
-                        "createPayPalOrder($ppac_type): Live PayPal order $existing_id status " .
-                        ($live['status'] ?? '') .
-                        '; reusing instead of creating.'
-                    );
-                    return true;
                 }
-            }
 
-            $create_request_id = CheckoutRecovery::newCreateRequestId($order_guid);
-            $log->write(
-                "createPayPalOrder($ppac_type): GUID matches but status ($cached_status) is not reusable; creating a new PayPal order with Request-Id $create_request_id."
-            );
+                $create_request_id = CheckoutRecovery::newCreateRequestId($order_guid);
+                $log->write(
+                    "createPayPalOrder($ppac_type): GUID matches but status ($cached_status) is not reusable; creating a new PayPal order with Request-Id $create_request_id."
+                );
+            }
         }
 
         // Log the cc_info data for debugging (mask sensitive data)
@@ -1758,10 +1828,17 @@ class PayPalCommon {
         $paypal_id = $paypal_order['id'];
         $status = $paypal_order['status'];
 
+        $created_amount = (string)($paypal_order['purchase_units'][0]['amount']['value'] ?? '');
+        $log->writeAlways(
+            "createPayPalOrder($ppac_type): PayPal order created successfully."
+            . " id={$paypal_id} status={$status} amount={$created_amount}"
+            . " expected_current={$current_amount}"
+        );
         $log->write(
             "createPayPalOrder($ppac_type): PayPal order created successfully.\n" .
             "  PayPal Order ID: $paypal_id\n" .
-            "  Status: $status"
+            "  Status: $status\n" .
+            "  Amount: $created_amount"
         );
 
         $approve_url = '';
