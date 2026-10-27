@@ -73,6 +73,11 @@ class paypalac_applepay extends base
 
     public PayPalAdvancedCheckoutApi $ppr;
     protected ErrorInfo $errorInfo;
+
+    /**
+     * Cached result of check() so the installed-state query runs once per request.
+     */
+    protected $_check;
     public Logger $log;
     public bool $emailAlerts = false;
     protected PayPalCommon $paypalCommon;
