@@ -101,7 +101,103 @@ if (!function_exists('ppac_wallet_sanitize_error_message')) {
     }
 }
 
+// -----
+// Default Zen Cart checkout: the coupon field is typed on checkout_payment but only
+// lands in $_SESSION['cc_id'] when that form POSTs to confirmation. Wallet buttons
+// create the PayPal order via AJAX first, so merge credit fields from the JSON body
+// (and optional checkout_posts blob) into $_POST / session before order totals run.
+//
+if (!function_exists('ppac_wallet_extract_checkout_credit_fields')) {
+    function ppac_wallet_extract_checkout_credit_fields(array $requestData): array
+    {
+        $fields = [];
+
+        $checkoutPosts = [];
+        if (!empty($requestData['checkout_posts'])) {
+            if (is_string($requestData['checkout_posts'])) {
+                parse_str($requestData['checkout_posts'], $checkoutPosts);
+            } elseif (is_array($requestData['checkout_posts'])) {
+                $checkoutPosts = $requestData['checkout_posts'];
+            }
+        }
+        if (!is_array($checkoutPosts)) {
+            $checkoutPosts = [];
+        }
+
+        foreach (['dc_redeem_code', 'cot_gv'] as $key) {
+            if (array_key_exists($key, $requestData) && $requestData[$key] !== null && $requestData[$key] !== '') {
+                $fields[$key] = is_scalar($requestData[$key]) ? trim((string)$requestData[$key]) : '';
+            } elseif (array_key_exists($key, $checkoutPosts) && $checkoutPosts[$key] !== null && $checkoutPosts[$key] !== '') {
+                $fields[$key] = is_scalar($checkoutPosts[$key]) ? trim((string)$checkoutPosts[$key]) : '';
+            }
+        }
+
+        return $fields;
+    }
+}
+
+if (!function_exists('ppac_wallet_apply_checkout_credits')) {
+    /**
+     * Apply coupon / GV credits from the payment form without ot_coupon's redirect.
+     *
+     * @return string|null Error message for the browser, or null on success / no-op.
+     */
+    function ppac_wallet_apply_checkout_credits(array $creditFields): ?string
+    {
+        if (isset($creditFields['cot_gv']) && $creditFields['cot_gv'] !== '') {
+            $_POST['cot_gv'] = $creditFields['cot_gv'];
+            $_SESSION['cot_gv'] = $creditFields['cot_gv'];
+        }
+
+        if (!isset($creditFields['dc_redeem_code']) || $creditFields['dc_redeem_code'] === '') {
+            return null;
+        }
+
+        $couponCode = $creditFields['dc_redeem_code'];
+        $_POST['dc_redeem_code'] = $couponCode;
+
+        if (!defined('TEXT_COMMAND_TO_DELETE_CURRENT_COUPON_FROM_ORDER')) {
+            define('TEXT_COMMAND_TO_DELETE_CURRENT_COUPON_FROM_ORDER', 'REMOVE');
+        }
+        if (strtoupper($couponCode) === TEXT_COMMAND_TO_DELETE_CURRENT_COUPON_FROM_ORDER) {
+            unset($_SESSION['cc_id']);
+            unset($_POST['dc_redeem_code']);
+            return null;
+        }
+
+        if (!isset($GLOBALS['ot_coupon']) || !is_object($GLOBALS['ot_coupon'])) {
+            return null;
+        }
+
+        /** @var ot_coupon $otCoupon */
+        $otCoupon = $GLOBALS['ot_coupon'];
+        if (!method_exists($otCoupon, 'performValidations')) {
+            // Older ot_coupon: fall back to collect_posts (may redirect on invalid codes).
+            return null;
+        }
+
+        $couponId = $otCoupon->performValidations($couponCode);
+        $errors = method_exists($otCoupon, 'getValidationErrors')
+            ? $otCoupon->getValidationErrors()
+            : [];
+        if (!empty($errors) && is_array($errors)) {
+            $message = trim(implode(' ', array_map('strip_tags', $errors)));
+            return $message !== '' ? $message : 'Invalid coupon code';
+        }
+
+        if (!empty($couponId)) {
+            $_SESSION['cc_id'] = (int)$couponId;
+        }
+
+        // Avoid ot_coupon::collect_posts() re-validating and zen_redirect()'ing on AJAX.
+        unset($_POST['dc_redeem_code']);
+
+        return null;
+    }
+}
+
 if ($hasValidCart && (!$configOnly || $wallet === 'paylater')) {
+$ppacWalletCreditFields = ppac_wallet_extract_checkout_credit_fields($requestData);
 try {
     if (!isset($order) || !is_object($order)) {
         require_once DIR_WS_CLASSES . 'order.php';
@@ -111,6 +207,15 @@ try {
     if (!isset($order_total_modules) || !is_object($order_total_modules)) {
         require_once DIR_WS_CLASSES . 'order_total.php';
         $order_total_modules = new order_total();
+    }
+
+    // Redeem typed coupon / GV amounts before totals so Google/Apple Pay charge
+    // the discounted amount even when checkout_payment has not POSTed yet.
+    $ppacWalletCreditError = ppac_wallet_apply_checkout_credits($ppacWalletCreditFields);
+    if ($ppacWalletCreditError !== null) {
+        echo json_encode(['success' => false, 'message' => $ppacWalletCreditError]);
+        require DIR_WS_INCLUDES . 'application_bottom.php';
+        return;
     }
 
     // Run order totals so coupons, tax, and shipping are applied before the
@@ -141,6 +246,7 @@ try {
             . ' wallet=' . $wallet
             . ' info_total=' . (isset($order->info['total']) ? (string)(float)$order->info['total'] : 'n/a')
             . ' cc_id=' . (isset($_SESSION['cc_id']) ? (is_array($_SESSION['cc_id']) ? implode(',', $_SESSION['cc_id']) : (string)$_SESSION['cc_id']) : '')
+            . ' posted_coupon=' . ($ppacWalletCreditFields['dc_redeem_code'] ?? '')
             . ' totals=' . json_encode(array_map(static function ($row) {
                 if (!is_array($row)) {
                     return $row;

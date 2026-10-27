@@ -298,15 +298,29 @@
     /**
      * Create PayPal order for Google Pay payment
      */
+    function collectCheckoutCreditFields() {
+        var fields = {};
+        var couponInput = document.querySelector('form[name="checkout_payment"] input[name="dc_redeem_code"]')
+            || document.querySelector('input[name="dc_redeem_code"]');
+        if (couponInput && couponInput.value && String(couponInput.value).trim() !== '') {
+            fields.dc_redeem_code = String(couponInput.value).trim();
+        }
+        var gvInput = document.querySelector('form[name="checkout_payment"] input[name="cot_gv"]')
+            || document.querySelector('input[name="cot_gv"]');
+        if (gvInput && gvInput.value && String(gvInput.value).trim() !== '') {
+            fields.cot_gv = String(gvInput.value).trim();
+        }
+        return fields;
+    }
+
     function createPayPalOrder() {
         console.log('[Google Pay] Creating PayPal order');
-        
+        var body = Object.assign({ wallet: 'google_pay' }, collectCheckoutCreditFields());
+
         return fetch('ppac_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                wallet: 'google_pay'
-            })
+            body: JSON.stringify(body)
         }).then(function(response) {
             return response.json();
         }).catch(function(error) {
