@@ -264,14 +264,35 @@
     }
 
     /**
+     * Read coupon / gift-certificate fields from the checkout payment form.
+     * Default Zen Cart only writes these into the session when the form POSTs
+     * to confirmation; wallet create runs earlier via AJAX.
+     */
+    function collectCheckoutCreditFields() {
+        var fields = {};
+        var couponInput = document.querySelector('form[name="checkout_payment"] input[name="dc_redeem_code"]')
+            || document.querySelector('input[name="dc_redeem_code"]');
+        if (couponInput && couponInput.value && String(couponInput.value).trim() !== '') {
+            fields.dc_redeem_code = String(couponInput.value).trim();
+        }
+        var gvInput = document.querySelector('form[name="checkout_payment"] input[name="cot_gv"]')
+            || document.querySelector('input[name="cot_gv"]');
+        if (gvInput && gvInput.value && String(gvInput.value).trim() !== '') {
+            fields.cot_gv = String(gvInput.value).trim();
+        }
+        return fields;
+    }
+
+    /**
      * Create a PayPal order for Venmo.
      * Called when user clicks the Venmo button.
      */
     function fetchWalletOrder() {
+        var body = Object.assign({ wallet: 'venmo' }, collectCheckoutCreditFields());
         return fetch('ppac_wallet.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ wallet: 'venmo' })
+            body: JSON.stringify(body)
         }).then(parseWalletResponse).catch(function (error) {
             console.error('Unable to create Venmo order', error);
             return { success: false, message: error && error.message ? error.message : 'Unable to create Venmo order' };

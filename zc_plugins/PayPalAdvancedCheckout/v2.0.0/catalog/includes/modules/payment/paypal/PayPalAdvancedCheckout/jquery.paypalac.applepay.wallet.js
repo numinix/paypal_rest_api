@@ -414,11 +414,26 @@
      * Create a PayPal order for Apple Pay.
      * Called when user clicks the Apple Pay button.
      */
+    function collectCheckoutCreditFields() {
+        var fields = {};
+        var couponInput = document.querySelector('form[name="checkout_payment"] input[name="dc_redeem_code"]')
+            || document.querySelector('input[name="dc_redeem_code"]');
+        if (couponInput && couponInput.value && String(couponInput.value).trim() !== '') {
+            fields.dc_redeem_code = String(couponInput.value).trim();
+        }
+        var gvInput = document.querySelector('form[name="checkout_payment"] input[name="cot_gv"]')
+            || document.querySelector('input[name="cot_gv"]');
+        if (gvInput && gvInput.value && String(gvInput.value).trim() !== '') {
+            fields.cot_gv = String(gvInput.value).trim();
+        }
+        return fields;
+    }
+
     function fetchWalletOrder() {
         console.log('[Apple Pay] fetchWalletOrder: Starting order creation request to ppac_wallet.php');
         var startTime = Date.now();
 
-        var orderData = { wallet: 'apple_pay' };
+        var orderData = Object.assign({ wallet: 'apple_pay' }, collectCheckoutCreditFields());
 
         // On product pages, send product info so the server can set up the
         // "Buy Now" cart before creating the PayPal order.
