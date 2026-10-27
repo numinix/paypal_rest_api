@@ -2219,11 +2219,11 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
                         $startdateTimestamp = (!empty($startdateAttribute)) ? strtotime($startdateAttribute) : false;
                         $subscriptions[$product['id']]['startdate'] = ($startdateTimestamp !== false && $startdateTimestamp > $todayTimestamp) ? $startdateAttribute : $defaultStartDate;
                         $subscriptions[$product['id']]['quantity'] = $product['quantity'];
-			if ($subscriptions[$product['id']]['billingperiod'] && !($subscriptions[$product['id']]['billingfrequency'] > 0) && strpos($subscriptions[$product['id']]['billingfrequency'], 'Lifetime') === false) {
+			if (!empty($subscriptions[$product['id']]['billingperiod']) && !(($subscriptions[$product['id']]['billingfrequency'] ?? 0) > 0) && strpos((string)($subscriptions[$product['id']]['billingfrequency'] ?? ''), 'Lifetime') === false) {
 				$subscriptions[$product['id']]['billingfrequency'] = '1'; //default in case it was missed
 			}
 // check if subscription exists and then populate all other fields
-			if ($subscriptions[$product['id']]['billingperiod'] && strpos($subscriptions[$product['id']]['billingfrequency'], 'Lifetime') === false) {
+			if (!empty($subscriptions[$product['id']]['billingperiod']) && strpos((string)($subscriptions[$product['id']]['billingfrequency'] ?? ''), 'Lifetime') === false) {
 // this needs to be set to the base price plus price of attributes but not including one-time charges then multiple by quantity
 				$subscriptions[$product['id']]['amt'] = ($product['final_price'] - $product['one_time_charges']) * $product['quantity'];
 				$subscriptions[$product['id']]['currencycode'] = $_SESSION['currency'];
@@ -2235,7 +2235,7 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
 				}
 			}
 			else {
-				if ($subscriptions[$product['id']]['product_info']['products_license']) {
+				if (!empty($subscriptions[$product['id']]['product_info']['products_license'])) {
 					$this->notify_error('possible configuration error', 'While looking for subscription products in this order, we found a product that is licensed but does not have a billing period so it is not recognized as a subscription product.  No subscription or licence will be created.  Subscription info: ' . json_encode($subscriptions[$product['id']]), 'warning');
 				}
 				unset($subscriptions[$product['id']]); //this is not a subscription product
