@@ -2213,8 +2213,10 @@ $cardPayload = $this->build_vault_payment_source($payment_details, array('stored
 		$defaultStartDate = date('Y-m-d');
                 $todayTimestamp = strtotime('today');
                 foreach ($products as $product) {
-                        $subscriptions[$product['id']]['product_info'] = $this->get_product_info($product['id']);
+                        $productInfo = $this->get_product_info($product['id']);
                         $subscriptions[$product['id']] = $this->get_subscription_attributes($product);
+                        // Keep product_info after attributes overwrite the whole array entry.
+                        $subscriptions[$product['id']]['product_info'] = is_array($productInfo) ? $productInfo : array();
                         $startdateAttribute = isset($subscriptions[$product['id']]['startdate']) ? $subscriptions[$product['id']]['startdate'] : null;
                         $startdateTimestamp = (!empty($startdateAttribute)) ? strtotime($startdateAttribute) : false;
                         $subscriptions[$product['id']]['startdate'] = ($startdateTimestamp !== false && $startdateTimestamp > $todayTimestamp) ? $startdateAttribute : $defaultStartDate;
