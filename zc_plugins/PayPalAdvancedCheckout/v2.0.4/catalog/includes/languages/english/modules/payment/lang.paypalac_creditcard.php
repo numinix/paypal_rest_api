@@ -11,6 +11,7 @@ $define = [
     'MODULE_PAYMENT_PAYPALAC_CC_FIRSTNAME' => 'First name',
     'MODULE_PAYMENT_PAYPALAC_CC_LASTNAME' => 'Last name',
     'MODULE_PAYMENT_PAYPALAC_CC_EXPIRES_YEAR' => 'Year',
+    'MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_PAYER_CANNOT_PAY' => 'We could not complete this card payment. Please try a different card, or pay with the PayPal button.',
 ];
 
 return $define;

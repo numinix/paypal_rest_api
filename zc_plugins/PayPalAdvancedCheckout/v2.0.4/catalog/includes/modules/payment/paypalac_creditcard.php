@@ -789,7 +789,25 @@ class paypalac_creditcard extends base
     {
         // Set payment type - this module always uses card payments
         $_SESSION['PayPalAdvancedCheckout']['ppac_type'] = 'card';
-        
+
+        // 3DS return: ppac_listener.php posts back here after the bank verification.
+        // The PayPal order already exists, so do not validate card fields or create a new order.
+        // A posted card number means a fresh submit, so a leftover 3DS result is dropped.
+        if (!empty($_POST['paypalac_cc_number']) || !empty($_POST['ppac_cc_number'])) {
+            unset($_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response']);
+        }
+        if (isset($_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response'], $_SESSION['PayPalAdvancedCheckout']['Order']['id'])) {
+            $payer_action_cart_id = $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_cart_id'] ?? null;
+            if ($payer_action_cart_id !== ($_SESSION['cart']->cartID ?? null)) {
+                $this->log->write('Credit Cards::pre_confirmation_check, cart changed during 3DS verification; PayPal order discarded.');
+                unset($_SESSION['PayPalAdvancedCheckout']['Order']);
+                $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
+                return;
+            }
+            $this->log->write('Credit Cards::pre_confirmation_check, returned from 3DS verification for PayPal order ' . $_SESSION['PayPalAdvancedCheckout']['Order']['id'] . '.');
+            return;
+        }
+
         // Store saved card selection if provided
         // Check both direct and forwarded field names
         if (isset($_POST['paypalac_saved_card'])) {
@@ -848,10 +866,66 @@ class paypalac_creditcard extends base
                 MODULE_PAYMENT_PAYPALAC_ALERT_SUBJECT_ORDER_ATTN,
                 MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
             );
+            if ($error_code === 'PAYER_CANNOT_PAY') {
+                $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_PAYER_CANNOT_PAY, FILENAME_CHECKOUT_PAYMENT);
+            }
             $this->setMessageAndRedirect(
                 sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE, $error_code),
                 FILENAME_CHECKOUT_PAYMENT
             );
+        }
+
+        // 3DS: PayPal asks for bank verification. Send the customer to the payer-action link;
+        // ppac_listener.php brings them back to this page with the 3DS result.
+        if (($_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? '') === PayPalAdvancedCheckoutApi::STATUS_PAYER_ACTION_REQUIRED) {
+            $payer_action_link = $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_link'] ?? '';
+            if ($payer_action_link === '') {
+                $this->log->write('Credit Cards::pre_confirmation_check, PAYER_ACTION_REQUIRED without payer-action link.' . "\n" . Logger::logJSON($_SESSION['PayPalAdvancedCheckout']['Order']));
+                unset($_SESSION['PayPalAdvancedCheckout']['Order']);
+                $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_CC_ERROR . ' ' . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
+                return;
+            }
+
+            // Card number and CVV are never kept in the session.
+            $savedPosts = $_POST;
+            unset(
+                $savedPosts['request'],
+                $savedPosts['paypalac_cc_number'],
+                $savedPosts['paypalac_cc_cvv'],
+                $savedPosts['paypalac_cc_code'],
+                $savedPosts['ppac_cc_number'],
+                $savedPosts['ppac_cc_cvv'],
+                $savedPosts['ppac_cc_code']
+            );
+
+            // ppac_listener.php removes PayerAction after its post-back, so the cart id is kept outside it.
+            // The cart object's id changes on every add/update/remove, unlike $_SESSION['cartID'].
+            global $current_page_base;
+            $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_cart_id'] = $_SESSION['cart']->cartID ?? null;
+            $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'] = [
+                'current_page_base' => $current_page_base,
+                'redirect_page' => $current_page_base,
+                'savedPosts' => $savedPosts,
+                'ccInfo' => [
+                    'cc_type' => $this->ccInfo['type'] ?? '',
+                    'cc_number' => 'XXXX' . ($this->ccInfo['last_digits'] ?? ''),
+                    'cc_owner' => $this->ccInfo['name'] ?? '',
+                    'cc_expires' => '',
+                ],
+            ];
+
+            $this->log->write("Credit Cards::pre_confirmation_check, sending the customer off to a 3DS link ($payer_action_link).", true, 'after');
+            // A 3DS redirect is not a failed payment; clear OPRC's in-flight flag so it is not counted as one.
+            unset($_SESSION['oprc_payment_in_flight']);
+            if ($this->isOpcAjaxRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'status' => 'redirect',
+                    'redirect_url' => $payer_action_link,
+                ]);
+                exit;
+            }
+            zen_redirect($payer_action_link);
         }
     }
 
@@ -1028,7 +1102,19 @@ class paypalac_creditcard extends base
 
     protected function isOpcAjaxRequest(): bool
     {
-        return (defined('IS_AJAX_REQUEST') && IS_AJAX_REQUEST === true);
+        if (isset($_SESSION['request']) && $_SESSION['request'] === 'ajax') {
+            return true;
+        }
+
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            return true;
+        }
+
+        if (isset($_REQUEST['request']) && $_REQUEST['request'] === 'ajax') {
+            return true;
+        }
+
+        return false;
     }
 
     protected function createPayPalOrder(string $ppac_type): bool
@@ -1068,6 +1154,12 @@ class paypalac_creditcard extends base
     public function setMessageAndRedirect(string $error_message, string $redirect_page, bool $log_only = false)
     {
         $this->log->write('Credit Cards redirect: ' . $error_message);
+
+        // The 3DS post-back runs oprc_checkout_process as a normal page request, where OPRC's
+        // AJAX-only shutdown cleanup does not run. Release its flags so the next attempt is not blocked.
+        if ($log_only === false && !$this->isOpcAjaxRequest()) {
+            unset($_SESSION['oprc_order_processing'], $_SESSION['oprc_payment_in_flight']);
+        }
 
         $this->paypalCommon->setMessageAndRedirect($error_message, $redirect_page, $log_only);
     }
@@ -1150,8 +1242,21 @@ class paypalac_creditcard extends base
         $wallet_status = $_SESSION['PayPalAdvancedCheckout']['Order']['status'] ?? '';
         $wallet_user_action = $_SESSION['PayPalAdvancedCheckout']['Order']['user_action'] ?? '';
         $payer_action_fast_path = ($wallet_status === PayPalAdvancedCheckoutApi::STATUS_PAYER_ACTION_REQUIRED && $wallet_user_action === 'PAY_NOW');
-        
-        if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false) {
+
+        // 3DS return: ppac_listener.php has already checked the liability shift.
+        // Record the card details on the order and continue to capture.
+        $three_ds_return = isset($_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response']);
+        if ($three_ds_return === true) {
+            $cc_info = $_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response'];
+            $order->info['cc_type'] = $cc_info['cc_type'] ?? '';
+            $order->info['cc_number'] = $cc_info['cc_number'] ?? '';
+            $order->info['cc_owner'] = $cc_info['cc_owner'] ?? '';
+            $order->info['cc_expires'] = $cc_info['cc_expires'] ?? '';
+            unset($_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response'], $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction']);
+            $this->log->write("Credit Cards::before_process, 3DS return; PayPal order status $wallet_status.");
+        }
+
+        if (!in_array($wallet_status, self::WALLET_SUCCESS_STATUSES, true) && $payer_action_fast_path === false && $three_ds_return === false) {
             $this->log->write('Credit Cards::before_process, cannot capture/authorize; wrong status' . "\n" . Logger::logJSON($_SESSION['PayPalAdvancedCheckout']['Order'] ?? []));
             unset($_SESSION['PayPalAdvancedCheckout']['Order'], $_SESSION['payment']);
             $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);

@@ -240,9 +240,9 @@ if ($order_status === false) {
 // https://developer.paypal.com/docs/checkout/advanced/customize/3d-secure/response-parameters/
 //
 if ($op === '3ds_return') {
-    $auth_result = $order_status['payment_source']['card']['authentication_result'];
-    $liability_shift = $auth_result['liability_shift'];
-    $enrollment_status = $auth_result['three_d_secure']['enrollment_status'];
+    $auth_result = $order_status['payment_source']['card']['authentication_result'] ?? [];
+    $liability_shift = $auth_result['liability_shift'] ?? 'UNKNOWN';
+    $enrollment_status = $auth_result['three_d_secure']['enrollment_status'] ?? '';
     if ($liability_shift === 'UNKNOWN' || ($enrollment_status === 'Y' && $liability_shift === 'NO')) {
         $messageStack->add_session('checkout_payment', MODULE_PAYMENT_PAYPALAC_REDIRECT_LISTENER_TRY_AGAIN, 'error');
         unset($_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'], $_SESSION['PayPalAdvancedCheckout']['Order']['authentication_result']);

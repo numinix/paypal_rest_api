@@ -65,7 +65,7 @@ class paypalac extends base
         return defined('MODULE_PAYMENT_PAYPALAC_ZONE') ? (int)MODULE_PAYMENT_PAYPALAC_ZONE : 0;
     }
 
-    protected const CURRENT_VERSION = '2.0.3';
+    protected const CURRENT_VERSION = '2.0.4';
     protected const WALLET_SUCCESS_STATUSES = [
         PayPalAdvancedCheckoutApi::STATUS_APPROVED,
         PayPalAdvancedCheckoutApi::STATUS_COMPLETED,
@@ -577,7 +577,7 @@ class paypalac extends base
                         "INSERT IGNORE INTO " . TABLE_CONFIGURATION . "
                             (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
                          VALUES
-                            ('Trigger 3D Secure on <b>Every</b> Txn?', 'MODULE_PAYMENT_PAYPALAC_SCA_ALWAYS', 'false', 'Choose <var>true</var> to trigger 3D Secure for <b>every</b> transaction, regardless of SCA requirements.<br><br><b>Default</b>: <var>false</var>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now())"
+                            ('Trigger 3D Secure on <b>Every</b> Txn?', 'MODULE_PAYMENT_PAYPALAC_SCA_ALWAYS', 'false', '<var>false</var>: 3D Secure runs only when the card\'s bank requires it (PayPal default).<br><var>true</var>: 3D Secure runs on <b>every</b> new card payment.<br><br><b>Default</b>: <var>false</var>', 6, 0, 'zen_cfg_select_option([\'true\', \'false\'], ', NULL, now())"
                     );
 
                 case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '1.2.0', '<'): //- Fall through from above
@@ -901,6 +901,14 @@ class paypalac extends base
                             (configuration_title, configuration_key, configuration_value, configuration_description, configuration_group_id, sort_order, set_function, use_function, date_added)
                          VALUES
                             ('Vault all credit cards?', 'MODULE_PAYMENT_PAYPALAC_VAULT_ALL_CARDS', 'False', 'Choose <var>True</var> to save every new credit card to PayPal Vault, including cards the customer did not choose to save. Cards the customer did not save can be rebilled by an administrator and are not offered at checkout. When <var>False</var>, only cards the customer chose to save are stored and can be rebilled. This setting applies only when Enable PayPal Vault is <var>True</var>. <b>Default</b>: <var>False</var>', 6, 0, 'zen_cfg_select_option([\'True\', \'False\'], ', NULL, now())"
+                    );
+
+                case version_compare(MODULE_PAYMENT_PAYPALAC_VERSION, '2.0.4', '<'): //- Fall through from above
+                    $db->Execute(
+                        "UPDATE " . TABLE_CONFIGURATION . "
+                            SET configuration_description = '<var>false</var>: 3D Secure runs only when the card\'s bank requires it (PayPal default).<br><var>true</var>: 3D Secure runs on <b>every</b> new card payment.<br><br><b>Default</b>: <var>false</var>'
+                          WHERE configuration_key = 'MODULE_PAYMENT_PAYPALAC_SCA_ALWAYS'
+                          LIMIT 1"
                     );
 
                 default:    //- Fall through from above

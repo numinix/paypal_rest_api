@@ -1852,6 +1852,17 @@ class PayPalCommon {
             }
         }
 
+        // Card 3DS: keep the payer-action (bank verification) link before the links are dropped.
+        $payer_action_link = '';
+        if ($ppac_type === 'card' && $status === PayPalAdvancedCheckoutApi::STATUS_PAYER_ACTION_REQUIRED) {
+            foreach ($paypal_order['links'] ?? [] as $next_link) {
+                if (($next_link['rel'] ?? '') === 'payer-action') {
+                    $payer_action_link = (string)($next_link['href'] ?? '');
+                    break;
+                }
+            }
+        }
+
         unset(
             $paypal_order['id'],
             $paypal_order['status'],
@@ -1869,6 +1880,9 @@ class PayPalCommon {
             'payment_source' => $ppac_type,
             'amount_mismatch' => $order_amount_mismatch,
         ];
+        if ($payer_action_link !== '') {
+            $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_link'] = $payer_action_link;
+        }
 
         if ($approve_url !== '' && !empty($_SESSION['PayPalAdvancedCheckout']['PayLaterRedirectApproval'])) {
             // Prefer the Pay Later funding UI on the hosted checkout page (Orders

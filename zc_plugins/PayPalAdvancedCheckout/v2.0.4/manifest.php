@@ -1,7 +1,7 @@
 <?php
 return [
     'pluginKey'         => 'PayPalAdvancedCheckout',
-    'pluginVersion'     => 'v2.0.0',
+    'pluginVersion'     => 'v2.0.4',
     'pluginName'        => 'PayPal Advanced Checkout',
     'pluginDescription' => 'PayPal REST Advanced Checkout payment modules for Zen Cart (paypalac and companion wallets). Installing removes any prior non-encapsulated overlay copies of this plugin while preserving existing Modules → Payment configuration.',
     'pluginAuthor'      => 'Numinix',

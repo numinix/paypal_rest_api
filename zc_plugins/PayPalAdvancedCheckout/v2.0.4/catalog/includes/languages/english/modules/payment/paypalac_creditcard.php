@@ -11,3 +11,4 @@ define('MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_DESCRIPTION', 'Accept credit car
 define('MODULE_PAYMENT_PAYPALAC_CC_FIRSTNAME', 'First name');
 define('MODULE_PAYMENT_PAYPALAC_CC_LASTNAME', 'Last name');
 define('MODULE_PAYMENT_PAYPALAC_CC_EXPIRES_YEAR', 'Year');
+define('MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_PAYER_CANNOT_PAY', 'We could not complete this card payment. Please try a different card, or pay with the PayPal button.');
