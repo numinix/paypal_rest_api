@@ -797,9 +797,12 @@ class paypalac_creditcard extends base
             unset($_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response']);
         }
         if (isset($_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response'], $_SESSION['PayPalAdvancedCheckout']['Order']['id'])) {
+            // The cart id covers product changes; the total also covers shipping, coupon, credit and address changes.
             $payer_action_cart_id = $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_cart_id'] ?? null;
-            if ($payer_action_cart_id !== ($_SESSION['cart']->cartID ?? null)) {
-                $this->log->write('Credit Cards::pre_confirmation_check, cart changed during 3DS verification; PayPal order discarded.');
+            $payer_action_total = $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_total'] ?? '';
+            $current_total = $this->getCheckoutTotalSignature();
+            if ($payer_action_cart_id !== ($_SESSION['cart']->cartID ?? null) || $payer_action_total === '' || $payer_action_total !== $current_total) {
+                $this->log->write("Credit Cards::pre_confirmation_check, cart or total changed during 3DS verification ($payer_action_total vs. $current_total); PayPal order discarded.");
                 unset($_SESSION['PayPalAdvancedCheckout']['Order']);
                 $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
                 return;
@@ -867,7 +870,13 @@ class paypalac_creditcard extends base
                 MODULE_PAYMENT_PAYPALAC_ALERT_ORDER_CREATE . Logger::logJSON($error_info)
             );
             if ($error_code === 'PAYER_CANNOT_PAY') {
-                $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_PAYER_CANNOT_PAY, FILENAME_CHECKOUT_PAYMENT);
+                // Language packs without this constant fall back to the English text.
+                $this->setMessageAndRedirect(
+                    defined('MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_PAYER_CANNOT_PAY')
+                        ? MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_PAYER_CANNOT_PAY
+                        : 'We could not complete this card payment. Please try a different card, or pay with the PayPal button.',
+                    FILENAME_CHECKOUT_PAYMENT
+                );
             }
             $this->setMessageAndRedirect(
                 sprintf(MODULE_PAYMENT_PAYPALAC_TEXT_CREATE_ORDER_ISSUE, MODULE_PAYMENT_PAYPALAC_CREDITCARD_TEXT_TITLE, $error_code),
@@ -902,6 +911,7 @@ class paypalac_creditcard extends base
             // The cart object's id changes on every add/update/remove, unlike $_SESSION['cartID'].
             global $current_page_base;
             $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_cart_id'] = $_SESSION['cart']->cartID ?? null;
+            $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_total'] = $this->getCheckoutTotalSignature();
             $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'] = [
                 'current_page_base' => $current_page_base,
                 'redirect_page' => $current_page_base,
@@ -1124,6 +1134,21 @@ class paypalac_creditcard extends base
         $order_info = $this->getOrderTotalsInfo();
 
         return $this->paypalCommon->createPayPalOrder($this, $order, $order_info, $ppac_type, $currencies);
+    }
+
+    // Order total and currency at this moment, used to detect checkout changes during 3DS.
+    protected function getCheckoutTotalSignature(): string
+    {
+        global $zcObserverPaypaladvcheckout;
+
+        $order_info = (isset($zcObserverPaypaladvcheckout) && is_object($zcObserverPaypaladvcheckout))
+            ? $zcObserverPaypaladvcheckout->getLastOrderValues()
+            : [];
+        if (!isset($order_info['total']) || !is_numeric($order_info['total'])) {
+            return '';
+        }
+
+        return number_format((float)$order_info['total'], 2, '.', '') . '|' . ($_SESSION['currency'] ?? '');
     }
 
     protected function getOrderTotalsInfo(): array
