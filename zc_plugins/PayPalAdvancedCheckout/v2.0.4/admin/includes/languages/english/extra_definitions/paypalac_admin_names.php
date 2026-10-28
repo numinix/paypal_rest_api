@@ -1,0 +1,28 @@
+<?php
+/**
+ * Language definitions for PayPal Advanced Checkout Admin Menu Labels
+ * These are loaded admin-wide automatically by Zen Cart.
+ * 
+ * @copyright Copyright 2025 Zen Cart Development Team
+ * @license http://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
+ */
+
+// Admin menu labels for PayPal subscription pages
+if (!defined('BOX_PAYPALAC_SUBSCRIPTIONS')) {
+    define('BOX_PAYPALAC_SUBSCRIPTIONS', 'PayPal Vaulted Subscriptions');
+}
+if (!defined('BOX_PAYPALAC_SAVED_CARD_RECURRING')) {
+    define('BOX_PAYPALAC_SAVED_CARD_RECURRING', 'Saved Card Subscriptions');
+}
+if (!defined('BOX_PAYPALAC_SUBSCRIPTIONS_REPORT')) {
+    define('BOX_PAYPALAC_SUBSCRIPTIONS_REPORT', 'Active Subscriptions Report');
+}
+if (!defined('BOX_PAYPALAC_WEBHOOK_LOGS')) {
+    define('BOX_PAYPALAC_WEBHOOK_LOGS', 'PayPal Webhook Logs');
+}
+if (!defined('BOX_PAYPALAC_REBILL')) {
+    define('BOX_PAYPALAC_REBILL', 'PayPal Vault Rebill');
+}
+if (!defined('BOX_PAYPALAC_ORPHAN_CAPTURES')) {
+    define('BOX_PAYPALAC_ORPHAN_CAPTURES', 'PayPal Orphan Captures');
+}

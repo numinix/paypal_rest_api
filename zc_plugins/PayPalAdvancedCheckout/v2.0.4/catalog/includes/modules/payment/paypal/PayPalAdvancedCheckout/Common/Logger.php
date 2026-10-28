@@ -1,0 +1,186 @@
+<?php
+/**
+ * Debug logging class for the PayPalAdvancedCheckout (paypalac) Payment Module
+ *
+ * @copyright Copyright 2023-2025 Zen Cart Development Team
+ * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
+ *
+ * Last updated: v1.2.0
+ */
+
+namespace PayPalAdvancedCheckout\Common;
+
+use PayPalAdvancedCheckout\Common\Helpers;
+
+class Logger
+{
+    /**
+     * Static variables associated with interface logging;
+     *
+     * @debugLogFile string
+     * @debug bool
+     */
+    /** @var bool */
+    protected static $debug = false;
+    /** @var string */
+    protected static $debugLogFile; // -----
+    // Class constructor.
+    //
+    public function __construct(string $uniqueName = '')
+    {
+        global $current_page_base;
+        // -----
+        // Using the same log-file name for each page-load.
+        // If it's already set, simply return.
+        //
+        if (isset(self::$debugLogFile)) {
+            return;
+        }
+        
+        if (!empty($current_page_base) && strpos((string)$current_page_base, 'webhook') !== false) {
+            $logfile_suffix = 'webhook-' . $uniqueName;
+            $logfile_suffix = trim($logfile_suffix, '-');
+        } elseif (!empty($_SESSION['in_cron'])) {
+            // Running from cron - use a dedicated cron log file
+            $logfile_suffix = 'cron';
+            if (!empty($uniqueName)) {
+                $logfile_suffix .= '-' . $uniqueName;
+            }
+        } elseif (IS_ADMIN_FLAG === false) {
+            $logfile_suffix = 'c-' . ($_SESSION['customer_id'] ?? 'na') . '-' . Helpers::getCustomerNameSuffix();
+        } else {
+            $logfile_suffix = 'adm-a' . $_SESSION['admin_id'];
+            global $order;
+            if (isset($order)) {
+                $logfile_suffix .= '-o' . $order->info['order_id'];
+            }
+        }
+        self::$debugLogFile = DIR_FS_LOGS . '/paypalac-' . $logfile_suffix . '-' . date('Ymd') . '.log';
+    }
+
+    public function enableDebug()
+    {
+        self::$debug = true;
+    }
+    public function disableDebug()
+    {
+        self::$debug = false;
+    }
+
+    // -----
+    // Format pretty-printed JSON for the debug-log, removing any HTTP Header
+    // information (present in the CURL options) and/or the actual access-token as well
+    // as obfuscating any credit-card information in the data supplied.
+    //
+    // Also remove unneeded return values that will just 'clutter up' the logged information,
+    // unless requested to keep them.
+    //
+    public static function logJSON($data, bool $keep_links = false, bool $use_var_export = false): string
+    {
+        if (is_array($data)) {
+            // Create a deep copy to avoid modifying the original data.
+            // Sanitize first so invalid UTF-8 in personalisation/cart text cannot collapse the copy to null
+            // (which previously logged "NULL" and mirrored the empty createOrder POST body).
+            $flags = 0;
+            if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+                $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+            }
+            $sanitized = Helpers::sanitizeForJson($data);
+            $encoded = json_encode($sanitized, $flags);
+            if ($encoded === false) {
+                return var_export($sanitized, true);
+            }
+            $data = json_decode($encoded, true);
+            if (!is_array($data)) {
+                return var_export($sanitized, true);
+            }
+
+            unset(
+                $data[CURLOPT_HTTPHEADER],
+                $data['access_token'],
+                $data['scope'],
+                $data['app_id'],
+                $data['nonce']
+            );
+            if (isset($data['payment_source']) && is_array($data['payment_source'])) {
+                if (isset($data['payment_source']['card']['number'])) {
+                    $data['payment_source']['card']['number'] = substr($data['payment_source']['card']['number'], -4);
+                }
+                if (isset($data['payment_source']['card']['security_code'])) {
+                    $data['payment_source']['card']['security_code'] = str_repeat('*', strlen($data['payment_source']['card']['security_code']));
+                }
+            }
+            if ($keep_links === false) {
+                unset(
+                    $data['links'],
+                    $data['purchase_units'][0]['payments']['authorizations']['links'],
+                    $data['purchase_units'][0]['payments']['captures']['links'],
+                    $data['purchase_units'][0]['payments']['refunds']['links']
+                );
+            }
+            foreach (['authorizations', 'captures', 'refunds'] as $next_payment_type) {
+                if (!isset($data['purchase_units'][0]['payments'][$next_payment_type])) {
+                    continue;
+                }
+                for ($i = 0, $n = count($data['purchase_units'][0]['payments'][$next_payment_type]); $i < $n; $i++) {
+                    unset($data['purchase_units'][0]['payments'][$next_payment_type][$i]['links']);
+                }
+            }
+        }
+        if ($use_var_export === true) {
+            return var_export($data, true);
+        }
+        $pretty = json_encode($data, JSON_PRETTY_PRINT | (defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0));
+        return ($pretty === false) ? var_export($data, true) : $pretty;
+    }
+
+    public function write(string $message, bool $include_timestamp = false, string $include_separator = '')
+    {
+        if (self::$debug === true) {
+            $this->writeToDebugLog($message, $include_timestamp, $include_separator);
+        }
+    }
+
+    /**
+     * Always write wallet/amount diagnostics, even when MODULE_PAYMENT_PAYPALAC_DEBUGGING is Off.
+     * Keeps coupon/total mismatches diagnosable without requiring a config change first.
+     */
+    public function writeAlways(string $message, bool $include_timestamp = true, string $include_separator = ''): void
+    {
+        if (!isset(self::$debugLogFile)) {
+            // Constructor early-returned or was never called with a usable path.
+            new self('amount');
+        }
+        $this->writeToDebugLog($message, $include_timestamp, $include_separator);
+
+        if (!defined('DIR_FS_LOGS')) {
+            return;
+        }
+        $auditFile = DIR_FS_LOGS . '/paypalac-wallet-amount-' . date('Ymd') . '.log';
+        $line = date('Y-m-d H:i:s') . ' ' . str_replace(["\r", "\n"], ['', ' | '], $message) . "\n";
+        error_log($line, 3, $auditFile);
+    }
+
+    protected function writeToDebugLog(string $message, bool $include_timestamp = false, string $include_separator = ''): void
+    {
+        global $current_page_base;
+
+        if (!isset(self::$debugLogFile)) {
+            return;
+        }
+
+        $timestamp = ($include_timestamp === false) ? '' : ("\n" . date('Y-m-d H:i:s: ') . "($current_page_base) ");
+        $separator = '';
+        $separator_before = '';
+        $separator_after = '';
+        if ($include_separator !== '') {
+            $separator = "************************************************";
+            if ($include_separator === 'before') {
+                $separator_before = (strpos($message, "\n") === 0) ? "\n$separator" : "\n$separator\n";
+            } else {
+                $separator_after = (substr($message, -1) === "\n") ? "$separator\n" : "\n$separator\n";
+            }
+        }
+        error_log($separator_before . $timestamp . $message . $separator_after, 3, self::$debugLogFile);
+    }
+}
