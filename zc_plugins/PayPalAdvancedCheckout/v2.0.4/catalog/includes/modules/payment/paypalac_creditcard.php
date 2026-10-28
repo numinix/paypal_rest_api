@@ -797,12 +797,12 @@ class paypalac_creditcard extends base
             unset($_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response']);
         }
         if (isset($_SESSION['PayPalAdvancedCheckout']['Order']['3DS_response'], $_SESSION['PayPalAdvancedCheckout']['Order']['id'])) {
-            // The cart id covers product changes; the total also covers shipping, coupon, credit and address changes.
+            // The cart id covers product changes; the signature covers total, currency and address changes.
             $payer_action_cart_id = $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_cart_id'] ?? null;
-            $payer_action_total = $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_total'] ?? '';
-            $current_total = $this->getCheckoutTotalSignature();
-            if ($payer_action_cart_id !== ($_SESSION['cart']->cartID ?? null) || $payer_action_total === '' || $payer_action_total !== $current_total) {
-                $this->log->write("Credit Cards::pre_confirmation_check, cart or total changed during 3DS verification ($payer_action_total vs. $current_total); PayPal order discarded.");
+            $payer_action_signature = $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_signature'] ?? '';
+            $current_signature = $this->getCheckoutSignature();
+            if ($payer_action_cart_id !== ($_SESSION['cart']->cartID ?? null) || $payer_action_signature === '' || $payer_action_signature !== $current_signature) {
+                $this->log->write("Credit Cards::pre_confirmation_check, cart, total or address changed during 3DS verification ($payer_action_signature vs. $current_signature); PayPal order discarded.");
                 unset($_SESSION['PayPalAdvancedCheckout']['Order']);
                 $this->setMessageAndRedirect(MODULE_PAYMENT_PAYPALAC_TEXT_STATUS_MISMATCH . "\n" . MODULE_PAYMENT_PAYPALAC_TEXT_TRY_AGAIN, FILENAME_CHECKOUT_PAYMENT);
                 return;
@@ -911,7 +911,7 @@ class paypalac_creditcard extends base
             // The cart object's id changes on every add/update/remove, unlike $_SESSION['cartID'].
             global $current_page_base;
             $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_cart_id'] = $_SESSION['cart']->cartID ?? null;
-            $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_total'] = $this->getCheckoutTotalSignature();
+            $_SESSION['PayPalAdvancedCheckout']['Order']['payer_action_signature'] = $this->getCheckoutSignature();
             $_SESSION['PayPalAdvancedCheckout']['Order']['PayerAction'] = [
                 'current_page_base' => $current_page_base,
                 'redirect_page' => $current_page_base,
@@ -1136,10 +1136,11 @@ class paypalac_creditcard extends base
         return $this->paypalCommon->createPayPalOrder($this, $order, $order_info, $ppac_type, $currencies);
     }
 
-    // Order total and currency at this moment, used to detect checkout changes during 3DS.
-    protected function getCheckoutTotalSignature(): string
+    // Order total, currency and addresses at this moment, used to detect checkout changes during 3DS.
+    // The addresses are hashed so the log does not show them.
+    protected function getCheckoutSignature(): string
     {
-        global $zcObserverPaypaladvcheckout;
+        global $zcObserverPaypaladvcheckout, $order;
 
         $order_info = (isset($zcObserverPaypaladvcheckout) && is_object($zcObserverPaypaladvcheckout))
             ? $zcObserverPaypaladvcheckout->getLastOrderValues()
@@ -1148,7 +1149,12 @@ class paypalac_creditcard extends base
             return '';
         }
 
-        return number_format((float)$order_info['total'], 2, '.', '') . '|' . ($_SESSION['currency'] ?? '');
+        $addresses = md5(json_encode([
+            'delivery' => (isset($order) && is_object($order)) ? ($order->delivery ?? []) : [],
+            'billing' => (isset($order) && is_object($order)) ? ($order->billing ?? []) : [],
+        ]));
+
+        return number_format((float)$order_info['total'], 2, '.', '') . '|' . ($_SESSION['currency'] ?? '') . '|' . $addresses;
     }
 
     protected function getOrderTotalsInfo(): array
