@@ -1,0 +1,1319 @@
+/**
+ * PayPal Apple Pay Integration - Native API Implementation
+ *
+ * This module implements PayPal's native Apple Pay integration using:
+ * - paypal.Applepay().config() for payment configuration
+ * - ApplePaySession for native Apple Pay button and payment sheet
+ * - paypal.Applepay().confirmOrder() for order confirmation
+ *
+ * Reference: https://developer.paypal.com/docs/checkout/advanced/applepay/
+ *
+ * @copyright Copyright 2025 Zen Cart Development Team
+ * @license https://www.zen-cart.com/license/2_0.txt GNU Public License V2.0
+ */
+(function () {
+    'use strict';
+
+    // PayPal order status constants
+    var PAYPAL_STATUS = {
+        APPROVED: 'APPROVED',
+        PAYER_ACTION_REQUIRED: 'PAYER_ACTION_REQUIRED'
+    };
+
+    var checkoutSubmitting = false;
+    var sdkState = {
+        config: null,
+        applepay: null
+    };
+
+    var sharedSdkLoader = window.paypalacSdkLoaderState || { key: null, promise: null };
+    window.paypalacSdkLoaderState = sharedSdkLoader;
+
+    // Apple Pay JS SDK loader state
+    var appleSdkLoader = {
+        promise: null
+    };
+
+    // -------------------------------------------------------------------------
+    // Utility Functions
+    // -------------------------------------------------------------------------
+
+    /**
+     * Get the PayPal SDK namespace.
+     * The header observer may load the SDK with data-namespace="PayPalSDK",
+     * placing it at window.PayPalSDK instead of window.paypal.
+     */
+    function getPayPalNamespace() {
+        return window.paypal || window.PayPalSDK;
+    }
+
+    /**
+     * Get CSP nonce from existing script tags if available.
+     * This helps comply with Content Security Policy when loading external scripts.
+     */
+    function getCspNonce() {
+        var existingScript = document.querySelector('script[nonce]');
+        return existingScript ? existingScript.nonce || existingScript.getAttribute('nonce') : '';
+    }
+
+    function hasPayloadData(payload) {
+        if (!payload) {
+            return false;
+        }
+
+        if (typeof payload === 'object') {
+            return Object.keys(payload).length > 0;
+        }
+
+        return true;
+    }
+
+    /**
+     * Extract the order total amount from the page.
+     * Defaults to checking #ottotal element, but can be configured via data attribute.
+     * @returns {Object} Object with amount (string) and currency (string) properties
+     */
+    function getOrderTotalFromPage() {
+        // Get the element selector from configuration or use default
+        var container = document.getElementById('paypalac-applepay-button');
+        var totalSelector = container && container.dataset.totalSelector 
+            ? container.dataset.totalSelector 
+            : 'ottotal';
+        
+        var totalElement = document.getElementById(totalSelector);
+        if (!totalElement) {
+            console.warn('Order total element not found: #' + totalSelector);
+            return { amount: '0.00', currency: 'USD' };
+        }
+
+        // Extract text content and parse the amount
+        var totalText = totalElement.textContent || totalElement.innerText || '';
+        
+        // Remove currency symbols and extract numeric value
+        // Handles formats like: $123.45, USD 123.45, 123.45 USD, €123,45, 1,234.56
+        var numericMatch = totalText.match(/\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d+(?:\.\d{2})?/);
+        if (!numericMatch) {
+            console.warn('Could not extract numeric amount from: ' + totalText);
+            return { amount: '0.00', currency: 'USD' };
+        }
+
+        // Remove commas and validate as a number
+        var amount = numericMatch[0].replace(/,/g, '');
+        var parsedAmount = parseFloat(amount);
+        
+        if (isNaN(parsedAmount) || parsedAmount < 0) {
+            console.warn('Invalid amount extracted: ' + amount);
+            return { amount: '0.00', currency: 'USD' };
+        }
+        
+        // Format to 2 decimal places
+        amount = parsedAmount.toFixed(2);
+        
+        // Detect currency from text (defaults to USD)
+        var currency = 'USD';
+        if (totalText.includes('€') || totalText.toUpperCase().includes('EUR')) {
+            currency = 'EUR';
+        } else if (totalText.includes('£') || totalText.toUpperCase().includes('GBP')) {
+            currency = 'GBP';
+        } else if (totalText.toUpperCase().includes('CAD')) {
+            currency = 'CAD';
+        } else if (totalText.toUpperCase().includes('AUD')) {
+            currency = 'AUD';
+        }
+
+        return {
+            amount: amount,
+            currency: currency
+        };
+    }
+
+    function submitCheckoutForm() {
+        var form = document.querySelector('form[name="checkout_payment"]');
+        if (!form) {
+            return;
+        }
+
+        checkoutSubmitting = true;
+
+        if (typeof window.oprcShowProcessingOverlay === 'function') {
+            window.oprcShowProcessingOverlay();
+        }
+
+        var previousAllowState = typeof window.oprcAllowNativeCheckoutSubmit !== 'undefined'
+            ? window.oprcAllowNativeCheckoutSubmit
+            : false;
+        window.oprcAllowNativeCheckoutSubmit = true;
+
+        try {
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
+            } else if (typeof form.submit === 'function') {
+                form.submit();
+            }
+        } finally {
+            window.oprcAllowNativeCheckoutSubmit = previousAllowState;
+        }
+    }
+
+    function setApplePayPayload(payload) {
+        var payloadField = document.getElementById('paypalac-applepay-payload');
+        if (payloadField) {
+            try {
+                payloadField.value = JSON.stringify(payload || {});
+            } catch (error) {
+                console.error('Unable to serialise Apple Pay payload', error);
+                payloadField.value = '';
+            }
+        }
+
+        var payloadPresent = hasPayloadData(payload);
+        var statusField = document.getElementById('paypalac-applepay-status');
+        if (statusField) {
+            statusField.value = payloadPresent ? 'approved' : '';
+        }
+
+        if (payloadPresent && !checkoutSubmitting) {
+            selectApplePayRadio();
+            submitCheckoutForm();
+        }
+
+        if (!payloadPresent) {
+            checkoutSubmitting = false;
+        }
+    }
+
+    /**
+     * Select the Apple Pay module radio button.
+     * Called when the user interacts with the Apple Pay button.
+     */
+    function selectApplePayRadio() {
+        var moduleRadio = document.getElementById('pmt-paypalac_applepay');
+        if (moduleRadio && moduleRadio.type === 'radio' && !moduleRadio.checked) {
+            moduleRadio.checked = true;
+            // Trigger change event for any listeners
+            if (typeof jQuery !== 'undefined') {
+                jQuery(moduleRadio).trigger('change');
+            } else {
+                moduleRadio.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+    }
+
+    /**
+     * Hide the module's radio button using CSS.
+     * The radio is still functional but visually hidden.
+     */
+    function hideModuleRadio() {
+        var moduleRadio = document.getElementById('pmt-paypalac_applepay');
+        if (moduleRadio) {
+            moduleRadio.classList.add('paypalac-wallet-radio-hidden');
+            moduleRadio.style.display = 'none';
+            moduleRadio.setAttribute('aria-hidden', 'true');
+            moduleRadio.tabIndex = -1;
+            return true;
+        }
+
+        return false;
+    }
+
+    function getApplePayButton() {
+        var container = document.getElementById('paypalac-applepay-button');
+        if (!container) {
+            return null;
+        }
+
+        return container.querySelector('apple-pay-button') || container.querySelector('button');
+    }
+
+    function triggerApplePayButtonClick() {
+        var button = getApplePayButton();
+
+        if (button) {
+            button.click();
+            return true;
+        }
+
+        return false;
+    }
+
+    var PAYPALAC_NATIVE_ROW_HIDDEN = 'paypalac-checkout-row-hidden';
+
+    /**
+     * Find wrapper around the wallet button: OPRC (.payment-method), Bootstrap (.custom-control),
+     * module-specific ids, or legacy patterns.
+     */
+    function findPaymentMethodWrapper() {
+        var container = document.getElementById('paypalac-applepay-button');
+        if (!container) {
+            return null;
+        }
+
+        var wrapper = container.closest('.payment-method')
+            || container.closest('[id*="paypalac_applepay"][id*="container"]')
+            || container.closest('.moduleRow')
+            || container.closest('[class*="paypalac_applepay"]')
+            || container.closest('.custom-control');
+
+        if (wrapper) {
+            return wrapper;
+        }
+
+        var parent = container.parentElement;
+        var depth = 0;
+        var maxDepth = 5;
+
+        while (parent && depth < maxDepth) {
+            var parentId = (parent.id || '').toLowerCase();
+            var parentClass = (parent.className || '').toString().toLowerCase();
+
+            if (parentId.indexOf('paypalac_applepay') !== -1 ||
+                parentClass.indexOf('paypalac_applepay') !== -1 ||
+                parentClass.indexOf('modulerow') !== -1) {
+                return parent;
+            }
+            parent = parent.parentElement;
+            depth++;
+        }
+
+        return null;
+    }
+
+    /**
+     * Default Zen Cart checkout (no per-method wrapper): radio + label + optional ccinfo.
+     */
+    function hideNativeCheckoutWalletRow(moduleCode) {
+        if (moduleCode !== 'paypalac_applepay') {
+            return false;
+        }
+
+        var rid = 'pmt-' + moduleCode;
+        var radio = document.getElementById(rid);
+        var label = document.querySelector('label[for="' + rid + '"]');
+        var innerBtn = document.getElementById('paypalac-applepay-button');
+
+        if (!radio || !label || !innerBtn || label.contains(innerBtn) === false) {
+            return false;
+        }
+
+        [radio, label].forEach(function (el) {
+            el.classList.add(PAYPALAC_NATIVE_ROW_HIDDEN);
+            el.style.display = 'none';
+            el.setAttribute('hidden', 'hidden');
+        });
+
+        var node = label.nextElementSibling;
+        while (node) {
+            if (node.matches && (node.matches('input[type="radio"][name="payment"]') || node.matches('input[type="hidden"][name="payment"]'))) {
+                break;
+            }
+            var next = node.nextElementSibling;
+            if (node.classList && node.classList.contains('ccinfo')) {
+                node.classList.add(PAYPALAC_NATIVE_ROW_HIDDEN);
+                node.style.display = 'none';
+                node.setAttribute('hidden', 'hidden');
+                break;
+            }
+            if (node.tagName === 'BR') {
+                node.classList.add(PAYPALAC_NATIVE_ROW_HIDDEN);
+                node.style.display = 'none';
+            }
+            node = next;
+        }
+
+        return true;
+    }
+
+    function showNativeCheckoutWalletRow(moduleCode) {
+        if (moduleCode !== 'paypalac_applepay') {
+            return;
+        }
+
+        var rid = 'pmt-' + moduleCode;
+        var radio = document.getElementById(rid);
+        var label = document.querySelector('label[for="' + rid + '"]');
+
+        [radio, label].forEach(function (el) {
+            if (!el) {
+                return;
+            }
+            el.classList.remove(PAYPALAC_NATIVE_ROW_HIDDEN);
+            el.style.display = '';
+            el.removeAttribute('hidden');
+        });
+
+        if (!label) {
+            return;
+        }
+
+        var node = label.nextElementSibling;
+        while (node) {
+            if (node.matches && (node.matches('input[type="radio"][name="payment"]') || node.matches('input[type="hidden"][name="payment"]'))) {
+                break;
+            }
+            var next = node.nextElementSibling;
+            if (node.classList && node.classList.contains(PAYPALAC_NATIVE_ROW_HIDDEN)) {
+                node.classList.remove(PAYPALAC_NATIVE_ROW_HIDDEN);
+                node.style.display = '';
+                node.removeAttribute('hidden');
+            }
+            if (node.classList && node.classList.contains('ccinfo')) {
+                break;
+            }
+            node = next;
+        }
+    }
+
+    function showPaymentMethodContainer() {
+        var wrapper = findPaymentMethodWrapper();
+        if (wrapper) {
+            wrapper.style.display = '';
+            wrapper.removeAttribute('hidden');
+            wrapper.classList.remove('paypalac-checkout-row-hidden');
+        }
+
+        showNativeCheckoutWalletRow('paypalac_applepay');
+
+        var container = document.getElementById('paypalac-applepay-button');
+        if (container) {
+            container.style.display = '';
+            container.removeAttribute('hidden');
+            container.classList.remove('paypalac-checkout-row-hidden');
+        }
+
+        var moduleRadio = document.getElementById('pmt-paypalac_applepay');
+        if (moduleRadio) {
+            moduleRadio.classList.remove('paypalac-wallet-radio-hidden');
+            moduleRadio.style.display = '';
+            moduleRadio.removeAttribute('aria-hidden');
+            moduleRadio.tabIndex = 0;
+        }
+
+        var moduleLabel = document.querySelector('label[for="pmt-paypalac_applepay"]');
+        if (moduleLabel) {
+            moduleLabel.classList.remove('paypalac-wallet-label-hidden');
+            moduleLabel.style.display = '';
+            moduleLabel.removeAttribute('aria-hidden');
+        }
+    }
+
+    /**
+     * Hide the entire payment method when Apple Pay is not eligible on this device.
+     */
+    function hidePaymentMethodContainer() {
+        var wrapper = findPaymentMethodWrapper();
+        if (wrapper) {
+            wrapper.style.display = 'none';
+            wrapper.setAttribute('hidden', 'hidden');
+            wrapper.classList.add('paypalac-checkout-row-hidden');
+            return;
+        }
+
+        if (hideNativeCheckoutWalletRow('paypalac_applepay')) {
+            return;
+        }
+
+        if (hideModuleRadio()) {
+            return;
+        }
+
+        var container = document.getElementById('paypalac-applepay-button');
+        if (container) {
+            container.style.display = 'none';
+            container.setAttribute('hidden', 'hidden');
+            container.classList.add('paypalac-checkout-row-hidden');
+        }
+    }
+
+    /**
+     * Hide the textual label so the PayPal-rendered button (or placeholder)
+     * is the only visible call-to-action.
+     */
+    function hideModuleLabel() {
+        var moduleLabel = document.querySelector('label[for="pmt-paypalac_applepay"]');
+        if (moduleLabel) {
+            moduleLabel.classList.add('paypalac-wallet-label-hidden');
+            moduleLabel.style.display = 'none';
+            moduleLabel.setAttribute('aria-hidden', 'true');
+            return true;
+        }
+
+        return false;
+    }
+
+    function ensureWalletSelectionDisplay() {
+        // No-op: the wallet button container is now placed inside the
+        // module label by PHP, so there is no separate label to hide.
+    }
+
+    function ensureWalletSelectionHidden() {
+        // No-op: the wallet button container is placed inside the module
+        // label by PHP, so the radio and label are managed by the
+        // template.  The native radio input does not need to be hidden
+        // here because the checkout CSS already handles its visibility.
+    }
+
+    function rerenderApplePayButton() {
+        if (typeof window.paypalacApplePayRender === 'function') {
+            window.paypalacApplePayRender();
+        }
+
+        if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {
+            document.dispatchEvent(new CustomEvent('paypalac:applepay:rerender'));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // API Communication
+    // -------------------------------------------------------------------------
+
+    function parseWalletResponse(response) {
+        var contentType = (response.headers && response.headers.get('content-type')) || '';
+
+        if (!response.ok) {
+            return response.text().then(function (body) {
+                var message = 'Wallet endpoint returned HTTP ' + response.status;
+                var trimmed = (body || '').trim();
+
+                if (trimmed) {
+                    message += ': ' + trimmed;
+                }
+
+                throw new Error(message);
+            });
+        }
+
+        if (contentType.indexOf('application/json') === -1) {
+            return response.text().then(function (body) {
+                throw new Error('Wallet endpoint did not return JSON: ' + (body || '').trim());
+            });
+        }
+
+        return response.json();
+    }
+
+    /**
+     * Fetch SDK configuration only (no order creation).
+     * Used during initial button rendering.
+     */
+    function fetchWalletConfig() {
+        return fetch('ppac_wallet.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: 'apple_pay', config_only: true })
+        }).then(parseWalletResponse).catch(function (error) {
+            console.error('Unable to load Apple Pay configuration', error);
+            return { success: false, message: error && error.message ? error.message : 'Unable to load Apple Pay configuration' };
+        });
+    }
+
+    /**
+     * Read coupon / gift-certificate fields from the checkout payment form.
+     * Default Zen Cart only writes these into the session when the form POSTs
+     * to confirmation; wallet create runs earlier via AJAX.
+     */
+    function collectCheckoutCreditFields() {
+        var fields = {};
+        var couponInput = document.querySelector('form[name="checkout_payment"] input[name="dc_redeem_code"]')
+            || document.querySelector('input[name="dc_redeem_code"]');
+        if (couponInput && couponInput.value && String(couponInput.value).trim() !== '') {
+            fields.dc_redeem_code = String(couponInput.value).trim();
+        }
+        var gvInput = document.querySelector('form[name="checkout_payment"] input[name="cot_gv"]')
+            || document.querySelector('input[name="cot_gv"]');
+        if (gvInput && gvInput.value && String(gvInput.value).trim() !== '') {
+            fields.cot_gv = String(gvInput.value).trim();
+        }
+        return fields;
+    }
+
+    /**
+     * Create a PayPal order for Apple Pay.
+     * Called when user clicks the Apple Pay button.
+     */
+    function fetchWalletOrder() {
+        console.log('[Apple Pay] fetchWalletOrder: Starting order creation request to ppac_wallet.php');
+        var startTime = Date.now();
+        var body = Object.assign({ wallet: 'apple_pay' }, collectCheckoutCreditFields());
+        if (body.dc_redeem_code) {
+            console.log('[Apple Pay] fetchWalletOrder: including coupon from payment form');
+        }
+
+        return fetch('ppac_wallet.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        }).then(function(response) {
+            var elapsed = Date.now() - startTime;
+            console.log('[Apple Pay] fetchWalletOrder: Received response after ' + elapsed + 'ms, status:', response.status);
+            return parseWalletResponse(response);
+        }).then(function(data) {
+            var elapsed = Date.now() - startTime;
+            console.log('[Apple Pay] fetchWalletOrder: Order creation completed after ' + elapsed + 'ms, data:', data);
+            return data;
+        }).catch(function (error) {
+            var elapsed = Date.now() - startTime;
+            console.error('[Apple Pay] fetchWalletOrder: Unable to create Apple Pay order after ' + elapsed + 'ms', error);
+            return { success: false, message: error && error.message ? error.message : 'Unable to create Apple Pay order' };
+        });
+    }
+
+    /**
+     * Fetch updated shipping options and totals when address or shipping selection changes.
+     * Called by Apple Pay shipping contact selection and shipping method selection handlers.
+     * 
+     * @param {Object} shippingContact - Apple Pay shipping contact object
+     * @param {string} selectedShippingMethodId - Currently selected shipping method identifier (optional)
+     * @returns {Promise} Promise resolving to updated shipping methods and totals
+     */
+    function fetchShippingOptions(shippingContact, selectedShippingMethodId) {
+        console.log('[Apple Pay] Fetching shipping options for address - countryCode:', shippingContact.countryCode, 'postalCode:', shippingContact.postalCode);
+        
+        // Normalize the Apple Pay contact format to match what the server expects
+        var normalizedAddress = {
+            name: ((shippingContact.givenName || '') + ' ' + (shippingContact.familyName || '')).trim(),
+            address1: (shippingContact.addressLines && shippingContact.addressLines[0]) || '',
+            address2: (shippingContact.addressLines && shippingContact.addressLines[1]) || '',
+            locality: shippingContact.locality || '',
+            administrativeArea: shippingContact.administrativeArea || '',
+            postalCode: shippingContact.postalCode || '',
+            countryCode: shippingContact.countryCode || '',
+            phoneNumber: shippingContact.phoneNumber || ''
+        };
+        
+        var requestData = {
+            module: 'paypalac_applepay',
+            shippingAddress: normalizedAddress
+        };
+        
+        // Include selected shipping option if provided
+        if (selectedShippingMethodId) {
+            requestData.selectedShippingOptionId = selectedShippingMethodId;
+        }
+        
+        // Use configurable base path for AJAX endpoint to support subdirectory installations
+        var ajaxBasePath = window.paypalacAjaxBasePath || 'ajax/';
+        var ajaxUrl = ajaxBasePath + 'paypalac_wallet.php';
+        
+        return fetch(ajaxUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestData)
+        }).then(function(response) {
+            console.log('[Apple Pay] Shipping options response status:', response.status);
+            return parseWalletResponse(response);
+        }).then(function(data) {
+            console.log('[Apple Pay] Shipping options received - shipping method count:', (data.newShippingMethods) ? data.newShippingMethods.length : 0);
+            return data;
+        }).catch(function (error) {
+            console.error('[Apple Pay] Failed to fetch shipping options', error);
+            throw error;
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // SDK Loading
+    // -------------------------------------------------------------------------
+
+    /**
+     * Load Apple's Apple Pay JS SDK.
+     * Required for the apple-pay-button WebKit custom element to render properly.
+     * This SDK must be loaded before the button element is appended to the DOM.
+     *
+     * @returns {Promise} Resolves when the SDK is loaded
+     */
+    function loadApplePayJsSdk() {
+        if (appleSdkLoader.promise) {
+            return appleSdkLoader.promise;
+        }
+
+        appleSdkLoader.promise = new Promise(function (resolve, reject) {
+            var existing = document.querySelector('script[data-apple-pay-sdk="true"]');
+            
+            // If script exists and has already loaded, resolve immediately
+            if (existing) {
+                // Check if script has finished loading
+                if (existing.readyState === 'complete' || existing.readyState === 'loaded') {
+                    return resolve();
+                }
+                
+                // Script exists but hasn't loaded yet, wait for it
+                existing.addEventListener('load', function () { resolve(); });
+                existing.addEventListener('error', function (e) { reject(e); });
+                return;
+            }
+
+            // Create and load the script
+            var script = document.createElement('script');
+            script.src = 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js';
+            script.dataset.applePaySdk = 'true';
+            
+            // Add CSP nonce if available
+            var nonce = getCspNonce();
+            if (nonce) {
+                script.setAttribute('nonce', nonce);
+            }
+            
+            script.onload = function () { resolve(); };
+            script.onerror = function (e) { reject(e); };
+            document.head.appendChild(script);
+        });
+
+        return appleSdkLoader.promise;
+    }
+
+    function buildSdkKey(config) {
+        var currency = config.currency || 'USD';
+        var merchantId = config.merchantId || '';
+        var environment = config.environment || 'sandbox';
+        var clientId = config.clientId || '';
+        return [clientId, currency, merchantId, environment].join('|');
+    }
+
+    /**
+     * Load the PayPal SDK with applepay component.
+     * Uses buyer-country parameter for sandbox mode.
+     */
+    function loadPayPalSdk(config) {
+        if (!config || !config.clientId) {
+            return Promise.reject(new Error('Missing clientId for PayPal SDK load'));
+        }
+
+        var desiredKey = buildSdkKey(config);
+        // Also detect the header-loaded SDK script (id="PayPalJSSDK") which does
+        // not carry the data-paypal-sdk attribute but uses data-namespace="PayPalSDK".
+        var existingScript = document.querySelector('script[data-paypal-sdk="true"]') || document.getElementById('PayPalJSSDK');
+        var isSandbox = config.environment === 'sandbox';
+
+        // Check if the SDK is already available under either namespace
+        var paypalNs = getPayPalNamespace();
+        if (sharedSdkLoader.promise && sharedSdkLoader.key === desiredKey && paypalNs && typeof paypalNs.Applepay === 'function') {
+            return sharedSdkLoader.promise.then(function () { return getPayPalNamespace(); });
+        }
+
+        // SDK already fully loaded (e.g. by the header observer) but sharedSdkLoader
+        // was never set (different script context).  Reuse it immediately.
+        if (paypalNs && typeof paypalNs.Applepay === 'function') {
+            sharedSdkLoader.key = desiredKey;
+            sharedSdkLoader.promise = Promise.resolve(paypalNs);
+            return sharedSdkLoader.promise;
+        }
+
+        if (existingScript) {
+            var matchesClient = existingScript.src.indexOf(encodeURIComponent(config.clientId)) !== -1;
+            var matchesCurrency = existingScript.src.indexOf('currency=' + encodeURIComponent(config.currency || 'USD')) !== -1;
+            var matchesMerchant = !config.merchantId || existingScript.src.indexOf('merchant-id=' + encodeURIComponent(config.merchantId)) !== -1;
+
+            if (matchesClient && matchesCurrency && matchesMerchant) {
+                var loadedNs = getPayPalNamespace();
+                if (loadedNs && typeof loadedNs.Applepay === 'function') {
+                    sharedSdkLoader.key = desiredKey;
+                    sharedSdkLoader.promise = Promise.resolve(loadedNs);
+                    return sharedSdkLoader.promise;
+                }
+
+                return new Promise(function (resolve, reject) {
+                    existingScript.addEventListener('load', function () {
+                        existingScript.dataset.loaded = 'true';
+                        sharedSdkLoader.key = desiredKey;
+                        resolve(getPayPalNamespace());
+                    });
+                    existingScript.addEventListener('error', function (event) {
+                        sharedSdkLoader.promise = null;
+                        reject(event);
+                    });
+                });
+            }
+
+            // Only remove the script if it was one we created (has data-paypal-sdk),
+            // never remove the header-loaded SDK.
+            if (existingScript.dataset && existingScript.dataset.paypalSdk === 'true') {
+                existingScript.parentNode.removeChild(existingScript);
+            }
+        }
+
+        // Build SDK URL with all wallet components to support multiple payment methods
+        // Note: The 'intent' parameter is NOT a valid PayPal SDK URL parameter.
+        // Intent (capture/authorize) is specified when creating the PayPal order, not when loading the SDK.
+        var query = '?client-id=' + encodeURIComponent(config.clientId)
+            + '&components=buttons,googlepay,applepay'
+            + '&currency=' + encodeURIComponent(config.currency || 'USD');
+
+        // Add buyer-country parameter for sandbox mode (required for testing)
+        if (isSandbox) {
+            query += '&buyer-country=US';
+        }
+
+        // Only include merchant-id if it's a valid PayPal merchant ID (alphanumeric, typically 13 chars).
+        // Do NOT include language label strings like "Merchant ID:" or placeholder values like "*".
+        if (config.merchantId && /^[A-Z0-9]{5,20}$/i.test(config.merchantId)) {
+            query += '&merchant-id=' + encodeURIComponent(config.merchantId);
+        }
+
+        sharedSdkLoader.promise = new Promise(function (resolve, reject) {
+            var script = document.createElement('script');
+            script.src = 'https://www.paypal.com/sdk/js' + query;
+            script.dataset.paypalSdk = 'true';
+            script.dataset.loaded = 'false';
+            
+            // Add CSP nonce if available
+            var nonce = getCspNonce();
+            if (nonce) {
+                script.setAttribute('nonce', nonce);
+            }
+            
+            script.onload = function () {
+                script.dataset.loaded = 'true';
+                sharedSdkLoader.key = desiredKey;
+                window.paypalacSdkConfig = {
+                    clientId: config.clientId,
+                    currency: config.currency,
+                    merchantId: config.merchantId,
+                    environment: config.environment
+                };
+                resolve(getPayPalNamespace());
+            };
+            script.onerror = function (event) {
+                sharedSdkLoader.promise = null;
+                reject(event);
+            };
+            document.head.appendChild(script);
+        });
+
+        return sharedSdkLoader.promise;
+    }
+
+    // -------------------------------------------------------------------------
+    // Native Apple Pay Integration
+    // -------------------------------------------------------------------------
+
+    /**
+     * Handle the Apple Pay button click event.
+     * Creates an Apple Pay session and initiates the payment flow using ApplePaySession.
+     * 
+     * IMPORTANT: ApplePaySession must be created synchronously within the user gesture handler
+     * to avoid "InvalidAccessError: Must create a new ApplePaySession from a user gesture handler."
+     * 
+     * Flow:
+     * 1. Extract order total from the page (e.g., #ottotal element) synchronously
+     * 2. Create ApplePaySession synchronously with this amount
+     * 3. Call session.begin() synchronously
+     * 4. In onvalidatemerchant: Validate merchant IMMEDIATELY (don't create order yet)
+     * 5. In onpaymentauthorized: Create PayPal order, then confirm payment with PayPal
+     * 
+     * This approach:
+     * - Maintains user gesture context (session created synchronously)
+     * - Shows actual amount to user (extracted from page, not $0.00 placeholder)
+     * - Prevents merchant validation timeout (validates immediately without waiting)
+     * - Only creates PayPal orders when user authorizes payment (not on cancel)
+     */
+    function onApplePayButtonClicked(event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        var sessionAbortReason = null;
+
+        selectApplePayRadio();
+
+        // Show processing overlay if available
+        if (typeof window.oprcShowProcessingOverlay === 'function') {
+            window.oprcShowProcessingOverlay();
+        }
+
+        // Get Apple Pay SDK reference
+        var applepay = sdkState.applepay;
+        if (!applepay) {
+            console.error('Apple Pay not properly initialized');
+            setApplePayPayload({});
+            if (typeof window.oprcHideProcessingOverlay === 'function') {
+                window.oprcHideProcessingOverlay();
+            }
+            return;
+        }
+
+        // Get the Apple Pay configuration from PayPal SDK
+        var applePayConfig = applepay.config();
+        if (!applePayConfig || typeof applePayConfig !== 'object') {
+            console.error('Apple Pay configuration is invalid or missing');
+            setApplePayPayload({});
+            if (typeof window.oprcHideProcessingOverlay === 'function') {
+                window.oprcHideProcessingOverlay();
+            }
+            return;
+        }
+
+        // Step 1: Get the order total from the page
+        // This allows us to show the actual amount in the Apple Pay sheet
+        var orderTotal = getOrderTotalFromPage();
+        console.log('[Apple Pay] Order total from page:', orderTotal);
+
+        // Step 2: Variables to store order data (will be created in onvalidatemerchant)
+        var orderId = null;
+        var orderConfig = null;
+        var orderPromise = null;
+
+        // Create payment request with the actual order amount from the page
+        // On checkout, shipping address and options are already handled by the checkout flow,
+        // so the Apple Pay modal should NOT request shipping fields.
+        var paymentRequest = {
+            countryCode: applePayConfig.countryCode || 'US',
+            currencyCode: orderTotal.currency || applePayConfig.currencyCode || 'USD',
+            merchantCapabilities: applePayConfig.merchantCapabilities || ['supports3DS'],
+            supportedNetworks: applePayConfig.supportedNetworks || ['visa', 'masterCard', 'amex', 'discover'],
+            total: {
+                label: 'Total',
+                amount: orderTotal.amount,
+                type: 'final'
+            },
+            lineItems: [{
+                label: 'Order total',
+                amount: orderTotal.amount,
+                type: 'final'
+            }],
+            // Request billing contact fields required by PayPal's API
+            requiredBillingContactFields: ['postalAddress', 'name', 'email']
+        };
+
+        // Step 3: Create ApplePaySession synchronously in the click handler
+        // This MUST happen synchronously to maintain user gesture context
+        var session;
+        try {
+            console.log('[Apple Pay] Creating ApplePaySession with payment request:', paymentRequest);
+            session = new ApplePaySession(4, paymentRequest);
+            console.log('[Apple Pay] ApplePaySession created successfully');
+        } catch (e) {
+            console.error('[Apple Pay] Failed to create ApplePaySession', e);
+            setApplePayPayload({});
+            if (typeof window.oprcHideProcessingOverlay === 'function') {
+                window.oprcHideProcessingOverlay();
+            }
+            return;
+        }
+
+        // Step 4: Handle merchant validation
+        // IMPORTANT: Validate merchant IMMEDIATELY, don't wait for order creation
+        // Order creation should ONLY happen in onpaymentauthorized (when user authorizes payment)
+        session.onvalidatemerchant = function (event) {
+            console.log('[Apple Pay] onvalidatemerchant called, validationURL:', event.validationURL);
+            
+            // DO NOT create order here - only validate merchant
+            // Order creation happens in onpaymentauthorized when user actually authorizes payment
+            console.log('[Apple Pay] Calling validateMerchant (order creation will happen in onpaymentauthorized)...');
+            applepay.validateMerchant({
+                validationUrl: event.validationURL
+            }).then(function (merchantValidationResponse) {
+                var merchantSession = merchantValidationResponse && merchantValidationResponse.merchantSession
+                    ? merchantValidationResponse.merchantSession
+                    : merchantValidationResponse;
+
+                if (!merchantSession) {
+                    sessionAbortReason = 'Merchant validation returned empty session';
+                    console.error('[Apple Pay] Merchant validation succeeded but no session returned');
+                    session.abort();
+                    setApplePayPayload({});
+                    if (typeof window.oprcHideProcessingOverlay === 'function') {
+                        window.oprcHideProcessingOverlay();
+                    }
+                    return;
+                }
+
+                console.log('[Apple Pay] validateMerchant succeeded, completing merchant validation');
+                session.completeMerchantValidation(merchantSession);
+            }).catch(function (error) {
+                console.error('[Apple Pay] Merchant validation failed', error);
+                sessionAbortReason = 'Merchant validation failed';
+                session.abort();
+                setApplePayPayload({});
+                if (typeof window.oprcHideProcessingOverlay === 'function') {
+                    window.oprcHideProcessingOverlay();
+                }
+            });
+        };
+
+        // Note: onshippingcontactselected and onshippingmethodselected are NOT registered
+        // on checkout because shipping is already handled by the checkout flow.
+
+        // Step 5: Handle payment authorization
+        // Create order only when user authorizes payment
+        session.onpaymentauthorized = function (event) {
+            console.log('[Apple Pay] onpaymentauthorized called - creating order now that user has authorized payment');
+            
+            // Create the order now that user has authorized payment
+            console.log('[Apple Pay] Creating PayPal order...');
+            orderPromise = fetchWalletOrder();
+            
+            // Wait for order to be created
+            orderPromise.then(function (config) {
+                console.log('[Apple Pay] Order creation completed, config:', config);
+                
+                if (!config || config.success === false || !config.orderID) {
+                    console.error('[Apple Pay] Failed to create PayPal order for Apple Pay', config);
+                    session.completePayment(ApplePaySession.STATUS_FAILURE);
+                    setApplePayPayload({});
+                    if (typeof window.oprcHideProcessingOverlay === 'function') {
+                        window.oprcHideProcessingOverlay();
+                    }
+                    return;
+                }
+
+                // Store order data
+                orderConfig = config;
+                orderId = config.orderID;
+                sdkState.config = config;
+                
+                // Check if PayPal Applepay.confirmOrder is available
+                if (!sdkState.applepay || typeof sdkState.applepay.confirmOrder !== 'function') {
+                    console.error('[Apple Pay] PayPal Applepay.confirmOrder not available');
+                    session.completePayment(ApplePaySession.STATUS_FAILURE);
+                    setApplePayPayload({});
+                    if (typeof window.oprcHideProcessingOverlay === 'function') {
+                        window.oprcHideProcessingOverlay();
+                    }
+                    return;
+                }
+
+                console.log('[Apple Pay] Calling paypal.Applepay().confirmOrder...', orderId);
+
+                // Confirm the order using PayPal's client-side API
+                // This handles the Apple Pay token and device context properly
+                return sdkState.applepay.confirmOrder({
+                    orderId: orderId,
+                    token: event.payment.token,
+                    billingContact: event.payment.billingContact || null,
+                    shippingContact: event.payment.shippingContact || null
+                }).then(function (confirmResult) {
+                    console.log('[Apple Pay] confirmOrder result:', confirmResult);
+
+                    // Only now do we tell Apple Pay the payment succeeded
+                    session.completePayment(ApplePaySession.STATUS_SUCCESS);
+
+                    // For checkout flow: Store payment data and submit form
+                    // The checkout form submission goes to normal checkout processing
+                    // No AJAX request needed - everything handled by payment module
+                    var billingContact = event.payment.billingContact || {};
+                    var email = billingContact.emailAddress || '';
+
+                    // Build the payload for the hidden form field
+                    // Set confirmed: true to indicate client-side confirmation was successful
+                    var checkoutPayload = {
+                        confirmed: true,
+                        orderID: orderId,
+                        email: email,
+                        confirmResult: confirmResult
+                        // Note: No shipping_address or billing_address
+                        // Checkout uses addresses already in session
+                    };
+
+                    console.log('[Apple Pay] Storing payload and submitting checkout form');
+
+                    // Store payload in hidden field and submit form
+                    // This triggers normal checkout processing via payment module
+                    setApplePayPayload(checkoutPayload);
+                }).catch(function (err) {
+                    console.error('[Apple Pay] confirmOrder failed:', err);
+                    session.completePayment(ApplePaySession.STATUS_FAILURE);
+                    setApplePayPayload({});
+                    if (typeof window.oprcHideProcessingOverlay === 'function') {
+                        window.oprcHideProcessingOverlay();
+                    }
+                });
+            }).catch(function (error) {
+                console.error('[Apple Pay] Order creation failed', error);
+                session.completePayment(ApplePaySession.STATUS_FAILURE);
+                setApplePayPayload({});
+                if (typeof window.oprcHideProcessingOverlay === 'function') {
+                    window.oprcHideProcessingOverlay();
+                }
+            });
+        };
+
+        // Step 6: Handle cancellation
+        session.oncancel = function (event) {
+            console.log('[Apple Pay] oncancel called, event:', event);
+            if (sessionAbortReason) {
+                console.error('[Apple Pay] Session aborted before completion:', sessionAbortReason);
+            } else {
+                console.log('[Apple Pay] Session cancelled - this may be due to user cancellation OR merchant validation timeout');
+                console.log('[Apple Pay] To diagnose: Check if onvalidatemerchant completed successfully above');
+            }
+            setApplePayPayload({});
+            if (typeof window.oprcHideProcessingOverlay === 'function') {
+                window.oprcHideProcessingOverlay();
+            }
+        };
+
+        // Step 7: Start the Apple Pay session synchronously
+        // This must be called synchronously in the click handler
+        console.log('[Apple Pay] Calling session.begin()...');
+        session.begin();
+        console.log('[Apple Pay] session.begin() called - waiting for onvalidatemerchant callback');
+    }
+
+    /**
+     * Create a native Apple Pay button element.
+     * Note: Sizing via CSS custom properties (--apple-pay-button-width, etc.) is handled in paypalac.css
+     * to ensure proper rendering on iOS Safari. Do not set these as inline styles.
+     */
+    function createApplePayButton() {
+        var button = document.createElement('apple-pay-button');
+        button.setAttribute('buttonstyle', 'black');
+        button.setAttribute('type', 'pay');
+        button.setAttribute('locale', 'en-US');
+        button.addEventListener('click', onApplePayButtonClicked);
+        return button;
+    }
+
+    /**
+     * Append the Apple Pay button after SDK and merchant eligibility checks pass.
+     */
+    function appendApplePayButton(container) {
+        var button = createApplePayButton();
+        container.appendChild(button);
+        return button;
+    }
+
+    /**
+     * Render the native Apple Pay button.
+     */
+    function renderApplePayButton() {
+        var container = document.getElementById('paypalac-applepay-button');
+        if (!container) {
+            return;
+        }
+
+        showPaymentMethodContainer();
+
+        container.innerHTML = '';
+
+        // Load Apple's SDK first so non-Safari browsers get the ApplePaySession
+        // polyfill required for the iOS 18+ QR scan flow on desktop.
+        loadApplePayJsSdk().then(function () {
+            if (typeof window.ApplePaySession === 'undefined' || !ApplePaySession.canMakePayments()) {
+                console.log('Apple Pay is not available on this device/browser');
+                hidePaymentMethodContainer();
+                return null;
+            }
+
+            return fetchWalletConfig();
+        }).then(function (config) {
+            if (!config) {
+                return null;
+            }
+            if (config.success === false) {
+                console.warn('Unable to load Apple Pay configuration', config);
+                hidePaymentMethodContainer();
+                return null;
+            }
+
+            sdkState.config = config;
+
+            // Load PayPal SDK with applepay component
+            return loadPayPalSdk(config).then(function (paypal) {
+                // Verify PayPal Applepay API is available
+                if (typeof paypal.Applepay !== 'function') {
+                    console.warn('PayPal Applepay API not available');
+                    hidePaymentMethodContainer();
+                    return null;
+                }
+
+                // Initialize PayPal Apple Pay
+                var applepay = paypal.Applepay();
+                sdkState.applepay = applepay;
+
+                // Check eligibility using PayPal's isEligible method
+                if (typeof applepay.isEligible === 'function' && !applepay.isEligible()) {
+                    console.log('Apple Pay is not eligible for this user/device');
+                    hidePaymentMethodContainer();
+                    return null;
+                }
+
+                // Get Apple Pay configuration to verify merchant capabilities
+                var applePayConfig = applepay.config();
+
+                // Verify the merchant can make payments with Apple Pay
+                if (typeof ApplePaySession.canMakePaymentsWithActiveCard === 'function') {
+                    var merchantIdentifier = applePayConfig.merchantId || '';
+                    if (merchantIdentifier) {
+                        return ApplePaySession.canMakePaymentsWithActiveCard(merchantIdentifier)
+                            .then(function (canMakePayments) {
+                                if (!canMakePayments) {
+                                    console.log('Apple Pay: User cannot make payments with active card');
+                                    // Still show button - user might add a card or scan QR on another device
+                                }
+                                return appendApplePayButton(container);
+                            });
+                    }
+                }
+
+                return appendApplePayButton(container);
+            });
+        }).catch(function (error) {
+            console.error('Failed to render Apple Pay button', error);
+            hidePaymentMethodContainer();
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Order Total Observer
+    // -------------------------------------------------------------------------
+
+    /**
+     * Observe the order total element for changes and re-render the Apple Pay button.
+     * The element ID can be configured via data-total-selector attribute on the button container.
+     * Default: 'ottotal' (standard Zen Cart order total element)
+     * 
+     * To customize, add data-total-selector="custom-total-id" to the button container element.
+     */
+    function observeOrderTotal() {
+        // Get the element selector from configuration or use default
+        var container = document.getElementById('paypalac-applepay-button');
+        var totalSelector = container && container.dataset.totalSelector 
+            ? container.dataset.totalSelector 
+            : 'ottotal';
+        
+        var totalElement = document.getElementById(totalSelector);
+
+        // Prefer a stable ancestor that is not destroyed when order totals
+        // are refreshed.  OPRC replaces the *inner* content of the wrapper
+        // (e.g. #shopBagWrapper), which removes the original element and
+        // any MutationObserver attached to it.  Observing the wrapper
+        // instead ensures the observer survives content replacement.
+        var observeTarget = null;
+        if (totalElement) {
+            var stableAncestor = totalElement.closest('#shopBagWrapper');
+            observeTarget = stableAncestor || totalElement;
+        } else {
+            observeTarget = document.getElementById('shopBagWrapper');
+        }
+
+        if (!observeTarget || typeof MutationObserver === 'undefined') {
+            if (!totalElement) {
+                console.warn('Apple Pay: Order total element not found: #' + totalSelector);
+            }
+            return;
+        }
+
+        // Disconnect any previous observer so that re-executions of this
+        // script (e.g. when OPRC refreshes the payment container) do not
+        // accumulate duplicate observers.
+        if (window._paypalacApplePayOrderTotalObserver) {
+            window._paypalacApplePayOrderTotalObserver.disconnect();
+        }
+
+        var rerenderTimeout = null;
+
+        var observer = new MutationObserver(function (mutations) {
+            var hasRelevantChange = mutations.some(function (mutation) {
+                return mutation.type === 'characterData' || mutation.type === 'childList';
+            });
+
+            if (!hasRelevantChange) {
+                return;
+            }
+
+            clearTimeout(rerenderTimeout);
+            rerenderTimeout = setTimeout(rerenderApplePayButton, 50);
+        });
+
+        observer.observe(observeTarget, { childList: true, subtree: true, characterData: true });
+        window._paypalacApplePayOrderTotalObserver = observer;
+    }
+
+    // -------------------------------------------------------------------------
+    // Initialization
+    // -------------------------------------------------------------------------
+
+    window.paypalacApplePaySetPayload = setApplePayPayload;
+    window.paypalacApplePaySelectRadio = selectApplePayRadio;
+
+    document.addEventListener('paypalac:applepay:payload', function (event) {
+        setApplePayPayload(event.detail || {});
+    });
+
+    // Hide the radio button on page load
+    ensureWalletSelectionHidden();
+
+    // If a user still clicks the hidden radio, select the payment method
+    // but do NOT launch the modal - only the button click or form submit should do that
+    var moduleRadio = document.getElementById('pmt-paypalac_applepay');
+    if (moduleRadio) {
+        if (!moduleRadio.dataset.applePayBound) {
+            moduleRadio.addEventListener('click', function () {
+                selectApplePayRadio();
+            });
+            moduleRadio.dataset.applePayBound = 'true';
+        }
+    }
+
+    // Intercept checkout submission when Apple Pay radio is selected
+    var checkoutForm = document.querySelector('form[name="checkout_payment"]');
+    if (checkoutForm) {
+        checkoutForm.addEventListener('submit', function (event) {
+            if (checkoutSubmitting) {
+                return;
+            }
+
+            var radio = document.getElementById('pmt-paypalac_applepay');
+            var statusField = document.getElementById('paypalac-applepay-status');
+            var payloadApproved = statusField && statusField.value === 'approved';
+
+            if (radio && radio.checked && !payloadApproved) {
+                selectApplePayRadio();
+                if (triggerApplePayButtonClick()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            }
+        });
+    }
+
+    // Add click handler to the button container to select the radio
+    var container = document.getElementById('paypalac-applepay-button');
+    if (container) {
+        container.addEventListener('click', function () {
+            selectApplePayRadio();
+        });
+
+        if (container.innerHTML.trim() === '') {
+            var ph = document.createElement('span');
+            ph.className = 'paypalac-applepay-placeholder';
+            ph.textContent = typeof paypalacApplePayText !== 'undefined' ? paypalacApplePayText : 'Apple Pay';
+            container.appendChild(ph);
+        }
+    }
+
+    if (typeof window !== 'undefined') {
+        window.paypalacApplePayRender = renderApplePayButton;
+    }
+
+    // Listen for the OPRC checkout-reload event so the button re-renders
+    // after all container updates (order totals, shipping, etc.) are
+    // complete.  The event name is assembled at runtime to prevent
+    // oprcProcessScriptsAndDispatch from deduplicating this script
+    // (the dedup regex matches the literal event name in script content).
+    //
+    // The listener is removed and re-added on every IIFE execution so
+    // that OPRC's managed-listener system (oprcCaptureEventListeners /
+    // oprcResetManagedEventListeners) can track and clean up the
+    // reference correctly.  A one-time guard would leave a stale
+    // listener after OPRC removes the captured reference, preventing
+    // the button from re-rendering on subsequent payment refreshes.
+    var reloadEventName = ['onePage', 'Checkout', 'Reloaded'].join('');
+
+    if (typeof window._paypalacApplePayReloadListener === 'function') {
+        document.removeEventListener(reloadEventName, window._paypalacApplePayReloadListener);
+    }
+
+    window._paypalacApplePayReloadListener = function () {
+        if (typeof window.paypalacApplePayRender === 'function') {
+            window.paypalacApplePayRender();
+        }
+    };
+
+    document.addEventListener(reloadEventName, window._paypalacApplePayReloadListener);
+
+    renderApplePayButton();
+
+    observeOrderTotal();
+})();
