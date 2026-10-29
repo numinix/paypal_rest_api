@@ -330,6 +330,17 @@
         });
         params.set('payment', 'paypalac_paylater');
         params.set('ppac_type', 'paylater');
+
+        // OPRC posts to the processing page via the form action, not a main_page
+        // field. ppac_listener posts back to main_page after PayPal approval, so
+        // without it the shopper lands on the checkout display page, not the order.
+        if (!params.get('main_page')) {
+            var actionMatch = (form.getAttribute('action') || '').match(/[?&]main_page=([^&#]+)/);
+            if (actionMatch) {
+                params.set('main_page', decodeURIComponent(actionMatch[1]));
+            }
+        }
+
         return params.toString();
     }
 
