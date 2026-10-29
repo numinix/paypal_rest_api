@@ -1182,7 +1182,12 @@ class paypalac_paylater extends base
     public function after_process()
     {
         $this->paypalCommon->processAfterOrder($this->orderInfo);
-        $this->paypalCommon->updateOrderHistory($this->orderInfo, 'paylater');
+
+        // PayPal reports Pay Later captures under payment_source.paypal; label the
+        // order history as paylater, like the other wallets show their own name.
+        $historyOrderInfo = $this->orderInfo;
+        $historyOrderInfo['payment_info']['payment_type'] = 'paylater';
+        $this->paypalCommon->updateOrderHistory($historyOrderInfo, 'paylater');
         $this->paypalCommon->releaseAdvancedCheckoutMysqlOrderLock();
         $this->paypalCommon->resetOrder();
     }

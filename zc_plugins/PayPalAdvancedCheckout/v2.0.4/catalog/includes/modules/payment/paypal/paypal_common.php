@@ -1308,8 +1308,12 @@ class PayPalCommon {
         $payment_source_type = $payment_info['payment_type'] ?? $payment_type;
         $message .= MODULE_PAYMENT_PAYPALAC_FUNDING_SOURCE . $payment_source_type . "\n";
 
-        if (!empty($orderInfo['payment_source'][$payment_source_type]['email_address'])) {
-            $message .= MODULE_PAYMENT_PAYPALAC_BUYER_EMAIL . $orderInfo['payment_source'][$payment_source_type]['email_address'] . "\n";
+        // The label can differ from PayPal's payment_source key (Pay Later is reported as paypal).
+        $buyer_email = $orderInfo['payment_source'][$payment_source_type]['email_address']
+            ?? $orderInfo['payment_source'][array_key_first($orderInfo['payment_source'] ?? []) ?? '']['email_address']
+            ?? '';
+        if ($buyer_email !== '') {
+            $message .= MODULE_PAYMENT_PAYPALAC_BUYER_EMAIL . $buyer_email . "\n";
         }
 
         zen_update_orders_history($orderInfo['orders_id'], $message, null, -1, 0);
