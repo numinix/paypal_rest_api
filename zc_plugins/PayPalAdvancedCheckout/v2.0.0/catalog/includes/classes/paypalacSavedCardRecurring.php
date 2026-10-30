@@ -1124,6 +1124,8 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                if ($payment_name === '') {
                        $payment_name = 'Admin vault rebill';
                }
+               // so_payments.payment_name is varchar(40); truncate to avoid strict-mode insert failures after capture.
+               $payment_name = substr($payment_name, 0, 40);
 
                zen_db_perform($payments_table, array(
                        'orders_id' => $orders_id,
