@@ -828,7 +828,7 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
 
                if ($existing_orders_id > 0) {
                        $order_check = $db->Execute(
-                           "SELECT orders_id, customers_id FROM " . TABLE_ORDERS . "
+                           "SELECT orders_id, customers_id, currency FROM " . TABLE_ORDERS . "
                              WHERE orders_id = " . $existing_orders_id . " LIMIT 1"
                        );
                        if ($order_check->EOF) {
@@ -836,6 +836,14 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                        }
                        if ($customers_id > 0 && (int)$order_check->fields['customers_id'] !== $customers_id) {
                                return array('success' => false, 'error' => 'Order #' . $existing_orders_id . ' belongs to a different customer');
+                       }
+                       $order_currency = strtoupper(trim((string)$order_check->fields['currency']));
+                       $charge_currency = strtoupper(trim((string)$currency));
+                       if ($order_currency !== '' && $charge_currency !== '' && $order_currency !== $charge_currency) {
+                               return array(
+                                       'success' => false,
+                                       'error' => 'Currency ' . $charge_currency . ' does not match order #' . $existing_orders_id . ' currency ' . $order_currency . '; Balance Due was not updated',
+                               );
                        }
                        $customers_id = (int)$order_check->fields['customers_id'];
                        $orders_id = $existing_orders_id;
