@@ -1040,6 +1040,39 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
         * @param array $payment_details
         * @return bool
         */
+       /**
+        * Read the first capture status from a process_rest_payment() result, if present.
+        *
+        * @param array $payment_result
+        * @return string Uppercase status (e.g. COMPLETED) or empty when unknown
+        */
+       function extract_rest_capture_status($payment_result = array())
+       {
+               $finalize = $payment_result['finalize_response'] ?? array();
+               if (!is_array($finalize) || empty($finalize['purchase_units']) || !is_array($finalize['purchase_units'])) {
+                       return '';
+               }
+               foreach ($finalize['purchase_units'] as $unit) {
+                       if (!is_array($unit)) {
+                               continue;
+                       }
+                       $captures = $unit['payments']['captures'] ?? array();
+                       if (!is_array($captures)) {
+                               continue;
+                       }
+                       foreach ($captures as $capture) {
+                               if (!is_array($capture)) {
+                                       continue;
+                               }
+                               $status = strtoupper(trim((string)($capture['status'] ?? '')));
+                               if ($status !== '') {
+                                       return $status;
+                               }
+                       }
+               }
+               return '';
+       }
+
        function record_super_orders_payment($orders_id, $amount, $transaction_id, $payment_details = array(), $payment_result = array(), $currency = '')
        {
                global $db;
@@ -1054,6 +1087,13 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                // Authorization-only rebills are not paid yet — do not reduce Balance Due.
                $payment_status = strtolower(trim((string)($payment_result['payment_status'] ?? 'Completed')));
                if ($payment_status !== '' && $payment_status !== 'completed') {
+                       return false;
+               }
+
+               // process_rest_payment() may label CAPTURE intent as Completed even when the
+               // nested capture is still PENDING (e.g. awaiting review). Only post when COMPLETED.
+               $capture_status = $this->extract_rest_capture_status($payment_result);
+               if ($capture_status !== '' && $capture_status !== 'COMPLETED') {
                        return false;
                }
 
