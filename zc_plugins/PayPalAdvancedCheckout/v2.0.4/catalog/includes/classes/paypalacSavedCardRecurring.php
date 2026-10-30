@@ -1020,6 +1020,7 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                $payment_details['saved_credit_card_recurring_id'] = 0;
                $payment_details['paypal_txn_source'] = 'admin_rebill';
                $this->record_paypal_transaction($orders_id, $payment_result, $payment_details);
+               $this->record_super_orders_payment($orders_id, $amount, $transaction_id, $payment_details);
 
                return array(
                        'success' => true,
@@ -1027,6 +1028,168 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                        'transaction_id' => $transaction_id,
                        'paypal_order_id' => $paypal_order_id,
                );
+       }
+
+       /**
+        * Post an admin vault rebill into Super Orders payments so Balance Due updates.
+        * No-ops when Super Orders tables are not present.
+        *
+        * @param int $orders_id
+        * @param string|float $amount
+        * @param string $transaction_id
+        * @param array $payment_details
+        * @return bool
+        */
+       function record_super_orders_payment($orders_id, $amount, $transaction_id, $payment_details = array())
+       {
+               global $db;
+
+               $orders_id = (int)$orders_id;
+               $amount = number_format((float)$amount, 2, '.', '');
+               $transaction_id = trim((string)$transaction_id);
+               if ($orders_id <= 0 || (float)$amount == 0.0) {
+                       return false;
+               }
+
+               $payments_table = defined('TABLE_SO_PAYMENTS') ? TABLE_SO_PAYMENTS : (defined('DB_PREFIX') ? DB_PREFIX . 'so_payments' : 'so_payments');
+               $types_table = defined('TABLE_SO_PAYMENT_TYPES') ? TABLE_SO_PAYMENT_TYPES : (defined('DB_PREFIX') ? DB_PREFIX . 'so_payment_types' : 'so_payment_types');
+               $refunds_table = defined('TABLE_SO_REFUNDS') ? TABLE_SO_REFUNDS : (defined('DB_PREFIX') ? DB_PREFIX . 'so_refunds' : 'so_refunds');
+
+               $table_check = @$db->Execute("SHOW TABLES LIKE '" . zen_db_input($payments_table) . "'");
+               if (!$table_check || $table_check->EOF) {
+                       return false;
+               }
+
+               $payment_number = $transaction_id !== '' ? $transaction_id : ('rebill-' . $orders_id . '-' . time());
+               $dup = $db->Execute(
+                   "SELECT payment_id FROM " . $payments_table . "
+                     WHERE orders_id = " . $orders_id . "
+                       AND payment_number = '" . zen_db_input($payment_number) . "'
+                     LIMIT 1"
+               );
+               if (!$dup->EOF) {
+                       $this->refresh_super_orders_balance_due($orders_id, $payments_table, $refunds_table);
+                       return true;
+               }
+
+               $payment_type = 'PP';
+               $types_check = @$db->Execute("SHOW TABLES LIKE '" . zen_db_input($types_table) . "'");
+               if ($types_check && !$types_check->EOF) {
+                       $lang_id = isset($_SESSION['languages_id']) ? (int)$_SESSION['languages_id'] : 1;
+                       $type_row = $db->Execute(
+                           "SELECT payment_type_code FROM " . $types_table . "
+                             WHERE language_id = " . $lang_id . "
+                               AND (
+                                    payment_type_code IN ('PP', 'PAYP')
+                                 OR payment_type_full LIKE '%PayPal%'
+                                 OR payment_type_full LIKE '%Paypal%'
+                               )
+                          ORDER BY CASE
+                                     WHEN payment_type_code = 'PP' THEN 0
+                                     WHEN payment_type_code = 'PAYP' THEN 1
+                                     ELSE 2
+                                   END, payment_type_id
+                             LIMIT 1"
+                       );
+                       if (!$type_row->EOF && trim((string)$type_row->fields['payment_type_code']) !== '') {
+                               $payment_type = trim((string)$type_row->fields['payment_type_code']);
+                       }
+               }
+
+               $firstname = trim((string)($payment_details['customers_firstname'] ?? ''));
+               $lastname = trim((string)($payment_details['customers_lastname'] ?? ''));
+               $payment_name = trim($firstname . ' ' . $lastname);
+               if ($payment_name === '') {
+                       $payment_name = 'Admin vault rebill';
+               }
+
+               zen_db_perform($payments_table, array(
+                       'orders_id' => $orders_id,
+                       'payment_number' => $payment_number,
+                       'payment_name' => $payment_name,
+                       'payment_amount' => $amount,
+                       'payment_type' => $payment_type,
+                       'purchase_order_id' => 0,
+                       'date_posted' => 'now()',
+                       'last_modified' => 'now()',
+               ));
+
+               $this->refresh_super_orders_balance_due($orders_id, $payments_table, $refunds_table);
+               return true;
+       }
+
+       /**
+        * Recalculate Super Orders balance_due from payments/refunds.
+        *
+        * @param int $orders_id
+        * @param string $payments_table
+        * @param string $refunds_table
+        * @return void
+        */
+       function refresh_super_orders_balance_due($orders_id, $payments_table, $refunds_table)
+       {
+               global $db;
+
+               $orders_id = (int)$orders_id;
+               if ($orders_id <= 0) {
+                       return;
+               }
+
+               // Prefer the Super Orders class when available (admin rebill context).
+               if (!class_exists('super_order')) {
+                       $candidates = array();
+                       if (defined('DIR_FS_ADMIN') && DIR_FS_ADMIN !== '') {
+                               $candidates[] = DIR_FS_ADMIN . 'includes/classes/super_order.php';
+                       }
+                       if (defined('DIR_WS_ADMIN') && defined('DIR_FS_CATALOG')) {
+                               $candidates[] = DIR_FS_CATALOG . DIR_WS_ADMIN . 'includes/classes/super_order.php';
+                       }
+                       if (defined('DIR_FS_CATALOG')) {
+                               $candidates[] = DIR_FS_CATALOG . 'includes/classes/super_order.php';
+                       }
+                       foreach ($candidates as $path) {
+                               if (is_file($path)) {
+                                       require_once $path;
+                                       break;
+                               }
+                       }
+               }
+               if (class_exists('super_order')) {
+                       new super_order($orders_id);
+                       return;
+               }
+
+               $order = $db->Execute(
+                   "SELECT order_total FROM " . TABLE_ORDERS . " WHERE orders_id = " . $orders_id . " LIMIT 1"
+               );
+               if ($order->EOF) {
+                       return;
+               }
+
+               $amount_applied = 0.0;
+               $pay = $db->Execute(
+                   "SELECT COALESCE(SUM(payment_amount), 0) AS total_paid
+                      FROM " . $payments_table . "
+                     WHERE orders_id = " . $orders_id
+               );
+               if (!$pay->EOF) {
+                       $amount_applied += (float)$pay->fields['total_paid'];
+               }
+
+               $refunds_check = @$db->Execute("SHOW TABLES LIKE '" . zen_db_input($refunds_table) . "'");
+               if ($refunds_check && !$refunds_check->EOF) {
+                       $ref = $db->Execute(
+                           "SELECT COALESCE(SUM(refund_amount), 0) AS total_refunded
+                              FROM " . $refunds_table . "
+                             WHERE orders_id = " . $orders_id
+                       );
+                       if (!$ref->EOF) {
+                               $amount_applied -= (float)$ref->fields['total_refunded'];
+                       }
+               }
+
+               $balance_due = number_format((float)$order->fields['order_total'] - $amount_applied, 2, '.', '');
+               zen_db_perform(TABLE_ORDERS, array('balance_due' => $balance_due), 'update', 'orders_id = ' . $orders_id);
        }
 
        function process_rest_payment($payment_details, $total_to_bill, $options = array()) {
