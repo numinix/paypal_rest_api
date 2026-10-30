@@ -42,5 +42,6 @@ define('ERROR_REBILL_CARD_NOT_ELIGIBLE', 'That card is not available for rebill.
 define('ERROR_REBILL_CLASS_MISSING', 'paypalacSavedCardRecurring is not available.');
 define('ERROR_REBILL_CHARGE_FAILED', 'Rebill charge failed: %s');
 define('ERROR_REBILL_ORDER_FAILED', 'Charge succeeded (txn %s) but order recording failed: %s');
+define('ERROR_REBILL_CURRENCY_MISMATCH', 'Charge currency %s does not match order #%d currency %s. Choose a matching currency before charging so Balance Due can update.');
 define('SUCCESS_REBILL_WITH_ORDER', 'Rebill successful. Transaction %s recorded on order #%d.');
 define('SUCCESS_REBILL_CHARGE_ONLY', 'Rebill charge successful (txn %s). No Zen Cart order was created.');

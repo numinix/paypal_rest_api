@@ -193,6 +193,26 @@ if ($action === 'charge' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         zen_redirect(zen_href_link(FILENAME_PAYPALAC_REBILL, 'customers_id=' . $customers_id));
     }
 
+    // Prevent charging against an order when currencies differ (Super Orders has no FX conversion).
+    if ($existing_orders_id > 0) {
+        $orderCurrencyCheck = $db->Execute(
+            "SELECT currency FROM " . TABLE_ORDERS . " WHERE orders_id = " . $existing_orders_id . " LIMIT 1"
+        );
+        if ($orderCurrencyCheck->EOF) {
+            $messageStack->add_session(sprintf(ERROR_REBILL_ORDER_FAILED, '', 'Order #' . $existing_orders_id . ' not found'), 'error');
+            zen_redirect(zen_href_link(FILENAME_PAYPALAC_REBILL, 'customers_id=' . $customers_id));
+        }
+        $orderCurrency = strtoupper(trim((string)$orderCurrencyCheck->fields['currency']));
+        $chargeCurrency = strtoupper(trim((string)$currency));
+        if ($orderCurrency !== '' && $chargeCurrency !== '' && $orderCurrency !== $chargeCurrency) {
+            $messageStack->add_session(
+                sprintf(ERROR_REBILL_CURRENCY_MISMATCH, $chargeCurrency, $existing_orders_id, $orderCurrency),
+                'error'
+            );
+            zen_redirect(zen_href_link(FILENAME_PAYPALAC_REBILL, 'customers_id=' . $customers_id));
+        }
+    }
+
     $rebiller = new paypalacSavedCardRecurring();
     $charge = ['success' => false, 'error' => 'Choose a card to charge'];
     if (preg_match('/^scc:(\d+)$/', $rebill_target, $targetMatch) === 1) {
