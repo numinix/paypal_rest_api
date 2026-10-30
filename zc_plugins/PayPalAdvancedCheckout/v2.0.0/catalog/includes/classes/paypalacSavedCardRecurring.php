@@ -1020,7 +1020,7 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                $payment_details['saved_credit_card_recurring_id'] = 0;
                $payment_details['paypal_txn_source'] = 'admin_rebill';
                $this->record_paypal_transaction($orders_id, $payment_result, $payment_details);
-               $this->record_super_orders_payment($orders_id, $amount, $transaction_id, $payment_details);
+               $this->record_super_orders_payment($orders_id, $amount, $transaction_id, $payment_details, $payment_result, $currency);
 
                return array(
                        'success' => true,
@@ -1040,7 +1040,7 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
         * @param array $payment_details
         * @return bool
         */
-       function record_super_orders_payment($orders_id, $amount, $transaction_id, $payment_details = array())
+       function record_super_orders_payment($orders_id, $amount, $transaction_id, $payment_details = array(), $payment_result = array(), $currency = '')
        {
                global $db;
 
@@ -1051,12 +1051,34 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                        return false;
                }
 
+               // Authorization-only rebills are not paid yet — do not reduce Balance Due.
+               $payment_status = strtolower(trim((string)($payment_result['payment_status'] ?? 'Completed')));
+               if ($payment_status !== '' && $payment_status !== 'completed') {
+                       return false;
+               }
+
                $payments_table = defined('TABLE_SO_PAYMENTS') ? TABLE_SO_PAYMENTS : (defined('DB_PREFIX') ? DB_PREFIX . 'so_payments' : 'so_payments');
                $types_table = defined('TABLE_SO_PAYMENT_TYPES') ? TABLE_SO_PAYMENT_TYPES : (defined('DB_PREFIX') ? DB_PREFIX . 'so_payment_types' : 'so_payment_types');
                $refunds_table = defined('TABLE_SO_REFUNDS') ? TABLE_SO_REFUNDS : (defined('DB_PREFIX') ? DB_PREFIX . 'so_refunds' : 'so_refunds');
 
                $table_check = @$db->Execute("SHOW TABLES LIKE '" . zen_db_input($payments_table) . "'");
                if (!$table_check || $table_check->EOF) {
+                       return false;
+               }
+
+               // Super Orders amounts are not FX-converted; only apply when currencies match.
+               $currency = strtoupper(trim((string)$currency));
+               if ($currency === '') {
+                       $currency = strtoupper(trim((string)($payment_result['currency'] ?? (defined('DEFAULT_CURRENCY') ? DEFAULT_CURRENCY : 'USD'))));
+               }
+               $order_currency = $db->Execute(
+                   "SELECT currency FROM " . TABLE_ORDERS . " WHERE orders_id = " . $orders_id . " LIMIT 1"
+               );
+               if ($order_currency->EOF) {
+                       return false;
+               }
+               $order_currency_code = strtoupper(trim((string)$order_currency->fields['currency']));
+               if ($order_currency_code !== '' && $currency !== '' && $order_currency_code !== $currency) {
                        return false;
                }
 
