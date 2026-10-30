@@ -1031,16 +1031,6 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
        }
 
        /**
-        * Post an admin vault rebill into Super Orders payments so Balance Due updates.
-        * No-ops when Super Orders tables are not present.
-        *
-        * @param int $orders_id
-        * @param string|float $amount
-        * @param string $transaction_id
-        * @param array $payment_details
-        * @return bool
-        */
-       /**
         * Read the first capture status from a process_rest_payment() result, if present.
         *
         * @param array $payment_result
@@ -1073,6 +1063,18 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                return '';
        }
 
+       /**
+        * Post an admin vault rebill into Super Orders payments so Balance Due updates.
+        * No-ops when Super Orders tables are not present.
+        *
+        * @param int $orders_id
+        * @param string|float $amount
+        * @param string $transaction_id
+        * @param array $payment_details
+        * @param array $payment_result
+        * @param string $currency
+        * @return bool
+        */
        function record_super_orders_payment($orders_id, $amount, $transaction_id, $payment_details = array(), $payment_result = array(), $currency = '')
        {
                global $db;
