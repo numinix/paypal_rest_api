@@ -1091,9 +1091,9 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                }
 
                // process_rest_payment() may label CAPTURE intent as Completed even when the
-               // nested capture is still PENDING (e.g. awaiting review). Only post when COMPLETED.
+               // nested capture is missing or still PENDING. Require an explicit COMPLETED capture.
                $capture_status = $this->extract_rest_capture_status($payment_result);
-               if ($capture_status !== '' && $capture_status !== 'COMPLETED') {
+               if ($capture_status !== 'COMPLETED') {
                        return false;
                }
 
@@ -1164,8 +1164,12 @@ $vaultId = $this->extract_vault_id_from_card($payment_details);
                if ($payment_name === '') {
                        $payment_name = 'Admin vault rebill';
                }
-               // so_payments.payment_name is varchar(40); truncate to avoid strict-mode insert failures after capture.
-               $payment_name = substr($payment_name, 0, 40);
+               // so_payments.payment_name is varchar(40); truncate on character boundaries for UTF-8 names.
+               if (function_exists('mb_substr')) {
+                       $payment_name = mb_substr($payment_name, 0, 40, 'UTF-8');
+               } else {
+                       $payment_name = substr($payment_name, 0, 40);
+               }
 
                zen_db_perform($payments_table, array(
                        'orders_id' => $orders_id,
