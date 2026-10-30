@@ -15,6 +15,7 @@ define('TEXT_AMOUNT', 'Amount');
 define('TEXT_CURRENCY', 'Currency');
 define('TEXT_COMMENTS', 'Admin comments (order history)');
 define('TEXT_CREATE_ORDER', 'Create a new Zen Cart order for this charge');
+define('TEXT_NO_CUSTOMER_EMAIL', 'The customer is not emailed for admin rebills (even when an order is created or updated).');
 define('TEXT_EXISTING_ORDER', 'Or attach to existing order ID (optional)');
 define('TEXT_EXISTING_ORDER_PLACEHOLDER', 'e.g. 1005527');
 define('TEXT_CONFIRM_REBILL', 'Charge this vaulted card now?');
