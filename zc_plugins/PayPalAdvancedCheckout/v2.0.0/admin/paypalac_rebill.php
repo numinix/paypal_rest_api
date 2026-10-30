@@ -443,9 +443,10 @@ if (!paypalac_rebill_vault_enabled() && isset($messageStack) && is_object($messa
                             </div>
                             <div class="nmx-form-group">
                                 <label>
-                                    <input type="checkbox" name="create_order" value="1" checked>
+                                    <input type="checkbox" name="create_order" value="1">
                                     <?php echo TEXT_CREATE_ORDER; ?>
                                 </label>
+                                <p><small><?php echo TEXT_NO_CUSTOMER_EMAIL; ?></small></p>
                             </div>
                             <div class="nmx-form-group">
                                 <label for="orders_id"><?php echo TEXT_EXISTING_ORDER; ?></label>
